@@ -1,22 +1,33 @@
+use std::time::Instant;
+
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use std::time::Instant;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
 use sdl2::render::{CanvasBuilder, WindowCanvas};
 use sdl2::Sdl;
-use sdl2::pixels::Color;
+
+use world::{World, WorldViewer};
 
 const TICKS_PER_SECOND: usize = 20;
 const SKIP_TICKS: usize = 1000 / TICKS_PER_SECOND;
 const MAX_FRAMESKIP: u32 = 5;
 
-pub struct Engine {
+pub struct Engine<'a> {
     sdl: Sdl,
     canvas: WindowCanvas,
+    world_viewer: WorldViewer<'a>,
 }
 
-impl Engine {
+#[derive(Debug)]
+enum KeyEvent {
+    Down(Keycode),
+    Up(Keycode),
+}
+
+impl<'a> Engine<'a> {
     /// Panics if SDL fails
-    pub fn new() -> Self {
+    pub fn new(world: &'a mut World) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");
 
         let video = sdl.video().expect("Failed to init SDL video");
@@ -36,6 +47,7 @@ impl Engine {
         Self {
             sdl,
             canvas,
+            world_viewer: WorldViewer::from_world(world),
         }
     }
 
@@ -55,9 +67,10 @@ impl Engine {
                     | Event::KeyDown {
                         keycode: Some(Keycode::Escape),
                         ..
-                    } => {
-                        break 'running;
-                    }
+                    } => break 'running,
+
+                    Event::KeyDown { keycode: Some(key), .. } => self.handle_key(KeyEvent::Down(key)),
+                    Event::KeyUp { keycode: Some(key), .. } => self.handle_key(KeyEvent::Up(key)),
                     _ => {}
                 }
             }
@@ -89,8 +102,27 @@ impl Engine {
         self.canvas.clear();
 
         println!("render ({})", interpolation);
+        for mesh in self.world_viewer.visible_meshes() {
+            let rect = Rect::new(mesh.x, mesh.y, mesh.width, mesh.height);
+
+            // fill
+            self.canvas.set_draw_color(Color::from(mesh.color));
+            self.canvas.fill_rect(rect).unwrap();
+
+            // outline
+            self.canvas.set_draw_color(Color::RGB(255, 255, 255));
+            self.canvas.draw_rect(rect).unwrap();
+        }
 
         // render
         self.canvas.present();
+    }
+
+    fn handle_key(&mut self, event: KeyEvent) {
+        match event {
+            KeyEvent::Down(Keycode::Up) => self.world_viewer.move_up(),
+            KeyEvent::Down(Keycode::Down) => self.world_viewer.move_down(),
+            _ => {},
+        }
     }
 }
