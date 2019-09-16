@@ -6,7 +6,7 @@ use crate::slice::{Slice, SliceMut};
 pub type SliceIndex = i32;
 pub type Coordinate = u32;
 
-const SIZE: usize = 4;
+const SIZE: usize = 16;
 pub const CHUNK_SIZE: u32 = SIZE as u32;
 
 pub const BLOCK_COUNT_CHUNK: usize = SIZE * SIZE * SIZE;

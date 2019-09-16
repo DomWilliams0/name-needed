@@ -1,14 +1,15 @@
-use std::cmp::{max, min};
-
 use crate::{chunk, slice, World};
 use crate::block::Block;
 use crate::chunk::{BLOCK_COUNT_CHUNK, CHUNK_SIZE};
 
 const BLOCK_RENDER_SIZE: u32 = 16;
+const VIEW_RANGE: i32 = 3;
 
 pub struct WorldViewer<'a> {
     world: &'a mut World,
-    current: chunk::SliceIndex,
+
+    current_lower: chunk::SliceIndex,
+    current_upper: chunk::SliceIndex,
 
     // reused between calls to visible_meshes
     visible_meshes: Vec<SliceMesh>,
@@ -25,9 +26,11 @@ pub struct SliceMesh {
 
 impl<'a> WorldViewer<'a> {
     pub fn from_world(world: &'a mut World) -> Self {
+        let start = 0;
         Self {
             world,
-            current: 0,
+            current_lower: start,
+            current_upper: start + VIEW_RANGE,
             visible_meshes: Vec::with_capacity(BLOCK_COUNT_CHUNK), // max size to avoid more allocation
         }
     }
@@ -36,38 +39,41 @@ impl<'a> WorldViewer<'a> {
     pub fn visible_meshes(&mut self) -> &[SliceMesh] {
         self.visible_meshes.clear();
 
-        let current = self.current;
         for c in self.world.visible_chunks() {
-            // TODO copy slice locally?
-            let slice = c.slice(current);
+            let slice_range = self.current_lower..=self.current_upper;
 
-            // get chunk offset
-            let (cx, cy) = {
-                let (x, y) = c.pos();
-                (x * CHUNK_SIZE * BLOCK_RENDER_SIZE, y * CHUNK_SIZE * BLOCK_RENDER_SIZE)
-            };
+            for slice_index in slice_range {
+                // TODO copy slice locally?
+                let slice = c.slice(slice_index);
 
-            // iterate non-air blocks
-            for (i, b) in slice
-                .iter()
-                .enumerate()
-                .filter(|(_i, b)| **b != Block::Air) {
-                // unflatten slice index to 2d slice coords
-                let (sx, sy) = slice::unflatten_index(i);
-
-                // find rectangle render pos
-                let x = (cx + (sx * BLOCK_RENDER_SIZE)) as i32;
-                let y = (cy + (sy * BLOCK_RENDER_SIZE)) as i32;
-
-                let mesh = SliceMesh {
-                    x,
-                    y,
-                    width: BLOCK_RENDER_SIZE,
-                    height: BLOCK_RENDER_SIZE,
-                    color: color_for_block(*b),
+                // get chunk offset
+                let (cx, cy) = {
+                    let (x, y) = c.pos();
+                    (x * CHUNK_SIZE * BLOCK_RENDER_SIZE, y * CHUNK_SIZE * BLOCK_RENDER_SIZE)
                 };
 
-                self.visible_meshes.push(mesh);
+                // iterate non-air blocks
+                for (i, b) in slice
+                    .iter()
+                    .enumerate()
+                    .filter(|(_i, b)| **b != Block::Air) {
+                    // unflatten slice index to 2d slice coords
+                    let (sx, sy) = slice::unflatten_index(i);
+
+                    // find rectangle render pos
+                    let x = (cx + (sx * BLOCK_RENDER_SIZE)) as i32;
+                    let y = (cy + (sy * BLOCK_RENDER_SIZE)) as i32;
+
+                    let mesh = SliceMesh {
+                        x,
+                        y,
+                        width: BLOCK_RENDER_SIZE,
+                        height: BLOCK_RENDER_SIZE,
+                        color: color_for_block(*b),
+                    };
+
+                    self.visible_meshes.push(mesh);
+                }
             }
         }
 
@@ -77,18 +83,20 @@ impl<'a> WorldViewer<'a> {
 
 
     pub fn move_up(&mut self) {
-        // TODO check if slice exists and allow unlimited movement up
-        self.current += 1;
-
+        // TODO check if slice exists and allow unlimited movement
         // TODO cap to prevent panics for now
-        self.current = min(CHUNK_SIZE as i32 - 1, self.current);
+        if self.current_upper < (CHUNK_SIZE - 1) as i32 {
+            self.current_lower += 1;
+            self.current_upper += 1;
+        }
     }
     pub fn move_down(&mut self) {
-        // TODO check if slice exists and allow unlimited movement down
-        self.current -= 1;
-
-        // TODO cap to 0 to prevent panics for now
-        self.current = max(0, self.current);
+        // TODO check if slice exists and allow unlimited movement
+        // TODO cap to prevent panics for now
+        if self.current_lower > 0 {
+            self.current_lower -= 1;
+            self.current_upper -= 1;
+        }
     }
 
 //    pub fn goto(&mut self, new_slice: SliceIndex) { unimplemented!() }
