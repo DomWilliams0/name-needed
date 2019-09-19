@@ -12,7 +12,6 @@ pub const CHUNK_SIZE: u32 = SIZE as u32;
 pub const BLOCK_COUNT_CHUNK: usize = SIZE * SIZE * SIZE;
 pub const BLOCK_COUNT_SLICE: usize = SIZE * SIZE;
 
-
 pub struct Chunk {
     pos: (Coordinate, Coordinate),
     blocks: [Block; BLOCK_COUNT_CHUNK],
@@ -63,11 +62,10 @@ impl Chunk {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::block::Block;
-    use crate::chunk::{BLOCK_COUNT_SLICE, Chunk, SIZE};
+    use crate::chunk::{Chunk, BLOCK_COUNT_SLICE, SIZE};
 
     #[test]
     fn chunk_ops() {

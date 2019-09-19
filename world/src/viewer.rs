@@ -1,6 +1,6 @@
-use crate::{chunk, slice, World};
 use crate::block::Block;
 use crate::chunk::{BLOCK_COUNT_CHUNK, CHUNK_SIZE};
+use crate::{chunk, slice, World};
 
 const BLOCK_RENDER_SIZE: u32 = 16;
 const VIEW_RANGE: i32 = 3;
@@ -49,14 +49,14 @@ impl<'a> WorldViewer<'a> {
                 // get chunk offset
                 let (cx, cy) = {
                     let (x, y) = c.pos();
-                    (x * CHUNK_SIZE * BLOCK_RENDER_SIZE, y * CHUNK_SIZE * BLOCK_RENDER_SIZE)
+                    (
+                        x * CHUNK_SIZE * BLOCK_RENDER_SIZE,
+                        y * CHUNK_SIZE * BLOCK_RENDER_SIZE,
+                    )
                 };
 
                 // iterate non-air blocks
-                for (i, b) in slice
-                    .iter()
-                    .enumerate()
-                    .filter(|(_i, b)| **b != Block::Air) {
+                for (i, b) in slice.iter().enumerate().filter(|(_i, b)| **b != Block::Air) {
                     // unflatten slice index to 2d slice coords
                     let (sx, sy) = slice::unflatten_index(i);
 
@@ -81,7 +81,6 @@ impl<'a> WorldViewer<'a> {
         &self.visible_meshes
     }
 
-
     pub fn move_up(&mut self) {
         // TODO check if slice exists and allow unlimited movement
         // TODO cap to prevent panics for now
@@ -99,7 +98,7 @@ impl<'a> WorldViewer<'a> {
         }
     }
 
-//    pub fn goto(&mut self, new_slice: SliceIndex) { unimplemented!() }
+    //    pub fn goto(&mut self, new_slice: SliceIndex) { unimplemented!() }
 }
 
 fn color_for_block(block: Block) -> (u8, u8, u8) {

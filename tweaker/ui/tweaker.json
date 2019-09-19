@@ -1,0 +1,18 @@
+{
+    "hiyaf": {
+        "value": 10.0,
+        "increment": 1.0
+    },
+    "another": {
+        "value": 450,
+        "increment": 50
+    },
+    "_dummy_int": {
+        "value": 29,
+        "increment": 1
+    },
+    "_dummy_float": {
+        "value": -0.25,
+        "increment": 1.0
+    }
+}
