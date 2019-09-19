@@ -1,5 +1,1 @@
-
-trait Generator {
-
-
-}
+trait Generator {}

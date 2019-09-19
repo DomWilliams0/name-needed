@@ -69,8 +69,12 @@ impl<'a> Engine<'a> {
                         ..
                     } => break 'running,
 
-                    Event::KeyDown { keycode: Some(key), .. } => self.handle_key(KeyEvent::Down(key)),
-                    Event::KeyUp { keycode: Some(key), .. } => self.handle_key(KeyEvent::Up(key)),
+                    Event::KeyDown {
+                        keycode: Some(key), ..
+                    } => self.handle_key(KeyEvent::Down(key)),
+                    Event::KeyUp {
+                        keycode: Some(key), ..
+                    } => self.handle_key(KeyEvent::Up(key)),
                     _ => {}
                 }
             }
@@ -85,7 +89,8 @@ impl<'a> Engine<'a> {
             }
 
             let now = start_time.elapsed().as_millis() as usize;
-            let interpolation: f64 = ((now + SKIP_TICKS - next_game_tick) as f64) / (SKIP_TICKS as f64);
+            let interpolation: f64 =
+                ((now + SKIP_TICKS - next_game_tick) as f64) / (SKIP_TICKS as f64);
 
             self.render(interpolation);
         }
@@ -122,7 +127,7 @@ impl<'a> Engine<'a> {
         match event {
             KeyEvent::Down(Keycode::Up) => self.world_viewer.move_up(),
             KeyEvent::Down(Keycode::Down) => self.world_viewer.move_down(),
-            _ => {},
+            _ => {}
         }
     }
 }

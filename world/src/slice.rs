@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 
 use crate::block::Block;
-use crate::chunk::{CHUNK_SIZE, Coordinate};
+use crate::chunk::{Coordinate, CHUNK_SIZE};
 
 pub struct Slice<'a> {
     slice: &'a [Block],

@@ -26,7 +26,7 @@ impl Default for World {
 }
 
 impl World {
-    pub fn visible_chunks(&self) -> impl Iterator<Item=&Chunk> {
+    pub fn visible_chunks(&self) -> impl Iterator<Item = &Chunk> {
         // TODO filter visible
         self.chunks.iter()
     }
