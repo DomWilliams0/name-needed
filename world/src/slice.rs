@@ -16,6 +16,17 @@ impl<'a> Slice<'a> {
     pub fn new(slice: &'a [Block]) -> Self {
         Self { slice }
     }
+
+    pub fn non_air_blocks(&self) -> impl Iterator<Item = ((Coordinate, Coordinate), &Block)> {
+        self.slice
+            .iter()
+            .enumerate()
+            .filter(|(_i, &b)| b != Block::Air)
+            .map(|(i, b)| {
+                let pos = unflatten_index(i);
+                (pos, b)
+            })
+    }
 }
 
 impl<'a> Deref for Slice<'a> {

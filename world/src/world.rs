@@ -14,8 +14,19 @@ impl Default for World {
 
             // odd staircase
             for i in 0u32..chunk::CHUNK_SIZE {
-                c.set_block(0, i, i as i32, Block::Dirt);
+                c.set_block(0, i, i as i32, Block::Hi);
             }
+
+            // fill 0
+            for b in c.slice_mut(0).iter_mut() {
+                *b = Block::Dirt;
+            }
+
+            c.set_block(0, 0, 0, Block::Hi);
+            c.set_block(1, 1, 0, Block::Hi);
+            c.set_block(1, 1, 1, Block::Hi);
+            c.set_block(4, 2, 2, Block::Hi);
+
             c
         };
 

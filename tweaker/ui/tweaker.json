@@ -1,11 +1,7 @@
 {
-    "hiyaf": {
-        "value": 10.0,
-        "increment": 1.0
-    },
-    "another": {
-        "value": 450,
-        "increment": 50
+    "zoom": {
+        "value": 2.0,
+        "increment": 0.05
     },
     "_dummy_int": {
         "value": 29,

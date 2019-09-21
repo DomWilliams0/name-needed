@@ -21,4 +21,3 @@ impl From<Value> for f64 {
         }
     }
 }
-

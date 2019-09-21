@@ -1,10 +1,14 @@
+use std::cell::Cell;
 use std::convert::TryFrom;
+use std::ops::Shl;
 
 use crate::block::Block;
 use crate::slice::{Slice, SliceMut};
 
 pub type SliceIndex = i32;
 pub type Coordinate = u32;
+pub type ChunkPosition = (Coordinate, Coordinate);
+pub type ChunkId = u64;
 
 const SIZE: usize = 16;
 pub const CHUNK_SIZE: u32 = SIZE as u32;
@@ -13,20 +17,37 @@ pub const BLOCK_COUNT_CHUNK: usize = SIZE * SIZE * SIZE;
 pub const BLOCK_COUNT_SLICE: usize = SIZE * SIZE;
 
 pub struct Chunk {
-    pos: (Coordinate, Coordinate),
+    /// unique for each chunk
+    pos: ChunkPosition,
     blocks: [Block; BLOCK_COUNT_CHUNK],
+    dirty: Cell<bool>,
 }
 
 impl Chunk {
-    pub fn empty(pos: (Coordinate, Coordinate)) -> Self {
+    pub fn empty(pos: ChunkPosition) -> Self {
         Self {
             pos,
             blocks: [Block::Air; BLOCK_COUNT_CHUNK],
+            dirty: Cell::new(true),
         }
     }
 
-    pub fn pos(&self) -> (Coordinate, Coordinate) {
+    pub fn pos(&self) -> ChunkPosition {
         self.pos
+    }
+
+    pub fn id(&self) -> ChunkId {
+        let (x, y) = self.pos;
+        (u64::from(x)).shl(32) | u64::from(y)
+    }
+
+    /// Clears dirty bit before returning it
+    pub fn dirty(&self) -> bool {
+        self.dirty.replace(false)
+    }
+
+    pub fn invalidate(&self) {
+        self.dirty.set(true)
     }
 
     pub fn slice_mut(&mut self, index: SliceIndex) -> SliceMut {
@@ -104,5 +125,14 @@ mod tests {
 
         assert_eq!(Chunk::index(0, 0, 1), BLOCK_COUNT_SLICE);
         assert_eq!(Chunk::index(1, 0, 1), BLOCK_COUNT_SLICE + 1);
+    }
+
+    #[test]
+    fn chunk_id() {
+        let id1 = Chunk::empty((0, 0)).id();
+        let id2 = Chunk::empty((0, 1)).id();
+        let id3 = Chunk::empty((1, 0)).id();
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
     }
 }

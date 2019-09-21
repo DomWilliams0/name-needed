@@ -1,13 +1,13 @@
 use std::time::Instant;
 
-use sdl2::event::Event;
+use glium_sdl2::DisplayBuild;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-use sdl2::render::{CanvasBuilder, WindowCanvas};
 use sdl2::Sdl;
 
 use world::{World, WorldViewer};
+
+use crate::render::GliumRenderer;
 
 const TICKS_PER_SECOND: usize = 20;
 const SKIP_TICKS: usize = 1000 / TICKS_PER_SECOND;
@@ -15,8 +15,7 @@ const MAX_FRAMESKIP: u32 = 5;
 
 pub struct Engine<'a> {
     sdl: Sdl,
-    canvas: WindowCanvas,
-    world_viewer: WorldViewer<'a>,
+    renderer: GliumRenderer<'a>,
 }
 
 #[derive(Debug)]
@@ -26,28 +25,28 @@ enum KeyEvent {
 }
 
 impl<'a> Engine<'a> {
-    /// Panics if SDL fails
+    /// Panics if SDL or glium initialisation fails
     pub fn new(world: &'a mut World) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");
 
         let video = sdl.video().expect("Failed to init SDL video");
+        video.gl_attr().set_context_version(3, 3);
+        video.gl_attr().set_context_minor_version(3);
+        println!(
+            "opengl {}.{}",
+            video.gl_attr().context_major_version(),
+            video.gl_attr().context_minor_version(),
+        );
 
-        let window = video
+        let display = video
             .window("Name Needed", 800, 600)
             .position_centered()
-            .build()
-            .expect("Failed to create window");
-
-        let canvas = CanvasBuilder::new(window)
-            .accelerated()
-            .present_vsync()
-            .build()
-            .expect("Failed to create canvas");
+            .build_glium()
+            .expect("Failed to create glium window");
 
         Self {
             sdl,
-            canvas,
-            world_viewer: WorldViewer::from_world(world),
+            renderer: GliumRenderer::new(display, WorldViewer::from_world(world)),
         }
     }
 
@@ -75,6 +74,14 @@ impl<'a> Engine<'a> {
                     Event::KeyUp {
                         keycode: Some(key), ..
                     } => self.handle_key(KeyEvent::Up(key)),
+                    Event::Window {
+                        win_event: WindowEvent::Resized(w, h),
+                        ..
+                    } => self.renderer.on_resize(w, h),
+
+                    //                    Event::MouseMotion { xrel, yrel, .. } => {
+                    //                        self.renderer.camera().handle_cursor(xrel, yrel)
+                    //                    }
                     _ => {}
                 }
             }
@@ -97,37 +104,34 @@ impl<'a> Engine<'a> {
     }
 
     fn tick(&mut self) {
-        println!("tick");
+        // println!("tick");
+
+        self.renderer.tick();
     }
 
     fn render(&mut self, interpolation: f64) {
-        // clear
-        let bg = Color::RGB(17, 17, 19);
-        self.canvas.set_draw_color(bg);
-        self.canvas.clear();
-
-        println!("render ({})", interpolation);
-        for mesh in self.world_viewer.visible_meshes() {
-            let rect = Rect::new(mesh.x, mesh.y, mesh.width, mesh.height);
-
-            // fill
-            self.canvas.set_draw_color(Color::from(mesh.color));
-            self.canvas.fill_rect(rect).unwrap();
-
-            // outline
-            self.canvas.set_draw_color(Color::RGB(255, 255, 255));
-            self.canvas.draw_rect(rect).unwrap();
-        }
-
-        // render
-        self.canvas.present();
+        // println!("render ({})", interpolation);
+        self.renderer.render(interpolation);
     }
 
     fn handle_key(&mut self, event: KeyEvent) {
         match event {
-            KeyEvent::Down(Keycode::Up) => self.world_viewer.move_up(),
-            KeyEvent::Down(Keycode::Down) => self.world_viewer.move_down(),
+            KeyEvent::Down(Keycode::Up) => self.renderer.world_viewer().move_up(),
+            KeyEvent::Down(Keycode::Down) => self.renderer.world_viewer().move_down(),
             _ => {}
-        }
+        };
+
+        // this is silly
+        let pressed = if let KeyEvent::Down(_) = event {
+            true
+        } else {
+            false
+        };
+        let key = match event {
+            KeyEvent::Down(k) => k,
+            KeyEvent::Up(k) => k,
+        };
+
+        self.renderer.camera().handle_key(key, pressed);
     }
 }
