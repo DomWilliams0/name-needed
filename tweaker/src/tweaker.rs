@@ -6,7 +6,6 @@ use std::net::TcpStream;
 use std::sync::Mutex;
 use std::thread;
 
-use failure::_core::marker::PhantomData;
 use serde_json;
 use serde_json::Value as JsonValue;
 
@@ -14,6 +13,8 @@ use lazy_static::lazy_static;
 
 use crate::error::*;
 use crate::value::Value;
+use failure::Error;
+use std::marker::PhantomData;
 
 lazy_static! {
     static ref MAP: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::new());
@@ -21,7 +22,7 @@ lazy_static! {
 
 const PORT: u16 = 44448;
 
-pub fn init() -> TweakerResult<()> {
+pub fn init(bg_error_callback: fn(Error)) -> TweakerResult<()> {
     let mut sock = TcpStream::connect(("127.0.0.1", PORT))
         .context(TweakerErrorKind::SocketConnection { port: PORT })?;
 
@@ -35,8 +36,10 @@ pub fn init() -> TweakerResult<()> {
                 "[tweaker] failed to read message in background thread: {}",
                 e
             );
-            eprintln!("[tweaker] taking process down with me 🖕"); // TODO
-            std::process::exit(1);
+
+            // call user callback and exit thread
+            bg_error_callback(e.into());
+            break;
         }
     });
 
@@ -94,7 +97,7 @@ impl<T: From<Value>> Tweak<T> {
     }
 
     fn resolve_safely(&self) -> Option<Value> {
-        MAP.lock().unwrap().get(self.key).map(|v| v.clone())
+        MAP.lock().unwrap().get(self.key).copied()
     }
 
     pub fn resolve(&self) -> T {
@@ -102,6 +105,10 @@ impl<T: From<Value>> Tweak<T> {
             Some(val) => val.into(),
             None => panic!("[tweaker] key '{}' not found", self.key),
         }
+    }
+
+    pub fn lookup(key: &'static str) -> T {
+        Tweak::new(key).resolve()
     }
 }
 
@@ -118,7 +125,7 @@ mod tests {
         let t_float = Tweak::<f64>::new("_dummy_float");
         let t_nope = Tweak::<i64>::new("totally made up");
 
-        init().unwrap();
+        init(|_| {}).unwrap();
 
         assert_eq!(t_int.resolve(), 29i64);
         assert_eq!(t_float.resolve(), -0.25f64);
