@@ -10,5 +10,9 @@
     "_dummy_float": {
         "value": -0.25,
         "increment": 1.0
+    },
+    "lookaround": {
+        "value": 0,
+        "increment": 1
     }
 }
