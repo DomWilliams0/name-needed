@@ -76,8 +76,11 @@ def mk_window(store):
 
 if __name__ == '__main__':
     store = Store.load()
-    atexit.register(Store.save, store)
+    atexit.register(Store.save, store)  # save on error
 
     thread = server.start_server(store)
     mk_window(store)
-    os._exit(0)  # please just exit
+
+    # save and suicide on clean exit
+    store.save()
+    os._exit(0)  # please, just exit
