@@ -10,6 +10,9 @@ pub type Coordinate = u32;
 pub type ChunkPosition = (Coordinate, Coordinate);
 pub type ChunkId = u64;
 
+pub const MIN_SLICE: SliceIndex = std::i32::MIN;
+pub const MAX_SLICE: SliceIndex = std::i32::MAX;
+
 const SIZE: usize = 16;
 pub const CHUNK_SIZE: u32 = SIZE as u32;
 

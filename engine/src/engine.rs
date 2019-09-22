@@ -1,21 +1,19 @@
-use std::time::Instant;
-
 use glium_sdl2::DisplayBuild;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
 
+use gameloop::{FrameAction, GameLoop};
+use simulation::Simulation;
+use tweaker::Tweak;
 use world::{World, WorldViewer};
 
-use crate::render::GliumRenderer;
-
-const TICKS_PER_SECOND: usize = 20;
-const SKIP_TICKS: usize = 1000 / TICKS_PER_SECOND;
-const MAX_FRAMESKIP: u32 = 5;
+use crate::render::{GliumRenderer, SimulationRenderer};
 
 pub struct Engine<'a> {
     sdl: Sdl,
     renderer: GliumRenderer<'a>,
+    simulation: Simulation<'a, SimulationRenderer>,
 }
 
 #[derive(Debug)]
@@ -44,9 +42,14 @@ impl<'a> Engine<'a> {
             .build_glium()
             .expect("Failed to create glium window");
 
+        let renderer = GliumRenderer::new(display, WorldViewer::from_world(world));
+
+        let simulation = Simulation::new();
+
         Self {
             sdl,
-            renderer: GliumRenderer::new(display, WorldViewer::from_world(world)),
+            renderer,
+            simulation,
         }
     }
 
@@ -54,11 +57,11 @@ impl<'a> Engine<'a> {
     pub fn run(mut self) {
         let mut event_pump = self.sdl.event_pump().expect("Failed to create event pump");
 
-        // deWITTERS game loop
-        let start_time = Instant::now();
-        let mut next_game_tick: usize = start_time.elapsed().as_millis() as usize;
+        let game_loop = GameLoop::new(20, 5);
 
         'running: loop {
+            let frame = game_loop.start_frame();
+
             // process events
             for event in event_pump.poll_iter() {
                 match event {
@@ -79,39 +82,33 @@ impl<'a> Engine<'a> {
                         ..
                     } => self.renderer.on_resize(w, h),
 
-                    //                    Event::MouseMotion { xrel, yrel, .. } => {
-                    //                        self.renderer.camera().handle_cursor(xrel, yrel)
-                    //                    }
+                    Event::MouseMotion { xrel, yrel, .. }
+                        if Tweak::<i64>::lookup("lookaround") == 1 =>
+                    {
+                        self.renderer.camera().handle_cursor(xrel, yrel)
+                    }
                     _ => {}
                 }
             }
 
-            let mut loops = 0;
-            let now = start_time.elapsed().as_millis() as usize;
-            while now > next_game_tick && loops < MAX_FRAMESKIP {
-                self.tick();
-
-                next_game_tick += SKIP_TICKS;
-                loops += 1;
+            for action in frame.actions() {
+                match action {
+                    FrameAction::Tick => self.tick(),
+                    FrameAction::Render { interpolation } => self.render(interpolation),
+                }
             }
-
-            let now = start_time.elapsed().as_millis() as usize;
-            let interpolation: f64 =
-                ((now + SKIP_TICKS - next_game_tick) as f64) / (SKIP_TICKS as f64);
-
-            self.render(interpolation);
         }
     }
 
     fn tick(&mut self) {
         // println!("tick");
-
+        self.simulation.tick();
         self.renderer.tick();
     }
 
     fn render(&mut self, interpolation: f64) {
         // println!("render ({})", interpolation);
-        self.renderer.render(interpolation);
+        self.renderer.render(&mut self.simulation, interpolation);
     }
 
     fn handle_key(&mut self, event: KeyEvent) {

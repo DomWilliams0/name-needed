@@ -1,5 +1,5 @@
 [package]
-name = "world"
+name = "simulation"
 version = "0.1.0"
 authors = ["Dom Williams <me@domwillia.ms>"]
 edition = "2018"
@@ -7,5 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generator = "0.6"
-scale = {path = "../scale"}
+world = {path = "../world"}
+specs = "0.15"
+specs-derive = "0.4"

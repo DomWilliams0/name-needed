@@ -2,6 +2,9 @@
 
 members = [
 	"engine",
+	"gameloop",
 	"world",
 	"tweaker",
+	"simulation",
+	"scale",
 ]

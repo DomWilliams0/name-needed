@@ -1,4 +1,7 @@
-use crate::chunk::{Chunk, SliceIndex};
+use scale;
+
+use crate::chunk::Chunk;
+use crate::viewer::SliceRange;
 use crate::BLOCK_COUNT_CHUNK;
 
 #[derive(Copy, Clone)]
@@ -26,9 +29,9 @@ impl Vertex {
 const VERTICES_PER_BLOCK: usize = 6;
 pub const VERTICES_PER_CHUNK: usize = VERTICES_PER_BLOCK * BLOCK_COUNT_CHUNK;
 
-pub const BLOCK_RENDER_SIZE: f32 = 0.1f32;
-const X: f32 = BLOCK_RENDER_SIZE;
-// for ease of declaration
+// for ease of declaration. /2 as based around the center of the block
+const X: f32 = scale::BLOCK / 2.0;
+
 pub const BLOCK_VERTICES: [Vertex; 36] = [
     // front
     Vertex::new(-X, -X, -X),
@@ -98,16 +101,21 @@ const FACES: [Face; FACE_COUNT] = [
     Face::Back,
 ];
 
-pub fn make_mesh(chunk: &Chunk, slice_range: (SliceIndex, SliceIndex)) -> Vec<Vertex> {
+pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
     let mut vertices = Vec::with_capacity(VERTICES_PER_CHUNK); // TODO reuse/calculate needed capacity first
-    for slice_index in slice_range.0..=slice_range.1 {
+    for slice_index in slice_range.into_iter() {
         let slice = chunk.slice(slice_index);
         // TODO skip if slice knows it is empty
 
         for (block_pos, block) in slice.non_air_blocks() {
             let (bx, by, bz) = {
                 let (x, y) = block_pos;
-                (x as f32, y as f32, slice_index as f32)
+                (
+                    // +0.5 to render in the center of the block, which is the block mesh's origin
+                    x as f32 + 0.5,
+                    y as f32 + 0.5,
+                    slice_index as f32,
+                )
             };
 
             let color = block.color_as_f32();
@@ -121,9 +129,9 @@ pub fn make_mesh(chunk: &Chunk, slice_range: (SliceIndex, SliceIndex)) -> Vec<Ve
                 for vertex in face_verts.iter() {
                     let [fx, fy, fz] = vertex.v_pos;
                     vertices.push(Vertex::with_color(
-                        fx + bx * 2.0 * BLOCK_RENDER_SIZE,
-                        fy + by * 2.0 * BLOCK_RENDER_SIZE,
-                        fz + bz * 2.0 * BLOCK_RENDER_SIZE,
+                        fx + bx * scale::BLOCK,
+                        fy + by * scale::BLOCK,
+                        fz + bz * scale::BLOCK,
                         color,
                     ));
                 }

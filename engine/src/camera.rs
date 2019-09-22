@@ -55,25 +55,25 @@ impl FreeRangeCamera {
         self.pitch = Angle::asin(self.dir.y);
         self.yaw = Angle::atan2(self.dir.z, self.dir.x);
     }
-//
-//    pub fn handle_cursor(&mut self, dx: i32, dy: i32) {
-//        self.yaw += Deg(dx as f32 * TURN_SPEED);
-//        self.pitch = {
-//            let Deg(mut pitch) = self.pitch;
-//            pitch -= dy as f32;
-//            Deg(if pitch < -89.0 {
-//                -89.0
-//            } else if pitch > 89.0 {
-//                89.0
-//            } else {
-//                pitch
-//            })
-//        };
-//
-//        self.dir.x = Deg::cos(self.yaw) * Deg::cos(self.pitch);
-//        self.dir.y = Deg::sin(self.pitch);
-//        self.dir.z = Deg::sin(self.yaw) * Deg::cos(self.pitch);
-//    }
+
+    pub fn handle_cursor(&mut self, dx: i32, dy: i32) {
+        self.yaw += Deg(dx as f32 * 0.3);
+        self.pitch = {
+            let Deg(mut pitch) = self.pitch;
+            pitch -= dy as f32;
+            Deg(if pitch < -89.0 {
+                -89.0
+            } else if pitch > 89.0 {
+                89.0
+            } else {
+                pitch
+            })
+        };
+
+        self.dir.x = Deg::cos(self.yaw) * Deg::cos(self.pitch);
+        self.dir.y = Deg::sin(self.pitch);
+        self.dir.z = Deg::sin(self.yaw) * Deg::cos(self.pitch);
+    }
 
     pub fn handle_key(&mut self, key: Keycode, pressed: bool) {
         if let Some(dir) = Direction::from_key(key) {
@@ -97,7 +97,7 @@ impl FreeRangeCamera {
         Matrix4::look_at(self.pos, self.pos + self.dir, self.up)
     }
 
-//    pub fn pos(&self) -> Point3<f32> {
-//        self.pos
-//    }
+    //    pub fn pos(&self) -> Point3<f32> {
+    //        self.pos
+    //    }
 }
