@@ -6,19 +6,23 @@ use specs::prelude::*;
 pub use specs::System;
 use specs::World as SpecsWorld;
 
+use world::{SliceRange, World, CHUNK_SIZE};
+
 use crate::movement::{MovementSystem, Position, Velocity};
-use crate::render::{Physical, RenderSystem, Renderer};
-use world::{SliceRange, CHUNK_SIZE};
+use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
 
 pub struct Simulation<'a, R: Renderer> {
     specs_world: SpecsWorld,
     specs_dispatcher: Dispatcher<'a, 'a>,
 
+    world: Rc<RefCell<World>>,
+
     renderer: PhantomData<R>,
+    debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
 }
 
 impl<'a, R: Renderer> Simulation<'a, R> {
-    pub fn new() -> Self {
+    pub fn new(world: Rc<RefCell<World>>) -> Self {
         let mut specs_world = SpecsWorld::new();
 
         // register systems
@@ -63,6 +67,10 @@ impl<'a, R: Renderer> Simulation<'a, R> {
             specs_world,
             specs_dispatcher,
             renderer: PhantomData,
+            world,
+            debug_renderers: vec![
+                // Box::new(DummyDebugRenderer)
+            ],
         }
     }
 
@@ -79,13 +87,32 @@ impl<'a, R: Renderer> Simulation<'a, R> {
         renderer: &mut R,
         _interpolation: f64,
     ) {
-        let mut render_system = RenderSystem {
-            target,
+        let frame_state = FrameRenderState {
+            target: target.clone(),
             slices,
-            renderer,
         };
 
-        // TODO interpolation as resource
-        render_system.run_now(&self.specs_world);
+        renderer.init(frame_state.target.clone());
+        renderer.start();
+
+        {
+            let mut render_system = RenderSystem {
+                renderer,
+                frame_state: frame_state.clone(),
+            };
+
+            // TODO interpolation as resource
+            render_system.run_now(&self.specs_world);
+        }
+
+        renderer.debug_start();
+
+        for debug_renderer in self.debug_renderers.iter_mut() {
+            debug_renderer.render(renderer, self.world.clone(), &frame_state);
+        }
+
+        renderer.debug_finish();
+
+        renderer.finish();
     }
 }

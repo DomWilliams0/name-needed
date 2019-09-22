@@ -39,7 +39,7 @@ impl From<WorldVertex> for Vertex {
 
 type ChunkMesh = glium::VertexBuffer<Vertex>;
 
-pub struct GliumRenderer<'a> {
+pub struct GliumRenderer {
     display: SDL2Facade,
     window_size: (i32, i32),
 
@@ -47,15 +47,15 @@ pub struct GliumRenderer<'a> {
     chunk_meshes: HashMap<ChunkPosition, ChunkMesh>,
     program: glium::Program,
 
-    world_viewer: WorldViewer<'a>,
+    world_viewer: WorldViewer,
     camera: FreeRangeCamera,
 
     // simulation rendering
     simulation_renderer: SimulationRenderer,
 }
 
-impl<'a> GliumRenderer<'a> {
-    pub fn new(display: SDL2Facade, world_viewer: WorldViewer<'a>) -> Self {
+impl GliumRenderer {
+    pub fn new(display: SDL2Facade, world_viewer: WorldViewer) -> Self {
         // world program
         let program = load_program(&display, "world").unwrap();
 
@@ -92,7 +92,7 @@ impl<'a> GliumRenderer<'a> {
         self.window_size = (w, h);
     }
 
-    pub fn world_viewer(&mut self) -> &mut WorldViewer<'a> {
+    pub fn world_viewer(&mut self) -> &mut WorldViewer {
         &mut self.world_viewer
     }
 

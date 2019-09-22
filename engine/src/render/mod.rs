@@ -5,6 +5,7 @@ use glium_sdl2::SDL2Facade;
 pub use self::renderer::GliumRenderer;
 pub use self::simulation::{FrameTarget, SimulationRenderer};
 
+mod debug;
 mod renderer;
 mod simulation;
 

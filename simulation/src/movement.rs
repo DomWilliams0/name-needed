@@ -29,3 +29,9 @@ impl<'a> System<'a> for MovementSystem {
         }
     }
 }
+
+impl Position {
+    pub fn new(x: f32, y: f32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+}
