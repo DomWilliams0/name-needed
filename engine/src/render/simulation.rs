@@ -8,6 +8,7 @@ use glium_sdl2::SDL2Facade;
 
 use simulation::{Physical, Position, Renderer};
 
+use crate::render::debug::{DebugLine, DebugLines};
 use crate::render::load_program;
 
 #[derive(Copy, Clone)]
@@ -34,6 +35,9 @@ pub struct SimulationRenderer {
     // per frame
     // Option because unset until ``init`` is called each frame
     target: Option<Rc<RefCell<<Self as Renderer>::Target>>>,
+
+    // debug
+    debug_lines: DebugLines,
 }
 
 impl SimulationRenderer {
@@ -77,6 +81,7 @@ impl SimulationRenderer {
             entity_vertex_buf,
             entity_geometry,
             target: None,
+            debug_lines: DebugLines::new(display),
         }
     }
 }
@@ -157,5 +162,18 @@ impl Renderer for SimulationRenderer {
         }
 
         self.target = None;
+    }
+
+    fn debug_add_line(&mut self, from: Position, to: Position, color: (u8, u8, u8)) {
+        self.debug_lines.lines.push(DebugLine { from, to, color })
+    }
+
+    fn debug_finish(&mut self) {
+        let mut target = self.target
+            .as_ref()
+            .expect("init was not called")
+            .borrow_mut();
+
+        self.debug_lines.draw(&mut target);
     }
 }

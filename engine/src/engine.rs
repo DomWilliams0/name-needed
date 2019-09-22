@@ -9,10 +9,12 @@ use tweaker::Tweak;
 use world::{World, WorldViewer};
 
 use crate::render::{GliumRenderer, SimulationRenderer};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Engine<'a> {
     sdl: Sdl,
-    renderer: GliumRenderer<'a>,
+    renderer: GliumRenderer,
     simulation: Simulation<'a, SimulationRenderer>,
 }
 
@@ -24,7 +26,7 @@ enum KeyEvent {
 
 impl<'a> Engine<'a> {
     /// Panics if SDL or glium initialisation fails
-    pub fn new(world: &'a mut World) -> Self {
+    pub fn new(world: Rc<RefCell<World>>) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");
 
         let video = sdl.video().expect("Failed to init SDL video");
@@ -42,9 +44,9 @@ impl<'a> Engine<'a> {
             .build_glium()
             .expect("Failed to create glium window");
 
-        let renderer = GliumRenderer::new(display, WorldViewer::from_world(world));
+        let renderer = GliumRenderer::new(display, WorldViewer::from_world(world.clone()));
 
-        let simulation = Simulation::new();
+        let simulation = Simulation::new(world.clone());
 
         Self {
             sdl,

@@ -12,10 +12,13 @@ impl Renderer for DebugRenderer {
     fn entity(&mut self, pos: &Position, physical: &Physical) {
         println!("pos({}, {}, {}), {:?}", pos.x, pos.y, pos.z, physical);
     }
+
+    fn debug_add_line(&mut self, _from: Position, _to: Position, _color: (u8, u8, u8)) {}
 }
 
 fn main() {
-    let mut sim = Simulation::new();
+    let w = Rc::new(RefCell::new(world::World::default()));
+    let mut sim = Simulation::new(w);
     let mut renderer = DebugRenderer;
 
     let nop = Rc::new(RefCell::new(()));

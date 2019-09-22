@@ -1,4 +1,7 @@
+use std::cell::RefCell;
+use std::convert::TryFrom;
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 
 use generator::{done, Generator, Gn};
 
@@ -6,14 +9,12 @@ use crate::chunk::CHUNK_SIZE;
 use crate::mesh;
 use crate::mesh::Vertex;
 use crate::{chunk, ChunkPosition, World, MAX_SLICE, MIN_SLICE};
-use std::convert::TryFrom;
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
 
-pub struct WorldViewer<'a> {
-    world: &'a mut World,
-
+pub struct WorldViewer {
+    world: Rc<RefCell<World>>,
     view_range: SliceRange,
 }
 
@@ -74,8 +75,8 @@ impl SliceRange {
     }
 }
 
-impl<'a> WorldViewer<'a> {
-    pub fn from_world(world: &'a mut World) -> Self {
+impl WorldViewer {
+    pub fn from_world(world: Rc<RefCell<World>>) -> Self {
         let start = 0;
         Self {
             world,
@@ -86,7 +87,7 @@ impl<'a> WorldViewer<'a> {
     pub fn regen_dirty_chunk_meshes(&mut self) -> Generator<(), (ChunkPosition, Vec<Vertex>)> {
         Gn::new_scoped(move |mut s| {
             let range = self.view_range;
-            for dirty_chunk in self.world.visible_chunks().filter(|c| c.dirty()) {
+            for dirty_chunk in self.world.borrow().visible_chunks().filter(|c| c.dirty()) {
                 let mesh = mesh::make_mesh(dirty_chunk, range);
                 s.yield_((dirty_chunk.pos(), mesh));
             }
@@ -95,9 +96,9 @@ impl<'a> WorldViewer<'a> {
         })
     }
 
-    fn invalidate_visible_chunks(&mut self) {
+    fn invalidate_visible_chunks(&self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        for c in self.world.visible_chunks() {
+        for c in self.world.borrow_mut().visible_chunks() {
             c.invalidate();
         }
     }
