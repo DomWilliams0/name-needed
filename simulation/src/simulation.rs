@@ -10,6 +10,7 @@ use world::{SliceRange, World, CHUNK_SIZE};
 
 use crate::movement::{MovementSystem, Position, Velocity};
 use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
+use crate::steer::{Steering, SteeringSystem};
 
 pub struct Simulation<'a, R: Renderer> {
     specs_world: SpecsWorld,
@@ -27,13 +28,15 @@ impl<'a, R: Renderer> Simulation<'a, R> {
 
         // register systems
         let specs_dispatcher = DispatcherBuilder::new()
-            .with(MovementSystem, "movement", &[])
+            .with(SteeringSystem, "steering", &[])
+            .with(MovementSystem, "movement", &["steering"])
             .build();
 
         // register components
         specs_world.register::<Position>();
         specs_world.register::<Velocity>();
         specs_world.register::<Physical>();
+        specs_world.register::<Steering>();
 
         // add dummy entities
         {
@@ -44,10 +47,15 @@ impl<'a, R: Renderer> Simulation<'a, R> {
                     y: CHUNK_SIZE as f32, // should be at the top of the chunk
                     z: 0,
                 })
-                .with(Velocity { x: 0.5, y: -1.25 })
+                .with(Velocity { x: 0.0, y: 0.0 })
                 .with(Physical {
                     color: (100, 10, 15),
                 })
+                .with(Steering::arrive(Position {
+                    x: 10.0,
+                    y: 9.0,
+                    z: 0,
+                }))
                 .build();
 
             specs_world
