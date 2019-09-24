@@ -10,3 +10,4 @@ edition = "2018"
 world = {path = "../world"}
 specs = "0.15"
 specs-derive = "0.4"
+cgmath = "0.17"

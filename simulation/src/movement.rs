@@ -1,8 +1,10 @@
 use specs::prelude::*;
 use specs_derive::Component;
 
+// TODO use cgmath vectors
+
 /// World position
-#[derive(Component, Debug, Copy, Clone)]
+#[derive(Component, Debug, Copy, Clone, Default)]
 #[storage(VecStorage)]
 pub struct Position {
     pub x: f32,
@@ -10,6 +12,7 @@ pub struct Position {
     pub z: i32,
 }
 
+/// Desired velocity, should be normalized
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
 pub struct Velocity {
@@ -24,8 +27,12 @@ impl<'a> System<'a> for MovementSystem {
 
     fn run(&mut self, (vel, mut pos): Self::SystemData) {
         for (vel, pos) in (&vel, &mut pos).join() {
-            pos.x += vel.x * 0.1;
-            pos.y += vel.y * 0.1;
+            // TODO expand normalized desired velocity to real velocity
+            let speed = 0.2;
+            let (vx, vy) = (vel.x * speed, vel.y * speed);
+
+            pos.x += vx;
+            pos.y += vy;
         }
     }
 }
