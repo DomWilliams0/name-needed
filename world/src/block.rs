@@ -23,3 +23,9 @@ impl Block {
         )
     }
 }
+
+impl Default for Block {
+    fn default() -> Self {
+        Block::Air
+    }
+}
