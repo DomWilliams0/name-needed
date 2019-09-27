@@ -1,22 +1,24 @@
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 /// 3d only
 pub trait Dims {
-    fn dims() -> &'static [usize; 3];
+    fn dims() -> &'static [i32; 3];
 
     fn full_length() -> usize {
-        Self::dims().iter().fold(1, |acc, x| acc * *x)
+        Self::dims().iter().fold(1, |acc, x| acc * *x) as usize
     }
 }
 
-type CoordType = [usize; 3];
+type CoordType = [i32; 3];
 
 pub struct Grid<T, D>
 where
     T: Default,
     D: Dims,
 {
+    // TODO make this inline, through a macro maybe? until associated constants actually work
     array: Vec<T>,
     phantom: PhantomData<D>,
 }
@@ -39,12 +41,15 @@ where
     fn flatten(coord: &CoordType) -> usize {
         let &[x, y, z] = coord;
         let &[xs, ys, _zs] = D::dims();
-        x + xs * (y + ys * z)
+        usize::try_from(x + xs * (y + ys * z)).unwrap()
     }
 
     fn unflatten(index: usize) -> CoordType {
         // TODO are %s optimised to bitwise ops if a multiple of 2?
         let &[xs, ys, _zs] = D::dims();
+        //        let xs = usize::try_from(xs).unwrap();
+        //        let ys = usize::try_from(ys).unwrap();
+        let index = i32::try_from(index).unwrap();
         [index % xs, (index / xs) % ys, index / (ys * xs)]
     }
 }
@@ -102,7 +107,7 @@ mod tests {
     struct DimsTest;
 
     impl Dims for DimsTest {
-        fn dims() -> &'static [usize; 3] {
+        fn dims() -> &'static [i32; 3] {
             &[4, 5, 6]
         }
     }

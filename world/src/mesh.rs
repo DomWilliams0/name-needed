@@ -1,6 +1,7 @@
 use scale;
 
 use crate::chunk::Chunk;
+use crate::coordinate::world::{BlockCoord, SliceBlock, SliceIndex};
 use crate::viewer::SliceRange;
 use crate::BLOCK_COUNT_CHUNK;
 
@@ -109,11 +110,12 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
 
         for (block_pos, block) in slice.non_air_blocks() {
             let (bx, by, bz) = {
-                let (x, y) = block_pos;
+                let SliceBlock(BlockCoord(x), BlockCoord(y)) = block_pos;
+                let SliceIndex(slice_index) = slice_index;
                 (
                     // +0.5 to render in the center of the block, which is the block mesh's origin
-                    x as f32 + 0.5,
-                    y as f32 + 0.5,
+                    f32::from(x) + 0.5,
+                    f32::from(y) + 0.5,
                     slice_index as f32,
                 )
             };

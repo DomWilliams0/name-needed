@@ -1,16 +1,16 @@
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Block {
+pub enum BlockType {
     Air,
     Dirt,
     Hi,
 }
 
-impl Block {
+impl BlockType {
     pub fn color_as_u8(self) -> (u8, u8, u8) {
         match self {
-            Block::Air => (0, 0, 0),
-            Block::Dirt => (192, 57, 43),
-            Block::Hi => (20, 100, 20),
+            BlockType::Air => (0, 0, 0),
+            BlockType::Dirt => (192, 57, 43),
+            BlockType::Hi => (20, 100, 20),
         }
     }
 
@@ -24,8 +24,8 @@ impl Block {
     }
 }
 
-impl Default for Block {
+impl Default for BlockType {
     fn default() -> Self {
-        Block::Air
+        BlockType::Air
     }
 }
