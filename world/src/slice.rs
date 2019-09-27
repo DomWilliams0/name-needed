@@ -1,27 +1,27 @@
-use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 
-use crate::block::Block;
-use crate::chunk::{Coordinate, CHUNK_SIZE};
+use crate::block::BlockType;
+use crate::chunk::CHUNK_SIZE;
+use crate::coordinate::world::{BlockCoord, SliceBlock};
 
 pub struct Slice<'a> {
-    slice: &'a [Block],
+    slice: &'a [BlockType],
 }
 
 pub struct SliceMut<'a> {
-    slice: &'a mut [Block],
+    slice: &'a mut [BlockType],
 }
 
 impl<'a> Slice<'a> {
-    pub fn new(slice: &'a [Block]) -> Self {
+    pub fn new(slice: &'a [BlockType]) -> Self {
         Self { slice }
     }
 
-    pub fn non_air_blocks(&self) -> impl Iterator<Item = ((Coordinate, Coordinate), &Block)> {
+    pub fn non_air_blocks(&self) -> impl Iterator<Item = (SliceBlock, &BlockType)> {
         self.slice
             .iter()
             .enumerate()
-            .filter(|(_i, &b)| b != Block::Air)
+            .filter(|(_i, &b)| b != BlockType::Air)
             .map(|(i, b)| {
                 let pos = unflatten_index(i);
                 (pos, b)
@@ -30,7 +30,7 @@ impl<'a> Slice<'a> {
 }
 
 impl<'a> Deref for Slice<'a> {
-    type Target = [Block];
+    type Target = [BlockType];
 
     fn deref(&self) -> &Self::Target {
         self.slice
@@ -40,18 +40,18 @@ impl<'a> Deref for Slice<'a> {
 // -------
 
 impl<'a> SliceMut<'a> {
-    pub fn new(slice: &'a mut [Block]) -> Self {
+    pub fn new(slice: &'a mut [BlockType]) -> Self {
         Self { slice }
     }
 
-    pub fn set_block(&mut self, x: Coordinate, y: Coordinate, block: Block) {
-        let index = flatten_coords((x, y));
+    pub fn set_block(&mut self, pos: SliceBlock, block: BlockType) {
+        let index = flatten_coords(pos);
         self.slice[index] = block;
     }
 }
 
 impl<'a> Deref for SliceMut<'a> {
-    type Target = [Block];
+    type Target = [BlockType];
 
     fn deref(&self) -> &Self::Target {
         self.slice
@@ -66,15 +66,16 @@ impl<'a> DerefMut for SliceMut<'a> {
 
 // -------
 
-pub fn unflatten_index(index: usize) -> (Coordinate, Coordinate) {
-    let index = Coordinate::try_from(index).unwrap();
-    (index % CHUNK_SIZE, index / CHUNK_SIZE)
+pub fn unflatten_index(index: usize) -> SliceBlock {
+    SliceBlock(
+        BlockCoord((index % CHUNK_SIZE as usize) as u16),
+        BlockCoord((index / CHUNK_SIZE as usize) as u16),
+    )
 }
 
-fn flatten_coords((x, y): (Coordinate, Coordinate)) -> usize {
-    let x = usize::try_from(x).unwrap();
-    let y = usize::try_from(y).unwrap();
-    (y * CHUNK_SIZE as usize) + x
+fn flatten_coords(block: SliceBlock) -> usize {
+    let SliceBlock(BlockCoord(x), BlockCoord(y)) = block;
+    ((y * CHUNK_SIZE as u16) + x) as usize
 }
 
 #[cfg(test)]
@@ -87,13 +88,13 @@ mod tests {
     fn unflatten_slice_index() {
         assert!(CHUNK_SIZE >= 3);
 
-        assert_eq!(unflatten_index(0), (0, 0));
-        assert_eq!(unflatten_index(1), (1, 0));
-        assert_eq!(unflatten_index(2), (2, 0));
+        assert_eq!(unflatten_index(0), (0, 0).into());
+        assert_eq!(unflatten_index(1), (1, 0).into());
+        assert_eq!(unflatten_index(2), (2, 0).into());
 
         let size = CHUNK_SIZE as usize;
-        assert_eq!(unflatten_index(size + 0), (0, 1));
-        assert_eq!(unflatten_index(size + 1), (1, 1));
-        assert_eq!(unflatten_index(size + 2), (2, 1));
+        assert_eq!(unflatten_index(size + 0), (0, 1).into());
+        assert_eq!(unflatten_index(size + 1), (1, 1).into());
+        assert_eq!(unflatten_index(size + 2), (2, 1).into());
     }
 }

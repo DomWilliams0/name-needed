@@ -6,9 +6,11 @@ use std::rc::Rc;
 use generator::{done, Generator, Gn};
 
 use crate::chunk::CHUNK_SIZE;
+use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType};
 use crate::mesh;
 use crate::mesh::Vertex;
-use crate::{chunk, ChunkPosition, World, MAX_SLICE, MIN_SLICE};
+use crate::World;
+use std::iter::Map;
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
@@ -19,25 +21,27 @@ pub struct WorldViewer {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct SliceRange(chunk::SliceIndex, chunk::SliceIndex);
+pub struct SliceRange(SliceIndex, SliceIndex);
 
 impl IntoIterator for SliceRange {
-    type Item = chunk::SliceIndex;
-    type IntoIter = RangeInclusive<chunk::SliceIndex>;
+    type Item = SliceIndex;
+    type IntoIter = Map<RangeInclusive<SliceIndexType>, fn(SliceIndexType) -> SliceIndex>; // yuk
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0..=self.1
+        let SliceIndex(from) = self.0;
+        let SliceIndex(to) = self.1;
+        (from..=to).map(SliceIndex)
     }
 }
 
 impl SliceRange {
-    fn new(start: chunk::SliceIndex, size: i32) -> Self {
+    fn new(start: SliceIndex, size: i32) -> Self {
         assert!(size > 0); // TODO Result?
-        Self(start, start + size)
+        Self(start, SliceIndex(start.0 + size))
     }
 
     pub fn null() -> Self {
-        Self(MIN_SLICE, MAX_SLICE)
+        Self(SliceIndex::MIN, SliceIndex::MAX)
     }
 
     /// returns true if it moved, otherwise false
@@ -46,7 +50,7 @@ impl SliceRange {
         // TODO cap to prevent panics for now
         let delta = i32::try_from(delta).expect("don't move so much");
         let new_upper = self.1 + delta;
-        if new_upper <= (CHUNK_SIZE - 1) as i32 {
+        if new_upper.0 <= (CHUNK_SIZE - 1) as i32 {
             self.0 += delta;
             self.1 = new_upper;
             true
@@ -61,7 +65,7 @@ impl SliceRange {
         // TODO cap to prevent panics for now
         let delta = i32::try_from(delta).expect("don't move so much");
         let new_lower = self.0 - delta;
-        if new_lower >= 0 {
+        if new_lower.0 >= 0 {
             self.0 = new_lower;
             self.1 -= delta;
             true
@@ -70,14 +74,17 @@ impl SliceRange {
         }
     }
 
-    pub fn contains(self, slice: chunk::SliceIndex) -> bool {
-        slice >= self.0 && slice <= self.1
+    pub fn contains<S: Into<SliceIndex>>(self, slice: S) -> bool {
+        let SliceIndex(slice) = slice.into();
+        let SliceIndex(lower) = self.0;
+        let SliceIndex(upper) = self.1;
+        slice >= lower && slice <= upper
     }
 }
 
 impl WorldViewer {
     pub fn from_world(world: Rc<RefCell<World>>) -> Self {
-        let start = 0;
+        let start = SliceIndex(0);
         Self {
             world,
             view_range: SliceRange::new(start, VIEW_RANGE),
