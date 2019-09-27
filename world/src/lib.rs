@@ -1,5 +1,6 @@
 mod block;
 mod chunk;
+mod grid;
 mod mesh;
 mod slice;
 mod viewer;

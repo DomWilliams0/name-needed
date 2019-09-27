@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use std::ops::Shl;
 
 use crate::block::Block;
+use crate::grid::{Dims, Grid};
 use crate::slice::{Slice, SliceMut};
 
 pub type SliceIndex = i32;
@@ -19,10 +20,20 @@ pub const CHUNK_SIZE: u32 = SIZE as u32;
 pub const BLOCK_COUNT_CHUNK: usize = SIZE * SIZE * SIZE;
 pub const BLOCK_COUNT_SLICE: usize = SIZE * SIZE;
 
+struct ChunkGridImpl;
+
+impl Dims for ChunkGridImpl {
+    fn dims() -> &'static [usize; 3] {
+        &[SIZE, SIZE, SIZE]
+    }
+}
+
+type ChunkGrid = Grid<Block, ChunkGridImpl>;
+
 pub struct Chunk {
     /// unique for each chunk
     pos: ChunkPosition,
-    blocks: [Block; BLOCK_COUNT_CHUNK],
+    blocks: ChunkGrid,
     dirty: Cell<bool>,
 }
 
@@ -30,7 +41,7 @@ impl Chunk {
     pub fn empty(pos: ChunkPosition) -> Self {
         Self {
             pos,
-            blocks: [Block::Air; BLOCK_COUNT_CHUNK],
+            blocks: ChunkGrid::new(),
             dirty: Cell::new(true),
         }
     }
@@ -55,12 +66,12 @@ impl Chunk {
 
     pub fn slice_mut(&mut self, index: SliceIndex) -> SliceMut {
         let (from, to) = self.slice_range(index);
-        SliceMut::new(&mut self.blocks[from..to])
+        SliceMut::new(&mut (*self.blocks)[from..to])
     }
 
     pub fn slice(&self, index: SliceIndex) -> Slice {
         let (from, to) = self.slice_range(index);
-        Slice::new(&self.blocks[from..to])
+        Slice::new(&(*self.blocks)[from..to])
     }
 
     fn slice_range(&self, index: SliceIndex) -> (usize, usize) {
@@ -71,18 +82,13 @@ impl Chunk {
     }
 
     pub fn set_block(&mut self, x: Coordinate, y: Coordinate, z: SliceIndex, block: Block) {
-        self.blocks[Chunk::index(x, y, z)] = block;
+        // TODO allow negative slice indices
+        self.blocks[&[x as usize, y as usize, z as usize]] = block;
     }
 
     pub fn get_block(&self, x: Coordinate, y: Coordinate, z: SliceIndex) -> Block {
-        self.blocks[Chunk::index(x, y, z)]
-    }
-
-    fn index(x: Coordinate, y: Coordinate, z: SliceIndex) -> usize {
-        let x = usize::try_from(x).unwrap();
-        let y = usize::try_from(y).unwrap();
-        let z = usize::try_from(z).unwrap();
-        (z * BLOCK_COUNT_SLICE) + (y * SIZE) + x
+        // TODO allow negative slice indices
+        self.blocks[&[x as usize, y as usize, z as usize]]
     }
 }
 
@@ -113,21 +119,6 @@ mod tests {
         assert_eq!(chunk.get_block(0, 0, 0), Block::Dirt);
         assert_eq!(chunk.get_block(1, 1, 0), Block::Dirt);
         assert_eq!(chunk.get_block(2, 2, 0), Block::Dirt);
-    }
-
-    #[test]
-    fn index() {
-        // slices should be contiguous
-        assert_eq!(Chunk::index(0, 0, 0), 0);
-        assert_eq!(Chunk::index(1, 0, 0), 1);
-        assert_eq!(Chunk::index(2, 0, 0), 2);
-
-        assert_eq!(Chunk::index(0, 1, 0), SIZE);
-        assert_eq!(Chunk::index(1, 1, 0), SIZE + 1);
-        assert_eq!(Chunk::index(2, 1, 0), SIZE + 2);
-
-        assert_eq!(Chunk::index(0, 0, 1), BLOCK_COUNT_SLICE);
-        assert_eq!(Chunk::index(1, 0, 1), BLOCK_COUNT_SLICE + 1);
     }
 
     #[test]
