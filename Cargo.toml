@@ -7,4 +7,5 @@ members = [
 	"tweaker",
 	"simulation",
 	"scale",
+	"ecs",
 ]
