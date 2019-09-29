@@ -5,8 +5,7 @@ use std::rc::Rc;
 
 use generator::{done, Generator, Gn};
 
-use crate::chunk::CHUNK_SIZE;
-use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType};
+use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType, CHUNK_SIZE};
 use crate::mesh;
 use crate::mesh::Vertex;
 use crate::World;

@@ -9,3 +9,8 @@ edition = "2018"
 [dependencies]
 generator = "0.6"
 scale = {path = "../scale"}
+pathfinding = "1.1"
+petgraph = "0.4"
+float-cmp = "0.5"
+cgmath = "0.17"
+nd_iter = "0.0.4"

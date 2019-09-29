@@ -9,7 +9,8 @@ use specs::World as SpecsWorld;
 use world::{SliceRange, World, CHUNK_SIZE};
 
 use crate::movement::{MovementSystem, Position, Velocity};
-use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
+use crate::render::{DebugRenderer, FrameRenderState, NavigationMeshDebugRenderer, Physical,
+                    RenderSystem, Renderer};
 use crate::steer::{Steering, SteeringSystem};
 
 pub struct Simulation<'a, R: Renderer> {
@@ -45,7 +46,7 @@ impl<'a, R: Renderer> Simulation<'a, R> {
                 .with(Position {
                     x: 0.0,
                     y: CHUNK_SIZE as f32, // should be at the top of the chunk
-                    z: 0,
+                    z: 3,
                 })
                 .with(Velocity { x: 0.0, y: 0.0 })
                 .with(Physical {
@@ -54,7 +55,7 @@ impl<'a, R: Renderer> Simulation<'a, R> {
                 .with(Steering::arrive(Position {
                     x: 10.0,
                     y: 9.0,
-                    z: 0,
+                    z: 3,
                 }))
                 .build();
 
@@ -77,7 +78,8 @@ impl<'a, R: Renderer> Simulation<'a, R> {
             renderer: PhantomData,
             world,
             debug_renderers: vec![
-                // Box::new(DummyDebugRenderer)
+                // Box::new(DummyDebugRenderer),
+                Box::new(NavigationMeshDebugRenderer),
             ],
         }
     }
