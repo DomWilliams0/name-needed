@@ -1,0 +1,54 @@
+language: rust
+
+# from https://levans.fr/rust_travis_cache.html
+cache:
+    directories:
+        - /home/travis/.cargo
+before_cache:
+    - rm -rf /home/travis/.cargo/registry
+# ---
+
+branches:
+    only:
+        - develop
+        - master
+
+install:
+    - bash .travis-install-sdl2.sh
+
+env:
+os:
+    - linux
+      # TODO windows and osx
+rust:
+    - stable
+
+
+#matrix:
+#  fast_finish: true
+#  allow_failures:
+#  include:
+#    - env: NAME='cargo-travis'
+#      sudo: required # travis-ci/travis-ci#9061
+#      before_script:
+#        - cargo install cargo-update || echo "cargo-update already installed"
+#        - cargo install cargo-travis || echo "cargo-travis already installed"
+#        - cargo install-update -a
+#      script:
+#        - |
+#          cargo build --verbose &&
+#          cargo coverage --verbose # &&
+#          bash <(curl -s https://codecov.io/bash) -s target/kcov
+#      addons: # required for kcov
+#        apt:
+#          packages:
+#            - libcurl4-openssl-dev
+#            - libelf-dev
+#            - libdw-dev
+#            - binutils-dev
+#            - cmake
+
+script: |
+        export RUST_BACKTRACE=1 &&
+        cargo build --verbose --all &&
+        cargo test --verbose --all
