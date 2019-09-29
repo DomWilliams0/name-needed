@@ -37,8 +37,17 @@ impl<'a> System<'a> for MovementSystem {
     }
 }
 
+// ----
+
 impl Position {
     pub fn new(x: f32, y: f32, z: i32) -> Self {
         Self { x, y, z }
+    }
+}
+
+impl From<&[f32; 3]> for Position {
+    fn from(arr: &[f32; 3]) -> Self {
+        let [x, y, z] = arr;
+        Position::new(*x, *y, *z as i32)
     }
 }

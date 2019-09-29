@@ -3,7 +3,7 @@ use cgmath::{Deg, Matrix4, Point3, Vector3};
 use enum_map::{Enum, EnumMap};
 use sdl2::keyboard::Keycode;
 
-const MOVE_SPEED: f32 = 0.02;
+const MOVE_SPEED: f32 = 0.2;
 
 #[derive(Enum)]
 enum Direction {

@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 world = {path = "../world"}
+scale = {path = "../scale"}
 specs = "0.15"
 specs-derive = "0.4"
 cgmath = "0.17"

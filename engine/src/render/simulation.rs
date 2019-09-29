@@ -8,8 +8,9 @@ use glium_sdl2::SDL2Facade;
 
 use simulation::{Physical, Position, Renderer};
 
-use crate::render::debug::{DebugLine, DebugLines};
-use crate::render::load_program;
+use crate::render::debug::{DebugShape, DebugShapes};
+use crate::render::{draw_params, load_program};
+use world::WorldPoint;
 
 #[derive(Copy, Clone)]
 struct EntityVertex {
@@ -37,7 +38,7 @@ pub struct SimulationRenderer {
     target: Option<Rc<RefCell<<Self as Renderer>::Target>>>,
 
     // debug
-    debug_lines: DebugLines,
+    debug_shapes: DebugShapes,
 }
 
 impl SimulationRenderer {
@@ -81,7 +82,7 @@ impl SimulationRenderer {
             entity_vertex_buf,
             entity_geometry,
             target: None,
-            debug_lines: DebugLines::new(display),
+            debug_shapes: DebugShapes::new(display),
         }
     }
 }
@@ -156,7 +157,7 @@ impl Renderer for SimulationRenderer {
                     indices,
                     &self.program,
                     &uniforms,
-                    &Default::default(),
+                    &draw_params(),
                 )
                 .unwrap();
         }
@@ -164,8 +165,17 @@ impl Renderer for SimulationRenderer {
         self.target = None;
     }
 
-    fn debug_add_line(&mut self, from: Position, to: Position, color: (u8, u8, u8)) {
-        self.debug_lines.lines.push(DebugLine { from, to, color })
+    fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: (u8, u8, u8)) {
+        self.debug_shapes.shapes.push(DebugShape::Line {
+            points: [from, to],
+            color,
+        })
+    }
+
+    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: (u8, u8, u8)) {
+        self.debug_shapes
+            .shapes
+            .push(DebugShape::Tri { points, color })
     }
 
     fn debug_finish(&mut self) {
@@ -174,6 +184,6 @@ impl Renderer for SimulationRenderer {
             .expect("init was not called")
             .borrow_mut();
 
-        self.debug_lines.draw(&mut target);
+        self.debug_shapes.draw(&mut target);
     }
 }

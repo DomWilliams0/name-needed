@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use cgmath::{ortho, Point3};
+use float_ord::FloatOrd;
 use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
@@ -15,9 +17,7 @@ use tweaker::Tweak;
 use world::{ChunkPosition, Vertex as WorldVertex, WorldViewer, CHUNK_SIZE};
 
 use crate::camera::FreeRangeCamera;
-use crate::render::{load_program, FrameTarget, SimulationRenderer};
-use float_ord::FloatOrd;
-use std::cmp::max;
+use crate::render::{draw_params, load_program, FrameTarget, SimulationRenderer};
 
 /// Copy of world::mesh::Vertex
 #[derive(Copy, Clone)]
@@ -69,7 +69,7 @@ impl GliumRenderer {
             let pos = Point3::new(
                 scale::BLOCK * block_count, // mid chunk
                 scale::BLOCK * block_count, // mid chunk
-                4.5,
+                15.0,
             );
 
             FreeRangeCamera::new(pos)
@@ -123,7 +123,9 @@ impl GliumRenderer {
             let mut world_target = target.borrow_mut();
 
             // clear
-            world_target.frame.clear_color(0.06, 0.06, 0.075, 1.0);
+            world_target
+                .frame
+                .clear_color_and_depth((0.06, 0.06, 0.075, 1.0), 1.0);
 
             // calculate projection and view matrices
             let (projection, view) = {
@@ -162,7 +164,7 @@ impl GliumRenderer {
                         &glium::index::NoIndices(PrimitiveType::TrianglesList),
                         &self.program,
                         &uniforms,
-                        &Default::default(),
+                        &draw_params(),
                     )
                     .unwrap();
             }

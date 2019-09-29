@@ -2,7 +2,7 @@ use simulation::{Physical, Position, Renderer, Simulation};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
-use world::SliceRange;
+use world::{SliceRange, WorldPoint};
 
 struct DebugRenderer;
 
@@ -13,7 +13,9 @@ impl Renderer for DebugRenderer {
         println!("pos({}, {}, {}), {:?}", pos.x, pos.y, pos.z, physical);
     }
 
-    fn debug_add_line(&mut self, _from: Position, _to: Position, _color: (u8, u8, u8)) {}
+    fn debug_add_line(&mut self, _from: WorldPoint, _to: WorldPoint, _color: (u8, u8, u8)) {}
+
+    fn debug_add_tri(&mut self, _points: [WorldPoint; 3], _color: (u8, u8, u8)) {}
 }
 
 fn main() {

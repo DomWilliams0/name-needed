@@ -44,6 +44,8 @@ impl<'a> Engine<'a> {
             .build_glium()
             .expect("Failed to create glium window");
 
+        video.gl_attr().set_depth_size(24);
+
         let renderer = GliumRenderer::new(display, WorldViewer::from_world(world.clone()));
 
         let simulation = Simulation::new(world.clone());

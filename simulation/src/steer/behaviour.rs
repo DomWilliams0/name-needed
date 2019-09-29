@@ -57,7 +57,7 @@ trait DoASteer {
 pub struct Nop;
 
 impl DoASteer for Nop {
-    fn tick(&mut self, current_pos: Position, vel: &mut Velocity) -> CompleteAction {
+    fn tick(&mut self, _current_pos: Position, _vel: &mut Velocity) -> CompleteAction {
         // it never ends
         CompleteAction::Continue
     }

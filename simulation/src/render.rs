@@ -4,7 +4,7 @@ use std::rc::Rc;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use world::{SliceRange, World};
+use world::{SliceRange, World, WorldPoint};
 
 use crate::movement::Position;
 
@@ -31,7 +31,9 @@ pub trait Renderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, from: Position, to: Position, color: (u8, u8, u8));
+    fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: (u8, u8, u8));
+
+    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: (u8, u8, u8));
 
     fn debug_finish(&mut self) {}
 }
@@ -76,6 +78,54 @@ pub trait DebugRenderer<R: Renderer> {
         world: Rc<RefCell<World>>,
         frame_state: &FrameRenderState<R>,
     );
+}
+
+/// Draws navigation mesh
+pub struct NavigationMeshDebugRenderer;
+
+impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
+    fn render(
+        &mut self,
+        renderer: &mut R,
+        world: Rc<RefCell<World>>,
+        frame_state: &FrameRenderState<R>,
+    ) {
+        for c in world.borrow().visible_chunks() {
+            let nav = c.navigation();
+            for node in nav.nodes()
+                .filter(|n| nav.is_visible(*n, frame_state.slices))
+            {
+                let node_pos = nav.node_position(node);
+                let WorldPoint(x, y, z) = node_pos.to_world_pos_centered(c.pos());
+                let tri = scale::BLOCK / 3.0;
+
+                // hover just above the supporting block below
+                // let z = z - 0.8;
+
+                renderer.debug_add_tri(
+                    [
+                        (x - tri, y + tri, z).into(),
+                        (x + tri, y + tri, z).into(),
+                        (x, y - tri, z).into(),
+                    ],
+                    (20, 200, 10),
+                );
+            }
+
+            for (_, from, to) in nav.all_edges().filter(|(_, a, b)| {
+                nav.is_visible(*a, frame_state.slices) || nav.is_visible(*b, frame_state.slices)
+            }) {
+                let from = nav.node_position(from);
+                let to = nav.node_position(to);
+
+                renderer.debug_add_line(
+                    from.to_world_pos_centered(c.pos()),
+                    to.to_world_pos_centered(c.pos()),
+                    (20, 30, 190),
+                );
+            }
+        }
+    }
 }
 
 /*

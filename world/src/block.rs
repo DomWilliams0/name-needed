@@ -2,7 +2,8 @@
 pub enum BlockType {
     Air,
     Dirt,
-    Hi,
+    Grass,
+    Stone,
 }
 
 impl BlockType {
@@ -10,7 +11,8 @@ impl BlockType {
         match self {
             BlockType::Air => (0, 0, 0),
             BlockType::Dirt => (192, 57, 43),
-            BlockType::Hi => (20, 100, 20),
+            BlockType::Grass => (40, 102, 25),
+            BlockType::Stone => (106, 106, 117),
         }
     }
 
@@ -21,6 +23,10 @@ impl BlockType {
             f32::from(g) / 255.0,
             f32::from(b) / 255.0,
         )
+    }
+
+    pub fn solid(self) -> bool {
+        self != BlockType::Air
     }
 }
 

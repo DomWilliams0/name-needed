@@ -1,8 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::block::BlockType;
-use crate::chunk::CHUNK_SIZE;
-use crate::coordinate::world::{BlockCoord, SliceBlock};
+use crate::coordinate::world::{BlockCoord, SliceBlock, CHUNK_SIZE};
 
 pub struct Slice<'a> {
     slice: &'a [BlockType],
@@ -27,6 +26,13 @@ impl<'a> Slice<'a> {
                 (pos, b)
             })
     }
+
+    pub fn blocks(&self) -> impl Iterator<Item = (SliceBlock, &BlockType)> {
+        self.slice.iter().enumerate().map(|(i, b)| {
+            let pos = unflatten_index(i);
+            (pos, b)
+        })
+    }
 }
 
 impl<'a> Deref for Slice<'a> {
@@ -44,8 +50,8 @@ impl<'a> SliceMut<'a> {
         Self { slice }
     }
 
-    pub fn set_block(&mut self, pos: SliceBlock, block: BlockType) {
-        let index = flatten_coords(pos);
+    pub fn set_block<P: Into<SliceBlock>>(&mut self, pos: P, block: BlockType) {
+        let index = flatten_coords(pos.into());
         self.slice[index] = block;
     }
 }
