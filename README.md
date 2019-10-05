@@ -13,3 +13,8 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 <p style="margin: auto; width: 60%">
     <img src=".screenshots/navmesh.jpg" width="60%"/>
 </p>
+
+* 05 Oct 2019: <em>Half steps and navmesh edge costs - blue edges are cheap walking flat/up a half step, and red edges are more expensive jumps</em>
+<p style="margin: auto; width: 60%">
+    <img src=".screenshots/navmesh-halfsteps.jpg" width="60%"/>
+</p>
