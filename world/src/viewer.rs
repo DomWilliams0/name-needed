@@ -1,21 +1,18 @@
-use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::RangeInclusive;
-use std::rc::Rc;
 
 use generator::{done, Generator, Gn};
 
 use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType, CHUNK_SIZE};
-use crate::mesh;
 use crate::mesh::Vertex;
-use crate::World;
+use crate::{mesh, WorldRef};
 use std::iter::Map;
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
 
 pub struct WorldViewer {
-    world: Rc<RefCell<World>>,
+    world: WorldRef,
     view_range: SliceRange,
 }
 
@@ -82,7 +79,7 @@ impl SliceRange {
 }
 
 impl WorldViewer {
-    pub fn from_world(world: Rc<RefCell<World>>) -> Self {
+    pub fn from_world(world: WorldRef) -> Self {
         let start = SliceIndex(0);
         Self {
             world,

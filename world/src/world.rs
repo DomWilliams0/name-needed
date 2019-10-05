@@ -1,5 +1,14 @@
 use crate::block::{BlockHeight, BlockType};
 use crate::chunk::{Chunk, ChunkBuilder, CHUNK_SIZE};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+/// Reference to the world
+pub type WorldRef = Rc<RefCell<World>>;
+
+pub fn world_ref(w: World) -> WorldRef {
+    Rc::new(RefCell::new(w))
+}
 
 pub struct World {
     chunks: Vec<Chunk>,

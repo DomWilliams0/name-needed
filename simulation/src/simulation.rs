@@ -6,7 +6,7 @@ use specs::prelude::*;
 pub use specs::System;
 use specs::World as SpecsWorld;
 
-use world::{SliceRange, World, CHUNK_SIZE};
+use world::{SliceRange, WorldRef, CHUNK_SIZE};
 
 use crate::movement::{MovementSystem, Position, Velocity};
 use crate::render::{DebugRenderer, FrameRenderState, NavigationMeshDebugRenderer, Physical,
@@ -17,14 +17,14 @@ pub struct Simulation<'a, R: Renderer> {
     specs_world: SpecsWorld,
     specs_dispatcher: Dispatcher<'a, 'a>,
 
-    world: Rc<RefCell<World>>,
+    world: WorldRef,
 
     renderer: PhantomData<R>,
     debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
 }
 
 impl<'a, R: Renderer> Simulation<'a, R> {
-    pub fn new(world: Rc<RefCell<World>>) -> Self {
+    pub fn new(world: WorldRef) -> Self {
         let mut specs_world = SpecsWorld::new();
 
         // register systems

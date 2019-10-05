@@ -6,11 +6,9 @@ use sdl2::Sdl;
 use gameloop::{FrameAction, GameLoop};
 use simulation::Simulation;
 use tweaker::Tweak;
-use world::{World, WorldViewer};
+use world::{WorldRef, WorldViewer};
 
 use crate::render::{GliumRenderer, SimulationRenderer};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub struct Engine<'a> {
     sdl: Sdl,
@@ -26,7 +24,7 @@ enum KeyEvent {
 
 impl<'a> Engine<'a> {
     /// Panics if SDL or glium initialisation fails
-    pub fn new(world: Rc<RefCell<World>>) -> Self {
+    pub fn new(world: WorldRef) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");
 
         let video = sdl.video().expect("Failed to init SDL video");

@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use tweaker;
 use world;
 
@@ -18,7 +16,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let world = Rc::new(RefCell::new(world::World::default()));
+    let world = world::world_ref(world::World::default());
     let eng = engine::Engine::new(world);
     eng.run();
 }

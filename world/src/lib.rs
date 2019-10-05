@@ -13,4 +13,4 @@ pub use self::chunk::*;
 pub use self::coordinate::world::{BlockPosition, ChunkPosition, WorldPoint};
 pub use self::mesh::{Vertex, VERTICES_PER_CHUNK};
 pub use self::viewer::{SliceRange, WorldViewer};
-pub use self::world::World;
+pub use self::world::{world_ref, World, WorldRef};

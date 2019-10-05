@@ -5,7 +5,7 @@ use specs::prelude::*;
 use specs_derive::Component;
 
 use world::navigation::{Edge, NodeIndex};
-use world::{BlockPosition, Chunk, SliceRange, World, WorldPoint};
+use world::{BlockPosition, Chunk, SliceRange, WorldPoint, WorldRef};
 
 use crate::movement::Position;
 
@@ -73,24 +73,14 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 }
 
 pub trait DebugRenderer<R: Renderer> {
-    fn render(
-        &mut self,
-        renderer: &mut R,
-        world: Rc<RefCell<World>>,
-        frame_state: &FrameRenderState<R>,
-    );
+    fn render(&mut self, renderer: &mut R, world: WorldRef, frame_state: &FrameRenderState<R>);
 }
 
 /// Draws navigation mesh
 pub struct NavigationMeshDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
-    fn render(
-        &mut self,
-        renderer: &mut R,
-        world: Rc<RefCell<World>>,
-        frame_state: &FrameRenderState<R>,
-    ) {
+    fn render(&mut self, renderer: &mut R, world: WorldRef, frame_state: &FrameRenderState<R>) {
         fn node_position_renderable(node: NodeIndex, chunk: &Chunk) -> WorldPoint {
             let block_pos: BlockPosition = *chunk.navigation().node_position(node);
 
