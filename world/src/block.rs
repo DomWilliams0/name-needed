@@ -1,3 +1,11 @@
+/// A single block in a chunk
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Block {
+    pub block_type: BlockType,
+    pub height: BlockHeight,
+}
+
+/// The type of a block
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum BlockType {
     Air,
@@ -33,5 +41,50 @@ impl BlockType {
 impl Default for BlockType {
     fn default() -> Self {
         BlockType::Air
+    }
+}
+
+/// The additional height offset for a block
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BlockHeight {
+    Half = 0,
+    Full = 1,
+    // TODO Third?
+}
+
+impl BlockHeight {
+    pub fn height(self) -> f32 {
+        match self {
+            BlockHeight::Full => 1.0,
+            BlockHeight::Half => 0.5,
+        }
+    }
+
+    pub fn solid(self) -> bool {
+        self == BlockHeight::Full
+    }
+
+    /// Offset to subtract from z position to lower from the center of the block to the bottom
+    pub fn offset_from_center(self) -> f32 {
+        match self {
+            BlockHeight::Full => 0.0,
+            BlockHeight::Half => 0.25,
+        }
+    }
+}
+
+impl Default for BlockHeight {
+    fn default() -> Self {
+        BlockHeight::Full
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::block::BlockHeight;
+
+    #[test]
+    fn ordering() {
+        assert!(BlockHeight::Full > BlockHeight::Half);
     }
 }

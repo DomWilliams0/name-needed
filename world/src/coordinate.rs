@@ -4,7 +4,7 @@ pub mod world {
     use crate::grid::CoordType;
 
     pub const CHUNK_SIZE: usize = 16;
-    // TODO expose as w h and d and in different types too
+    // TODO expose as w h and d and in different types too (#38)
 
     /// A slice of blocks in a chunk, z coordinate
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -17,7 +17,7 @@ pub mod world {
 
     /// A block in a chunk
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    pub struct Block(pub BlockCoord, pub BlockCoord, pub SliceIndex);
+    pub struct BlockPosition(pub BlockCoord, pub BlockCoord, pub SliceIndex);
 
     /// A block in a slice
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -41,10 +41,10 @@ pub mod world {
         pub const MAX: SliceIndex = Self(std::i32::MAX);
     }
 
-    impl Block {
+    impl BlockPosition {
         pub fn to_world_pos<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
             let ChunkPosition(cx, cy) = chunk_pos.into();
-            let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
+            let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
             WorldPoint(
                 f32::from(x + (cx * CHUNK_SIZE as i32) as u16),
                 f32::from(y + (cy * CHUNK_SIZE as i32) as u16),
@@ -62,7 +62,7 @@ pub mod world {
         }
 
         pub fn to_chunk_point_centered(self) -> ChunkPoint {
-            let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
+            let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
             ChunkPoint(f32::from(x), f32::from(y), z as f32)
         }
     }
@@ -73,23 +73,23 @@ pub mod world {
             Self(u)
         }
     }
-    impl From<(u16, u16, SliceIndexType)> for Block {
+    impl From<(u16, u16, SliceIndexType)> for BlockPosition {
         fn from(pos: (u16, u16, i32)) -> Self {
             let (x, y, z) = pos;
             Self(x.into(), y.into(), SliceIndex(z))
         }
     }
 
-    impl From<&CoordType> for Block {
+    impl From<&CoordType> for BlockPosition {
         fn from(pos: &CoordType) -> Self {
             let &[x, y, z] = pos;
             Self((x as u16).into(), (y as u16).into(), SliceIndex(z))
         }
     }
 
-    impl From<Block> for CoordType {
-        fn from(b: Block) -> Self {
-            let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = b;
+    impl From<BlockPosition> for CoordType {
+        fn from(b: BlockPosition) -> Self {
+            let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = b;
             [i32::from(x), i32::from(y), z]
         }
     }
@@ -140,9 +140,9 @@ pub mod world {
         }
     }
 
-    impl From<Block> for (u16, u16, SliceIndexType) {
-        fn from(b: Block) -> Self {
-            let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = b;
+    impl From<BlockPosition> for (u16, u16, SliceIndexType) {
+        fn from(b: BlockPosition) -> Self {
+            let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = b;
             (x, y, z)
         }
     }
@@ -172,12 +172,12 @@ mod tests {
 
     use float_cmp::ApproxEq;
 
-    use crate::coordinate::world::{Block, BlockCoord, SliceIndex};
+    use crate::coordinate::world::{BlockCoord, BlockPosition, SliceIndex};
     use crate::{WorldPoint, CHUNK_SIZE};
 
     #[test]
     fn block_to_world() {
-        let b = Block(BlockCoord(1), BlockCoord(2), SliceIndex(3));
+        let b = BlockPosition(BlockCoord(1), BlockCoord(2), SliceIndex(3));
 
         // at origin
         let WorldPoint(x, y, z) = b.to_world_pos((0, 0));

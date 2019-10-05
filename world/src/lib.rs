@@ -1,16 +1,16 @@
 #![allow(dead_code)]
-mod block;
+pub mod block;
 mod chunk;
 mod coordinate;
 mod grid;
 mod mesh;
-mod navigation;
+pub mod navigation;
 mod slice;
 mod viewer;
 mod world;
 
 pub use self::chunk::*;
-pub use self::coordinate::world::{ChunkPosition, WorldPoint};
+pub use self::coordinate::world::{BlockPosition, ChunkPosition, WorldPoint};
 pub use self::mesh::{Vertex, VERTICES_PER_CHUNK};
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::World;

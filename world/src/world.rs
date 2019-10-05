@@ -1,4 +1,4 @@
-use crate::block::BlockType;
+use crate::block::{BlockHeight, BlockType};
 use crate::chunk::{Chunk, ChunkBuilder, CHUNK_SIZE};
 
 pub struct World {
@@ -20,6 +20,11 @@ impl Default for World {
                         s.set_block((x, y), BlockType::Dirt);
                     }
                 }
+
+                // step up from slice 0
+                for y in 2..half-2 {
+                    s.set_block_with_height((half-1,y), BlockType::Stone, BlockHeight::Half)
+                }
             })
             .with_slice(2, |mut s| {
                 // fill smaller section of 2
@@ -28,6 +33,9 @@ impl Default for World {
                         s.set_block((x, y), BlockType::Grass);
                     }
                 }
+
+                // step up from slice 1
+                s.set_block_with_height((half + 3, half), BlockType::Dirt, BlockHeight::Half)
             })
             .apply(|s| {
                 // stairs

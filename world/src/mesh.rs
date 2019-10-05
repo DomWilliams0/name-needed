@@ -1,5 +1,6 @@
 use scale;
 
+use crate::block::Block;
 use crate::chunk::Chunk;
 use crate::coordinate::world::{BlockCoord, SliceBlock, SliceIndex};
 use crate::viewer::SliceRange;
@@ -33,7 +34,7 @@ pub const VERTICES_PER_CHUNK: usize = VERTICES_PER_BLOCK * BLOCK_COUNT_CHUNK;
 // for ease of declaration. /2 as based around the center of the block
 const X: f32 = scale::BLOCK / 2.0;
 
-pub const BLOCK_VERTICES: [Vertex; 36] = [
+const BLOCK_VERTICES: [Vertex; 36] = [
     // front
     Vertex::new(-X, -X, -X),
     Vertex::new(-X, -X, X),
@@ -109,18 +110,28 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
         // TODO skip if slice knows it is empty
 
         for (block_pos, block) in slice.non_air_blocks() {
+            let Block { block_type, height } = block;
+
             let (bx, by, bz) = {
                 let SliceBlock(BlockCoord(x), BlockCoord(y)) = block_pos;
                 let SliceIndex(slice_index) = slice_index;
+                let z = {
+                    let z = slice_index as f32;
+
+                    // blocks that aren't full would be floating around the center, so lower to
+                    // the bottom of the block
+                    z - height.offset_from_center()
+                };
                 (
                     // +0.5 to render in the center of the block, which is the block mesh's origin
                     f32::from(x) + 0.5,
                     f32::from(y) + 0.5,
-                    slice_index as f32,
+                    z,
                 )
             };
 
-            let color = block.color_as_f32();
+            let color = block_type.color_as_f32();
+            let height = height.height();
 
             for face in 0..FACE_COUNT {
                 let face_verts = {
@@ -133,7 +144,7 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
                     vertices.push(Vertex::with_color(
                         fx + bx * scale::BLOCK,
                         fy + by * scale::BLOCK,
-                        fz + bz * scale::BLOCK,
+                        (fz * height) + bz * scale::BLOCK,
                         color,
                     ));
                 }

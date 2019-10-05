@@ -3,8 +3,8 @@ use std::mem::MaybeUninit;
 
 use nd_iter::iter_3d;
 
-use crate::block::BlockType;
-use crate::coordinate::world::{Block, BlockCoord, SliceIndex};
+use crate::block::{Block, BlockHeight, BlockType};
+use crate::coordinate::world::{BlockCoord, BlockPosition, SliceIndex};
 use crate::slice::SliceMut;
 use crate::{Chunk, ChunkGrid, ChunkPosition};
 
@@ -23,11 +23,23 @@ impl ChunkBuilder {
         }
     }
 
-    pub fn set_block<B: Into<Block>>(mut self, pos: B, block: BlockType) -> Self {
+    pub fn set_block<B: Into<BlockPosition>>(self, pos: B, block: BlockType) -> Self {
+        self.set_block_with_height(pos, block, BlockHeight::default())
+    }
+
+    pub fn set_block_with_height<B: Into<BlockPosition>>(
+        mut self,
+        pos: B,
+        block: BlockType,
+        height: BlockHeight,
+    ) -> Self {
         // TODO allow negative slice indices
         // TODO copied!
-        let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = pos.into();
-        self.blocks[&[i32::from(x), i32::from(y), z]] = block;
+        let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = pos.into();
+        self.blocks[&[i32::from(x), i32::from(y), z]] = Block {
+            block_type: block,
+            height,
+        };
         self
     }
 
@@ -35,10 +47,10 @@ impl ChunkBuilder {
         let SliceIndex(index) = slice.into();
         let (from, to) = ChunkGrid::slice_range(index);
 
-        let blocks: &mut [BlockType] = &mut *self.blocks;
+        let blocks: &mut [Block] = &mut *self.blocks;
 
         for b in &mut blocks[from..to] {
-            *b = block;
+            b.block_type = block;
         }
 
         self
@@ -46,8 +58,8 @@ impl ChunkBuilder {
 
     pub fn fill_range<F, T, B>(mut self, from: F, to: T, block: B) -> Self
     where
-        F: Into<Block>,
-        T: Into<Block>,
+        F: Into<BlockPosition>,
+        T: Into<BlockPosition>,
         B: Fn((i32, i32, i32)) -> Option<BlockType>,
     {
         let [fx, fy, fz]: [i32; 3] = from.into().into();
@@ -56,7 +68,7 @@ impl ChunkBuilder {
         for (x, y, z) in iter_3d(fx..tx, fy..ty, fz..tz) {
             let b = block((x, y, z));
             if let Some(block) = b {
-                self.blocks[&[x, y, z]] = block;
+                self.blocks[&[x, y, z]].block_type = block;
             }
         }
 
@@ -90,7 +102,15 @@ impl ChunkBuilder {
 }
 
 impl ChunkBuilderApply {
-    pub fn set_block<B: Into<Block>>(&mut self, pos: B, block: BlockType) -> &mut Self {
+    pub fn set_block<B: Into<BlockPosition>>(&mut self, pos: B, block: BlockType) -> &mut Self {
+        self.set_block_with_height(pos, block, BlockHeight::default())
+    }
+    pub fn set_block_with_height<B: Into<BlockPosition>>(
+        &mut self,
+        pos: B,
+        block: BlockType,
+        height: BlockHeight,
+    ) -> &mut Self {
         // swap out inner with dAnGeRoUs uNdEfInEd bEhAvIoUr
         #[allow(clippy::uninit_assumed_init)]
         let dummy_uninit = unsafe { MaybeUninit::uninit().assume_init() };
@@ -99,7 +119,7 @@ impl ChunkBuilderApply {
         // self.inner is currently undefined
 
         // process and get new builder
-        let new = chunk_builder.set_block(pos, block);
+        let new = chunk_builder.set_block_with_height(pos, block, height);
 
         self.inner.set(new);
 
@@ -117,7 +137,7 @@ impl Default for ChunkBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::BlockType;
+    use crate::block::{BlockHeight, BlockType};
     use crate::chunk::ChunkBuilder;
 
     #[test]
@@ -126,17 +146,22 @@ mod tests {
             .fill_slice(0, BlockType::Grass)
             .build((0, 0));
 
-        assert!(c.slice(0).iter().all(|b| *b == BlockType::Grass));
-        assert!(c.slice(1).iter().all(|b| *b == BlockType::Air));
+        assert!(c.slice(0).all_blocks_are(BlockType::Grass));
+        assert!(c.slice(1).all_blocks_are(BlockType::Air));
     }
 
     #[test]
     fn set_block() {
         let c = ChunkBuilder::new()
             .set_block((2, 2, 1), BlockType::Stone)
+            .set_block_with_height((3, 3, 3), BlockType::Grass, BlockHeight::Half)
             .build((0, 0));
 
-        assert_eq!(c.get_block((2, 2, 1)), BlockType::Stone);
+        assert_eq!(c.get_block((2, 2, 1)).block_type, BlockType::Stone);
+        assert_eq!(c.get_block((2, 2, 1)).height, BlockHeight::Full);
+
+        assert_eq!(c.get_block((3, 3, 3)).block_type, BlockType::Grass);
+        assert_eq!(c.get_block((3, 3, 3)).height, BlockHeight::Half);
     }
 
     #[test]
@@ -148,8 +173,8 @@ mod tests {
             })
             .build((0, 0));
 
-        assert_eq!(c.get_block((1, 1, 1)), BlockType::Grass);
-        assert_eq!(c.get_block((1, 2, 1)), BlockType::Grass);
+        assert_eq!(c.get_block_type((1, 1, 1)), BlockType::Grass);
+        assert_eq!(c.get_block_type((1, 2, 1)), BlockType::Grass);
     }
 
     #[test]
@@ -159,7 +184,9 @@ mod tests {
             .build((0, 0));
 
         assert_eq!(
-            c.blocks().filter(|(_, b)| *b == BlockType::Stone).count(),
+            c.blocks()
+                .filter(|(_, b)| b.block_type == BlockType::Stone)
+                .count(),
             3 * 3 * 3
         );
 
@@ -168,7 +195,9 @@ mod tests {
             .build((0, 0));
 
         assert_eq!(
-            c.blocks().filter(|(_, b)| *b == BlockType::Stone).count(),
+            c.blocks()
+                .filter(|(_, b)| b.block_type == BlockType::Stone)
+                .count(),
             0
         );
 
@@ -182,14 +211,21 @@ mod tests {
             })
             .build((0, 0));
 
-        assert_eq!(c.blocks().filter(|(_, b)| *b == BlockType::Dirt).count(), 1);
-        assert_eq!(c.get_block((0, 3, 3)), BlockType::Dirt);
+        assert_eq!(
+            c.blocks()
+                .filter(|(_, b)| b.block_type == BlockType::Dirt)
+                .count(),
+            1
+        );
+        assert_eq!(c.get_block_type((0, 3, 3)), BlockType::Dirt);
 
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (10, 0, 0), |_| Some(BlockType::Stone))
             .build((0, 0));
         assert_eq!(
-            c.blocks().filter(|(_, b)| *b == BlockType::Stone).count(),
+            c.blocks()
+                .filter(|(_, b)| b.block_type == BlockType::Stone)
+                .count(),
             0
         );
 
@@ -197,7 +233,9 @@ mod tests {
             .fill_range((0, 0, 0), (10, 1, 1), |_| Some(BlockType::Stone))
             .build((0, 0));
         assert_eq!(
-            c.blocks().filter(|(_, b)| *b == BlockType::Stone).count(),
+            c.blocks()
+                .filter(|(_, b)| b.block_type == BlockType::Stone)
+                .count(),
             10
         );
     }

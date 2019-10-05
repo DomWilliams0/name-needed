@@ -4,7 +4,8 @@ use std::rc::Rc;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use world::{SliceRange, World, WorldPoint};
+use world::navigation::{Edge, NodeIndex};
+use world::{BlockPosition, Chunk, SliceRange, World, WorldPoint};
 
 use crate::movement::Position;
 
@@ -90,17 +91,23 @@ impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
         world: Rc<RefCell<World>>,
         frame_state: &FrameRenderState<R>,
     ) {
+        fn node_position_renderable(node: NodeIndex, chunk: &Chunk) -> WorldPoint {
+            let block_pos: BlockPosition = *chunk.navigation().node_position(node);
+
+            let mut world_pos: WorldPoint = block_pos.to_world_pos_centered(chunk.pos());
+
+            world_pos.2 += 1.0 - chunk.get_block(block_pos).height.height(); // lower to the height of the block
+            world_pos.2 -= scale::BLOCK * 0.8; // lower to just above the surface
+            world_pos
+        }
+
         for c in world.borrow().visible_chunks() {
             let nav = c.navigation();
             for node in nav.nodes()
                 .filter(|n| nav.is_visible(*n, frame_state.slices))
             {
-                let node_pos = nav.node_position(node);
-                let WorldPoint(x, y, z) = node_pos.to_world_pos_centered(c.pos());
+                let WorldPoint(x, y, z) = node_position_renderable(node, c);
                 let tri = scale::BLOCK / 3.0;
-
-                // hover just above the supporting block below
-                // let z = z - 0.8;
 
                 renderer.debug_add_tri(
                     [
@@ -112,17 +119,17 @@ impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
                 );
             }
 
-            for (_, from, to) in nav.all_edges().filter(|(_, a, b)| {
+            for (e, from, to) in nav.all_edges().filter(|(_, a, b)| {
                 nav.is_visible(*a, frame_state.slices) || nav.is_visible(*b, frame_state.slices)
             }) {
-                let from = nav.node_position(from);
-                let to = nav.node_position(to);
+                let from = node_position_renderable(from, c);
+                let to = node_position_renderable(to, c);
+                let color = match e.weight() {
+                    Edge::Jump => (250, 20, 20),
+                    Edge::Walk(_) => (35, 150, 250),
+                };
 
-                renderer.debug_add_line(
-                    from.to_world_pos_centered(c.pos()),
-                    to.to_world_pos_centered(c.pos()),
-                    (20, 30, 190),
-                );
+                renderer.debug_add_line(from, to, color);
             }
         }
     }

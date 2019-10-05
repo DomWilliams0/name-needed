@@ -5,29 +5,20 @@ use cgmath::MetricSpace;
 use cgmath::Vector3;
 use petgraph::algo::astar;
 use petgraph::graph::EdgeReference;
-use petgraph::prelude::*;
-use petgraph::{Graph, Undirected};
+use petgraph::visit::EdgeRef;
 
+use crate::block::{Block, BlockHeight};
 use crate::chunk::Chunk;
-use crate::coordinate::world::{Block, CHUNK_SIZE};
+use crate::coordinate::world::{BlockPosition, CHUNK_SIZE};
 use crate::grid::{CoordType, Grid, GridImpl};
+use crate::navigation::graph::{Edge, NavGraph, NavIdx};
+use crate::navigation::{Node, NodeIndex};
 use crate::SliceRange;
 use crate::{grid_declare, ChunkGrid};
-
-type NavIdx = u32;
-type NavGraph = Graph<Node, Edge, Undirected, NavIdx>; // TODO directed
 
 pub struct Navigation {
     graph: NavGraph,
 }
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct Node(Block);
-
-type Edge = ();
-
-//#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-//struct Edge(i32); // cost
 
 impl Navigation {
     /// Initialize from a chunk's geometry
@@ -38,7 +29,11 @@ impl Navigation {
         pub struct NavMarker {
             done: Cell<bool>,
             node: Cell<Option<NodeIndex>>,
+            /// is material solid
             solid: bool,
+
+            /// is not a half step
+            height: BlockHeight,
         }
 
         const SZ: usize = CHUNK_SIZE as usize;
@@ -51,14 +46,16 @@ impl Navigation {
         // populate grid with solidness flag
         for idx in grid.indices() {
             let pos = grid.unflatten_index(idx);
-            let mut marker = &mut grid[idx];
-            marker.solid = chunk[&pos].solid();
+            let mut marker: &mut NavMarker = &mut grid[idx];
+            let block: Block = chunk[&pos];
+            marker.solid = block.block_type.solid();
+            marker.height = block.height;
         }
 
         // no corners
         const NEIGHBOURS: [(i32, i32); 4] = [(-1, 0), (0, -1), (0, 1), (1, 0)];
 
-        let walkable = |pos: Block| -> bool {
+        let walkable = |pos: BlockPosition| -> bool {
             let (x, y, z) = pos.into();
 
             // nothing below or above: nope
@@ -66,24 +63,33 @@ impl Navigation {
                 return false;
             }
 
-            // solid: nope
             let coord: CoordType = pos.into();
-            let marker = &grid[&coord];
+            let marker: &NavMarker = &grid[&coord];
+
             if marker.solid {
-                return false;
+                // solid and half block: yes
+                // solid and full block: no
+                return !marker.height.solid();
             }
+
+            let below: BlockPosition = (x, y, z - 1).into();
+            let below: &NavMarker = &grid[&below.into()];
 
             // below not solid either: nope
-            let below: Block = (x, y, z - 1).into();
-            if !grid[&below.into()].solid {
+            if !below.solid {
                 return false;
             }
 
-            // nice
+            // below is solid but half block: nope
+            if !below.height.solid() {
+                return false;
+            }
+
+            // below is solid and full: nice
             true
         };
 
-        let get_or_create_node = |pos: Block| -> NodeIndex {
+        let get_or_create_node = |pos: BlockPosition| -> NodeIndex {
             let coord: CoordType = pos.into();
             match grid[&coord].node.get() {
                 None => {
@@ -98,7 +104,31 @@ impl Navigation {
         let add_edge = |a: NodeIndex, b: NodeIndex| {
             let (from, to) = if a < b { (a, b) } else { (b, a) };
 
-            graph.borrow_mut().update_edge(from, to, ());
+            let edge = {
+                let g = graph.borrow();
+                let from_pos: BlockPosition = g.node_weight(from).unwrap().0;
+                let to_pos: BlockPosition = g.node_weight(to).unwrap().0;
+
+                let from_height: BlockHeight = grid[&from_pos.into()].height;
+                let to_height: BlockHeight = grid[&to_pos.into()].height;
+
+                if from_height.solid() && to_height.solid() {
+                    // both are solid
+                    if from_pos.2 == to_pos.2 {
+                        // and on the same level, must be a ezpz flat walk
+                        Edge::Walk(BlockHeight::Full)
+                    } else {
+                        // but not on the same level, must be a jump
+                        Edge::Jump
+                    }
+                } else {
+                    // one is elevated, so its a climb
+                    // choose the minimum i.e. the non-full step
+                    let height = std::cmp::min(from_height, to_height);
+                    Edge::Walk(height)
+                }
+            };
+            graph.borrow_mut().update_edge(from, to, edge);
         };
 
         fn get_neighbour(src: (u16, u16), delta: (i32, i32)) -> Option<(u16, u16)> {
@@ -125,7 +155,7 @@ impl Navigation {
             grid[idx].done.set(true);
 
             let pos = grid.unflatten_index(idx);
-            let pos: Block = (&pos).into();
+            let pos: BlockPosition = (&pos).into();
             if !walkable(pos) {
                 // not suitable
                 continue;
@@ -135,6 +165,12 @@ impl Navigation {
             grid[idx].node.set(Some(node));
             let (x, y, z) = pos.into();
 
+            // if above is blocked, dont bother checking for diagonal edges
+            let above_blocked = {
+                let above: BlockPosition = (x, y, z + 1).into();
+                grid[&above.into()].solid
+            };
+
             // horizontal neighbours
             for &(dx, dy) in &NEIGHBOURS {
                 let (nx, ny) = match get_neighbour((x, y), (dx, dy)) {
@@ -142,22 +178,28 @@ impl Navigation {
                     _ => continue,
                 };
 
-                let neighbour: Block = (nx, ny, z).into();
+                let neighbour: BlockPosition = (nx, ny, z).into();
                 if walkable(neighbour) {
                     // nice, walkable
                     // connect with parent
                     let node_neighbour = get_or_create_node(neighbour);
                     add_edge(node, node_neighbour);
-                } else {
-                    // maybe above is walkable instead
-                    let above: Block = (nx, ny, z + 1).into();
+                } else if !above_blocked {
+                    // maybe above is walkable instead, either via a jump or step
+                    let above: BlockPosition = (nx, ny, z + 1).into();
                     if walkable(above) {
                         let node_above = get_or_create_node(above);
                         add_edge(node, node_above);
-                        // graph.add_edge(node_above, node, ());
                     }
                 }
             }
+        }
+
+        // remove unconnected nodes (disable in tests)
+        if !cfg!(test) {
+            graph
+                .borrow_mut()
+                .retain_nodes(|g, n| g.edges(n).count() > 0);
         }
 
         Self {
@@ -165,17 +207,21 @@ impl Navigation {
         }
     }
 
-    pub fn resolve_node(&self, block: Block) -> Option<NodeIndex> {
+    pub fn resolve_node(&self, block: BlockPosition) -> Option<NodeIndex> {
         self.graph
             .node_indices()
             .find(|i| self.graph.node_weight(*i).unwrap().0 == block)
     }
 
     // TODO return Result instead
-    pub fn find_path<F: Into<Block>, T: Into<Block>>(&self, from: F, to: T) -> Option<Path> {
+    pub fn find_path<F: Into<BlockPosition>, T: Into<BlockPosition>>(
+        &self,
+        from: F,
+        to: T,
+    ) -> Option<Path> {
         // TODO better lookup
-        let from: Block = from.into();
-        let to: Block = to.into();
+        let from: BlockPosition = from.into();
+        let to: BlockPosition = to.into();
 
         let (from_node, to_node) = match (self.resolve_node(from), self.resolve_node(to)) {
             (Some(from), Some(to)) => (from, to),
@@ -188,7 +234,7 @@ impl Navigation {
             &self.graph,
             from_node,
             |n| n == to_node,
-            |_| 1, // edge cost
+            |e| e.weight().weight(),
             |n| {
                 let node = self.graph.node_weight(n).unwrap();
                 let here_vec: Vector3<f32> = node.0.to_chunk_point_centered().into();
@@ -215,7 +261,7 @@ impl Navigation {
         self.graph.node_indices()
     }
 
-    pub fn node_position(&self, idx: NodeIndex) -> &Block {
+    pub fn node_position(&self, idx: NodeIndex) -> &BlockPosition {
         &self.graph.node_weight(idx).expect("bad node index").0
     }
 
@@ -235,13 +281,13 @@ impl Navigation {
     }
 
     pub fn is_visible(&self, node: NodeIndex, range: SliceRange) -> bool {
-        let Block(_, _, slice) = self.graph.node_weight(node).unwrap().0;
+        let BlockPosition(_, _, slice) = self.graph.node_weight(node).unwrap().0;
         range.contains(slice - 1) // -1 to only render if the supporting block below is visible
     }
 }
 
 #[derive(Debug)]
-pub struct Path(Vec<Block>);
+pub struct Path(Vec<BlockPosition>);
 
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -255,12 +301,30 @@ impl Display for Path {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::BlockType;
+    use crate::block::{BlockHeight, BlockType};
     use crate::chunk::ChunkBuilder;
+    use crate::navigation::graph::Edge;
     use crate::CHUNK_SIZE;
 
     #[test]
     fn simple() {
+        // just 1 at 0,0,0
+        let chunk = ChunkBuilder::new()
+            .set_block((0, 0, 0), BlockType::Dirt)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+        assert_eq!(nav.graph.node_count(), 1);
+
+        // just 1 at 0,0,1
+        let chunk = ChunkBuilder::new()
+            .set_block((0, 0, 1), BlockType::Dirt)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+        assert_eq!(nav.graph.node_count(), 1);
+
+        // 2 adjacent on level 1
         let chunk = ChunkBuilder::new()
             .set_block((1, 1, 1), BlockType::Dirt)
             .set_block((1, 2, 1), BlockType::Dirt)
@@ -274,24 +338,73 @@ mod tests {
     }
 
     #[test]
-    fn step_up() {
+    fn jump_up() {
+        //  _
+        // _
         let chunk = ChunkBuilder::new()
-            .set_block((0, 0, 0), BlockType::Dirt)
             .set_block((1, 0, 0), BlockType::Dirt)
-            .set_block((1, 1, 0), BlockType::Dirt)
-            .set_block((0, 1, 0), BlockType::Dirt)
             .set_block((1, 1, 1), BlockType::Grass)
             .build((0, 0));
 
         let nav = chunk.navigation();
 
-        // only 1 on top of each block
-        assert_eq!(nav.graph.node_count(), 4);
-        assert_eq!(nav.graph.edge_count(), 4); // all should be interconnected
+        assert_eq!(nav.graph.node_count(), 2); // only 1 on top of each block
+        assert_eq!(nav.graph.edge_count(), 1); // 1 jump edge
+        assert_eq!(
+            nav.graph.edge_references().next().unwrap().weight(),
+            &Edge::Jump
+        );
     }
 
     #[test]
-    fn impossible_step_up() {
+    fn step_up_single() {
+        // single step up
+        // _-
+        let chunk = ChunkBuilder::new()
+            .set_block((1, 0, 0), BlockType::Dirt)
+            .set_block_with_height((1, 1, 1), BlockType::Grass, BlockHeight::Half)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+
+        assert_eq!(nav.graph.node_count(), 2); // only 1 on top of each block
+        assert_eq!(nav.graph.edge_count(), 1); // can step on half block
+        assert_eq!(
+            nav.graph.edge_references().next().unwrap().weight(),
+            &Edge::Walk(BlockHeight::Half)
+        );
+    }
+
+    #[test]
+    fn step_up_full() {
+        // full step up
+        //    _
+        // _--
+        let chunk = ChunkBuilder::new()
+            .set_block((1, 0, 0), BlockType::Dirt)
+            .set_block_with_height((1, 1, 1), BlockType::Grass, BlockHeight::Half)
+            .set_block((1, 2, 1), BlockType::Grass)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+
+        assert_eq!(nav.graph.node_count(), 3); // only 1 on top of each block
+        assert_eq!(nav.graph.edge_count(), 2); // can step on half block
+
+        // both edges should be half steps
+        let mut edges = nav.graph.edge_references();
+        assert_eq!(
+            edges.next().unwrap().weight(),
+            &Edge::Walk(BlockHeight::Half)
+        );
+        assert_eq!(
+            edges.next().unwrap().weight(),
+            &Edge::Walk(BlockHeight::Half)
+        );
+    }
+
+    #[test]
+    fn impossible_jump_up() {
         let chunk = ChunkBuilder::new()
             .set_block((1, 1, 1), BlockType::Dirt)
             .set_block((1, 2, 3), BlockType::Dirt)
@@ -312,10 +425,38 @@ mod tests {
             .build((0, 0));
 
         let nav = chunk.navigation();
-        let path = nav.find_path((1, 1, 2), (1, 3, 2)).expect("path succeeded");
+        let path = nav.find_path((1, 1, 2), (1, 3, 2));
+        assert!(path.is_some());
         assert_eq!(
-            path.0.iter().map(|b| b.flatten()).collect::<Vec<_>>(),
+            path.unwrap()
+                .0
+                .iter()
+                .map(|b| b.flatten())
+                .collect::<Vec<_>>(),
             vec![(1, 1, 2), (1, 2, 2), (1, 3, 2)]
+        );
+    }
+
+    #[test]
+    fn simple_path_up_some_stairs() {
+        let chunk = ChunkBuilder::new()
+            .set_block_with_height((0, 0, 0), BlockType::Dirt, BlockHeight::Full)
+            .set_block_with_height((0, 1, 1), BlockType::Dirt, BlockHeight::Half)
+            .set_block_with_height((0, 2, 1), BlockType::Dirt, BlockHeight::Full)
+            .set_block_with_height((0, 3, 2), BlockType::Dirt, BlockHeight::Half)
+            .set_block_with_height((0, 4, 2), BlockType::Dirt, BlockHeight::Full)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+        let path = nav.find_path((0, 0, 1), (0, 4, 3));
+        assert!(path.is_some());
+        assert_eq!(
+            path.unwrap()
+                .0
+                .iter()
+                .map(|b| b.flatten())
+                .collect::<Vec<_>>(),
+            vec![(0, 0, 1), (0, 1, 1), (0, 2, 2), (0, 3, 2), (0, 4, 3)]
         );
     }
 
@@ -324,7 +465,6 @@ mod tests {
         let chunk = ChunkBuilder::new()
             .set_block((1, 1, 1), BlockType::Dirt)
             .set_block((1, 2, 1), BlockType::Dirt)
-            .set_block((1, 3, 1), BlockType::Dirt)
             .build((0, 0));
 
         let nav = chunk.navigation();
@@ -374,6 +514,38 @@ mod tests {
 
         let nav = chunk.navigation();
         let path = nav.find_path((0, 0, 1), (8, 0, 1));
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn path_costs() {
+        let chunk = ChunkBuilder::new()
+            .fill_slice(0, BlockType::Stone) // 0 is filled and walkable
+            .set_block((1, 0, 1), BlockType::Dirt) // little lump
+            .set_block((2, 0, 1), BlockType::Dirt)
+            .set_block((2, 0, 2), BlockType::Dirt)
+            .set_block((3, 0, 1), BlockType::Dirt)
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+        let path = nav.find_path((0, 0, 1), (4, 0, 1));
+
+        // path should take into account that jumps cost more than walking, so should walk around
+        // the obstruction rather than climbing up and down it
+        assert!(path.is_some());
+        assert!(path.unwrap().0.into_iter().all(|p| (p.2).0 == 1));
+    }
+
+    #[test]
+    fn dont_bang_your_head() {
+        let chunk = ChunkBuilder::new()
+            .set_block((0, 0, 1), BlockType::Dirt)  // start here, fine
+            .set_block((1, 0, 0), BlockType::Dirt)  // step down, fine
+            .set_block((1, 0, 2), BlockType::Stone) // blocks your head!!!!
+            .build((0, 0));
+
+        let nav = chunk.navigation();
+        let path = nav.find_path((0, 0, 2), (1, 0, 1));
         assert!(path.is_none());
     }
 }

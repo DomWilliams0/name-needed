@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::convert::TryFrom;
 use std::ops::Shl;
 
-use crate::block::BlockType;
-use crate::coordinate::world::{Block, BlockCoord, ChunkPosition, SliceBlock, SliceIndex};
+use crate::block::{Block, BlockType};
+use crate::coordinate::world::{BlockCoord, BlockPosition, ChunkPosition, SliceBlock, SliceIndex};
 use crate::grid::{Grid, GridImpl};
 use crate::grid_declare;
 use crate::navigation::Navigation;
@@ -17,7 +17,7 @@ pub use crate::coordinate::world::CHUNK_SIZE;
 pub const BLOCK_COUNT_CHUNK: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE * CHUNK_SIZE;
 
-grid_declare!(struct ChunkGrid<ChunkGridImpl, BlockType>, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
+grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
 
 pub struct Chunk {
     /// unique for each chunk
@@ -95,10 +95,14 @@ impl Chunk {
     //        self.blocks[&[i32::from(x), i32::from(y), z]] = block;
     //    }
     //
-    pub fn get_block<B: Into<Block>>(&self, pos: B) -> BlockType {
+    pub fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Block {
         // TODO allow negative slice indices
-        let Block(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = pos.into();
+        let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = pos.into();
         self.blocks[&[i32::from(x), i32::from(y), z]]
+    }
+
+    pub fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> BlockType {
+        self.get_block(pos).block_type
     }
 
     /// Call when terrain has changed
@@ -121,7 +125,7 @@ pub struct Blocks<'a> {
 }
 
 impl<'a> Iterator for Blocks<'a> {
-    type Item = (Block, BlockType);
+    type Item = (BlockPosition, Block);
 
     fn next(&mut self) -> Option<Self::Item> {
         let b = loop {
@@ -142,7 +146,7 @@ impl<'a> Iterator for Blocks<'a> {
         };
 
         let SliceBlock(x, y) = unflatten_index(self.idx);
-        let block_pos = Block(x, y, self.current_slice.0);
+        let block_pos = BlockPosition(x, y, self.current_slice.0);
 
         self.idx += 1;
 
@@ -170,17 +174,17 @@ mod tests {
             .build((0, 0));
 
         // slice 1
-        assert_eq!(chunk.get_block((2, 3, 1)), BlockType::Dirt);
+        assert_eq!(chunk.get_block_type((2, 3, 1)), BlockType::Dirt);
 
         // collect slice
-        let slice: Vec<BlockType> = chunk.slice(0).iter().map(|b| *b).collect();
+        let slice: Vec<BlockType> = chunk.slice(0).iter().map(|b| b.block_type).collect();
         assert_eq!(slice.len(), BLOCK_COUNT_SLICE); // ensure exact length
         assert_eq!(slice.iter().filter(|b| **b != BlockType::Air).count(), 3); // ensure exact number of filled blocks
 
         // ensure each exact coord was filled
-        assert_eq!(chunk.get_block((0, 0, 0)), BlockType::Dirt);
-        assert_eq!(chunk.get_block((1, 1, 0)), BlockType::Dirt);
-        assert_eq!(chunk.get_block((2, 2, 0)), BlockType::Dirt);
+        assert_eq!(chunk.get_block_type((0, 0, 0)), BlockType::Dirt);
+        assert_eq!(chunk.get_block_type((1, 1, 0)), BlockType::Dirt);
+        assert_eq!(chunk.get_block_type((2, 2, 0)), BlockType::Dirt);
     }
 
     #[test]
@@ -196,9 +200,18 @@ mod tests {
     fn blocks() {
         let c = Chunk::empty((0, 0));
         let mut b = c.blocks();
-        assert_eq!(b.next(), Some(((0, 0, 0).into(), BlockType::Air)));
-        assert_eq!(b.next(), Some(((1, 0, 0).into(), BlockType::Air)));
-        assert_eq!(b.next(), Some(((2, 0, 0).into(), BlockType::Air)));
+        assert_eq!(
+            b.next().map(|(p, b)| (p, b.block_type)),
+            Some(((0, 0, 0).into(), BlockType::Air))
+        );
+        assert_eq!(
+            b.next().map(|(p, b)| (p, b.block_type)),
+            Some(((1, 0, 0).into(), BlockType::Air))
+        );
+        assert_eq!(
+            b.next().map(|(p, b)| (p, b.block_type)),
+            Some(((2, 0, 0).into(), BlockType::Air))
+        );
 
         let rest: Vec<_> = b.collect();
         assert_eq!(rest.len(), BLOCK_COUNT_CHUNK - 3);
