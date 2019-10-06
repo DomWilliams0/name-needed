@@ -37,7 +37,12 @@ class Store:
         with self.mutex:
             me = self._dict[key]
             my_type = type(me["value"])
-            value = my_type(value)
+
+            # terrible edge case with bool("anything") == true
+            if my_type == bool:
+                value = value == "True"
+            else:
+                value = my_type(value)
             me["value"] = value
 
             if self.callbacks_enabled:
@@ -58,14 +63,12 @@ class Store:
 
         self._dict[name] = {
             "value": initial,
-            "increment": increment,
         }
+        if increment is not None:
+            self._dict[name]["increment"] = increment
 
     def fields(self):
-        """
-        Skips keys starting with _
-        """
-        return ((k, v["value"], v["increment"]) for (k, v) in self._dict.items() if k[0] != '_')
+        return ((k, v["value"], v.get("increment")) for (k, v) in self._dict.items())
 
     def items(self):
         return {k: v["value"] for (k, v) in self._dict.items()}

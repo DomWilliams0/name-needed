@@ -1,3 +1,4 @@
+use log::warn;
 use num_traits::cast::cast;
 use std::convert::TryFrom;
 
@@ -20,7 +21,10 @@ impl TryFrom<Value> for $real_type {
         $(
             $pattern(_v) => cast(_v).ok_or(()),
         )*
-            _ => panic!("[tweaker] wrong type"),
+            _ => {
+                warn!("wrong type (expected {}, got {:?})", stringify!($real_type), v);
+                Err(())
+            }
         }
     }
 }

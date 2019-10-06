@@ -40,7 +40,7 @@ class Handler(socketserver.BaseRequestHandler):
                     # only take if send was successful
                     store.take_changed()
                 except BrokenPipeError:
-                    sys.stderr.write("socket ded\n")
+                    # sys.stderr.write("socket ded\n")
                     return
 
     def _send(self, wot):

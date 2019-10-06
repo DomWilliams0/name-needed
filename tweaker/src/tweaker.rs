@@ -65,7 +65,7 @@ fn read_message<R: Read>(r: &mut R) -> TweakerResult<()> {
             let value = match value {
                 JsonValue::Number(ref i) if i.is_i64() => Ok(Value::Int(i.as_i64().unwrap())),
                 JsonValue::Number(ref f) if f.is_f64() => Ok(Value::Float(f.as_f64().unwrap())),
-                JsonValue::Bool(ref b) => Ok(Value::Bool(*b)),
+                JsonValue::Bool(ref b) => Ok(Value::Int(if *b { 1 } else { 0 })),
                 _ => {
                     warn!("unsupported value type for {}: {:?}", name, value);
                     Err(TweakerErrorKind::UnsupportedJsonType)
@@ -139,7 +139,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn bad_type() {
         let val = Value::Int(10);
         assert_eq!(None, resolve_value::<f64>(val));

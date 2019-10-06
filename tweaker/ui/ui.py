@@ -13,6 +13,7 @@ class Value:
         self.val = val
         self.incr = increment
         self.txt = urwid.Text("", align="center")
+        self.is_int = not isinstance(val, bool)
 
         self.callbacks = [
             lambda s: self.txt.set_text(("value", s)),
@@ -26,11 +27,17 @@ class Value:
             cb(val)
 
     def on_add(self):
-        self.val += self.incr
+        if self.is_int:
+            self.val += self.incr
+        else:
+            self.val = not self.val
         self.update()
 
     def on_sub(self):
-        self.val -= self.incr
+        if self.is_int:
+            self.val -= self.incr
+        else:
+            self.val = not self.val
         self.update()
 
     def __str__(self):
