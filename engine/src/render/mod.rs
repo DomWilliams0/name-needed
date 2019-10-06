@@ -17,12 +17,14 @@ fn load_program(
     let root = {
         let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         p.push("shaders");
-        p.push(format!("{}.nop", key));
+        p.push(format!("{}.nop", key)); // ext will be substituted
         p
     };
 
-    let v = std::fs::read_to_string(root.with_extension("glslv")).unwrap();
-    let f = std::fs::read_to_string(root.with_extension("glslf")).unwrap();
+    let v = std::fs::read_to_string(root.with_extension("glslv"))
+        .expect("Failed to read vertex shader");
+    let f = std::fs::read_to_string(root.with_extension("glslf"))
+        .expect("Failed to read fragment shader");
 
     glium::Program::from_source(display, &v, &f, None)
 }

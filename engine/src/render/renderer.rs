@@ -1,3 +1,4 @@
+use log::{debug, info};
 use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
@@ -57,12 +58,13 @@ pub struct GliumRenderer {
 impl GliumRenderer {
     pub fn new(display: SDL2Facade, world_viewer: WorldViewer) -> Self {
         // world program
-        let program = load_program(&display, "world").unwrap();
+        let program = load_program(&display, "world").expect("Failed to load world program");
 
         let window_size = {
             let (w, h) = display.window().size();
             (w as i32, h as i32)
         };
+        info!("window size is {}x{}", window_size.0, window_size.1);
 
         let camera = {
             let block_count = CHUNK_SIZE.to_f32().unwrap();
@@ -71,6 +73,8 @@ impl GliumRenderer {
                 scale::BLOCK * block_count, // mid chunk
                 15.0,
             );
+
+            info!("placing camera at {:?}", pos);
 
             FreeRangeCamera::new(pos)
         };
@@ -90,6 +94,7 @@ impl GliumRenderer {
 
     pub fn on_resize(&mut self, w: i32, h: i32) {
         self.window_size = (w, h);
+        debug!("window resized to {}x{}", w, h);
     }
 
     pub fn world_viewer(&mut self) -> &mut WorldViewer {
@@ -107,7 +112,7 @@ impl GliumRenderer {
             let vertex_buffer =
                 glium::VertexBuffer::dynamic(&self.display, &converted_vertices).unwrap();
             self.chunk_meshes.insert(chunk_pos, vertex_buffer);
-            println!("[mesh] regenerated for {:?}", chunk_pos);
+            debug!("regenerated mesh for chunk {:?}", chunk_pos);
         }
     }
 

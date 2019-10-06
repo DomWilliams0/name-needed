@@ -1,4 +1,5 @@
 use glium_sdl2::DisplayBuild;
+use log::debug;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
@@ -30,7 +31,7 @@ impl<'a> Engine<'a> {
         let video = sdl.video().expect("Failed to init SDL video");
         video.gl_attr().set_context_version(3, 3);
         video.gl_attr().set_context_minor_version(3);
-        println!(
+        debug!(
             "opengl {}.{}",
             video.gl_attr().context_major_version(),
             video.gl_attr().context_minor_version(),
@@ -103,13 +104,13 @@ impl<'a> Engine<'a> {
     }
 
     fn tick(&mut self) {
-        // println!("tick");
+        debug!("tick");
         self.simulation.tick();
         self.renderer.tick();
     }
 
     fn render(&mut self, interpolation: f64) {
-        // println!("render ({})", interpolation);
+        debug!("render (interpolation={})", interpolation);
         self.renderer.render(&mut self.simulation, interpolation);
     }
 

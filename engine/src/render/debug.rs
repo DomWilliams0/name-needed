@@ -1,6 +1,7 @@
 use glium::index::{NoIndices, PrimitiveType};
 use glium::{implement_vertex, uniform, DrawParameters, PolygonMode, Surface};
 use glium_sdl2::SDL2Facade;
+use log::debug;
 
 use crate::render::{load_program, FrameTarget};
 use world::WorldPoint;
@@ -79,6 +80,7 @@ impl DebugShapes {
         };
 
         // TODO instancing!
+        let mut draw_calls = 0;
 
         for shape in self.shapes.iter() {
             let color = {
@@ -119,8 +121,10 @@ impl DebugShapes {
                     &params,
                 )
                 .unwrap();
+            draw_calls += 1;
         }
 
+        debug!("{} draw calls", draw_calls);
         self.shapes.clear();
     }
 }

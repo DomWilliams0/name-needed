@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::TcpStream;
@@ -32,8 +33,8 @@ pub fn init(bg_error_callback: fn(Error)) -> TweakerResult<()> {
     // start server thread
     thread::spawn(move || loop {
         if let Err(e) = read_message(&mut sock) {
-            eprintln!(
-                "[tweaker] failed to read message in background thread: {}",
+            error!(
+                "failed to read message in background thread: {}",
                 e
             );
 
@@ -68,12 +69,11 @@ fn read_message<R: Read>(r: &mut R) -> TweakerResult<()> {
                 JsonValue::Number(ref i) if i.is_i64() => Ok(Value::Int(i.as_i64().unwrap())),
                 JsonValue::Number(ref f) if f.is_f64() => Ok(Value::Float(f.as_f64().unwrap())),
                 _ => {
-                    // crashes the compiler....
-                    // eprintln!("[tweaker] unsupported value type for {}: {:?}", name, value);
+                    warn!("unsupported value type for {}: {:?}", name, value);
                     Err(TweakerErrorKind::UnsupportedJsonType)
                 }
             }?;
-            println!("[tweaker] {} := {:?}", name, value);
+            debug!("{} := {:?}", name, value);
             MAP.lock().unwrap().insert(name, value);
         }
     } else {

@@ -1,3 +1,4 @@
+use log::info;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -27,6 +28,8 @@ impl<'a, R: Renderer> Simulation<'a, R> {
     pub fn new(world: WorldRef) -> Self {
         let mut specs_world = SpecsWorld::new();
 
+        info!("registering systems and components");
+
         // register systems
         let specs_dispatcher = DispatcherBuilder::new()
             .with(SteeringSystem, "steering", &[])
@@ -41,6 +44,7 @@ impl<'a, R: Renderer> Simulation<'a, R> {
 
         // add dummy entities
         {
+            info!("adding dummy entities");
             specs_world
                 .create_entity()
                 .with(Position {

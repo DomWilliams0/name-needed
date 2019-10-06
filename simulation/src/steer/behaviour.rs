@@ -14,6 +14,7 @@ impl From<Position> for Vector3<f32> {
     }
 }
 
+#[derive(Debug)]
 pub enum SteeringBehaviour {
     Nop(Nop),
     Seek(Seek),
@@ -53,7 +54,7 @@ trait DoASteer {
 }
 
 // nop
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Nop;
 
 impl DoASteer for Nop {
@@ -64,7 +65,7 @@ impl DoASteer for Nop {
 }
 
 // seek
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Seek {
     pub target: Position,
 }
@@ -86,7 +87,7 @@ impl DoASteer for Seek {
 }
 
 // arrive
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Arrive {
     pub target: Position,
     pub approach_radius: f32,

@@ -1,3 +1,4 @@
+use log::debug;
 use specs::prelude::*;
 use specs_derive::Component;
 
@@ -51,6 +52,9 @@ impl<'a> System<'a> for SteeringSystem {
     fn run(&mut self, (pos, mut steer, mut vel): Self::SystemData) {
         for (pos, steer, vel) in (&pos, &mut steer, &mut vel).join() {
             if let CompleteAction::Stop = steer.behaviour.tick(*pos, vel) {
+                debug!("entity finished {:?}", steer.behaviour);
+
+                debug!("reverting to default steering behaviour");
                 steer.behaviour = SteeringBehaviour::default();
             }
         }

@@ -1,3 +1,4 @@
+use log::info;
 use std::cell::Cell;
 use std::time::Instant;
 
@@ -31,6 +32,10 @@ impl GameLoop {
     pub fn new(tps: usize, max_frameskip: u32) -> Self {
         let start_time = Instant::now();
         let skip_ticks = 1000 / tps;
+        info!(
+            "initialized with {} ticks/second ({}ms/tick), with a max frame skip of {}",
+            tps, skip_ticks, max_frameskip
+        );
         Self {
             start_time,
             max_frameskip,
