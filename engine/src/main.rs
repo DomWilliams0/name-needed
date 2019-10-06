@@ -1,5 +1,6 @@
 use env_logger;
-use log::{error, info};
+use log::{error, info, warn};
+
 use tweaker;
 use world;
 
@@ -18,8 +19,10 @@ fn main() {
         .init();
 
     if let Err(e) = tweaker::init(on_tweaker_fail) {
-        error!("failed to init debug tweaker: {}", e);
-        std::process::exit(1);
+        warn!(
+            "failed to init debug tweaker, falling back on default values ({})",
+            e
+        );
     }
 
     let world = {

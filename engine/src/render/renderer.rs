@@ -1,4 +1,3 @@
-use log::{debug, info};
 use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
@@ -10,11 +9,12 @@ use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
 use glium_sdl2::SDL2Facade;
+use log::{debug, info};
 use num_traits::ToPrimitive;
 
 use scale;
 use simulation::Simulation;
-use tweaker::Tweak;
+use tweaker;
 use world::{ChunkPosition, Vertex as WorldVertex, WorldViewer, CHUNK_SIZE};
 
 use crate::camera::FreeRangeCamera;
@@ -134,7 +134,7 @@ impl GliumRenderer {
 
             // calculate projection and view matrices
             let (projection, view) = {
-                let zoom: f32 = Tweak::<f64>::lookup("zoom") as f32; // TODO move to camera
+                let zoom: f32 = tweaker::resolve("zoom").unwrap_or(12.0); // TODO move to camera
                 let (w, h) = (self.window_size.0 as f32, self.window_size.1 as f32);
 
                 // scale to window size to prevent stretching

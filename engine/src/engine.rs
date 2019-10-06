@@ -6,7 +6,7 @@ use sdl2::Sdl;
 
 use gameloop::{FrameAction, GameLoop};
 use simulation::Simulation;
-use tweaker::Tweak;
+use tweaker;
 use world::{WorldRef, WorldViewer};
 
 use crate::render::{GliumRenderer, SimulationRenderer};
@@ -86,7 +86,7 @@ impl<'a> Engine<'a> {
                     } => self.renderer.on_resize(w, h),
 
                     Event::MouseMotion { xrel, yrel, .. }
-                        if Tweak::<i64>::lookup("lookaround") == 1 =>
+                        if tweaker::resolve::<bool>("lookaround") == Some(true) =>
                     {
                         self.renderer.camera().handle_cursor(xrel, yrel)
                     }

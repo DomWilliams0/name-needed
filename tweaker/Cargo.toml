@@ -1,6 +1,6 @@
 [package]
 name = "tweaker"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Dom Williams <me@domwillia.ms>"]
 edition = "2018"
 
@@ -13,3 +13,4 @@ serde = "1.0"
 failure = "0.1"
 failure_derive = "0.1"
 log = "0.4"
+num-traits = "0.2"

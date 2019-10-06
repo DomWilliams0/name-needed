@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 
-use log::{debug, error, warn};
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::io::Read;
 use std::net::TcpStream;
 use std::sync::Mutex;
 use std::thread;
 
+use failure::Error;
+use log::{debug, warn};
 use serde_json;
 use serde_json::Value as JsonValue;
 
@@ -14,8 +16,6 @@ use lazy_static::lazy_static;
 
 use crate::error::*;
 use crate::value::Value;
-use failure::Error;
-use std::marker::PhantomData;
 
 lazy_static! {
     static ref MAP: Mutex<HashMap<String, Value>> = Mutex::new(HashMap::new());
@@ -33,10 +33,7 @@ pub fn init(bg_error_callback: fn(Error)) -> TweakerResult<()> {
     // start server thread
     thread::spawn(move || loop {
         if let Err(e) = read_message(&mut sock) {
-            error!(
-                "failed to read message in background thread: {}",
-                e
-            );
+            warn!("failed to read message in background thread: {}", e);
 
             // call user callback and exit thread
             bg_error_callback(e.into());
@@ -68,6 +65,7 @@ fn read_message<R: Read>(r: &mut R) -> TweakerResult<()> {
             let value = match value {
                 JsonValue::Number(ref i) if i.is_i64() => Ok(Value::Int(i.as_i64().unwrap())),
                 JsonValue::Number(ref f) if f.is_f64() => Ok(Value::Float(f.as_f64().unwrap())),
+                JsonValue::Bool(ref b) => Ok(Value::Bool(*b)),
                 _ => {
                     warn!("unsupported value type for {}: {:?}", name, value);
                     Err(TweakerErrorKind::UnsupportedJsonType)
@@ -76,59 +74,74 @@ fn read_message<R: Read>(r: &mut R) -> TweakerResult<()> {
             debug!("{} := {:?}", name, value);
             MAP.lock().unwrap().insert(name, value);
         }
+        Ok(())
     } else {
-        Err(TweakerErrorKind::BadRootJsonType)?
-    }
-
-    Ok(())
-}
-
-pub struct Tweak<T: From<Value>> {
-    key: &'static str,
-    marker: std::marker::PhantomData<T>,
-}
-
-impl<T: From<Value>> Tweak<T> {
-    pub fn new(key: &'static str) -> Self {
-        Self {
-            key,
-            marker: PhantomData,
-        }
-    }
-
-    fn resolve_safely(&self) -> Option<Value> {
-        MAP.lock().unwrap().get(self.key).copied()
-    }
-
-    pub fn resolve(&self) -> T {
-        match self.resolve_safely() {
-            Some(val) => val.into(),
-            None => panic!("[tweaker] key '{}' not found", self.key),
-        }
-    }
-
-    pub fn lookup(key: &'static str) -> T {
-        Tweak::new(key).resolve()
+        Err(TweakerErrorKind::BadRootJsonType.into())
     }
 }
 
-// can't impl Deref because it expects to return a reference
+pub fn resolve<T: TryFrom<Value>>(key: &'static str) -> Option<T> {
+    MAP.lock()
+        .unwrap()
+        .get(key)
+        .copied()
+        .and_then(resolve_value)
+}
+
+fn resolve_value<T: TryFrom<Value>>(value: Value) -> Option<T> {
+    value.try_into().ok()
+}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use num_traits::float::FloatCore;
+
+    use crate::tweaker::resolve_value;
+    use crate::value::Value;
 
     #[test]
-    #[ignore]
-    fn tweak() {
-        let t_int = Tweak::<i64>::new("_dummy_int");
-        let t_float = Tweak::<f64>::new("_dummy_float");
-        let t_nope = Tweak::<i64>::new("totally made up");
+    fn nice_ints() {
+        let val = Value::Int(100);
+        assert_eq!(Some(100i64), resolve_value::<i64>(val));
+        assert_eq!(Some(100i32), resolve_value::<i32>(val));
+    }
 
-        init(|_| {}).unwrap();
+    #[test]
+    fn big_ints() {
+        let n = 2i64.pow(48);
+        let val = Value::Int(n);
+        assert_eq!(Some(n), resolve_value::<i64>(val));
+        assert_eq!(None, resolve_value::<i32>(val));
+    }
 
-        assert_eq!(t_int.resolve(), 29i64);
-        assert_eq!(t_float.resolve(), -0.25f64);
-        assert_eq!(t_nope.resolve_safely(), None);
+    #[test]
+    fn nice_floats() {
+        let val = Value::Float(10.0);
+        assert_eq!(Some(10.0), resolve_value::<f64>(val));
+        assert_eq!(Some(10.0), resolve_value::<f32>(val));
+    }
+
+    #[test]
+    fn big_floats() {
+        let n = f64::max_value();
+        let val = Value::Float(n);
+        assert_eq!(Some(n), resolve_value::<f64>(val));
+        assert_eq!(None, resolve_value::<f32>(val));
+    }
+
+    #[test]
+    fn bools() {
+        let val = Value::Int(1);
+        assert_eq!(Some(true), resolve_value::<bool>(val));
+
+        let val = Value::Int(0);
+        assert_eq!(Some(false), resolve_value::<bool>(val));
+    }
+
+    #[test]
+    #[should_panic]
+    fn bad_type() {
+        let val = Value::Int(10);
+        assert_eq!(None, resolve_value::<f64>(val));
     }
 }
