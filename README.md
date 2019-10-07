@@ -9,12 +9,18 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 
 ## Progress log
 
-* 29 Sept 2019: <em>A basic navigation mesh superimposed on an epic 3D world</em>
+* 07 Oct 2019: <em>Multiple chunks</em>
 <p style="margin: auto; width: 60%">
-    <img src=".screenshots/navmesh.jpg" width="60%"/>
+    <img src=".screenshots/multichunk.jpg" width="60%"/>
 </p>
 
 * 05 Oct 2019: <em>Half steps and navmesh edge costs - blue edges are cheap walking flat/up a half step, and red edges are more expensive jumps</em>
 <p style="margin: auto; width: 60%">
     <img src=".screenshots/navmesh-halfsteps.jpg" width="60%"/>
 </p>
+
+* 29 Sept 2019: <em>A basic navigation mesh superimposed on an epic 3D world</em>
+<p style="margin: auto; width: 60%">
+    <img src=".screenshots/navmesh.jpg" width="60%"/>
+</p>
+
