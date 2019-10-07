@@ -1,9 +1,12 @@
 {
     "zoom": {
-        "value": 17.64999,
+        "value": 10.64998,
         "increment": 1.0
     },
     "lookaround": {
+        "value": false
+    },
+    "render-navmesh": {
         "value": true
     }
 }

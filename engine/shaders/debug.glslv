@@ -2,6 +2,7 @@
 
 in vec3 v_pos;
 in vec3 v_color;
+
 out vec3 rgb;
 
 uniform mat4 proj;

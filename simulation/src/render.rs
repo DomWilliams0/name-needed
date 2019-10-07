@@ -4,6 +4,7 @@ use std::rc::Rc;
 use specs::prelude::*;
 use specs_derive::Component;
 
+use tweaker;
 use world::navigation::{Edge, NodeIndex};
 use world::{BlockPosition, Chunk, SliceRange, WorldPoint, WorldRef};
 
@@ -81,10 +82,14 @@ pub struct NavigationMeshDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
     fn render(&mut self, renderer: &mut R, world: WorldRef, frame_state: &FrameRenderState<R>) {
+        if !tweaker::resolve("render-navmesh").unwrap_or(false) {
+            return;
+        }
+
         fn node_position_renderable(node: NodeIndex, chunk: &Chunk) -> WorldPoint {
             let block_pos: BlockPosition = *chunk.navigation().node_position(node);
 
-            let mut world_pos: WorldPoint = block_pos.to_world_pos_centered(chunk.pos());
+            let mut world_pos: WorldPoint = block_pos.to_world_point_centered(chunk.pos());
 
             world_pos.2 += 1.0 - chunk.get_block(block_pos).height.height(); // lower to the height of the block
             world_pos.2 -= scale::BLOCK * 0.8; // lower to just above the surface
@@ -125,57 +130,36 @@ impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
     }
 }
 
-/*
+#[allow(dead_code)]
+pub mod dummy {
+    use world::{WorldPoint, WorldRef};
 
-/// draws some lines
-pub struct DummyDebugRenderer;
+    use crate::render::{DebugRenderer, FrameRenderState};
+    use crate::Renderer;
 
-impl<R: Renderer> DebugRenderer<R> for DummyDebugRenderer {
-    fn render(
-        &mut self,
-        renderer: &mut R,
-        world: Rc<RefCell<World>>,
-        _frame_state: &FrameRenderState<R>,
-    ) {
-        renderer.debug_add_line(
-            Position::new(0.0, 0.0, 0),
-            Position::new(5.0, 5.0, 5),
-            (255, 0, 0),
-        );
+    pub struct DummyDebugRenderer;
 
-        renderer.debug_add_line(
-            Position::new(0.0, 0.0, 0),
-            Position::new(0.0, 20.0, 0),
-            (10, 255, 0),
-        );
+    impl<R: Renderer> DebugRenderer<R> for DummyDebugRenderer {
+        fn render(
+            &mut self,
+            renderer: &mut R,
+            _world: WorldRef,
+            _frame_state: &FrameRenderState<R>,
+        ) {
+            renderer.debug_add_line(
+                WorldPoint(0.0, 0.0, 0.0),
+                WorldPoint(5.0, 5.0, 0.0),
+                (255, 0, 0),
+            );
 
-        // outline blocks in slice 2
-        for c in world.borrow().visible_chunks() {
-            for (pos, _) in c.slice(2).non_air_blocks() {
-                let color = (10, 190, 30);
-                let x = pos.0 as f32;
-                let y = pos.1 as f32;
-                let z = 5;
-
-                renderer.debug_add_line(
-                    Position::new(x, y, z),
-                    Position::new(x + 1.0, y, z),
-                    color
-                );
-                renderer.debug_add_line(
-                    Position::new(x + 1.0, y, z),
-                    Position::new(x + 1.0, y + 1.0, z),
-                    color
-                );
-                renderer.debug_add_line(
-                    Position::new(x + 1.0, y + 1.0, z),
-                    Position::new(x, y + 1.0, z),
-                    color
-                );
-            }
-
+            renderer.debug_add_tri(
+                [
+                    WorldPoint(2.0, 0.0, 0.0),
+                    WorldPoint(5.0, 0.0, 0.0),
+                    WorldPoint(5.0, 3.0, 0.0),
+                ],
+                (255, 100, 0),
+            );
         }
     }
 }
-
-*/

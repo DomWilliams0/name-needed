@@ -35,6 +35,10 @@ pub mod world {
     #[derive(Debug, Copy, Clone, PartialEq)]
     pub struct WorldPoint(pub f32, pub f32, pub f32);
 
+    /// A block anywhere in the world
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub struct WorldPosition(pub i32, pub i32, pub i32);
+
     // --------
     impl SliceIndex {
         pub const MIN: SliceIndex = Self(std::i32::MIN);
@@ -42,18 +46,22 @@ pub mod world {
     }
 
     impl BlockPosition {
-        pub fn to_world_pos<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
+        pub fn to_world_pos<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPosition {
             let ChunkPosition(cx, cy) = chunk_pos.into();
             let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
-            WorldPoint(
-                f32::from(x + (cx * CHUNK_SIZE as i32) as u16),
-                f32::from(y + (cy * CHUNK_SIZE as i32) as u16),
-                z as f32,
+            WorldPosition(
+                i32::from(x) + cx * CHUNK_SIZE as i32,
+                i32::from(y) + cy * CHUNK_SIZE as i32,
+                z,
             )
         }
+        pub fn to_world_point<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
+            let WorldPosition(x, y, z) = self.to_world_pos(chunk_pos);
+            WorldPoint(x as f32, y as f32, z as f32)
+        }
 
-        pub fn to_world_pos_centered<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
-            let WorldPoint(x, y, z) = self.to_world_pos(chunk_pos);
+        pub fn to_world_point_centered<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
+            let WorldPoint(x, y, z) = self.to_world_point(chunk_pos);
             WorldPoint(x + 0.5, y + 0.5, z)
         }
 
@@ -159,6 +167,29 @@ pub mod world {
             cgmath::Vector3 { x, y, z }
         }
     }
+
+    impl From<ChunkPosition> for WorldPoint {
+        fn from(p: ChunkPosition) -> Self {
+            Self(
+                (p.0 * CHUNK_SIZE as i32) as f32,
+                (p.1 * CHUNK_SIZE as i32) as f32,
+                0.0,
+            )
+        }
+    }
+
+    impl From<WorldPoint> for [f32; 3] {
+        fn from(p: WorldPoint) -> Self {
+            let WorldPoint(x, y, z) = p;
+            [x, y, z]
+        }
+    }
+
+    impl From<(i32, i32, i32)> for WorldPosition {
+        fn from((x, y, z): (i32, i32, i32)) -> Self {
+            Self(x, y, z)
+        }
+    }
 }
 
 pub mod screen {
@@ -180,16 +211,26 @@ mod tests {
         let b = BlockPosition(BlockCoord(1), BlockCoord(2), SliceIndex(3));
 
         // at origin
-        let WorldPoint(x, y, z) = b.to_world_pos((0, 0));
+        let WorldPoint(x, y, z) = b.to_world_point((0, 0));
         assert!(x.approx_eq(1.0, (EPSILON, 2)));
         assert!(y.approx_eq(2.0, (EPSILON, 2)));
         assert!(z.approx_eq(3.0, (EPSILON, 2)));
 
         // a few chunks over
-        let WorldPoint(x, y, z) = b.to_world_pos((1, 2));
+        let WorldPoint(x, y, z) = b.to_world_point((1, 2));
         let sz: f32 = CHUNK_SIZE as f32;
         assert!(x.approx_eq(1.0 + sz, (EPSILON, 2)));
         assert!(y.approx_eq(2.0 + sz + sz, (EPSILON, 2)));
         assert!(z.approx_eq(3.0, (EPSILON, 2)));
+    }
+
+    #[test]
+    fn negative_block_to_world() {
+        let b: BlockPosition = (0, 0, 0).into();
+        let wp = b.to_world_point((-1, -1));
+        assert_eq!(
+            wp,
+            WorldPoint(-(CHUNK_SIZE as f32), -(CHUNK_SIZE as f32), 0.0)
+        );
     }
 }

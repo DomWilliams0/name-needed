@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use cgmath::{ortho, Point3};
+use cgmath::{ortho, Matrix4, Point3, Vector3};
 use float_ord::FloatOrd;
 use glium::index::PrimitiveType;
 use glium::uniform;
@@ -15,7 +15,7 @@ use num_traits::ToPrimitive;
 use scale;
 use simulation::Simulation;
 use tweaker;
-use world::{ChunkPosition, Vertex as WorldVertex, WorldViewer, CHUNK_SIZE};
+use world::{ChunkPosition, Vertex as WorldVertex, WorldPoint, WorldViewer, CHUNK_SIZE};
 
 use crate::camera::FreeRangeCamera;
 use crate::render::{draw_params, load_program, FrameTarget, SimulationRenderer};
@@ -38,7 +38,10 @@ impl From<WorldVertex> for Vertex {
     }
 }
 
-type ChunkMesh = glium::VertexBuffer<Vertex>;
+struct ChunkMesh {
+    vertex_buffer: glium::VertexBuffer<Vertex>,
+    chunk_pos: ChunkPosition,
+}
 
 pub struct GliumRenderer {
     display: SDL2Facade,
@@ -111,7 +114,12 @@ impl GliumRenderer {
             let converted_vertices: Vec<Vertex> = new_mesh.into_iter().map(|v| v.into()).collect();
             let vertex_buffer =
                 glium::VertexBuffer::dynamic(&self.display, &converted_vertices).unwrap();
-            self.chunk_meshes.insert(chunk_pos, vertex_buffer);
+
+            let mesh = ChunkMesh {
+                vertex_buffer,
+                chunk_pos,
+            };
+            self.chunk_meshes.insert(chunk_pos, mesh);
             debug!("regenerated mesh for chunk {:?}", chunk_pos);
         }
     }
@@ -150,22 +158,29 @@ impl GliumRenderer {
                     0.1,
                     100.0,
                 ).into();
-                let view: [[f32; 4]; 4] = self.camera.world_to_view().into();
+                let view = self.camera.world_to_view();
 
                 world_target.projection = projection;
-                world_target.view = view;
+                world_target.view = view.into();
                 (projection, view)
             };
 
-            let uniforms = uniform! { proj: projection, view: view, };
-
             // draw world chunks
-            // TODO chunk offset in view
             for mesh in self.chunk_meshes.values() {
+                let view: [[f32; 4]; 4] = {
+                    // chunk offset
+                    let WorldPoint(x, y, z) = mesh.chunk_pos.into();
+                    let translate = Vector3::new(x, y, z).map(|c| c * scale::BLOCK);
+
+                    (view * Matrix4::from_translation(translate)).into()
+                };
+
+                let uniforms = uniform! { proj: projection, view: view, };
+
                 world_target
                     .frame
                     .draw(
-                        mesh,
+                        &mesh.vertex_buffer,
                         &glium::index::NoIndices(PrimitiveType::TrianglesList),
                         &self.program,
                         &uniforms,

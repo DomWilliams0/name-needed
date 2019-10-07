@@ -1,12 +1,14 @@
 use std::convert::TryFrom;
+use std::fmt::{Display, Error, Formatter};
+use std::iter::Map;
 use std::ops::RangeInclusive;
 
 use generator::{done, Generator, Gn};
+use log::info;
 
 use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType, CHUNK_SIZE};
 use crate::mesh::Vertex;
 use crate::{mesh, WorldRef};
-use std::iter::Map;
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
@@ -78,6 +80,13 @@ impl SliceRange {
     }
 }
 
+impl Display for SliceRange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let SliceRange(SliceIndex(from), SliceIndex(to)) = self;
+        write!(f, "[{} => {}]", from, to)
+    }
+}
+
 impl WorldViewer {
     pub fn from_world(world: WorldRef) -> Self {
         let start = SliceIndex(0);
@@ -108,12 +117,18 @@ impl WorldViewer {
 
     pub fn move_up(&mut self) {
         if self.view_range.move_up(1) {
+            info!("moved view range to {}", self.view_range);
             self.invalidate_visible_chunks();
+        } else {
+            info!("cannot move view range, it remains at {}", self.view_range);
         }
     }
     pub fn move_down(&mut self) {
         if self.view_range.move_down(1) {
+            info!("moved view range to {}", self.view_range);
             self.invalidate_visible_chunks();
+        } else {
+            info!("cannot move view range, it remains at {}", self.view_range);
         }
     }
 

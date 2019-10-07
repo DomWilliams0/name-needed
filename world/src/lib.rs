@@ -5,6 +5,7 @@ mod coordinate;
 mod grid;
 mod mesh;
 pub mod navigation;
+mod presets;
 mod slice;
 mod viewer;
 mod world;

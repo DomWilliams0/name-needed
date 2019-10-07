@@ -1,7 +1,11 @@
-use crate::block::{BlockHeight, BlockType};
-use crate::chunk::{Chunk, ChunkBuilder, CHUNK_SIZE};
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
+
+use log::{debug, warn};
+
+use crate::chunk::Chunk;
+use crate::presets;
 
 /// Reference to the world
 pub type WorldRef = Rc<RefCell<World>>;
@@ -15,59 +19,78 @@ pub struct World {
 }
 
 impl Default for World {
-    /// 1 chunk with some epic terrain
     fn default() -> Self {
-        let full: u16 = CHUNK_SIZE as u16;
-        let half: u16 = full / 2;
-
-        let chunk = ChunkBuilder::new()
-            .fill_slice(0, BlockType::Stone) // fill 0 with stone
-            .with_slice(1, |mut s| {
-                // fill section of 1
-                for x in half..full {
-                    for y in 0..full {
-                        s.set_block((x, y), BlockType::Dirt);
-                    }
-                }
-
-                // step up from slice 0
-                for y in 2..half-2 {
-                    s.set_block_with_height((half-1,y), BlockType::Stone, BlockHeight::Half)
-                }
-            })
-            .with_slice(2, |mut s| {
-                // fill smaller section of 2
-                for x in half..full {
-                    for y in half..full {
-                        s.set_block((x, y), BlockType::Grass);
-                    }
-                }
-
-                // step up from slice 1
-                s.set_block_with_height((half + 3, half), BlockType::Dirt, BlockHeight::Half)
-            })
-            .apply(|s| {
-                // stairs
-                s.set_block((3, 13, 0), BlockType::Grass);
-                s.set_block((4, 13, 1), BlockType::Grass);
-                s.set_block((5, 13, 2), BlockType::Grass);
-
-                // bridge
-                for x in 6..13 {
-                    s.set_block((x, 13, 2), BlockType::Grass);
-                }
-            })
-            .build((0, 0));
-
-        Self {
-            chunks: vec![chunk],
-        }
+        presets::multi_chunk_wonder()
     }
 }
 
 impl World {
+    pub(crate) fn from_chunks(chunks: Vec<Chunk>) -> Self {
+        // ensure all are unique
+        {
+            let mut seen = HashSet::new();
+            let mut bad = Vec::with_capacity(chunks.len());
+            for c in &chunks {
+                if !seen.insert(c.pos()) {
+                    bad.push(c.pos())
+                }
+            }
+
+            if !bad.is_empty() {
+                for bad_pos in &bad {
+                    warn!("duplicate chunk {:?} in world is not allowed", bad_pos);
+                }
+
+                panic!("[world] {} duplicate chunks!!1!", bad.len()); // TODO return a result instead
+            }
+        }
+
+        debug!("world has {} chunks", chunks.len());
+        Self { chunks }
+    }
+
     pub fn visible_chunks(&self) -> impl Iterator<Item = &Chunk> {
         // TODO filter visible
         self.chunks.iter()
     }
+
+    /*
+        /// Finds a path between 2 arbitrary positions in the world
+        pub fn find_path<F: Into<WorldPosition>, T: Into<WorldPosition>>(
+            &self,
+            from: F,
+            to: T,
+        ) -> Option<Path> {
+            None
+        }
+    */
+}
+
+#[cfg(test)]
+mod tests {
+    /*
+            #[test]
+            fn find_path_cross_chunk_simple() {
+                // 2 chunks with a line across x at y=0
+                let w = World::from_chunks(vec![
+                    ChunkBuilder::new()
+                        .fill_range((0, 0, 0), (CHUNK_SIZE as u16 - 1, 1, 1), |_| {
+                            Some(BlockType::Stone)
+                        })
+                        .build((-1, 0)),
+                    ChunkBuilder::new()
+                        .fill_range((0, 0, 0), (CHUNK_SIZE as u16 - 1, 1, 1), |_| {
+                            Some(BlockType::Stone)
+                        })
+                        .build((0, 0)),
+                ]);
+
+                let path = w.find_path(
+                    (-4, 0, 1), // chunk (-1, 0)
+                    (4, 0, 1),  // chunk (0, 0)
+                );
+
+                assert!(path.is_some());
+            }
+        */
 }
