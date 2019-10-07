@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::block::{Block, BlockHeight, BlockType};
-use crate::coordinate::world::{BlockCoord, SliceBlock, CHUNK_SIZE};
+use crate::coordinate::world::{BlockCoord, SliceBlock};
+use crate::CHUNK_SIZE;
 
 pub struct Slice<'a> {
     slice: &'a [Block],
@@ -97,31 +98,30 @@ impl<'a> DerefMut for SliceMut<'a> {
 
 pub fn unflatten_index(index: usize) -> SliceBlock {
     SliceBlock(
-        BlockCoord((index % CHUNK_SIZE as usize) as u16),
-        BlockCoord((index / CHUNK_SIZE as usize) as u16),
+        BlockCoord((index % CHUNK_SIZE.as_usize()) as u16),
+        BlockCoord((index / CHUNK_SIZE.as_usize()) as u16),
     )
 }
 
 fn flatten_coords(block: SliceBlock) -> usize {
     let SliceBlock(BlockCoord(x), BlockCoord(y)) = block;
-    ((y * CHUNK_SIZE as u16) + x) as usize
+    ((y * CHUNK_SIZE.as_u16()) + x) as usize
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::chunk::CHUNK_SIZE;
 
     use super::*;
 
     #[test]
     fn unflatten_slice_index() {
-        assert!(CHUNK_SIZE >= 3);
+        assert!(CHUNK_SIZE.as_i32() >= 3);
 
         assert_eq!(unflatten_index(0), (0, 0).into());
         assert_eq!(unflatten_index(1), (1, 0).into());
         assert_eq!(unflatten_index(2), (2, 0).into());
 
-        let size = CHUNK_SIZE as usize;
+        let size = CHUNK_SIZE.as_usize();
         assert_eq!(unflatten_index(size + 0), (0, 1).into());
         assert_eq!(unflatten_index(size + 1), (1, 1).into());
         assert_eq!(unflatten_index(size + 2), (2, 1).into());

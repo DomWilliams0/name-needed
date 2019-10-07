@@ -8,8 +8,8 @@ use petgraph::graph::EdgeReference;
 use petgraph::visit::EdgeRef;
 
 use crate::block::{Block, BlockHeight};
-use crate::chunk::Chunk;
-use crate::coordinate::world::{BlockPosition, CHUNK_SIZE};
+use crate::chunk::{Chunk, CHUNK_DEPTH, CHUNK_SIZE};
+use crate::coordinate::world::BlockPosition;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::navigation::graph::{Edge, NavGraph, NavIdx};
 use crate::navigation::{Node, NodeIndex};
@@ -36,8 +36,7 @@ impl Navigation {
             height: BlockHeight,
         }
 
-        const SZ: usize = CHUNK_SIZE as usize;
-        grid_declare!(struct NavCreationGrid<NavCreationGridImpl, NavMarker>, SZ, SZ, SZ);
+        grid_declare!(struct NavCreationGrid<NavCreationGridImpl, NavMarker>, CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), CHUNK_DEPTH.as_usize());
 
         // instead of constantly reading from the chunk terrain, read it once and populate
         // this 3d bitmask
@@ -59,7 +58,7 @@ impl Navigation {
             let (x, y, z) = pos.into();
 
             // nothing below or above: nope
-            if z == 0 || z >= (CHUNK_SIZE - 1) as i32 {
+            if z == 0 || z >= (CHUNK_DEPTH.as_i32() - 1) {
                 return false;
             }
 
@@ -140,9 +139,10 @@ impl Navigation {
                 }
             }
 
-            const LIMIT: u16 = (CHUNK_SIZE as u16) - 1;
+            const X_LIMIT: u16 = (CHUNK_SIZE.as_u16()) - 1;
+            const Y_LIMIT: u16 = (CHUNK_SIZE.as_u16()) - 1;
             match (add(src.0, delta.0), add(src.1, delta.1)) {
-                (Some(nx), Some(ny)) if nx <= LIMIT && ny <= LIMIT => Some((nx, ny)),
+                (Some(nx), Some(ny)) if nx <= X_LIMIT && ny <= Y_LIMIT => Some((nx, ny)),
                 _ => None,
             }
         }
@@ -509,7 +509,7 @@ mod tests {
 
         let chunk = ChunkBuilder::new()
             .fill_slice(0, BlockType::Stone) // 0 is filled and walkable
-            .fill_range((3, 0, 0), (4, CHUNK_SIZE as u16 + 1, 4), |_| Some(BlockType::Dirt)) // impassible wall at x=3
+            .fill_range((3, 0, 0), (4, CHUNK_SIZE.as_u16() + 1, 4), |_| Some(BlockType::Dirt)) // impassible wall at x=3
             .build((0, 0));
 
         let nav = chunk.navigation();

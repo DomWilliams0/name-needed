@@ -10,7 +10,6 @@ use glium::uniform;
 use glium::{implement_vertex, Surface};
 use glium_sdl2::SDL2Facade;
 use log::{debug, info};
-use num_traits::ToPrimitive;
 
 use scale;
 use simulation::Simulation;
@@ -70,10 +69,9 @@ impl GliumRenderer {
         info!("window size is {}x{}", window_size.0, window_size.1);
 
         let camera = {
-            let block_count = CHUNK_SIZE.to_f32().unwrap();
             let pos = Point3::new(
-                scale::BLOCK * block_count, // mid chunk
-                scale::BLOCK * block_count, // mid chunk
+                scale::BLOCK * CHUNK_SIZE.as_f32(), // mid chunk
+                scale::BLOCK * CHUNK_SIZE.as_f32(), // mid chunk
                 15.0,
             );
 

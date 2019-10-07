@@ -12,12 +12,13 @@ use crate::slice::{unflatten_index, Slice, SliceMut};
 pub type ChunkId = u64;
 
 // reexport
-pub use crate::coordinate::world::CHUNK_SIZE;
+pub use crate::coordinate::dim::{CHUNK_DEPTH, CHUNK_SIZE};
 
-pub const BLOCK_COUNT_CHUNK: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE * CHUNK_SIZE;
+pub const BLOCK_COUNT_CHUNK: usize =
+    CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize() * CHUNK_DEPTH.as_usize();
+pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
-grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
+grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>, CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), CHUNK_DEPTH.as_usize());
 
 pub struct Chunk {
     /// unique for each chunk
@@ -134,7 +135,7 @@ impl<'a> Iterator for Blocks<'a> {
                 None => {
                     // next slice
                     let SliceIndex(idx) = self.current_slice.0 + 1;
-                    if idx >= CHUNK_SIZE as i32 {
+                    if idx >= CHUNK_DEPTH.as_i32() {
                         return None;
                     }
                     let next_slice = self.chunk.slice(idx);

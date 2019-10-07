@@ -6,9 +6,9 @@ use std::ops::RangeInclusive;
 use generator::{done, Generator, Gn};
 use log::info;
 
-use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType, CHUNK_SIZE};
+use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType};
 use crate::mesh::Vertex;
-use crate::{mesh, WorldRef};
+use crate::{mesh, WorldRef, CHUNK_SIZE};
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
@@ -48,7 +48,7 @@ impl SliceRange {
         // TODO cap to prevent panics for now
         let delta = i32::try_from(delta).expect("don't move so much");
         let new_upper = self.1 + delta;
-        if new_upper.0 <= (CHUNK_SIZE - 1) as i32 {
+        if new_upper.0 < CHUNK_SIZE.as_i32() {
             self.0 += delta;
             self.1 = new_upper;
             true

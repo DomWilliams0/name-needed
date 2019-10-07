@@ -1,5 +1,6 @@
 use crate::block::{BlockHeight, BlockType};
-use crate::{ChunkBuilder, World, CHUNK_SIZE};
+use crate::chunk::CHUNK_SIZE;
+use crate::{ChunkBuilder, World};
 
 /// Multiple flat chunks
 pub fn multi_chunk_wonder() -> World {
@@ -31,7 +32,7 @@ pub fn multi_chunk_wonder() -> World {
 
 /// 1 chunk with some epic terrain
 pub fn one_chunk_wonder() -> World {
-    let full: u16 = CHUNK_SIZE as u16;
+    let full: u16 = CHUNK_SIZE.as_u16();
     let half: u16 = full / 2;
 
     let chunk = ChunkBuilder::new()

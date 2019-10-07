@@ -1,10 +1,8 @@
 pub mod world {
     use std::ops::{Add, AddAssign, Sub, SubAssign};
 
+    use super::dim::CHUNK_SIZE;
     use crate::grid::CoordType;
-
-    pub const CHUNK_SIZE: usize = 16;
-    // TODO expose as w h and d and in different types too (#38)
 
     /// A slice of blocks in a chunk, z coordinate
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -50,8 +48,8 @@ pub mod world {
             let ChunkPosition(cx, cy) = chunk_pos.into();
             let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
             WorldPosition(
-                i32::from(x) + cx * CHUNK_SIZE as i32,
-                i32::from(y) + cy * CHUNK_SIZE as i32,
+                i32::from(x) + cx * CHUNK_SIZE.as_i32(),
+                i32::from(y) + cy * CHUNK_SIZE.as_i32(),
                 z,
             )
         }
@@ -171,8 +169,8 @@ pub mod world {
     impl From<ChunkPosition> for WorldPoint {
         fn from(p: ChunkPosition) -> Self {
             Self(
-                (p.0 * CHUNK_SIZE as i32) as f32,
-                (p.1 * CHUNK_SIZE as i32) as f32,
+                (p.0 * CHUNK_SIZE.as_i32()) as f32,
+                (p.1 * CHUNK_SIZE.as_i32()) as f32,
                 0.0,
             )
         }
@@ -197,14 +195,44 @@ pub mod screen {
     pub struct ScreenPoint(pub u32, pub u32);
 }
 
+pub mod dim {
+    /// Chunk size X and Y dimension
+    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+    pub struct ChunkDimension(u32);
+
+    pub const CHUNK_SIZE: ChunkDimension = ChunkDimension(16);
+
+    // TODO temporary while chunks are still fixed 3d grids (#15)
+    pub const CHUNK_DEPTH: ChunkDimension = ChunkDimension(16);
+
+    impl ChunkDimension {
+        pub const fn as_f32(self) -> f32 {
+            self.0 as f32
+        }
+
+        pub const fn as_i32(self) -> i32 {
+            self.0 as i32
+        }
+
+        pub const fn as_u16(self) -> u16 {
+            self.0 as u16
+        }
+
+        pub const fn as_usize(self) -> usize {
+            self.0 as usize
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32::EPSILON;
 
     use float_cmp::ApproxEq;
 
+    use crate::coordinate::dim::CHUNK_SIZE;
     use crate::coordinate::world::{BlockCoord, BlockPosition, SliceIndex};
-    use crate::{WorldPoint, CHUNK_SIZE};
+    use crate::WorldPoint;
 
     #[test]
     fn block_to_world() {
@@ -218,7 +246,7 @@ mod tests {
 
         // a few chunks over
         let WorldPoint(x, y, z) = b.to_world_point((1, 2));
-        let sz: f32 = CHUNK_SIZE as f32;
+        let sz: f32 = CHUNK_SIZE.as_f32();
         assert!(x.approx_eq(1.0 + sz, (EPSILON, 2)));
         assert!(y.approx_eq(2.0 + sz + sz, (EPSILON, 2)));
         assert!(z.approx_eq(3.0, (EPSILON, 2)));
@@ -230,7 +258,7 @@ mod tests {
         let wp = b.to_world_point((-1, -1));
         assert_eq!(
             wp,
-            WorldPoint(-(CHUNK_SIZE as f32), -(CHUNK_SIZE as f32), 0.0)
+            WorldPoint(-CHUNK_SIZE.as_f32(), -CHUNK_SIZE.as_f32(), 0.0)
         );
     }
 }

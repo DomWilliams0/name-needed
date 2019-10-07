@@ -49,7 +49,7 @@ impl<'a, R: Renderer> Simulation<'a, R> {
                 .create_entity()
                 .with(Position {
                     x: 0.0,
-                    y: CHUNK_SIZE as f32, // should be at the top of the chunk
+                    y: CHUNK_SIZE.as_f32(), // should be at the top of the chunk
                     z: 3,
                 })
                 .with(Velocity { x: 0.0, y: 0.0 })
