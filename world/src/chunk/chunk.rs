@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn chunk_ops() {
-        // TODO immutable too
+        // check setting and getting blocks works
         let chunk = ChunkBuilder::new()
             .apply(|c| {
                 // a bit on slice 0
@@ -174,7 +174,7 @@ mod tests {
             .set_block((2, 3, 1), BlockType::Dirt)
             .build((0, 0));
 
-        // slice 1
+        // slice 1 was filled
         assert_eq!(chunk.get_block_type((2, 3, 1)), BlockType::Dirt);
 
         // collect slice
@@ -190,6 +190,7 @@ mod tests {
 
     #[test]
     fn chunk_id() {
+        // check chunk ids are unique
         let id1 = Chunk::empty((0, 0)).id();
         let id2 = Chunk::empty((0, 1)).id();
         let id3 = Chunk::empty((1, 0)).id();
@@ -199,6 +200,7 @@ mod tests {
 
     #[test]
     fn blocks() {
+        // check individual block collection is ordered as intended
         let c = Chunk::empty((0, 0));
         let mut b = c.blocks();
         assert_eq!(
@@ -215,6 +217,6 @@ mod tests {
         );
 
         let rest: Vec<_> = b.collect();
-        assert_eq!(rest.len(), BLOCK_COUNT_CHUNK - 3);
+        assert_eq!(rest.len(), BLOCK_COUNT_CHUNK - 3); // ensure full length
     }
 }

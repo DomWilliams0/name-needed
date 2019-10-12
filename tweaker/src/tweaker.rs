@@ -101,6 +101,7 @@ mod tests {
 
     #[test]
     fn nice_ints() {
+        // ints that fit into both i64 and i32 should pass conversion
         let val = Value::Int(100);
         assert_eq!(Some(100i64), resolve_value::<i64>(val));
         assert_eq!(Some(100i32), resolve_value::<i32>(val));
@@ -108,6 +109,7 @@ mod tests {
 
     #[test]
     fn big_ints() {
+        // ints that dont fit into i32 should fail conversion
         let n = 2i64.pow(48);
         let val = Value::Int(n);
         assert_eq!(Some(n), resolve_value::<i64>(val));
@@ -116,6 +118,7 @@ mod tests {
 
     #[test]
     fn nice_floats() {
+        // floats that fit into both f64 and f32 should pass conversion
         let val = Value::Float(10.0);
         assert_eq!(Some(10.0), resolve_value::<f64>(val));
         assert_eq!(Some(10.0), resolve_value::<f32>(val));
@@ -123,6 +126,7 @@ mod tests {
 
     #[test]
     fn big_floats() {
+        // floats that dont fit into f32 should fail conversion
         let n = f64::max_value();
         let val = Value::Float(n);
         assert_eq!(Some(n), resolve_value::<f64>(val));
@@ -131,6 +135,7 @@ mod tests {
 
     #[test]
     fn bools() {
+        // bools should be able to be converted from ints
         let val = Value::Int(1);
         assert_eq!(Some(true), resolve_value::<bool>(val));
 
@@ -140,7 +145,13 @@ mod tests {
 
     #[test]
     fn bad_type() {
+        // trying to retrieve a value by the wrong type should fail
         let val = Value::Int(10);
         assert_eq!(None, resolve_value::<f64>(val));
+        assert_eq!(None, resolve_value::<f32>(val));
+
+        let val = Value::Float(10.0);
+        assert_eq!(None, resolve_value::<i64>(val));
+        assert_eq!(None, resolve_value::<i32>(val));
     }
 }

@@ -236,6 +236,7 @@ mod tests {
 
     #[test]
     fn block_to_world() {
+        // ensure block positions convert to the expected world position
         let b = BlockPosition(BlockCoord(1), BlockCoord(2), SliceIndex(3));
 
         // at origin
@@ -254,6 +255,7 @@ mod tests {
 
     #[test]
     fn negative_block_to_world() {
+        // negative chunk coords should be handled fine
         let b: BlockPosition = (0, 0, 0).into();
         let wp = b.to_world_point((-1, -1));
         assert_eq!(

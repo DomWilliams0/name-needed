@@ -115,6 +115,7 @@ mod tests {
 
     #[test]
     fn unflatten_slice_index() {
+        // these tests assume the chunk size is at least 3
         assert!(CHUNK_SIZE.as_i32() >= 3);
 
         assert_eq!(unflatten_index(0), (0, 0).into());

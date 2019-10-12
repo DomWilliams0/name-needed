@@ -142,6 +142,7 @@ mod tests {
 
     #[test]
     fn fill_slice() {
+        // check that filling a slice with a block really does
         let c = ChunkBuilder::new()
             .fill_slice(0, BlockType::Grass)
             .build((0, 0));
@@ -152,6 +153,7 @@ mod tests {
 
     #[test]
     fn set_block() {
+        // check setting a specific block works
         let c = ChunkBuilder::new()
             .set_block((2, 2, 1), BlockType::Stone)
             .set_block_with_height((3, 3, 3), BlockType::Grass, BlockHeight::Half)
@@ -166,6 +168,7 @@ mod tests {
 
     #[test]
     fn apply() {
+        // check that the apply helper works as intended
         let c = ChunkBuilder::new()
             .apply(|c| {
                 c.set_block((1, 1, 1), BlockType::Grass);
@@ -179,10 +182,12 @@ mod tests {
 
     #[test]
     fn fill_range() {
+        // check that range filling works as intended
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (3, 3, 3), |_| Some(BlockType::Stone))
             .build((0, 0));
 
+        // expected to have filled 0-2 on all 3 dimensions
         assert_eq!(
             c.blocks()
                 .filter(|(_, b)| b.block_type == BlockType::Stone)
@@ -190,6 +195,7 @@ mod tests {
             3 * 3 * 3
         );
 
+        // returning None should not actually set a block
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (3, 3, 3), |_| None)
             .build((0, 0));
@@ -201,6 +207,7 @@ mod tests {
             0
         );
 
+        // more complex range with a conditional to only set 1 block
         let c = ChunkBuilder::new()
             .fill_range((0, 3, 3), (8, 4, 4), |(x, _y, _z)| {
                 if x == 0 {
@@ -217,8 +224,9 @@ mod tests {
                 .count(),
             1
         );
-        assert_eq!(c.get_block_type((0, 3, 3)), BlockType::Dirt);
+        assert_eq!(c.get_block_type((0, 3, 3)), BlockType::Dirt); // it was the one we intended
 
+        // annoyingly if any dimension has a width of 0, do nothing
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (10, 0, 0), |_| Some(BlockType::Stone))
             .build((0, 0));
@@ -229,6 +237,7 @@ mod tests {
             0
         );
 
+        // alternatively with a width of 1, work as intended
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (10, 1, 1), |_| Some(BlockType::Stone))
             .build((0, 0));

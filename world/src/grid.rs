@@ -147,13 +147,18 @@ impl<I: GridImpl> DerefMut for Grid<I> {
 mod tests {
     use super::*;
 
+    // grid of u32s with dimensions 4x5x6
     grid_declare!(struct TestGrid<TestImpl, u32>, 4, 5, 6);
 
     #[test]
     fn simple() {
         let mut grid = TestGrid::default();
+
+        // check the number of elements is as expected
         assert_eq!(TestGrid::full_size(), 4 * 5 * 6);
         assert_eq!(TestGrid::full_size(), grid.indices().len());
+
+        // check coordinate resolution works
         assert_eq!(TestGrid::flatten(&[0, 0, 0]), 0);
         assert_eq!(TestGrid::flatten(&[1, 0, 0]), 1);
         assert_eq!(TestGrid::flatten(&[0, 1, 0]), 4);
@@ -165,6 +170,7 @@ mod tests {
             assert_eq!(i, j);
         }
 
+        // check iter_mut works and actually sets values
         for x in grid.iter_mut() {
             *x = 1;
         }
