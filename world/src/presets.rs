@@ -2,7 +2,7 @@ use crate::block::{BlockHeight, BlockType};
 use crate::chunk::CHUNK_SIZE;
 use crate::{ChunkBuilder, World};
 
-/// Multiple flat chunks
+/// Multiple flat chunks with a big deep one
 pub fn multi_chunk_wonder() -> World {
     let chunks = vec![
         // 0, 0 is slice 0
@@ -25,6 +25,15 @@ pub fn multi_chunk_wonder() -> World {
         ChunkBuilder::new()
             .fill_slice(2, BlockType::Grass)
             .build((-1, -1)),
+        // 2, 0 is very deep
+        ChunkBuilder::new()
+            .fill_range((4, 4, -40), (10, 10, 40), |p| match p {
+                (_, _, -40) => BlockType::Dirt,
+                (_, _, 39) => BlockType::Stone,
+                (_, _, z) if z < 0 => BlockType::Stone,
+                _ => BlockType::Grass,
+            })
+            .build((2, 0)),
     ];
 
     World::from_chunks(chunks)
@@ -47,7 +56,7 @@ pub fn one_chunk_wonder() -> World {
 
             // step up from slice 0
             for y in 2..half-2 {
-                s.set_block_with_height((half-1,y), BlockType::Stone, BlockHeight::Half)
+                s.set_block((half-1,y), (BlockType::Stone, BlockHeight::Half))
             }
         })
         .with_slice(2, |mut s| {
@@ -59,7 +68,7 @@ pub fn one_chunk_wonder() -> World {
             }
 
             // step up from slice 1
-            s.set_block_with_height((half + 3, half), BlockType::Dirt, BlockHeight::Half)
+            s.set_block((half + 3, half), (BlockType::Dirt, BlockHeight::Half))
         })
         .apply(|s| {
             // stairs

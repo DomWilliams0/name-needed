@@ -1,11 +1,13 @@
 pub mod world {
+    use std::i32;
     use std::ops::{Add, AddAssign, Sub, SubAssign};
 
     use super::dim::CHUNK_SIZE;
     use crate::grid::CoordType;
+    use std::fmt::{Display, Error, Formatter};
 
     /// A slice of blocks in a chunk, z coordinate
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub struct SliceIndex(pub SliceIndexType);
     pub type SliceIndexType = i32;
 
@@ -26,7 +28,7 @@ pub mod world {
     pub struct ChunkPoint(pub f32, pub f32, pub f32);
 
     /// A chunk in the world
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
     pub struct ChunkPosition(pub i32, pub i32);
 
     /// A point anywhere in the world
@@ -34,13 +36,17 @@ pub mod world {
     pub struct WorldPoint(pub f32, pub f32, pub f32);
 
     /// A block anywhere in the world
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub struct WorldPosition(pub i32, pub i32, pub i32);
 
     // --------
     impl SliceIndex {
         pub const MIN: SliceIndex = Self(std::i32::MIN);
         pub const MAX: SliceIndex = Self(std::i32::MAX);
+
+        pub fn abs(self) -> Self {
+            Self(self.0.abs())
+        }
     }
 
     impl BlockPosition {
@@ -73,16 +79,48 @@ pub mod world {
         }
     }
 
+    impl Display for BlockPosition {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+            write!(
+                f,
+                "BlockPosition({}, {}, {})",
+                (self.0).0,
+                (self.1).0,
+                (self.2).0
+            )
+        }
+    }
+
+    impl Display for WorldPosition {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+            write!(f, "WorldPosition({}, {}, {})", self.0, self.1, self.2)
+        }
+    }
+
+    impl SliceBlock {
+        pub fn to_block_position(self, slice: SliceIndex) -> BlockPosition {
+            BlockPosition(self.0, self.1, slice)
+        }
+    }
+
     // --------
     impl From<u16> for BlockCoord {
         fn from(u: u16) -> Self {
             Self(u)
         }
     }
+
     impl From<(u16, u16, SliceIndexType)> for BlockPosition {
         fn from(pos: (u16, u16, i32)) -> Self {
             let (x, y, z) = pos;
             Self(x.into(), y.into(), SliceIndex(z))
+        }
+    }
+
+    impl From<(i32, i32, i32)> for BlockPosition {
+        fn from(pos: (i32, i32, i32)) -> Self {
+            let (x, y, z) = pos;
+            Self((x as u16).into(), (y as u16).into(), z.into())
         }
     }
 
@@ -143,6 +181,12 @@ pub mod world {
     impl From<(u16, u16)> for SliceBlock {
         fn from((x, y): (u16, u16)) -> Self {
             Self(BlockCoord(x), BlockCoord(y))
+        }
+    }
+
+    impl From<BlockPosition> for SliceBlock {
+        fn from(b: BlockPosition) -> Self {
+            Self(b.0, b.1)
         }
     }
 

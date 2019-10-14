@@ -1,10 +1,8 @@
 use scale;
 
-use crate::block::Block;
 use crate::chunk::Chunk;
-use crate::coordinate::world::{BlockCoord, SliceBlock, SliceIndex};
+use crate::coordinate::world::{BlockCoord, SliceBlock};
 use crate::viewer::SliceRange;
-use crate::BLOCK_COUNT_CHUNK;
 
 #[derive(Copy, Clone)]
 pub struct Vertex {
@@ -29,7 +27,6 @@ impl Vertex {
 }
 
 const VERTICES_PER_BLOCK: usize = 6;
-pub const VERTICES_PER_CHUNK: usize = VERTICES_PER_BLOCK * BLOCK_COUNT_CHUNK;
 
 // for ease of declaration. /2 as based around the center of the block
 const X: f32 = scale::BLOCK / 2.0;
@@ -104,19 +101,17 @@ const FACES: [Face; FACE_COUNT] = [
 ];
 
 pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
-    let mut vertices = Vec::with_capacity(VERTICES_PER_CHUNK); // TODO reuse/calculate needed capacity first
-    for slice_index in slice_range.into_iter() {
-        let slice = chunk.slice(slice_index);
+    let mut vertices = Vec::new(); // TODO reuse/calculate needed capacity first
+    for (slice_index, slice) in chunk.slice_range(slice_range) {
         // TODO skip if slice knows it is empty
 
         for (block_pos, block) in slice.non_air_blocks() {
-            let Block { block_type, height } = block;
+            let height = block.block_height();
 
             let (bx, by, bz) = {
                 let SliceBlock(BlockCoord(x), BlockCoord(y)) = block_pos;
-                let SliceIndex(slice_index) = slice_index;
                 let z = {
-                    let z = slice_index as f32;
+                    let z = slice_index.0 as f32;
 
                     // blocks that aren't full would be floating around the center, so lower to
                     // the bottom of the block
@@ -130,7 +125,7 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
                 )
             };
 
-            let color = block_type.color_as_f32();
+            let color = block.block_type().color_as_f32();
             let height = height.height();
 
             for face in 0..FACE_COUNT {

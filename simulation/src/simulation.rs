@@ -10,8 +10,7 @@ use specs::World as SpecsWorld;
 use world::{SliceRange, WorldRef, CHUNK_SIZE};
 
 use crate::movement::{MovementSystem, Position, Velocity};
-use crate::render::{DebugRenderer, FrameRenderState, NavigationMeshDebugRenderer, Physical,
-                    RenderSystem, Renderer};
+use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
 use crate::steer::{Steering, SteeringSystem};
 
 pub struct Simulation<'a, R: Renderer> {
@@ -83,7 +82,9 @@ impl<'a, R: Renderer> Simulation<'a, R> {
             world,
             debug_renderers: vec![
                 // Box::new(DummyDebugRenderer),
-                Box::new(NavigationMeshDebugRenderer),
+
+                // temporarily unimplemented
+                // Box::new(NavigationMeshDebugRenderer),
             ],
         }
     }

@@ -1,11 +1,15 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-use crate::block::{Block, BlockHeight, BlockType};
+use crate::block::{Block, BlockType};
 use crate::coordinate::world::{BlockCoord, SliceBlock};
 use crate::CHUNK_SIZE;
 
 pub struct Slice<'a> {
     slice: &'a [Block],
+}
+
+pub struct SliceOwned {
+    slice: Vec<Block>,
 }
 
 pub struct SliceMut<'a> {
@@ -18,7 +22,7 @@ impl<'a> Slice<'a> {
     }
 
     pub fn non_air_blocks(&self) -> impl Iterator<Item = (SliceBlock, &Block)> {
-        self.filter_blocks(move |&b| b.block_type != BlockType::Air)
+        self.filter_blocks(move |&b| b.block_type() != BlockType::Air)
     }
 
     pub fn filter_blocks<F>(&self, f: F) -> impl Iterator<Item = (SliceBlock, &Block)>
@@ -36,7 +40,7 @@ impl<'a> Slice<'a> {
     }
 
     pub fn all_blocks_are(&self, block_type: BlockType) -> bool {
-        self.filter_blocks(move |&b| b.block_type != block_type)
+        self.filter_blocks(move |&b| b.block_type() != block_type)
             .count() == 0
     }
 
@@ -56,6 +60,23 @@ impl<'a> Deref for Slice<'a> {
     }
 }
 
+impl<'a> Into<SliceOwned> for Slice<'a> {
+    fn into(self) -> SliceOwned {
+        let slice = self.slice.to_vec();
+        SliceOwned { slice }
+    }
+}
+
+// -------
+
+impl Deref for SliceOwned {
+    type Target = [Block];
+
+    fn deref(&self) -> &Self::Target {
+        &self.slice
+    }
+}
+
 // -------
 
 impl<'a> SliceMut<'a> {
@@ -63,19 +84,22 @@ impl<'a> SliceMut<'a> {
         Self { slice }
     }
 
-    pub fn set_block<P: Into<SliceBlock>>(&mut self, pos: P, block: BlockType) {
-        self.set_block_with_height(pos, block, BlockHeight::default())
-    }
-    pub fn set_block_with_height<P: Into<SliceBlock>>(
-        &mut self,
-        pos: P,
-        block: BlockType,
-        height: BlockHeight,
-    ) {
+    pub fn set_block<P, B>(&mut self, pos: P, block: B)
+    where
+        P: Into<SliceBlock>,
+        B: Into<Block>,
+    {
         let index = flatten_coords(pos.into());
-        self.slice[index] = Block {
-            block_type: block,
-            height,
+        self.slice[index] = block.into();
+    }
+
+    pub fn fill<B>(&mut self, block: B)
+    where
+        B: Into<Block>,
+    {
+        let block = block.into();
+        for b in self.slice.iter_mut() {
+            *b = block;
         }
     }
 }
@@ -96,6 +120,37 @@ impl<'a> DerefMut for SliceMut<'a> {
 
 // -------
 
+impl<'a, I: Into<SliceBlock>> Index<I> for Slice<'a> {
+    type Output = Block;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.slice[flatten_coords(index.into())]
+    }
+}
+
+impl<I: Into<SliceBlock>> Index<I> for SliceOwned {
+    type Output = Block;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.slice[flatten_coords(index.into())]
+    }
+}
+
+impl<'a, I: Into<SliceBlock>> Index<I> for SliceMut<'a> {
+    type Output = Block;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.slice[flatten_coords(index.into())]
+    }
+}
+
+impl<'a, I: Into<SliceBlock>> IndexMut<I> for SliceMut<'a> {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        &mut self.slice[flatten_coords(index.into())]
+    }
+}
+
+// TODO make not pub
 pub fn unflatten_index(index: usize) -> SliceBlock {
     SliceBlock(
         BlockCoord((index % CHUNK_SIZE.as_usize()) as u16),
@@ -110,7 +165,6 @@ fn flatten_coords(block: SliceBlock) -> usize {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

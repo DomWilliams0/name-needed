@@ -4,7 +4,7 @@
         "increment": 1.0
     },
     "lookaround": {
-        "value": false
+        "value": true
     },
     "render-navmesh": {
         "value": true

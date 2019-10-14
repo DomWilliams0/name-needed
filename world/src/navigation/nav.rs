@@ -47,8 +47,8 @@ impl Navigation {
             let pos = grid.unflatten_index(idx);
             let mut marker: &mut NavMarker = &mut grid[idx];
             let block: Block = chunk[&pos];
-            marker.solid = block.block_type.solid();
-            marker.height = block.height;
+            marker.solid = block.solid();
+            marker.height = block.block_height();
         }
 
         // no corners
@@ -362,7 +362,7 @@ mod tests {
         // _-
         let chunk = ChunkBuilder::new()
             .set_block((1, 0, 0), BlockType::Dirt)
-            .set_block_with_height((1, 1, 1), BlockType::Grass, BlockHeight::Half)
+            .set_block((1, 1, 1), (BlockType::Grass, BlockHeight::Half))
             .build((0, 0));
 
         let nav = chunk.navigation();
@@ -382,7 +382,7 @@ mod tests {
         // _--
         let chunk = ChunkBuilder::new()
             .set_block((1, 0, 0), BlockType::Dirt)
-            .set_block_with_height((1, 1, 1), BlockType::Grass, BlockHeight::Half)
+            .set_block((1, 1, 1), (BlockType::Grass, BlockHeight::Half))
             .set_block((1, 2, 1), BlockType::Grass)
             .build((0, 0));
 
@@ -440,11 +440,11 @@ mod tests {
     #[test]
     fn simple_path_up_some_stairs() {
         let chunk = ChunkBuilder::new()
-            .set_block_with_height((0, 0, 0), BlockType::Dirt, BlockHeight::Full)
-            .set_block_with_height((0, 1, 1), BlockType::Dirt, BlockHeight::Half)
-            .set_block_with_height((0, 2, 1), BlockType::Dirt, BlockHeight::Full)
-            .set_block_with_height((0, 3, 2), BlockType::Dirt, BlockHeight::Half)
-            .set_block_with_height((0, 4, 2), BlockType::Dirt, BlockHeight::Full)
+            .set_block((0, 0, 0), (BlockType::Dirt, BlockHeight::Full))
+            .set_block((0, 1, 1), (BlockType::Dirt, BlockHeight::Half))
+            .set_block((0, 2, 1), (BlockType::Dirt, BlockHeight::Full))
+            .set_block((0, 3, 2), (BlockType::Dirt, BlockHeight::Half))
+            .set_block((0, 4, 2), (BlockType::Dirt, BlockHeight::Full))
             .build((0, 0));
 
         let nav = chunk.navigation();
@@ -500,7 +500,7 @@ mod tests {
     fn complex_path() {
         let chunk = ChunkBuilder::new()
             .fill_slice(0, BlockType::Stone) // 0 is filled and walkable
-            .fill_range((3, 0, 0), (4, 4, 4), |_| Some(BlockType::Dirt)) // big wall at x=3
+            .fill_range((3, 0, 0), (4, 4, 4), |_| BlockType::Dirt) // big wall at x=3
             .build((0, 0));
 
         let nav = chunk.navigation();
@@ -509,7 +509,7 @@ mod tests {
 
         let chunk = ChunkBuilder::new()
             .fill_slice(0, BlockType::Stone) // 0 is filled and walkable
-            .fill_range((3, 0, 0), (4, CHUNK_SIZE.as_u16() + 1, 4), |_| Some(BlockType::Dirt)) // impassible wall at x=3
+            .fill_range((3, 0, 0), (4, CHUNK_SIZE.as_u16() + 1, 4), |_| BlockType::Dirt) // impassible wall at x=3
             .build((0, 0));
 
         let nav = chunk.navigation();

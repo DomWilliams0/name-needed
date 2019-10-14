@@ -1,8 +1,49 @@
+use crate::area::SlabAreaIndex;
+
 /// A single block in a chunk
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Block {
-    pub block_type: BlockType,
-    pub height: BlockHeight,
+    block_type: BlockType,
+    height: BlockHeight,
+    area: SlabAreaIndex,
+}
+
+impl Block {
+    /// Called by BlockBuilder
+    fn new(block_type: BlockType, height: BlockHeight) -> Self {
+        Self {
+            block_type,
+            height,
+            area: SlabAreaIndex::UNINITIALIZED,
+        }
+    }
+
+    pub const fn block_type(&self) -> BlockType {
+        self.block_type
+    }
+
+    pub fn block_type_mut(&mut self) -> &mut BlockType {
+        &mut self.block_type
+    }
+
+    pub fn solid(&self) -> bool {
+        self.block_type.solid()
+    }
+
+    pub const fn block_height(&self) -> BlockHeight {
+        self.height
+    }
+
+    pub fn height(&self) -> f32 {
+        self.height.height()
+    }
+
+    pub(crate) fn area_index(&self) -> SlabAreaIndex {
+        self.area
+    }
+    pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
+        &mut self.area
+    }
 }
 
 /// The type of a block
@@ -76,6 +117,54 @@ impl BlockHeight {
 impl Default for BlockHeight {
     fn default() -> Self {
         BlockHeight::Full
+    }
+}
+
+#[derive(Default)]
+pub struct BlockBuilder {
+    block_type: BlockType,
+    height: BlockHeight,
+}
+
+impl BlockBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_type(mut self, block_type: BlockType) -> Self {
+        self.block_type = block_type;
+        self
+    }
+
+    pub fn with_height(mut self, height: BlockHeight) -> Self {
+        self.height = height;
+        self
+    }
+
+    pub fn build(self) -> Block {
+        Block::new(self.block_type, self.height)
+    }
+}
+
+impl Into<Block> for BlockBuilder {
+    fn into(self) -> Block {
+        self.build()
+    }
+}
+
+// helpful
+impl Into<Block> for BlockType {
+    fn into(self) -> Block {
+        BlockBuilder::new().with_type(self).build()
+    }
+}
+
+impl Into<Block> for (BlockType, BlockHeight) {
+    fn into(self) -> Block {
+        BlockBuilder::new()
+            .with_type(self.0)
+            .with_height(self.1)
+            .build()
     }
 }
 

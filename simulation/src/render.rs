@@ -91,7 +91,7 @@ impl<R: Renderer> DebugRenderer<R> for NavigationMeshDebugRenderer {
 
             let mut world_pos: WorldPoint = block_pos.to_world_point_centered(chunk.pos());
 
-            world_pos.2 += 1.0 - chunk.get_block(block_pos).height.height(); // lower to the height of the block
+            world_pos.2 += 1.0 - chunk.get_block(block_pos).unwrap().height(); // lower to the height of the block
             world_pos.2 -= scale::BLOCK * 0.8; // lower to just above the surface
             world_pos
         }

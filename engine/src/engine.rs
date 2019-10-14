@@ -116,8 +116,8 @@ impl<'a> Engine<'a> {
 
     fn handle_key(&mut self, event: KeyEvent) {
         match event {
-            KeyEvent::Down(Keycode::Up) => self.renderer.world_viewer().move_up(),
-            KeyEvent::Down(Keycode::Down) => self.renderer.world_viewer().move_down(),
+            KeyEvent::Down(Keycode::Up) => self.renderer.world_viewer().move_by(1),
+            KeyEvent::Down(Keycode::Down) => self.renderer.world_viewer().move_by(-1),
             _ => {}
         };
 

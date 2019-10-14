@@ -59,12 +59,12 @@ pub trait GridImpl: Default {
 pub struct Grid<I: GridImpl>(I);
 
 impl<I: GridImpl> Grid<I> {
+    pub const FULL_SIZE: usize = I::FULL_SIZE;
+    pub const SLICE_COUNT: i32 = I::DIMS[2];
+    pub const SLICE_SIZE: usize = (I::DIMS[0] * I::DIMS[1]) as usize;
+
     pub fn indices(&self) -> Range<usize> {
         0..I::FULL_SIZE
-    }
-
-    pub fn full_size() -> usize {
-        I::FULL_SIZE
     }
 
     fn flatten(coord: &CoordType) -> usize {
@@ -92,10 +92,6 @@ impl<I: GridImpl> Grid<I> {
         let slice_count = xs * ys;
         let offset = index * slice_count;
         (offset as usize, (offset + slice_count) as usize)
-    }
-
-    pub fn slice_count() -> i32 {
-        I::DIMS[2]
     }
 }
 
@@ -155,9 +151,8 @@ mod tests {
         let mut grid = TestGrid::default();
 
         // check the number of elements is as expected
-        assert_eq!(TestGrid::full_size(), 4 * 5 * 6);
-        assert_eq!(TestGrid::full_size(), grid.indices().len());
-
+        assert_eq!(TestGrid::FULL_SIZE, 4 * 5 * 6);
+        assert_eq!(TestGrid::FULL_SIZE, grid.indices().len());
         // check coordinate resolution works
         assert_eq!(TestGrid::flatten(&[0, 0, 0]), 0);
         assert_eq!(TestGrid::flatten(&[1, 0, 0]), 1);

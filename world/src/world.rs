@@ -4,8 +4,10 @@ use std::rc::Rc;
 
 use log::{debug, warn};
 
+use crate::area::AreaGraph;
 use crate::chunk::Chunk;
-use crate::presets;
+
+use crate::{presets, SliceRange};
 
 /// Reference to the world
 pub type WorldRef = Rc<RefCell<World>>;
@@ -16,6 +18,7 @@ pub fn world_ref(w: World) -> WorldRef {
 
 pub struct World {
     chunks: Vec<Chunk>,
+    area_graph: AreaGraph,
 }
 
 impl Default for World {
@@ -46,12 +49,32 @@ impl World {
         }
 
         debug!("world has {} chunks", chunks.len());
-        Self { chunks }
+
+        // build area graph
+        let area_graph = AreaGraph::from_chunks(&chunks);
+
+        Self { chunks, area_graph }
     }
 
     pub fn visible_chunks(&self) -> impl Iterator<Item = &Chunk> {
         // TODO filter visible
         self.chunks.iter()
+    }
+
+    pub fn slice_bounds(&self) -> SliceRange {
+        let min = self.chunks
+            .iter()
+            .map(|c| c.slice_bounds_as_slabs().bottom())
+            .min();
+        let max = self.chunks
+            .iter()
+            .map(|c| c.slice_bounds_as_slabs().top())
+            .max();
+
+        match (min, max) {
+            (Some(min), Some(max)) => SliceRange::from_bounds(min, max),
+            _ => SliceRange::null(),
+        }
     }
 
     /*

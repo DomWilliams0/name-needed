@@ -1,14 +1,14 @@
-use std::convert::TryFrom;
+
 use std::fmt::{Display, Error, Formatter};
 use std::iter::Map;
-use std::ops::RangeInclusive;
+use std::ops::{Add, RangeInclusive};
 
 use generator::{done, Generator, Gn};
 use log::info;
 
 use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType};
 use crate::mesh::Vertex;
-use crate::{mesh, WorldRef, CHUNK_SIZE};
+use crate::{mesh, WorldRef};
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
@@ -18,7 +18,7 @@ pub struct WorldViewer {
     view_range: SliceRange,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SliceRange(SliceIndex, SliceIndex);
 
 impl IntoIterator for SliceRange {
@@ -38,38 +38,16 @@ impl SliceRange {
         Self(start, SliceIndex(start.0 + size))
     }
 
-    pub fn null() -> Self {
+    pub fn from_bounds<F: Into<SliceIndex>, T: Into<SliceIndex>>(from: F, to: T) -> Self {
+        Self(from.into(), to.into())
+    }
+
+    pub fn all() -> Self {
         Self(SliceIndex::MIN, SliceIndex::MAX)
     }
 
-    /// returns true if it moved, otherwise false
-    fn move_up(&mut self, delta: u32) -> bool {
-        // TODO check if slice exists and allow unlimited movement
-        // TODO cap to prevent panics for now
-        let delta = i32::try_from(delta).expect("don't move so much");
-        let new_upper = self.1 + delta;
-        if new_upper.0 < CHUNK_SIZE.as_i32() {
-            self.0 += delta;
-            self.1 = new_upper;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// returns true if it moved, otherwise false
-    fn move_down(&mut self, delta: u32) -> bool {
-        // TODO check if slice exists and allow unlimited movement
-        // TODO cap to prevent panics for now
-        let delta = i32::try_from(delta).expect("don't move so much");
-        let new_lower = self.0 - delta;
-        if new_lower.0 >= 0 {
-            self.0 = new_lower;
-            self.1 -= delta;
-            true
-        } else {
-            false
-        }
+    pub fn null() -> Self {
+        Self(SliceIndex(0), SliceIndex(0))
     }
 
     pub fn contains<S: Into<SliceIndex>>(self, slice: S) -> bool {
@@ -78,12 +56,27 @@ impl SliceRange {
         let SliceIndex(upper) = self.1;
         slice >= lower && slice <= upper
     }
+
+    pub fn bottom(&self) -> SliceIndex {
+        self.0
+    }
+    pub fn top(&self) -> SliceIndex {
+        self.1
+    }
 }
 
 impl Display for SliceRange {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         let SliceRange(SliceIndex(from), SliceIndex(to)) = self;
         write!(f, "[{} => {}]", from, to)
+    }
+}
+
+impl Add<i32> for SliceRange {
+    type Output = SliceRange;
+
+    fn add(self, rhs: i32) -> Self::Output {
+        SliceRange(self.0 + rhs, self.1 + rhs)
     }
 }
 
@@ -115,6 +108,31 @@ impl WorldViewer {
         }
     }
 
+    pub fn move_by(&mut self, delta: i32) {
+        let new_range = self.view_range + delta;
+        let new_max = match delta.signum() {
+            0 => return, // nop
+            1 => new_range.1,
+            -1 => new_range.0,
+            _ => unreachable!(),
+        };
+
+        // TODO cache?
+        let bounds = self.world.borrow().slice_bounds();
+        if bounds.contains(new_max) {
+            // in range
+            self.view_range = new_range;
+            self.invalidate_visible_chunks();
+            info!("moved view range to {}", self.view_range);
+        } else {
+            info!(
+                "cannot move view range, it remains at {} (world range is {})",
+                self.view_range, bounds
+            );
+        }
+    }
+
+    /*
     pub fn move_up(&mut self) {
         if self.view_range.move_up(1) {
             info!("moved view range to {}", self.view_range);
@@ -131,6 +149,7 @@ impl WorldViewer {
             info!("cannot move view range, it remains at {}", self.view_range);
         }
     }
+*/
 
     //    pub fn goto(&mut self, new_slice: SliceIndex) { unimplemented!() }
 
