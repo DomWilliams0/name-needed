@@ -1,10 +1,11 @@
 pub mod world {
+    use std::fmt::{Display, Error, Formatter};
     use std::i32;
     use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-    use super::dim::CHUNK_SIZE;
     use crate::grid::CoordType;
-    use std::fmt::{Display, Error, Formatter};
+
+    use super::dim::CHUNK_SIZE;
 
     /// A slice of blocks in a chunk, z coordinate
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -71,11 +72,6 @@ pub mod world {
 
         pub fn flatten(self) -> (u16, u16, SliceIndexType) {
             self.into()
-        }
-
-        pub fn to_chunk_point_centered(self) -> ChunkPoint {
-            let BlockPosition(BlockCoord(x), BlockCoord(y), SliceIndex(z)) = self;
-            ChunkPoint(f32::from(x), f32::from(y), z as f32)
         }
     }
 
@@ -197,6 +193,13 @@ pub mod world {
         }
     }
 
+    impl From<BlockPosition> for ChunkPoint {
+        fn from(b: BlockPosition) -> Self {
+            let (x, y, z) = b.into();
+            ChunkPoint(f32::from(x), f32::from(y), z as f32)
+        }
+    }
+
     impl From<(f32, f32, f32)> for WorldPoint {
         fn from((x, y, z): (f32, f32, f32)) -> Self {
             WorldPoint(x, y, z)
@@ -230,6 +233,35 @@ pub mod world {
     impl From<(i32, i32, i32)> for WorldPosition {
         fn from((x, y, z): (i32, i32, i32)) -> Self {
             Self(x, y, z)
+        }
+    }
+
+    impl Add<(i32, i32, i32)> for WorldPosition {
+        type Output = WorldPosition;
+
+        fn add(self, (x, y, z): (i32, i32, i32)) -> Self::Output {
+            WorldPosition(self.0 + x, self.1 + y, self.2 + z)
+        }
+    }
+
+    impl From<WorldPosition> for ChunkPosition {
+        fn from(wp: WorldPosition) -> Self {
+            let WorldPosition(x, y, _) = wp;
+            ChunkPosition(
+                x.div_euclid(CHUNK_SIZE.as_i32()),
+                y.div_euclid(CHUNK_SIZE.as_i32()),
+            )
+        }
+    }
+
+    impl From<WorldPosition> for BlockPosition {
+        fn from(wp: WorldPosition) -> Self {
+            let WorldPosition(x, y, z) = wp;
+            BlockPosition(
+                BlockCoord(x.rem_euclid(CHUNK_SIZE.as_i32()) as u16),
+                BlockCoord(y.rem_euclid(CHUNK_SIZE.as_i32()) as u16),
+                SliceIndex(z),
+            )
         }
     }
 }
@@ -275,8 +307,8 @@ mod tests {
     use float_cmp::ApproxEq;
 
     use crate::coordinate::dim::CHUNK_SIZE;
-    use crate::coordinate::world::{BlockCoord, BlockPosition, SliceIndex};
-    use crate::WorldPoint;
+    use crate::coordinate::world::{BlockCoord, BlockPosition, SliceIndex, WorldPosition};
+    use crate::{ChunkPosition, WorldPoint};
 
     #[test]
     fn block_to_world() {
@@ -305,6 +337,31 @@ mod tests {
         assert_eq!(
             wp,
             WorldPoint(-CHUNK_SIZE.as_f32(), -CHUNK_SIZE.as_f32(), 0.0)
+        );
+    }
+
+    #[test]
+    fn world_to_chunk() {
+        assert_eq!(
+            ChunkPosition::from(WorldPosition(10, 20, 50)),
+            ChunkPosition(0, 1)
+        );
+        assert_eq!(
+            ChunkPosition::from(WorldPosition(-20, -40, 50)),
+            ChunkPosition(-2, -3)
+        );
+
+        assert_eq!(
+            ChunkPosition::from(WorldPosition(-2, 2, 0)),
+            ChunkPosition(-1, 0)
+        );
+    }
+
+    #[test]
+    fn negative_world_to_block() {
+        assert_eq!(
+            BlockPosition::from(WorldPosition(-10, -10, -10)),
+            BlockPosition::from((6, 6, -10))
         );
     }
 }

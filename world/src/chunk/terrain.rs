@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::debug;
 
 use crate::area::discovery::AreaDiscovery;
-use crate::area::{Area, ChunkBoundary, SlabArea};
+use crate::area::{BlockGraph, ChunkArea, ChunkBoundary, WorldArea};
 use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
@@ -18,8 +18,8 @@ pub(crate) type SlabPointer = Box<Slab>;
 
 pub struct ChunkTerrain {
     slabs: DoubleSidedVec<SlabPointer>,
-    areas: Vec<Area>,
-    boundary_links: Vec<(Area, Vec<BlockPosition>)>,
+    areas: HashMap<WorldArea, BlockGraph>,
+    boundary_links: Vec<(WorldArea, Vec<BlockPosition>)>,
 }
 
 #[derive(Copy, Clone)]
@@ -51,7 +51,7 @@ impl ChunkTerrain {
             .fill_until(target, |idx| SlabPointer::new(Slab::empty(idx)));
     }
 
-    fn slab_index_for_slice(slice: SliceIndex) -> SlabIndex {
+    pub(crate) fn slab_index_for_slice(slice: SliceIndex) -> SlabIndex {
         (slice.0 as f32 / SLAB_SIZE as f32).floor() as SlabIndex
     }
 
@@ -174,34 +174,29 @@ impl ChunkTerrain {
 
         // per slab
         for idx in self.slabs.indices_increasing() {
-            let slab_below = self.slabs
+            let slice_below = self.slabs
                 .get(idx - 1)
                 .map(|s| s.slice(SLAB_SIZE as i32 - 1).into());
+            let slice_above = self.slabs.get(idx + 1).map(|s| s.slice(0).into());
             let slab = self.slabs.get_mut(idx).unwrap();
 
             // collect slab into local grid
-            let mut discovery = AreaDiscovery::from_slab(slab, slab_below);
+            let mut discovery = AreaDiscovery::from_slab(slab, slice_below, slice_above);
 
             // flood fill and assign areas
             let area_count = discovery.flood_fill_areas();
-            debug!(
-                "slab {}: {} areas: {:?}",
-                idx,
-                area_count,
-                discovery.areas()
-            );
+            debug!("slab {}: {} areas", idx, area_count);
 
-            // collect areas
+            // collect areas and graphs
             self.areas.extend(
                 discovery
-                    .areas()
-                    .iter()
-                    .map(|slab_area| slab_area.into_area(chunk_pos)),
+                    .areas_with_graph()
+                    .map(|(chunk_area, block_graph)| {
+                        (chunk_area.into_world_area(chunk_pos), block_graph)
+                    }),
             );
 
             // TODO discover internal area links
-
-            // collect boundary areas and linking blocks
 
             discovery.apply(slab);
         }
@@ -211,7 +206,7 @@ impl ChunkTerrain {
     pub(crate) fn areas_for_boundary(
         &self,
         boundary: ChunkBoundary,
-        out: &mut HashMap<SlabArea, Vec<BlockPosition>>,
+        out: &mut HashMap<ChunkArea, Vec<BlockPosition>>,
     ) {
         for slab in self.slabs.iter_increasing() {
             let idx = slab.index();
@@ -226,17 +221,21 @@ impl ChunkTerrain {
                     let links = blocks.map(|(pos, _)| pos);
 
                     // promote slab-local area to chunk-local area
-                    let slab_area = SlabArea { slab: idx, area };
+                    let chunk_area = ChunkArea { slab: idx, area };
 
-                    (slab_area, links)
+                    (chunk_area, links)
                 }) {
                 out.insert(slab_area, links.collect());
             }
         }
     }
 
-    pub(crate) fn areas(&self) -> &[Area] {
-        &self.areas
+    pub(crate) fn areas(&self) -> impl Iterator<Item = &WorldArea> {
+        self.areas.keys()
+    }
+
+    pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
+        self.areas.get(&area)
     }
 
     /// Only for tests
@@ -277,7 +276,7 @@ impl Default for ChunkTerrain {
     fn default() -> Self {
         let mut terrain = Self {
             slabs: DoubleSidedVec::with_capacity(8),
-            areas: Vec::new(),
+            areas: HashMap::new(),
             boundary_links: Vec::new(),
         };
 
@@ -289,7 +288,13 @@ impl Default for ChunkTerrain {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::BlockType;
+    use matches::assert_matches;
+    use ordered_float::OrderedFloat;
+    use petgraph::visit::{IntoNodeReferences, NodeRef};
+    use petgraph::Direction;
+
+    use crate::area::EdgeCost;
+    use crate::block::{BlockHeight, BlockType};
     use crate::chunk::slab::{Slab, SLAB_SIZE};
     use crate::chunk::terrain::{ChunkTerrain, SlabPointer};
     use crate::coordinate::world::SliceIndex;
@@ -394,7 +399,7 @@ mod tests {
         let mut slab = Slab::empty(0);
         slab.slice_mut(0).fill(BlockType::Stone);
 
-        let area_count = AreaDiscovery::from_slab(&slab, None).flood_fill_areas();
+        let area_count = AreaDiscovery::from_slab(&slab, None, None).flood_fill_areas();
         assert_eq!(area_count, 1);
 
         // slab with 2 unconnected floors should have 2
@@ -402,8 +407,80 @@ mod tests {
         slab.slice_mut(0).fill(BlockType::Stone);
         slab.slice_mut(5).fill(BlockType::Stone);
 
-        let area_count = AreaDiscovery::from_slab(&slab, None).flood_fill_areas();
+        let area_count = AreaDiscovery::from_slab(&slab, None, None).flood_fill_areas();
         assert_eq!(area_count, 2);
+    }
+
+    #[test]
+    fn slab_areas_step() {
+        // terrain with accessible half steps should still be 1 area
+
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll); // solid walkable
+
+        // half steps next to it
+        terrain.set_block(
+            (3, 2, 3),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+        terrain.set_block(
+            (1, 2, 3),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+
+        // 1 area still
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 1);
+
+        // half step out of reach is still unreachable
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block(
+            (4, 2, 3),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 2);
+    }
+
+    #[test]
+    fn slab_areas_jump() {
+        // terrain with accessible jumps should still be 1 area
+
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll); // solid walkable
+
+        // full jump staircase next to it
+        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((4, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((5, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        // 1 area still
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 1);
+
+        // too big jump out of reach is still unreachable
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((4, 2, 7), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 2);
+
+        // if above is blocked, can't jump
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((2, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll); // blocks jump!
+
+        // so 2 areas expected
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 2);
     }
 
     #[test]
@@ -479,4 +556,184 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn block_graph_step_up() {
+        // a half step up should be a valid edge
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block(
+            (2, 2, 2),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+        terrain.set_block((3, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 1);
+
+        let graph = terrain.areas.values().next().unwrap();
+        assert_eq!(graph.graph().node_count(), 2);
+        assert_eq!(graph.graph().edge_count(), 2);
+    }
+
+    #[test]
+    fn block_graph_long_route() {
+        // check that both ways up and down a staircase of jumps and half steps work as intended
+
+        let mut terrain = ChunkTerrain::default();
+        // 3 flat
+        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((3, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((4, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        // 2 half steps of the same height
+        terrain.set_block(
+            (5, 2, 3),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+        terrain.set_block(
+            (6, 2, 3),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+
+        // 1 jump up to another half step
+        terrain.set_block(
+            (7, 2, 4),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        );
+
+        // 1 half step up to full
+        terrain.set_block((8, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        // 2 jumps up
+        terrain.set_block((9, 2, 5), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain.set_block((10, 2, 6), BlockType::Stone, SlabCreationPolicy::CreateAll);
+
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 1);
+
+        let graph = terrain.areas.values().next().unwrap();
+        assert_eq!(graph.graph().node_count(), 9);
+
+        // ------ upwards
+        let path = graph
+            .find_path((2, 2, 3), (10, 2, 7))
+            .expect("path should succeed")
+            .as_tuples();
+        assert_eq!(path.len(), 9);
+
+        // collect edge pairs
+        let edges = path.iter()
+            .tuple_windows()
+            .map(|(&a, &b)| graph.get_edge_between(a, b).unwrap())
+            .collect_vec();
+
+        assert_eq!(
+            edges,
+            vec![
+                // flat walking
+                EdgeCost::Walk,
+                EdgeCost::Walk,
+                // step up half step
+                EdgeCost::Step(OrderedFloat(0.5)),
+                // half step to half step
+                EdgeCost::Walk,
+                // jump up to half step
+                EdgeCost::JumpUp,
+                // step up half step again
+                EdgeCost::Step(OrderedFloat(0.5)),
+                // jumps
+                EdgeCost::JumpUp,
+                EdgeCost::JumpUp,
+            ]
+        );
+
+        // ------ downwards
+        let path = graph
+            .find_path((10, 2, 7), (2, 2, 3))
+            .expect("reverse path should succeed")
+            .as_tuples();
+        assert_eq!(path.len(), 9);
+
+        // collect edge pairs
+        let edges = path.iter()
+            .tuple_windows()
+            .map(|(&a, &b)| graph.get_edge_between(a, b).unwrap())
+            .collect_vec();
+
+        assert_eq!(
+            edges,
+            vec![
+                // jump down twice
+                EdgeCost::JumpDown,
+                EdgeCost::JumpDown,
+                // step down
+                EdgeCost::Step(OrderedFloat(-0.5)),
+                // jump down to next half step
+                EdgeCost::JumpDown,
+                // walk to next half step on same level
+                EdgeCost::Walk,
+                // step down
+                EdgeCost::Step(OrderedFloat(-0.5)),
+                // flat walking
+                EdgeCost::Walk,
+                EdgeCost::Walk,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_graph_high_jump() {
+        // there should be no edge that is a jump of > 1.0
+
+        let mut terrain = ChunkTerrain::default();
+        terrain.set_block(
+            (2, 2, 2),
+            (BlockType::Stone, BlockHeight::Half),
+            SlabCreationPolicy::CreateAll,
+        ); // half block
+        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll); // technically a vertical neighbour but the jump is too high
+
+        terrain.discover_areas((0, 0).into());
+        assert_eq!(terrain.areas.len(), 2); // 2 disconnected areas
+    }
+
+    #[test]
+    fn discovery_neighbour_count() {
+        let mut terrain = ChunkTerrain::default();
+        terrain.slice_mut(1).unwrap().fill(BlockType::Stone);
+        terrain.discover_areas((0, 0).into());
+
+        // check random block in the middle
+        let (_area, block_graph) = terrain.areas.iter().next().unwrap();
+        let (idx, _node) = block_graph
+            .graph()
+            .node_references()
+            .find(|n| n.weight().0 == (4, 4, 2).into())
+            .unwrap();
+
+        assert_matches!(block_graph.get_edge_between((4, 4, 2), (4, 3, 2)), Some(_));
+        assert_matches!(block_graph.get_edge_between((4, 4, 2), (4, 5, 2)), Some(_));
+        assert_matches!(block_graph.get_edge_between((4, 4, 2), (3, 4, 2)), Some(_));
+        assert_matches!(block_graph.get_edge_between((4, 4, 2), (5, 4, 2)), Some(_));
+
+        assert_eq!(
+            block_graph
+                .graph()
+                .edges_directed(idx, Direction::Outgoing)
+                .count(),
+            4
+        );
+        assert_eq!(
+            block_graph
+                .graph()
+                .edges_directed(idx, Direction::Incoming)
+                .count(),
+            4
+        );
+    }
+
 }

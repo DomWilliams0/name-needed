@@ -1,20 +1,20 @@
-use log::debug;
 use std::cell::Cell;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Shl};
 
+use log::debug;
+
+use crate::area::WorldArea;
 use crate::block::{Block, BlockType};
-use crate::coordinate::world::{BlockPosition, ChunkPosition};
+use crate::chunk::terrain::ChunkTerrain;
+pub use crate::coordinate::dim::{CHUNK_DEPTH, CHUNK_SIZE};
+use crate::coordinate::world::{BlockPosition, ChunkPosition, WorldPosition};
 use crate::grid::{Grid, GridImpl};
 use crate::grid_declare;
-use crate::navigation::Navigation;
 
 pub type ChunkId = u64;
 
 // reexport
-
-use crate::chunk::terrain::ChunkTerrain;
-pub use crate::coordinate::dim::{CHUNK_DEPTH, CHUNK_SIZE};
 
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
@@ -70,9 +70,16 @@ impl Chunk {
         self.get_block(pos).map(|b| b.block_type())
     }
 
-    pub fn navigation(&self) -> &Navigation {
-        unimplemented!()
-        // &self.nav
+    pub(crate) fn area_for_block(&self, pos: WorldPosition) -> Option<WorldArea> {
+        self.get_block(pos).map(|b| {
+            let area_index = b.area_index();
+            let block_pos: BlockPosition = pos.into();
+            WorldArea {
+                chunk: self.pos,
+                slab: ChunkTerrain::slab_index_for_slice(block_pos.2),
+                area: area_index,
+            }
+        })
     }
 }
 
@@ -93,7 +100,6 @@ impl DerefMut for Chunk {
 #[cfg(test)]
 mod tests {
     use crate::block::BlockType;
-
     use crate::chunk::{Chunk, ChunkBuilder, BLOCK_COUNT_SLICE};
 
     #[test]

@@ -1,4 +1,3 @@
-
 use std::fmt::{Display, Error, Formatter};
 use std::iter::Map;
 use std::ops::{Add, RangeInclusive};

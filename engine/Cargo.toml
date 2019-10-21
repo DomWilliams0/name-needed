@@ -27,3 +27,4 @@ env_logger = "0.7"
 [dependencies.glium]
 version = "0.25"
 default-features = false  # removes glutin
+

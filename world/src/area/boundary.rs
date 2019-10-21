@@ -1,8 +1,8 @@
+use lazy_static::lazy_static;
+
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::coordinate::world::WorldPosition;
 use crate::{BlockPosition, CHUNK_SIZE};
-
-use std::mem::MaybeUninit;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ChunkBoundary {
@@ -26,69 +26,87 @@ const BOUNDARIES: [ChunkBoundary; 4] = [
     ChunkBoundary::Right,
 ];
 
-// TODO ideally each boundary would have its own array, but i'll wait until const functions have
-// stablized: rfc 57563
-// and pls forgive me for the unsafe mess, this is only temporary after all ;¬)
 const CHUNK_BOUNDARY_SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * SLAB_SIZE;
-static mut POSITIONS: [MaybeUninit<BlockPosition>; CHUNK_BOUNDARY_SLICE_SIZE] =
-    [MaybeUninit::uninit(); CHUNK_BOUNDARY_SLICE_SIZE];
+
+// TODO ideally this would run at compile time with const fns, must must wait for rfc 57563
+lazy_static! {
+    static ref BOUNDARY_BLOCKS: [[BlockPosition; CHUNK_BOUNDARY_SLICE_SIZE]; 4] = {
+        let mut blocks = [[(0,0,0).into(); CHUNK_BOUNDARY_SLICE_SIZE]; 4];
+
+        let mut populate = |tup: (usize, &ChunkBoundary)| {
+            // iterate in slabs for spacial locality
+            let blocks = &mut blocks[tup.0];
+            let mut cursor = 0;
+            let write = |pos: BlockPosition| {
+                blocks[cursor] = pos;
+                cursor += 1;
+            };
+
+            match tup.1 {
+                ChunkBoundary::Up => {
+                    let y = CHUNK_SIZE.as_i32() - 1;
+                    (0..SLAB_SIZE as i32)
+                        .flat_map(move |z| {
+                            (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
+                        })
+                        .for_each(write)
+                }
+                ChunkBoundary::Down => {
+                    let y = 0;
+                    (0..SLAB_SIZE as i32)
+                        .flat_map(move |z| {
+                            (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
+                        })
+                        .for_each(write)
+                }
+                ChunkBoundary::Left => {
+                    let x = 0;
+                    (0..SLAB_SIZE as i32)
+                        .flat_map(move |z| {
+                            (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
+                        })
+                        .for_each(write)
+                }
+                ChunkBoundary::Right => {
+                    let x = CHUNK_SIZE.as_i32() - 1;
+                    (0..SLAB_SIZE as i32)
+                        .flat_map(move |z| {
+                            (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
+                        })
+                        .for_each(write)
+                }
+            };
+
+        };
+
+        for tup in BOUNDARIES.iter().enumerate() {
+            populate(tup);
+        }
+
+        blocks
+    };
+}
 
 impl ChunkBoundary {
     pub fn boundaries() -> impl Iterator<Item = ChunkBoundary> {
         BOUNDARIES.iter().copied()
     }
 
-    //noinspection DuplicatedCode
+    fn blocks(self) -> impl Iterator<Item = BlockPosition> {
+        let idx = match self {
+            ChunkBoundary::Up => 0usize,
+            ChunkBoundary::Down => 1,
+            ChunkBoundary::Left => 2,
+            ChunkBoundary::Right => 3,
+        };
+
+        BOUNDARY_BLOCKS[idx].iter().copied()
+    }
+
     pub fn blocks_in_slab(self, slab: SlabIndex) -> impl Iterator<Item = BlockPosition> {
-        // iterate in slabs for spacial locality
-
-        let mut cursor = 0;
-
-        // offset z coords for slab index
-        let z_coords = (0..SLAB_SIZE as i32).map(|z| z + (slab * SLAB_SIZE as i32));
-
-        let write_awful = |pos| {
-            unsafe { *POSITIONS[cursor].as_mut_ptr() = pos };
-            cursor += 1;
-        };
-
-        match self {
-            ChunkBoundary::Up => {
-                let y = CHUNK_SIZE.as_i32() - 1;
-                z_coords
-                    .flat_map(move |z| {
-                        (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
-                    })
-                    .for_each(write_awful)
-            }
-            ChunkBoundary::Down => {
-                let y = 0;
-                z_coords
-                    .flat_map(move |z| {
-                        (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
-                    })
-                    .for_each(write_awful)
-            }
-            ChunkBoundary::Left => {
-                let x = 0;
-                z_coords
-                    .flat_map(move |z| {
-                        (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
-                    })
-                    .for_each(write_awful)
-            }
-            ChunkBoundary::Right => {
-                let x = CHUNK_SIZE.as_i32() - 1;
-                z_coords
-                    .flat_map(move |z| {
-                        (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
-                    })
-                    .for_each(write_awful)
-            }
-        };
-
-        // i know, i know...
-        unsafe { POSITIONS.iter().map(|mem| mem.assume_init()) }
+        let z_offset = slab * SLAB_SIZE as i32;
+        self.blocks()
+            .map(move |pos| BlockPosition(pos.0, pos.1, pos.2 + z_offset))
     }
 
     pub fn shift(self, pos: WorldPosition) -> WorldPosition {
@@ -114,10 +132,8 @@ impl ChunkBoundary {
 
 #[cfg(test)]
 mod tests {
-
     use crate::area::ChunkBoundary;
     use crate::chunk::slab::SLAB_SIZE;
-
     use crate::CHUNK_SIZE;
 
     #[test]
@@ -130,5 +146,6 @@ mod tests {
                 (b.2).0 >= SLAB_SIZE as i32 && (b.2).0 < (SLAB_SIZE as i32 * 2);
             y_is_constant && z_is_in_range_of_slab
         }));
+        assert_ne!(v[0], v[1]);
     }
 }
