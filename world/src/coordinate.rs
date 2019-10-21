@@ -272,16 +272,13 @@ pub mod screen {
 }
 
 pub mod dim {
-    /// Chunk size X and Y dimension
     #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-    pub struct ChunkDimension(u32);
+    pub struct SmallUnsignedConstant(u32);
 
-    pub const CHUNK_SIZE: ChunkDimension = ChunkDimension(16);
+    /// Chunk size X and Y dimension
+    pub const CHUNK_SIZE: SmallUnsignedConstant = SmallUnsignedConstant(16);
 
-    // TODO temporary while chunks are still fixed 3d grids (#15)
-    pub const CHUNK_DEPTH: ChunkDimension = ChunkDimension(16);
-
-    impl ChunkDimension {
+    impl SmallUnsignedConstant {
         pub const fn as_f32(self) -> f32 {
             self.0 as f32
         }
@@ -296,6 +293,10 @@ pub mod dim {
 
         pub const fn as_usize(self) -> usize {
             self.0 as usize
+        }
+
+        pub const fn new(u: u32) -> Self {
+            Self(u)
         }
     }
 }

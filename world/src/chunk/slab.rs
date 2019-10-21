@@ -1,15 +1,19 @@
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::chunk::CHUNK_SIZE;
+use crate::coordinate::dim::SmallUnsignedConstant;
 use crate::coordinate::world::SliceIndex;
 use crate::{grid::{Grid, GridImpl},
             grid_declare};
 
-// TODO use ChunkDimension and rename to be a generic small unsigned int
-pub(crate) const SLAB_SIZE: usize = 32;
+pub(crate) const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
 pub(crate) type SlabIndex = i32;
 
-grid_declare!(struct SlabGrid<SlabGridImpl, Block>, CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), SLAB_SIZE);
+grid_declare!(struct SlabGrid<SlabGridImpl, Block>,
+    CHUNK_SIZE.as_usize(),
+    CHUNK_SIZE.as_usize(),
+    SLAB_SIZE.as_usize()
+);
 
 pub(crate) struct Slab {
     grid: SlabGrid,

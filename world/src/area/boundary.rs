@@ -26,7 +26,7 @@ const BOUNDARIES: [ChunkBoundary; 4] = [
     ChunkBoundary::Right,
 ];
 
-const CHUNK_BOUNDARY_SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * SLAB_SIZE;
+const CHUNK_BOUNDARY_SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * SLAB_SIZE.as_usize();
 
 // TODO ideally this would run at compile time with const fns, must must wait for rfc 57563
 lazy_static! {
@@ -45,7 +45,7 @@ lazy_static! {
             match tup.1 {
                 ChunkBoundary::Up => {
                     let y = CHUNK_SIZE.as_i32() - 1;
-                    (0..SLAB_SIZE as i32)
+                    (0..SLAB_SIZE.as_i32())
                         .flat_map(move |z| {
                             (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
                         })
@@ -53,7 +53,7 @@ lazy_static! {
                 }
                 ChunkBoundary::Down => {
                     let y = 0;
-                    (0..SLAB_SIZE as i32)
+                    (0..SLAB_SIZE.as_i32())
                         .flat_map(move |z| {
                             (0..CHUNK_SIZE.as_i32()).map(move |x| (x, y, z as i32).into())
                         })
@@ -61,7 +61,7 @@ lazy_static! {
                 }
                 ChunkBoundary::Left => {
                     let x = 0;
-                    (0..SLAB_SIZE as i32)
+                    (0..SLAB_SIZE.as_i32())
                         .flat_map(move |z| {
                             (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
                         })
@@ -69,7 +69,7 @@ lazy_static! {
                 }
                 ChunkBoundary::Right => {
                     let x = CHUNK_SIZE.as_i32() - 1;
-                    (0..SLAB_SIZE as i32)
+                    (0..SLAB_SIZE.as_i32())
                         .flat_map(move |z| {
                             (0..CHUNK_SIZE.as_i32()).map(move |y| (x, y, z as i32).into())
                         })
@@ -104,7 +104,7 @@ impl ChunkBoundary {
     }
 
     pub fn blocks_in_slab(self, slab: SlabIndex) -> impl Iterator<Item = BlockPosition> {
-        let z_offset = slab * SLAB_SIZE as i32;
+        let z_offset = slab * SLAB_SIZE.as_i32();
         self.blocks()
             .map(move |pos| BlockPosition(pos.0, pos.1, pos.2 + z_offset))
     }
@@ -139,11 +139,11 @@ mod tests {
     #[test]
     fn boundary() {
         let v: Vec<_> = ChunkBoundary::Up.blocks_in_slab(1).collect();
-        assert_eq!(v.len(), CHUNK_SIZE.as_usize() * SLAB_SIZE);
+        assert_eq!(v.len(), CHUNK_SIZE.as_usize() * SLAB_SIZE.as_usize());
         assert!(v.iter().all(|b| {
             let y_is_constant = (b.1).0 == CHUNK_SIZE.as_u16() - 1;
             let z_is_in_range_of_slab =
-                (b.2).0 >= SLAB_SIZE as i32 && (b.2).0 < (SLAB_SIZE as i32 * 2);
+                (b.2).0 >= SLAB_SIZE.as_i32() && (b.2).0 < (SLAB_SIZE.as_i32() * 2);
             y_is_constant && z_is_in_range_of_slab
         }));
         assert_ne!(v[0], v[1]);

@@ -5,10 +5,10 @@ use std::rc::Rc;
 use itertools::Itertools;
 use log::{debug, warn};
 
-use crate::{ChunkPosition, presets, SliceRange};
 use crate::area::{AreaGraph, AreaPath, WorldArea, WorldPath};
 use crate::chunk::Chunk;
 use crate::coordinate::world::WorldPosition;
+use crate::{presets, ChunkPosition, SliceRange};
 
 /// Reference to the world
 pub type WorldRef = Rc<RefCell<World>>;
@@ -152,10 +152,10 @@ impl World {
 mod tests {
     use matches::assert_matches;
 
-    use crate::{ChunkBuilder, ChunkPosition, World};
     use crate::area::{AreaPathNode, EdgeCost, WorldArea};
     use crate::block::{BlockHeight, BlockType};
     use crate::coordinate::world::WorldPosition;
+    use crate::{ChunkBuilder, ChunkPosition, World};
 
     #[test]
     fn area_path_cross_three_chunks() {

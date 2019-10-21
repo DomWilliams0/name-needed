@@ -52,12 +52,12 @@ impl ChunkTerrain {
     }
 
     pub(crate) fn slab_index_for_slice(slice: SliceIndex) -> SlabIndex {
-        (slice.0 as f32 / SLAB_SIZE as f32).floor() as SlabIndex
+        (slice.0 as f32 / SLAB_SIZE.as_f32()).floor() as SlabIndex
     }
 
     fn slice_index_in_slab(slice: SliceIndex) -> SliceIndex {
         let SliceIndex(mut idx) = slice;
-        idx %= SLAB_SIZE as i32; // cap at slab size
+        idx %= SLAB_SIZE.as_i32(); // cap at slab size
         idx = idx.abs(); // positive only
         SliceIndex(idx)
     }
@@ -88,7 +88,7 @@ impl ChunkTerrain {
         let bottom = slabs.next().unwrap_or(0);
         let top = slabs.last().unwrap_or(0) + 1;
 
-        SliceRange::from_bounds(bottom * SLAB_SIZE as i32, top * SLAB_SIZE as i32)
+        SliceRange::from_bounds(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
     }
 
     pub fn slice_range(&self, range: SliceRange) -> Generator<(), (SliceIndex, Slice)> {
@@ -176,7 +176,7 @@ impl ChunkTerrain {
         for idx in self.slabs.indices_increasing() {
             let slice_below = self.slabs
                 .get(idx - 1)
-                .map(|s| s.slice(SLAB_SIZE as i32 - 1).into());
+                .map(|s| s.slice(SLAB_SIZE.as_i32() - 1).into());
             let slice_above = self.slabs.get(idx + 1).map(|s| s.slice(0).into());
             let slab = self.slabs.get_mut(idx).unwrap();
 
@@ -248,8 +248,8 @@ impl ChunkTerrain {
 
         let bottom_slab = self.slabs_from_bottom().next().unwrap();
 
-        let low_z = bottom_slab.index() * SLAB_SIZE as i32;
-        let high_z = low_z + (self.slab_count() * SLAB_SIZE) as i32;
+        let low_z = bottom_slab.index() * SLAB_SIZE.as_i32();
+        let high_z = low_z + (self.slab_count() * SLAB_SIZE.as_usize()) as i32;
 
         let total_size: usize = ((high_z - low_z) * BLOCK_COUNT_SLICE as i32) as usize;
         out.reserve(total_size);
@@ -354,7 +354,7 @@ mod tests {
             BlockType::Air
         );
 
-        assert!(terrain.slice(SLAB_SIZE as i32).is_none());
+        assert!(terrain.slice(SLAB_SIZE.as_i32()).is_none());
         assert!(terrain.slice(-1).is_none());
 
         terrain.add_slab(SlabPointer::new(Slab::empty(-1)));
@@ -492,7 +492,7 @@ mod tests {
 
         // fill top layer of first slab
         terrain
-            .slice_mut(SLAB_SIZE as i32 - 1)
+            .slice_mut(SLAB_SIZE.as_i32() - 1)
             .unwrap()
             .fill(BlockType::Stone);
 
@@ -506,7 +506,7 @@ mod tests {
     fn create_slab() {
         // setting blocks in non-existent places should create a slab to fill it
 
-        const SLAB_SIZE_I32: i32 = SLAB_SIZE as i32;
+        const SLAB_SIZE_I32: i32 = SLAB_SIZE.as_i32();
         let mut terrain = ChunkTerrain::default();
 
         // 1 slab below should not yet exist

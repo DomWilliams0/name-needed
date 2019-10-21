@@ -6,8 +6,9 @@ use log::debug;
 
 use crate::area::WorldArea;
 use crate::block::{Block, BlockType};
+use crate::chunk::slab::SLAB_SIZE;
 use crate::chunk::terrain::ChunkTerrain;
-pub use crate::coordinate::dim::{CHUNK_DEPTH, CHUNK_SIZE};
+pub use crate::coordinate::dim::CHUNK_SIZE;
 use crate::coordinate::world::{BlockPosition, ChunkPosition, WorldPosition};
 use crate::grid::{Grid, GridImpl};
 use crate::grid_declare;
@@ -18,7 +19,11 @@ pub type ChunkId = u64;
 
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
-grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>, CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), CHUNK_DEPTH.as_usize());
+grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>,
+    CHUNK_SIZE.as_usize(),
+    CHUNK_SIZE.as_usize(),
+    SLAB_SIZE.as_usize()
+);
 
 pub struct Chunk {
     /// unique for each chunk

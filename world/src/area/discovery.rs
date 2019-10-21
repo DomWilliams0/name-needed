@@ -6,9 +6,13 @@ use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::SliceOwned;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
-use crate::{CHUNK_DEPTH, CHUNK_SIZE};
+use crate::CHUNK_SIZE;
 
-grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>, CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), CHUNK_DEPTH.as_usize());
+grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>,
+    CHUNK_SIZE.as_usize(),
+    CHUNK_SIZE.as_usize(),
+    SLAB_SIZE.as_usize()
+);
 
 // TODO shouldnt be pub
 #[derive(Default, Copy, Clone)]
@@ -221,7 +225,7 @@ impl AreaDiscovery {
         offset: VerticalOffset,
     ) -> _AreaDiscoveryGridBlock {
         let [x, y, z] = block;
-        const TOP: i32 = SLAB_SIZE as i32 - 1;
+        const TOP: i32 = SLAB_SIZE.as_i32() - 1;
 
         match z {
             // top of the slab: check slab above
