@@ -110,6 +110,14 @@ impl ChunkTerrain {
         })
     }
 
+    pub fn slices_from_top(&self) -> impl Iterator<Item = (SliceIndex, Slice)> {
+        self.slabs_from_top().flat_map(|slab| {
+            (0..Slab::slice_count())
+                .rev()
+                .map(move |idx| (SliceIndex(idx), slab.slice(idx)))
+        })
+    }
+
     pub fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Option<Block> {
         let pos = pos.into();
         self.slice(pos.2).map(|slice| slice[pos])

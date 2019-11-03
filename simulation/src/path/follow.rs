@@ -1,0 +1,54 @@
+use cgmath::{MetricSpace, Point3};
+use crate::Position;
+use world::{WorldPath, WorldPosition};
+
+pub struct PathFollowing {
+    pub path: WorldPath,
+    next: usize,
+    changed: bool,
+}
+
+impl PathFollowing {
+    pub fn new(path: WorldPath) -> Self {
+        Self {
+            path,
+            next: 0,
+            changed: false,
+        }
+    }
+
+    pub fn next_waypoint(&mut self, current_pos: &Position) -> Option<(WorldPosition, bool)> {
+        let mut is_final = false;
+        let mut changed = false;
+
+        // check distance to current
+        let (waypoint, _cost) = &self.path.0[self.next];
+        let distance2 = Point3::from(current_pos).distance2(Point3::from(waypoint));
+        if distance2 < 0.5f32.powi(2) {
+            // move on to next waypoint
+            self.next += 1;
+            is_final = self.next + 1 == self.path.0.len();
+            changed = true;
+        }
+
+        self.changed = changed;
+        self.path
+            .0
+            .get(self.next)
+            .map(|&(wp, _cost)| (wp, is_final))
+    }
+
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+}
+
+impl From<&Position> for Point3<f32> {
+    fn from(pos: &Position) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+        }
+    }
+}

@@ -3,6 +3,7 @@ use cgmath::Vector3;
 
 use crate::movement::Velocity;
 use crate::Position;
+use world::WorldPoint;
 
 impl From<Position> for Vector3<f32> {
     fn from(pos: Position) -> Self {
@@ -67,7 +68,7 @@ impl DoASteer for Nop {
 // seek
 #[derive(Default, Debug)]
 pub struct Seek {
-    pub target: Position,
+    pub target: WorldPoint,
 }
 
 impl DoASteer for Seek {
@@ -89,7 +90,7 @@ impl DoASteer for Seek {
 // arrive
 #[derive(Default, Debug)]
 pub struct Arrive {
-    pub target: Position,
+    pub target: WorldPoint,
     pub approach_radius: f32,
     pub arrival_radius: f32,
 }

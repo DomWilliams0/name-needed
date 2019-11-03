@@ -38,6 +38,10 @@ impl Block {
         self.height.height()
     }
 
+    pub fn walkable(&self) -> bool {
+        self.area.initialized()
+    }
+
     pub(crate) fn area_index(&self) -> SlabAreaIndex {
         self.area
     }

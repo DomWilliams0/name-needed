@@ -27,7 +27,7 @@ fn main() {
 
     let world = {
         info!("creating default world");
-        world::world_ref(world::World::default())
+        world::WorldRef::new(world::World::default())
     };
     let eng = engine::Engine::new(world);
     eng.run();

@@ -1,21 +1,12 @@
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
 
 use itertools::Itertools;
 use log::{debug, warn};
 
 use crate::area::{AreaGraph, AreaPath, WorldArea, WorldPath};
 use crate::chunk::Chunk;
-use crate::coordinate::world::WorldPosition;
-use crate::{presets, ChunkPosition, SliceRange};
-
-/// Reference to the world
-pub type WorldRef = Rc<RefCell<World>>;
-
-pub fn world_ref(w: World) -> WorldRef {
-    Rc::new(RefCell::new(w))
-}
+use crate::coordinate::world::{SliceBlock, WorldPosition};
+use crate::{presets, BlockPosition, ChunkPosition, SliceRange};
 
 pub struct World {
     chunks: Vec<Chunk>,
@@ -57,9 +48,13 @@ impl World {
         Self { chunks, area_graph }
     }
 
+    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk> {
+        self.chunks.iter()
+    }
+
     pub fn visible_chunks(&self) -> impl Iterator<Item = &Chunk> {
         // TODO filter visible
-        self.chunks.iter()
+        self.all_chunks()
     }
 
     pub fn slice_bounds(&self) -> SliceRange {
@@ -78,9 +73,18 @@ impl World {
         }
     }
 
-    fn chunk_for_area(&self, area: WorldArea) -> Option<&Chunk> {
+    fn find_chunk<P: Fn(&Chunk) -> bool>(&self, predicate: P) -> Option<&Chunk> {
         // TODO spatial
-        self.chunks.iter().find(|c| c.pos() == area.chunk)
+        self.chunks.iter().find(|c| predicate(c))
+    }
+
+    fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
+        // TODO spatial
+        self.find_chunk(|c| c.pos() == chunk_pos)
+    }
+
+    fn chunk_for_area(&self, area: WorldArea) -> Option<&Chunk> {
+        self.find_chunk(|c| c.pos() == area.chunk)
     }
 
     pub(crate) fn find_area_path<F: Into<WorldPosition>, T: Into<WorldPosition>>(
@@ -91,9 +95,7 @@ impl World {
         // resolve areas
         let resolve_area = |pos: WorldPosition| {
             let chunk_pos: ChunkPosition = pos.into();
-            self.chunks
-                .iter()
-                .find(|c| c.pos() == chunk_pos)
+            self.find_chunk_with_pos(chunk_pos)
                 .and_then(|c| c.area_for_block(pos))
         };
 
@@ -144,6 +146,17 @@ impl World {
             .collect_vec();
 
         Some(WorldPath(block_path))
+    }
+
+    pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
+        let world_pos = WorldPosition(x, y, 0);
+        let chunk_pos = ChunkPosition::from(world_pos);
+        let slice_block = SliceBlock::from(BlockPosition::from(world_pos));
+        self.find_chunk_with_pos(chunk_pos).and_then(|c| {
+            c.slices_from_top()
+                .find(|(_, slice)| slice[slice_block].walkable())
+                .map(|(z, _)| slice_block.to_block_position(z).to_world_pos(chunk_pos))
+        })
     }
 }
 
@@ -353,5 +366,31 @@ mod tests {
 
         // done
         assert_matches!(p.next(), None);
+    }
+
+    #[test]
+    fn accessible_block_in_column() {
+        let w = World::from_chunks(vec![
+            ChunkBuilder::new()
+                .fill_slice(6, BlockType::Grass) // lower slice
+                .fill_slice(9, BlockType::Grass) // higher slice blocks it...
+                .set_block((10, 10, 9), BlockType::Air) // ...with a hole here
+                .build((0, 0)),
+        ]);
+
+        // finds higher slice
+        assert_eq!(
+            w.find_accessible_block_in_column(4, 4),
+            Some(WorldPosition(4, 4, 10))
+        );
+
+        // finds lower slice through hole
+        assert_eq!(
+            w.find_accessible_block_in_column(10, 10),
+            Some(WorldPosition(10, 10, 7))
+        );
+
+        // non existent
+        assert_matches!(w.find_accessible_block_in_column(-5, 30), None);
     }
 }

@@ -7,9 +7,10 @@ use specs::prelude::*;
 pub use specs::System;
 use specs::World as SpecsWorld;
 
-use world::{SliceRange, WorldRef, CHUNK_SIZE};
+use world::{SliceRange, WorldRef};
 
 use crate::movement::{MovementSystem, Position, Velocity};
+use crate::path::{FollowPath, PathSteeringSystem, TempPathAssignmentSystem};
 use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
 use crate::steer::{Steering, SteeringSystem};
 
@@ -31,7 +32,9 @@ impl<'a, R: Renderer> Simulation<'a, R> {
 
         // register systems
         let specs_dispatcher = DispatcherBuilder::new()
-            .with(SteeringSystem, "steering", &[])
+            .with(TempPathAssignmentSystem, "pathassign", &[])
+            .with(PathSteeringSystem, "pathsteering", &["pathassign"])
+            .with(SteeringSystem, "steering", &["pathsteering"])
             .with(MovementSystem, "movement", &["steering"])
             .build();
 
@@ -40,35 +43,33 @@ impl<'a, R: Renderer> Simulation<'a, R> {
         specs_world.register::<Velocity>();
         specs_world.register::<Physical>();
         specs_world.register::<Steering>();
+        specs_world.register::<FollowPath>();
+
+        // world as resource
+        specs_world.insert(world.clone());
 
         // add dummy entities
         {
+            let w = world.borrow();
             info!("adding dummy entities");
             specs_world
                 .create_entity()
-                .with(Position {
-                    x: 0.0,
-                    y: CHUNK_SIZE.as_f32(), // should be at the top of the chunk
-                    z: 3,
-                })
+                .with(
+                    Position::from_highest_safe_point(&w, 0.0, 8.5).expect("should be valid point"),
+                )
                 .with(Velocity { x: 0.0, y: 0.0 })
                 .with(Physical {
                     color: (100, 10, 15),
                 })
-                .with(Steering::arrive(Position {
-                    x: 10.0,
-                    y: 9.0,
-                    z: 3,
-                }))
+                .with(FollowPath::default())
+                .with(Steering::default())
                 .build();
 
             specs_world
                 .create_entity()
-                .with(Position {
-                    x: 0.2,
-                    y: 3.7,
-                    z: 2,
-                })
+                .with(
+                    Position::from_highest_safe_point(&w, 0.2, 3.7).expect("should be valid point"),
+                )
                 .with(Physical {
                     color: (30, 200, 90),
                 })
@@ -102,10 +103,7 @@ impl<'a, R: Renderer> Simulation<'a, R> {
         renderer: &mut R,
         _interpolation: f64,
     ) {
-        let frame_state = FrameRenderState {
-            target: target.clone(),
-            slices,
-        };
+        let frame_state = FrameRenderState { target, slices };
 
         renderer.init(frame_state.target.clone());
         renderer.start();

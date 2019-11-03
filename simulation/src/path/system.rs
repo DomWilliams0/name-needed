@@ -1,29 +1,62 @@
+use log::*;
 use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use world::navigation::Path as NavPath;
-use world::{ChunkPosition, CHUNK_SIZE};
+use world::{BlockPosition, WorldRef, CHUNK_SIZE};
 
-use crate::simulation::WorldResource;
-use crate::steer::Steering;
+use crate::path::follow::PathFollowing;
+use crate::steer::{Steering, SteeringBehaviour};
+use crate::Position;
 
 /// Holds the current path to follow
 #[derive(Component, Default)]
 #[storage(VecStorage)]
 pub struct FollowPath {
-    pub path: Option<NavPath>,
+    path: Option<PathFollowing>,
 }
 
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
 
 impl<'a> System<'a> for PathSteeringSystem {
-    type SystemData = (ReadStorage<'a, FollowPath>, WriteStorage<'a, Steering>);
+    type SystemData = (
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, FollowPath>,
+        WriteStorage<'a, Steering>,
+    );
 
-    fn run(&mut self, (path, mut steer): Self::SystemData) {
-        for (path, steer) in (&path, &mut steer).join() {
-            // TODO
+    fn run(&mut self, (pos, mut path, mut steer): Self::SystemData) {
+        for (pos, path, steer) in (&pos, &mut path, &mut steer).join() {
+            let following = match path.path {
+                Some(ref mut path) => path,
+                None => continue,
+            };
+
+            *steer = match following.next_waypoint(pos) {
+                // waypoint
+                Some((waypoint, false)) => {
+                    if following.changed() {
+                        debug!("heading towards {:?}", waypoint);
+                    }
+                    Steering::seek(waypoint.into())
+                }
+
+                // last waypoint
+                Some((waypoint, true)) => {
+                    if following.changed() {
+                        debug!("heading towards final waypoint {:?}", waypoint);
+                    }
+                    Steering::arrive(waypoint.into())
+                }
+
+                // path over
+                None => {
+                    debug!("arrived at destination");
+                    path.path = None;
+                    Steering::default()
+                }
+            }
         }
     }
 }
@@ -34,20 +67,34 @@ impl<'a> System<'a> for PathSteeringSystem {
 pub struct TempPathAssignmentSystem;
 
 impl<'a> System<'a> for TempPathAssignmentSystem {
-    type SystemData = (Read<'a, WorldResource>, WriteStorage<'a, FollowPath>);
+    type SystemData = (
+        Read<'a, WorldRef>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, FollowPath>,
+    );
 
-    fn run(&mut self, (world, mut path): Self::SystemData) {
+    fn run(&mut self, (world, pos, mut path): Self::SystemData) {
         let mut rand = rand::thread_rng();
-        let world = world.0.get();
-        for path in &mut path.join() {
+        let world = world.borrow();
+        for (pos, path) in (&pos, &mut path).join() {
             if path.path.is_none() {
                 // uh oh, new path needed
 
                 // get random destination with limit on attempts
-                let mut attempts_left = 10;
+                const ATTEMPTS: i32 = 10;
+                let mut attempts_left = ATTEMPTS;
                 let target = loop {
-                    let x = rand.gen_range(0, CHUNK_SIZE as i32);
-                    let y = rand.gen_range(0, CHUNK_SIZE as i32);
+                    let (x, y) = {
+                        let random_chunk = world
+                            .all_chunks()
+                            .choose(&mut rand)
+                            .expect("world should have >0 chunks");
+                        let x = rand.gen_range(0, CHUNK_SIZE.as_u16());
+                        let y = rand.gen_range(0, CHUNK_SIZE.as_u16());
+                        let block = BlockPosition::from((x, y, 0));
+                        let world_pos = block.to_world_pos(random_chunk.pos());
+                        (world_pos.0, world_pos.1)
+                    };
 
                     // find accessible place in world
                     if let target @ Some(_) = world.find_accessible_block_in_column(x, y) {
@@ -56,17 +103,23 @@ impl<'a> System<'a> for TempPathAssignmentSystem {
 
                     attempts_left -= 1;
                     if attempts_left < 0 {
+                        warn!(
+                            "tried and failed {} times to find a random place to path find to",
+                            ATTEMPTS,
+                        );
                         break None;
                     }
                 };
 
-                // TODO calculate path and set as target
-/*
-                let path = target.and_then(|target| {
-                    // TODO calculate target cross chunks?!
-                    unimplemented!();
-                });
-*/
+                // calculate path and set as target
+                let full_path = target.and_then(|target| world.find_path(*pos, target));
+
+                match full_path {
+                    Some(_) => info!("found path from {:?} to {:?}", pos, target),
+                    None => warn!("failed to find a path from {:?} to {:?}", pos, target),
+                }
+
+                path.path = full_path.map(PathFollowing::new);
             }
         }
     }

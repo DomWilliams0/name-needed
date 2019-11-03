@@ -33,7 +33,7 @@ pub mod world {
     pub struct ChunkPosition(pub i32, pub i32);
 
     /// A point anywhere in the world
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Default)]
     pub struct WorldPoint(pub f32, pub f32, pub f32);
 
     /// A block anywhere in the world
@@ -116,6 +116,8 @@ pub mod world {
     impl From<(i32, i32, i32)> for BlockPosition {
         fn from(pos: (i32, i32, i32)) -> Self {
             let (x, y, z) = pos;
+            assert!(x >= 0);
+            assert!(y >= 0);
             Self((x as u16).into(), (y as u16).into(), z.into())
         }
     }
@@ -206,6 +208,31 @@ pub mod world {
         }
     }
 
+    impl From<WorldPoint> for cgmath::Vector3<f32> {
+        fn from(p: WorldPoint) -> Self {
+            Self {
+                x: p.0,
+                y: p.1,
+                z: p.2,
+            }
+        }
+    }
+
+    impl From<WorldPosition> for WorldPoint {
+        fn from(pos: WorldPosition) -> Self {
+            Self(pos.0 as f32, pos.1 as f32, pos.2 as f32)
+        }
+    }
+
+    impl From<&WorldPosition> for cgmath::Point3<f32> {
+        fn from(pos: &WorldPosition) -> Self {
+            Self {
+                x: pos.0 as f32,
+                y: pos.1 as f32,
+                z: pos.2 as f32,
+            }
+        }
+    }
     impl From<ChunkPoint> for cgmath::Vector3<f32> {
         fn from(p: ChunkPoint) -> Self {
             let ChunkPoint(x, y, z) = p;

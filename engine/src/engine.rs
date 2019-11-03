@@ -1,5 +1,5 @@
 use glium_sdl2::DisplayBuild;
-use log::debug;
+use log::*;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
@@ -47,7 +47,7 @@ impl<'a> Engine<'a> {
 
         let renderer = GliumRenderer::new(display, WorldViewer::from_world(world.clone()));
 
-        let simulation = Simulation::new(world.clone());
+        let simulation = Simulation::new(world);
 
         Self {
             sdl,
@@ -104,13 +104,13 @@ impl<'a> Engine<'a> {
     }
 
     fn tick(&mut self) {
-        debug!("tick");
+        trace!("tick");
         self.simulation.tick();
         self.renderer.tick();
     }
 
     fn render(&mut self, interpolation: f64) {
-        debug!("render (interpolation={})", interpolation);
+        trace!("render (interpolation={})", interpolation);
         self.renderer.render(&mut self.simulation, interpolation);
     }
 

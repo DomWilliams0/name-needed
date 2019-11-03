@@ -1,4 +1,5 @@
 mod movement;
+mod path;
 mod render;
 mod simulation;
 mod steer;

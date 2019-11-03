@@ -1,5 +1,6 @@
 use specs::prelude::*;
 use specs_derive::Component;
+use world::{InnerWorldRef, WorldPoint, WorldPosition};
 
 // TODO use cgmath vectors
 
@@ -9,7 +10,7 @@ use specs_derive::Component;
 pub struct Position {
     pub x: f32,
     pub y: f32,
-    pub z: i32,
+    pub z: f32,
 }
 
 /// Desired velocity, should be normalized
@@ -40,14 +41,51 @@ impl<'a> System<'a> for MovementSystem {
 // ----
 
 impl Position {
-    pub fn new(x: f32, y: f32, z: i32) -> Self {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
+    }
+
+    pub fn from_highest_safe_point(world: &InnerWorldRef, x: f32, y: f32) -> Option<Self> {
+        world
+            .find_accessible_block_in_column(x as i32, y as i32)
+            .map(|pos| {
+                let mut point = WorldPoint::from(pos);
+                point.0 = x;
+                point.1 = y;
+                point.into()
+            })
+    }
+
+    /* pub */
+    fn _place_safely(_world: &InnerWorldRef, _search_from: (i32, i32)) -> Self {
+        // TODO guaranteed place safely
+        unimplemented!()
+    }
+
+    pub fn slice(&self) -> i32 {
+        self.z as i32
     }
 }
 
 impl From<&[f32; 3]> for Position {
     fn from(arr: &[f32; 3]) -> Self {
         let [x, y, z] = arr;
-        Position::new(*x, *y, *z as i32)
+        Position::new(*x, *y, *z)
+    }
+}
+
+impl From<Position> for WorldPosition {
+    fn from(pos: Position) -> Self {
+        WorldPosition(pos.x as i32, pos.y as i32, pos.z as i32)
+    }
+}
+
+impl From<WorldPoint> for Position {
+    fn from(pos: WorldPoint) -> Self {
+        Self {
+            x: pos.0,
+            y: pos.1,
+            z: pos.2,
+        }
     }
 }

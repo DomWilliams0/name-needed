@@ -64,7 +64,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 
     fn run(&mut self, (pos, physical): Self::SystemData) {
         for (pos, physical) in (&pos, &physical).join() {
-            if self.frame_state.slices.contains(pos.z) {
+            if self.frame_state.slices.contains(pos.slice()) {
                 self.renderer.entity(pos, physical);
             }
         }

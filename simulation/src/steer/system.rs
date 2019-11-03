@@ -6,6 +6,7 @@ use crate::movement::Velocity;
 use crate::steer::behaviour::{Arrive, CompleteAction, Nop, Seek};
 use crate::steer::SteeringBehaviour;
 use crate::Position;
+use world::WorldPoint;
 
 /// Steering behaviour
 #[derive(Component)]
@@ -23,13 +24,13 @@ impl Default for Steering {
 }
 
 impl Steering {
-    pub fn seek(target: Position) -> Self {
+    pub fn seek(target: WorldPoint) -> Self {
         Self {
             behaviour: SteeringBehaviour::Seek(Seek { target }),
         }
     }
 
-    pub fn arrive(target: Position) -> Self {
+    pub fn arrive(target: WorldPoint) -> Self {
         Self {
             behaviour: SteeringBehaviour::Arrive(Arrive {
                 target,
