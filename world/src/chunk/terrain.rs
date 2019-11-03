@@ -94,7 +94,7 @@ impl ChunkTerrain {
     pub fn slice_range(&self, range: SliceRange) -> Generator<(), (SliceIndex, Slice)> {
         Gn::new_scoped(move |mut s| {
             for slice in range
-                .into_iter()
+                .as_range()
                 .filter_map(|idx| self.slice(idx).map(|s| (idx, s)))
             {
                 s.yield_(slice);
@@ -743,5 +743,4 @@ mod tests {
             4
         );
     }
-
 }

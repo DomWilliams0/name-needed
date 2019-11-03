@@ -153,13 +153,13 @@ impl<'a, I: Into<SliceBlock>> IndexMut<I> for SliceMut<'a> {
 // TODO make not pub
 pub fn unflatten_index(index: usize) -> SliceBlock {
     SliceBlock(
-        BlockCoord((index % CHUNK_SIZE.as_usize()) as u16),
-        BlockCoord((index / CHUNK_SIZE.as_usize()) as u16),
+        (index % CHUNK_SIZE.as_usize()) as BlockCoord,
+        (index / CHUNK_SIZE.as_usize()) as BlockCoord,
     )
 }
 
 fn flatten_coords(block: SliceBlock) -> usize {
-    let SliceBlock(BlockCoord(x), BlockCoord(y)) = block;
+    let SliceBlock(x, y) = block;
     ((y * CHUNK_SIZE.as_u16()) + x) as usize
 }
 

@@ -106,7 +106,7 @@ impl ChunkBoundary {
     pub fn blocks_in_slab(self, slab: SlabIndex) -> impl Iterator<Item = BlockPosition> {
         let z_offset = slab * SLAB_SIZE.as_i32();
         self.blocks()
-            .map(move |pos| BlockPosition(pos.0, pos.1, pos.2 + z_offset))
+            .map(move |pos| BlockPosition::from((pos.0, pos.1, pos.2 + z_offset)))
     }
 
     pub fn shift(self, pos: WorldPosition) -> WorldPosition {
@@ -141,7 +141,7 @@ mod tests {
         let v: Vec<_> = ChunkBoundary::Up.blocks_in_slab(1).collect();
         assert_eq!(v.len(), CHUNK_SIZE.as_usize() * SLAB_SIZE.as_usize());
         assert!(v.iter().all(|b| {
-            let y_is_constant = (b.1).0 == CHUNK_SIZE.as_u16() - 1;
+            let y_is_constant = b.1 == CHUNK_SIZE.as_u16() - 1;
             let z_is_in_range_of_slab =
                 (b.2).0 >= SLAB_SIZE.as_i32() && (b.2).0 < (SLAB_SIZE.as_i32() * 2);
             y_is_constant && z_is_in_range_of_slab

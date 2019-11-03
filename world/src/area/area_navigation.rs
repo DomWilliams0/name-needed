@@ -400,5 +400,4 @@ mod tests {
         assert_eq!(edge_up.cost, EdgeCost::JumpUp);
         assert_eq!(edge_down.cost, EdgeCost::JumpDown);
     }
-
 }

@@ -1,7 +1,7 @@
 use scale;
 
 use crate::chunk::Chunk;
-use crate::coordinate::world::{BlockCoord, SliceBlock};
+use crate::coordinate::world::SliceBlock;
 use crate::viewer::SliceRange;
 
 #[derive(Copy, Clone)]
@@ -109,7 +109,7 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
             let height = block.block_height();
 
             let (bx, by, bz) = {
-                let SliceBlock(BlockCoord(x), BlockCoord(y)) = block_pos;
+                let SliceBlock(x, y) = block_pos;
                 let z = {
                     let z = slice_index.0 as f32;
 

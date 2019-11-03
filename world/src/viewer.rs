@@ -1,11 +1,10 @@
 use std::fmt::{Display, Error, Formatter};
-use std::iter::Map;
-use std::ops::{Add, RangeInclusive};
+use std::ops::Add;
 
 use generator::{done, Generator, Gn};
 use log::info;
 
-use crate::coordinate::world::{ChunkPosition, SliceIndex, SliceIndexType};
+use crate::coordinate::world::{ChunkPosition, SliceIndex};
 use crate::mesh::Vertex;
 use crate::{mesh, WorldRef};
 
@@ -19,17 +18,6 @@ pub struct WorldViewer {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SliceRange(SliceIndex, SliceIndex);
-
-impl IntoIterator for SliceRange {
-    type Item = SliceIndex;
-    type IntoIter = Map<RangeInclusive<SliceIndexType>, fn(SliceIndexType) -> SliceIndex>; // yuk
-
-    fn into_iter(self) -> Self::IntoIter {
-        let SliceIndex(from) = self.0;
-        let SliceIndex(to) = self.1;
-        (from..=to).map(SliceIndex)
-    }
-}
 
 impl SliceRange {
     fn new(start: SliceIndex, size: i32) -> Self {
@@ -56,11 +44,17 @@ impl SliceRange {
         slice >= lower && slice <= upper
     }
 
-    pub fn bottom(&self) -> SliceIndex {
+    pub fn bottom(self) -> SliceIndex {
         self.0
     }
-    pub fn top(&self) -> SliceIndex {
+    pub fn top(self) -> SliceIndex {
         self.1
+    }
+
+    pub fn as_range(self) -> impl Iterator<Item = SliceIndex> {
+        let SliceIndex(from) = self.0;
+        let SliceIndex(to) = self.1;
+        (from..=to).map(SliceIndex)
     }
 }
 
@@ -75,6 +69,7 @@ impl Add<i32> for SliceRange {
     type Output = SliceRange;
 
     fn add(self, rhs: i32) -> Self::Output {
+        let rhs = SliceIndex(rhs);
         SliceRange(self.0 + rhs, self.1 + rhs)
     }
 }

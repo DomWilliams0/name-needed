@@ -6,7 +6,7 @@ use specs_derive::Component;
 use world::{BlockPosition, WorldRef, CHUNK_SIZE};
 
 use crate::path::follow::PathFollowing;
-use crate::steer::{Steering, SteeringBehaviour};
+use crate::steer::Steering;
 use crate::Position;
 
 /// Holds the current path to follow

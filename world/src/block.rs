@@ -18,7 +18,7 @@ impl Block {
         }
     }
 
-    pub const fn block_type(&self) -> BlockType {
+    pub const fn block_type(self) -> BlockType {
         self.block_type
     }
 
@@ -26,23 +26,23 @@ impl Block {
         &mut self.block_type
     }
 
-    pub fn solid(&self) -> bool {
+    pub fn solid(self) -> bool {
         self.block_type.solid()
     }
 
-    pub const fn block_height(&self) -> BlockHeight {
+    pub const fn block_height(self) -> BlockHeight {
         self.height
     }
 
-    pub fn height(&self) -> f32 {
+    pub fn height(self) -> f32 {
         self.height.height()
     }
 
-    pub fn walkable(&self) -> bool {
+    pub fn walkable(self) -> bool {
         self.area.initialized()
     }
 
-    pub(crate) fn area_index(&self) -> SlabAreaIndex {
+    pub(crate) fn area_index(self) -> SlabAreaIndex {
         self.area
     }
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
