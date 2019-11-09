@@ -24,7 +24,7 @@ if __name__ == '__main__':
     prog.add_argument("name")
     prog.add_argument("type")
     prog.add_argument("initial_value")
-    prog.add_argument("--increment", "-i", type=int, default=None)
+    prog.add_argument("--increment", "-i", default=None)
 
     args = prog.parse_args()
 

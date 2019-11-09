@@ -1,6 +1,7 @@
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use enum_map::{Enum, EnumMap};
+use num_traits::clamp;
 use sdl2::keyboard::Keycode;
 
 const MOVE_SPEED: f32 = 0.2;
@@ -35,6 +36,7 @@ pub struct FreeRangeCamera {
     yaw: Deg<f32>,
 
     key_state: EnumMap<Direction, bool>,
+    lookaround: bool,
 }
 
 impl FreeRangeCamera {
@@ -46,6 +48,7 @@ impl FreeRangeCamera {
             pitch: Deg(0.0),
             yaw: Deg(0.0),
             key_state: EnumMap::new(),
+            lookaround: false,
         };
         cam.update_yaw_n_pitch();
         cam
@@ -56,19 +59,21 @@ impl FreeRangeCamera {
         self.yaw = Angle::atan2(self.dir.z, self.dir.x);
     }
 
+    pub fn handle_click(&mut self, down: bool) {
+        self.lookaround = down
+    }
+
     pub fn handle_cursor(&mut self, dx: i32, dy: i32) {
-        self.yaw += Deg(dx as f32 * 0.3);
-        self.pitch = {
-            let Deg(mut pitch) = self.pitch;
-            pitch -= dy as f32;
-            Deg(if pitch < -89.0 {
-                -89.0
-            } else if pitch > 89.0 {
-                89.0
-            } else {
-                pitch
-            })
-        };
+        if !self.lookaround {
+            return;
+        }
+
+        let turnspeed = tweaker::resolve("turnspeed").unwrap_or(1.0);
+        let dx = (dx as f32) * turnspeed;
+        let dy = (dy as f32) * turnspeed;
+
+        self.yaw += Deg(dx);
+        self.pitch = clamp(self.pitch - Deg(dy), Deg(-89.0), Deg(89.0));
 
         self.dir.x = Deg::cos(self.yaw) * Deg::cos(self.pitch);
         self.dir.y = Deg::sin(self.pitch);
@@ -96,8 +101,4 @@ impl FreeRangeCamera {
         }
         Matrix4::look_at(self.pos, self.pos + self.dir, self.up)
     }
-
-    //    pub fn pos(&self) -> Point3<f32> {
-    //        self.pos
-    //    }
 }

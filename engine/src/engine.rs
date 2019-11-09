@@ -6,7 +6,6 @@ use sdl2::Sdl;
 
 use gameloop::{FrameAction, GameLoop};
 use simulation::Simulation;
-use tweaker;
 use world::{WorldRef, WorldViewer};
 
 use crate::render::{GliumRenderer, SimulationRenderer};
@@ -85,9 +84,9 @@ impl<'a> Engine<'a> {
                         ..
                     } => self.renderer.on_resize(w, h),
 
-                    Event::MouseMotion { xrel, yrel, .. }
-                        if tweaker::resolve::<bool>("lookaround") == Some(true) =>
-                    {
+                    Event::MouseButtonDown { .. } => self.renderer.camera().handle_click(true),
+                    Event::MouseButtonUp { .. } => self.renderer.camera().handle_click(false),
+                    Event::MouseMotion { xrel, yrel, .. } => {
                         self.renderer.camera().handle_cursor(xrel, yrel)
                     }
                     _ => {}

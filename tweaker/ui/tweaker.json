@@ -8,5 +8,13 @@
     },
     "render-navmesh": {
         "value": true
+    },
+    "turnspeed": {
+        "value": 0.119999,
+        "increment": 0.01
+    },
+    "fov": {
+        "value": 30,
+        "increment": 5
     }
 }

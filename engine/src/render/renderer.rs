@@ -1,10 +1,8 @@
 use std::cell::RefCell;
-use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use cgmath::{ortho, Matrix4, Point3, Vector3};
-use float_ord::FloatOrd;
+use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
 use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
@@ -70,8 +68,8 @@ impl GliumRenderer {
 
         let camera = {
             let pos = Point3::new(
-                scale::BLOCK * CHUNK_SIZE.as_f32(), // mid chunk
-                scale::BLOCK * CHUNK_SIZE.as_f32(), // mid chunk
+                scale::BLOCK * CHUNK_SIZE.as_f32() * 0.5,
+                scale::BLOCK * CHUNK_SIZE.as_f32() * 0.5,
                 15.0,
             );
 
@@ -140,22 +138,12 @@ impl GliumRenderer {
 
             // calculate projection and view matrices
             let (projection, view) = {
-                let zoom: f32 = tweaker::resolve("zoom").unwrap_or(12.0); // TODO move to camera
                 let (w, h) = (self.window_size.0 as f32, self.window_size.1 as f32);
+                let aspect = w / h;
 
-                // scale to window size to prevent stretching
-                let scale_y = h / w;
-                let zoom_range = (1.0f32, 22.0f32); // TODO define zoom properly (#20)
-                let base_size = max(FloatOrd(zoom_range.0), FloatOrd(zoom_range.1 - zoom)).0;
+                let fov = tweaker::resolve("fov").unwrap_or(30) as f32;
+                let projection: [[f32; 4]; 4] = perspective(Deg(fov), aspect, 0.1, 100.0).into();
 
-                let projection: [[f32; 4]; 4] = ortho(
-                    -base_size,
-                    base_size,
-                    -(base_size * scale_y),
-                    base_size * scale_y,
-                    0.1,
-                    100.0,
-                ).into();
                 let view = self.camera.world_to_view();
 
                 world_target.projection = projection;
