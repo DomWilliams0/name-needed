@@ -121,10 +121,11 @@ impl Renderer for SimulationRenderer {
             {
                 let mut mapping = self.entity_vertex_buf.map();
                 for (src, dest) in self.entity_instances.iter().zip(mapping.iter_mut()) {
+                    // scale to camera space
                     dest.e_pos = [
-                        src.0.x * scale::BLOCK,
-                        src.0.y * scale::BLOCK,
-                        src.0.z as f32 * scale::BLOCK,
+                        src.0.x * scale::BLOCK_DIAMETER,
+                        src.0.y * scale::BLOCK_DIAMETER,
+                        src.0.z as f32 * scale::BLOCK_DIAMETER,
                     ];
 
                     let (r, g, b) = src.1.color;

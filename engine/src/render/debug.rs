@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::ops::Range;
 
 use glium::index::{NoIndices, PrimitiveType};
@@ -121,20 +121,24 @@ impl DebugShapes {
                         false
                     }
                 })
-                .unwrap_or(last_tri - 1);
+                .unwrap_or(last_tri);
 
             (first_tri, last_tri)
         };
 
-        let n = self.last_written_n;
-        let n = self.draw_shapes(target, &uniforms, 0..first_tri, PrimitiveType::LinesList, n);
-        let n = self.draw_shapes(
-            target,
-            &uniforms,
-            first_tri..last_tri,
-            PrimitiveType::TrianglesList,
-            n,
-        );
+        let mut n = self.last_written_n;
+        n = self.draw_shapes(target, &uniforms, 0..first_tri, PrimitiveType::LinesList, n);
+
+        // some triangles should be present
+        if first_tri != last_tri {
+            n = self.draw_shapes(
+                target,
+                &uniforms,
+                first_tri..last_tri,
+                PrimitiveType::TrianglesList,
+                n,
+            );
+        }
         self.last_written_n = n;
 
         self.shapes.clear();
@@ -164,7 +168,7 @@ impl DebugShapes {
                 let rounded = ((n_to_clear + MULTIPLE - 1) / MULTIPLE) * MULTIPLE;
 
                 // cap at buf size of course
-                max(rounded, DebugShapes::MAX_VERTICES)
+                min(rounded, DebugShapes::MAX_VERTICES)
             };
             for i in 0..n_to_clear {
                 buf.set(i, Default::default());
@@ -176,7 +180,11 @@ impl DebugShapes {
                 for vertex in shape.points().iter().map(|p| {
                     let WorldPoint(x, y, z) = *p;
                     DebugShapeVertex {
-                        v_pos: [x * scale::BLOCK, y * scale::BLOCK, z * scale::BLOCK], // TODO helper?
+                        v_pos: [
+                            x * scale::BLOCK_DIAMETER,
+                            y * scale::BLOCK_DIAMETER,
+                            z * scale::BLOCK_DIAMETER,
+                        ],
                         v_color: shape.color(),
                     }
                 }) {

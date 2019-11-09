@@ -28,8 +28,8 @@ impl Vertex {
 
 const VERTICES_PER_BLOCK: usize = 6;
 
-// for ease of declaration. /2 as based around the center of the block
-const X: f32 = scale::BLOCK / 2.0;
+// for ease of declaration. /2 for radius as this is based around the center of the block
+const X: f32 = scale::BLOCK_DIAMETER / 2.0;
 
 const BLOCK_VERTICES: [Vertex; 36] = [
     // front
@@ -137,9 +137,9 @@ pub fn make_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
                 for vertex in face_verts.iter() {
                     let [fx, fy, fz] = vertex.v_pos;
                     vertices.push(Vertex::with_color(
-                        fx + bx * scale::BLOCK,
-                        fy + by * scale::BLOCK,
-                        (fz * height) + bz * scale::BLOCK,
+                        fx + bx * scale::BLOCK_DIAMETER,
+                        fy + by * scale::BLOCK_DIAMETER,
+                        (fz * height) + bz * scale::BLOCK_DIAMETER,
                         color,
                     ));
                 }

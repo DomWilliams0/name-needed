@@ -67,9 +67,10 @@ impl GliumRenderer {
         info!("window size is {}x{}", window_size.0, window_size.1);
 
         let camera = {
+            // mid chunk
             let pos = Point3::new(
-                scale::BLOCK * CHUNK_SIZE.as_f32() * 0.5,
-                scale::BLOCK * CHUNK_SIZE.as_f32() * 0.5,
+                scale::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
+                scale::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
                 15.0,
             );
 
@@ -156,7 +157,7 @@ impl GliumRenderer {
                 let view: [[f32; 4]; 4] = {
                     // chunk offset
                     let WorldPoint(x, y, z) = mesh.chunk_pos.into();
-                    let translate = Vector3::new(x, y, z).map(|c| c * scale::BLOCK);
+                    let translate = Vector3::new(x, y, z).map(|c| c * scale::BLOCK_DIAMETER);
 
                     (view * Matrix4::from_translation(translate)).into()
                 };
