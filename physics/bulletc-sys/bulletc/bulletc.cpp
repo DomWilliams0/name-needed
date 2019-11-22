@@ -1,4 +1,5 @@
 #include <btBulletDynamicsCommon.h>
+#include <iterator>
 #include "bulletc.hpp"
 #include "debug.hpp"
 

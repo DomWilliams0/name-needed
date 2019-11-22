@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(bulletc)
 
+set (CMAKE_CXX_STANDARD 11)
+
 set(SRC bulletc.cpp bulletc.hpp debug.cpp debug.hpp)
 
 add_library(bulletc SHARED ${SRC})

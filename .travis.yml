@@ -4,19 +4,29 @@ language: rust
 cache:
     directories:
         - /home/travis/.cargo
+        - $SDL_DIR
 before_cache:
     - rm -rf /home/travis/.cargo/registry
+
+before_install:
+    - sudo apt install libbullet-dev
+addons:
+    apt:
+        update: true
+
 # ---
 
 branches:
     only:
         - develop
         - master
+        - feature/#30-fix-travis
 
 install:
     - bash .travis-install-sdl2.sh
 
 env:
+    SDL_DIR=SDL2-2.0.9
 os:
     - linux
       # TODO windows and osx

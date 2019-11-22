@@ -3,6 +3,13 @@
 
 set -xueo pipefail
 
-wget https://www.libsdl.org/release/SDL2-2.0.9.tar.gz -O sdl2.tar.gz
-tar xzf sdl2.tar.gz
-pushd SDL2-* && ./configure && make -j`nproc` && sudo make install && popd
+# SDL_VERSION=2.0.9
+# SDL_DIR="SDL2-$SDL_VERSION"
+
+if [ ! -f "$SDL_DIR/configure" ]
+then
+	wget https://www.libsdl.org/release/SDL2-2.0.9.tar.gz -O sdl2.tar.gz
+	tar xzf sdl2.tar.gz
+fi
+
+pushd $SDL_DIR && ./configure && make -j`nproc` && sudo make install && popd
