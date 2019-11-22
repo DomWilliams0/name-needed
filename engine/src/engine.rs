@@ -5,10 +5,10 @@ use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
 
 use gameloop::{FrameAction, GameLoop};
-use simulation::Simulation;
+use simulation::{self, Simulation};
 use world::{WorldRef, WorldViewer};
 
-use crate::render::{GliumRenderer, SimulationRenderer};
+use crate::render::{self, GliumRenderer, SimulationRenderer};
 
 pub struct Engine<'a> {
     sdl: Sdl,
@@ -59,7 +59,8 @@ impl<'a> Engine<'a> {
     pub fn run(mut self) {
         let mut event_pump = self.sdl.event_pump().expect("Failed to create event pump");
 
-        let game_loop = GameLoop::new(20, 5);
+        // TODO separate faster rate for physics?
+        let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5);
 
         'running: loop {
             let frame = game_loop.start_frame();
@@ -117,6 +118,20 @@ impl<'a> Engine<'a> {
         match event {
             KeyEvent::Down(Keycode::Up) => self.renderer.world_viewer().move_by(1),
             KeyEvent::Down(Keycode::Down) => self.renderer.world_viewer().move_by(-1),
+            KeyEvent::Down(Keycode::Y) => {
+                let wireframe = unsafe { render::wireframe_world_toggle() };
+                debug!(
+                    "world is {} wireframe",
+                    if wireframe { "now" } else { "no longer" }
+                )
+            }
+            KeyEvent::Down(Keycode::U) => {
+                let rendering = self.simulation.toggle_physics_debug_rendering();
+                debug!(
+                    "{} physics debug rendering",
+                    if rendering { "enabled" } else { "disabled" }
+                )
+            }
             _ => {}
         };
 

@@ -7,17 +7,17 @@ use glium::{implement_vertex, uniform, DrawParameters, PolygonMode, Surface};
 use glium_sdl2::SDL2Facade;
 use log::warn;
 
-use world::WorldPoint;
+use world::ViewPoint;
 
 use crate::render::{load_program, FrameTarget};
 
 pub enum DebugShape {
     Line {
-        points: [WorldPoint; 2],
+        points: [ViewPoint; 2],
         color: (u8, u8, u8),
     },
     Tri {
-        points: [WorldPoint; 3],
+        points: [ViewPoint; 3],
         color: (u8, u8, u8),
     },
 }
@@ -37,7 +37,7 @@ impl DebugShape {
         ]
     }
 
-    pub fn points(&self) -> &[WorldPoint] {
+    pub fn points(&self) -> &[ViewPoint] {
         match self {
             DebugShape::Line { points, .. } => points,
             DebugShape::Tri { points, .. } => points,
@@ -178,13 +178,9 @@ impl DebugShapes {
 
             'done: for shape in shapes {
                 for vertex in shape.points().iter().map(|p| {
-                    let WorldPoint(x, y, z) = *p;
+                    let ViewPoint(x, y, z) = *p;
                     DebugShapeVertex {
-                        v_pos: [
-                            x * scale::BLOCK_DIAMETER,
-                            y * scale::BLOCK_DIAMETER,
-                            z * scale::BLOCK_DIAMETER,
-                        ],
+                        v_pos: [x, y, z],
                         v_color: shape.color(),
                     }
                 }) {

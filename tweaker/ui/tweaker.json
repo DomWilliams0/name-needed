@@ -1,14 +1,4 @@
 {
-    "zoom": {
-        "value": 10.64998,
-        "increment": 1.0
-    },
-    "lookaround": {
-        "value": true
-    },
-    "render-navmesh": {
-        "value": true
-    },
     "turnspeed": {
         "value": 0.119999,
         "increment": 0.01

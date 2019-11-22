@@ -1,10 +1,10 @@
 pub mod world {
-    use derive_more::*;
+    use std::convert::TryFrom;
     use std::fmt::{Display, Error, Formatter};
     use std::i32;
     use std::ops::Add;
 
-    use crate::grid::CoordType;
+    use derive_more::*;
 
     use super::dim::CHUNK_SIZE;
 
@@ -117,14 +117,14 @@ pub mod world {
         }
     }
 
-    impl From<&CoordType> for BlockPosition {
-        fn from(pos: &CoordType) -> Self {
+    impl From<&[i32; 3]> for BlockPosition {
+        fn from(pos: &[i32; 3]) -> Self {
             let &[x, y, z] = pos;
             Self(x as BlockCoord, y as BlockCoord, SliceIndex(z))
         }
     }
 
-    impl From<BlockPosition> for CoordType {
+    impl From<BlockPosition> for [i32; 3] {
         fn from(b: BlockPosition) -> Self {
             let BlockPosition(x, y, SliceIndex(z)) = b;
             [i32::from(x), i32::from(y), z]
@@ -160,6 +160,12 @@ pub mod world {
         }
     }
 
+    impl From<WorldPoint> for WorldPosition {
+        fn from(pos: WorldPoint) -> Self {
+            Self(pos.0 as i32, pos.1 as i32, pos.2 as i32)
+        }
+    }
+
     impl From<&WorldPosition> for cgmath::Point3<f32> {
         fn from(pos: &WorldPosition) -> Self {
             Self {
@@ -186,10 +192,37 @@ pub mod world {
         }
     }
 
+    impl From<ChunkPosition> for WorldPosition {
+        fn from(p: ChunkPosition) -> Self {
+            WorldPoint::from(p).into()
+        }
+    }
+
     impl From<WorldPoint> for [f32; 3] {
         fn from(p: WorldPoint) -> Self {
             let WorldPoint(x, y, z) = p;
             [x, y, z]
+        }
+    }
+
+    impl From<[f32; 3]> for WorldPoint {
+        fn from([x, y, z]: [f32; 3]) -> Self {
+            WorldPoint(x, y, z)
+        }
+    }
+
+    impl TryFrom<&[f32]> for WorldPoint {
+        type Error = ();
+
+        fn try_from(slice: &[f32]) -> Result<Self, Self::Error> {
+            if slice.len() == 3 {
+                let x = slice[0];
+                let y = slice[1];
+                let z = slice[2];
+                Ok(WorldPoint(x, y, z))
+            } else {
+                Err(())
+            }
         }
     }
 
@@ -266,6 +299,24 @@ pub mod dim {
     }
 }
 
+pub mod view {
+    use derive_more::*;
+
+    use crate::coordinate::world::WorldPoint;
+    use crate::BLOCK_DIAMETER;
+
+    /// A point anywhere in the world, in meters
+    #[derive(Debug, Copy, Clone, Default, Into, From)]
+    pub struct ViewPoint(pub f32, pub f32, pub f32);
+
+    impl From<WorldPoint> for ViewPoint {
+        fn from(pos: WorldPoint) -> Self {
+            let WorldPoint(x, y, z) = pos;
+            Self(x * BLOCK_DIAMETER, y * BLOCK_DIAMETER, z * BLOCK_DIAMETER)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32::EPSILON;
@@ -273,8 +324,8 @@ mod tests {
     use float_cmp::ApproxEq;
 
     use crate::coordinate::dim::CHUNK_SIZE;
-    use crate::coordinate::world::{BlockPosition, SliceIndex, WorldPosition};
-    use crate::{ChunkPosition, WorldPoint};
+    use crate::coordinate::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPoint,
+                                   WorldPosition};
 
     #[test]
     fn block_to_world() {

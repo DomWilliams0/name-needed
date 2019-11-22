@@ -6,6 +6,7 @@ in vec3 v_pos;
 // instance attribs
 in vec3 e_pos;
 in vec3 e_color;
+in mat4 e_model;
 
 out vec3 rgb;
 
@@ -21,7 +22,9 @@ void main() {
         gl_Position = vec4(-1.0, -1.0, -1.0, 1.0);
     } else {
         // normal
-        gl_Position = proj * view * vec4(v_pos + e_pos, 1.0);
+        vec4 v_pos_translated = e_model * vec4(v_pos, 1.0);
+        vec4 e_pos_translated = vec4(e_pos, 1.0);
+        gl_Position = proj * view * (v_pos_translated + e_pos_translated);
         rgb = e_color;
     }
 }

@@ -7,25 +7,31 @@ use glium::{uniform, Frame};
 use glium_sdl2::SDL2Facade;
 
 use simulation::{Physical, Position, Renderer};
+use world::{ViewPoint, WorldPoint};
 
 use crate::render::debug::{DebugShape, DebugShapes};
-use crate::render::{draw_params, load_program};
-use world::WorldPoint;
+use crate::render::{draw_params, load_program, DrawParamType};
 
 #[derive(Copy, Clone)]
 struct EntityVertex {
     v_pos: [f32; 3],
 }
-
 implement_vertex!(EntityVertex, v_pos);
+
+impl EntityVertex {
+    fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { v_pos: [x, y, z] }
+    }
+}
 
 #[derive(Copy, Clone, Default)]
 struct EntityInstanceAttributes {
     e_pos: [f32; 3],
     e_color: [f32; 3],
+    e_model: [[f32; 4]; 4],
 }
 
-implement_vertex!(EntityInstanceAttributes, e_pos, e_color);
+implement_vertex!(EntityInstanceAttributes, e_pos, e_color, e_model);
 
 pub struct SimulationRenderer {
     program: glium::Program,
@@ -51,24 +57,25 @@ impl SimulationRenderer {
         let entity_vertex_buf =
             glium::VertexBuffer::empty_dynamic(display, entity_instances.capacity()).unwrap();
 
-        // simple square
+        // 1m cube mesh, to be scaled in per-instance model matrix
         let entity_geometry = {
+            // 8 common vertices in a cube
             let vertices = vec![
-                EntityVertex {
-                    v_pos: [0.0, 0.0, 0.0],
-                },
-                EntityVertex {
-                    v_pos: [scale::HUMAN, 0.0, 0.0],
-                },
-                EntityVertex {
-                    v_pos: [scale::HUMAN, scale::HUMAN, 0.0],
-                },
-                EntityVertex {
-                    v_pos: [0.0, scale::HUMAN, 0.0],
-                },
+                EntityVertex::new(-0.5, -0.5, -0.5),
+                EntityVertex::new(0.5, -0.5, -0.5),
+                EntityVertex::new(0.5, 0.5, -0.5),
+                EntityVertex::new(-0.5, 0.5, -0.5),
+                EntityVertex::new(-0.5, -0.5, 0.5),
+                EntityVertex::new(0.5, -0.5, 0.5),
+                EntityVertex::new(0.5, 0.5, 0.5),
+                EntityVertex::new(-0.5, 0.5, 0.5),
             ];
 
-            let indices = vec![0, 1, 2, 2, 3, 0];
+            // 6x6 vertex instances
+            let indices = vec![
+                3, 1, 0, 2, 1, 3, 2, 5, 1, 6, 5, 2, 6, 4, 5, 7, 4, 6, 7, 0, 4, 3, 0, 7, 7, 2, 3, 6,
+                2, 7, 0, 5, 4, 1, 5, 0,
+            ];
 
             (
                 glium::VertexBuffer::new(display, &vertices).unwrap(),
@@ -121,12 +128,11 @@ impl Renderer for SimulationRenderer {
             {
                 let mut mapping = self.entity_vertex_buf.map();
                 for (src, dest) in self.entity_instances.iter().zip(mapping.iter_mut()) {
-                    // scale to camera space
-                    dest.e_pos = [
-                        src.0.x * scale::BLOCK_DIAMETER,
-                        src.0.y * scale::BLOCK_DIAMETER,
-                        src.0.z as f32 * scale::BLOCK_DIAMETER,
-                    ];
+                    // keep attribute position in world coordinates
+                    dest.e_pos = {
+                        let WorldPoint(x, y, z) = src.0.pos;
+                        [x, y, z]
+                    };
 
                     let (r, g, b) = src.1.color;
                     dest.e_color = [
@@ -134,6 +140,10 @@ impl Renderer for SimulationRenderer {
                         f32::from(g) / 255.0,
                         f32::from(b) / 255.0,
                     ];
+
+                    let (sx, sy, sz) = src.1.dimensions;
+                    let model = cgmath::Matrix4::from_nonuniform_scale(sx, sy, sz);
+                    dest.e_model = model.into();
                 }
             }
 
@@ -158,7 +168,7 @@ impl Renderer for SimulationRenderer {
                     indices,
                     &self.program,
                     &uniforms,
-                    &draw_params(),
+                    &draw_params(DrawParamType::Entity),
                 )
                 .unwrap();
         }
@@ -166,14 +176,14 @@ impl Renderer for SimulationRenderer {
         self.target = None;
     }
 
-    fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: (u8, u8, u8)) {
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8)) {
         self.debug_shapes.shapes.push(DebugShape::Line {
             points: [from, to],
             color,
         })
     }
 
-    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: (u8, u8, u8)) {
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8)) {
         self.debug_shapes
             .shapes
             .push(DebugShape::Tri { points, color })

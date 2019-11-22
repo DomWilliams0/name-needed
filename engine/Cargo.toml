@@ -14,7 +14,7 @@ world = {path = "../world"}
 tweaker = {path = "../tweaker"}
 simulation = {path = "../simulation"}
 gameloop = {path = "../gameloop"}
-scale = {path = "../scale"}
+unit = {path = "../unit"}
 sdl2 = "0.32"
 glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2"}
 cgmath = "0.17"

@@ -26,8 +26,9 @@ fn main() {
     }
 
     let world = {
-        info!("creating default world");
-        world::WorldRef::new(world::World::default())
+        info!("creating world");
+        // TODO load this from a config
+        world::WorldRef::new(world::presets::multi_chunk_wonder())
     };
     let eng = engine::Engine::new(world);
     eng.run();

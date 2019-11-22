@@ -41,6 +41,7 @@ impl ChunkBuilder {
         S: Into<SliceIndex>,
         B: Into<Block>,
     {
+        // TODO create slice if missing
         if let Some(mut slice) = self.terrain.slice_mut(slice) {
             slice.fill(block);
         }

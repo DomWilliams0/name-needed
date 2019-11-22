@@ -6,7 +6,7 @@ use log::debug;
 
 use crate::area::WorldArea;
 use crate::block::{Block, BlockType};
-use crate::chunk::slab::SLAB_SIZE;
+use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::chunk::terrain::ChunkTerrain;
 pub use crate::coordinate::dim::CHUNK_SIZE;
 use crate::coordinate::world::{BlockPosition, ChunkPosition, WorldPosition};
@@ -54,6 +54,12 @@ impl Chunk {
 
     pub const fn pos(&self) -> ChunkPosition {
         self.pos
+    }
+
+    pub(crate) fn slab_pos(chunk_pos: ChunkPosition, slab: SlabIndex) -> WorldPosition {
+        let mut pos = WorldPosition::from(chunk_pos);
+        pos.2 = slab * SLAB_SIZE.as_i32();
+        pos
     }
 
     pub fn id(&self) -> ChunkId {

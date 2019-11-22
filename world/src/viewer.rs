@@ -87,7 +87,7 @@ impl WorldViewer {
         Gn::new_scoped(move |mut s| {
             let range = self.view_range;
             for dirty_chunk in self.world.borrow().visible_chunks().filter(|c| c.dirty()) {
-                let mesh = mesh::make_mesh(dirty_chunk, range);
+                let mesh = mesh::make_render_mesh(dirty_chunk, range);
                 s.yield_((dirty_chunk.pos(), mesh));
             }
 

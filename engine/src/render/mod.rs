@@ -29,14 +29,32 @@ fn load_program(
     glium::Program::from_source(display, &v, &f, None)
 }
 
-fn draw_params<'a>() -> DrawParameters<'a> {
+static mut WIREFRAME_WORLD: bool = false;
+
+pub unsafe fn wireframe_world_toggle() -> bool {
+    WIREFRAME_WORLD = !WIREFRAME_WORLD;
+    WIREFRAME_WORLD
+}
+
+#[derive(Copy, Clone)]
+enum DrawParamType {
+    World,
+    Entity,
+}
+
+fn draw_params<'a>(draw_type: DrawParamType) -> DrawParameters<'a> {
+    let polygon_mode = match draw_type {
+        DrawParamType::World if unsafe { WIREFRAME_WORLD } => PolygonMode::Line,
+        _ => PolygonMode::Fill,
+    };
+
     DrawParameters {
         depth: Depth {
             test: DepthTest::IfLess,
             write: true,
             ..Default::default()
         },
-        polygon_mode: PolygonMode::Fill,
+        polygon_mode,
         backface_culling: BackfaceCullingMode::CullClockwise,
         ..Default::default()
     }

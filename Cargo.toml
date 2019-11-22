@@ -6,5 +6,12 @@ members = [
 	"world",
 	"tweaker",
 	"simulation",
-	"scale",
+	"unit",
+	"physics",
+	"physics/bulletc-sys",
+	"physics/debug-draw",
 ]
+
+# "temporary" fix for building without parallelization https://github.com/amethyst/specs/issues/642
+[patch.crates-io]
+shred = { git = "https://github.com/mystal/shred.git", branch = "fix_no_parallel", default-features = false }

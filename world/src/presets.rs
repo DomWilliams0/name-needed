@@ -8,6 +8,7 @@ pub fn multi_chunk_wonder() -> World {
         // 0, 0 is slice 0
         ChunkBuilder::new()
             .fill_slice(0, BlockType::Stone)
+            .set_block((1, 1, 1), BlockType::Grass)
             .build((0, 0)),
         // 1, 0 is slice 1
         ChunkBuilder::new()
@@ -81,6 +82,15 @@ pub fn one_chunk_wonder() -> World {
                 s.set_block((x, 13, 2), BlockType::Grass);
             }
         })
+        .build((0, 0));
+
+    World::from_chunks(vec![chunk])
+}
+
+/// A single block in a single chunk
+pub fn one_block_wonder() -> World {
+    let chunk = ChunkBuilder::new()
+        .set_block((1, 1, 1), BlockType::Stone)
         .build((0, 0));
 
     World::from_chunks(vec![chunk])

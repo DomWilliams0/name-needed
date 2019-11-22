@@ -9,13 +9,13 @@ use glium::{implement_vertex, Surface};
 use glium_sdl2::SDL2Facade;
 use log::{debug, info};
 
-use scale;
 use simulation::Simulation;
 use tweaker;
-use world::{ChunkPosition, Vertex as WorldVertex, WorldPoint, WorldViewer, CHUNK_SIZE};
+use unit;
+use world::{ChunkPosition, Vertex as WorldVertex, ViewPoint, WorldPoint, WorldViewer, CHUNK_SIZE};
 
 use crate::camera::FreeRangeCamera;
-use crate::render::{draw_params, load_program, FrameTarget, SimulationRenderer};
+use crate::render::{draw_params, load_program, DrawParamType, FrameTarget, SimulationRenderer};
 
 /// Copy of world::mesh::Vertex
 #[derive(Copy, Clone)]
@@ -69,8 +69,8 @@ impl GliumRenderer {
         let camera = {
             // mid chunk
             let pos = Point3::new(
-                scale::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
-                scale::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
+                unit::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
+                unit::BLOCK_DIAMETER * CHUNK_SIZE.as_f32() * 0.5,
                 15.0,
             );
 
@@ -156,8 +156,9 @@ impl GliumRenderer {
             for mesh in self.chunk_meshes.values() {
                 let view: [[f32; 4]; 4] = {
                     // chunk offset
-                    let WorldPoint(x, y, z) = mesh.chunk_pos.into();
-                    let translate = Vector3::new(x, y, z).map(|c| c * scale::BLOCK_DIAMETER);
+                    let world_point = WorldPoint::from(mesh.chunk_pos);
+                    let ViewPoint(x, y, z) = ViewPoint::from(world_point);
+                    let translate = Vector3::new(x, y, z);
 
                     (view * Matrix4::from_translation(translate)).into()
                 };
@@ -171,7 +172,7 @@ impl GliumRenderer {
                         &glium::index::NoIndices(PrimitiveType::TrianglesList),
                         &self.program,
                         &uniforms,
-                        &draw_params(),
+                        &draw_params(DrawParamType::World),
                     )
                     .unwrap();
             }

@@ -11,3 +11,5 @@
 
 !bin
 *.trace
+cmake-build-*
+physics/libbulletc.so

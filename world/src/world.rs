@@ -3,13 +3,17 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use log::{debug, warn};
 
+use physics::PhysicsWorld;
+
 use crate::area::{AreaGraph, AreaPath, WorldArea, WorldPath};
 use crate::chunk::Chunk;
-use crate::coordinate::world::{SliceBlock, WorldPosition};
+use crate::coordinate::world::{SliceBlock, WorldPoint, WorldPosition};
+use crate::mesh;
 use crate::{presets, BlockPosition, ChunkPosition, SliceRange};
 
 pub struct World {
     chunks: Vec<Chunk>,
+    physics: PhysicsWorld,
     area_graph: AreaGraph,
 }
 
@@ -20,7 +24,7 @@ impl Default for World {
 }
 
 impl World {
-    pub(crate) fn from_chunks(chunks: Vec<Chunk>) -> Self {
+    pub(crate) fn from_chunks(mut chunks: Vec<Chunk>) -> Self {
         // ensure all are unique
         {
             let mut seen = HashSet::new();
@@ -45,7 +49,51 @@ impl World {
         // build area graph
         let area_graph = AreaGraph::from_chunks(&chunks);
 
-        Self { chunks, area_graph }
+        let physics_world = {
+            let mut physics_world = PhysicsWorld::new(-7.0);
+
+            // build collision mesh for each slab
+            let mut vertices = Vec::with_capacity(1024);
+            let mut indices = Vec::with_capacity(1024);
+            for chunk in chunks.iter_mut() {
+                let chunk_pos = chunk.pos();
+
+                for (idx, slab) in chunk.slabs_from_bottom_mut() {
+                    let slab_pos = WorldPoint::from(Chunk::slab_pos(chunk_pos, idx));
+
+                    mesh::make_collision_mesh(slab, &mut vertices, &mut indices);
+
+                    if !vertices.is_empty() {
+                        debug!(
+                            "adding slab collider with {}/{} vertices/indices for chunk {:?} slab {} at {:?}",
+                            vertices.len() / 3,
+                            indices.len(),
+                            chunk_pos,
+                            slab.index(),
+                            slab_pos,
+                        );
+
+                        physics_world.update_slab_collider(
+                            slab_pos,
+                            slab.collider_mut(),
+                            &vertices,
+                            &indices,
+                        );
+                    }
+
+                    vertices.clear();
+                    indices.clear();
+                }
+            }
+
+            physics_world
+        };
+
+        Self {
+            chunks,
+            area_graph,
+            physics: physics_world,
+        }
     }
 
     pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk> {
@@ -157,6 +205,13 @@ impl World {
                 .find(|(_, slice)| slice[slice_block].walkable())
                 .map(|(z, _)| slice_block.to_block_position(z).to_world_pos(chunk_pos))
         })
+    }
+
+    pub fn physics_world(&self) -> &PhysicsWorld {
+        &self.physics
+    }
+    pub fn physics_world_mut(&mut self) -> &mut PhysicsWorld {
+        &mut self.physics
     }
 }
 

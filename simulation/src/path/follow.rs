@@ -1,6 +1,6 @@
 use cgmath::{MetricSpace, Point3};
 use crate::Position;
-use world::{WorldPath, WorldPosition};
+use world::{WorldPath, WorldPoint, WorldPosition};
 
 pub struct PathFollowing {
     pub path: WorldPath,
@@ -23,7 +23,23 @@ impl PathFollowing {
 
         // check distance to current
         let (waypoint, _cost) = &self.path.0[self.next];
-        let distance2 = Point3::from(current_pos).distance2(Point3::from(waypoint));
+        let distance2 = {
+            let from = Point3 {
+                x: current_pos.pos.0,
+                y: current_pos.pos.1,
+                z: current_pos.pos.2,
+            };
+
+            let waypoint = WorldPoint::from(*waypoint);
+            let to = Point3 {
+                x: waypoint.0,
+                y: waypoint.1,
+                z: waypoint.2,
+            };
+
+            from.distance2(to)
+        };
+
         if distance2 < 0.5f32.powi(2) {
             // move on to next waypoint
             self.next += 1;
@@ -40,15 +56,5 @@ impl PathFollowing {
 
     pub fn changed(&self) -> bool {
         self.changed
-    }
-}
-
-impl From<&Position> for Point3<f32> {
-    fn from(pos: &Position) -> Self {
-        Self {
-            x: pos.x,
-            y: pos.y,
-            z: pos.z,
-        }
     }
 }

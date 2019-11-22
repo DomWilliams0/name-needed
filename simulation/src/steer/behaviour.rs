@@ -8,9 +8,9 @@ use world::WorldPoint;
 impl From<Position> for Vector3<f32> {
     fn from(pos: Position) -> Self {
         Self {
-            x: pos.x,
-            y: pos.y,
-            z: pos.z as f32,
+            x: pos.x(),
+            y: pos.y(),
+            z: pos.z(),
         }
     }
 }

@@ -1,5 +1,6 @@
-/// TODO use some fancy type safe unit conversion if this ever becomes a problem
+mod coordinate;
 
+// TODO use some fancy type safe unit conversion if this ever becomes a problem
 mod scaling {
     /// 2 blocks per 1m
     pub const BLOCK_DIAMETER: f32 = 0.5;
@@ -9,3 +10,5 @@ mod scaling {
 }
 
 pub use scaling::{BLOCK_DIAMETER, HUMAN};
+
+pub use coordinate::*;

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use generator::{done, Generator, Gn};
 use itertools::Itertools;
@@ -36,8 +36,15 @@ impl ChunkTerrain {
         self.slabs.iter_decreasing().map(|ptr| ptr.deref())
     }
 
-    fn slabs_from_bottom(&self) -> impl Iterator<Item = &Slab> {
+    pub(crate) fn slabs_from_bottom(&self) -> impl Iterator<Item = &Slab> {
         self.slabs.iter_increasing().map(|ptr| ptr.deref())
+    }
+
+    pub(crate) fn slabs_from_bottom_mut(&mut self) -> impl Iterator<Item = (SlabIndex, &mut Slab)> {
+        self.slabs
+            .iter_mut_increasing()
+            .map(|ptr| ptr.deref_mut())
+            .map(|slab| (slab.index(), slab))
     }
 
     fn add_slab(&mut self, slab: SlabPointer) {
@@ -58,7 +65,10 @@ impl ChunkTerrain {
     fn slice_index_in_slab(slice: SliceIndex) -> SliceIndex {
         let SliceIndex(mut idx) = slice;
         idx %= SLAB_SIZE.as_i32(); // cap at slab size
-        idx = idx.abs(); // positive only
+        if idx.is_negative() {
+            // negative slices flip
+            idx = SLAB_SIZE.as_i32() + idx;
+        }
         SliceIndex(idx)
     }
 
@@ -741,6 +751,25 @@ mod tests {
                 .edges_directed(idx, Direction::Incoming)
                 .count(),
             4
+        );
+    }
+
+    #[test]
+    fn slice_index_in_slab() {
+        // positives are simple modulus
+        assert_eq!(
+            ChunkTerrain::slice_index_in_slab(SliceIndex(5)),
+            SliceIndex(5)
+        );
+        assert_eq!(
+            ChunkTerrain::slice_index_in_slab(SliceIndex(SLAB_SIZE.as_i32() + 4)),
+            SliceIndex(4)
+        );
+
+        // negatives work backwards
+        assert_eq!(
+            ChunkTerrain::slice_index_in_slab(SliceIndex(-1)),
+            SliceIndex(SLAB_SIZE.as_i32() - 1)
         );
     }
 }

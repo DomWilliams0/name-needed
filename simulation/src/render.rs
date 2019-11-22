@@ -4,7 +4,7 @@ use std::rc::Rc;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use world::{SliceRange, WorldPoint, WorldRef};
+use world::{SliceRange, ViewPoint, WorldRef};
 
 use crate::movement::Position;
 
@@ -12,8 +12,11 @@ use crate::movement::Position;
 #[derive(Component, Debug, Copy, Clone)]
 #[storage(VecStorage)]
 pub struct Physical {
-    /// temporary flat color
+    /// temporary simple color
     pub color: (u8, u8, u8),
+
+    /// 3d dimensions in world scale
+    pub dimensions: (f32, f32, f32),
 }
 
 pub trait Renderer {
@@ -31,9 +34,9 @@ pub trait Renderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: (u8, u8, u8));
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8));
 
-    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: (u8, u8, u8));
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8));
 
     fn debug_finish(&mut self) {}
 }
@@ -77,7 +80,7 @@ pub trait DebugRenderer<R: Renderer> {
 
 #[allow(dead_code)]
 pub mod dummy {
-    use world::{WorldPoint, WorldRef};
+    use world::{ViewPoint, WorldRef};
 
     use crate::render::{DebugRenderer, FrameRenderState};
     use crate::Renderer;
@@ -92,18 +95,14 @@ pub mod dummy {
             _frame_state: &FrameRenderState<R>,
         ) {
             renderer.debug_add_line(
-                WorldPoint(0.0, 0.0, 0.0),
-                WorldPoint(5.0, 5.0, 0.0),
+                ViewPoint(0.0, 0.0, 0.0),
+                ViewPoint(1.0, 0.0, 0.0),
                 (255, 0, 0),
             );
-
-            renderer.debug_add_tri(
-                [
-                    WorldPoint(2.0, 0.0, 0.0),
-                    WorldPoint(5.0, 0.0, 0.0),
-                    WorldPoint(5.0, 3.0, 0.0),
-                ],
-                (255, 100, 0),
+            renderer.debug_add_line(
+                ViewPoint(0.0, 0.0, 0.0),
+                ViewPoint(0.0, 1.0, 0.0),
+                (255, 0, 0),
             );
         }
     }

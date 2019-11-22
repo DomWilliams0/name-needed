@@ -1,16 +1,13 @@
 use specs::prelude::*;
 use specs_derive::Component;
+
 use world::{InnerWorldRef, WorldPoint, WorldPosition};
 
-// TODO use cgmath vectors
-
-/// World position
+/// World position, center of entity
 #[derive(Component, Debug, Copy, Clone, Default)]
 #[storage(VecStorage)]
 pub struct Position {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub pos: WorldPoint,
 }
 
 /// Desired velocity, should be normalized
@@ -32,8 +29,8 @@ impl<'a> System<'a> for MovementSystem {
             let speed = 0.2;
             let (vx, vy) = (vel.x * speed, vel.y * speed);
 
-            pos.x += vx;
-            pos.y += vy;
+            pos.pos.0 += vx;
+            pos.pos.1 += vy;
         }
     }
 }
@@ -42,17 +39,30 @@ impl<'a> System<'a> for MovementSystem {
 
 impl Position {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Self { x, y, z }
+        let pos = WorldPoint(x, y, z);
+        Self { pos }
     }
 
-    pub fn from_highest_safe_point(world: &InnerWorldRef, x: f32, y: f32) -> Option<Self> {
+    pub fn from_block_center(x: i32, y: i32, z: i32) -> Self {
+        Self::new(x as f32 + 0.5, y as f32 + 0.5, z as f32)
+    }
+
+    pub fn from_highest_safe_point(
+        world: &InnerWorldRef,
+        block_x: i32,
+        block_y: i32,
+    ) -> Option<Self> {
+        // TODO doesn't take into account width and depth of entity, they might not fit
         world
-            .find_accessible_block_in_column(x as i32, y as i32)
+            .find_accessible_block_in_column(block_x, block_y)
             .map(|pos| {
-                let mut point = WorldPoint::from(pos);
-                point.0 = x;
-                point.1 = y;
-                point.into()
+                let mut pos = WorldPoint::from(pos);
+
+                // center of block
+                pos.0 += 0.5;
+                pos.1 += 0.5;
+
+                Self { pos }
             })
     }
 
@@ -63,29 +73,28 @@ impl Position {
     }
 
     pub fn slice(&self) -> i32 {
-        self.z as i32
+        self.pos.2 as i32
     }
-}
 
-impl From<&[f32; 3]> for Position {
-    fn from(arr: &[f32; 3]) -> Self {
-        let [x, y, z] = arr;
-        Position::new(*x, *y, *z)
+    pub const fn x(&self) -> f32 {
+        self.pos.0
+    }
+    pub const fn y(&self) -> f32 {
+        self.pos.1
+    }
+    pub const fn z(&self) -> f32 {
+        self.pos.2
     }
 }
 
 impl From<Position> for WorldPosition {
     fn from(pos: Position) -> Self {
-        WorldPosition(pos.x as i32, pos.y as i32, pos.z as i32)
+        pos.pos.into()
     }
 }
 
 impl From<WorldPoint> for Position {
     fn from(pos: WorldPoint) -> Self {
-        Self {
-            x: pos.0,
-            y: pos.1,
-            z: pos.2,
-        }
+        Self { pos }
     }
 }

@@ -68,7 +68,7 @@ impl FreeRangeCamera {
             return;
         }
 
-        let turnspeed = tweaker::resolve("turnspeed").unwrap_or(1.0);
+        let turnspeed = tweaker::resolve("turnspeed").unwrap_or(0.12);
         let dx = (dx as f32) * turnspeed;
         let dy = (dy as f32) * turnspeed;
 
