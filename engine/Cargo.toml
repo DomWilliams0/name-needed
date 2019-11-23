@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 world = {path = "../world"}
-tweaker = {path = "../tweaker"}
+config = {path = "../config"}
 simulation = {path = "../simulation"}
 gameloop = {path = "../gameloop"}
 unit = {path = "../unit"}

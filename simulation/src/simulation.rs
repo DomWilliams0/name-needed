@@ -86,10 +86,9 @@ impl<'a, R: Renderer> Simulation<'a, R> {
                 };
 
             info!("adding dummy entities");
-
-            create_entity((3, 4, Some(5)), (10, 10, 255), (1.2, 0.6, 1.95));
-
-            create_entity((1, 1, None), (100, 10, 15), (1.1, 0.75, 1.85));
+            for desc in &config::get().simulation.initial_entities {
+                create_entity(desc.pos, desc.color, desc.size);
+            }
         }
 
         // add physics debug renderer but don't enable

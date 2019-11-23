@@ -1,6 +1,15 @@
+use config::WorldPreset;
 use crate::block::{BlockHeight, BlockType};
 use crate::chunk::CHUNK_SIZE;
 use crate::{ChunkBuilder, World};
+
+pub fn from_config() -> World {
+    match config::get().world.preset {
+        WorldPreset::OneChunkWonder => one_chunk_wonder(),
+        WorldPreset::MultiChunkWonder => multi_chunk_wonder(),
+        WorldPreset::OneBlockWonder => one_block_wonder(),
+    }
+}
 
 /// Multiple flat chunks with a big deep one
 pub fn multi_chunk_wonder() -> World {

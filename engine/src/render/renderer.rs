@@ -10,7 +10,6 @@ use glium_sdl2::SDL2Facade;
 use log::{debug, info};
 
 use simulation::Simulation;
-use tweaker;
 use unit;
 use world::{ChunkPosition, Vertex as WorldVertex, ViewPoint, WorldPoint, WorldViewer, CHUNK_SIZE};
 
@@ -142,8 +141,8 @@ impl GliumRenderer {
                 let (w, h) = (self.window_size.0 as f32, self.window_size.1 as f32);
                 let aspect = w / h;
 
-                let fov = tweaker::resolve("fov").unwrap_or(30) as f32;
-                let projection: [[f32; 4]; 4] = perspective(Deg(fov), aspect, 0.1, 100.0).into();
+                let fov = Deg(config::get().display.fov);
+                let projection: [[f32; 4]; 4] = perspective(fov, aspect, 0.1, 100.0).into();
 
                 let view = self.camera.world_to_view();
 

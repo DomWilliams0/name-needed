@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 unit = {path = "../unit"}
 physics = {path = "../physics"}
+config = {path = "../config"}
 generator = "0.6"
 petgraph = "0.4"
 float-cmp = "0.5"

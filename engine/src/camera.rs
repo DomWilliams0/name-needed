@@ -68,9 +68,9 @@ impl FreeRangeCamera {
             return;
         }
 
-        let turnspeed = tweaker::resolve("turnspeed").unwrap_or(0.12);
-        let dx = (dx as f32) * turnspeed;
-        let dy = (dy as f32) * turnspeed;
+        let turn_speed = config::get().display.camera_turn_multiplier;
+        let dx = (dx as f32) * turn_speed;
+        let dy = (dy as f32) * turn_speed;
 
         self.yaw += Deg(dx);
         self.pitch = clamp(self.pitch - Deg(dy), Deg(-89.0), Deg(89.0));

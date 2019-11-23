@@ -36,8 +36,9 @@ impl<'a> Engine<'a> {
             video.gl_attr().context_minor_version(),
         );
 
+        let (w, h) = config::get().display.resolution;
         let display = video
-            .window("Name Needed", 800, 600)
+            .window("Name Needed", w, h)
             .position_centered()
             .build_glium()
             .expect("Failed to create glium window");

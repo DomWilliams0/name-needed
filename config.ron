@@ -1,0 +1,24 @@
+Config(
+    display: (
+        resolution: (800, 600),
+        fov: 30, // degrees
+        camera_turn_multiplier: 0.12,
+    ),
+    world: (
+        preset: OneChunkWonder,
+    ),
+    simulation: (
+        initial_entities: [
+            (
+                pos: (3, 4, Some(4)),
+                color: (110, 160, 90),
+                size: (1.2, 0.6, 1.95),
+            ),
+            (
+                pos: (12, 12, None),
+                color: (100, 40, 100),
+                size: (1.1, 0.75, 1.85),
+            ),
+        ],
+     )
+)

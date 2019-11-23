@@ -9,8 +9,8 @@ edition = "2018"
 [dependencies]
 world = {path = "../world"}
 unit = {path = "../unit"}
-tweaker = {path = "../tweaker"}
 physics = {path = "../physics"}
+config = {path = "../config"}
 debug-draw = { path = "../physics/debug-draw" }
 specs-derive = "0.4"
 cgmath = "0.17"
