@@ -5,7 +5,7 @@ Config(
         camera_turn_multiplier: 0.12,
     ),
     world: (
-        preset: OneChunkWonder,
+        preset: FlatLands,
     ),
     simulation: (
         initial_entities: [
@@ -20,5 +20,7 @@ Config(
                 size: (1.1, 0.75, 1.85),
             ),
         ],
+        random_count: 10,
+        move_speed: 7.0,
      )
 )

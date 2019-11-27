@@ -12,12 +12,8 @@ unit = {path = "../unit"}
 physics = {path = "../physics"}
 config = {path = "../config"}
 debug-draw = { path = "../physics/debug-draw" }
-specs-derive = "0.4"
 cgmath = "0.17"
 log = "0.4"
 env_logger = "0.7"
 rand = "0.7"
-
-[dependencies.specs]
-version = "0.15"
-default-features = false # disable parallelization
+pyro = "0.2"

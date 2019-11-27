@@ -4,6 +4,7 @@ use std::time::Instant;
 use bulletc_sys as ffi;
 use unit::world::WorldPoint;
 
+use cgmath::Vector3;
 use crate::collider::Collider;
 use crate::TICKS_PER_SECOND;
 use std::ptr::null_mut;
@@ -75,15 +76,61 @@ impl PhysicsWorld {
         }
     }
 
-    pub fn position(&self, collider: &Collider) -> Option<[f32; 3]> {
-        let mut pos = [0.0f32; 3];
-        let ret =
-            unsafe { ffi::entity_collider_position(collider.collider, &mut pos[0] as *mut f32) };
-        if ret == 0 {
-            Some(pos)
+    pub fn sync_from(
+        &self,
+        collider: &Collider,
+        pos: &mut WorldPoint,
+        rot: &mut Vector3<f32>,
+    ) -> bool {
+        let mut ffi_pos = [0.0f32; 3];
+        let mut ffi_rot = [0.0f32; 3];
+
+        let ret = unsafe {
+            ffi::entity_collider_get(
+                collider.collider,
+                &mut ffi_pos[0] as *mut f32,
+                &mut ffi_rot[0] as *mut f32,
+            )
+        };
+
+        if ret != 0 {
+            false
         } else {
-            None
+            // TODO probably kinda slow
+
+            pos.0 = ffi_pos[0];
+            pos.1 = ffi_pos[1];
+            pos.2 = ffi_pos[2];
+
+            rot.x = ffi_rot[0];
+            rot.y = ffi_rot[1];
+            rot.z = ffi_rot[2];
+
+            true
         }
+    }
+
+    pub fn sync_to(
+        &self,
+        collider: &Collider,
+        pos: &WorldPoint,
+        rot: &Vector3<f32>,
+        vel: &Vector3<f32>,
+    ) -> bool {
+        let ffi_pos: [f32; 3] = [pos.0, pos.1, pos.2];
+        let ffi_rot: [f32; 3] = [rot.x, rot.y, rot.z];
+        let ffi_vel: [f32; 3] = [vel.x, vel.y, vel.z];
+
+        let ret = unsafe {
+            ffi::entity_collider_set(
+                collider.collider,
+                &ffi_pos as *const f32,
+                &ffi_rot as *const f32,
+                &ffi_vel as *const f32,
+            )
+        };
+
+        ret == 0
     }
 
     pub fn set_debug_drawer(&mut self, enable: bool) {
@@ -98,6 +145,7 @@ impl PhysicsWorld {
         }
     }
 
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn debug_draw(&mut self, frame_blob: *mut c_void) {
         unsafe { ffi::dynworld_debug_draw(self.dynworld, frame_blob) }
     }

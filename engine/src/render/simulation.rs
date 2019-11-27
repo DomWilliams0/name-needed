@@ -6,7 +6,7 @@ use glium::{implement_vertex, Surface};
 use glium::{uniform, Frame};
 use glium_sdl2::SDL2Facade;
 
-use simulation::{Physical, Position, Renderer};
+use simulation::{Physical, Renderer, Transform};
 use world::{ViewPoint, WorldPoint};
 
 use crate::render::debug::{DebugShape, DebugShapes};
@@ -35,7 +35,7 @@ implement_vertex!(EntityInstanceAttributes, e_pos, e_color, e_model);
 
 pub struct SimulationRenderer {
     program: glium::Program,
-    entity_instances: Vec<(Position, Physical)>,
+    entity_instances: Vec<(Transform, Physical)>,
     entity_vertex_buf: glium::VertexBuffer<EntityInstanceAttributes>,
     entity_geometry: (glium::VertexBuffer<EntityVertex>, glium::IndexBuffer<u32>),
 
@@ -111,10 +111,10 @@ impl Renderer for SimulationRenderer {
         self.entity_instances.clear();
     }
 
-    fn entity(&mut self, pos: &Position, physical: &Physical) {
+    fn entity(&mut self, transform: &Transform, physical: &Physical) {
         // TODO for safety until it can be expanded
         assert!(self.entity_instances.len() < self.entity_instances.capacity());
-        self.entity_instances.push((*pos, *physical));
+        self.entity_instances.push((*transform, *physical));
     }
 
     fn finish(&mut self) {
@@ -130,7 +130,7 @@ impl Renderer for SimulationRenderer {
                 for (src, dest) in self.entity_instances.iter().zip(mapping.iter_mut()) {
                     // keep attribute position in world coordinates
                     dest.e_pos = {
-                        let WorldPoint(x, y, z) = src.0.pos;
+                        let WorldPoint(x, y, z) = src.0.position;
                         [x, y, z]
                     };
 
@@ -143,6 +143,7 @@ impl Renderer for SimulationRenderer {
 
                     let (sx, sy, sz) = src.1.dimensions;
                     let model = cgmath::Matrix4::from_nonuniform_scale(sx, sy, sz);
+                    // TODO rotation from transform
                     dest.e_model = model.into();
                 }
             }
@@ -172,7 +173,9 @@ impl Renderer for SimulationRenderer {
                 )
                 .unwrap();
         }
+    }
 
+    fn deinit(&mut self) {
         self.target = None;
     }
 

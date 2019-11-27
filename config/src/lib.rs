@@ -3,4 +3,4 @@ mod config;
 mod load;
 
 pub use self::config::*;
-pub use load::{get, init};
+pub use load::{get, init, load_time};

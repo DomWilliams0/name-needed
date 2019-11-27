@@ -23,14 +23,3 @@ impl WorldRef {
         (*self.0).borrow_mut()
     }
 }
-
-// just to satisfy specs, never used because we don't use more than 1 thread
-unsafe impl Send for WorldRef {}
-unsafe impl Sync for WorldRef {}
-
-// just to satisfy specs, never used
-impl Default for WorldRef {
-    fn default() -> Self {
-        unimplemented!()
-    }
-}

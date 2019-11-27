@@ -20,7 +20,6 @@ branches:
     only:
         - develop
         - master
-        - feature/#30-fix-travis
 
 install:
     - bash .travis-install-sdl2.sh
@@ -61,4 +60,5 @@ rust:
 script: |
         export RUST_BACKTRACE=1 &&
         cargo build --verbose --all &&
-        cargo test --verbose --all
+        cargo test --verbose --all &&
+        NN_LOG=debug cargo run --verbose --bin lite

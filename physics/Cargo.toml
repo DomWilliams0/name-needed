@@ -12,3 +12,4 @@ unit = { path = "../unit" }
 debug-draw = { path = "debug-draw" }
 log = "0.4"
 itertools = "0.8"
+cgmath = "0.17"

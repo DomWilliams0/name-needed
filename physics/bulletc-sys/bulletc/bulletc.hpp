@@ -28,7 +28,10 @@ struct entity_collider;
 struct entity_collider *entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3]);
 
 /// returns 0 on success
-int entity_collider_position(struct entity_collider *collider, float out[3]);
+int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[3]);
+
+/// returns 0 on success
+int entity_collider_set(struct entity_collider *collider, const float pos[3], const float rot[3], const float vel[3]);
 
 /// hello world example from bullet
 void hello_world_example();

@@ -1,27 +1,26 @@
-use specs::prelude::*;
-use specs_derive::Component;
+use std::os::raw::c_void;
 
+use debug_draw::{DebugDrawer, FrameBlob};
 use physics;
 use physics::Collider;
+use unit::world::WorldPoint;
 use world::{InnerWorldRefMut, WorldRef};
 
+use crate::ecs::*;
 use crate::render::{DebugRenderer, FrameRenderState};
-use crate::{Physical, Position, Renderer};
-use debug_draw::{DebugDrawer, FrameBlob};
-use std::os::raw::c_void;
-use unit::world::WorldPoint;
+use crate::{Physical, Renderer, Transform};
 
 /// Collisions and gravity
-#[derive(Component)]
-#[storage(VecStorage)]
 pub struct Physics {
-    collider: Collider,
+    pub collider: Collider,
 }
+
+impl Component for Physics {}
 
 impl Physics {
     /// position = center position
-    pub fn new(mut world: InnerWorldRefMut, position: &Position, physical: &Physical) -> Self {
-        let pos = position.pos;
+    pub fn new(mut world: InnerWorldRefMut, transform: &Transform, physical: &Physical) -> Self {
+        let pos = transform.position;
         let dims = physical.dimensions;
         let collider = world.physics_world_mut().add_entity(pos, dims);
 
@@ -31,15 +30,9 @@ impl Physics {
 
 pub struct PhysicsSystem;
 
-impl<'a> System<'a> for PhysicsSystem {
-    type SystemData = (
-        WriteStorage<'a, Position>,
-        ReadStorage<'a, Physics>,
-        Read<'a, WorldRef>,
-    );
-
-    fn run(&mut self, (mut pos, phys, world): Self::SystemData) {
-        let mut world = world.borrow_mut();
+impl System for PhysicsSystem {
+    fn tick_system(&mut self, data: &TickData) {
+        let mut world = data.voxel_world.borrow_mut();
         let physics_world = world.physics_world_mut();
 
         // step physics world
@@ -47,20 +40,17 @@ impl<'a> System<'a> for PhysicsSystem {
 
         // handle collision events
         physics_world.handle_collision_events();
-
-        // TODO sync transform from physics position
-        for (mut pos, phys) in (&mut pos, &phys).join() {
-            let phys_pos: [f32; 3] = physics_world
-                .position(&phys.collider)
-                .expect("body should exist") // TODO it might not
-                .into();
-            pos.pos = phys_pos.into();
-        }
     }
 }
 
 impl<'a, R: Renderer> DebugRenderer<R> for DebugDrawer {
-    fn render(&mut self, renderer: &mut R, world: WorldRef, _frame_state: &FrameRenderState<R>) {
+    fn render(
+        &mut self,
+        renderer: &mut R,
+        world: WorldRef,
+        _ecs_world: &EcsWorld,
+        _frame_state: &FrameRenderState<R>,
+    ) {
         let mut draw_line = |from: WorldPoint, to: WorldPoint, color| {
             renderer.debug_add_line(from.into(), to.into(), color);
         };

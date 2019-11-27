@@ -1,13 +1,16 @@
 use config::WorldPreset;
+
 use crate::block::{BlockHeight, BlockType};
 use crate::chunk::CHUNK_SIZE;
 use crate::{ChunkBuilder, World};
+use itertools::Itertools;
 
 pub fn from_config() -> World {
     match config::get().world.preset {
         WorldPreset::OneChunkWonder => one_chunk_wonder(),
         WorldPreset::MultiChunkWonder => multi_chunk_wonder(),
         WorldPreset::OneBlockWonder => one_block_wonder(),
+        WorldPreset::FlatLands => flat_lands(),
     }
 }
 
@@ -103,4 +106,19 @@ pub fn one_block_wonder() -> World {
         .build((0, 0));
 
     World::from_chunks(vec![chunk])
+}
+
+/// Multiple flat chunks at z=0
+pub fn flat_lands() -> World {
+    let chunks = (-2..4)
+        .flat_map(|x| {
+            (-2..2).map(move |y| {
+                ChunkBuilder::new()
+                    .fill_slice(0, BlockType::Stone)
+                    .build((x, y))
+            })
+        })
+        .collect_vec();
+
+    World::from_chunks(chunks)
 }

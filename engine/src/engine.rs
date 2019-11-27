@@ -10,10 +10,10 @@ use world::{WorldRef, WorldViewer};
 
 use crate::render::{self, GliumRenderer, SimulationRenderer};
 
-pub struct Engine<'a> {
+pub struct Engine {
     sdl: Sdl,
     renderer: GliumRenderer,
-    simulation: Simulation<'a, SimulationRenderer>,
+    simulation: Simulation<SimulationRenderer>,
 }
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ enum KeyEvent {
     Up(Keycode),
 }
 
-impl<'a> Engine<'a> {
+impl Engine {
     /// Panics if SDL or glium initialisation fails
     pub fn new(world: WorldRef) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");

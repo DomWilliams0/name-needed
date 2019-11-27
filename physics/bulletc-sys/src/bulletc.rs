@@ -599,9 +599,19 @@ extern "C" {
 }
 extern "C" {
     #[doc = " returns 0 on success"]
-    pub fn entity_collider_position(
+    pub fn entity_collider_get(
         collider: *mut entity_collider,
-        out: *mut f32,
+        pos: *mut f32,
+        rot: *mut f32,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    #[doc = " returns 0 on success"]
+    pub fn entity_collider_set(
+        collider: *mut entity_collider,
+        pos: *const f32,
+        rot: *const f32,
+        vel: *const f32,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {

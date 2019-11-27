@@ -47,6 +47,8 @@ pub(crate) struct AreaPath(pub Vec<AreaPathNode>);
 #[derive(Debug)]
 pub struct WorldPath(pub Vec<(WorldPosition, EdgeCost)>);
 
+pub type WorldPathSlice<'a> = &'a [(WorldPosition, EdgeCost)];
+
 // ----
 
 impl IntoIterator for AreaPath {

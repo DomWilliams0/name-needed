@@ -68,6 +68,9 @@ struct entity_collider {
     }
 };
 
+#define COL_WORLD (1u << 0u)
+#define COL_ENTITIES (1u << 1u)
+
 // -------
 
 struct dynworld *dynworld_create(float gravity) {
@@ -143,7 +146,7 @@ slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[
     collider->slab_body = new btRigidBody(desc);
 
     // add to world
-    world->dynamicsWorld->addRigidBody(collider->slab_body);
+    world->dynamicsWorld->addRigidBody(collider->slab_body, COL_WORLD, COL_ENTITIES);
 
     return collider;
 }
@@ -153,34 +156,71 @@ struct entity_collider *entity_collider_create(struct dynworld *world, const flo
     btVector3 pos(center[0], center[1], center[2]);
 
     btBoxShape *shape = new btBoxShape(dims); // TODO add to struct
-    btRigidBody::btRigidBodyConstructionInfo desc(1.0, nullptr, shape);
+    btRigidBody::btRigidBodyConstructionInfo desc(2.0, nullptr, shape);
+    desc.m_friction = 0.2;
+    desc.m_linearDamping = 0.8;
     desc.m_startWorldTransform.setOrigin(pos);
     btRigidBody *rb = new btRigidBody(desc);
 
     // only rotate in z axis
     rb->setAngularFactor(btVector3(0.0, 0.0, 1.0));
 
-    // add to work
-    world->dynamicsWorld->addRigidBody(rb); // TODO collision group
+    // add to world
+    world->dynamicsWorld->addRigidBody(rb, COL_ENTITIES, COL_WORLD);
 
     return new entity_collider(rb);
 }
 
-int entity_collider_position(struct entity_collider *collider, float out[3]) {
+int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[3]) {
     int ret = -1;
 
     if (collider != nullptr && collider->body != nullptr) {
         const btTransform &transform = collider->body->getInterpolationWorldTransform();
-        const btVector3 &pos = transform.getOrigin();
+        const btVector3 &position = transform.getOrigin();
 
-        out[0] = pos.x();
-        out[1] = pos.y();
-        out[2] = pos.z();
+        btVector3 fwd(0.0, 1.0, 0.0); // y = forwards
+        btVector3 rotation = fwd * transform.getBasis();
+
+        pos[0] = position.x();
+        pos[1] = position.y();
+        pos[2] = position.z();
+
+        rot[0] = rotation.x();
+        rot[1] = rotation.y();
+        rot[2] = rotation.z();
         ret = 0;
     }
 
     return ret;
 }
+
+int entity_collider_set(struct entity_collider *collider, const float pos[3], const float rot[3], const float vel[3]) {
+    int ret = -1;
+
+    if (collider != nullptr && collider->body != nullptr) {
+        btTransform transform = collider->body->getCenterOfMassTransform();
+
+        btVector3 new_pos(pos[0], pos[1], pos[2]);
+        transform.setOrigin(new_pos);
+
+        // TODO global constant if this actually works
+        // TODO rotation AFTER debug rendering of velocity and movement target
+        btVector3 new_rot_vec(rot[0], rot[1], rot[2]);
+        btVector3 fwd(0.0, 1.0, 0.0); // y = forwards
+        btScalar angle = fwd.angle(new_rot_vec);
+        btQuaternion new_rot(btVector3(0.0, 0.0, 1.0), angle);
+        //transform.setRotation(new_rot);
+        collider->body->setCenterOfMassTransform(transform);
+
+        btVector3 new_vel(vel[0], vel[1], vel[2]);
+        collider->body->applyCentralForce(new_vel);
+
+        ret = 0;
+    }
+
+    return ret;
+}
+
 void hello_world_example() {
 ///-----includes_end-----
 

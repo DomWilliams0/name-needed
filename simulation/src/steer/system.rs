@@ -1,19 +1,19 @@
 use log::debug;
-use specs::prelude::*;
-use specs_derive::Component;
 
-use crate::movement::Velocity;
-use crate::steer::behaviour::{Arrive, CompleteAction, Nop, Seek};
-use crate::steer::SteeringBehaviour;
-use crate::Position;
 use world::WorldPoint;
 
+use crate::ecs::*;
+use crate::movement::DesiredVelocity;
+use crate::steer::behaviour::{Arrive, CompleteAction, Nop, Seek};
+use crate::steer::SteeringBehaviour;
+use crate::Transform;
+
 /// Steering behaviour
-#[derive(Component)]
-#[storage(VecStorage)]
 pub struct Steering {
     pub behaviour: SteeringBehaviour,
 }
+
+impl Component for Steering {}
 
 impl Default for Steering {
     fn default() -> Self {
@@ -43,21 +43,20 @@ impl Steering {
 
 pub struct SteeringSystem;
 
-impl<'a> System<'a> for SteeringSystem {
-    type SystemData = (
-        ReadStorage<'a, Position>,
-        WriteStorage<'a, Steering>,
-        WriteStorage<'a, Velocity>,
-    );
-
-    fn run(&mut self, (pos, mut steer, mut vel): Self::SystemData) {
-        for (pos, steer, vel) in (&pos, &mut steer, &mut vel).join() {
-            if let CompleteAction::Stop = steer.behaviour.tick(*pos, vel) {
-                debug!("entity finished {:?}", steer.behaviour);
-
-                debug!("reverting to default steering behaviour");
-                steer.behaviour = SteeringBehaviour::default();
-            }
-        }
+impl System for SteeringSystem {
+    fn tick_system(&mut self, data: &TickData) {
+        data.ecs_world
+            .matcher_with_entities::<All<(Read<Transform>, Write<Steering>, Write<DesiredVelocity>)>>(
+            )
+            .for_each(|(e, (transform, steer, vel))| {
+                if let CompleteAction::Stop = steer.behaviour.tick(transform, vel) {
+                    debug!(
+                        "{}: finished steering {:?}, reverting to default behaviour",
+                        NiceEntity(e),
+                        steer.behaviour
+                    );
+                    steer.behaviour = SteeringBehaviour::default();
+                }
+            });
     }
 }

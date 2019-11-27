@@ -1,9 +1,9 @@
 use cgmath::{MetricSpace, Point3};
-use crate::Position;
-use world::{WorldPath, WorldPoint, WorldPosition};
+
+use world::{WorldPath, WorldPathSlice, WorldPoint, WorldPosition};
 
 pub struct PathFollowing {
-    pub path: WorldPath,
+    path: WorldPath,
     next: usize,
     changed: bool,
 }
@@ -17,7 +17,7 @@ impl PathFollowing {
         }
     }
 
-    pub fn next_waypoint(&mut self, current_pos: &Position) -> Option<(WorldPosition, bool)> {
+    pub fn next_waypoint(&mut self, current_pos: &WorldPoint) -> Option<(WorldPosition, bool)> {
         let mut is_final = false;
         let mut changed = false;
 
@@ -25,9 +25,9 @@ impl PathFollowing {
         let (waypoint, _cost) = &self.path.0[self.next];
         let distance2 = {
             let from = Point3 {
-                x: current_pos.pos.0,
-                y: current_pos.pos.1,
-                z: current_pos.pos.2,
+                x: current_pos.0,
+                y: current_pos.1,
+                z: current_pos.2,
             };
 
             let waypoint = WorldPoint::from(*waypoint);
@@ -56,5 +56,9 @@ impl PathFollowing {
 
     pub fn changed(&self) -> bool {
         self.changed
+    }
+
+    pub fn path_remaining(&self) -> WorldPathSlice {
+        &self.path.0[self.next..]
     }
 }

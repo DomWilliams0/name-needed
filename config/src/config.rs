@@ -24,11 +24,14 @@ pub enum WorldPreset {
     OneChunkWonder,
     MultiChunkWonder,
     OneBlockWonder,
+    FlatLands,
 }
 
 #[derive(Deserialize)]
 pub struct Simulation {
     pub initial_entities: Vec<EntityDescriptor>,
+    pub random_count: u32,
+    pub move_speed: f32,
 }
 
 #[derive(Deserialize)]

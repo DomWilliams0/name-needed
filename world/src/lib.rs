@@ -9,7 +9,7 @@ mod viewer;
 mod world;
 mod world_ref;
 
-pub use self::area::{EdgeCost, WorldPath};
+pub use self::area::{EdgeCost, WorldPath, WorldPathSlice};
 pub use self::chunk::*;
 pub use self::mesh::Vertex;
 pub use self::viewer::{SliceRange, WorldViewer};

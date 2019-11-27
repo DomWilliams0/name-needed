@@ -31,8 +31,8 @@ use cgmath::Vector3;
 pub use cost::EdgeCost;
 use crate::chunk::slab::SlabIndex;
 use crate::ChunkPosition;
-pub use path::WorldPath;
 pub(crate) use path::{AreaPath, AreaPathNode};
+pub use path::{WorldPath, WorldPathSlice};
 
 impl SlabAreaIndex {
     pub const UNINITIALIZED: SlabAreaIndex = SlabAreaIndex(0);

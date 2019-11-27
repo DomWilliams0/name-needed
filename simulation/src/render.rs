@@ -1,16 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use specs::prelude::*;
-use specs_derive::Component;
-
 use world::{SliceRange, ViewPoint, WorldRef};
 
-use crate::movement::Position;
+use crate::ecs::*;
+use crate::movement::Transform;
 
 /// Physical attributes to be rendered
-#[derive(Component, Debug, Copy, Clone)]
-#[storage(VecStorage)]
+#[derive(Debug, Copy, Clone)]
 pub struct Physical {
     /// temporary simple color
     pub color: (u8, u8, u8),
@@ -19,16 +16,24 @@ pub struct Physical {
     pub dimensions: (f32, f32, f32),
 }
 
+impl Component for Physical {}
+
 pub trait Renderer {
     type Target;
 
+    /// Initialize frame rendering
     fn init(&mut self, _target: Rc<RefCell<Self::Target>>) {}
 
+    /// Start rendering simulation
     fn start(&mut self) {}
 
-    fn entity(&mut self, pos: &Position, physical: &Physical);
+    fn entity(&mut self, transform: &Transform, physical: &Physical);
 
+    /// Finish rendering simulation
     fn finish(&mut self) {}
+
+    /// End rendering frame
+    fn deinit(&mut self) {}
 
     // ---
 
@@ -62,26 +67,33 @@ pub(crate) struct RenderSystem<'a, R: Renderer> {
     pub frame_state: FrameRenderState<R>,
 }
 
-impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
-    type SystemData = (ReadStorage<'a, Position>, ReadStorage<'a, Physical>);
-
-    fn run(&mut self, (pos, physical): Self::SystemData) {
-        for (pos, physical) in (&pos, &physical).join() {
-            if self.frame_state.slices.contains(pos.slice()) {
-                self.renderer.entity(pos, physical);
-            }
-        }
+impl<'a, R: Renderer> System for RenderSystem<'a, R> {
+    fn tick_system(&mut self, data: &TickData) {
+        data.ecs_world
+            .matcher::<All<(Read<Transform>, Read<Physical>)>>()
+            .for_each(|(transform, physical)| {
+                if self.frame_state.slices.contains(transform.slice()) {
+                    self.renderer.entity(transform, physical);
+                }
+            });
     }
 }
 
 pub trait DebugRenderer<R: Renderer> {
-    fn render(&mut self, renderer: &mut R, world: WorldRef, frame_state: &FrameRenderState<R>);
+    fn render(
+        &mut self,
+        renderer: &mut R,
+        world: WorldRef,
+        ecs_world: &EcsWorld,
+        frame_state: &FrameRenderState<R>,
+    );
 }
 
 #[allow(dead_code)]
 pub mod dummy {
     use world::{ViewPoint, WorldRef};
 
+    use crate::ecs::EcsWorld;
     use crate::render::{DebugRenderer, FrameRenderState};
     use crate::Renderer;
 
@@ -92,6 +104,7 @@ pub mod dummy {
             &mut self,
             renderer: &mut R,
             _world: WorldRef,
+            _ecs_world: &EcsWorld,
             _frame_state: &FrameRenderState<R>,
         ) {
             renderer.debug_add_line(

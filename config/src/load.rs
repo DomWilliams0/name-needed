@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use log::*;
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
@@ -14,12 +14,23 @@ use crate::config::Config;
 
 type ConfigResult<T> = std::result::Result<T, String>;
 
-#[derive(Default)]
 pub(crate) struct RawConfig {
     pub parsed: Option<Config>,
     pub path: Option<PathBuf>,
+    pub load_time: Instant,
 
     watcher: Option<RecommendedWatcher>,
+}
+
+impl Default for RawConfig {
+    fn default() -> Self {
+        Self {
+            load_time: Instant::now(),
+            parsed: None,
+            path: None,
+            watcher: None,
+        }
+    }
 }
 
 impl RawConfig {
@@ -35,6 +46,7 @@ impl RawConfig {
     pub fn parse_bytes(&mut self, bytes: &str) -> ConfigResult<()> {
         let parsed = ron::de::from_str(bytes).map_err(|e| format!("parsing config: {}", e))?;
         self.parsed = Some(parsed);
+        self.load_time = Instant::now();
 
         Ok(())
     }
@@ -126,4 +138,8 @@ pub fn get<'a>() -> ConfigRef<'a> {
         // intentional panic - this only happens if the config fails on its initial load
         panic!("config must be loaded")
     }
+}
+
+pub fn load_time() -> Instant {
+    CONFIG.lock().unwrap().load_time
 }
