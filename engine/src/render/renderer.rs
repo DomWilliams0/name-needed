@@ -121,7 +121,7 @@ impl GliumRenderer {
     }
 
     /// Calculates camera projection, renders world then entities
-    pub fn render(&mut self, simulation: &mut Simulation<SimulationRenderer>, _interpolation: f64) {
+    pub fn render(&mut self, simulation: &mut Simulation<SimulationRenderer>, interpolation: f64) {
         let target = Rc::new(RefCell::new(FrameTarget {
             frame: self.display.draw(),
             projection: Default::default(),
@@ -182,7 +182,7 @@ impl GliumRenderer {
             self.world_viewer.range(),
             target.clone(),
             &mut self.simulation_renderer,
-            _interpolation,
+            interpolation,
         );
 
         // done

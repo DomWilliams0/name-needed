@@ -82,7 +82,11 @@ void dynworld_destroy(struct dynworld *world) {
 }
 
 void dynworld_step(struct dynworld *world, float elapsed_seconds, float fixed_rate) {
-    world->dynamicsWorld->stepSimulation(elapsed_seconds, 2, fixed_rate);
+    world->dynamicsWorld->stepSimulation(elapsed_seconds, 1, fixed_rate);
+}
+
+void dynworld_step_render_only(struct dynworld *world, float elapsed_seconds) {
+    world->dynamicsWorld->stepSimulation(elapsed_seconds);
 }
 
 void dynworld_set_debug_drawer(struct dynworld *world, fn_draw_line draw_line) {
@@ -193,6 +197,24 @@ int entity_collider_get(struct entity_collider *collider, float pos[3], float ro
 
     return ret;
 }
+
+int entity_collider_get_pos(struct entity_collider *collider, float pos[3]) {
+    int ret = -1;
+
+    if (collider != nullptr && collider->body != nullptr) {
+        const btTransform &transform = collider->body->getInterpolationWorldTransform();
+        const btVector3 &position = transform.getOrigin();
+
+        pos[0] = position.x();
+        pos[1] = position.y();
+        pos[2] = position.z();
+
+        ret = 0;
+    }
+
+    return ret;
+}
+
 
 int entity_collider_set(struct entity_collider *collider, const float pos[3], const float rot[3], const float vel[3]) {
     int ret = -1;

@@ -553,6 +553,9 @@ extern "C" {
 extern "C" {
     pub fn dynworld_step(world: *mut dynworld, elapsed_seconds: f32, fixed_rate: f32);
 }
+extern "C" {
+    pub fn dynworld_step_render_only(world: *mut dynworld, elapsed_seconds: f32);
+}
 pub type fn_draw_line = ::std::option::Option<
     unsafe extern "C" fn(
         blob: *mut ::std::os::raw::c_void,
@@ -603,6 +606,13 @@ extern "C" {
         collider: *mut entity_collider,
         pos: *mut f32,
         rot: *mut f32,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    #[doc = " returns 0 on success"]
+    pub fn entity_collider_get_pos(
+        collider: *mut entity_collider,
+        pos: *mut f32,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {

@@ -1,17 +1,23 @@
 use std::os::raw::c_void;
+use std::ptr::null_mut;
 use std::time::Instant;
+
+use cgmath::Vector3;
 
 use bulletc_sys as ffi;
 use unit::world::WorldPoint;
 
-use cgmath::Vector3;
 use crate::collider::Collider;
 use crate::TICKS_PER_SECOND;
-use std::ptr::null_mut;
 
 pub struct PhysicsWorld {
     dynworld: *mut ffi::dynworld,
     last_tick: Instant,
+}
+
+pub enum StepType {
+    RenderOnly,
+    Tick,
 }
 
 impl PhysicsWorld {
@@ -64,15 +70,33 @@ impl PhysicsWorld {
 
     pub fn handle_collision_events(&self) {}
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, step_type: StepType) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_tick).as_secs_f32();
-        self.last_tick = now;
 
         const TICK_RATE: f32 = 1.0 / TICKS_PER_SECOND as f32;
 
-        unsafe {
-            ffi::dynworld_step(self.dynworld, elapsed, TICK_RATE);
+        match step_type {
+            StepType::RenderOnly => unsafe {
+                ffi::dynworld_step_render_only(self.dynworld, elapsed)
+            },
+            StepType::Tick => {
+                self.last_tick = now;
+                unsafe { ffi::dynworld_step(self.dynworld, elapsed, TICK_RATE) }
+            }
+        }
+    }
+
+    pub fn sync_render_pos_from(&self, collider: &Collider) -> Option<WorldPoint> {
+        let mut ffi_pos = [0.0f32; 3];
+
+        let ret =
+            unsafe { ffi::entity_collider_get_pos(collider.collider, &mut ffi_pos[0] as *mut f32) };
+
+        if ret != 0 {
+            None
+        } else {
+            Some(WorldPoint::from(ffi_pos))
         }
     }
 

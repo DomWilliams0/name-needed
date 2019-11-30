@@ -142,7 +142,7 @@ impl<R: Renderer> Simulation<R> {
         slices: SliceRange,
         target: Rc<RefCell<R::Target>>,
         renderer: &mut R,
-        _interpolation: f64,
+        interpolation: f64,
     ) {
         let frame_state = FrameRenderState { target, slices };
 
@@ -156,6 +156,7 @@ impl<R: Renderer> Simulation<R> {
                 let mut render_system = RenderSystem {
                     renderer,
                     frame_state: frame_state.clone(),
+                    interpolation,
                 };
 
                 render_system.tick_system(&self.tick_data());
@@ -163,9 +164,8 @@ impl<R: Renderer> Simulation<R> {
             renderer.finish();
         }
 
-        // TODO RenderData instead of TickData with intepolation/dt etc
-
         // render debug shapes
+        // TODO needs interpolation?
         {
             renderer.debug_start();
 

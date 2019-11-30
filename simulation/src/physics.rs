@@ -2,7 +2,7 @@ use std::os::raw::c_void;
 
 use debug_draw::{DebugDrawer, FrameBlob};
 use physics;
-use physics::Collider;
+use physics::{Collider, StepType};
 use unit::world::WorldPoint;
 use world::{InnerWorldRefMut, WorldRef};
 
@@ -36,7 +36,7 @@ impl System for PhysicsSystem {
         let physics_world = world.physics_world_mut();
 
         // step physics world
-        physics_world.step();
+        physics_world.step(StepType::Tick);
 
         // handle collision events
         physics_world.handle_collision_events();

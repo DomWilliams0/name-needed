@@ -5,6 +5,8 @@ use world::{SliceRange, ViewPoint, WorldRef};
 
 use crate::ecs::*;
 use crate::movement::Transform;
+use crate::physics::Physics;
+use physics::StepType;
 
 /// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
@@ -65,15 +67,34 @@ impl<R: Renderer> Clone for FrameRenderState<R> {
 pub(crate) struct RenderSystem<'a, R: Renderer> {
     pub renderer: &'a mut R,
     pub frame_state: FrameRenderState<R>,
+    pub interpolation: f64,
 }
 
 impl<'a, R: Renderer> System for RenderSystem<'a, R> {
     fn tick_system(&mut self, data: &TickData) {
+        let mut voxel_world = data.voxel_world.borrow_mut();
+        let physics_world = voxel_world.physics_world_mut();
+
+        physics_world.step(StepType::RenderOnly);
+
         data.ecs_world
-            .matcher::<All<(Read<Transform>, Read<Physical>)>>()
-            .for_each(|(transform, physical)| {
+            .matcher_with_entities::<All<(Read<Transform>, Read<Physical>)>>()
+            .for_each(move |(e, (transform, physical))| {
                 if self.frame_state.slices.contains(transform.slice()) {
-                    self.renderer.entity(transform, physical);
+                    // make copy
+                    let mut transform = *transform;
+
+                    if let Some(physics) = data.ecs_world.get_component::<Physics>(e) {
+                        // TODO these conditionals hurt
+
+                        if let Some(interpolated_pos) =
+                            physics_world.sync_render_pos_from(&physics.collider)
+                        {
+                            transform.position = interpolated_pos;
+                        }
+                    }
+
+                    self.renderer.entity(&transform, physical);
                 }
             });
     }

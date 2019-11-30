@@ -8,9 +8,6 @@ use crate::Transform;
 /// Syncs entity transforms to physics world pre-step
 pub struct SyncToPhysicsSystem;
 
-/// Syncs entity transforms back from physics world post-step
-pub struct SyncFromPhysicsSystem;
-
 impl System for SyncToPhysicsSystem {
     fn tick_system(&mut self, data: &TickData) {
         let mut w = data.voxel_world.borrow_mut();
@@ -35,6 +32,9 @@ impl System for SyncToPhysicsSystem {
             });
     }
 }
+
+/// Syncs entity transforms back from physics world post-step
+pub struct SyncFromPhysicsSystem;
 
 impl System for SyncFromPhysicsSystem {
     fn tick_system(&mut self, data: &TickData) {
