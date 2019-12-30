@@ -1,7 +1,7 @@
-use crate::World;
 use std::cell::{Ref, RefCell, RefMut};
-
 use std::rc::Rc;
+
+use crate::World;
 
 /// Reference counted reference to the world
 #[derive(Clone)]

@@ -1,5 +1,4 @@
-use cgmath::Vector3;
-
+use common::*;
 use world::{InnerWorldRef, WorldPoint, WorldPosition};
 
 use crate::ecs::*;
@@ -11,7 +10,7 @@ pub struct Transform {
     pub position: WorldPoint,
 
     /// Rotation
-    pub rotation: Vector3<f32>,
+    pub rotation: Vector3,
 }
 
 impl Component for Transform {}
@@ -28,7 +27,7 @@ impl Default for Transform {
 #[derive(Debug, Copy, Clone)]
 pub struct DesiredVelocity {
     /// Normalized
-    pub velocity: Vector3<f32>,
+    pub velocity: Vector3,
 }
 
 impl Component for DesiredVelocity {}

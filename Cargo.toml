@@ -1,10 +1,13 @@
 [workspace]
 
 members = [
+	"game",
+	"game-presets",
 	"engine",
 	"gameloop",
 	"world",
 	"config",
+	"common",
 	"simulation",
 	"unit",
 	"physics",

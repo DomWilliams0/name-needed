@@ -1,4 +1,4 @@
-use lazy_static::lazy_static;
+use common::*;
 
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::coordinate::world::WorldPosition;

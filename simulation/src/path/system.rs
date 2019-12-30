@@ -1,6 +1,4 @@
-use log::*;
-use rand::prelude::*;
-
+use common::*;
 use world::{BlockPosition, WorldPathSlice, CHUNK_SIZE};
 
 use crate::ecs::*;
@@ -75,7 +73,7 @@ pub struct TempPathAssignmentSystem;
 
 impl System for TempPathAssignmentSystem {
     fn tick_system(&mut self, data: &TickData) {
-        let mut rand = rand::thread_rng();
+        let mut rand = thread_rng();
         let world = data.voxel_world.borrow();
 
         data.ecs_world

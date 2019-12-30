@@ -15,14 +15,11 @@ config = {path = "../config"}
 simulation = {path = "../simulation"}
 gameloop = {path = "../gameloop"}
 unit = {path = "../unit"}
+common = {path = "../common"}
 sdl2 = "0.32"
 glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2"}
-cgmath = "0.17"
 enum-map = "0.6"
-num-traits = "0.2"
 float-ord = "0.2"
-log = {version = "0.4", features = ["release_max_level_info"]}
-env_logger = "0.7"
 
 [dependencies.glium]
 version = "0.25"

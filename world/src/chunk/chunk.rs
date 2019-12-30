@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Shl};
 
-use log::debug;
+use common::*;
 
 use crate::area::WorldArea;
 use crate::block::{Block, BlockType};

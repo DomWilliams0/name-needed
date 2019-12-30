@@ -2,9 +2,8 @@ use std::os::raw::c_void;
 use std::ptr::null_mut;
 use std::time::Instant;
 
-use cgmath::Vector3;
-
 use bulletc_sys as ffi;
+use common::*;
 use unit::world::WorldPoint;
 
 use crate::collider::Collider;
@@ -100,12 +99,7 @@ impl PhysicsWorld {
         }
     }
 
-    pub fn sync_from(
-        &self,
-        collider: &Collider,
-        pos: &mut WorldPoint,
-        rot: &mut Vector3<f32>,
-    ) -> bool {
+    pub fn sync_from(&self, collider: &Collider, pos: &mut WorldPoint, rot: &mut Vector3) -> bool {
         let mut ffi_pos = [0.0f32; 3];
         let mut ffi_rot = [0.0f32; 3];
 
@@ -138,8 +132,8 @@ impl PhysicsWorld {
         &self,
         collider: &Collider,
         pos: &WorldPoint,
-        rot: &Vector3<f32>,
-        vel: &Vector3<f32>,
+        rot: &Vector3,
+        vel: &Vector3,
     ) -> bool {
         let ffi_pos: [f32; 3] = [pos.0, pos.1, pos.2];
         let ffi_rot: [f32; 3] = [rot.x, rot.y, rot.z];

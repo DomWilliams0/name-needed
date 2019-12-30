@@ -1,5 +1,4 @@
-use cgmath::{MetricSpace, Point3};
-
+use common::*;
 use world::{WorldPath, WorldPathSlice, WorldPoint, WorldPosition};
 
 pub struct PathFollowing {

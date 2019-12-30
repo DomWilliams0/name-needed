@@ -2,13 +2,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use cgmath::{perspective, Deg, Matrix4, Point3, Vector3};
+use cgmath::perspective;
 use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
 use glium_sdl2::SDL2Facade;
-use log::{debug, info};
 
+use common::*;
 use simulation::Simulation;
 use unit;
 use world::{ChunkPosition, Vertex as WorldVertex, ViewPoint, WorldPoint, WorldViewer, CHUNK_SIZE};

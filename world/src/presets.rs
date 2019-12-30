@@ -1,9 +1,9 @@
 use config::WorldPreset;
 
+use common::*;
 use crate::block::{BlockHeight, BlockType};
 use crate::chunk::CHUNK_SIZE;
 use crate::{ChunkBuilder, World};
-use itertools::Itertools;
 
 pub fn from_config() -> World {
     match config::get().world.preset {

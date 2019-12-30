@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-use cgmath::MetricSpace;
-use cgmath::Vector3;
-use itertools::Itertools;
 use petgraph::algo::astar;
 use petgraph::graph::DiGraph;
+use petgraph::prelude::NodeIndex;
+
+use common::*;
 
 use crate::area::path::{AreaPath, AreaPathNode};
 use crate::area::{ChunkBoundary, EdgeCost, WorldArea};
 use crate::coordinate::world::WorldPosition;
 use crate::Chunk;
-use petgraph::prelude::NodeIndex;
 
 type AreaNavGraph = DiGraph<Node, Edge>;
 

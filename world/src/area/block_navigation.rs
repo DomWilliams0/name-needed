@@ -2,17 +2,16 @@
 
 use std::collections::HashMap;
 
-use cgmath::MetricSpace;
-use cgmath::Vector3;
-
 use petgraph::algo::astar;
 use petgraph::graph::NodeIndex;
+use petgraph::prelude::DiGraph;
+
+use common::*;
 
 use crate::area::path::BlockPath;
 use crate::area::EdgeCost;
 use crate::coordinate::world::ChunkPoint;
 use crate::BlockPosition;
-use petgraph::prelude::DiGraph;
 
 pub type BlockGraphType = DiGraph<Node, Edge>;
 
@@ -95,7 +94,7 @@ impl BlockGraph {
             _ => return None,
         };
 
-        let to_vec: Vector3<f32> = ChunkPoint::from(to).into();
+        let to_vec: Vector3 = ChunkPoint::from(to).into();
 
         match astar(
             &self.graph,
@@ -104,7 +103,7 @@ impl BlockGraph {
             |e| e.weight().0.weight(),
             |n| {
                 let node = self.graph.node_weight(n).unwrap();
-                let here_vec: Vector3<f32> = ChunkPoint::from(node.0).into();
+                let here_vec: Vector3 = ChunkPoint::from(node.0).into();
                 to_vec.distance2(here_vec) as i32
             },
         ) {

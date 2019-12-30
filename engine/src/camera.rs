@@ -1,8 +1,8 @@
-use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4, Point3, Vector3};
 use enum_map::{Enum, EnumMap};
 use num_traits::clamp;
 use sdl2::keyboard::Keycode;
+
+use common::*;
 
 const MOVE_SPEED: f32 = 0.2;
 
@@ -28,9 +28,9 @@ impl Direction {
 
 /// Only for debugging
 pub struct FreeRangeCamera {
-    pos: Point3<f32>,
-    dir: Vector3<f32>,
-    up: Vector3<f32>,
+    pos: Point3,
+    dir: Vector3,
+    up: Vector3,
 
     pitch: Deg<f32>,
     yaw: Deg<f32>,
@@ -40,7 +40,7 @@ pub struct FreeRangeCamera {
 }
 
 impl FreeRangeCamera {
-    pub fn new(pos: Point3<f32>) -> Self {
+    pub fn new(pos: Point3) -> Self {
         let mut cam = Self {
             pos,
             dir: -Vector3::unit_z(),

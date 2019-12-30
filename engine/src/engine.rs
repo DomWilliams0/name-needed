@@ -1,12 +1,12 @@
+use common::*;
 use glium_sdl2::DisplayBuild;
-use log::*;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
 
 use gameloop::{FrameAction, GameLoop};
 use simulation::{self, Simulation};
-use world::{WorldRef, WorldViewer};
+use world::WorldViewer;
 
 use crate::render::{self, GliumRenderer, SimulationRenderer};
 
@@ -24,7 +24,7 @@ enum KeyEvent {
 
 impl Engine {
     /// Panics if SDL or glium initialisation fails
-    pub fn new(world: WorldRef) -> Self {
+    pub fn new(simulation: Simulation<SimulationRenderer>) -> Self {
         let sdl = sdl2::init().expect("Failed to init SDL");
 
         let video = sdl.video().expect("Failed to init SDL video");
@@ -45,9 +45,7 @@ impl Engine {
 
         video.gl_attr().set_depth_size(24);
 
-        let renderer = GliumRenderer::new(display, WorldViewer::from_world(world.clone()));
-
-        let simulation = Simulation::new(world);
+        let renderer = GliumRenderer::new(display, WorldViewer::from_world(simulation.world()));
 
         Self {
             sdl,
@@ -124,13 +122,6 @@ impl Engine {
                 debug!(
                     "world is {} wireframe",
                     if wireframe { "now" } else { "no longer" }
-                )
-            }
-            KeyEvent::Down(Keycode::U) => {
-                let rendering = self.simulation.toggle_physics_debug_rendering();
-                debug!(
-                    "{} physics debug rendering",
-                    if rendering { "enabled" } else { "disabled" }
                 )
             }
             _ => {}

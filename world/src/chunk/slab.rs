@@ -1,3 +1,5 @@
+use physics::SlabCollider;
+
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::chunk::CHUNK_SIZE;
@@ -5,9 +7,9 @@ use crate::coordinate::dim::SmallUnsignedConstant;
 use crate::coordinate::world::SliceIndex;
 use crate::{grid::{Grid, GridImpl},
             grid_declare};
-use physics::SlabCollider;
 
 pub(crate) const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
+
 pub(crate) type SlabIndex = i32;
 
 grid_declare!(struct SlabGrid<SlabGridImpl, Block>,

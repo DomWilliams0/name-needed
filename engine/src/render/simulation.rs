@@ -6,6 +6,7 @@ use glium::{implement_vertex, Surface};
 use glium::{uniform, Frame};
 use glium_sdl2::SDL2Facade;
 
+use common::Matrix4;
 use simulation::{Physical, Renderer, Transform};
 use world::{ViewPoint, WorldPoint};
 
@@ -142,7 +143,7 @@ impl Renderer for SimulationRenderer {
                     ];
 
                     let (sx, sy, sz) = src.1.dimensions;
-                    let model = cgmath::Matrix4::from_nonuniform_scale(sx, sy, sz);
+                    let model = Matrix4::from_nonuniform_scale(sx, sy, sz);
                     // TODO rotation from transform
                     dest.e_model = model.into();
                 }

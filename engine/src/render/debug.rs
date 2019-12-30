@@ -1,11 +1,11 @@
 use std::cmp::{max, min};
 use std::ops::Range;
 
+use common::*;
 use glium::index::{NoIndices, PrimitiveType};
 use glium::uniforms::{AsUniformValue, Uniforms, UniformsStorage};
 use glium::{implement_vertex, uniform, DrawParameters, PolygonMode, Surface};
 use glium_sdl2::SDL2Facade;
-use log::warn;
 
 use world::ViewPoint;
 

@@ -1,3 +1,14 @@
+pub use area_navigation::AreaGraph;
+pub use block_navigation::BlockGraph;
+pub use boundary::ChunkBoundary;
+use common::Vector3;
+pub use cost::EdgeCost;
+pub(crate) use path::{AreaPath, AreaPathNode};
+pub use path::{WorldPath, WorldPathSlice};
+
+use crate::chunk::slab::SlabIndex;
+use crate::ChunkPosition;
+
 mod area_navigation;
 mod block_navigation;
 mod boundary;
@@ -23,16 +34,6 @@ pub(crate) struct WorldArea {
     pub slab: SlabIndex,
     pub area: SlabAreaIndex,
 }
-
-pub use area_navigation::AreaGraph;
-pub use block_navigation::BlockGraph;
-pub use boundary::ChunkBoundary;
-use cgmath::Vector3;
-pub use cost::EdgeCost;
-use crate::chunk::slab::SlabIndex;
-use crate::ChunkPosition;
-pub(crate) use path::{AreaPath, AreaPathNode};
-pub use path::{WorldPath, WorldPathSlice};
 
 impl SlabAreaIndex {
     pub const UNINITIALIZED: SlabAreaIndex = SlabAreaIndex(0);
@@ -65,7 +66,7 @@ impl ChunkArea {
     }
 }
 
-impl From<WorldArea> for Vector3<f32> {
+impl From<WorldArea> for Vector3 {
     fn from(area: WorldArea) -> Self {
         // is this good for estimating node cost?
         Vector3 {

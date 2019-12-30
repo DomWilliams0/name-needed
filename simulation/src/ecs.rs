@@ -1,8 +1,8 @@
 use std::fmt::{Display, Error, Formatter};
 use std::num::Wrapping;
 
-pub use pyro::{All, Read, Write};
-use pyro::{ComponentId, Entity, StorageId, Version};
+pub use pyro::{All, Entity, Read, Write};
+use pyro::{ComponentId, StorageId, Version};
 
 use world::WorldRef;
 
@@ -36,6 +36,7 @@ struct PyroEntity {
 
 impl Display for NiceEntity {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        // TODO this isnt reliable!
         let copy: PyroEntity = unsafe { std::mem::transmute(self.0) };
         write!(f, "Entity[{}:{}]", copy.version, copy.id)
     }

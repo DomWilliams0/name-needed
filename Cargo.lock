@@ -188,11 +188,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "config"
 version = "0.1.0"
 dependencies = [
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "notify 4.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "ron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -272,16 +284,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "config 0.1.0",
  "enum-map 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "float-ord 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gameloop 0.1.0",
  "glium 0.25.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "glium_sdl2 0.15.0 (git+https://github.com/DomWilliams0/glium-sdl2)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-traits 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "sdl2 0.32.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "simulation 0.1.0",
  "unit 0.1.0",
@@ -402,10 +411,32 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "game"
+version = "0.1.0"
+dependencies = [
+ "common 0.1.0",
+ "config 0.1.0",
+ "engine 0.1.0",
+ "game-presets 0.1.0",
+ "simulation 0.1.0",
+ "world 0.1.0",
+]
+
+[[package]]
+name = "game-presets"
+version = "0.1.0"
+dependencies = [
+ "common 0.1.0",
+ "config 0.1.0",
+ "simulation 0.1.0",
+ "world 0.1.0",
+]
+
+[[package]]
 name = "gameloop"
 version = "0.1.0"
 dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
 ]
 
 [[package]]
@@ -791,10 +822,8 @@ name = "physics"
 version = "0.1.0"
 dependencies = [
  "bulletc-sys 0.1.0",
- "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "debug-draw 0.1.0",
- "itertools 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "unit 0.1.0",
 ]
 
@@ -1161,14 +1190,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "simulation"
 version = "0.1.0"
 dependencies = [
- "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "config 0.1.0",
  "debug-draw 0.1.0",
- "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "game-presets 0.1.0",
  "physics 0.1.0",
  "pyro 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "unit 0.1.0",
  "world 0.1.0",
 ]
@@ -1269,7 +1296,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "unit"
 version = "0.1.0"
 dependencies = [
- "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "float-cmp 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1357,13 +1384,10 @@ dependencies = [
 name = "world"
 version = "0.1.0"
 dependencies = [
- "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
  "config 0.1.0",
  "float-cmp 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "generator 0.6.19 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "nd_iter 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordered-float 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",

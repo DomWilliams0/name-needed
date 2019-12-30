@@ -1,5 +1,4 @@
-use log::*;
-
+use common::*;
 use unit;
 
 use crate::chunk::slab::{Slab, SLAB_SIZE};
@@ -159,6 +158,7 @@ const fn min_const(a: usize, b: usize) -> usize {
     [a, b][(a > b) as usize]
 }
 
+#[allow(clippy::many_single_char_names)]
 /// Based off this[0] and its insane javascript implementation[1]. An attempt was made to make it
 /// more idiomatic and less dense but it stops working in subtle ways so I'm leaving it at this :^)
 ///  - [0] https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/

@@ -1,4 +1,4 @@
-use log::*;
+use common::*;
 
 use crate::ecs::*;
 use crate::movement::DesiredVelocity;

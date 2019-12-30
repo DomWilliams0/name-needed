@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use physics::StepType;
 use world::{SliceRange, ViewPoint, WorldRef};
 
 use crate::ecs::*;
 use crate::movement::Transform;
 use crate::physics::Physics;
-use physics::StepType;
 
 /// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
@@ -140,4 +140,16 @@ pub mod dummy {
             );
         }
     }
+}
+
+pub struct NullRenderer;
+
+impl Renderer for NullRenderer {
+    type Target = ();
+
+    fn entity(&mut self, transform: &Transform, physical: &Physical) {}
+
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8)) {}
+
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8)) {}
 }

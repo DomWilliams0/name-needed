@@ -6,6 +6,8 @@ pub mod world {
 
     use derive_more::*;
 
+    use common::*;
+
     use super::dim::CHUNK_SIZE;
 
     /// A slice of blocks in a chunk, z coordinate
@@ -144,7 +146,7 @@ pub mod world {
         }
     }
 
-    impl From<WorldPoint> for cgmath::Vector3<f32> {
+    impl From<WorldPoint> for Vector3 {
         fn from(p: WorldPoint) -> Self {
             Self {
                 x: p.0,
@@ -166,7 +168,7 @@ pub mod world {
         }
     }
 
-    impl From<&WorldPosition> for cgmath::Point3<f32> {
+    impl From<&WorldPosition> for Point3 {
         fn from(pos: &WorldPosition) -> Self {
             Self {
                 x: pos.0 as f32,
@@ -175,7 +177,8 @@ pub mod world {
             }
         }
     }
-    impl From<ChunkPoint> for cgmath::Vector3<f32> {
+
+    impl From<ChunkPoint> for Vector3 {
         fn from(p: ChunkPoint) -> Self {
             let ChunkPoint(x, y, z) = p;
             cgmath::Vector3 { x, y, z }

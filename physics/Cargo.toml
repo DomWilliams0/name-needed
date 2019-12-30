@@ -10,6 +10,4 @@ edition = "2018"
 bulletc-sys = { path = "bulletc-sys" }
 unit = { path = "../unit" }
 debug-draw = { path = "debug-draw" }
-log = "0.4"
-itertools = "0.8"
-cgmath = "0.17"
+common = { path = "../common" }

@@ -1,5 +1,6 @@
-use gameloop::GameLoop;
 use std::time::Duration;
+
+use gameloop::GameLoop;
 
 #[test]
 #[ignore]

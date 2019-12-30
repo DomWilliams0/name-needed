@@ -1,3 +1,4 @@
+use common::*;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
@@ -5,10 +6,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use log::*;
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-
-use lazy_static::lazy_static;
 
 use crate::config::Config;
 
@@ -68,6 +66,22 @@ lazy_static! {
     static ref CONFIG: Mutex<RawConfig> = Mutex::new(RawConfig::default());
 }
 
+fn lock<'a>() -> MutexGuard<'a, RawConfig> {
+    if cfg!(debug_assertions) {
+        // try a few times then panic instead of blocking
+        for _ in 0..3 {
+            match CONFIG.try_lock() {
+                Ok(guard) => return guard,
+                Err(_) => continue,
+            }
+        }
+
+        panic!("config lock is already held")
+    } else {
+        CONFIG.lock().unwrap()
+    }
+}
+
 pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
     let path = path.into()
         .canonicalize()
@@ -77,7 +91,7 @@ pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
         return Err("not a file".to_owned());
     }
 
-    let mut raw = CONFIG.lock().unwrap();
+    let mut raw = lock();
     raw.path = Some(path.clone());
 
     // watch directory for changes
@@ -120,7 +134,7 @@ pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
 
             if reload {
                 info!("config was modified, reloading");
-                if let Err(e) = CONFIG.lock().unwrap().parse_file() {
+                if let Err(e) = lock().parse_file() {
                     warn!("failed to reload config: {}", e);
                 }
             }
@@ -131,7 +145,7 @@ pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
 }
 
 pub fn get<'a>() -> ConfigRef<'a> {
-    let guard = CONFIG.lock().unwrap();
+    let guard = lock();
     if guard.parsed.as_ref().is_some() {
         ConfigRef { config: guard }
     } else {
@@ -141,5 +155,5 @@ pub fn get<'a>() -> ConfigRef<'a> {
 }
 
 pub fn load_time() -> Instant {
-    CONFIG.lock().unwrap().load_time
+    lock().load_time
 }

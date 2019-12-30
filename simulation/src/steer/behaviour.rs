@@ -1,9 +1,10 @@
-use cgmath::prelude::*;
-use cgmath::Vector3;
+use num_traits::Zero;
+
+use common::*;
+use world::WorldPoint;
 
 use crate::movement::DesiredVelocity;
 use crate::Transform;
-use world::WorldPoint;
 
 #[derive(Debug)]
 pub enum SteeringBehaviour {
@@ -63,8 +64,8 @@ pub struct Seek {
 
 impl DoASteer for Seek {
     fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction {
-        let target: Vector3<f32> = self.target.into();
-        let current_pos: Vector3<f32> = transform.position.into();
+        let target: Vector3 = self.target.into();
+        let current_pos: Vector3 = transform.position.into();
 
         let delta = (target - current_pos).normalize();
 
@@ -87,8 +88,8 @@ pub struct Arrive {
 
 impl DoASteer for Arrive {
     fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction {
-        let target: Vector3<f32> = self.target.into();
-        let current_pos: Vector3<f32> = transform.position.into();
+        let target: Vector3 = self.target.into();
+        let current_pos: Vector3 = transform.position.into();
         let distance = current_pos.distance2(target);
 
         let (new_vel, action) = if distance < self.arrival_radius.powi(2) {

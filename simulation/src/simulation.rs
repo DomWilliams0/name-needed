@@ -2,14 +2,12 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use log::info;
-use rand::Rng;
-
+use common::*;
 use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
 
-use crate::ecs::{EcsWorld, System, TickData};
-use crate::movement::{DesiredVelocity, Transform};
+use crate::ecs::{EcsWorld, Entity, System, TickData};
+use crate::movement::{Transform, DesiredVelocity};
 use crate::path::{FollowPath, PathDebugRenderer, PathSteeringSystem, TempPathAssignmentSystem};
 use crate::physics::{Physics, PhysicsSystem};
 use crate::render::dummy::DummyDebugRenderer;
@@ -30,67 +28,7 @@ pub struct Simulation<R: Renderer> {
 
 impl<R: Renderer> Simulation<R> {
     pub fn new(world: WorldRef) -> Self {
-        let mut ecs_world = EcsWorld::new();
-
-        // add dummy entities
-        {
-            let mut create_entity =
-                |block_position: (i32, i32, Option<i32>), color, dimensions: (f32, f32, f32)| {
-                    let transform = match block_position {
-                        (x, y, Some(z)) => Transform::from_block_center(x, y, z),
-                        (x, y, None) => {
-                            let mut transform =
-                                Transform::from_highest_safe_point(&world.borrow(), x, y)
-                                    .expect("should be valid position");
-
-                            // stand on top
-                            transform.position.2 += dimensions.2 / 4.0;
-
-                            transform
-                        }
-                    };
-                    let physical = Physical { color, dimensions };
-                    let physics = Physics::new(world.borrow_mut(), &transform, &physical);
-
-                    ecs_world.append_components(Some((
-                        transform,
-                        physical,
-                        physics,
-                        Steering::default(),
-                        FollowPath::default(),
-                        DesiredVelocity::default(),
-                    )))
-                };
-
-            {
-                let dummies = &config::get().simulation.initial_entities;
-                info!("adding {} dummy entities", dummies.len());
-                for desc in dummies {
-                    create_entity(desc.pos, desc.color, desc.size);
-                }
-            }
-
-            let randoms = config::get().simulation.random_count;
-            if randoms > 0 {
-                info!("adding {} random entities", randoms);
-                let mut rng = rand::thread_rng();
-                for _ in 0..randoms {
-                    let pos = (4 + rng.gen_range(-4, 4), 4 + rng.gen_range(-4, 4), Some(3));
-                    let color = (
-                        rng.gen_range(20, 230u8),
-                        rng.gen_range(20, 230u8),
-                        rng.gen_range(20, 230u8),
-                    );
-                    let dims = (
-                        rng.gen_range(0.8, 1.1),
-                        rng.gen_range(0.9, 1.1),
-                        rng.gen_range(1.4, 2.0),
-                    );
-
-                    create_entity(pos, color, dims);
-                }
-            }
-        }
+        let ecs_world = EcsWorld::new();
 
         // add physics debug renderer but don't enable
         let has_physics_debug_renderer = true;
@@ -108,6 +46,44 @@ impl<R: Renderer> Simulation<R> {
             has_physics_debug_renderer,
             is_physics_debug_renderer_enabled,
         }
+    }
+
+    // TODO return result
+    // TODO entity builder
+    pub fn add_entity(
+        &mut self,
+        block_pos: (i32, i32, Option<i32>),
+        color: (u8, u8, u8),
+        dimensions: (f32, f32, f32),
+    ) {
+        let world = &self.voxel_world;
+        let transform = match block_pos {
+            (x, y, Some(z)) => Transform::from_block_center(x, y, z),
+            (x, y, None) => {
+                let mut transform = Transform::from_highest_safe_point(&world.borrow(), x, y)
+                    .expect("should be valid position");
+
+                // stand on top
+                transform.position.2 += dimensions.2 / 4.0;
+
+                transform
+            }
+        };
+
+        let physical = Physical { color, dimensions };
+        let physics = Physics::new(world.borrow_mut(), &transform, &physical);
+
+        info!("adding an entity at {:?}", transform.position);
+
+        self.ecs_world.append_components(Some((
+            transform,
+            DesiredVelocity::default(),
+            physical,
+            physics,
+            FollowPath::default(),
+            // Steering::seek(WorldPoint(15.0, 3.0, 3.0)),
+            Steering::default(),
+        )));
     }
 
     fn tick_data(&mut self) -> TickData {
@@ -134,6 +110,14 @@ impl<R: Renderer> Simulation<R> {
         SyncToPhysicsSystem.tick_system(&tick_data);
         PhysicsSystem.tick_system(&tick_data);
         SyncFromPhysicsSystem.tick_system(&tick_data);
+    }
+
+    pub fn entities<'s>(&'s self) -> impl Iterator<Item = Entity> + 's {
+        self.ecs_world.entities()
+    }
+
+    pub fn world(&self) -> WorldRef {
+        self.voxel_world.clone()
     }
 
     // target is for this frame only

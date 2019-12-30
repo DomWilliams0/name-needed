@@ -2,8 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use log::*;
-
+use common::*;
 use simulation::{Physical, Renderer, Simulation, Transform};
 use world::{self, SliceRange, ViewPoint, WorldRef};
 

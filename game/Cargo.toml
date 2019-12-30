@@ -1,5 +1,5 @@
 [package]
-name = "world"
+name = "game"
 version = "0.1.0"
 authors = ["Dom Williams <me@domwillia.ms>"]
 edition = "2018"
@@ -7,15 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-unit = {path = "../unit"}
-physics = {path = "../physics"}
+world = {path = "../world"}
+engine = {path = "../engine"}
+simulation = {path = "../simulation"}
 config = {path = "../config"}
-common = { path = "../common" }
-generator = "0.6"
-petgraph = "0.4"
-float-cmp = "0.5"
-nd_iter = "0.0.4"
-ordered-float = "1.0"
-
-[dev-dependencies]
-matches = "0.1"
+common = { path = "../common", features = ["binary"] }
+game-presets = { path = "../game-presets"}

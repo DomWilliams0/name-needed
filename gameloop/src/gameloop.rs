@@ -1,6 +1,7 @@
-use log::info;
 use std::cell::Cell;
 use std::time::Instant;
+
+use common::*;
 
 pub struct GameLoop {
     start_time: Instant,
