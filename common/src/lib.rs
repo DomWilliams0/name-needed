@@ -1,4 +1,5 @@
 pub use cgmath;
+pub use float_cmp::ApproxEq;
 pub use itertools::Itertools;
 pub use lazy_static::lazy_static;
 pub use log::*;
@@ -12,4 +13,5 @@ pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;
 pub type Vector2 = cgmath::Vector2<F>;
 pub type Point3 = cgmath::Point3<F>;
-pub use cgmath::{Angle, Deg, InnerSpace, Matrix4, MetricSpace, Rad};
+pub type Matrix4 = cgmath::Matrix4<F>;
+pub use cgmath::{Angle, Deg, InnerSpace, MetricSpace, Rad, VectorSpace};

@@ -30,9 +30,9 @@ impl<R: Renderer> Simulation<R> {
     pub fn new(world: WorldRef) -> Self {
         let ecs_world = EcsWorld::new();
 
-        // add physics debug renderer but don't enable
+        // add physics debug renderer
         let has_physics_debug_renderer = true;
-        let is_physics_debug_renderer_enabled = false;
+        let is_physics_debug_renderer_enabled = config::get().display.debug_physics;
         world
             .borrow_mut()
             .physics_world_mut()

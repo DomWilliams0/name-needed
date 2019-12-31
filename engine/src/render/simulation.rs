@@ -143,8 +143,12 @@ impl Renderer for SimulationRenderer {
                     ];
 
                     let (sx, sy, sz) = src.1.dimensions;
-                    let model = Matrix4::from_nonuniform_scale(sx, sy, sz);
-                    // TODO rotation from transform
+                    let model = {
+                        let scale = Matrix4::from_nonuniform_scale(sx, sy, sz);
+                        let angle = src.0.rotation_angle();
+                        let rotation = Matrix4::from_angle_z(angle);
+                        rotation * scale // must be in this order
+                    };
                     dest.e_model = model.into();
                 }
             }

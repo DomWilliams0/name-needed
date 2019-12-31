@@ -111,9 +111,9 @@ impl PhysicsWorld {
         }
     }
 
-    pub fn sync_from(&self, collider: &Collider, pos: &mut WorldPoint, rot: &mut Vector3) -> bool {
+    pub fn sync_from(&self, collider: &Collider, pos: &mut WorldPoint, rot: &mut Vector2) -> bool {
         let mut ffi_pos = [0.0f32; 3];
-        let mut ffi_rot = [0.0f32; 3];
+        let mut ffi_rot = [0.0f32; 2];
 
         let ret = unsafe {
             ffi::entity_collider_get(
@@ -134,28 +134,20 @@ impl PhysicsWorld {
 
             rot.x = ffi_rot[0];
             rot.y = ffi_rot[1];
-            rot.z = ffi_rot[2];
 
             true
         }
     }
 
-    pub fn sync_to(
-        &self,
-        collider: &Collider,
-        pos: &WorldPoint,
-        rot: &Vector3,
-        vel: &Vector3,
-    ) -> bool {
+    pub fn sync_to(&self, collider: &Collider, pos: &WorldPoint, rot: F, vel: &Vector3) -> bool {
         let ffi_pos: [f32; 3] = [pos.0, pos.1, pos.2];
-        let ffi_rot: [f32; 3] = [rot.x, rot.y, rot.z];
         let ffi_vel: [f32; 3] = [vel.x, vel.y, vel.z];
 
         let ret = unsafe {
             ffi::entity_collider_set(
                 collider.collider,
                 &ffi_pos as *const f32,
-                &ffi_rot as *const f32,
+                rot,
                 &ffi_vel as *const f32,
             )
         };

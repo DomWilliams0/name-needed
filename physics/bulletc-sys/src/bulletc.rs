@@ -622,9 +622,15 @@ extern "C" {
     pub fn entity_collider_set(
         collider: *mut entity_collider,
         pos: *const f32,
-        rot: *const f32,
+        rot: f32,
         vel: *const f32,
     ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn rotate_to_quat_raw(vec: *const f32, quat_out: *mut f32);
+}
+extern "C" {
+    pub fn rotate_from_quat_raw(quat: *const f32, out: *mut f32);
 }
 extern "C" {
     #[doc = " hello world example from bullet"]

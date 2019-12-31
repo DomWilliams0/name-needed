@@ -59,6 +59,7 @@ rust:
 
 script: |
         export RUST_BACKTRACE=1 &&
-        cargo build --verbose --all &&
-        cargo test --verbose --all &&
+        cargo build --verbose --workspace &&
+        cargo test --verbose --workspace &&
+        cargo test --verbose -- --ignored &&
         NN_LOG=debug cargo run --verbose --bin lite

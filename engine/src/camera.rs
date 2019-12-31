@@ -3,6 +3,7 @@ use num_traits::clamp;
 use sdl2::keyboard::Keycode;
 
 use common::*;
+use simulation::{AXIS_FWD, AXIS_UP};
 
 const MOVE_SPEED: f32 = 0.2;
 
@@ -43,8 +44,8 @@ impl FreeRangeCamera {
     pub fn new(pos: Point3) -> Self {
         let mut cam = Self {
             pos,
-            dir: -Vector3::unit_z(),
-            up: Vector3::unit_y(),
+            dir: -AXIS_UP,
+            up: AXIS_FWD,
             pitch: Deg(0.0),
             yaw: Deg(0.0),
             key_state: EnumMap::new(),
@@ -86,7 +87,7 @@ impl FreeRangeCamera {
         }
     }
 
-    pub fn world_to_view(&mut self) -> Matrix4<f32> {
+    pub fn world_to_view(&mut self) -> Matrix4 {
         for dir in self.key_state
             .iter()
             .filter_map(|(d, on)| if *on { Some(d) } else { None })

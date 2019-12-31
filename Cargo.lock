@@ -104,6 +104,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen 0.51.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cmake 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common 0.1.0",
 ]
 
 [[package]]
@@ -193,6 +194,7 @@ version = "0.1.0"
 dependencies = [
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "float-cmp 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1299,7 +1301,6 @@ version = "0.1.0"
 dependencies = [
  "common 0.1.0",
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "float-cmp 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

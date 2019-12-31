@@ -3,9 +3,10 @@ Config(
         resolution: (800, 600),
         fov: 30, // degrees
         camera_turn_multiplier: 0.12,
+        debug_physics: true,
     ),
     world: (
-        preset: FlatLands,
+        preset: MultiChunkWonder,
     ),
     simulation: (
         initial_entities: [
@@ -24,5 +25,6 @@ Config(
         move_speed: 22.0,
         friction: 0.1,
         linear_damping: 0.95,
+        lerp_sharpness: 0.2
      )
 )

@@ -67,11 +67,8 @@ impl DoASteer for Seek {
         let target: Vector3 = self.target.into();
         let current_pos: Vector3 = transform.position.into();
 
-        let delta = (target - current_pos).normalize();
-
-        vel.velocity.x = delta.x;
-        vel.velocity.y = delta.y;
-        // TODO z?
+        let delta = target - current_pos;
+        vel.velocity = delta.truncate().normalize();
 
         // seek forever
         CompleteAction::Continue
@@ -110,9 +107,7 @@ impl DoASteer for Arrive {
 
         // TODO speed?
         // TODO lerp towards desired velocity in movement system?
-        vel.velocity.x = new_vel.x;
-        vel.velocity.y = new_vel.y;
-        // TODO z?
+        vel.velocity = new_vel.truncate().normalize();
 
         action
     }

@@ -12,6 +12,7 @@ pub struct Display {
     pub resolution: (u32, u32),
     pub fov: f32,
     pub camera_turn_multiplier: f32,
+    pub debug_physics: bool,
 }
 
 #[derive(Deserialize)]
@@ -34,6 +35,7 @@ pub struct Simulation {
     pub move_speed: f32,
     pub friction: f32,
     pub linear_damping: f32,
+    pub lerp_sharpness: f32,
 }
 
 #[derive(Deserialize, Clone)]

@@ -178,15 +178,19 @@ entity_collider_create(struct dynworld *world, const float center[3], const floa
     return new entity_collider(rb);
 }
 
-int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[3]) {
+// z axis
+const btVector3 UP(0.0, 0.0, 1.0);
+
+// y axis
+const btVector3 FWD(0.0, 1.0, 0.0);
+
+int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[2]) {
     int ret = -1;
 
     if (collider != nullptr && collider->body != nullptr) {
         const btTransform &transform = collider->body->getInterpolationWorldTransform();
         const btVector3 &position = transform.getOrigin();
-
-        btVector3 fwd(0.0, 1.0, 0.0); // y = forwards
-        btVector3 rotation = fwd * transform.getBasis();
+        const btVector3 rotation = quatRotate(transform.getRotation(), FWD);
 
         pos[0] = position.x();
         pos[1] = position.y();
@@ -194,7 +198,7 @@ int entity_collider_get(struct entity_collider *collider, float pos[3], float ro
 
         rot[0] = rotation.x();
         rot[1] = rotation.y();
-        rot[2] = rotation.z();
+
         ret = 0;
     }
 
@@ -219,7 +223,7 @@ int entity_collider_get_pos(struct entity_collider *collider, float pos[3]) {
 }
 
 
-int entity_collider_set(struct entity_collider *collider, const float pos[3], const float rot[3], const float vel[3]) {
+int entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3]) {
     int ret = -1;
 
     if (collider != nullptr && collider->body != nullptr) {
@@ -228,13 +232,9 @@ int entity_collider_set(struct entity_collider *collider, const float pos[3], co
         btVector3 new_pos(pos[0], pos[1], pos[2]);
         transform.setOrigin(new_pos);
 
-        // TODO global constant if this actually works
-        // TODO rotation AFTER debug rendering of velocity and movement target
-        btVector3 new_rot_vec(rot[0], rot[1], rot[2]);
-        btVector3 fwd(0.0, 1.0, 0.0); // y = forwards
-        btScalar angle = fwd.angle(new_rot_vec);
-        btQuaternion new_rot(btVector3(0.0, 0.0, 1.0), angle);
-        //transform.setRotation(new_rot);
+        btQuaternion new_rot(UP, rot);
+        transform.setRotation(new_rot);
+
         collider->body->setCenterOfMassTransform(transform);
 
         btVector3 new_vel(vel[0], vel[1], vel[2]);
@@ -247,8 +247,6 @@ int entity_collider_set(struct entity_collider *collider, const float pos[3], co
 }
 
 void hello_world_example() {
-///-----includes_end-----
-
     int i;
     ///-----initialization_start-----
 

@@ -12,3 +12,6 @@ cmake = "0.1"
 bindgen = "0.51"
 
 [dependencies]
+
+[dev-dependencies]
+common = { path = "../../common" }

@@ -31,13 +31,17 @@ entity_collider_create(struct dynworld *world, const float center[3], const floa
                        float linear_damping);
 
 /// returns 0 on success
-int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[3]);
+int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[2]);
 
 /// returns 0 on success
 int entity_collider_get_pos(struct entity_collider *collider, float pos[3]);
 
 /// returns 0 on success
-int entity_collider_set(struct entity_collider *collider, const float pos[3], const float rot[3], const float vel[3]);
+int entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3]);
+
+void rotate_to_quat_raw(const float vec[2], float *quat_out);
+
+void rotate_from_quat_raw(const float quat[4], float out[2]);
 
 /// hello world example from bullet
 void hello_world_example();

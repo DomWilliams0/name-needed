@@ -324,7 +324,7 @@ pub mod view {
 mod tests {
     use std::f32::EPSILON;
 
-    use float_cmp::ApproxEq;
+    use common::*;
 
     use crate::coordinate::dim::CHUNK_SIZE;
     use crate::coordinate::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPoint,

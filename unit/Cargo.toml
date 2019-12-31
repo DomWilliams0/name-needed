@@ -9,6 +9,3 @@ edition = "2018"
 [dependencies]
 common = { path = "../common" }
 derive_more = "0.15"
-
-[dev-dependencies]
-float-cmp = "0.5"
