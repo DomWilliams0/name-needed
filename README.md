@@ -9,6 +9,11 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 
 ## Progress log
 
+* 31 Dec 2019: <em>Entities choosing random blocks and path finding to them, facing their direction of travel - low frame rate is to reduce GIF size, it's actually buttery smooth</em>
+<p style="margin: auto; width: 80%">
+    <img src=".screenshots/movement-with-rotation.gif"/>
+</p>
+
 * 07 Oct 2019: <em>Multiple chunks</em>
 <p style="margin: auto; width: 80%">
     <img src=".screenshots/multichunk.jpg"/>
