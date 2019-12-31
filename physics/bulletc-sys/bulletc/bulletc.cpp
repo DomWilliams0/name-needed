@@ -147,6 +147,7 @@ slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[
 
     btRigidBody::btRigidBodyConstructionInfo desc(0.0, nullptr, collider->shape);
     desc.m_startWorldTransform.setOrigin(btVector3(slab_pos[0], slab_pos[1], slab_pos[2]-0.5));
+    desc.m_friction = 0.5;
     collider->slab_body = new btRigidBody(desc);
 
     // add to world
@@ -155,14 +156,16 @@ slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[
     return collider;
 }
 
-struct entity_collider *entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3]) {
+struct entity_collider *
+entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3],
+                       float friction, float linear_damping) {
     btVector3 dims(half_extents[0], half_extents[1], half_extents[2]);
     btVector3 pos(center[0], center[1], center[2]);
 
     btBoxShape *shape = new btBoxShape(dims); // TODO add to struct
     btRigidBody::btRigidBodyConstructionInfo desc(2.0, nullptr, shape);
-    desc.m_friction = 0.2;
-    desc.m_linearDamping = 0.8;
+    desc.m_friction = friction;
+    desc.m_linearDamping = linear_damping;
     desc.m_startWorldTransform.setOrigin(pos);
     btRigidBody *rb = new btRigidBody(desc);
 

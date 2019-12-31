@@ -823,6 +823,7 @@ version = "0.1.0"
 dependencies = [
  "bulletc-sys 0.1.0",
  "common 0.1.0",
+ "config 0.1.0",
  "debug-draw 0.1.0",
  "unit 0.1.0",
 ]

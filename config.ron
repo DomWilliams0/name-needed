@@ -21,6 +21,8 @@ Config(
             ),
         ],
         random_count: 10,
-        move_speed: 7.0,
+        move_speed: 22.0,
+        friction: 0.1,
+        linear_damping: 0.95,
      )
 )

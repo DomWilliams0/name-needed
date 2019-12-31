@@ -32,9 +32,11 @@ pub struct Simulation {
     pub initial_entities: Vec<EntityDescriptor>,
     pub random_count: u32,
     pub move_speed: f32,
+    pub friction: f32,
+    pub linear_damping: f32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct EntityDescriptor {
     pub pos: (i32, i32, Option<i32>),
     pub color: (u8, u8, u8),

@@ -598,6 +598,8 @@ extern "C" {
         world: *mut dynworld,
         center: *const f32,
         half_extents: *const f32,
+        friction: f32,
+        linear_damping: f32,
     ) -> *mut entity_collider;
 }
 extern "C" {

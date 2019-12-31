@@ -7,7 +7,7 @@ use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
 
 use crate::ecs::{EcsWorld, Entity, System, TickData};
-use crate::movement::{Transform, DesiredVelocity};
+use crate::movement::{DesiredVelocity, Transform};
 use crate::path::{FollowPath, PathDebugRenderer, PathSteeringSystem, TempPathAssignmentSystem};
 use crate::physics::{Physics, PhysicsSystem};
 use crate::render::dummy::DummyDebugRenderer;

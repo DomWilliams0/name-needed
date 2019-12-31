@@ -11,3 +11,4 @@ bulletc-sys = { path = "bulletc-sys" }
 unit = { path = "../unit" }
 debug-draw = { path = "debug-draw" }
 common = { path = "../common" }
+config = { path = "../config" }

@@ -24,7 +24,7 @@ impl GamePreset for DevGamePreset {
     fn init<R: Renderer>(&self, sim: &mut Simulation<R>) {
         // add entities from config
         {
-            let dummies = &config::get().simulation.initial_entities;
+            let dummies = config::get().simulation.initial_entities.clone();
             info!("adding {} dummy entities", dummies.len());
             for desc in dummies {
                 sim.add_entity(desc.pos, desc.color, desc.size);

@@ -26,7 +26,9 @@ slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[
                      size_t vertices_count, const uint32_t *indices, size_t indices_count);
 
 struct entity_collider;
-struct entity_collider *entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3]);
+struct entity_collider *
+entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3], float friction,
+                       float linear_damping);
 
 /// returns 0 on success
 int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[3]);

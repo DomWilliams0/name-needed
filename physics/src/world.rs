@@ -35,7 +35,19 @@ impl PhysicsWorld {
         let center: *const f32 = &[pos.0, pos.1, pos.2] as *const f32;
         let half_extents: *const f32 =
             &[dimensions.0 / 2.0, dimensions.1 / 2.0, dimensions.2 / 2.0] as *const f32;
-        let collider = unsafe { ffi::entity_collider_create(self.dynworld, center, half_extents) };
+
+        let collider = {
+            let cfg = config::get();
+            unsafe {
+                ffi::entity_collider_create(
+                    self.dynworld,
+                    center,
+                    half_extents,
+                    cfg.simulation.friction,
+                    cfg.simulation.linear_damping,
+                )
+            }
+        };
         Collider { collider }
     }
 
