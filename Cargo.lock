@@ -416,6 +416,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "game"
 version = "0.1.0"
 dependencies = [
+ "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "common 0.1.0",
  "config 0.1.0",
  "engine 0.1.0",
@@ -1196,7 +1197,6 @@ dependencies = [
  "common 0.1.0",
  "config 0.1.0",
  "debug-draw 0.1.0",
- "game-presets 0.1.0",
  "physics 0.1.0",
  "pyro 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "unit 0.1.0",

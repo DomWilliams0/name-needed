@@ -3,12 +3,15 @@ use std::path::Path;
 use common::*;
 use simulation::{Renderer, Simulation};
 
+
 use crate::GamePreset;
-use world::WorldRef;
+use std::marker::PhantomData;
 
-pub struct DevGamePreset;
+pub struct DevGamePreset<R: Renderer> {
+    _phantom: PhantomData<R>,
+}
 
-impl GamePreset for DevGamePreset {
+impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
     fn name(&self) -> &str {
         "dev"
     }
@@ -17,11 +20,7 @@ impl GamePreset for DevGamePreset {
         Some(Path::new("config.ron"))
     }
 
-    fn world(&self) -> WorldRef {
-        WorldRef::new(world::presets::from_config())
-    }
-
-    fn init<R: Renderer>(&self, sim: &mut Simulation<R>) {
+    fn init(&self, sim: &mut Simulation<R>) {
         // add entities from config
         {
             let dummies = config::get().simulation.initial_entities.clone();
@@ -51,6 +50,14 @@ impl GamePreset for DevGamePreset {
 
                 sim.add_entity(pos, color, dims);
             }
+        }
+    }
+}
+
+impl<R: Renderer> Default for DevGamePreset<R> {
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData,
         }
     }
 }

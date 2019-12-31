@@ -6,15 +6,20 @@ use cgmath::perspective;
 use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
-use glium_sdl2::SDL2Facade;
+use glium_sdl2::{DisplayBuild, SDL2Facade};
 
 use common::*;
-use simulation::Simulation;
+use simulation::{EventsOutcome, Simulation, SimulationBackend};
 use unit;
 use world::{ChunkPosition, Vertex as WorldVertex, ViewPoint, WorldPoint, WorldViewer, CHUNK_SIZE};
 
-use crate::camera::FreeRangeCamera;
-use crate::render::{draw_params, load_program, DrawParamType, FrameTarget, SimulationRenderer};
+use crate::render;
+use crate::render::camera::FreeRangeCamera;
+use crate::render::{draw_params, load_program, DrawParamType, FrameTarget, GliumRenderer};
+use sdl2::event::{Event, WindowEvent};
+use sdl2::keyboard::Keycode;
+use sdl2::EventPump;
+use std::mem::MaybeUninit;
 
 /// Copy of world::mesh::Vertex
 #[derive(Copy, Clone)]
@@ -39,7 +44,8 @@ struct ChunkMesh {
     chunk_pos: ChunkPosition,
 }
 
-pub struct GliumRenderer {
+pub struct SdlGliumBackend {
+    event_pump: EventPump,
     display: SDL2Facade,
     window_size: (i32, i32),
 
@@ -51,20 +57,48 @@ pub struct GliumRenderer {
     camera: FreeRangeCamera,
 
     // simulation rendering
-    simulation_renderer: SimulationRenderer,
+    simulation_renderer: GliumRenderer,
 }
 
-impl GliumRenderer {
-    pub fn new(display: SDL2Facade, world_viewer: WorldViewer) -> Self {
-        // world program
+#[derive(Debug)]
+enum KeyEvent {
+    Down(Keycode),
+    Up(Keycode),
+}
+
+impl SimulationBackend for SdlGliumBackend {
+    type Renderer = GliumRenderer;
+
+    /// Panics if SDL or glium initialisation fails
+    fn new(world_viewer: WorldViewer) -> Self {
+        // init SDL
+        let sdl = sdl2::init().expect("Failed to init SDL");
+        let video = sdl.video().expect("Failed to init SDL video");
+        video.gl_attr().set_context_version(3, 3);
+        video.gl_attr().set_context_minor_version(3);
+        debug!(
+            "opengl {}.{}",
+            video.gl_attr().context_major_version(),
+            video.gl_attr().context_minor_version(),
+        );
+        let event_pump = sdl.event_pump().expect("Failed to create event pump");
+
+        // create window
+        let (w, h) = config::get().display.resolution;
+        info!("window size is {}x{}", w, h);
+        let display = video
+            .window("Name Needed", w, h)
+            .position_centered()
+            .build_glium()
+            .expect("Failed to create glium window");
+
+        // configure opengl
+        video.gl_attr().set_depth_size(24);
+
+        // load world program
         let program = load_program(&display, "world").expect("Failed to load world program");
 
-        let window_size = {
-            let (w, h) = display.window().size();
-            (w as i32, h as i32)
-        };
-        info!("window size is {}x{}", window_size.0, window_size.1);
-
+        // create camera
         let camera = {
             // mid chunk
             let pos = Point3::new(
@@ -78,11 +112,12 @@ impl GliumRenderer {
             FreeRangeCamera::new(pos)
         };
 
-        let simulation_renderer = SimulationRenderer::new(&display);
+        let simulation_renderer = GliumRenderer::new(&display);
 
         Self {
+            event_pump,
             display,
-            window_size,
+            window_size: (w as i32, h as i32),
             chunk_meshes: HashMap::new(),
             program,
             world_viewer,
@@ -91,20 +126,51 @@ impl GliumRenderer {
         }
     }
 
-    pub fn on_resize(&mut self, w: i32, h: i32) {
-        self.window_size = (w, h);
-        debug!("window resized to {}x{}", w, h);
+    fn consume_events(&mut self) -> EventsOutcome {
+        // we need mutable access to self while consuming events, so temporarily move event pump
+        // out of `self`
+        #[allow(clippy::uninit_assumed_init)]
+        let dummy = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut event_pump = std::mem::replace(&mut self.event_pump, dummy);
+
+        let mut outcome = EventsOutcome::Continue;
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
+                    outcome = EventsOutcome::Exit;
+                    break;
+                }
+
+                Event::KeyDown {
+                    keycode: Some(key), ..
+                } => self.handle_key(KeyEvent::Down(key)),
+                Event::KeyUp {
+                    keycode: Some(key), ..
+                } => self.handle_key(KeyEvent::Up(key)),
+                Event::Window {
+                    win_event: WindowEvent::Resized(w, h),
+                    ..
+                } => self.on_resize(w, h),
+
+                Event::MouseButtonDown { .. } => self.camera.handle_click(true),
+                Event::MouseButtonUp { .. } => self.camera.handle_click(false),
+                Event::MouseMotion { xrel, yrel, .. } => self.camera.handle_cursor(xrel, yrel),
+                _ => {}
+            }
+        }
+
+        // move real event pump back into `self`, forgetting about the uninit'd dummy
+        let dummy = std::mem::replace(&mut self.event_pump, event_pump);
+        std::mem::forget(dummy);
+
+        outcome
     }
 
-    pub fn world_viewer(&mut self) -> &mut WorldViewer {
-        &mut self.world_viewer
-    }
-
-    pub fn camera(&mut self) -> &mut FreeRangeCamera {
-        &mut self.camera
-    }
-
-    pub fn tick(&mut self) {
+    fn tick(&mut self) {
         // regenerate meshes for dirty chunks
         for (chunk_pos, new_mesh) in self.world_viewer.regen_dirty_chunk_meshes() {
             let converted_vertices: Vec<Vertex> = new_mesh.into_iter().map(|v| v.into()).collect();
@@ -121,7 +187,7 @@ impl GliumRenderer {
     }
 
     /// Calculates camera projection, renders world then entities
-    pub fn render(&mut self, simulation: &mut Simulation<SimulationRenderer>, interpolation: f64) {
+    fn render(&mut self, simulation: &mut Simulation<GliumRenderer>, interpolation: f64) {
         let target = Rc::new(RefCell::new(FrameTarget {
             frame: self.display.draw(),
             projection: Default::default(),
@@ -193,5 +259,48 @@ impl GliumRenderer {
             .expect("failed to swap buffers");
 
         assert_eq!(Rc::strong_count(&target), 1); // target should be dropped here
+    }
+}
+
+impl SdlGliumBackend {
+    pub fn on_resize(&mut self, w: i32, h: i32) {
+        self.window_size = (w, h);
+        debug!("window resized to {}x{}", w, h);
+    }
+
+    pub fn world_viewer(&mut self) -> &mut WorldViewer {
+        &mut self.world_viewer
+    }
+
+    pub fn camera(&mut self) -> &mut FreeRangeCamera {
+        &mut self.camera
+    }
+
+    fn handle_key(&mut self, event: KeyEvent) {
+        match event {
+            KeyEvent::Down(Keycode::Up) => self.world_viewer.move_by(1),
+            KeyEvent::Down(Keycode::Down) => self.world_viewer.move_by(-1),
+            KeyEvent::Down(Keycode::Y) => {
+                let wireframe = unsafe { render::wireframe_world_toggle() };
+                debug!(
+                    "world is {} wireframe",
+                    if wireframe { "now" } else { "no longer" }
+                )
+            }
+            _ => {}
+        };
+
+        // this is silly
+        let pressed = if let KeyEvent::Down(_) = event {
+            true
+        } else {
+            false
+        };
+        let key = match event {
+            KeyEvent::Down(k) => k,
+            KeyEvent::Up(k) => k,
+        };
+
+        self.camera.handle_key(key, pressed);
     }
 }

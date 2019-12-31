@@ -144,6 +144,7 @@ pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
     raw.parse_file()
 }
 
+// TODO add a variant that returns a default instead of panicking
 pub fn get<'a>() -> ConfigRef<'a> {
     let guard = lock();
     if guard.parsed.as_ref().is_some() {

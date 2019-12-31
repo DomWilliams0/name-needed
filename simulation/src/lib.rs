@@ -3,6 +3,7 @@ pub use ::physics::TICKS_PER_SECOND;
 pub use crate::movement::{Transform, AXIS_FWD, AXIS_UP};
 pub use crate::render::{Physical, Renderer};
 pub use crate::simulation::Simulation;
+pub use crate::backend::{SimulationBackend, EventsOutcome};
 
 mod movement;
 mod sync;
@@ -12,4 +13,5 @@ mod render;
 mod simulation;
 mod steer;
 mod ecs;
+mod backend;
 

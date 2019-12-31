@@ -16,8 +16,8 @@ simulation = {path = "../simulation"}
 gameloop = {path = "../gameloop"}
 unit = {path = "../unit"}
 common = {path = "../common"}
-sdl2 = "0.32"
-glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2"}
+sdl2 = {version = "0.32", optional = true}
+glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2", optional = true}
 enum-map = "0.6"
 float-ord = "0.2"
 
@@ -25,3 +25,7 @@ float-ord = "0.2"
 version = "0.25"
 default-features = false  # removes glutin
 
+[features]
+default = []
+sdl-glium = ["sdl2", "glium_sdl2"]
+lite = []

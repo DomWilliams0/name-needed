@@ -14,6 +14,3 @@ config = {path = "../config"}
 debug-draw = { path = "../physics/debug-draw" }
 common = { path = "../common" }
 pyro = "0.2"
-
-[dev-dependencies]
-game-presets = { path = "../game-presets" }

@@ -34,7 +34,7 @@ struct EntityInstanceAttributes {
 
 implement_vertex!(EntityInstanceAttributes, e_pos, e_color, e_model);
 
-pub struct SimulationRenderer {
+pub struct GliumRenderer {
     program: glium::Program,
     entity_instances: Vec<(Transform, Physical)>,
     entity_vertex_buf: glium::VertexBuffer<EntityInstanceAttributes>,
@@ -48,7 +48,7 @@ pub struct SimulationRenderer {
     debug_shapes: DebugShapes,
 }
 
-impl SimulationRenderer {
+impl GliumRenderer {
     pub fn new(display: &SDL2Facade) -> Self {
         let program = load_program(display, "entity").unwrap();
 
@@ -101,7 +101,7 @@ pub struct FrameTarget {
     pub view: [[f32; 4]; 4],
 }
 
-impl Renderer for SimulationRenderer {
+impl Renderer for GliumRenderer {
     type Target = FrameTarget;
 
     fn init(&mut self, target: Rc<RefCell<Self::Target>>) {

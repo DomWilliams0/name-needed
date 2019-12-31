@@ -13,3 +13,9 @@ simulation = {path = "../simulation"}
 config = {path = "../config"}
 common = { path = "../common", features = ["binary"] }
 game-presets = { path = "../game-presets"}
+clap = "2.33"
+
+[features]
+default = ["sdl-glium"]
+sdl-glium = ["engine/sdl-glium"]
+lite = ["engine/lite"]

@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use glium::{BackfaceCullingMode, Depth, DepthTest, DrawParameters, PolygonMode};
 use glium_sdl2::SDL2Facade;
 
-pub use self::renderer::GliumRenderer;
-pub use self::simulation::{FrameTarget, SimulationRenderer};
+pub use self::renderer::SdlGliumBackend;
+pub use self::simulation::{FrameTarget, GliumRenderer};
 
+mod camera;
 mod debug;
 mod renderer;
 mod simulation;
