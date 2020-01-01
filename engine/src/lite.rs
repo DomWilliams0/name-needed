@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use color::ColorRgb;
 use simulation::{EventsOutcome, Physical, Renderer, Simulation, SimulationBackend, Transform};
 use unit::view::ViewPoint;
 use world::WorldViewer;
