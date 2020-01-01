@@ -13,4 +13,5 @@ physics = {path = "../physics"}
 config = {path = "../config"}
 debug-draw = { path = "../physics/debug-draw" }
 common = { path = "../common" }
+color = { path = "../color" }
 pyro = "0.2"

@@ -189,6 +189,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "color"
+version = "0.1.0"
+dependencies = [
+ "common 0.1.0",
+]
+
+[[package]]
 name = "common"
 version = "0.1.0"
 dependencies = [
@@ -256,6 +263,7 @@ dependencies = [
 name = "debug-draw"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "unit 0.1.0",
 ]
 
@@ -286,6 +294,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "engine"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "common 0.1.0",
  "config 0.1.0",
  "enum-map 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -429,6 +438,7 @@ dependencies = [
 name = "game-presets"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "common 0.1.0",
  "config 0.1.0",
  "simulation 0.1.0",
@@ -1194,6 +1204,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "simulation"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "common 0.1.0",
  "config 0.1.0",
  "debug-draw 0.1.0",
@@ -1386,6 +1397,7 @@ dependencies = [
 name = "world"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "common 0.1.0",
  "config 0.1.0",
  "float-cmp 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",

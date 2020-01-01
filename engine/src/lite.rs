@@ -15,9 +15,9 @@ impl Renderer for DummyRenderer {
 
     fn entity(&mut self, transform: &Transform, physical: &Physical) {}
 
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8)) {}
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {}
 
-    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8)) {}
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb) {}
 }
 
 impl SimulationBackend for DummyBackend {

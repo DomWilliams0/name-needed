@@ -11,6 +11,7 @@ unit = {path = "../unit"}
 physics = {path = "../physics"}
 config = {path = "../config"}
 common = { path = "../common" }
+color = { path = "../color" }
 generator = "0.6"
 petgraph = "0.4"
 float-cmp = "0.5"

@@ -1,3 +1,4 @@
+use color::ColorRgb;
 use crate::area::SlabAreaIndex;
 
 /// A single block in a chunk
@@ -60,22 +61,13 @@ pub enum BlockType {
 }
 
 impl BlockType {
-    pub fn color_as_u8(self) -> (u8, u8, u8) {
+    pub fn color(self) -> ColorRgb {
         match self {
-            BlockType::Air => (0, 0, 0),
-            BlockType::Dirt => (192, 57, 43),
-            BlockType::Grass => (40, 102, 25),
-            BlockType::Stone => (106, 106, 117),
+            BlockType::Air => ColorRgb::new(0, 0, 0),
+            BlockType::Dirt => ColorRgb::new(192, 57, 43),
+            BlockType::Grass => ColorRgb::new(40, 102, 25),
+            BlockType::Stone => ColorRgb::new(106, 106, 117),
         }
-    }
-
-    pub fn color_as_f32(self) -> (f32, f32, f32) {
-        let (r, g, b) = self.color_as_u8();
-        (
-            f32::from(r) / 255.0,
-            f32::from(g) / 255.0,
-            f32::from(b) / 255.0,
-        )
     }
 
     pub fn solid(self) -> bool {

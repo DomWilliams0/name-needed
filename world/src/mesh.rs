@@ -1,3 +1,4 @@
+use color::ColorRgb;
 use common::*;
 use unit;
 
@@ -21,10 +22,10 @@ impl Vertex {
         }
     }
 
-    fn with_color(x: f32, y: f32, z: f32, rgb: (f32, f32, f32)) -> Self {
+    fn with_color(x: f32, y: f32, z: f32, rgb: ColorRgb) -> Self {
         Self {
             v_pos: [x, y, z],
-            v_color: [rgb.0, rgb.1, rgb.2],
+            v_color: rgb.into(),
         }
     }
 }
@@ -128,7 +129,7 @@ pub fn make_render_mesh(chunk: &Chunk, slice_range: SliceRange) -> Vec<Vertex> {
                 )
             };
 
-            let color = block.block_type().color_as_f32();
+            let color = block.block_type().color();
             let height = height.height();
 
             for face in 0..FACE_COUNT {

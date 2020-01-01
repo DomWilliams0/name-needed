@@ -6,9 +6,10 @@ use glium::{implement_vertex, Surface};
 use glium::{uniform, Frame};
 use glium_sdl2::SDL2Facade;
 
+use color::ColorRgb;
 use common::Matrix4;
 use simulation::{Physical, Renderer, Transform};
-use world::{ViewPoint, WorldPoint};
+use world::ViewPoint;
 
 use crate::render::debug::{DebugShape, DebugShapes};
 use crate::render::{draw_params, load_program, DrawParamType};
@@ -130,17 +131,8 @@ impl Renderer for GliumRenderer {
                 let mut mapping = self.entity_vertex_buf.map();
                 for (src, dest) in self.entity_instances.iter().zip(mapping.iter_mut()) {
                     // keep attribute position in world coordinates
-                    dest.e_pos = {
-                        let WorldPoint(x, y, z) = src.0.position;
-                        [x, y, z]
-                    };
-
-                    let (r, g, b) = src.1.color;
-                    dest.e_color = [
-                        f32::from(r) / 255.0,
-                        f32::from(g) / 255.0,
-                        f32::from(b) / 255.0,
-                    ];
+                    dest.e_pos = src.0.position.into();
+                    dest.e_color = src.1.color.into();
 
                     let (sx, sy, sz) = src.1.dimensions;
                     let model = {
@@ -184,14 +176,14 @@ impl Renderer for GliumRenderer {
         self.target = None;
     }
 
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8)) {
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {
         self.debug_shapes.shapes.push(DebugShape::Line {
             points: [from, to],
             color,
         })
     }
 
-    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8)) {
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb) {
         self.debug_shapes
             .shapes
             .push(DebugShape::Tri { points, color })

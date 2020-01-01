@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
+use color::ColorRgb;
 use common::*;
 use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
@@ -53,7 +54,7 @@ impl<R: Renderer> Simulation<R> {
     pub fn add_entity(
         &mut self,
         block_pos: (i32, i32, Option<i32>),
-        color: (u8, u8, u8),
+        color: ColorRgb,
         dimensions: (f32, f32, f32),
     ) {
         let world = &self.voxel_world;

@@ -13,7 +13,8 @@ members = [
 	"physics",
 	"physics/bulletc-sys",
 	"physics/debug-draw",
+	"color"
 ]
 
 [profile.dev]
-#debug = 0
+debug = 0

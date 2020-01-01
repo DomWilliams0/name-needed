@@ -41,6 +41,6 @@ pub struct Simulation {
 #[derive(Deserialize, Clone)]
 pub struct EntityDescriptor {
     pub pos: (i32, i32, Option<i32>),
-    pub color: (u8, u8, u8),
+    pub color: Option<(u8, u8, u8)>,
     pub size: (f32, f32, f32),
 }

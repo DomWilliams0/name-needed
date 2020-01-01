@@ -1,8 +1,8 @@
 use crate::GamePreset;
 use simulation::{Renderer, Simulation};
-use world::WorldRef;
-use world::presets::one_block_wonder;
 use std::path::Path;
+use world::presets::one_block_wonder;
+use world::WorldRef;
 
 #[derive(Default)]
 pub struct EmptyGamePreset;

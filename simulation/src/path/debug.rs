@@ -21,21 +21,18 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
             .matcher_with_entities::<All<(Read<FollowPath>, Read<Transform>)>>()
             .for_each(|(e, (follow_path, transform))| {
                 if let Some(path) = follow_path.path() {
-                    let color = ecs_world
-                        .get_component::<Physical>(e)
-                        .map(|p| p.color)
-                        .unwrap_or((200, 30, 40));
+                    if let Some(Physical { color, .. }) = ecs_world.get_component::<Physical>(e) {
+                        let mut line_from = transform.position;
+                        for (next_point, _) in path.iter() {
+                            let line_to = WorldPoint::from(*next_point);
+                            renderer.debug_add_line(
+                                ViewPoint::from(line_from),
+                                ViewPoint::from(line_to),
+                                *color,
+                            );
 
-                    let mut line_from = transform.position;
-                    for (next_point, _) in path.iter() {
-                        let line_to = WorldPoint::from(*next_point);
-                        renderer.debug_add_line(
-                            ViewPoint::from(line_from),
-                            ViewPoint::from(line_to),
-                            color,
-                        );
-
-                        line_from = line_to;
+                            line_from = line_to;
+                        }
                     }
                 }
             });

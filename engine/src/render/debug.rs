@@ -1,12 +1,13 @@
 use std::cmp::{max, min};
 use std::ops::Range;
 
-use common::*;
 use glium::index::{NoIndices, PrimitiveType};
 use glium::uniforms::{AsUniformValue, Uniforms, UniformsStorage};
 use glium::{implement_vertex, uniform, DrawParameters, PolygonMode, Surface};
 use glium_sdl2::SDL2Facade;
 
+use color::ColorRgb;
+use common::*;
 use world::ViewPoint;
 
 use crate::render::{load_program, FrameTarget};
@@ -14,27 +15,20 @@ use crate::render::{load_program, FrameTarget};
 pub enum DebugShape {
     Line {
         points: [ViewPoint; 2],
-        color: (u8, u8, u8),
+        color: ColorRgb,
     },
     Tri {
         points: [ViewPoint; 3],
-        color: (u8, u8, u8),
+        color: ColorRgb,
     },
 }
 
 impl DebugShape {
-    pub fn color(&self) -> [f32; 3] {
-        let (r, g, b) = *match self {
+    pub fn color(&self) -> ColorRgb {
+        *match self {
             DebugShape::Line { color, .. } => color,
             DebugShape::Tri { color, .. } => color,
-        };
-
-        // TODO rgb!
-        [
-            f32::from(r) / 255.0,
-            f32::from(g) / 255.0,
-            f32::from(b) / 255.0,
-        ]
+        }
     }
 
     pub fn points(&self) -> &[ViewPoint] {
@@ -181,7 +175,7 @@ impl DebugShapes {
                     let ViewPoint(x, y, z) = *p;
                     DebugShapeVertex {
                         v_pos: [x, y, z],
-                        v_color: shape.color(),
+                        v_color: shape.color().into(),
                     }
                 }) {
                     if buf_offset >= DebugShapes::MAX_VERTICES {

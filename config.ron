@@ -3,7 +3,7 @@ Config(
         resolution: (800, 600),
         fov: 30, // degrees
         camera_turn_multiplier: 0.12,
-        debug_physics: true,
+        debug_physics: false,
     ),
     world: (
         preset: MultiChunkWonder,
@@ -12,16 +12,16 @@ Config(
         initial_entities: [
             (
                 pos: (3, 4, Some(4)),
-                color: (110, 160, 90),
+                color: Some((110, 160, 90)),
                 size: (1.2, 0.6, 1.95),
             ),
             (
                 pos: (12, 12, None),
-                color: (100, 40, 100),
+                color: None,
                 size: (1.1, 0.75, 1.85),
             ),
         ],
-        random_count: 10,
+        random_count: 5,
         move_speed: 22.0,
         friction: 0.1,
         linear_damping: 0.95,

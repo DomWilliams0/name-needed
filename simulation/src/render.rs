@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use color::ColorRgb;
 use physics::StepType;
 use world::{SliceRange, ViewPoint, WorldRef};
 
@@ -12,7 +13,7 @@ use crate::physics::Physics;
 #[derive(Debug, Copy, Clone)]
 pub struct Physical {
     /// temporary simple color
-    pub color: (u8, u8, u8),
+    pub color: ColorRgb,
 
     /// 3d dimensions in world scale
     pub dimensions: (f32, f32, f32),
@@ -41,9 +42,9 @@ pub trait Renderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: (u8, u8, u8));
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb);
 
-    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: (u8, u8, u8));
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb);
 
     fn debug_finish(&mut self) {}
 }
@@ -112,6 +113,7 @@ pub trait DebugRenderer<R: Renderer> {
 
 #[allow(dead_code)]
 pub mod dummy {
+    use color::ColorRgb;
     use world::{ViewPoint, WorldRef};
 
     use crate::ecs::EcsWorld;
@@ -131,12 +133,12 @@ pub mod dummy {
             renderer.debug_add_line(
                 ViewPoint(0.0, 0.0, 0.0),
                 ViewPoint(1.0, 0.0, 0.0),
-                (255, 0, 0),
+                ColorRgb::new(255, 0, 0),
             );
             renderer.debug_add_line(
                 ViewPoint(0.0, 0.0, 0.0),
                 ViewPoint(0.0, 1.0, 0.0),
-                (255, 0, 0),
+                ColorRgb::new(255, 0, 0),
             );
         }
     }

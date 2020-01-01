@@ -16,6 +16,7 @@ simulation = {path = "../simulation"}
 gameloop = {path = "../gameloop"}
 unit = {path = "../unit"}
 common = {path = "../common"}
+color = {path = "../color"}
 sdl2 = {version = "0.32", optional = true}
 glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2", optional = true}
 enum-map = "0.6"

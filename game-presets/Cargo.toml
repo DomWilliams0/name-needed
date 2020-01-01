@@ -11,3 +11,4 @@ world = {path = "../world"}
 simulation = {path = "../simulation"}
 config = {path = "../config"}
 common = { path = "../common"}
+color = { path = "../color"}
