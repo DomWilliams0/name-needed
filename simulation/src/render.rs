@@ -6,20 +6,18 @@ use physics::StepType;
 use world::{SliceRange, ViewPoint, WorldRef};
 
 use crate::ecs::*;
-use crate::movement::Transform;
-use crate::physics::Physics;
+use crate::physics::PhysicsComponent;
+use crate::TransformComponent;
 
 /// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
-pub struct Physical {
+pub struct PhysicalComponent {
     /// temporary simple color
     pub color: ColorRgb,
 
     /// 3d dimensions in world scale
     pub dimensions: (f32, f32, f32),
 }
-
-impl Component for Physical {}
 
 pub trait Renderer {
     type Target;
@@ -30,7 +28,7 @@ pub trait Renderer {
     /// Start rendering simulation
     fn start(&mut self) {}
 
-    fn entity(&mut self, transform: &Transform, physical: &Physical);
+    fn entity(&mut self, transform: &TransformComponent, physical: &PhysicalComponent);
 
     /// Finish rendering simulation
     fn finish(&mut self) {}
@@ -49,7 +47,6 @@ pub trait Renderer {
     fn debug_finish(&mut self) {}
 }
 
-//#[derive(Clone)]
 pub struct FrameRenderState<R: Renderer> {
     pub target: Rc<RefCell<R::Target>>,
     pub slices: SliceRange,
@@ -72,32 +69,33 @@ pub(crate) struct RenderSystem<'a, R: Renderer> {
 }
 
 impl<'a, R: Renderer> System for RenderSystem<'a, R> {
-    fn tick_system(&mut self, data: &TickData) {
+    fn tick_system(&mut self, data: &mut TickData) {
         let mut voxel_world = data.voxel_world.borrow_mut();
         let physics_world = voxel_world.physics_world_mut();
 
         physics_world.step(StepType::RenderOnly);
 
-        data.ecs_world
-            .matcher_with_entities::<All<(Read<Transform>, Read<Physical>)>>()
-            .for_each(move |(e, (transform, physical))| {
-                if self.frame_state.slices.contains(transform.slice()) {
-                    // make copy
-                    let mut transform = *transform;
+        let query = <(
+            Read<TransformComponent>,
+            Read<PhysicalComponent>,
+            TryRead<PhysicsComponent>,
+        )>::query();
+        for (transform, physical, physics) in query.iter(data.ecs_world) {
+            if self.frame_state.slices.contains(transform.slice()) {
+                // make copy to mutate for interpolation
+                let mut transform = *transform;
 
-                    if let Some(physics) = data.ecs_world.get_component::<Physics>(e) {
-                        // TODO these conditionals hurt
-
-                        if let Some(interpolated_pos) =
-                            physics_world.sync_render_pos_from(&physics.collider)
-                        {
-                            transform.position = interpolated_pos;
-                        }
+                if let Some(physics) = physics {
+                    if let Some(interpolated_pos) =
+                        physics_world.sync_render_pos_from(&physics.collider)
+                    {
+                        transform.position = interpolated_pos;
                     }
-
-                    self.renderer.entity(&transform, physical);
                 }
-            });
+
+                self.renderer.entity(&transform, physical.as_ref());
+            }
+        }
     }
 }
 
@@ -120,6 +118,7 @@ pub mod dummy {
     use crate::render::{DebugRenderer, FrameRenderState};
     use crate::Renderer;
 
+    /// Example renderer that draws lines at the origin along the X and Y axes
     pub struct DummyDebugRenderer;
 
     impl<R: Renderer> DebugRenderer<R> for DummyDebugRenderer {

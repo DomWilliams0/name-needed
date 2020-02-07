@@ -600,14 +600,17 @@ extern "C" {
         half_extents: *const f32,
         friction: f32,
         linear_damping: f32,
+        jump_sensor: bool,
     ) -> *mut entity_collider;
 }
 extern "C" {
     #[doc = " returns 0 on success"]
     pub fn entity_collider_get(
+        world: *mut dynworld,
         collider: *mut entity_collider,
         pos: *mut f32,
         rot: *mut f32,
+        jump_sensor_occluded: *mut bool,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -624,6 +627,7 @@ extern "C" {
         pos: *const f32,
         rot: f32,
         vel: *const f32,
+        jump_force: f32,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {

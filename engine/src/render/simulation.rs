@@ -8,7 +8,7 @@ use glium_sdl2::SDL2Facade;
 
 use color::ColorRgb;
 use common::Matrix4;
-use simulation::{Physical, Renderer, Transform};
+use simulation::{PhysicalComponent, Renderer, TransformComponent};
 use world::ViewPoint;
 
 use crate::render::debug::{DebugShape, DebugShapes};
@@ -37,7 +37,7 @@ implement_vertex!(EntityInstanceAttributes, e_pos, e_color, e_model);
 
 pub struct GliumRenderer {
     program: glium::Program,
-    entity_instances: Vec<(Transform, Physical)>,
+    entity_instances: Vec<(TransformComponent, PhysicalComponent)>,
     entity_vertex_buf: glium::VertexBuffer<EntityInstanceAttributes>,
     entity_geometry: (glium::VertexBuffer<EntityVertex>, glium::IndexBuffer<u32>),
 
@@ -113,7 +113,7 @@ impl Renderer for GliumRenderer {
         self.entity_instances.clear();
     }
 
-    fn entity(&mut self, transform: &Transform, physical: &Physical) {
+    fn entity(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
         // TODO for safety until it can be expanded
         assert!(self.entity_instances.len() < self.entity_instances.capacity());
         self.entity_instances.push((*transform, *physical));

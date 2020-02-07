@@ -11,20 +11,16 @@ Config(
     simulation: (
         initial_entities: [
             (
-                pos: (3, 4, Some(4)),
-                color: Some((110, 160, 90)),
-                size: (1.2, 0.6, 1.95),
-            ),
-            (
-                pos: (12, 12, None),
+                pos: (3, 4, None),
                 color: None,
-                size: (1.1, 0.75, 1.85),
-            ),
+                size: (1.2, 0.6, 1.95),
+            )
         ],
         random_count: 5,
         move_speed: 22.0,
         friction: 0.1,
         linear_damping: 0.95,
-        lerp_sharpness: 0.2
+        lerp_sharpness: 0.2,
+        jump_impulse: 50.0,
      )
 )

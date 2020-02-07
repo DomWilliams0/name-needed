@@ -1,127 +1,65 @@
+use num_traits::zero;
+
 use common::*;
-use world::{InnerWorldRef, WorldPoint, WorldPosition};
 
 use crate::ecs::*;
-use num_traits::zero;
+use crate::physics::PhysicsComponent;
 
 pub const AXIS_UP: Vector3 = Vector3::new(0.0, 0.0, 1.0);
 pub const AXIS_FWD: Vector3 = Vector3::new(0.0, 1.0, 0.0);
 
-/// Position and rotation
+/// Desired movement by the brain, and practical movement to be realized by the body
 #[derive(Debug, Copy, Clone)]
-pub struct Transform {
-    /// World position, center of entity
-    pub position: WorldPoint,
+pub struct DesiredMovementComponent {
+    pub realized_velocity: Vector2,
 
-    /// Rotation angle, corresponds to `rotation_dir`
-    rotation: Rad<F>,
+    pub desired_velocity: Vector2,
 
-    /// Rotation direction
-    rotation_dir: Vector2,
+    /// 0-1
+    pub jump_force: f32,
 }
 
-impl Component for Transform {}
-
-impl Default for Transform {
+impl Default for DesiredMovementComponent {
     fn default() -> Self {
-        let mut t = Self {
-            rotation: Rad(0.0),
-            rotation_dir: zero(),
-            position: WorldPoint::default(),
-        };
-        t.set_rotation_from_direction(AXIS_FWD.truncate()); // just to make sure
-        t
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct DesiredVelocity {
-    /// Normalized
-    pub velocity: Vector2,
-}
-
-impl Component for DesiredVelocity {}
-
-impl Default for DesiredVelocity {
-    fn default() -> Self {
-        Self { velocity: zero() }
-    }
-}
-
-impl Transform {
-    pub fn new(position: WorldPoint) -> Self {
         Self {
-            position,
-            ..Self::default()
+            realized_velocity: zero(),
+            desired_velocity: zero(),
+            jump_force: 0.0,
         }
     }
-
-    pub fn from_block_center(x: i32, y: i32, z: i32) -> Self {
-        let position = WorldPoint(x as f32 + 0.5, y as f32 + 0.5, z as f32);
-        Self::new(position)
-    }
-
-    pub fn from_highest_safe_point(
-        world: &InnerWorldRef,
-        block_x: i32,
-        block_y: i32,
-    ) -> Option<Self> {
-        // TODO doesn't take into account width and depth of entity, they might not fit
-        world
-            .find_accessible_block_in_column(block_x, block_y)
-            .map(|pos| {
-                let mut pos = WorldPoint::from(pos);
-
-                // center of block
-                pos.0 += 0.5;
-                pos.1 += 0.5;
-
-                Self::new(pos)
-            })
-    }
-
-    /* pub */
-    fn _place_safely(_world: &InnerWorldRef, _search_from: (i32, i32)) -> Self {
-        // TODO guaranteed place safely
-        unimplemented!()
-    }
-
-    pub fn set_rotation_from_direction(&mut self, direction: Vector2) {
-        self.rotation = angle_from_direction(direction);
-        self.rotation_dir = direction;
-    }
-
-    pub fn rotation_dir(&self) -> Vector2 {
-        self.rotation_dir
-    }
-    pub fn rotation_angle(&self) -> Rad<F> {
-        self.rotation
-    }
-
-    pub fn slice(&self) -> i32 {
-        self.position.2 as i32
-    }
-
-    pub const fn x(&self) -> f32 {
-        self.position.0
-    }
-    pub const fn y(&self) -> f32 {
-        self.position.1
-    }
-    pub const fn z(&self) -> f32 {
-        self.position.2
-    }
 }
 
-impl From<Transform> for WorldPosition {
-    fn from(transform: Transform) -> Self {
-        transform.position.into()
-    }
-}
+/// Converts *desired* movement to *practical* movement.
+/// this will depend on the entity's health and presence of necessary limbs -
+/// you can't jump without legs, or see a jump without eyes
+pub struct MovementFulfilmentSystem;
 
-impl From<WorldPoint> for Transform {
-    fn from(pos: WorldPoint) -> Self {
-        Self::new(pos)
+impl System for MovementFulfilmentSystem {
+    fn tick_system(&mut self, data: &mut TickData) {
+        let query = <(Write<DesiredMovementComponent>, Write<PhysicsComponent>)>::query();
+        for (mut movement, mut physics) in query.iter(data.ecs_world) {
+            // scale velocity based on max speed
+            let vel = movement.desired_velocity * config::get().simulation.move_speed;
+
+            let jump_force = {
+                if movement.jump_force > 0.0 {
+                    // preserve desired jump force
+                    movement.jump_force
+                } else if physics.collider.jump_sensor_occluded() {
+                    // jump if sensor is occluded
+                    // TODO always?
+                    // TODO get block height+type at sensor (or self.pos + fwd*1), dont jump up half blocks
+                    1.0 // TODO jump force
+                } else {
+                    0.0
+                }
+            };
+
+            debug_assert!((0.0f32..=1.0).contains(&jump_force));
+
+            movement.realized_velocity = vel;
+            movement.jump_force = jump_force;
+        }
     }
 }
 
@@ -138,9 +76,11 @@ pub fn angle_from_direction(direction: Vector2) -> Rad<F> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use cgmath::{Quaternion, Rotation, Rotation3};
+
     use common::*;
+
+    use super::*;
 
     fn do_rot_non_normal<V: Into<Vector2>>(vec_in: V) {
         do_rot(vec_in.into().normalize())

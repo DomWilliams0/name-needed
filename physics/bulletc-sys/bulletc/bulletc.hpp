@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+// -------------------------------------------------------------------------------
+
 struct dynworld;
 struct dynworld *dynworld_create(float gravity);
 void dynworld_destroy(struct dynworld *world);
@@ -25,23 +27,29 @@ slab_collider *
 slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[3], const float *vertices,
                      size_t vertices_count, const uint32_t *indices, size_t indices_count);
 
+// -------------------------------------------------------------------------------
+
 struct entity_collider;
 struct entity_collider *
 entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3], float friction,
-                       float linear_damping);
+                       float linear_damping, bool jump_sensor);
 
 /// returns 0 on success
-int entity_collider_get(struct entity_collider *collider, float pos[3], float rot[2]);
+int entity_collider_get(struct dynworld *world, struct entity_collider *collider, float pos[3], float rot[2],
+                        bool *jump_sensor_occluded);
 
 /// returns 0 on success
 int entity_collider_get_pos(struct entity_collider *collider, float pos[3]);
 
 /// returns 0 on success
-int entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3]);
+int entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3],
+                        float jump_force);
 
 void rotate_to_quat_raw(const float vec[2], float *quat_out);
 
 void rotate_from_quat_raw(const float quat[4], float out[2]);
+
+// -------------------------------------------------------------------------------
 
 /// hello world example from bullet
 void hello_world_example();

@@ -2,19 +2,17 @@ use common::*;
 use world::WorldPoint;
 
 use crate::ecs::*;
-use crate::movement::DesiredVelocity;
+use crate::movement::DesiredMovementComponent;
 use crate::steer::behaviour::{Arrive, CompleteAction, Nop, Seek};
 use crate::steer::SteeringBehaviour;
-use crate::Transform;
+use crate::TransformComponent;
 
 /// Steering behaviour
-pub struct Steering {
+pub struct SteeringComponent {
     pub behaviour: SteeringBehaviour,
 }
 
-impl Component for Steering {}
-
-impl Default for Steering {
+impl Default for SteeringComponent {
     fn default() -> Self {
         Self {
             behaviour: SteeringBehaviour::Nop(Nop),
@@ -22,7 +20,7 @@ impl Default for Steering {
     }
 }
 
-impl Steering {
+impl SteeringComponent {
     pub fn seek(target: WorldPoint) -> Self {
         Self {
             behaviour: SteeringBehaviour::Seek(Seek { target }),
@@ -43,19 +41,27 @@ impl Steering {
 pub struct SteeringSystem;
 
 impl System for SteeringSystem {
-    fn tick_system(&mut self, data: &TickData) {
-        data.ecs_world
-            .matcher_with_entities::<All<(Read<Transform>, Write<Steering>, Write<DesiredVelocity>)>>(
-            )
-            .for_each(|(e, (transform, steer, vel))| {
-                if let CompleteAction::Stop = steer.behaviour.tick(transform, vel) {
-                    debug!(
-                        "{}: finished steering {:?}, reverting to default behaviour",
-                        NiceEntity(e),
-                        steer.behaviour
-                    );
-                    steer.behaviour = SteeringBehaviour::default();
-                }
-            });
+    fn tick_system(&mut self, data: &mut TickData) {
+        let query = <(
+            Read<TransformComponent>,
+            Write<SteeringComponent>,
+            Write<DesiredMovementComponent>,
+        )>::query();
+        for (e, (transform, mut steer, mut movement)) in query.iter_entities(data.ecs_world) {
+            // clear previous tick's inputs
+            *movement = DesiredMovementComponent::default();
+
+            use std::borrow::BorrowMut;
+            if let CompleteAction::Stop = steer
+                .behaviour
+                .tick(transform.as_ref(), movement.borrow_mut())
+            {
+                debug!(
+                    "{}: finished steering {:?}, reverting to default behaviour",
+                    e, steer.behaviour
+                );
+                steer.behaviour = SteeringBehaviour::default();
+            }
+        }
     }
 }

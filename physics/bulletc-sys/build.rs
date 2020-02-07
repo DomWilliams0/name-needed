@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use bindgen;
 use cmake;
+use std::env;
 
 fn main() {
     // build libbulletc
@@ -10,13 +11,15 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=bulletc");
     println!("cargo:rustc-flags=-l dylib=stdc++");
 
-    // for easy access for debugging
-    std::fs::copy(dst.join("libbulletc.so"), "../libbulletc.so").expect("couldnt copy dylib");
+    if env::var("PROFILE").unwrap() == "debug" {
+        // for easy access for debugging
+        std::fs::copy(dst.join("libbulletc.so"), "../libbulletc.so").expect("couldnt copy dylib");
+    }
 
     // bindgen
     let header = "bulletc/bulletc.hpp";
     println!("cargo:rerun-if-changed={}", header);
-    println!("cargo:rerun-if-changed=bulletc/bulletc.cpp");
+    println!("cargo:rerun-if-changed=bulletc");
     let bindings = bindgen::Builder::default()
         .header(header)
         .generate()

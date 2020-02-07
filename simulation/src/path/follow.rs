@@ -23,17 +23,15 @@ impl PathFollowing {
         // check distance to current
         let (waypoint, _cost) = &self.path.0[self.next];
         let distance2 = {
-            let from = Point3 {
+            let from = Point2 {
                 x: current_pos.0,
                 y: current_pos.1,
-                z: current_pos.2,
             };
 
             let waypoint = WorldPoint::from(*waypoint);
-            let to = Point3 {
+            let to = Point2 {
                 x: waypoint.0,
                 y: waypoint.1,
-                z: waypoint.2,
             };
 
             from.distance2(to)

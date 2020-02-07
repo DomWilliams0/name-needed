@@ -36,6 +36,7 @@ pub struct Simulation {
     pub friction: f32,
     pub linear_damping: f32,
     pub lerp_sharpness: f32,
+    pub jump_impulse: f32,
 }
 
 #[derive(Deserialize, Clone)]

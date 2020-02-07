@@ -1,12 +1,14 @@
-use std::fmt::{Display, Error, Formatter};
-use std::num::Wrapping;
-
-pub use pyro::{All, Entity, Read, Write};
-use pyro::{ComponentId, StorageId, Version};
+use legion;
+pub use legion::prelude::{Entity, IntoQuery, Read, TryRead, TryWrite, Write};
 
 use world::WorldRef;
 
-pub type EcsWorld = pyro::World<pyro::SoaStorage>;
+pub type EcsWorld = legion::world::World;
+
+pub fn create_ecs_world() -> EcsWorld {
+    let universe = legion::world::Universe::new();
+    universe.create_world()
+}
 
 pub struct TickData<'a> {
     pub voxel_world: WorldRef,
@@ -14,30 +16,5 @@ pub struct TickData<'a> {
 }
 
 pub trait System {
-    fn tick_system(&mut self, data: &TickData);
-}
-
-/// Marker for components
-pub trait Component {}
-
-#[derive(Copy, Clone)]
-pub struct NiceEntity(pub Entity);
-
-/// Identical to pyro's Entity so we can transmute to it for nice formatting....
-struct PyroEntity {
-    /// Removing entities will increment the versioning. Accessing an [`Entity`] with an
-    /// outdated version will result in a `panic`. `version` does wrap on overflow.
-    version: Wrapping<Version>,
-    /// The id of the storage where the [`Entity`] lives in
-    _storage_id: StorageId,
-    /// The actual id inside a storage
-    id: ComponentId,
-}
-
-impl Display for NiceEntity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        // TODO this isnt reliable!
-        let copy: PyroEntity = unsafe { std::mem::transmute(self.0) };
-        write!(f, "Entity[{}:{}]", copy.version, copy.id)
-    }
+    fn tick_system(&mut self, data: &mut TickData);
 }

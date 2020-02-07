@@ -3,8 +3,8 @@ use num_traits::Zero;
 use common::*;
 use world::WorldPoint;
 
-use crate::movement::DesiredVelocity;
-use crate::Transform;
+use crate::movement::DesiredMovementComponent;
+use crate::TransformComponent;
 
 #[derive(Debug)]
 pub enum SteeringBehaviour {
@@ -29,11 +29,15 @@ impl Default for SteeringBehaviour {
 }
 
 impl SteeringBehaviour {
-    pub fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction {
+    pub fn tick(
+        &mut self,
+        transform: &TransformComponent,
+        movement: &mut DesiredMovementComponent,
+    ) -> CompleteAction {
         match self {
-            SteeringBehaviour::Nop(behaviour) => behaviour.tick(transform, vel),
-            SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, vel),
-            SteeringBehaviour::Arrive(behaviour) => behaviour.tick(transform, vel),
+            SteeringBehaviour::Nop(behaviour) => behaviour.tick(transform, movement),
+            SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, movement),
+            SteeringBehaviour::Arrive(behaviour) => behaviour.tick(transform, movement),
         }
     }
 }
@@ -42,7 +46,11 @@ impl SteeringBehaviour {
 // then movement system can use that on its current movement speed
 
 trait DoASteer {
-    fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction;
+    fn tick(
+        &mut self,
+        transform: &TransformComponent,
+        movement: &mut DesiredMovementComponent,
+    ) -> CompleteAction;
 }
 
 // nop
@@ -50,7 +58,11 @@ trait DoASteer {
 pub struct Nop;
 
 impl DoASteer for Nop {
-    fn tick(&mut self, _transform: &Transform, _vel: &mut DesiredVelocity) -> CompleteAction {
+    fn tick(
+        &mut self,
+        _transform: &TransformComponent,
+        _movement: &mut DesiredMovementComponent,
+    ) -> CompleteAction {
         // it never ends
         CompleteAction::Continue
     }
@@ -63,12 +75,16 @@ pub struct Seek {
 }
 
 impl DoASteer for Seek {
-    fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction {
+    fn tick(
+        &mut self,
+        transform: &TransformComponent,
+        movement: &mut DesiredMovementComponent,
+    ) -> CompleteAction {
         let target: Vector3 = self.target.into();
         let current_pos: Vector3 = transform.position.into();
 
         let delta = target - current_pos;
-        vel.velocity = delta.truncate().normalize();
+        movement.desired_velocity = delta.truncate().normalize();
 
         // seek forever
         CompleteAction::Continue
@@ -84,7 +100,11 @@ pub struct Arrive {
 }
 
 impl DoASteer for Arrive {
-    fn tick(&mut self, transform: &Transform, vel: &mut DesiredVelocity) -> CompleteAction {
+    fn tick(
+        &mut self,
+        transform: &TransformComponent,
+        movement: &mut DesiredMovementComponent,
+    ) -> CompleteAction {
         let target: Vector3 = self.target.into();
         let current_pos: Vector3 = transform.position.into();
         let distance = current_pos.distance2(target);
@@ -105,9 +125,7 @@ impl DoASteer for Arrive {
             (vel, CompleteAction::Continue)
         };
 
-        // TODO speed?
-        // TODO lerp towards desired velocity in movement system?
-        vel.velocity = new_vel.truncate().normalize();
+        movement.desired_velocity = new_vel.truncate().normalize();
 
         action
     }

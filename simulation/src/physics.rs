@@ -2,24 +2,27 @@ use std::os::raw::c_void;
 
 use debug_draw::{DebugDrawer, FrameBlob};
 use physics;
-use physics::{Collider, StepType};
+use physics::{ColliderHandle, StepType};
 use unit::world::WorldPoint;
 use world::{InnerWorldRefMut, WorldRef};
 
 use crate::ecs::*;
 use crate::render::{DebugRenderer, FrameRenderState};
-use crate::{Physical, Renderer, Transform};
+use crate::{PhysicalComponent, Renderer, TransformComponent};
 
-/// Collisions and gravity
-pub struct Physics {
-    pub collider: Collider,
+/// Collisions and gravity component
+pub struct PhysicsComponent {
+    /// Handle to collider in physics world
+    pub collider: ColliderHandle,
 }
 
-impl Component for Physics {}
-
-impl Physics {
+impl PhysicsComponent {
     /// position = center position
-    pub fn new(mut world: InnerWorldRefMut, transform: &Transform, physical: &Physical) -> Self {
+    pub fn new(
+        mut world: InnerWorldRefMut,
+        transform: &TransformComponent,
+        physical: &PhysicalComponent,
+    ) -> Self {
         let pos = transform.position;
         let dims = physical.dimensions;
         let collider = world.physics_world_mut().add_entity(pos, dims);
@@ -28,10 +31,11 @@ impl Physics {
     }
 }
 
+/// Ticks the bullet physics world and (TODO one day) emits collision events
 pub struct PhysicsSystem;
 
 impl System for PhysicsSystem {
-    fn tick_system(&mut self, data: &TickData) {
+    fn tick_system(&mut self, data: &mut TickData) {
         let mut world = data.voxel_world.borrow_mut();
         let physics_world = world.physics_world_mut();
 
@@ -39,7 +43,7 @@ impl System for PhysicsSystem {
         physics_world.step(StepType::Tick);
 
         // handle collision events
-        physics_world.handle_collision_events();
+        // physics_world.handle_collision_events();
     }
 }
 

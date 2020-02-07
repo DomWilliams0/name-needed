@@ -1,4 +1,4 @@
-pub use collider::{Collider, ColliderData};
+pub use collider::{ColliderData, ColliderHandle};
 pub use world::{PhysicsWorld, SlabCollider, StepType};
 
 mod collider;

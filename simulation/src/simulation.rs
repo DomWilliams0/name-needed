@@ -7,14 +7,16 @@ use common::*;
 use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
 
-use crate::ecs::{EcsWorld, Entity, System, TickData};
-use crate::movement::{DesiredVelocity, Transform};
-use crate::path::{FollowPath, PathDebugRenderer, PathSteeringSystem, TempPathAssignmentSystem};
-use crate::physics::{Physics, PhysicsSystem};
+use crate::ecs::{create_ecs_world, EcsWorld, Entity, System, TickData};
+use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
+use crate::path::{FollowPathComponent, PathDebugRenderer, PathSteeringSystem,
+                  TempPathAssignmentSystem};
+use crate::physics::{PhysicsComponent, PhysicsSystem};
 use crate::render::dummy::DummyDebugRenderer;
-use crate::render::{DebugRenderer, FrameRenderState, Physical, RenderSystem, Renderer};
-use crate::steer::{Steering, SteeringSystem};
+use crate::render::{DebugRenderer, FrameRenderState, PhysicalComponent, RenderSystem, Renderer};
+use crate::steer::{SteeringComponent, SteeringSystem};
 use crate::sync::{SyncFromPhysicsSystem, SyncToPhysicsSystem};
+use crate::transform::TransformComponent;
 
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
@@ -22,30 +24,23 @@ pub struct Simulation<R: Renderer> {
 
     renderer: PhantomData<R>,
     debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
-
-    has_physics_debug_renderer: bool,
-    is_physics_debug_renderer_enabled: bool,
+    debug_physics: bool,
 }
 
 impl<R: Renderer> Simulation<R> {
     pub fn new(world: WorldRef) -> Self {
-        let ecs_world = EcsWorld::new();
-
-        // add physics debug renderer
-        let has_physics_debug_renderer = true;
-        let is_physics_debug_renderer_enabled = config::get().display.debug_physics;
+        // unconditionally add physics debug renderer
         world
             .borrow_mut()
             .physics_world_mut()
-            .set_debug_drawer(has_physics_debug_renderer);
+            .set_debug_drawer(true);
 
         Self {
-            ecs_world,
+            ecs_world: create_ecs_world(),
             renderer: PhantomData,
             voxel_world: world,
             debug_renderers: vec![Box::new(DummyDebugRenderer), Box::new(PathDebugRenderer)],
-            has_physics_debug_renderer,
-            is_physics_debug_renderer_enabled,
+            debug_physics: config::get().display.debug_physics,
         }
     }
 
@@ -56,13 +51,14 @@ impl<R: Renderer> Simulation<R> {
         block_pos: (i32, i32, Option<i32>),
         color: ColorRgb,
         dimensions: (f32, f32, f32),
-    ) {
+    ) -> &[Entity] {
         let world = &self.voxel_world;
         let transform = match block_pos {
-            (x, y, Some(z)) => Transform::from_block_center(x, y, z),
+            (x, y, Some(z)) => TransformComponent::from_block_center(x, y, z),
             (x, y, None) => {
-                let mut transform = Transform::from_highest_safe_point(&world.borrow(), x, y)
-                    .expect("should be valid position");
+                let mut transform =
+                    TransformComponent::from_highest_safe_point(&world.borrow(), x, y)
+                        .expect("should be valid position");
 
                 // stand on top
                 transform.position.2 += dimensions.2 / 4.0;
@@ -71,20 +67,23 @@ impl<R: Renderer> Simulation<R> {
             }
         };
 
-        let physical = Physical { color, dimensions };
-        let physics = Physics::new(world.borrow_mut(), &transform, &physical);
+        let physical = PhysicalComponent { color, dimensions };
+        let physics = PhysicsComponent::new(world.borrow_mut(), &transform, &physical);
 
         info!("adding an entity at {:?}", transform.position);
 
-        self.ecs_world.append_components(Some((
-            transform,
-            DesiredVelocity::default(),
-            physical,
-            physics,
-            FollowPath::default(),
-            // Steering::seek(WorldPoint(15.0, 3.0, 3.0)),
-            Steering::default(),
-        )));
+        self.ecs_world.insert(
+            (),
+            vec![(
+                transform,
+                DesiredMovementComponent::default(),
+                physical,
+                physics,
+                FollowPathComponent::default(),
+                // Steering::seek(WorldPoint(15.0, 3.0, 3.0)),
+                SteeringComponent::default(),
+            )],
+        )
     }
 
     fn tick_data(&mut self) -> TickData {
@@ -96,25 +95,24 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn tick(&mut self) {
         // tick systems
-        let tick_data = self.tick_data();
+        let mut tick_data = self.tick_data();
 
         // assign paths
-        TempPathAssignmentSystem.tick_system(&tick_data);
+        TempPathAssignmentSystem.tick_system(&mut tick_data);
 
         // follow paths with steering
-        PathSteeringSystem.tick_system(&tick_data);
+        PathSteeringSystem.tick_system(&mut tick_data);
 
         // apply steering
-        SteeringSystem.tick_system(&tick_data);
+        SteeringSystem.tick_system(&mut tick_data);
+
+        // attempt to fulfil desired velocity
+        MovementFulfilmentSystem.tick_system(&mut tick_data);
 
         // apply physics
-        SyncToPhysicsSystem.tick_system(&tick_data);
-        PhysicsSystem.tick_system(&tick_data);
-        SyncFromPhysicsSystem.tick_system(&tick_data);
-    }
-
-    pub fn entities<'s>(&'s self) -> impl Iterator<Item = Entity> + 's {
-        self.ecs_world.entities()
+        SyncToPhysicsSystem.tick_system(&mut tick_data);
+        PhysicsSystem.tick_system(&mut tick_data);
+        SyncFromPhysicsSystem.tick_system(&mut tick_data);
     }
 
     pub fn world(&self) -> WorldRef {
@@ -144,7 +142,7 @@ impl<R: Renderer> Simulation<R> {
                     interpolation,
                 };
 
-                render_system.tick_system(&self.tick_data());
+                render_system.tick_system(&mut self.tick_data());
             }
             renderer.finish();
         }
@@ -162,7 +160,7 @@ impl<R: Renderer> Simulation<R> {
                     &frame_state,
                 );
             }
-            if self.is_physics_debug_renderer_enabled && self.has_physics_debug_renderer {
+            if self.debug_physics {
                 DebugDrawer.render(
                     renderer,
                     self.voxel_world.clone(),
@@ -178,8 +176,9 @@ impl<R: Renderer> Simulation<R> {
         renderer.deinit();
     }
 
+    /// Toggles and returns new enabled state
     pub fn toggle_physics_debug_rendering(&mut self) -> bool {
-        self.is_physics_debug_renderer_enabled = !self.is_physics_debug_renderer_enabled;
-        self.is_physics_debug_renderer_enabled
+        self.debug_physics = !self.debug_physics;
+        self.debug_physics
     }
 }

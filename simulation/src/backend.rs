@@ -1,6 +1,8 @@
-use crate::{Renderer, Simulation};
 use world::WorldViewer;
 
+use crate::{Renderer, Simulation};
+
+/// Action to take after consuming events
 pub enum EventsOutcome {
     Continue,
     Exit,

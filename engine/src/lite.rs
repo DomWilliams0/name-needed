@@ -1,7 +1,8 @@
 use std::time::{Duration, Instant};
 
 use color::ColorRgb;
-use simulation::{EventsOutcome, Physical, Renderer, Simulation, SimulationBackend, Transform};
+use simulation::{EventsOutcome, PhysicalComponent, Renderer, Simulation, SimulationBackend,
+                 TransformComponent};
 use unit::view::ViewPoint;
 use world::WorldViewer;
 
@@ -14,7 +15,7 @@ pub struct DummyBackend {
 impl Renderer for DummyRenderer {
     type Target = ();
 
-    fn entity(&mut self, transform: &Transform, physical: &Physical) {}
+    fn entity(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {}
 
     fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {}
 

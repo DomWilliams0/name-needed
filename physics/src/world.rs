@@ -6,7 +6,7 @@ use bulletc_sys as ffi;
 use common::*;
 use unit::world::WorldPoint;
 
-use crate::collider::Collider;
+use crate::collider::ColliderHandle;
 use crate::TICKS_PER_SECOND;
 
 pub struct PhysicsWorld {
@@ -31,7 +31,7 @@ impl PhysicsWorld {
 
     /// pos: center
     /// dimensions: full extents
-    pub fn add_entity(&mut self, pos: WorldPoint, dimensions: (f32, f32, f32)) -> Collider {
+    pub fn add_entity(&mut self, pos: WorldPoint, dimensions: (f32, f32, f32)) -> ColliderHandle {
         let center: *const f32 = &[pos.0, pos.1, pos.2] as *const f32;
         let half_extents: *const f32 =
             &[dimensions.0 / 2.0, dimensions.1 / 2.0, dimensions.2 / 2.0] as *const f32;
@@ -45,10 +45,12 @@ impl PhysicsWorld {
                     half_extents,
                     cfg.simulation.friction,
                     cfg.simulation.linear_damping,
+                    true, // TODO pointer to callback instead
                 )
             }
         };
-        Collider { collider }
+
+        ColliderHandle::new(collider)
     }
 
     pub fn update_slab_collider(
@@ -79,7 +81,7 @@ impl PhysicsWorld {
         collider.slab_collider = new;
     }
 
-    pub fn handle_collision_events(&self) {}
+    // pub fn handle_collision_events(&self) {}
 
     pub fn step(&mut self, step_type: StepType) {
         let now = Instant::now();
@@ -98,7 +100,7 @@ impl PhysicsWorld {
         }
     }
 
-    pub fn sync_render_pos_from(&self, collider: &Collider) -> Option<WorldPoint> {
+    pub fn sync_render_pos_from(&self, collider: &ColliderHandle) -> Option<WorldPoint> {
         let mut ffi_pos = [0.0f32; 3];
 
         let ret =
@@ -111,15 +113,23 @@ impl PhysicsWorld {
         }
     }
 
-    pub fn sync_from(&self, collider: &Collider, pos: &mut WorldPoint, rot: &mut Vector2) -> bool {
+    pub fn sync_from(
+        &self,
+        collider: &mut ColliderHandle,
+        pos: &mut WorldPoint,
+        rot: &mut Vector2,
+    ) -> bool {
         let mut ffi_pos = [0.0f32; 3];
         let mut ffi_rot = [0.0f32; 2];
+        let mut jump_sensor_occluded = false;
 
         let ret = unsafe {
             ffi::entity_collider_get(
+                self.dynworld,
                 collider.collider,
                 &mut ffi_pos[0] as *mut f32,
                 &mut ffi_rot[0] as *mut f32,
+                &mut jump_sensor_occluded as *mut bool,
             )
         };
 
@@ -135,11 +145,21 @@ impl PhysicsWorld {
             rot.x = ffi_rot[0];
             rot.y = ffi_rot[1];
 
+            // TODO not used yet
+            // collider.set_jump_sensor_occluded(jump_sensor_occluded);
+
             true
         }
     }
 
-    pub fn sync_to(&self, collider: &Collider, pos: &WorldPoint, rot: F, vel: &Vector3) -> bool {
+    pub fn sync_to(
+        &self,
+        collider: &mut ColliderHandle,
+        pos: &WorldPoint,
+        rot: F,
+        vel: &Vector3,
+        jump_force: f32,
+    ) -> bool {
         let ffi_pos: [f32; 3] = [pos.0, pos.1, pos.2];
         let ffi_vel: [f32; 3] = [vel.x, vel.y, vel.z];
 
@@ -149,6 +169,7 @@ impl PhysicsWorld {
                 &ffi_pos as *const f32,
                 rot,
                 &ffi_vel as *const f32,
+                jump_force,
             )
         };
 
