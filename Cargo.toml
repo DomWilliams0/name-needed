@@ -9,6 +9,7 @@ members = [
 	"config",
 	"common",
 	"simulation",
+	"struclog",
 	"unit",
 	"physics",
 	"physics/bulletc-sys",

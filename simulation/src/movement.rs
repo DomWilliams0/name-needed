@@ -37,7 +37,7 @@ pub struct MovementFulfilmentSystem;
 impl System for MovementFulfilmentSystem {
     fn tick_system(&mut self, data: &mut TickData) {
         let query = <(Write<DesiredMovementComponent>, Write<PhysicsComponent>)>::query();
-        for (mut movement, mut physics) in query.iter(data.ecs_world) {
+        for (e, (mut movement, mut physics)) in query.iter_entities(data.ecs_world) {
             // scale velocity based on max speed
             let vel = movement.desired_velocity * config::get().simulation.move_speed;
 
@@ -59,6 +59,10 @@ impl System for MovementFulfilmentSystem {
 
             movement.realized_velocity = vel;
             movement.jump_force = jump_force;
+            event_trace(Event::Entity(EntityEvent::MovementIntention(
+                entity_id(e),
+                (vel.x, vel.y),
+            )));
         }
     }
 }

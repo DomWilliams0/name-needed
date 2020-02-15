@@ -7,7 +7,7 @@ use common::*;
 use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
 
-use crate::ecs::{create_ecs_world, EcsWorld, Entity, System, TickData};
+use crate::ecs::{create_ecs_world, entity_id, EcsWorld, Entity, System, TickData};
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
 use crate::path::{FollowPathComponent, PathDebugRenderer, PathSteeringSystem,
                   TempPathAssignmentSystem};
@@ -72,7 +72,7 @@ impl<R: Renderer> Simulation<R> {
 
         info!("adding an entity at {:?}", transform.position);
 
-        self.ecs_world.insert(
+        let entities = self.ecs_world.insert(
             (),
             vec![(
                 transform,
@@ -83,7 +83,12 @@ impl<R: Renderer> Simulation<R> {
                 // Steering::seek(WorldPoint(15.0, 3.0, 3.0)),
                 SteeringComponent::default(),
             )],
-        )
+        );
+
+        for &e in entities {
+            event_verbose(Event::Entity(EntityEvent::Create(entity_id(e))))
+        }
+        entities
     }
 
     fn tick_data(&mut self) -> TickData {
@@ -95,6 +100,7 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn tick(&mut self) {
         // tick systems
+        let _span = enter_span(Span::Tick);
         let mut tick_data = self.tick_data();
 
         // assign paths

@@ -1,5 +1,7 @@
+use common::struclog;
 use legion;
 pub use legion::prelude::{Entity, IntoQuery, Read, TryRead, TryWrite, Write};
+use std::mem;
 
 use world::WorldRef;
 
@@ -17,4 +19,12 @@ pub struct TickData<'a> {
 
 pub trait System {
     fn tick_system(&mut self, data: &mut TickData);
+}
+
+pub fn entity_id(e: Entity) -> struclog::EntityId {
+    debug_assert_eq!(
+        mem::size_of::<Entity>(),
+        mem::size_of::<struclog::EntityId>()
+    );
+    unsafe { mem::transmute(e) }
 }

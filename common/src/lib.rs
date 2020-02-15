@@ -5,6 +5,8 @@ pub use lazy_static::lazy_static;
 pub use log::*;
 pub use num_traits;
 pub use rand::prelude::*;
+pub use struclog::{self, enter_span, event_error, event_info, event_trace, event_verbose,
+                   EntityEvent, Event, Span};
 
 #[cfg(feature = "binary")]
 pub use env_logger;

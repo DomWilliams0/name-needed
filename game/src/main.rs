@@ -5,6 +5,7 @@ use game_presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::SimulationBackend;
 
 use std::path::PathBuf;
+use struclog::sink::ipc::IpcSink;
 
 fn main() {
     let args = App::new(env!("CARGO_PKG_NAME"))
@@ -64,8 +65,14 @@ fn main() {
         }
     }
 
+    // enable structured logging
+    struclog::init(Some(Box::new(IpcSink::default())));
+
     // and away we go
-    let sim = preset.load();
+    let sim = {
+        let _span = enter_span(Span::Setup);
+        preset.load()
+    };
     let engine = Engine::<Renderer, Backend>::new(sim);
     engine.run();
 

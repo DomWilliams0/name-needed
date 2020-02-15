@@ -55,6 +55,9 @@ impl System for PathSteeringSystem {
                 // path over
                 None => {
                     trace!("{}: arrived at destination", e);
+                    event_trace(Event::Entity(EntityEvent::NavigationTargetReached(
+                        entity_id(e),
+                    )));
                     path.path = None;
                     SteeringComponent::default()
                 }
@@ -122,6 +125,12 @@ impl System for TempPathAssignmentSystem {
                 }
 
                 path.path = full_path.map(PathFollowing::new);
+                if let Some(tgt) = target {
+                    event_trace(Event::Entity(EntityEvent::NewNavigationTarget(
+                        entity_id(e),
+                        tgt.into(),
+                    )));
+                }
             }
         }
     }

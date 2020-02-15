@@ -15,8 +15,9 @@ itertools = "0.8"
 rand = "0.7"
 env_logger = {version = "0.7", optional = true}
 float-cmp = "0.5"
+struclog = { path = "../struclog" }
 
 # TODO feature for cgmath
 [features]
 default = []
-binary = ["log/release_max_level_info", "env_logger"]
+binary = ["log/release_max_level_info", "env_logger", "struclog/trace"]
