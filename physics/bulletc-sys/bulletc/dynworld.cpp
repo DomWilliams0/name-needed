@@ -1,3 +1,4 @@
+#include <iterator>
 #include "dynworld.hpp"
 #include "bulletc.hpp"
 #include "common.hpp"
