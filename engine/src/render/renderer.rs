@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::mem::MaybeUninit;
 use std::rc::Rc;
 
 use cgmath::perspective;
@@ -7,7 +8,11 @@ use glium::index::PrimitiveType;
 use glium::uniform;
 use glium::{implement_vertex, Surface};
 use glium_sdl2::{DisplayBuild, SDL2Facade};
+use sdl2::event::{Event, WindowEvent};
+use sdl2::keyboard::Keycode;
+use sdl2::EventPump;
 
+use common::input::{Key, KeyEvent};
 use common::*;
 use simulation::{EventsOutcome, Simulation, SimulationBackend};
 use unit;
@@ -16,10 +21,6 @@ use world::{ChunkPosition, Vertex as WorldVertex, ViewPoint, WorldPoint, WorldVi
 use crate::render;
 use crate::render::camera::FreeRangeCamera;
 use crate::render::{draw_params, load_program, DrawParamType, FrameTarget, GliumRenderer};
-use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Keycode;
-use sdl2::EventPump;
-use std::mem::MaybeUninit;
 
 /// Copy of world::mesh::Vertex
 #[derive(Copy, Clone)]
@@ -58,12 +59,6 @@ pub struct SdlGliumBackend {
 
     // simulation rendering
     simulation_renderer: GliumRenderer,
-}
-
-#[derive(Debug)]
-enum KeyEvent {
-    Down(Keycode),
-    Up(Keycode),
 }
 
 impl SimulationBackend for SdlGliumBackend {
@@ -129,7 +124,7 @@ impl SimulationBackend for SdlGliumBackend {
     fn consume_events(&mut self) -> EventsOutcome {
         // we need mutable access to self while consuming events, so temporarily move event pump
         // out of `self`
-        #[allow(clippy::uninit_assumed_init)]
+        #[allow(clippy::uninit_assumed_init, invalid_value)]
         let dummy = unsafe { MaybeUninit::uninit().assume_init() };
         let mut event_pump = std::mem::replace(&mut self.event_pump, dummy);
 
@@ -147,10 +142,10 @@ impl SimulationBackend for SdlGliumBackend {
 
                 Event::KeyDown {
                     keycode: Some(key), ..
-                } => self.handle_key(KeyEvent::Down(key)),
+                } => self.handle_key_down(key),
                 Event::KeyUp {
                     keycode: Some(key), ..
-                } => self.handle_key(KeyEvent::Up(key)),
+                } => self.handle_key_up(key),
                 Event::Window {
                     win_event: WindowEvent::Resized(w, h),
                     ..
@@ -276,31 +271,62 @@ impl SdlGliumBackend {
         &mut self.camera
     }
 
+    #[inline(always)]
+    fn handle_key_down(&mut self, key: Keycode) {
+        if let Some(key) = map_sdl_keycode(key) {
+            self.handle_key(KeyEvent::Down(key))
+        }
+    }
+
+    #[inline(always)]
+    fn handle_key_up(&mut self, key: Keycode) {
+        if let Some(key) = map_sdl_keycode(key) {
+            self.handle_key(KeyEvent::Up(key))
+        }
+    }
+
     fn handle_key(&mut self, event: KeyEvent) {
         match event {
-            KeyEvent::Down(Keycode::Up) => self.world_viewer.move_by(1),
-            KeyEvent::Down(Keycode::Down) => self.world_viewer.move_by(-1),
-            KeyEvent::Down(Keycode::Y) => {
+            KeyEvent::Down(Key::SliceUp) => self.world_viewer.move_by(1),
+            KeyEvent::Down(Key::SliceDown) => self.world_viewer.move_by(-1),
+            KeyEvent::Down(Key::ToggleWireframe) => {
                 let wireframe = unsafe { render::wireframe_world_toggle() };
                 debug!(
                     "world is {} wireframe",
                     if wireframe { "now" } else { "no longer" }
                 )
             }
+            k if k.is_camera_key() => self.camera.handle_key(k),
             _ => {}
         };
+    }
+}
 
-        // this is silly
-        let pressed = if let KeyEvent::Down(_) = event {
-            true
-        } else {
-            false
-        };
-        let key = match event {
-            KeyEvent::Down(k) => k,
-            KeyEvent::Up(k) => k,
-        };
-
-        self.camera.handle_key(key, pressed);
+/// can't use TryInto/TryFrom for now
+// -----
+// error[E0119]: conflicting implementations of trait `std::convert::TryInto<common::input::Key>` for type `sdl2::keyboard::keycode::Keycode`:
+//   --> engine/src/render/renderer.rs:306:1
+//    |
+//306 | impl TryInto<Key> for Keycode {
+//    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//    |
+//    = note: conflicting implementation in crate `core`:
+//            - impl<T, U> std::convert::TryInto<U> for T
+//              where U: std::convert::TryFrom<T>;
+//    = note: upstream crates may add a new impl of trait `std::convert::From<sdl2::keyboard::keycode::Keycode>` for type `common::input::Key` in future versions
+fn map_sdl_keycode(keycode: Keycode) -> Option<Key> {
+    match keycode {
+        Keycode::Escape => Some(Key::Exit),
+        Keycode::Up => Some(Key::SliceUp),
+        Keycode::Down => Some(Key::SliceDown),
+        Keycode::Y => Some(Key::ToggleWireframe),
+        Keycode::W => Some(Key::CameraForward),
+        Keycode::A => Some(Key::CameraLeft),
+        Keycode::S => Some(Key::CameraBack),
+        Keycode::D => Some(Key::CameraRight),
+        _ => {
+            debug!("ignoring unknown keycode {:?}", keycode);
+            None
+        }
     }
 }

@@ -98,8 +98,8 @@ impl ChunkBuilderApply {
         P: Into<BlockPosition>,
         B: Into<Block>,
     {
-        // swap out inner with dAnGeRoUs uNdEfInEd bEhAvIoUr
-        #[allow(clippy::uninit_assumed_init)]
+        // swap out inner with dAnGeRoUs uNdEfInEd bEhAvIoUr - it's fine we put it back
+        #[allow(clippy::uninit_assumed_init, invalid_value)]
         let dummy_uninit = unsafe { MaybeUninit::uninit().assume_init() };
         let chunk_builder = self.inner.replace(dummy_uninit);
 

@@ -19,6 +19,7 @@ pub struct FrameBlob<'a> {
     pub draw_line: &'a mut dyn FnMut(WorldPoint, WorldPoint, ColorRgb),
 }
 
+/// # Safety
 /// Called by C
 pub unsafe extern "C" fn raw_draw_line(
     frame_blob: *mut c_void,

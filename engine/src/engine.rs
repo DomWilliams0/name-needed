@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use common::*;
 use gameloop::{FrameAction, GameLoop};
 use simulation::{self, EventsOutcome, Renderer, Simulation, SimulationBackend};
@@ -21,6 +23,13 @@ impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
 
     /// Game loop
     pub fn run(mut self) {
+        // initial sleep
+        let delay = config::get().simulation.start_delay;
+        if delay > 0 {
+            info!("sleeping for {}ms before starting", delay);
+            std::thread::sleep(Duration::from_millis(delay as u64));
+        }
+
         // TODO separate faster rate for physics?
         let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5);
 

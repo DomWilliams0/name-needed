@@ -27,16 +27,10 @@ struct jump_sensor_callback : btCollisionWorld::ContactResultCallback {
 struct entity_jump_sensor {
     unsigned int occluded;
     btGhostObject body;
-    btBoxShape shape;
+    btConeShape cone;
 
-    explicit entity_jump_sensor(const btVector3 &half_dims) : occluded(false), shape(half_dims /* temporary */) {
-        btVector3 sensor_dims = half_dims;
-        sensor_dims[SIDE_DIM] *= 0.8;
-        sensor_dims[FWD_DIM] *= 0.8;
-        sensor_dims[UP_DIM] *= 0.25;
-
-        shape = btBoxShape(sensor_dims);
-        body.setCollisionShape(&shape);
+    explicit entity_jump_sensor(const btVector3 &half_dims) : occluded(false), cone(half_dims[SIDE_DIM] * 0.8, 0.0) {
+        body.setCollisionShape(&cone);
         body.setCollisionFlags(body.getCollisionFlags()
                                | btCollisionObject::CF_KINEMATIC_OBJECT
                                | btCollisionObject::CF_NO_CONTACT_RESPONSE);
@@ -46,27 +40,32 @@ struct entity_jump_sensor {
     }
 
     /// keep sensor in front of body
-    void update_jump_sensor_transform(const btVector3 &half_dims, const btTransform &body_transform) {
+    void
+    update_jump_sensor_transform(const btVector3 &half_dims, const btTransform &body_transform, float sensor_length) {
         btTransform transform = btTransform::getIdentity();
 
         btVector3 &translation = transform.getOrigin();
-        translation += FWD * half_dims[FWD_DIM] * (2.0 - shape.getHalfExtentsWithoutMargin()[FWD_DIM]);
-        translation += UP * half_dims[UP_DIM] * -0.5;
+        translation += FWD * ((half_dims[FWD_DIM] * 0.8) + sensor_length / 3.0);
+        translation += UP * half_dims[UP_DIM] * -0.1;
 
         body.setWorldTransform(body_transform * transform);
+        cone.setHeight(-sensor_length);
     }
 
     /// sensor should already be in place
     bool poll(dynworld *world) {
         static jump_sensor_callback contact_callback;
 
-        auto len = body.getNumOverlappingObjects();
-        auto pairs = body.getOverlappingPairs();
+        // only do expensive collision checking if the cone isn't 0 length i.e. not moving
+        if (abs(cone.getHeight()) > 0.0) {
+            auto len = body.getNumOverlappingObjects();
+            auto pairs = body.getOverlappingPairs();
 
-        for (int i = 0; i < len; ++i) {
-            btCollisionObject *other = pairs.at(i);
-            // TODO check the other is the world
-            world->dynamicsWorld->contactPairTest(&body, other, contact_callback);
+            for (int i = 0; i < len; ++i) {
+                btCollisionObject *other = pairs.at(i);
+                // TODO check the other is the world
+                world->dynamicsWorld->contactPairTest(&body, other, contact_callback);
+            }
         }
 
         bool ret = occluded == 1;
@@ -95,23 +94,31 @@ struct entity_collider {
 
         if (add_jump_sensor) {
             jump_sensor = new entity_jump_sensor(half_dims);
-            update_jump_sensor_transform();
+            update_jump_sensor_transform(0);
         }
     }
 
     /// keep sensor in front of body
     /// only call if `has_jump_sensor() == true`
-    void update_jump_sensor_transform() {
+    void update_jump_sensor_transform(float sensor_length) {
                 btAssert(has_jump_sensor());
-        jump_sensor->update_jump_sensor_transform(half_dims, body.getWorldTransform());
+        jump_sensor->update_jump_sensor_transform(half_dims, body.getWorldTransform(), sensor_length);
     }
 
     bool has_jump_sensor() const { return jump_sensor != nullptr; }
 
     /// sensor should already be in place from previous call to `update_jump_sensor_transform`
-    bool poll_jump_sensor(dynworld *world) {
+    bool should_jump(dynworld *world, entity_jump_action jump_action) {
                 btAssert(has_jump_sensor());
-        return jump_sensor->poll(world);
+
+        switch (jump_action) {
+            case entity_jump_action::NOPE:
+                return false;
+            case entity_jump_action::UNCONDITIONAL:
+                return true;
+            case entity_jump_action::IF_SENSOR_OCCLUDED:
+                return jump_sensor->poll(world);
+        }
     }
 
     virtual ~entity_collider() {
@@ -147,8 +154,7 @@ entity_collider_create(struct dynworld *world, const float center[3], const floa
     return collider;
 }
 
-int entity_collider_get(struct dynworld *world, struct entity_collider *collider, float pos[3], float rot[2],
-                        bool *jump_sensor_occluded) {
+int entity_collider_get(struct dynworld *world, struct entity_collider *collider, float pos[3], float rot[2]) {
     int ret = -1;
 
     if (collider != nullptr) {
@@ -162,10 +168,6 @@ int entity_collider_get(struct dynworld *world, struct entity_collider *collider
 
         rot[0] = rotation.x();
         rot[1] = rotation.y();
-
-        if (collider->has_jump_sensor()) {
-            *jump_sensor_occluded = collider->poll_jump_sensor(world);
-        }
 
         ret = 0;
     }
@@ -191,9 +193,8 @@ int entity_collider_get_pos(struct entity_collider *collider, float pos[3]) {
 }
 
 
-int
-entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3],
-                    float jump_force) {
+int entity_collider_set(struct dynworld *world, struct entity_collider *collider, const float *pos, float rot,
+                        const float *vel, enum entity_jump_action jump_action) {
     int ret = -1;
 
     if (collider != nullptr) {
@@ -206,14 +207,21 @@ entity_collider_set(struct entity_collider *collider, const float pos[3], float 
         transform.setRotation(new_rot);
 
         collider->body.setWorldTransform(transform);
-        if (collider->has_jump_sensor()) {
-            collider->update_jump_sensor_transform();
-        }
-
         btVector3 new_vel(vel[0], vel[1], vel[2]);
-        // TODO jump only if touching the ground
-        new_vel[UP_DIM] += jump_force;
         collider->body.applyCentralForce(new_vel);
+
+        if (collider->has_jump_sensor()) {
+            btVector3 actual_movement = collider->body.getLinearVelocity();
+            actual_movement.setZ(0.0); // ignore up movement
+            float sensor_length = actual_movement.length();
+
+            collider->update_jump_sensor_transform(sensor_length * g_config.jump_sensor_length_scale);
+
+            if (collider->should_jump(world, jump_action)) {
+                btVector3 jump_vel(0.0, 0.0, g_config.jump_force);
+                collider->body.applyCentralForce(jump_vel);
+            }
+        }
 
         ret = 0;
     }

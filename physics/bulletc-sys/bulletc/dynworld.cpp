@@ -1,9 +1,11 @@
 #include <iterator>
+
 #include "dynworld.hpp"
 #include "bulletc.hpp"
 #include "common.hpp"
 #include "debug.hpp"
 
+per_tick_config g_config;
 
 struct dynworld *dynworld_create(float gravity) {
     return new(std::nothrow) dynworld(gravity);

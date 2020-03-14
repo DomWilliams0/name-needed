@@ -67,8 +67,7 @@ impl System for PathSteeringSystem {
 }
 
 /// Temporary (!!) system to assign a path. Will be replaced by a proper system (mark my words).
-/// Look, it's even already deprecated
-#[deprecated(note = "Make sure this is replaced, thx")]
+/// Look it even has "Temp" in its name to show I'm serious
 pub struct TempPathAssignmentSystem;
 
 impl System for TempPathAssignmentSystem {

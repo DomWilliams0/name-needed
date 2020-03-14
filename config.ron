@@ -21,6 +21,10 @@ Config(
         friction: 0.1,
         linear_damping: 0.95,
         lerp_sharpness: 0.2,
-        jump_impulse: 50.0,
-     )
+        start_delay: 0,
+     ),
+     physics_per_tick: (
+        jump_sensor_length_scale: 0.3,
+        jump_force: 90.0,
+     ),
 )

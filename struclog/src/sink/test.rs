@@ -34,7 +34,6 @@ impl TestSink {
             .iter()
             .filter_map(|(spans, event)| match event {
                 Event::Entity(e) => Some((spans, e)),
-                _ => None,
             })
             .filter(move |(_, e)| e.entity_id() == entity_id)
     }

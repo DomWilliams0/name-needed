@@ -1,7 +1,9 @@
+use std::convert::TryFrom;
+
 use enum_map::{Enum, EnumMap};
 use num_traits::clamp;
-use sdl2::keyboard::Keycode;
 
+use common::input::{Key, KeyEvent};
 use common::*;
 use simulation::{AXIS_FWD, AXIS_UP};
 
@@ -15,14 +17,16 @@ enum Direction {
     Right,
 }
 
-impl Direction {
-    fn from_key(key: Keycode) -> Option<Self> {
-        match key {
-            Keycode::W => Some(Direction::Forward),
-            Keycode::A => Some(Direction::Left),
-            Keycode::S => Some(Direction::Backward),
-            Keycode::D => Some(Direction::Right),
-            _ => None,
+impl TryFrom<Key> for Direction {
+    type Error = ();
+
+    fn try_from(value: Key) -> Result<Self, Self::Error> {
+        match value {
+            Key::CameraForward => Ok(Direction::Forward),
+            Key::CameraLeft => Ok(Direction::Left),
+            Key::CameraBack => Ok(Direction::Backward),
+            Key::CameraRight => Ok(Direction::Right),
+            _ => Err(()),
         }
     }
 }
@@ -81,9 +85,9 @@ impl FreeRangeCamera {
         self.dir.z = Deg::sin(self.yaw) * Deg::cos(self.pitch);
     }
 
-    pub fn handle_key(&mut self, key: Keycode, pressed: bool) {
-        if let Some(dir) = Direction::from_key(key) {
-            self.key_state[dir] = pressed;
+    pub fn handle_key(&mut self, key_event: KeyEvent) {
+        if let Ok(dir) = Direction::try_from(key_event.key()) {
+            self.key_state[dir] = key_event.is_down();
         }
     }
 

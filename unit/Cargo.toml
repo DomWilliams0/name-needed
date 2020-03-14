@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 common = { path = "../common" }
-derive_more = "0.15"
+derive_more = "^0.99"

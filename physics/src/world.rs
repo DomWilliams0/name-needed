@@ -121,7 +121,6 @@ impl PhysicsWorld {
     ) -> bool {
         let mut ffi_pos = [0.0f32; 3];
         let mut ffi_rot = [0.0f32; 2];
-        let mut jump_sensor_occluded = false;
 
         let ret = unsafe {
             ffi::entity_collider_get(
@@ -129,7 +128,6 @@ impl PhysicsWorld {
                 collider.collider,
                 &mut ffi_pos[0] as *mut f32,
                 &mut ffi_rot[0] as *mut f32,
-                &mut jump_sensor_occluded as *mut bool,
             )
         };
 
@@ -158,22 +156,35 @@ impl PhysicsWorld {
         pos: &WorldPoint,
         rot: F,
         vel: &Vector3,
-        jump_force: f32,
+        jump_action: EntityJumpAction,
     ) -> bool {
         let ffi_pos: [f32; 3] = [pos.0, pos.1, pos.2];
         let ffi_vel: [f32; 3] = [vel.x, vel.y, vel.z];
 
         let ret = unsafe {
             ffi::entity_collider_set(
+                self.dynworld,
                 collider.collider,
                 &ffi_pos as *const f32,
                 rot,
                 &ffi_vel as *const f32,
-                jump_force,
+                jump_action,
             )
         };
 
         ret == 0
+    }
+
+    pub fn sync_config(&self) {
+        let conf = &config::get().physics_per_tick;
+        let ffi_conf = ffi::per_tick_config {
+            jump_sensor_length_scale: conf.jump_sensor_length_scale,
+            jump_force: conf.jump_force,
+        };
+
+        unsafe {
+            ffi::g_config = ffi_conf;
+        }
     }
 
     pub fn set_debug_drawer(&mut self, enable: bool) {
@@ -212,6 +223,8 @@ impl Default for SlabCollider {
         }
     }
 }
+
+pub use ffi::entity_jump_action as EntityJumpAction;
 
 #[cfg(test)]
 mod tests {

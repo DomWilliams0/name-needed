@@ -595,6 +595,16 @@ extern "C" {
         indices_count: usize,
     ) -> *mut slab_collider;
 }
+#[repr(i32)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum entity_jump_action {
+    #[doc = " jumping is out of the question"]
+    NOPE = 0,
+    #[doc = " jump right now"]
+    UNCONDITIONAL = 1,
+    #[doc = " jump only if the jump sensor is occluded"]
+    IF_SENSOR_OCCLUDED = 2,
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct entity_collider {
@@ -617,7 +627,6 @@ extern "C" {
         collider: *mut entity_collider,
         pos: *mut f32,
         rot: *mut f32,
-        jump_sensor_occluded: *mut bool,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -630,11 +639,12 @@ extern "C" {
 extern "C" {
     #[doc = " returns 0 on success"]
     pub fn entity_collider_set(
+        world: *mut dynworld,
         collider: *mut entity_collider,
         pos: *const f32,
         rot: f32,
         vel: *const f32,
-        jump_force: f32,
+        jump_action: entity_jump_action,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -642,6 +652,51 @@ extern "C" {
 }
 extern "C" {
     pub fn rotate_from_quat_raw(quat: *const f32, out: *mut f32);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct per_tick_config {
+    pub jump_sensor_length_scale: f32,
+    pub jump_force: f32,
+}
+#[test]
+fn bindgen_test_layout_per_tick_config() {
+    assert_eq!(
+        ::std::mem::size_of::<per_tick_config>(),
+        8usize,
+        concat!("Size of: ", stringify!(per_tick_config))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<per_tick_config>(),
+        4usize,
+        concat!("Alignment of ", stringify!(per_tick_config))
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<per_tick_config>())).jump_sensor_length_scale as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(per_tick_config),
+            "::",
+            stringify!(jump_sensor_length_scale)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<per_tick_config>())).jump_force as *const _ as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(per_tick_config),
+            "::",
+            stringify!(jump_force)
+        )
+    );
+}
+extern "C" {
+    pub static mut g_config: per_tick_config;
 }
 extern "C" {
     #[doc = " hello world example from bullet"]

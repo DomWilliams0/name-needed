@@ -196,8 +196,6 @@ pub(crate) fn make_collision_mesh(
         let u = (d + 1) % 3;
         let v = (d + 2) % 3;
 
-        let mask_size = dims[u] * dims[v];
-
         // unit vector from current direction
         let mut q = [0; 3];
         q[d] = 1;
@@ -294,7 +292,7 @@ pub(crate) fn make_collision_mesh(
 
                             // add indices
                             let vs = idx as u32 / 3;
-                            let indices = [vs + 0, vs + 1, vs + 2, vs + 2, vs + 3, vs + 0];
+                            let indices = [vs, vs + 1, vs + 2, vs + 2, vs + 3, vs];
                             out_indices.extend_from_slice(&indices);
                         }
 

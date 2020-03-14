@@ -1,9 +1,10 @@
 use num_traits::zero;
 
 use common::*;
+use physics::EntityJumpAction;
 
 use crate::ecs::*;
-use crate::movement::{angle_from_direction, DesiredMovementComponent};
+use crate::movement::{angle_from_direction, DesiredJumpBehavior, DesiredMovementComponent};
 use crate::physics::PhysicsComponent;
 use crate::TransformComponent;
 
@@ -14,6 +15,7 @@ impl System for SyncToPhysicsSystem {
     fn tick_system(&mut self, data: &mut TickData) {
         let mut w = data.voxel_world.borrow_mut();
         let phys_world = w.physics_world_mut();
+        phys_world.sync_config();
 
         let query = <(
             Read<DesiredMovementComponent>,
@@ -34,15 +36,29 @@ impl System for SyncToPhysicsSystem {
                 transform.rotation_angle()
             };
 
-            // convert scaled jump force into physics force
-            let jump_force = movement.jump_force * config::get().simulation.jump_impulse;
+            // TODO jump *this tick* if all other conditions are already met, the only last one
+            // to check is collusion of the sensor in physics world
+            let jump_action = {
+                // could possibly jump if wanted (TODO depends on physical condition)
+                let physically_possible = true;
+
+                match (physically_possible, movement.jump_behavior) {
+                    (false, _) => EntityJumpAction::NOPE,
+                    (true, DesiredJumpBehavior::ManuallyRightNow) => {
+                        EntityJumpAction::UNCONDITIONAL
+                    }
+                    (true, DesiredJumpBehavior::OnSensorObstruction) => {
+                        EntityJumpAction::IF_SENSOR_OCCLUDED
+                    }
+                }
+            };
 
             if !phys_world.sync_to(
                 &mut physics.collider,
                 &transform.position,
                 new_rotation,
                 &movement.realized_velocity.extend(0.0),
-                jump_force,
+                jump_action,
             ) {
                 warn!(
                     "{}: failed to sync transform to physics world - is the entity still alive?",

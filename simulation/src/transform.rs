@@ -4,7 +4,6 @@ use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 use world::InnerWorldRef;
 
-use crate::ecs::*;
 use crate::movement::angle_from_direction;
 use crate::AXIS_FWD;
 

@@ -50,7 +50,6 @@ impl Verbosity {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::Verbosity;
     use crate::event::Verbosity::*;
 
     #[test]

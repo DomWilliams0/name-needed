@@ -1,5 +1,5 @@
 pub use collider::{ColliderData, ColliderHandle};
-pub use world::{PhysicsWorld, SlabCollider, StepType};
+pub use world::{EntityJumpAction, PhysicsWorld, SlabCollider, StepType};
 
 mod collider;
 mod world;

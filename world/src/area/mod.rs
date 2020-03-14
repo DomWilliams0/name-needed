@@ -3,8 +3,11 @@ pub use block_navigation::BlockGraph;
 pub use boundary::ChunkBoundary;
 use common::Vector3;
 pub use cost::EdgeCost;
-pub(crate) use path::{AreaPath, AreaPathNode};
+pub(crate) use path::AreaPath;
 pub use path::{WorldPath, WorldPathSlice};
+
+#[cfg(test)]
+pub(crate) use path::AreaPathNode;
 
 use crate::chunk::slab::SlabIndex;
 use crate::ChunkPosition;

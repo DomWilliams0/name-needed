@@ -3,7 +3,6 @@ use num_traits::zero;
 use common::*;
 
 use crate::ecs::*;
-use crate::physics::PhysicsComponent;
 
 pub const AXIS_UP: Vector3 = Vector3::new(0.0, 0.0, 1.0);
 pub const AXIS_FWD: Vector3 = Vector3::new(0.0, 1.0, 0.0);
@@ -15,8 +14,7 @@ pub struct DesiredMovementComponent {
 
     pub desired_velocity: Vector2,
 
-    /// 0-1
-    pub jump_force: f32,
+    pub jump_behavior: DesiredJumpBehavior,
 }
 
 impl Default for DesiredMovementComponent {
@@ -24,8 +22,24 @@ impl Default for DesiredMovementComponent {
         Self {
             realized_velocity: zero(),
             desired_velocity: zero(),
-            jump_force: 0.0,
+            jump_behavior: DesiredJumpBehavior::default(),
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum DesiredJumpBehavior {
+    /// Only jump if possible and the jump sensor is occluded
+    OnSensorObstruction,
+
+    /// Ignore jump sensor and jump if possible now
+    #[allow(unused)]
+    ManuallyRightNow,
+}
+
+impl Default for DesiredJumpBehavior {
+    fn default() -> Self {
+        DesiredJumpBehavior::OnSensorObstruction
     }
 }
 
@@ -36,29 +50,12 @@ pub struct MovementFulfilmentSystem;
 
 impl System for MovementFulfilmentSystem {
     fn tick_system(&mut self, data: &mut TickData) {
-        let query = <(Write<DesiredMovementComponent>, Write<PhysicsComponent>)>::query();
-        for (e, (mut movement, mut physics)) in query.iter_entities(data.ecs_world) {
+        let query = <(Write<DesiredMovementComponent>,)>::query();
+        for (e, (mut movement,)) in query.iter_entities(data.ecs_world) {
             // scale velocity based on max speed
             let vel = movement.desired_velocity * config::get().simulation.move_speed;
 
-            let jump_force = {
-                if movement.jump_force > 0.0 {
-                    // preserve desired jump force
-                    movement.jump_force
-                } else if physics.collider.jump_sensor_occluded() {
-                    // jump if sensor is occluded
-                    // TODO always?
-                    // TODO get block height+type at sensor (or self.pos + fwd*1), dont jump up half blocks
-                    1.0 // TODO jump force
-                } else {
-                    0.0
-                }
-            };
-
-            debug_assert!((0.0f32..=1.0).contains(&jump_force));
-
             movement.realized_velocity = vel;
-            movement.jump_force = jump_force;
             event_trace(Event::Entity(EntityEvent::MovementIntention(
                 entity_id(e),
                 (vel.x, vel.y),

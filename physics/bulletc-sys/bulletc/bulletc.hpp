@@ -29,27 +29,46 @@ slab_collider_update(dynworld *world, slab_collider *prev, const float slab_pos[
 
 // -------------------------------------------------------------------------------
 
+enum class entity_jump_action {
+    /// jumping is out of the question
+            NOPE,
+
+    /// jump right now
+            UNCONDITIONAL,
+
+    /// jump only if the jump sensor is occluded
+            IF_SENSOR_OCCLUDED
+};
+
 struct entity_collider;
 struct entity_collider *
 entity_collider_create(struct dynworld *world, const float center[3], const float half_extents[3], float friction,
                        float linear_damping, bool jump_sensor);
 
 /// returns 0 on success
-int entity_collider_get(struct dynworld *world, struct entity_collider *collider, float pos[3], float rot[2],
-                        bool *jump_sensor_occluded);
+int entity_collider_get(struct dynworld *world, struct entity_collider *collider, float pos[3], float rot[2]);
 
 /// returns 0 on success
 int entity_collider_get_pos(struct entity_collider *collider, float pos[3]);
 
 /// returns 0 on success
-int entity_collider_set(struct entity_collider *collider, const float pos[3], float rot, const float vel[3],
-                        float jump_force);
+int entity_collider_set(struct dynworld *world, struct entity_collider *collider, const float *pos, float rot,
+                        const float *vel, enum entity_jump_action jump_action);
 
 void rotate_to_quat_raw(const float vec[2], float *quat_out);
 
 void rotate_from_quat_raw(const float quat[4], float out[2]);
 
+
 // -------------------------------------------------------------------------------
+
+
+struct per_tick_config {
+    float jump_sensor_length_scale;
+    float jump_force;
+};
+
+extern per_tick_config g_config;
 
 /// hello world example from bullet
 void hello_world_example();

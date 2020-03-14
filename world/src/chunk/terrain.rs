@@ -66,7 +66,7 @@ impl ChunkTerrain {
         idx %= SLAB_SIZE.as_i32(); // cap at slab size
         if idx.is_negative() {
             // negative slices flip
-            idx = SLAB_SIZE.as_i32() + idx;
+            idx += SLAB_SIZE.as_i32();
         }
         SliceIndex(idx)
     }

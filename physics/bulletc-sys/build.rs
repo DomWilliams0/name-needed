@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use bindgen;
+use bindgen::EnumVariation;
 use cmake;
 use std::env;
 
@@ -22,6 +23,10 @@ fn main() {
     println!("cargo:rerun-if-changed=bulletc");
     let bindings = bindgen::Builder::default()
         .header(header)
+        .default_enum_style(EnumVariation::Rust {
+            non_exhaustive: false,
+        })
+        .size_t_is_usize(true)
         .generate()
         .expect("failed to generate bulletc bindings");
 

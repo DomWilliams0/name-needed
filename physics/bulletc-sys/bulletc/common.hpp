@@ -12,7 +12,6 @@ const size_t FWD_DIM = 1;
 // x axis
 const size_t SIDE_DIM = 0;
 
-
 // collision groups
 constexpr uint32_t COL_NONE               = 0;
 constexpr uint32_t COL_WORLD              = 1u << 10u;

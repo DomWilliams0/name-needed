@@ -67,9 +67,9 @@ pub fn post(r: Record) {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::{EntityEvent, Event, Verbosity};
+    use crate::event::{EntityEvent, Event};
     use crate::sink::test::TestSink;
-    use crate::sink::{EventSink, Record};
+    use crate::sink::EventSink;
     use crate::span::Span;
 
     #[test]
