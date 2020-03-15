@@ -5,14 +5,16 @@ cache:
     directories:
         - /home/travis/.cargo
         - $SDL_DIR
+        - $BULLET_DIR
 before_cache:
     - rm -rf /home/travis/.cargo/registry
 
-before_install:
-    - sudo apt install libbullet-dev
-addons:
-    apt:
-        update: true
+#before_install:
+#    - sudo apt install libbullet-dev
+#    - git clone
+#addons:
+#    apt:
+#        update: true
 
 # ---
 
@@ -23,9 +25,11 @@ branches:
 
 install:
     - bash .travis-install-sdl2.sh
+    - bash .travis-install-bullet.sh
 
 env:
     SDL_DIR=SDL2-2.0.9
+    BULLET_DIR=bullet3-2.89
 os:
     - linux
       # TODO windows and osx
@@ -59,6 +63,10 @@ rust:
 #            - cmake
 
 script: |
+        export PATH=$PATH:/usr/local/lib &&
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib &&
+        export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/local/lib &&
+        env &&
         export RUST_BACKTRACE=1 &&
         export NN_LOG=debug &&
         cargo build --verbose --workspace &&
