@@ -1,0 +1,23 @@
+[package]
+name = "main"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+engine = {path = "../engine"}
+
+simulation = {path = "../../game/simulation"}
+
+config = {path = "../../shared/config"}
+common = { path = "../../shared/common", features = ["binary"] }
+color = { path = "../../shared/color"}
+
+clap = "^2.33"
+
+[features]
+default = ["sdl-glium"]
+sdl-glium = ["engine/sdl-glium"]
+lite = ["engine/lite"]

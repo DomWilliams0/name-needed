@@ -1,0 +1,24 @@
+[package]
+name = "world"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+physics = {path = "../physics"}
+
+unit = {path = "../../shared/unit"}
+config = {path = "../../shared/config"}
+common = { path = "../../shared/common" }
+color = { path = "../../shared/color" }
+
+generator = "^0.6"
+petgraph = "^0.5"
+float-cmp = "^0.6"
+nd_iter = "0.0.4"
+ordered-float = "^1.0"
+
+[dev-dependencies]
+matches = "^0.1"

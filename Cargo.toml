@@ -1,20 +1,21 @@
 [workspace]
 
 members = [
-	"game",
-	"game-presets",
-	"engine",
-	"gameloop",
-	"world",
-	"config",
-	"common",
-	"simulation",
-	"struclog",
-	"unit",
-	"physics",
-	"physics/bulletc-sys",
-	"physics/debug-draw",
-	"color"
+	"game/physics",
+	"game/physics/bulletc-sys",
+	"game/physics/debug-draw",
+	"game/simulation",
+	"game/world",
+
+	"renderer/engine",
+	"renderer/gameloop",
+	"renderer/main",
+
+	"shared/color",
+	"shared/common",
+	"shared/config",
+	"shared/struclog",
+	"shared/unit",
 ]
 
 [profile.dev]
