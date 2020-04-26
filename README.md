@@ -9,6 +9,11 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 
 ## Progress log
 
+* 26 Apr 2020: <em>Simplified 2D graphics in a 3D world without physics</em>
+<p style="margin: auto; width: 80%">
+    <img src=".screenshots/simple-2d.gif"/>
+</p>
+
 * 31 Dec 2019: <em>Entities choosing random blocks and path finding to them, facing their direction of travel - low frame rate is to reduce GIF size, it's actually buttery smooth</em>
 <p style="margin: auto; width: 80%">
     <img src=".screenshots/movement-with-rotation.gif"/>
