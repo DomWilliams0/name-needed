@@ -13,7 +13,7 @@ lazy_static = "^1.4"
 log = "^0.4"
 cgmath = "^0.17"
 num-traits = "^0.2"
-itertools = "^0.8"
+itertools = "^0.9"
 rand = "^0.7"
 env_logger = {version = "^0.7", optional = true}
 float-cmp = "^0.5"

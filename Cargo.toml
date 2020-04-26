@@ -1,9 +1,6 @@
 [workspace]
 
 members = [
-	"game/physics",
-	"game/physics/bulletc-sys",
-	"game/physics/debug-draw",
 	"game/simulation",
 	"game/world",
 

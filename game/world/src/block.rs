@@ -1,4 +1,5 @@
 use crate::area::SlabAreaIndex;
+use crate::occlusion::BlockOcclusion;
 use color::ColorRgb;
 
 /// A single block in a chunk
@@ -7,6 +8,7 @@ pub struct Block {
     block_type: BlockType,
     height: BlockHeight,
     area: SlabAreaIndex,
+    occlusion: BlockOcclusion,
 }
 
 impl Block {
@@ -16,6 +18,7 @@ impl Block {
             block_type,
             height,
             area: SlabAreaIndex::UNINITIALIZED,
+            occlusion: BlockOcclusion::default(),
         }
     }
 
@@ -48,6 +51,13 @@ impl Block {
     }
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
         &mut self.area
+    }
+
+    pub fn occlusion_mut(&mut self) -> &mut BlockOcclusion {
+        &mut self.occlusion
+    }
+    pub fn occlusion(&self) -> &BlockOcclusion {
+        &self.occlusion
     }
 }
 

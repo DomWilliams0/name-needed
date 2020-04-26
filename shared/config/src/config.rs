@@ -5,14 +5,12 @@ pub struct Config {
     pub display: Display,
     pub world: World,
     pub simulation: Simulation,
-    pub physics_per_tick: PhysicsPerTick,
 }
 
 #[derive(Deserialize)]
 pub struct Display {
     pub resolution: (u32, u32),
-    pub fov: f32,
-    pub camera_turn_multiplier: f32,
+    pub camera_speed: f32,
     pub debug_physics: bool,
 }
 
@@ -27,28 +25,14 @@ pub enum WorldPreset {
     MultiChunkWonder,
     OneBlockWonder,
     FlatLands,
+    PyramidMess,
+    Bottleneck,
 }
 
 #[derive(Deserialize)]
 pub struct Simulation {
-    pub initial_entities: Vec<EntityDescriptor>,
+    pub random_seed: Option<u64>,
     pub random_count: u32,
     pub move_speed: f32,
-    pub friction: f32,
-    pub linear_damping: f32,
-    pub lerp_sharpness: f32,
     pub start_delay: u32,
-}
-
-#[derive(Deserialize, Clone)]
-pub struct EntityDescriptor {
-    pub pos: (i32, i32, Option<i32>),
-    pub color: Option<(u8, u8, u8)>,
-    pub size: (f32, f32, f32),
-}
-
-#[derive(Deserialize)]
-pub struct PhysicsPerTick {
-    pub jump_sensor_length_scale: f32,
-    pub jump_force: f32,
 }

@@ -7,6 +7,7 @@ use serde::Serialize;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "ipc", derive(Serialize))]
+#[non_exhaustive]
 pub enum Event {
     Entity(EntityEvent),
 }
@@ -29,15 +30,12 @@ const VERBOSITY: Verbosity = Verbosity::Verbose;
 const VERBOSITY: Verbosity = Verbosity::Trace;
 
 /// Default for tests
-#[cfg(all(
-    test,
-    not(any(
-        feature = "error",
-        feature = "info",
-        feature = "verbose",
-        feature = "trace"
-    ))
-))]
+#[cfg(not(any(
+    feature = "error",
+    feature = "info",
+    feature = "verbose",
+    feature = "trace"
+)))]
 const VERBOSITY: Verbosity = Verbosity::Info;
 
 impl Verbosity {

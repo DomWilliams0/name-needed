@@ -8,9 +8,21 @@ use std::path::PathBuf;
 use std::process::Command;
 use struclog::sink::ipc::IpcSink;
 
+#[cfg(feature = "count-allocs")]
+mod count_allocs {
+    use alloc_counter::{count_alloc, AllocCounter};
+
+    type Allocator = std::alloc::System;
+
+    const ALLOCATOR: Allocator = std::alloc::System;
+
+    #[global_allocator]
+    static A: AllocCounter<Allocator> = AllocCounter(ALLOCATOR);
+}
+
 mod presets;
 
-fn main() {
+fn do_main() -> i32 {
     let args = App::new(env!("CARGO_PKG_NAME"))
         .arg(
             Arg::with_name("preset")
@@ -29,8 +41,8 @@ fn main() {
         )
         .get_matches();
 
-    #[cfg(feature = "sdl-glium")]
-    type Backend = engine::SdlGliumBackend;
+    #[cfg(feature = "use-sfml")]
+    type Backend = engine::SfmlBackend;
 
     #[cfg(feature = "lite")]
     type Backend = engine::DummyBackend;
@@ -64,7 +76,7 @@ fn main() {
         info!("loading config from '{:?}'", config_path);
         if let Err(e) = config::init(config_path) {
             error!("failed to load config initially: {}", e);
-            std::process::exit(1);
+            return 1;
         }
     }
 
@@ -83,7 +95,27 @@ fn main() {
         restart();
     }
 
-    info!("exiting cleanly");
+    0
+}
+
+fn main() {
+    #[cfg(feature = "count-allocs")]
+    let exit = {
+        use alloc_counter::count_alloc;
+        let (counts, result) = count_alloc(|| do_main());
+        // TODO more granular - n for engine setup, n for sim setup, n for each frame?
+        info!(
+            "{} allocations, {} reallocs, {} frees",
+            counts.0, counts.1, counts.2
+        );
+        result
+    };
+
+    #[cfg(not(feature = "count-allocs"))]
+    let exit = do_main();
+
+    info!("exiting cleanly with exit code {}", exit);
+    std::process::exit(exit);
 }
 
 #[cfg(unix)]
@@ -98,5 +130,5 @@ fn restart() -> ! {
         .args(std::env::args_os().skip(1))
         .envs(std::env::vars_os())
         .exec(); // won't return on success
-    panic!("failed to restart: {}", err);
+    unreachable!("failed to restart: {}", err);
 }

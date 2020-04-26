@@ -1,5 +1,5 @@
 pub use self::builder::ChunkBuilder;
-pub use self::chunk::{Chunk, ChunkGrid, ChunkId, BLOCK_COUNT_SLICE, CHUNK_SIZE};
+pub use self::chunk::{Chunk, ChunkId, BLOCK_COUNT_SLICE, CHUNK_SIZE};
 
 mod builder;
 

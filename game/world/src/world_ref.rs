@@ -1,25 +1,25 @@
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::Rc;
-
 use crate::World;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Reference counted reference to the world
 #[derive(Clone)]
-pub struct WorldRef(Rc<RefCell<World>>);
+pub struct WorldRef(Arc<RwLock<World>>);
 
-pub type InnerWorldRef<'a> = Ref<'a, World>;
-pub type InnerWorldRefMut<'a> = RefMut<'a, World>;
+pub type InnerWorldRef<'a> = RwLockReadGuard<'a, World>;
+pub type InnerWorldRefMut<'a> = RwLockWriteGuard<'a, World>;
 
 impl WorldRef {
     pub fn new(world: World) -> Self {
-        Self(Rc::new(RefCell::new(world)))
+        Self(Arc::new(RwLock::new(world)))
     }
 
+    // TODO don't unwrap()
+
     pub fn borrow(&self) -> InnerWorldRef<'_> {
-        (*self.0).borrow()
+        (*self.0).read().unwrap()
     }
 
     pub fn borrow_mut(&self) -> InnerWorldRefMut<'_> {
-        (*self.0).borrow_mut()
+        (*self.0).write().unwrap()
     }
 }

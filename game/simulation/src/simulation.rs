@@ -1,125 +1,72 @@
-use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::rc::Rc;
 
-use color::ColorRgb;
 use common::*;
-use debug_draw::DebugDrawer;
 use world::{SliceRange, WorldRef};
 
-use crate::ecs::{create_ecs_world, entity_id, EcsWorld, Entity, System, TickData};
+use crate::ecs::{create_ecs_world, EcsWorld};
+use crate::entity_builder::EntityBuilder;
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
-use crate::path::{
-    FollowPathComponent, PathDebugRenderer, PathSteeringSystem, TempPathAssignmentSystem,
-};
-use crate::physics::{PhysicsComponent, PhysicsSystem};
-use crate::render::dummy::DummyDebugRenderer;
-use crate::render::{DebugRenderer, FrameRenderState, PhysicalComponent, RenderSystem, Renderer};
+use crate::path::{FollowPathComponent, PathSteeringSystem, TempPathAssignmentSystem};
+use crate::physics::PhysicsSystem;
+use crate::render::{PhysicalComponent, RenderSystem, Renderer};
 use crate::steer::{SteeringComponent, SteeringSystem};
-use crate::sync::{SyncFromPhysicsSystem, SyncToPhysicsSystem};
 use crate::transform::TransformComponent;
+use specs::{RunNow, WorldExt};
 
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
 
     renderer: PhantomData<R>,
-    debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
+    //debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
     debug_physics: bool,
 }
 
 impl<R: Renderer> Simulation<R> {
     pub fn new(world: WorldRef) -> Self {
-        // unconditionally add physics debug renderer
-        world
-            .borrow_mut()
-            .physics_world_mut()
-            .set_debug_drawer(true);
+        let mut ecs_world = create_ecs_world();
+
+        // register components
+        ecs_world.register::<TransformComponent>();
+        ecs_world.register::<DesiredMovementComponent>();
+        ecs_world.register::<PhysicalComponent>();
+        ecs_world.register::<FollowPathComponent>();
+        ecs_world.register::<SteeringComponent>();
+
+        // insert resources
+        ecs_world.insert(world.clone());
 
         Self {
-            ecs_world: create_ecs_world(),
+            ecs_world,
             renderer: PhantomData,
             voxel_world: world,
-            debug_renderers: vec![Box::new(DummyDebugRenderer), Box::new(PathDebugRenderer)],
+            // debug_renderers: vec![Box::new(DummyDebugRenderer), Box::new(PathDebugRenderer)],
             debug_physics: config::get().display.debug_physics,
         }
     }
 
-    // TODO return result
-    // TODO entity builder
-    pub fn add_entity(
-        &mut self,
-        block_pos: (i32, i32, Option<i32>),
-        color: ColorRgb,
-        dimensions: (f32, f32, f32),
-    ) -> &[Entity] {
-        let world = &self.voxel_world;
-        let transform = match block_pos {
-            (x, y, Some(z)) => TransformComponent::from_block_center(x, y, z),
-            (x, y, None) => {
-                let mut transform =
-                    TransformComponent::from_highest_safe_point(&world.borrow(), x, y)
-                        .expect("should be valid position");
-
-                // stand on top
-                transform.position.2 += dimensions.2 / 4.0;
-
-                transform
-            }
-        };
-
-        let physical = PhysicalComponent { color, dimensions };
-        let physics = PhysicsComponent::new(world.borrow_mut(), &transform, &physical);
-
-        info!("adding an entity at {:?}", transform.position);
-
-        let entities = self.ecs_world.insert(
-            (),
-            vec![(
-                transform,
-                DesiredMovementComponent::default(),
-                physical,
-                physics,
-                FollowPathComponent::default(),
-                // Steering::seek(WorldPoint(15.0, 3.0, 3.0)),
-                SteeringComponent::default(),
-            )],
-        );
-
-        for &e in entities {
-            event_verbose(Event::Entity(EntityEvent::Create(entity_id(e))))
-        }
-        entities
-    }
-
-    fn tick_data(&mut self) -> TickData {
-        TickData {
-            voxel_world: self.voxel_world.clone(),
-            ecs_world: &mut self.ecs_world,
-        }
+    pub fn add_entity(&mut self) -> EntityBuilder {
+        EntityBuilder::new(&mut self.ecs_world)
     }
 
     pub fn tick(&mut self) {
         // tick systems
         let _span = enter_span(Span::Tick);
-        let mut tick_data = self.tick_data();
 
         // assign paths
-        TempPathAssignmentSystem.tick_system(&mut tick_data);
+        TempPathAssignmentSystem.run_now(&self.ecs_world);
 
         // follow paths with steering
-        PathSteeringSystem.tick_system(&mut tick_data);
+        PathSteeringSystem.run_now(&self.ecs_world);
 
         // apply steering
-        SteeringSystem.tick_system(&mut tick_data);
+        SteeringSystem.run_now(&self.ecs_world);
 
         // attempt to fulfil desired velocity
-        MovementFulfilmentSystem.tick_system(&mut tick_data);
+        MovementFulfilmentSystem.run_now(&self.ecs_world);
 
         // apply physics
-        SyncToPhysicsSystem.tick_system(&mut tick_data);
-        PhysicsSystem.tick_system(&mut tick_data);
-        SyncFromPhysicsSystem.tick_system(&mut tick_data);
+        PhysicsSystem.run_now(&self.ecs_world);
     }
 
     pub fn world(&self) -> WorldRef {
@@ -130,28 +77,26 @@ impl<R: Renderer> Simulation<R> {
     pub fn render(
         &mut self,
         slices: SliceRange,
-        target: Rc<RefCell<R::Target>>,
+        target: R::Target,
         renderer: &mut R,
         interpolation: f64,
-    ) {
-        let frame_state = FrameRenderState { target, slices };
-
+    ) -> R::Target {
         // start frame
-        renderer.init(frame_state.target.clone());
+        renderer.init(target);
 
         // render simulation
         {
-            renderer.start();
+            renderer.sim_start();
             {
                 let mut render_system = RenderSystem {
                     renderer,
-                    frame_state: frame_state.clone(),
-                    interpolation,
+                    slices,
+                    interpolation: interpolation as f32,
                 };
 
-                render_system.tick_system(&mut self.tick_data());
+                render_system.run_now(&self.ecs_world);
             }
-            renderer.finish();
+            renderer.sim_finish();
         }
 
         // render debug shapes
@@ -159,6 +104,8 @@ impl<R: Renderer> Simulation<R> {
         {
             renderer.debug_start();
 
+            // TODO debug renderers
+            /*
             for debug_renderer in self.debug_renderers.iter_mut() {
                 debug_renderer.render(
                     renderer,
@@ -167,6 +114,8 @@ impl<R: Renderer> Simulation<R> {
                     &frame_state,
                 );
             }
+            */
+            /*
             if self.debug_physics {
                 DebugDrawer.render(
                     renderer,
@@ -175,12 +124,13 @@ impl<R: Renderer> Simulation<R> {
                     &frame_state,
                 );
             }
+            */
 
             renderer.debug_finish();
         }
 
         // end frame
-        renderer.deinit();
+        renderer.deinit()
     }
 
     /// Toggles and returns new enabled state

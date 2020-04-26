@@ -1,7 +1,8 @@
-#[cfg(feature = "sdl-glium")]
+#[cfg(any(feature = "use-sfml"))]
 mod render;
-#[cfg(feature = "sdl-glium")]
-pub use render::SdlGliumBackend;
+
+#[cfg(feature = "use-sfml")]
+pub use render::sfml::SfmlBackend;
 
 #[cfg(feature = "lite")]
 mod lite;

@@ -1,17 +1,14 @@
 use std::collections::HashSet;
 
 use common::*;
-use physics::PhysicsWorld;
 
 use crate::area::{AreaGraph, AreaPath, WorldArea, WorldPath};
 use crate::chunk::Chunk;
-use crate::mesh;
 use crate::{presets, SliceRange};
-use unit::world::{BlockPosition, ChunkPosition, SliceBlock, WorldPoint, WorldPosition};
+use unit::world::{BlockPosition, ChunkPosition, SliceBlock, WorldPosition};
 
 pub struct World {
     chunks: Vec<Chunk>,
-    physics: PhysicsWorld,
     area_graph: AreaGraph,
 }
 
@@ -22,7 +19,7 @@ impl Default for World {
 }
 
 impl World {
-    pub(crate) fn from_chunks(mut chunks: Vec<Chunk>) -> Self {
+    pub(crate) fn from_chunks(chunks: Vec<Chunk>) -> Self {
         // ensure all are unique
         {
             let mut seen = HashSet::new();
@@ -47,6 +44,7 @@ impl World {
         // build area graph
         let area_graph = AreaGraph::from_chunks(&chunks);
 
+        /*
         let physics_world = {
             let mut physics_world = PhysicsWorld::new(-7.0);
 
@@ -86,12 +84,9 @@ impl World {
 
             physics_world
         };
+        */
 
-        Self {
-            chunks,
-            area_graph,
-            physics: physics_world,
-        }
+        Self { chunks, area_graph }
     }
 
     pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk> {
@@ -160,8 +155,26 @@ impl World {
         from: F,
         to: T,
     ) -> Option<WorldPath> {
-        let from: WorldPosition = from.into();
-        let to: WorldPosition = to.into();
+        // TODO return Result for failure reason
+        let from_pos = from.into();
+        let from = match self.find_accessible_block_in_column_starting_from(from_pos) {
+            Some(pos) => pos,
+            None => {
+                warn!("failed to find pos from {:?}", from_pos);
+                return None;
+            }
+        };
+
+        let to = match self.find_accessible_block_in_column_starting_from(to.into()) {
+            Some(pos) => pos,
+            None => return None,
+        };
+
+        // same blocks
+        if from == to {
+            debug!("from and to are the same");
+            return None;
+        }
 
         // find area path
         let area_path = match self.find_area_path(from, to) {
@@ -198,22 +211,29 @@ impl World {
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
-        let world_pos = WorldPosition(x, y, 0);
-        let chunk_pos = ChunkPosition::from(world_pos);
-        let slice_block = SliceBlock::from(BlockPosition::from(world_pos));
+        self.find_accessible_block_in_column_starting_from(WorldPosition(x, y, i32::MAX))
+    }
+
+    pub fn find_accessible_block_in_column_starting_from(
+        &self,
+        pos: WorldPosition,
+    ) -> Option<WorldPosition> {
+        let chunk_pos = ChunkPosition::from(pos);
+        let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos).and_then(|c| {
             c.slices_from_top()
+                .skip_while(|(s, _)| s.0 > pos.2)
                 .find(|(_, slice)| slice[slice_block].walkable())
                 .map(|(z, _)| slice_block.to_block_position(z).to_world_pos(chunk_pos))
         })
     }
 
-    pub fn physics_world(&self) -> &PhysicsWorld {
-        &self.physics
-    }
-    pub fn physics_world_mut(&mut self) -> &mut PhysicsWorld {
-        &mut self.physics
-    }
+    // pub fn physics_world(&self) -> &PhysicsWorld {
+    //     &self.physics
+    // }
+    // pub fn physics_world_mut(&mut self) -> &mut PhysicsWorld {
+    //     &mut self.physics
+    // }
 }
 
 //noinspection DuplicatedCode
@@ -438,6 +458,18 @@ mod tests {
         assert_eq!(
             w.find_accessible_block_in_column(4, 4),
             Some(WorldPosition(4, 4, 10))
+        );
+
+        // ...but not when we start searching from a lower point
+        assert_eq!(
+            w.find_accessible_block_in_column_starting_from(WorldPosition(4, 4, 8)),
+            Some(WorldPosition(4, 4, 7))
+        );
+
+        // even when starting from the slice itself
+        assert_eq!(
+            w.find_accessible_block_in_column_starting_from(WorldPosition(4, 4, 7)),
+            Some(WorldPosition(4, 4, 7))
         );
 
         // finds lower slice through hole

@@ -5,11 +5,9 @@ use std::ops::{Deref, DerefMut, Shl};
 use common::*;
 
 use crate::area::WorldArea;
-use crate::block::{Block, BlockType};
+use crate::block::BlockType;
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::chunk::terrain::ChunkTerrain;
-use crate::grid::{Grid, GridImpl};
-use crate::grid_declare;
 pub use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockPosition, ChunkPosition, WorldPosition};
 
@@ -18,12 +16,6 @@ pub type ChunkId = u64;
 // reexport
 
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
-
-grid_declare!(struct ChunkGrid<ChunkGridImpl, Block>,
-    CHUNK_SIZE.as_usize(),
-    CHUNK_SIZE.as_usize(),
-    SLAB_SIZE.as_usize()
-);
 
 pub struct Chunk {
     /// unique for each chunk
@@ -44,6 +36,7 @@ impl Chunk {
     pub(crate) fn with_terrain(pos: ChunkPosition, mut terrain: ChunkTerrain) -> Self {
         debug!("discovering areas for chunk {:?}", pos);
         terrain.discover_areas(pos);
+        terrain.init_occlusion();
 
         Self {
             pos,

@@ -16,11 +16,15 @@ pub struct DummyBackend {
 impl Renderer for DummyRenderer {
     type Target = ();
 
-    fn entity(&mut self, _transform: &TransformComponent, physical: &PhysicalComponent) {}
+    fn init(&mut self, _target: Self::Target) {}
 
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {}
+    fn sim_start(&mut self) {}
 
-    fn debug_add_tri(&mut self, _points: [ViewPoint; 3], color: ColorRgb) {}
+    fn sim_entity(&mut self, _transform: &TransformComponent, _physical: &PhysicalComponent) {}
+
+    fn sim_finish(&mut self) {}
+
+    fn deinit(&mut self) -> Self::Target {}
 }
 
 impl SimulationBackend for DummyBackend {

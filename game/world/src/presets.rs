@@ -11,6 +11,8 @@ pub fn from_config() -> World {
         WorldPreset::MultiChunkWonder => multi_chunk_wonder(),
         WorldPreset::OneBlockWonder => one_block_wonder(),
         WorldPreset::FlatLands => flat_lands(),
+        WorldPreset::PyramidMess => pyramid_mess(),
+        WorldPreset::Bottleneck => bottleneck(),
     }
 }
 
@@ -102,7 +104,15 @@ pub fn one_chunk_wonder() -> World {
 /// A single block in a single chunk
 pub fn one_block_wonder() -> World {
     let chunk = ChunkBuilder::new()
+        .set_block((2, 2, 2), BlockType::Grass)
         .set_block((1, 1, 1), BlockType::Stone)
+        .set_block((2, 1, 1), BlockType::Stone)
+        .set_block((3, 1, 1), BlockType::Dirt)
+        .set_block((1, 2, 1), BlockType::Stone)
+        .set_block((3, 2, 1), BlockType::Stone)
+        .set_block((1, 3, 1), BlockType::Dirt)
+        .set_block((2, 3, 1), BlockType::Stone)
+        .set_block((3, 3, 1), BlockType::Stone)
         .build((0, 0));
 
     World::from_chunks(vec![chunk])
@@ -117,6 +127,60 @@ pub fn flat_lands() -> World {
                     .fill_slice(0, BlockType::Stone)
                     .build((x, y))
             })
+        })
+        .collect_vec();
+
+    World::from_chunks(chunks)
+}
+
+/// Pyramid with some mess to test ambient occlusion across slab and chunk boundaries
+pub fn pyramid_mess() -> World {
+    let chunks = vec![
+        ChunkBuilder::new()
+            .fill_range((0, 0, -2), (9, 9, -1), |_| BlockType::Dirt)
+            .fill_range((1, 1, -1), (8, 8, 0), |_| BlockType::Stone)
+            .fill_range((2, 2, 0), (7, 7, 1), |_| BlockType::Grass)
+            .fill_range((3, 3, 1), (6, 6, 2), |_| BlockType::Stone)
+            .fill_range((4, 4, 2), (5, 5, 3), |_| BlockType::Dirt)
+            // chunk bridge
+            .fill_range((0, 4, 2), (3, 5, 3), |_| BlockType::Grass)
+            .set_block((0, 4, 3), BlockType::Stone)
+            .build((0, 0)),
+        ChunkBuilder::new()
+            .fill_slice(2, BlockType::Dirt)
+            .build((-1, 0)),
+    ];
+
+    World::from_chunks(chunks)
+}
+
+/// Bottleneck for path finding
+pub fn bottleneck() -> World {
+    let half_y = CHUNK_SIZE.as_i32() / 2;
+    let mut rng = thread_rng();
+    let chunks = (-2..2)
+        .map(|i| {
+            let hole = rng.gen_range(1, CHUNK_SIZE.as_i32() - 1);
+            ChunkBuilder::new()
+                .fill_range(
+                    (1, 0, 0),
+                    (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32(), 1),
+                    |(x, _, _)| {
+                        if x % 2 == 0 {
+                            BlockType::Grass
+                        } else {
+                            BlockType::Dirt
+                        }
+                    },
+                )
+                .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32(), half_y + 1, 5), |_| {
+                    BlockType::Stone
+                })
+                .fill_range((hole, half_y, 1), (hole + 2, half_y + 1, 5), |_| {
+                    BlockType::Air
+                })
+                .fill_slice(-5, BlockType::Stone)
+                .build((0, i))
         })
         .collect_vec();
 

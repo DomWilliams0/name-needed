@@ -15,9 +15,12 @@ config = {path = "../../shared/config"}
 common = { path = "../../shared/common", features = ["binary"] }
 color = { path = "../../shared/color"}
 
+alloc_counter = {version = "^0.0", optional = true}
+
 clap = "^2.33"
 
 [features]
-default = ["sdl-glium"]
-sdl-glium = ["engine/sdl-glium"]
+default = ["use-sfml"]
+use-sfml = ["engine/use-sfml"]
 lite = ["engine/lite"]
+count-allocs = ["alloc_counter"]

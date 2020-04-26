@@ -2,15 +2,15 @@ use std::fmt::{Display, Error, Formatter};
 use std::ops::Add;
 
 use common::*;
-use generator::{done, Generator, Gn};
 
-use crate::mesh::Vertex;
+use crate::mesh::BaseVertex;
 use crate::{mesh, WorldRef};
 use unit::world::{ChunkPosition, SliceIndex};
 
 /// Number of slices to see concurrently
 const VIEW_RANGE: i32 = 3;
 
+#[derive(Clone)]
 pub struct WorldViewer {
     world: WorldRef,
     view_range: SliceRange,
@@ -83,16 +83,15 @@ impl WorldViewer {
         }
     }
 
-    pub fn regen_dirty_chunk_meshes(&mut self) -> Generator<(), (ChunkPosition, Vec<Vertex>)> {
-        Gn::new_scoped(move |mut s| {
-            let range = self.view_range;
-            for dirty_chunk in self.world.borrow().visible_chunks().filter(|c| c.dirty()) {
-                let mesh = mesh::make_render_mesh(dirty_chunk, range);
-                s.yield_((dirty_chunk.pos(), mesh));
-            }
-
-            done!();
-        })
+    pub fn regenerate_dirty_chunk_meshes<F: FnMut(ChunkPosition, Vec<V>), V: BaseVertex>(
+        &self,
+        mut f: F,
+    ) {
+        let range = self.view_range;
+        for dirty_chunk in self.world.borrow().visible_chunks().filter(|&c| c.dirty()) {
+            let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
+            f(dirty_chunk.pos(), mesh);
+        }
     }
 
     fn invalidate_visible_chunks(&self) {

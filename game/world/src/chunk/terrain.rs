@@ -2,15 +2,16 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use common::*;
-use generator::{done, Generator, Gn};
 
 use crate::area::discovery::AreaDiscovery;
 use crate::area::{BlockGraph, ChunkArea, ChunkBoundary, WorldArea};
 use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
-use crate::chunk::slice::{Slice, SliceMut};
+use crate::chunk::slice::{unflatten_index, Slice, SliceMut};
+use crate::occlusion::{BlockOcclusion, NeighbourOffset};
 use crate::SliceRange;
+use std::iter::once;
 use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
 
 pub(crate) type SlabPointer = Box<Slab>;
@@ -42,6 +43,13 @@ impl ChunkTerrain {
     pub(crate) fn slabs_from_bottom_mut(&mut self) -> impl Iterator<Item = (SlabIndex, &mut Slab)> {
         self.slabs
             .iter_mut_increasing()
+            .map(|ptr| ptr.deref_mut())
+            .map(|slab| (slab.index(), slab))
+    }
+
+    pub(crate) fn slabs_from_top_mut(&mut self) -> impl Iterator<Item = (SlabIndex, &mut Slab)> {
+        self.slabs
+            .iter_mut_decreasing()
             .map(|ptr| ptr.deref_mut())
             .map(|slab| (slab.index(), slab))
     }
@@ -100,23 +108,26 @@ impl ChunkTerrain {
         SliceRange::from_bounds(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
     }
 
-    pub fn slice_range(&self, range: SliceRange) -> Generator<(), (SliceIndex, Slice)> {
-        Gn::new_scoped(move |mut s| {
-            for slice in range
-                .as_range()
-                .filter_map(|idx| self.slice(idx).map(|s| (idx, s)))
-            {
-                s.yield_(slice);
-            }
-
-            done!();
-        })
+    pub fn slice_range(&self, range: SliceRange) -> impl Iterator<Item = Slice> {
+        range.as_range().map(move |i| self.slice(i)).while_some()
     }
 
     pub fn slices_from_bottom(&self) -> impl Iterator<Item = (SliceIndex, Slice)> {
         self.slabs_from_bottom().flat_map(|slab| {
             (0..Slab::slice_count()).map(move |idx| (SliceIndex(idx), slab.slice(idx)))
         })
+    }
+
+    pub fn slices_from_bottom_mut_foreach<F: Fn(SliceIndex, SliceMut)>(&mut self, f: F) {
+        for (slab_idx, slab) in self.slabs_from_bottom_mut() {
+            let base_slice_idx = SLAB_SIZE.as_i32() * slab_idx;
+            for slice_idx in 0..Slab::slice_count() {
+                f(
+                    SliceIndex(base_slice_idx + slice_idx),
+                    slab.slice_mut(slice_idx),
+                )
+            }
+        }
     }
 
     pub fn slices_from_top(&self) -> impl Iterator<Item = (SliceIndex, Slice)> {
@@ -288,6 +299,77 @@ impl ChunkTerrain {
 
         out
     }
+    // (slab0 slice0 mut, slab0 slice1 immut), (slab0 slice1 mut, slab0 slice2 immut) ...
+    // ... (slab0 sliceN mut, slab1 slice0), (slab1 slice0 mut, slab1 slice1) ...
+    // ... (slabN sliceN-1 mut, slabN sliceN)
+    pub fn ascending_slice_pairs_foreach<F: FnMut(SliceMut, Slice)>(&mut self, mut f: F) {
+        // need to include a null slab at the end so the last slab is iterated too
+        let indices = self
+            .slabs
+            .indices_increasing()
+            .map(Some)
+            .chain(once(None))
+            .tuple_windows();
+
+        for (this_slab_idx, next_slab_idx) in indices {
+            let this_slab_idx = this_slab_idx.unwrap(); // first slab is always Some
+
+            let this_slab = self.slabs.get_mut(this_slab_idx).unwrap();
+
+            // exhaust this slab first
+            for (this_slice_idx, next_slice_idx) in (0..Slab::slice_count()).tuple_windows() {
+                let mut this_slice_mut = this_slab.slice_mut(this_slice_idx);
+
+                // Safety: slices don't overlap and this_slice_idx != next_slice_idx
+                let this_slice_mut = unsafe {
+                    let ptr = this_slice_mut.as_mut_ptr();
+                    SliceMut::from_ptr(ptr)
+                };
+                let next_slice = this_slab.slice(next_slice_idx);
+
+                f(this_slice_mut, next_slice);
+            }
+
+            // top slice of this slab and bottom of next
+            if let Some(next_slab_idx) = next_slab_idx {
+                // safety: mutable and immutable slices don't overlap
+                let this_slab_top_slice = unsafe {
+                    // can't have a mut and immut ref to self.slabs
+                    let mut slice = this_slab.slice_mut(Slab::slice_count() - 1);
+                    let ptr = slice.as_mut_ptr();
+                    SliceMut::from_ptr(ptr)
+                };
+
+                let next_slab_bottom_slice = self.slabs.get(next_slab_idx).unwrap().slice(0);
+                f(this_slab_top_slice, next_slab_bottom_slice);
+            }
+        }
+    }
+
+    pub fn init_occlusion(&mut self) {
+        self.ascending_slice_pairs_foreach(|mut slice_this, slice_next| {
+            for (i, b) in slice_this
+                .iter_mut()
+                .enumerate()
+                // this block should be solid
+                .filter(|(_, b)| b.solid())
+                // and the one above it should not be
+                .filter(|(i, _)| !(*slice_next)[*i].solid())
+            {
+                let this_block = unflatten_index(i);
+
+                // collect blocked state of each neighbour on the top face
+                let mut blocked = [false; 8];
+                for (n, offset) in NeighbourOffset::offsets() {
+                    if let Some(neighbour_block) = this_block.try_add(offset) {
+                        blocked[n as usize] = slice_next[neighbour_block].solid();
+                    }
+                }
+
+                *b.occlusion_mut() = BlockOcclusion::from_neighbour_opacities(blocked);
+            }
+        });
+    }
 }
 
 impl Default for ChunkTerrain {
@@ -319,6 +401,7 @@ mod tests {
     use unit::world::SliceIndex;
 
     use super::*;
+    use crate::occlusion::VertexOcclusion;
 
     #[test]
     fn empty() {
@@ -774,5 +857,99 @@ mod tests {
             ChunkTerrain::slice_index_in_slab(SliceIndex(-1)),
             SliceIndex(SLAB_SIZE.as_i32() - 1)
         );
+    }
+
+    #[test]
+    fn occlusion_in_slab() {
+        // no occlusion because the block directly above 2,2,2 is solid
+        let mut terrain = ChunkTerrain::default();
+        assert!(terrain.set_block((2, 2, 2), BlockType::Dirt, SlabCreationPolicy::CreateAll));
+        assert!(terrain.set_block((2, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll));
+        assert!(terrain.set_block((2, 3, 3), BlockType::Dirt, SlabCreationPolicy::CreateAll));
+        terrain.init_occlusion();
+
+        let occlusion = *terrain.get_block((2, 2, 2)).unwrap().occlusion();
+        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(2), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(3), VertexOcclusion::NotAtAll);
+
+        // occlusion will be populated if block directly above it is air
+        assert!(terrain.set_block((2, 2, 3), BlockType::Air, SlabCreationPolicy::CreateAll));
+        terrain.init_occlusion();
+
+        let occlusion = *terrain.get_block((2, 2, 2)).unwrap().occlusion();
+        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(2), VertexOcclusion::Mildly);
+        assert_matches!(occlusion.corner(3), VertexOcclusion::Mildly);
+    }
+
+    #[test]
+    fn occlusion_across_slab() {
+        let mut terrain = ChunkTerrain::default();
+        assert!(terrain.set_block(
+            (2, 2, SLAB_SIZE.as_i32() - 1),
+            BlockType::Dirt,
+            SlabCreationPolicy::CreateAll
+        ));
+        assert!(terrain.set_block(
+            (2, 3, SLAB_SIZE.as_i32()),
+            BlockType::Dirt,
+            SlabCreationPolicy::CreateAll
+        )); // next slab up
+        terrain.init_occlusion();
+
+        let occlusion = *terrain
+            .get_block((2, 2, SLAB_SIZE.as_i32() - 1))
+            .unwrap()
+            .occlusion();
+        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
+        assert_matches!(occlusion.corner(2), VertexOcclusion::Mildly);
+        assert_matches!(occlusion.corner(3), VertexOcclusion::Mildly);
+    }
+
+    #[test]
+    fn ascending_slice_pairs() {
+        let mut terrain = ChunkTerrain::default();
+
+        // this pattern should repeat across slices across slabs
+        const PATTERN: [BlockType; 4] = [
+            BlockType::Air,
+            BlockType::Dirt,
+            BlockType::Stone,
+            BlockType::Grass,
+        ];
+
+        // crosses 3 slabs
+        for (bt, z) in PATTERN
+            .iter()
+            .cycle()
+            .zip(-SLAB_SIZE.as_i32()..(SLAB_SIZE.as_i32() * 2) - 1)
+        {
+            terrain.set_block((0, 0, z), *bt, SlabCreationPolicy::CreateAll);
+        }
+
+        assert_eq!(terrain.slab_count(), 3);
+        const EXPECTED_COUNT: i32 = (SLAB_SIZE.as_i32() * 3) - 1;
+
+        let mut count = 0;
+        let mut expected = PATTERN.iter().cycle().copied().peekable();
+        terrain.ascending_slice_pairs_foreach(|a, b| {
+            count += 1;
+
+            assert_eq!(dbg!(a[(0, 0)].block_type()), expected.next().unwrap());
+
+            let expected_next = if count == EXPECTED_COUNT {
+                BlockType::Air // top of highest slab with nothing above it
+            } else {
+                *expected.peek().unwrap()
+            };
+
+            assert_eq!(dbg!(b[(0, 0)].block_type()), expected_next);
+        });
+
+        assert_eq!(count, EXPECTED_COUNT);
     }
 }

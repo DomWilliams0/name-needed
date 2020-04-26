@@ -20,6 +20,10 @@ impl Default for SteeringComponent {
     }
 }
 
+impl Component for SteeringComponent {
+    type Storage = VecStorage<Self>;
+}
+
 impl SteeringComponent {
     pub fn seek(target: WorldPoint) -> Self {
         Self {
@@ -40,24 +44,24 @@ impl SteeringComponent {
 
 pub struct SteeringSystem;
 
-impl System for SteeringSystem {
-    fn tick_system(&mut self, data: &mut TickData) {
-        let query = <(
-            Read<TransformComponent>,
-            Write<SteeringComponent>,
-            Write<DesiredMovementComponent>,
-        )>::query();
-        for (e, (transform, mut steer, mut movement)) in query.iter_entities(data.ecs_world) {
+impl<'a> System<'a> for SteeringSystem {
+    type SystemData = (
+        Read<'a, EntitiesRes>,
+        ReadStorage<'a, TransformComponent>,
+        WriteStorage<'a, SteeringComponent>,
+        WriteStorage<'a, DesiredMovementComponent>,
+    );
+
+    fn run(&mut self, (entities, transform, mut steer, mut movement): Self::SystemData) {
+        for (e, transform, mut steer, mut movement) in
+            (&entities, &transform, &mut steer, &mut movement).join()
+        {
             // clear previous tick's inputs
             *movement = DesiredMovementComponent::default();
 
-            use std::borrow::BorrowMut;
-            if let CompleteAction::Stop = steer
-                .behaviour
-                .tick(transform.as_ref(), movement.borrow_mut())
-            {
+            if let CompleteAction::Stop = steer.behaviour.tick(&transform, &mut movement) {
                 debug!(
-                    "{}: finished steering {:?}, reverting to default behaviour",
+                    "{:?}: finished steering {:?}, reverting to default behaviour",
                     e, steer.behaviour
                 );
                 steer.behaviour = SteeringBehaviour::default();

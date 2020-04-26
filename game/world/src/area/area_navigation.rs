@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn half_step() {
         // the edge between 2 areas should take into the account if its a jump/half step
-        let graph = AreaGraph::from_chunks(&vec![
+        let graph = AreaGraph::from_chunks(&[
             ChunkBuilder::new()
                 .set_block((15, 5, 0), BlockType::Stone)
                 .build((0, 0)),
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn jump() {
         // the edge between 2 areas should take into the account if its a jump/half step
-        let graph = AreaGraph::from_chunks(&vec![
+        let graph = AreaGraph::from_chunks(&[
             ChunkBuilder::new()
                 .set_block((15, 5, 0), BlockType::Stone)
                 .build((0, 0)),

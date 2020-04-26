@@ -5,12 +5,16 @@ use world::{WorldPathSlice, CHUNK_SIZE};
 use crate::ecs::*;
 use crate::path::follow::PathFollowing;
 use crate::steer::SteeringComponent;
-use crate::TransformComponent;
+use crate::{TransformComponent, WorldRef};
 
 /// Holds the current path to follow
 #[derive(Default)]
 pub struct FollowPathComponent {
     path: Option<PathFollowing>,
+}
+
+impl Component for FollowPathComponent {
+    type Storage = VecStorage<Self>;
 }
 
 impl FollowPathComponent {
@@ -23,14 +27,17 @@ impl FollowPathComponent {
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
 
-impl System for PathSteeringSystem {
-    fn tick_system(&mut self, data: &mut TickData) {
-        let query = <(
-            Read<TransformComponent>,
-            Write<FollowPathComponent>,
-            Write<SteeringComponent>,
-        )>::query();
-        for (e, (transform, mut path, mut steer)) in query.iter_entities(data.ecs_world) {
+impl<'a> System<'a> for PathSteeringSystem {
+    type SystemData = (
+        Read<'a, EntitiesRes>,
+        ReadStorage<'a, TransformComponent>,
+        WriteStorage<'a, FollowPathComponent>,
+        WriteStorage<'a, SteeringComponent>,
+    );
+
+    fn run(&mut self, (entities, transform, mut path, mut steer): Self::SystemData) {
+        for (e, transform, mut path, steer) in (&entities, &transform, &mut path, &mut steer).join()
+        {
             let following = match path.path {
                 Some(ref mut path) => path,
                 None => return,
@@ -40,7 +47,7 @@ impl System for PathSteeringSystem {
                 // waypoint
                 Some((waypoint, false)) => {
                     if following.changed() {
-                        trace!("{}: heading towards {:?}", e, waypoint);
+                        trace!("{:?}: heading towards {:?}", e, waypoint);
                     }
                     SteeringComponent::seek(waypoint.into())
                 }
@@ -48,14 +55,14 @@ impl System for PathSteeringSystem {
                 // last waypoint
                 Some((waypoint, true)) => {
                     if following.changed() {
-                        trace!("{}: heading towards final waypoint {:?}", e, waypoint);
+                        trace!("{:?}: heading towards final waypoint {:?}", e, waypoint);
                     }
                     SteeringComponent::arrive(waypoint.into())
                 }
 
                 // path over
                 None => {
-                    trace!("{}: arrived at destination", e);
+                    trace!("{:?}: arrived at destination", e);
                     event_trace(Event::Entity(EntityEvent::NavigationTargetReached(
                         entity_id(e),
                     )));
@@ -71,13 +78,18 @@ impl System for PathSteeringSystem {
 /// Look it even has "Temp" in its name to show I'm serious
 pub struct TempPathAssignmentSystem;
 
-impl System for TempPathAssignmentSystem {
-    fn tick_system(&mut self, data: &mut TickData) {
-        let mut rand = thread_rng();
-        let world = data.voxel_world.borrow();
+impl<'a> System<'a> for TempPathAssignmentSystem {
+    type SystemData = (
+        ReadExpect<'a, WorldRef>,
+        Read<'a, EntitiesRes>,
+        ReadStorage<'a, TransformComponent>,
+        WriteStorage<'a, FollowPathComponent>,
+    );
 
-        let query = <(Read<TransformComponent>, Write<FollowPathComponent>)>::query();
-        for (e, (transform, mut path)) in query.iter_entities(data.ecs_world) {
+    fn run(&mut self, (world, entities, transform, mut path): Self::SystemData) {
+        let mut rand = thread_rng();
+        let world = world.borrow();
+        for (e, transform, mut path) in (&entities, &transform, &mut path).join() {
             if path.path.is_none() {
                 // uh oh, new path needed
 
@@ -105,7 +117,7 @@ impl System for TempPathAssignmentSystem {
                     attempts_left -= 1;
                     if attempts_left < 0 {
                         warn!(
-                            "{}: tried and failed {} times to find a random place to path find to",
+                            "{:?}: tried and failed {} times to find a random place to path find to",
                             e, ATTEMPTS,
                         );
                         break None;
@@ -116,10 +128,13 @@ impl System for TempPathAssignmentSystem {
                 let position = transform.position;
                 let full_path = target.and_then(|target| world.find_path(position, target));
 
-                match full_path {
-                    Some(_) => info!("{}: found path from {:?} to {:?}", e, position, target),
+                match full_path.as_ref() {
+                    Some(p) => {
+                        debug_assert!(!p.0.is_empty());
+                        info!("{:?}: found path from {:?} to {:?}", e, position, target)
+                    }
                     None => debug!(
-                        "{}: failed to find a path from {:?} to {:?}",
+                        "{:?}: failed to find a path from {:?} to {:?}",
                         e, position, target
                     ),
                 }

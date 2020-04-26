@@ -85,6 +85,13 @@ impl<'a> SliceMut<'a> {
         Self { slice }
     }
 
+    /// Must point to a slice of length CHUNK_SIZE * CHUNK_SIZE
+    pub unsafe fn from_ptr(ptr: *mut Block) -> Self {
+        let slice =
+            std::slice::from_raw_parts_mut(ptr, CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize());
+        Self::new(slice)
+    }
+
     pub fn set_block<P, B>(&mut self, pos: P, block: B)
     where
         P: Into<SliceBlock>,

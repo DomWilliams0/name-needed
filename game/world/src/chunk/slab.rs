@@ -1,5 +1,3 @@
-use physics::SlabCollider;
-
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::chunk::CHUNK_SIZE;
@@ -23,7 +21,7 @@ grid_declare!(struct SlabGrid<SlabGridImpl, Block>,
 pub(crate) struct Slab {
     grid: SlabGrid,
     index: SlabIndex,
-    collider: SlabCollider,
+    // collider: SlabCollider,
 }
 
 impl Slab {
@@ -31,7 +29,7 @@ impl Slab {
         Self {
             grid: SlabGrid::default(),
             index,
-            collider: SlabCollider::default(),
+            // collider: SlabCollider::default(),
         }
     }
 
@@ -67,9 +65,9 @@ impl Slab {
         &mut self.grid
     }
 
-    pub(crate) fn collider_mut(&mut self) -> &mut SlabCollider {
-        &mut self.collider
-    }
+    // pub(crate) fn collider_mut(&mut self) -> &mut SlabCollider {
+    //     &mut self.collider
+    // }
 
     /*
         pub fn highest_slice_index(&self) -> Option<SliceIndex> {

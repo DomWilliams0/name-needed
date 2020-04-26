@@ -17,6 +17,10 @@ pub struct DesiredMovementComponent {
     pub jump_behavior: DesiredJumpBehavior,
 }
 
+impl Component for DesiredMovementComponent {
+    type Storage = VecStorage<Self>;
+}
+
 impl Default for DesiredMovementComponent {
     fn default() -> Self {
         Self {
@@ -48,88 +52,23 @@ impl Default for DesiredJumpBehavior {
 /// you can't jump without legs, or see a jump without eyes
 pub struct MovementFulfilmentSystem;
 
-impl System for MovementFulfilmentSystem {
-    fn tick_system(&mut self, data: &mut TickData) {
-        let query = <(Write<DesiredMovementComponent>,)>::query();
-        for (e, (mut movement,)) in query.iter_entities(data.ecs_world) {
+impl<'a> System<'a> for MovementFulfilmentSystem {
+    type SystemData = (
+        Read<'a, EntitiesRes>,
+        WriteStorage<'a, DesiredMovementComponent>,
+    );
+
+    fn run(&mut self, (entities, mut movement): Self::SystemData) {
+        for (e, mut movement) in (&entities, &mut movement).join() {
             // scale velocity based on max speed
             let vel = movement.desired_velocity * config::get().simulation.move_speed;
 
             movement.realized_velocity = vel;
+
             event_trace(Event::Entity(EntityEvent::MovementIntention(
                 entity_id(e),
                 (vel.x, vel.y),
             )));
-        }
-    }
-}
-
-pub fn angle_from_direction(direction: Vector2) -> Rad<F> {
-    let direction = direction.extend(0.0);
-    let mut angle = direction.angle(AXIS_FWD);
-
-    if direction.cross(AXIS_FWD).dot(AXIS_UP).is_sign_positive() {
-        angle = -angle;
-    }
-
-    angle
-}
-
-#[cfg(test)]
-mod test {
-    use cgmath::{Quaternion, Rotation, Rotation3};
-
-    use common::*;
-
-    use super::*;
-
-    fn do_rot_non_normal<V: Into<Vector2>>(vec_in: V) {
-        do_rot(vec_in.into().normalize())
-    }
-
-    fn do_rot<V: Into<Vector2>>(vec_in: V) {
-        let vec_in = vec_in.into();
-        let angle = angle_from_direction(vec_in);
-
-        let quat = Quaternion::from_axis_angle(AXIS_UP, angle);
-        let vec_out = quat.rotate_vector(AXIS_FWD);
-
-        assert!(vec_out.x.approx_eq(vec_in.x, (0.0001, 2)));
-        assert!(vec_out.y.approx_eq(vec_in.y, (0.0001, 2)));
-    }
-
-    #[test]
-    fn angle_from_rotation_right() {
-        do_rot((1.0, 0.0));
-    }
-
-    #[test]
-    fn angle_from_rotation_left() {
-        do_rot((-1.0, 0.0));
-    }
-
-    #[test]
-    fn angle_from_rotation_up() {
-        do_rot((0.0, 1.0));
-    }
-
-    #[test]
-    fn angle_from_rotation_down() {
-        do_rot((0.0, -1.0));
-    }
-
-    #[test]
-    fn angle_from_rotation_various() {
-        do_rot_non_normal((0.2, 0.4));
-        do_rot_non_normal((0.7, 0.133));
-        do_rot_non_normal((0.5, 0.5));
-
-        let mut rando = thread_rng();
-        for _ in 0..50 {
-            do_rot_non_normal((
-                rando.gen_range(0.0f32, 1.0f32),
-                rando.gen_range(0.0f32, 1.0f32),
-            ));
         }
     }
 }

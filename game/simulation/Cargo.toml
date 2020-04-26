@@ -7,16 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-crate-type = ["dylib"]
+#crate-type = ["dylib"]
 
 [dependencies]
 world = {path = "../world"}
-physics = {path = "../physics"}
-debug-draw = { path = "../physics/debug-draw" }
 
 unit = {path = "../../shared/unit"}
 config = {path = "../../shared/config"}
 common = { path = "../../shared/common", features=["library"] }
 color = { path = "../../shared/color" }
 
-legion = "^0.2"
+specs = {version = "^0.16", default-features = false} # no parallel

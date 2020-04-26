@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use common::Rng;
+use std::ops::Mul;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct ColorRgb {
@@ -92,6 +93,13 @@ impl From<ColorRgb> for (u8, u8, u8) {
     }
 }
 
+/// Includes alpha value of 255
+impl From<ColorRgb> for u32 {
+    fn from(c: ColorRgb) -> Self {
+        ((c.r as u32) << 24) | ((c.g as u32) << 16) | ((c.b as u32) << 8) | 0xff
+    }
+}
+
 impl TryFrom<&[f32]> for ColorRgb {
     type Error = ();
 
@@ -108,6 +116,18 @@ impl From<(u8, u8, u8)> for ColorRgb {
     fn from(tup: (u8, u8, u8)) -> Self {
         let (r, g, b) = tup;
         Self { r, g, b }
+    }
+}
+
+impl Mul<f32> for ColorRgb {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            r: ((self.r as f32) * rhs) as u8,
+            g: ((self.g as f32) * rhs) as u8,
+            b: ((self.b as f32) * rhs) as u8,
+        }
     }
 }
 

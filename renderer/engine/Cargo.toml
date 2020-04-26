@@ -18,16 +18,10 @@ unit = {path = "../../shared/unit"}
 common = {path = "../../shared/common"}
 color = {path = "../../shared/color"}
 
-sdl2 = {version = "^0.33", optional = true}
-glium_sdl2 = {git = "https://github.com/DomWilliams0/glium-sdl2", version = "0.16.1", optional = true}
-enum-map = "^0.6"
-float-ord = "^0.2"
-
-[dependencies.glium]
-version = "^0.25"
-default-features = false  # removes glutin
+sfml = {version = "^0.15", git = "https://github.com/jeremyletang/rust-sfml", optional = true}
+take_mut = "^0.2"
 
 [features]
 default = []
-sdl-glium = ["sdl2", "glium_sdl2"]
+use-sfml = ["sfml"]
 lite = []

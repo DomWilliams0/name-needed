@@ -116,6 +116,13 @@ impl<T> DoubleSidedVec<T> {
             .rev()
             .chain(self.positive.iter_mut())
     }
+
+    pub fn iter_mut_decreasing(&mut self) -> impl Iterator<Item = &mut T> {
+        self.positive
+            .iter_mut()
+            .rev()
+            .chain(self.negative.iter_mut())
+    }
 }
 
 #[cfg(test)]
@@ -230,6 +237,24 @@ mod tests {
         assert_eq!(
             v.indices_increasing().collect::<Vec<_>>(),
             vec![-4, -3, -2, -1, 0, 1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn iter_mut() {
+        let mut v = DoubleSidedVec::<i32>::with_capacity(4);
+        v.add(0, 0);
+        v.add(1, 1);
+        v.add(-1, -1);
+        v.add(-2, -2);
+
+        assert_eq!(
+            v.iter_mut_increasing().map(|x| *x).collect::<Vec<_>>(),
+            vec![-2, -1, 0, 1]
+        );
+        assert_eq!(
+            v.iter_mut_decreasing().map(|x| *x).collect::<Vec<_>>(),
+            vec![1, 0, -1, -2]
         );
     }
 }

@@ -1,29 +1,17 @@
 use common::struclog;
-pub use legion::prelude::{Entity, IntoQuery, Read, TryRead, TryWrite, Write};
-use std::mem;
 
-use world::WorldRef;
+use specs::prelude::*;
+pub use specs::{
+    world::EntitiesRes, Component, Entity, Join, Read, ReadExpect, ReadStorage, System, SystemData,
+    VecStorage, Write, WriteExpect, WriteStorage,
+};
 
-pub type EcsWorld = legion::world::World;
+pub type EcsWorld = World;
 
 pub fn create_ecs_world() -> EcsWorld {
-    let universe = legion::world::Universe::new();
-    universe.create_world()
-}
-
-pub struct TickData<'a> {
-    pub voxel_world: WorldRef,
-    pub ecs_world: &'a mut EcsWorld,
-}
-
-pub trait System {
-    fn tick_system(&mut self, data: &mut TickData);
+    World::new()
 }
 
 pub fn entity_id(e: Entity) -> struclog::EntityId {
-    debug_assert_eq!(
-        mem::size_of::<Entity>(),
-        mem::size_of::<struclog::EntityId>()
-    );
-    unsafe { mem::transmute(e) }
+    ((e.gen().id() as u64) << 32) | e.id() as u64
 }
