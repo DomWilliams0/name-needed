@@ -4,19 +4,9 @@ language: rust
 cache:
     directories:
         - /home/travis/.cargo
-        - $SDL_DIR
-        - $BULLET_DIR
+        - $SFML_INSTALL
 before_cache:
     - rm -rf /home/travis/.cargo/registry
-
-#before_install:
-#    - sudo apt install libbullet-dev
-#    - git clone
-#addons:
-#    apt:
-#        update: true
-
-# ---
 
 branches:
     only:
@@ -24,12 +14,13 @@ branches:
         - master
 
 install:
-    - bash .travis-install-sdl2.sh
-    - bash .travis-install-bullet.sh
+    - bash .travis-install-sfml.sh
 
 env:
-    SDL_DIR=SDL2-2.0.9
-    BULLET_DIR=bullet3-2.89
+  global:
+    - SFML_INSTALL=$TRAVIS_BUILD_DIR/SFML/sfml_install
+    - LIBRARY_PATH=$SFML_INSTALL/usr/local/lib
+    - LD_LIBRARY_PATH=$SFML_INSTALL/usr/local/lib
 os:
     - linux
       # TODO windows and osx
@@ -37,6 +28,26 @@ rust:
     - stable
     - nightly
 
+# sfml
+addons:
+  apt:
+    packages:
+    - libpthread-stubs0-dev
+    - libgl1-mesa-dev
+    - libx11-dev
+    - libx11-xcb-dev
+    - libxcb-image0-dev
+    - libxrandr-dev
+    - libxcb-randr0-dev
+    - libudev-dev
+    - libfreetype6-dev
+    - libglew-dev
+    - libjpeg8-dev
+    - libgpgme11-dev
+    - libsndfile1-dev
+    - libopenal-dev
+    - libjpeg62
+    - cmake
 
 #matrix:
 #  fast_finish: true
@@ -64,9 +75,8 @@ rust:
 
 script: |
         export PATH=$PATH:/usr/local/lib &&
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib &&
-        export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/usr/local/lib &&
         env &&
+        ls -l $SFML_INSTALL/usr/local/lib &&
         export RUST_BACKTRACE=1 &&
         export NN_LOG=debug &&
         cargo build --verbose --workspace &&
