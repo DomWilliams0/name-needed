@@ -18,3 +18,4 @@ common = { path = "../../shared/common", features=["library"] }
 color = { path = "../../shared/color" }
 
 specs = {version = "^0.16", default-features = false} # no parallel
+crossbeam = "^0.7"

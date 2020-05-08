@@ -1,5 +1,7 @@
 use crate::GamePreset;
-use simulation::{presets, Renderer, Simulation, WorldRef};
+use simulation::{
+    presets, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
+};
 use std::path::Path;
 
 #[derive(Default)]
@@ -14,8 +16,9 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
         Some(Path::new("config.ron"))
     }
 
-    fn world(&self) -> WorldRef {
-        WorldRef::new(presets::one_block_wonder())
+    fn world(&self) -> ThreadedWorldLoader {
+        let pool = ThreadedWorkerPool::new(1);
+        WorldLoader::new(presets::multi_chunk_wonder(), pool)
     }
 
     fn init(&self, _sim: &mut Simulation<R>) {

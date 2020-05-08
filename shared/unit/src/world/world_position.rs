@@ -1,7 +1,7 @@
 use std::fmt::{Display, Error, Formatter};
 use std::ops::Add;
 
-use derive_more::*;
+use common::derive_more::*;
 
 use common::Point3;
 
@@ -24,6 +24,12 @@ impl From<WorldPoint> for WorldPosition {
             pos.1.floor() as i32,
             pos.2.floor() as i32,
         )
+    }
+}
+
+impl From<(u8, u8, i32)> for WorldPosition {
+    fn from((x, y, z): (u8, u8, i32)) -> Self {
+        Self(x as i32, y as i32, z)
     }
 }
 

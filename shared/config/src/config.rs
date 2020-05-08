@@ -17,6 +17,7 @@ pub struct Display {
 #[derive(Deserialize)]
 pub struct World {
     pub preset: WorldPreset,
+    pub worker_threads: Option<usize>,
 }
 
 #[derive(Deserialize)]

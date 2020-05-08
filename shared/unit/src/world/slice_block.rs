@@ -1,13 +1,13 @@
-use derive_more::*;
+use common::derive_more::*;
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{BlockPosition, SliceIndex};
 
 /// A block in a chunk x/y coordinate. Must be < chunk size
-pub type BlockCoord = u16;
+pub type BlockCoord = u8;
 
 /// A block in a slice
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Into, From, Ord, PartialOrd)]
 pub struct SliceBlock(pub BlockCoord, pub BlockCoord);
 
 impl SliceBlock {

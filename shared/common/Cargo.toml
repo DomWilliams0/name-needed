@@ -17,6 +17,7 @@ itertools = "^0.9"
 rand = "^0.7"
 env_logger = {version = "^0.7", optional = true}
 float-cmp = "^0.5"
+derive_more = "^0.99"
 
 # TODO feature for cgmath
 [features]

@@ -2,16 +2,14 @@ use std::path::Path;
 
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
-use simulation::{presets, Renderer, Simulation, WorldRef};
+use simulation::{Renderer, Simulation, ThreadedWorldLoader};
 
 pub trait GamePreset<R: Renderer> {
     fn name(&self) -> &str;
     fn config(&self) -> Option<&Path> {
         None
     }
-    fn world(&self) -> WorldRef {
-        WorldRef::new(presets::from_config())
-    }
+    fn world(&self) -> ThreadedWorldLoader;
     fn init(&self, sim: &mut Simulation<R>);
 
     fn load(&self) -> Simulation<R> {

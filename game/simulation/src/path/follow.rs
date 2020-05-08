@@ -21,6 +21,7 @@ impl PathFollowing {
         let mut is_final = false;
         let mut changed = false;
 
+        /*
         // check distance to current
         let (waypoint, _cost) = &self.path.0[self.next];
         let distance2 = {
@@ -50,6 +51,8 @@ impl PathFollowing {
             .0
             .get(self.next)
             .map(|&(wp, _cost)| (wp, is_final))
+        */
+        todo!()
     }
 
     pub fn changed(&self) -> bool {
@@ -57,6 +60,7 @@ impl PathFollowing {
     }
 
     pub fn path_remaining(&self) -> WorldPathSlice {
-        &self.path.0[self.next..]
+        // &self.path.0[self.next..]
+        todo!()
     }
 }

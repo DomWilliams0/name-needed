@@ -1,10 +1,21 @@
 use std::fmt::{Display, Error, Formatter};
 
-use crate::area::{EdgeCost, WorldArea};
 use unit::world::{BlockPosition, WorldPosition};
 
+use crate::area::{AreaNavEdge, EdgeCost, WorldArea};
+
+// TODO smallvecs
+
 #[derive(Debug)]
-pub(crate) struct BlockPath(Vec<(BlockPosition, EdgeCost)>);
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub struct BlockPathNode {
+    pub block: BlockPosition,
+    pub exit_cost: EdgeCost,
+}
+
+/// Doesnt include goal node
+#[derive(Debug)]
+pub struct BlockPath(pub Vec<BlockPathNode>);
 
 impl Display for BlockPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -12,58 +23,38 @@ impl Display for BlockPath {
     }
 }
 
-impl BlockPath {
-    pub fn new(points: Vec<(BlockPosition, EdgeCost)>) -> Self {
-        Self(points)
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = (BlockPosition, EdgeCost)> {
-        // skip the first node which is just the start
-        self.0.into_iter().skip(1)
-    }
-
-    /// for easy comparisons in tests
-    #[cfg(test)]
-    pub fn as_tuples(&self) -> Vec<(u16, u16, i32)> {
-        self.0.iter().map(|&p| p.0.into()).collect()
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 pub(crate) struct AreaPathNode {
     pub area: WorldArea,
+    /// None for first node
+    pub entry: Option<AreaNavEdge>,
+}
 
-    /// None for first area
-    pub entry: Option<(WorldPosition, EdgeCost)>,
-
-    /// None for last area
-    pub exit: Option<(WorldPosition, EdgeCost)>,
+impl AreaPathNode {
+    pub fn new_start(area: WorldArea) -> Self {
+        Self { area, entry: None }
+    }
+    pub fn new(area: WorldArea, entry: AreaNavEdge) -> Self {
+        Self {
+            area,
+            entry: Some(entry),
+        }
+    }
 }
 
 #[derive(Debug)]
-pub(crate) struct AreaPath(pub Vec<AreaPathNode>);
+pub struct AreaPath(pub(crate) Vec<AreaPathNode>);
 
 #[derive(Debug)]
-pub struct WorldPath(pub Vec<(WorldPosition, EdgeCost)>);
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub struct WorldPathNode {
+    pub block: WorldPosition,
+    pub exit_cost: EdgeCost,
+}
 
+#[derive(Debug)]
+pub struct WorldPath(pub Vec<WorldPathNode>);
+
+// TODO
 pub type WorldPathSlice<'a> = &'a [(WorldPosition, EdgeCost)];
-
-// ----
-
-impl IntoIterator for AreaPath {
-    type Item = AreaPathNode;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl IntoIterator for WorldPath {
-    type Item = (WorldPosition, EdgeCost);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}

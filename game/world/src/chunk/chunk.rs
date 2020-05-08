@@ -7,16 +7,18 @@ use common::*;
 use crate::area::WorldArea;
 use crate::block::BlockType;
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
-use crate::chunk::terrain::ChunkTerrain;
-pub use unit::dim::CHUNK_SIZE;
+use crate::chunk::slice::Slice;
+use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
+use crate::chunk::BaseTerrain;
+use crate::SliceRange;
+use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockPosition, ChunkPosition, WorldPosition};
 
 pub type ChunkId = u64;
 
-// reexport
-
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
+#[cfg_attr(test, derive(Clone))]
 pub struct Chunk {
     /// unique for each chunk
     pos: ChunkPosition,
@@ -29,15 +31,14 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn empty<P: Into<ChunkPosition>>(pos: P) -> Self {
-        Self::with_terrain(pos.into(), ChunkTerrain::default())
+        let pos = pos.into();
+        // TODO still does a lot of unnecessary initialization
+        let terrain = ChunkTerrain::from_raw_terrain(RawChunkTerrain::default(), pos);
+        Self::with_completed_terrain(pos, terrain)
     }
 
     /// Called by ChunkBuilder when terrain has been finalized
-    pub(crate) fn with_terrain(pos: ChunkPosition, mut terrain: ChunkTerrain) -> Self {
-        debug!("discovering areas for chunk {:?}", pos);
-        terrain.discover_areas(pos);
-        terrain.init_occlusion();
-
+    pub(crate) fn with_completed_terrain(pos: ChunkPosition, terrain: ChunkTerrain) -> Self {
         Self {
             pos,
             terrain,
@@ -80,10 +81,14 @@ impl Chunk {
             let block_pos: BlockPosition = pos.into();
             WorldArea {
                 chunk: self.pos,
-                slab: ChunkTerrain::slab_index_for_slice(block_pos.2),
+                slab: RawChunkTerrain::slab_index_for_slice(block_pos.2),
                 area: area_index,
             }
         })
+    }
+
+    pub fn slice_range(&self, range: SliceRange) -> impl Iterator<Item = Slice> {
+        range.as_range().map(move |i| self.slice(i)).while_some()
     }
 }
 
@@ -101,9 +106,20 @@ impl DerefMut for Chunk {
     }
 }
 
+impl BaseTerrain for Chunk {
+    fn raw_terrain(&self) -> &RawChunkTerrain {
+        self.terrain.raw_terrain()
+    }
+
+    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
+        self.terrain.raw_terrain_mut()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::block::BlockType;
+    use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder, BLOCK_COUNT_SLICE};
 
     #[test]
@@ -112,12 +128,12 @@ mod tests {
         let chunk = ChunkBuilder::new()
             .apply(|c| {
                 // a bit on slice 0
-                for i in 0_u16..3 {
+                for i in 0..3 {
                     c.set_block((i, i, 0), BlockType::Dirt);
                 }
             })
             .set_block((2, 3, 1), BlockType::Dirt)
-            .build((0, 0));
+            .into_inner();
 
         // slice 1 was filled
         assert_eq!(chunk.get_block_type((2, 3, 1)), Some(BlockType::Dirt));

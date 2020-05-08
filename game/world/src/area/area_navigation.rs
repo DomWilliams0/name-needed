@@ -1,241 +1,268 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-use petgraph::algo::astar;
-use petgraph::graph::DiGraph;
-use petgraph::prelude::NodeIndex;
+use petgraph::stable_graph::StableGraph;
+use petgraph::Directed;
 
 use common::*;
+use unit::dim::CHUNK_SIZE;
+use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceIndex};
 
-use crate::area::path::{AreaPath, AreaPathNode};
-use crate::area::{ChunkBoundary, EdgeCost, WorldArea};
-use crate::Chunk;
-use unit::world::WorldPosition;
+use crate::area::astar::astar;
+use crate::area::path::AreaPathNode;
+use crate::area::{AreaPath, WorldArea};
+use crate::occlusion::NeighbourOffset;
+use crate::EdgeCost;
 
-type AreaNavGraph = DiGraph<Node, Edge>;
+type AreaNavGraph = StableGraph<AreaNavNode, AreaNavEdge, Directed, u16>;
+type NodeIndex = petgraph::prelude::NodeIndex<u16>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
-struct Node(pub WorldArea);
+pub(crate) struct AreaNavNode(pub WorldArea);
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-struct Edge {
-    /// in another area
-    pub from: WorldPosition,
-
-    /// in this area
-    pub to: WorldPosition,
-
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub struct AreaNavEdge {
+    pub direction: NeighbourOffset,
     pub cost: EdgeCost,
+
+    /// Block in the exiting chunk
+    pub exit: BlockPosition,
+    pub width: BlockCoord,
 }
 
+#[cfg_attr(test, derive(Clone))]
 pub struct AreaGraph {
     graph: AreaNavGraph,
+    node_lookup: HashMap<WorldArea, NodeIndex>,
+}
+
+impl Default for AreaGraph {
+    fn default() -> Self {
+        Self {
+            graph: AreaNavGraph::with_capacity(256, 256),
+            node_lookup: HashMap::with_capacity(256),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum AreaPathError {
+    NoSuchNode(WorldArea),
+    NoPath,
+}
+
+impl AreaNavEdge {
+    /// Should be sorted so BlockCoords are ascending
+    pub fn discover_ports_between(
+        direction: NeighbourOffset,
+        connecting_blocks: impl Iterator<Item = (EdgeCost, BlockCoord, SliceIndex)>,
+        out: &mut Vec<Self>,
+    ) {
+        let mut group_id = 0;
+        connecting_blocks
+            .chain(once((EdgeCost::Walk, 255, SliceIndex(999)))) // dummy last
+            .tuple_windows()
+            .map(|((a_cost, a_coord, a_z), (b_cost, b_coord, b_z))| {
+                let diff = b_coord - a_coord;
+                let this_group_id = if diff == 1 && a_cost == b_cost && a_z == b_z {
+                    // group
+                    group_id
+                } else {
+                    // next doesn't belong in this group
+                    group_id += 1;
+                    group_id - 1
+                };
+
+                (a_cost, a_coord, a_z, this_group_id)
+            })
+            .group_by(|(_, _, _, group)| *group)
+            .into_iter()
+            .for_each(|(_, mut ports)| {
+                let (cost, start, z, _) = ports.next().unwrap(); // definitely 1
+                let end = ports.last().map(|(_, end, _, _)| end).unwrap_or(start);
+                let width = (end - start) + 1;
+
+                let (x, y) = direction.position_on_boundary(start);
+
+                out.push(Self {
+                    direction,
+                    cost,
+                    exit: (x, y, z).into(),
+                    width,
+                });
+            });
+    }
+
+    pub fn reversed(self) -> Self {
+        let cost = self.cost.opposite();
+        let direction = self.direction.opposite();
+
+        let mut exit = self.exit;
+
+        // move to other side of the chunk
+        match direction {
+            NeighbourOffset::North | NeighbourOffset::South => {
+                exit.1 = CHUNK_SIZE.as_block_coord() - 1 - exit.1
+            }
+            _ => exit.0 = CHUNK_SIZE.as_block_coord() - 1 - exit.0,
+        };
+
+        // a reversed jump up/down requires the exit point moving down or up
+        exit.2 -= cost.z_offset();
+
+        Self {
+            direction,
+            cost,
+            exit,
+            ..self
+        }
+    }
+
+    pub fn exit_middle(self) -> BlockPosition {
+        let offset = self
+            .direction
+            .perpendicular_offset((self.width / 2).max(1) as i16);
+        self.exit.try_add(offset).expect("exit width is too wide")
+    }
 }
 
 impl AreaGraph {
-    pub fn from_chunks(chunks: &[Chunk]) -> Self {
-        let mut graph = AreaNavGraph::new();
-        let mut boundary_buf = HashMap::new();
-        let mut cross_chunk_links = HashMap::new();
-        let mut node_lookup = HashMap::new();
+    pub(crate) fn find_area_path(
+        &self,
+        start: WorldArea,
+        goal: WorldArea,
+    ) -> Result<AreaPath, AreaPathError> {
+        let src_node = self.get_node(start)?;
+        let dst_node = self.get_node(goal)?;
 
-        // add area nodes
-        for chunk in chunks {
-            for area in chunk.areas() {
-                let idx = graph.add_node(Node(*area));
-                node_lookup.insert(*area, idx);
-            }
+        // node lookup should be in sync with graph
+        debug_assert!(self.graph.contains_node(src_node), "start: {:?}", start);
+        debug_assert!(self.graph.contains_node(dst_node), "goal: {:?}", goal);
 
-            // TODO add chunk-internal links when they actually exist
-        }
-
-        // read boundary blocks and store them with their corresponding area
-        for chunk in chunks {
-            for boundary in ChunkBoundary::boundaries() {
-                // get boundary areas and their link blocks
-                chunk.areas_for_boundary(boundary, &mut boundary_buf);
-
-                for (chunk_area, link_blocks) in boundary_buf.drain() {
-                    // promote to world area
-                    let world_area = chunk_area.into_world_area(chunk.pos());
-
-                    for block in &link_blocks {
-                        let world_pos = block.to_world_pos(chunk.pos());
-                        let key = (world_pos, boundary);
-                        let value = (world_area, chunk.get_block(*block).unwrap().block_height());
-                        cross_chunk_links
-                            .entry(key)
-                            .and_modify(|(a, _)| {
-                                assert_eq!(
-                                    *a, world_area,
-                                    "must be same area in corner block links"
-                                )
-                            })
-                            .or_insert(value);
-                    }
-                }
-            }
-        }
-
-        // now extrapolate boundary blocks to the next chunk and link them up
-        for ((block, boundary), (area, height)) in &cross_chunk_links {
-            let (extrapolated, other_area, other_height) = {
-                // try the next block over
-                let shifted = boundary.shift(*block);
-                let opposite = boundary.opposite();
-
-                let mut extrapolated = shifted;
-                let result = cross_chunk_links
-                    .get(&(extrapolated, opposite))
-                    .or_else(|| {
-                        // try the one above
-                        extrapolated.2 = shifted.2 + 1;
-                        cross_chunk_links.get(&(extrapolated, opposite))
-                    })
-                    .or_else(|| {
-                        // try the one below
-                        extrapolated.2 = shifted.2 - 1;
-                        cross_chunk_links.get(&(extrapolated, opposite))
-                    });
-
-                if let Some((area, height)) = result {
-                    // nice, we found an area to link with
-                    (extrapolated, *area, *height)
-                } else {
-                    // block is in a non-existent chunk, never mind
-                    continue;
-                }
-            };
-
-            // add an edge between these areas via these 2 blocks
-            let from_node = *node_lookup.get(&area).unwrap();
-            let to_node = *node_lookup.get(&other_area).unwrap();
-            let edge = {
-                let cost = {
-                    let z_diff = extrapolated.2 - block.2;
-                    EdgeCost::from_height_diff(*height, other_height, z_diff)
-                        .expect("boundary blocks should be adjacent")
-                };
-                Edge {
-                    from: *block,
-                    to: extrapolated,
-                    cost,
-                }
-            };
-
-            graph.add_edge(from_node, to_node, edge);
-        }
-
-        Self { graph }
-    }
-
-    fn get_node_index(&self, area: WorldArea) -> Option<NodeIndex> {
-        self.graph
-            .node_indices()
-            .find(|n| self.graph.node_weight(*n).unwrap().0 == area)
-    }
-
-    fn get_node(&self, index: NodeIndex) -> Option<WorldArea> {
-        self.graph.node_weight(index).map(|n| n.0)
-    }
-
-    fn get_edge(&self, from: NodeIndex, to: NodeIndex) -> Option<&Edge> {
-        self.graph
-            .find_edge(from, to)
-            .and_then(|e| self.graph.edge_weight(e))
-    }
-
-    pub(crate) fn find_area_path(&self, start: WorldArea, goal: WorldArea) -> Option<AreaPath> {
-        let (from_node, to_node) = match (self.get_node_index(start), self.get_node_index(goal)) {
-            (Some(from), Some(to)) => (from, to),
-            _ => return None,
-        };
-
-        let to_vec = Vector3::from(goal);
-        match astar(
+        let path = astar(
             &self.graph,
-            from_node,
-            |n| n == to_node,
-            |e| e.weight().cost.weight(),
+            src_node,
+            |n| n == dst_node,
+            |edge| edge.weight().cost.weight(), // TODO could prefer wider ports
             |n| {
-                let here = self.graph.node_weight(n).unwrap().0;
-                let here_vec = Vector3::from(here);
-                to_vec.distance2(here_vec) as i32
+                // manhattan distance * chunk size, underestimates
+                let ChunkPosition(nx, ny) = &self.graph[n].0.chunk;
+                let ChunkPosition(gx, gy) = goal.chunk;
+
+                let dx = (nx - gx).abs() * CHUNK_SIZE.as_i32();
+                let dy = (ny - gy).abs() * CHUNK_SIZE.as_i32();
+                (dx + dy) as f32
             },
-        ) {
-            Some((_cost, nodes)) => {
-                // wrap each in Option with a None prepended and appended
-                let nodes = once(None).chain(nodes.iter().map(Some)).chain(once(None));
+        )
+        .ok_or(AreaPathError::NoPath)?;
 
-                let nodes = nodes
-                    .tuple_windows()
-                    .filter_map(|chunk| {
-                        match chunk {
-                            (None, Some(&b), Some(&c)) => {
-                                // `b` is first - no entry
-                                let b2c = self.get_edge(b, c).expect("edge should exist");
+        let mut out_path = Vec::with_capacity(path.len() + 1);
 
-                                Some(AreaPathNode {
-                                    area: self.get_node(b).expect("node should exist"),
-                                    entry: None,
-                                    exit: Some((b2c.from, b2c.cost)),
-                                })
-                            }
+        // first is a special case and unconditional
+        out_path.push(AreaPathNode::new_start(start));
 
-                            (Some(&a), Some(&b), Some(&c)) => {
-                                // `b` has an entry and exit edge
-                                let a2b = self.get_edge(a, b).expect("edge should exist");
-                                let b2c = self.get_edge(b, c).expect("edge should exist");
-
-                                Some(AreaPathNode {
-                                    area: self.get_node(b).expect("node should exist"),
-                                    entry: Some((a2b.to, a2b.cost)),
-                                    exit: Some((b2c.from, b2c.cost)),
-                                })
-                            }
-
-                            (Some(&a), Some(&b), None) => {
-                                // `b` is last - no exit
-                                let a2b = self.get_edge(a, b).expect("edge should exist");
-
-                                Some(AreaPathNode {
-                                    area: self.get_node(b).expect("node should exist"),
-                                    entry: Some((a2b.to, a2b.cost)),
-                                    exit: None,
-                                })
-                            }
-                            (None, Some(&area), None) => {
-                                // there is only a single area
-                                Some(AreaPathNode {
-                                    area: self.get_node(area).expect("node should exist"),
-                                    entry: None,
-                                    exit: None,
-                                })
-                            }
-
-                            bad => unreachable!("unexpected {:?}", bad),
-                        }
-                    })
-                    .collect_vec();
-
-                Some(AreaPath(nodes))
-            }
-            _ => None,
+        let area_nodes = path
+            .into_iter()
+            .map(|(node, edge)| (self.graph[node].0, self.graph[edge]));
+        for (area, edge) in area_nodes {
+            out_path.push(AreaPathNode::new(area, edge));
         }
+
+        Ok(AreaPath(out_path))
+    }
+
+    pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
+        info!("edge {:?} <-> {:?} | {:?}", from, to, edge);
+
+        let (a, b) = (self.add_node(from), self.add_node(to));
+        self.graph.add_edge(a, b, edge);
+        self.graph.add_edge(b, a, edge.reversed());
+    }
+
+    pub(crate) fn add_node(&mut self, area: WorldArea) -> NodeIndex {
+        match self.node_lookup.get(&area) {
+            Some(n) => *n,
+            None => {
+                debug_assert!(
+                    self.graph
+                        .node_indices()
+                        .find(|n| self.graph.node_weight(*n).unwrap().0 == area)
+                        .is_none(),
+                    "node is not in both lookup and graph"
+                );
+                let n = self.graph.add_node(AreaNavNode(area));
+                self.node_lookup.insert(area, n);
+                n
+            }
+        }
+    }
+
+    fn get_node(&self, area: WorldArea) -> Result<NodeIndex, AreaPathError> {
+        self.node_lookup
+            .get(&area)
+            .copied()
+            .ok_or_else(|| AreaPathError::NoSuchNode(area))
+    }
+
+    #[cfg(test)]
+    fn get_edges(&self, from: WorldArea, to: WorldArea) -> Vec<AreaNavEdge> {
+        use petgraph::prelude::{Direction, EdgeRef};
+
+        match (self.get_node(from), self.get_node(to)) {
+            (Ok(from), Ok(to)) => self
+                .graph
+                .edges_directed(from, Direction::Outgoing)
+                .filter(|e| e.target() == to)
+                .map(|e| *e.weight())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    fn edge_count(&self) -> usize {
+        self.graph.edge_count()
+    }
+
+    #[cfg(test)]
+    fn node_count(&self) -> usize {
+        self.graph.node_count()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ordered_float::OrderedFloat;
-    use petgraph::visit::EdgeRef;
-    use petgraph::Direction;
+    use matches::assert_matches;
 
-    use crate::area::AreaGraph;
-    use crate::area::EdgeCost;
-    use crate::block::{BlockHeight, BlockType};
-    use crate::{ChunkBuilder, CHUNK_SIZE};
-    use unit::world::ChunkPosition;
+    use common::*;
+    use unit::dim::CHUNK_SIZE;
+    use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
+
+    use crate::area::path::AreaPathNode;
+    use crate::area::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
+    use crate::block::BlockType;
+    use crate::chunk::slab::SLAB_SIZE;
+    use crate::chunk::ChunkBuilder;
+    use crate::occlusion::NeighbourOffset;
+    use crate::{world_from_chunks, ChunkDescriptor, EdgeCost};
+
+    fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
+        // gross but allows for neater tests
+        let world = world_from_chunks(chunks).into_inner();
+        (*world.area_graph()).clone()
+    }
+
+    fn get_edge(graph: &AreaGraph, from: WorldArea, to: WorldArea) -> Option<AreaNavEdge> {
+        let mut edges = graph.get_edges(from, to).into_iter();
+        let edge = edges.next();
+        assert!(
+            edges.next().is_none(),
+            "1 edge expected but found {}",
+            edges.len() + 1
+        );
+        edge
+    }
 
     #[test]
     fn one_block_one_side_flat() {
@@ -248,9 +275,10 @@ mod tests {
                 .build((1, 0)),
         ];
 
-        let graph = AreaGraph::from_chunks(&chunks);
+        let graph = make_graph(chunks);
+
         assert_eq!(graph.graph.node_count(), 2);
-        assert_eq!(graph.graph.edge_count(), 2); // 1 each way
+        assert_eq!(graph.graph.edge_count(), 2);
     }
 
     #[test]
@@ -267,31 +295,83 @@ mod tests {
                 .build((0, -1)),
         ];
 
-        let graph = AreaGraph::from_chunks(&chunks);
+        let graph = make_graph(chunks);
         assert_eq!(graph.graph.node_count(), 3);
+        assert_eq!(graph.graph.edge_count(), 2 * 2);
 
-        // get area at 0, 0 in a disgusting manner
-        let zerozero = graph
-            .graph
-            .node_indices()
-            .find(|n| graph.graph.node_weight(*n).unwrap().0.chunk == (0, 0).into())
-            .unwrap();
+        // get area at 0, 0
+        let zerozero = WorldArea::new((0, 0));
 
-        assert_eq!(
-            graph
-                .graph
-                .edges_directed(zerozero, Direction::Outgoing)
-                .count(),
-            2
-        ); // 1 out to each other chunk
+        let _ = get_edge(&graph, zerozero, WorldArea::new((1, 0)))
+            .expect("edge to (1, 0) should exist");
 
-        assert_eq!(
-            graph
-                .graph
-                .edges_directed(zerozero, Direction::Incoming)
-                .count(),
-            2
-        ); // 1 in from each other chunk too
+        let _ = get_edge(&graph, zerozero, WorldArea::new((0, -1)))
+            .expect("edge to (0, -1) should exist");
+    }
+
+    #[test]
+    fn cross_chunk_area_linkage() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        // step up from chunk 0 (0,5,N-1) to chunk 1 (-1, 5, N) slab 1
+        let graph = make_graph(vec![
+            ChunkBuilder::new()
+                .set_block((0, 5, -1), BlockType::Grass)
+                .build((0, 0)),
+            ChunkBuilder::new()
+                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), BlockType::Stone)
+                .build((-1, 0)),
+        ]);
+
+        assert_eq!(graph.node_count(), 2); // only 1 area in each chunk
+        assert_eq!(graph.edge_count(), 2); // 1 edge each way
+
+        let a = WorldArea::new((0, 0));
+        let b = WorldArea::new((-1, 0));
+
+        let _ = get_edge(&graph, a, b).expect("edge should exist");
+        let _ = get_edge(&graph, b, a).expect("node should exist both ways");
+    }
+
+    #[test]
+    fn cross_chunk_area_linkage_cross_slab() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        // -1, 5, 16 -> 0, 5, 15
+        let graph = make_graph(vec![
+            ChunkBuilder::new()
+                .set_block((0, 5, SLAB_SIZE.as_i32() - 1), BlockType::Grass)
+                .build((0, 0)),
+            ChunkBuilder::new()
+                .set_block(
+                    (CHUNK_SIZE.as_i32() - 1, 5, SLAB_SIZE.as_i32()),
+                    BlockType::Stone,
+                )
+                .build((-1, 0)),
+        ]);
+
+        assert_eq!(graph.node_count(), 3); // 1 area in (0,0) and 1 in each of the 2 slabs in (-1, 0)
+        assert_eq!(graph.edge_count(), 2 * 2); // 2 each way
+
+        let a = WorldArea {
+            chunk: ChunkPosition(0, 0),
+            slab: 1,
+            area: SlabAreaIndex::FIRST,
+        };
+        let b = WorldArea {
+            chunk: ChunkPosition(-1, 0),
+            slab: 1,
+            area: SlabAreaIndex::FIRST,
+        };
+
+        let _ = get_edge(&graph, a, b).expect("edge should exist");
+        let _ = get_edge(&graph, b, a).expect("node should exist both ways");
     }
 
     #[test]
@@ -314,90 +394,398 @@ mod tests {
                 .build((0, -1)),
         ];
 
-        let graph = AreaGraph::from_chunks(&chunks);
-        assert_eq!(graph.graph.node_count(), 5);
+        let graph = make_graph(chunks);
 
         // 0, 0 should have edges along each side
+        assert_eq!(graph.node_count(), 5);
         assert_eq!(
             graph
                 .graph
-                .edge_references()
-                .filter(|e| {
-                    let to = graph.graph.node_weight(e.target()).unwrap().0;
-                    to.chunk == ChunkPosition(0, 0)
-                })
+                .edge_indices()
+                .map(|e| (graph.graph[e], graph.graph.edge_endpoints(e).unwrap()))
+                .filter(|(_, (a, b))| graph.graph[*a].0.chunk == ChunkPosition(0, 0)
+                    || graph.graph[*b].0.chunk == ChunkPosition(0, 0))
                 .count(),
-            CHUNK_SIZE.as_usize() * 4
+            4 * 2
         );
     }
 
     #[test]
-    fn half_step() {
-        // the edge between 2 areas should take into the account if its a jump/half step
-        let graph = AreaGraph::from_chunks(&[
-            ChunkBuilder::new()
-                .set_block((15, 5, 0), BlockType::Stone)
-                .build((0, 0)),
-            ChunkBuilder::new()
-                .set_block((0, 5, 1), (BlockType::Grass, BlockHeight::Half))
-                .build((1, 0)),
-        ]);
-        assert_eq!(graph.graph.node_count(), 2);
-        assert_eq!(graph.graph.edge_count(), 2); // 1 each way
+    fn pure_port_discovery() {
+        // pure = isolated test
+        let link_blocks = vec![
+            // one group
+            (EdgeCost::Walk, 0, SliceIndex(0)),
+            (EdgeCost::Walk, 1, SliceIndex(0)),
+            (EdgeCost::Walk, 2, SliceIndex(0)),
+            // another group
+            (EdgeCost::Walk, 4, SliceIndex(0)),
+            (EdgeCost::Walk, 5, SliceIndex(0)),
+            (EdgeCost::Walk, 6, SliceIndex(0)),
+            // another group
+            (EdgeCost::JumpUp, 7, SliceIndex(0)),
+            (EdgeCost::JumpUp, 8, SliceIndex(0)),
+            // all alone groups
+            (EdgeCost::JumpUp, 10, SliceIndex(0)),
+            (EdgeCost::JumpUp, 11, SliceIndex(5)), // different z
+            (EdgeCost::JumpDown, 12, SliceIndex(5)), // different cost
+        ];
 
-        // chunk 0, 0
-        let node_a = graph
-            .graph
-            .node_indices()
-            .find(|n| {
-                let area = graph.graph.node_weight(*n).unwrap().0;
-                area.chunk.0 == 0
-            })
-            .unwrap();
+        let direction = NeighbourOffset::West;
+        let mut ports = vec![];
+        AreaNavEdge::discover_ports_between(direction, link_blocks.into_iter(), &mut ports);
 
-        // chunk 1, 0
-        let node_b = graph.graph.node_indices().find(|n| *n != node_a).unwrap();
+        let expected = vec![
+            AreaNavEdge {
+                cost: EdgeCost::Walk,
+                width: 3,
+                exit: BlockPosition(0, 0, SliceIndex(0)),
+                direction,
+            },
+            AreaNavEdge {
+                cost: EdgeCost::Walk,
+                width: 3,
+                exit: BlockPosition(0, 4, SliceIndex(0)),
+                direction,
+            },
+            AreaNavEdge {
+                cost: EdgeCost::JumpUp,
+                width: 2,
+                exit: BlockPosition(0, 7, SliceIndex(0)),
+                direction,
+            },
+            AreaNavEdge {
+                cost: EdgeCost::JumpUp,
+                width: 1,
+                exit: BlockPosition(0, 10, SliceIndex(0)),
+                direction,
+            },
+            AreaNavEdge {
+                cost: EdgeCost::JumpUp,
+                width: 1,
+                exit: BlockPosition(0, 11, SliceIndex(5)),
+                direction,
+            },
+            AreaNavEdge {
+                cost: EdgeCost::JumpDown,
+                width: 1,
+                exit: BlockPosition(0, 12, SliceIndex(5)),
+                direction,
+            },
+        ];
 
-        let edge_up = graph.get_edge(node_a, node_b).unwrap();
-        let edge_down = graph.get_edge(node_b, node_a).unwrap();
-
-        let half_height = BlockHeight::Half.height();
-        assert_eq!(edge_up.cost, EdgeCost::Step(OrderedFloat(half_height)));
-        assert_eq!(edge_down.cost, EdgeCost::Step(OrderedFloat(-half_height)));
+        assert_eq!(ports, expected);
     }
 
     #[test]
-    fn jump() {
-        // the edge between 2 areas should take into the account if its a jump/half step
-        let graph = AreaGraph::from_chunks(&[
+    fn world_port_discovery() {
+        let graph = make_graph(vec![
             ChunkBuilder::new()
-                .set_block((15, 5, 0), BlockType::Stone)
+                .fill_slice(3, BlockType::Stone)
+                .build((-4, -4)),
+            ChunkBuilder::new()
+                // 3 wide port
+                .set_block((0, 5, 3), BlockType::Grass)
+                .set_block((0, 6, 3), BlockType::Grass)
+                .set_block((0, 7, 3), BlockType::Grass)
+                // little bridge to have 1 connected area
+                .set_block((1, 7, 3), BlockType::Stone)
+                .set_block((1, 8, 3), BlockType::Stone)
+                .set_block((1, 9, 4), BlockType::Stone)
+                .set_block((1, 10, 4), BlockType::Stone)
+                // another disconnected 1 wide port
+                .set_block((0, 10, 4), BlockType::Grass)
+                .build((-3, -4)),
+            ChunkBuilder::new().build((0, 0)),
+        ]);
+
+        let mut edges = graph.get_edges(WorldArea::new((-4, -4)), WorldArea::new((-3, -4)));
+
+        let mut expected = vec![
+            AreaNavEdge {
+                direction: NeighbourOffset::East,
+                cost: EdgeCost::Walk,
+                exit: (15, 5, 4).into(),
+                width: 3,
+            },
+            AreaNavEdge {
+                direction: NeighbourOffset::East,
+                cost: EdgeCost::JumpUp,
+                exit: (15, 10, 4).into(),
+                width: 1,
+            },
+        ];
+
+        edges.sort_by_key(|e| e.exit.1);
+        expected.sort_by_key(|e| e.exit.1);
+
+        assert_eq!(edges, expected);
+    }
+
+    #[test]
+    fn area_path_ring_all_directions() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        let fill_except_outline = |z| {
+            ChunkBuilder::new().fill_range(
+                (1, 1, z),
+                (
+                    CHUNK_SIZE.as_block_coord() - 1,
+                    CHUNK_SIZE.as_block_coord() - 1,
+                    z + 1,
+                ),
+                |_| BlockType::Stone,
+            )
+        };
+
+        let graph = make_graph(vec![
+            // top left
+            fill_except_outline(3)
+                .set_block((3, 0, 3), BlockType::Stone) /* south bridge */
+                .build((-1, 1)), /* NO east bridge */
+
+            // top right
+            fill_except_outline(4)
+                .set_block((3, 0, 4), BlockType::Stone) /* south bridge */
+                .build((0, 1)), /* NO west bridge */
+
+            // bottom right
+            fill_except_outline(3)
+                .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 3), BlockType::Stone) /* north bridge */
+                .set_block((0, 3, 3), BlockType::Stone) /* west bridge */
+                .build((0, 0)),
+
+            // bottom left
+            fill_except_outline(4)
+                .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 4), BlockType::Stone) /* north bridge */
+                .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 4), BlockType::Stone) /* east bridge */
+                .build((-1, 0)),
+        ]);
+
+        {
+            // from top left to top right
+            // path crosses south,east,north boundaries because theres no east/west bridge between top 2
+            let path = graph
+                .find_area_path(WorldArea::new((-1, 1)), WorldArea::new((0, 1)))
+                .expect("path should succeed");
+
+            let expected = vec![
+                AreaPathNode::new_start(WorldArea::new((-1, 1))),
+                // south
+                AreaPathNode::new(
+                    WorldArea::new((-1, 0)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::South,
+                        cost: EdgeCost::JumpUp,
+                        exit: (3, 0, 4).into(),
+                        width: 1,
+                    },
+                ),
+                // east
+                AreaPathNode::new(
+                    WorldArea::new((0, 0)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::East,
+                        cost: EdgeCost::JumpDown,
+                        exit: (CHUNK_SIZE.as_block_coord() - 1, 3, 5).into(),
+                        width: 1,
+                    },
+                ),
+                // north
+                AreaPathNode::new(
+                    WorldArea::new((0, 1)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::North,
+                        cost: EdgeCost::JumpUp,
+                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 4).into(),
+                        width: 1,
+                    },
+                ),
+            ];
+
+            assert_eq!(path.0, expected);
+        }
+
+        {
+            // from top right to top left
+            // path crosses south,west,north boundaries this time
+            let path = graph
+                .find_area_path(WorldArea::new((0, 1)), WorldArea::new((-1, 1)))
+                .expect("path should succeed");
+
+            let expected = vec![
+                AreaPathNode::new_start(WorldArea::new((0, 1))),
+                // south
+                AreaPathNode::new(
+                    WorldArea::new((0, 0)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::South,
+                        cost: EdgeCost::JumpDown,
+                        exit: (3, 0, 5).into(),
+                        width: 1,
+                    },
+                ),
+                // west
+                AreaPathNode::new(
+                    WorldArea::new((-1, 0)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::West,
+                        cost: EdgeCost::JumpUp,
+                        exit: (0, 3, 4).into(),
+                        width: 1,
+                    },
+                ),
+                // north
+                AreaPathNode::new(
+                    WorldArea::new((-1, 1)),
+                    AreaNavEdge {
+                        direction: NeighbourOffset::North,
+                        cost: EdgeCost::JumpDown,
+                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 5).into(),
+                        width: 1,
+                    },
+                ),
+            ];
+
+            assert_eq!(path.0, expected);
+        }
+    }
+
+    #[test]
+    fn area_path_across_three_chunks() {
+        let graph = make_graph(vec![
+            ChunkBuilder::new()
+                // 2 wide port going east
+                .set_block((14, 2, 1), BlockType::Stone)
+                .set_block((14, 3, 1), BlockType::Stone)
+                .set_block((15, 2, 2), BlockType::Stone)
+                .set_block((15, 3, 2), BlockType::Stone)
+                .build((-1, 0)),
+            ChunkBuilder::new()
+                .fill_slice(3, BlockType::Grass)
                 .build((0, 0)),
             ChunkBuilder::new()
-                .set_block((0, 5, 1), BlockType::Grass)
+                // 1 wide port still going east
+                .set_block((0, 5, 2), BlockType::Stone)
+                .set_block((1, 5, 1), BlockType::Stone)
                 .build((1, 0)),
         ]);
-        assert_eq!(graph.graph.node_count(), 2);
-        assert_eq!(graph.graph.edge_count(), 2); // 1 each way
+        let path = graph
+            .find_area_path(WorldArea::new((-1, 0)), WorldArea::new((1, 0)))
+            .expect("path should succeed");
 
-        // chunk 0, 0
-        let node_a = graph
-            .graph
-            .node_indices()
-            .find(|n| {
-                let area = graph.graph.node_weight(*n).unwrap().0;
-                area.chunk.0 == 0
-            })
-            .unwrap();
+        let expected = vec![
+            AreaPathNode::new_start(WorldArea::new((-1, 0))),
+            AreaPathNode::new(
+                WorldArea::new((0, 0)),
+                AreaNavEdge {
+                    direction: NeighbourOffset::East,
+                    cost: EdgeCost::JumpUp,
+                    exit: BlockPosition(15, 2, SliceIndex(3)),
+                    width: 2,
+                },
+            ),
+            AreaPathNode::new(
+                WorldArea::new((1, 0)),
+                AreaNavEdge {
+                    direction: NeighbourOffset::East,
+                    cost: EdgeCost::JumpDown,
+                    exit: BlockPosition(15, 5, SliceIndex(4)),
+                    width: 1,
+                },
+            ),
+        ];
 
-        // chunk 1, 0
-        let node_b = graph.graph.node_indices().find(|n| *n != node_a).unwrap();
+        assert_eq!(path.0, expected);
+    }
 
-        let edge_up = graph.get_edge(node_a, node_b).unwrap();
-        let edge_down = graph.get_edge(node_b, node_a).unwrap();
+    #[test]
+    fn area_path_across_two_chunks() {
+        let w = world_from_chunks(vec![
+            ChunkBuilder::new()
+                .set_block((14, 2, 1), BlockType::Stone)
+                .set_block((15, 2, 1), BlockType::Stone)
+                .build((-1, 0)),
+            ChunkBuilder::new()
+                .fill_slice(1, BlockType::Grass)
+                .build((0, 0)),
+        ])
+        .into_inner();
 
-        let _half_height = BlockHeight::Half.height();
-        assert_eq!(edge_up.cost, EdgeCost::JumpUp);
-        assert_eq!(edge_down.cost, EdgeCost::JumpDown);
+        let path = w
+            .find_area_path(
+                (-2, 2, 2),  // chunk -1, 0
+                (10, 10, 2), // chunk 0, 0
+            )
+            .expect("path should succeed");
+
+        let expected = vec![
+            AreaPathNode::new_start(WorldArea::new((-1, 0))),
+            AreaPathNode::new(
+                WorldArea::new((0, 0)),
+                AreaNavEdge {
+                    direction: NeighbourOffset::East,
+                    cost: EdgeCost::Walk,
+                    exit: BlockPosition(15, 2, SliceIndex(2)),
+                    width: 1,
+                },
+            ),
+        ];
+
+        assert_eq!(path.0, expected);
+    }
+
+    #[test]
+    fn area_path_within_single_chunk() {
+        let w = world_from_chunks(vec![ChunkBuilder::new()
+            .fill_slice(1, BlockType::Grass)
+            .build((0, 0))])
+        .into_inner();
+
+        let path = w
+            .find_area_path(
+                (2, 2, 2), // chunk 0, 0
+                (8, 3, 2), // also chunk 0, 0
+            )
+            .expect("path should succeed");
+
+        assert_eq!(
+            path.0,
+            vec![AreaPathNode::new_start(WorldArea::new((0, 0)))]
+        );
+    }
+
+    #[test]
+    fn area_path_bad() {
+        let graph = make_graph(vec![ChunkBuilder::new()
+            .fill_slice(1, BlockType::Grass)
+            .build((0, 0))]);
+
+        let err = graph.find_area_path(WorldArea::new((0, 0)), WorldArea::new((100, 20)));
+
+        assert_matches!(err, Err(AreaPathError::NoSuchNode(_)));
+    }
+
+    #[test]
+    fn area_edge_reverse() {
+        let edge = AreaNavEdge {
+            direction: NeighbourOffset::South,
+            cost: EdgeCost::JumpUp,
+            exit: (5, 0, 5).into(),
+            width: 2,
+        };
+
+        let reversed = AreaNavEdge {
+            direction: NeighbourOffset::North,
+            cost: EdgeCost::JumpDown,
+            exit: BlockPosition(5, CHUNK_SIZE.as_block_coord() - 1, SliceIndex(6)),
+            width: 2,
+        };
+
+        assert_eq!(edge.reversed(), reversed);
+        assert_eq!(reversed.reversed(), edge);
     }
 }

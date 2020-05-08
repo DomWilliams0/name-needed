@@ -6,6 +6,7 @@ macro_rules! grid_declare {
     (struct $name:ident < $implname:ident, $t:ty > , $x:expr, $y:expr, $z:expr) => {
         pub type $name = Grid<$implname>;
 
+        #[derive(Clone)]
         pub struct $implname {
             // TODO pub hardcoded :(
             array: [$t; Self::FULL_SIZE],
@@ -47,7 +48,7 @@ macro_rules! grid_declare {
 pub type CoordType = [i32; 3];
 
 pub trait GridImpl: Default {
-    type Item: Default;
+    type Item: Default + Clone;
     const DIMS: [i32; 3];
     const FULL_SIZE: usize;
 
@@ -55,7 +56,7 @@ pub trait GridImpl: Default {
     fn array_mut(&mut self) -> &mut [Self::Item];
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Grid<I: GridImpl>(I);
 
 impl<I: GridImpl> Grid<I> {

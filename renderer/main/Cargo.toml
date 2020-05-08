@@ -17,6 +17,7 @@ common = { path = "../../shared/common", features = ["binary"] }
 color = { path = "../../shared/color"}
 
 alloc_counter = {version = "^0.0", optional = true}
+num_cpus = "1.13"
 
 clap = "^2.33"
 

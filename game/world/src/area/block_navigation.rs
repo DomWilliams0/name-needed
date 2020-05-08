@@ -1,45 +1,35 @@
 //! Navigation inside an area
 
-use std::collections::HashMap;
+use petgraph::graphmap::DiGraphMap;
 
-use petgraph::algo::astar;
-use petgraph::graph::NodeIndex;
-use petgraph::prelude::DiGraph;
+use unit::world::BlockPosition;
 
-use common::*;
-
-use crate::area::path::BlockPath;
+use crate::area::astar::astar;
+use crate::area::path::{BlockPath, BlockPathNode};
 use crate::area::EdgeCost;
-use unit::world::{BlockPosition, ChunkPoint};
 
-pub type BlockGraphType = DiGraph<Node, Edge>;
+type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Ord, PartialOrd, Hash)]
+pub struct BlockNavNode(pub BlockPosition);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Node(pub BlockPosition);
+pub struct BlockNavEdge(pub EdgeCost);
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Edge(pub EdgeCost);
-
+#[cfg_attr(test, derive(Clone))]
 pub struct BlockGraph {
-    graph: BlockGraphType,
-    node_lookup: HashMap<BlockPosition, NodeIndex>,
+    graph: BlockNavGraph,
+}
+
+#[derive(Debug)]
+pub enum BlockPathError {
+    NoPath(BlockPosition, BlockPosition),
 }
 
 impl BlockGraph {
     pub fn new() -> Self {
         Self {
-            graph: BlockGraphType::new(),
-            node_lookup: HashMap::new(),
-        }
-    }
-
-    fn get_node_or_create(&mut self, pos: BlockPosition) -> NodeIndex {
-        if let Some(idx) = self.node_lookup.get(&pos) {
-            *idx
-        } else {
-            let idx = self.graph.add_node(Node(pos));
-            self.node_lookup.insert(pos, idx);
-            idx
+            graph: BlockNavGraph::new(),
         }
     }
 
@@ -48,86 +38,134 @@ impl BlockGraph {
         F: Into<BlockPosition>,
         T: Into<BlockPosition>,
     {
-        let from = self.get_node_or_create(from.into());
-        let to = self.get_node_or_create(to.into());
-        self.graph.update_edge(from, to, Edge(cost));
+        let from = BlockNavNode(from.into());
+        let to = BlockNavNode(to.into());
 
-        self.graph.update_edge(to, from, Edge(cost.opposite()));
+        self.graph.add_edge(from, to, BlockNavEdge(cost));
+        self.graph.add_edge(to, from, BlockNavEdge(cost.opposite()));
     }
 
-    pub fn get_edge_between<F, T>(&self, from: F, to: T) -> Option<EdgeCost>
-    where
-        F: Into<BlockPosition>,
-        T: Into<BlockPosition>,
-    {
-        let from = self.get_node(from.into());
-        let to = self.get_node(to.into());
-        if let (Some(from), Some(to)) = (from, to) {
-            self.graph
-                .find_edge(from, to)
-                .and_then(|e| self.graph.edge_weight(e))
-                .map(|e| e.0)
-        } else {
-            None
-        }
+    #[cfg(test)]
+    pub fn edges(&self, block: BlockPosition) -> Vec<(BlockPosition, EdgeCost)> {
+        use common::Itertools;
+
+        let node = BlockNavNode(block);
+        let mut edges = self
+            .graph
+            .edges(node)
+            .map(|(_, to, e)| (to.0, e.0))
+            .collect_vec();
+
+        edges.sort_unstable_by_key(|(pos, _)| *pos);
+        edges
     }
 
-    pub fn graph(&self) -> &BlockGraphType {
-        &self.graph
-    }
-
-    fn get_node(&self, pos: BlockPosition) -> Option<NodeIndex> {
-        self.node_lookup.get(&pos).copied()
-    }
-
-    pub(crate) fn find_path<F: Into<BlockPosition>, T: Into<BlockPosition>>(
+    pub(crate) fn find_block_path<F: Into<BlockPosition>, T: Into<BlockPosition>>(
         &self,
         from: F,
         to: T,
-    ) -> Option<BlockPath> {
-        let from: BlockPosition = from.into();
-        let to: BlockPosition = to.into();
+    ) -> Result<BlockPath, BlockPathError> {
+        let from = from.into();
+        let to = to.into();
 
-        let (from_node, to_node) = match (self.get_node(from), self.get_node(to)) {
-            (Some(from), Some(to)) => (from, to),
-            _ => return None,
-        };
+        let src = BlockNavNode(from);
+        let dst = BlockNavNode(to);
 
-        let to_vec: Vector3 = ChunkPoint::from(to).into();
-
-        match astar(
+        let path = astar(
             &self.graph,
-            from_node,
-            |n| n == to_node,
-            |e| e.weight().0.weight(),
+            src,
+            |n| n == dst,
+            |(_, _, e)| e.0.weight(),
             |n| {
-                let node = self.graph.node_weight(n).unwrap();
-                let here_vec: Vector3 = ChunkPoint::from(node.0).into();
-                to_vec.distance2(here_vec) as i32
+                // manhattan distance
+                let [nx, ny, nz]: [i32; 3] = n.0.into();
+                let [gx, gy, gz]: [i32; 3] = dst.0.into();
+                // TODO use vertical distance differently?
+
+                let dx = (nx - gx).abs();
+                let dy = (ny - gy).abs();
+                let dz = (nz - gz).abs();
+                (dx + dy + dz) as f32
             },
-        ) {
-            Some((_cost, nodes)) => {
-                // collect block positions with default edge cost
-                let mut points: Vec<(BlockPosition, EdgeCost)> = nodes
-                    .iter()
-                    .map(|nid| (self.graph.node_weight(*nid).unwrap().0, EdgeCost::Walk))
-                    .collect();
+        )
+        .ok_or_else(|| BlockPathError::NoPath(to, from))?;
 
-                // populate edge costs using makeshift mutable windows
-                (0..points.len() - 1)
-                    .map(|i| (i, i + 1))
-                    .for_each(|(from, to)| {
-                        if let [(a_pos, _a_cost), (b_pos, b_cost)] = &mut points[from..=to] {
-                            let edge = self
-                                .get_edge_between(*a_pos, *b_pos)
-                                .expect("edge should exist");
-                            *b_cost = edge;
-                        }
-                    });
+        // TODO reuse vec allocation
+        let mut out_path = Vec::with_capacity(path.len());
 
-                Some(BlockPath::new(points))
-            }
-            _ => None,
+        for (_, (from, to)) in path {
+            let edge = self.graph.edge_weight(from, to).unwrap();
+            out_path.push(BlockPathNode {
+                block: from.0,
+                exit_cost: edge.0,
+            });
         }
+
+        Ok(BlockPath(out_path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use unit::world::ChunkPosition;
+
+    use crate::area::{BlockPathNode, WorldArea};
+    use crate::block::BlockType;
+    use crate::{world_from_chunks, ChunkBuilder, EdgeCost};
+
+    #[test]
+    fn simple_path() {
+        let world = world_from_chunks(vec![ChunkBuilder::new()
+            .fill_slice(1, BlockType::Stone)
+            .set_block((5, 5, 2), BlockType::Grass)
+            .set_block((6, 5, 3), BlockType::Grass)
+            .build((0, 0))])
+        .into_inner();
+        let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+        let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
+
+        let path = graph
+            .find_block_path((3, 5, 2), (6, 5, 4))
+            .expect("path should succeed");
+        let expected = vec![
+            BlockPathNode {
+                block: (3, 5, 2).into(),
+                exit_cost: EdgeCost::Walk,
+            },
+            BlockPathNode {
+                block: (4, 5, 2).into(),
+                exit_cost: EdgeCost::JumpUp,
+            },
+            BlockPathNode {
+                block: (5, 5, 3).into(),
+                exit_cost: EdgeCost::JumpUp,
+            },
+            // goal omitted
+        ];
+
+        assert_eq!(path.0, expected);
+
+        // in reverse
+        let path = graph
+            .find_block_path((6, 5, 4), (3, 5, 2))
+            .expect("reverse path should succeed");
+
+        let expected = vec![
+            BlockPathNode {
+                block: (6, 5, 4).into(),
+                exit_cost: EdgeCost::JumpDown,
+            },
+            BlockPathNode {
+                block: (5, 5, 3).into(),
+                exit_cost: EdgeCost::JumpDown,
+            },
+            BlockPathNode {
+                block: (4, 5, 2).into(),
+                exit_cost: EdgeCost::Walk,
+            },
+            // goal omitted
+        ];
+
+        assert_eq!(path.0, expected);
     }
 }

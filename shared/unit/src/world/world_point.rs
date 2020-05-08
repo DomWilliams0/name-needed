@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::ops::{Add, AddAssign};
 
-use derive_more::*;
+use common::derive_more::*;
 
 use common::{Vector2, Vector3};
 

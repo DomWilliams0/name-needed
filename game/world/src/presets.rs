@@ -1,11 +1,14 @@
-use config::WorldPreset;
+use std::iter::once;
 
-use crate::block::{BlockHeight, BlockType};
-use crate::chunk::CHUNK_SIZE;
-use crate::{ChunkBuilder, World};
 use common::*;
+use config::WorldPreset;
+use unit::dim::CHUNK_SIZE;
 
-pub fn from_config() -> World {
+use crate::block::BlockType;
+use crate::chunk::ChunkBuilder;
+use crate::loader::MemoryTerrainSource;
+
+pub fn from_config() -> MemoryTerrainSource {
     match config::get().world.preset {
         WorldPreset::OneChunkWonder => one_chunk_wonder(),
         WorldPreset::MultiChunkWonder => multi_chunk_wonder(),
@@ -17,7 +20,7 @@ pub fn from_config() -> World {
 }
 
 /// Multiple flat chunks with a big deep one
-pub fn multi_chunk_wonder() -> World {
+pub fn multi_chunk_wonder() -> MemoryTerrainSource {
     let chunks = vec![
         // 0, 0 is slice 0
         ChunkBuilder::new()
@@ -51,13 +54,14 @@ pub fn multi_chunk_wonder() -> World {
             .build((2, 0)),
     ];
 
-    World::from_chunks(chunks)
+    MemoryTerrainSource::from_chunks(chunks.into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
 }
 
 /// 1 chunk with some epic terrain
-pub fn one_chunk_wonder() -> World {
-    let full: u16 = CHUNK_SIZE.as_u16();
-    let half: u16 = full / 2;
+pub fn one_chunk_wonder() -> MemoryTerrainSource {
+    let full = CHUNK_SIZE.as_block_coord();
+    let half = full / 2;
 
     let chunk = ChunkBuilder::new()
         .fill_slice(0, BlockType::Stone) // fill 0 with stone
@@ -71,7 +75,7 @@ pub fn one_chunk_wonder() -> World {
 
             // step up from slice 0
             for y in 2..half - 2 {
-                s.set_block((half - 1, y), (BlockType::Stone, BlockHeight::Half))
+                s.set_block((half - 1, y), BlockType::Stone)
             }
         })
         .with_slice(2, |mut s| {
@@ -83,7 +87,7 @@ pub fn one_chunk_wonder() -> World {
             }
 
             // step up from slice 1
-            s.set_block((half + 3, half), (BlockType::Dirt, BlockHeight::Half))
+            s.set_block((half + 3, half), BlockType::Dirt)
         })
         .apply(|s| {
             // stairs
@@ -98,43 +102,46 @@ pub fn one_chunk_wonder() -> World {
         })
         .build((0, 0));
 
-    World::from_chunks(vec![chunk])
+    MemoryTerrainSource::from_chunks(once(chunk)).expect("hardcoded world preset is wrong??!!1!")
 }
 
 /// A single block in a single chunk
-pub fn one_block_wonder() -> World {
-    let chunk = ChunkBuilder::new()
-        .set_block((2, 2, 2), BlockType::Grass)
-        .set_block((1, 1, 1), BlockType::Stone)
-        .set_block((2, 1, 1), BlockType::Stone)
-        .set_block((3, 1, 1), BlockType::Dirt)
-        .set_block((1, 2, 1), BlockType::Stone)
-        .set_block((3, 2, 1), BlockType::Stone)
-        .set_block((1, 3, 1), BlockType::Dirt)
-        .set_block((2, 3, 1), BlockType::Stone)
-        .set_block((3, 3, 1), BlockType::Stone)
+pub fn one_block_wonder() -> MemoryTerrainSource {
+    let a = ChunkBuilder::new()
+        // 0, 15, 0
+        .set_block((0, CHUNK_SIZE.as_i32() - 1, 0), BlockType::Stone)
         .build((0, 0));
 
-    World::from_chunks(vec![chunk])
+    let b = ChunkBuilder::new()
+        // -1, 16, 1, occludes 0,0,0
+        .set_block((CHUNK_SIZE.as_i32() - 1, 0, 1), BlockType::Grass)
+        .build((-1, 1));
+
+    let c = ChunkBuilder::new()
+        // 0, 16, 1, occludes 0,0,0
+        .set_block((0, 0, 1), BlockType::Grass)
+        .build((0, 1));
+    let chunks = vec![a, b, c];
+
+    MemoryTerrainSource::from_chunks(chunks.into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
 }
 
 /// Multiple flat chunks at z=0
-pub fn flat_lands() -> World {
-    let chunks = (-2..4)
-        .flat_map(|x| {
-            (-2..2).map(move |y| {
-                ChunkBuilder::new()
-                    .fill_slice(0, BlockType::Stone)
-                    .build((x, y))
-            })
+pub fn flat_lands() -> MemoryTerrainSource {
+    let chunks = (-2..4).flat_map(|x| {
+        (-2..2).map(move |y| {
+            ChunkBuilder::new()
+                .fill_slice(0, BlockType::Stone)
+                .build((x, y))
         })
-        .collect_vec();
+    });
 
-    World::from_chunks(chunks)
+    MemoryTerrainSource::from_chunks(chunks).expect("hardcoded world preset is wrong??!!1!")
 }
 
 /// Pyramid with some mess to test ambient occlusion across slab and chunk boundaries
-pub fn pyramid_mess() -> World {
+pub fn pyramid_mess() -> MemoryTerrainSource {
     let chunks = vec![
         ChunkBuilder::new()
             .fill_range((0, 0, -2), (9, 9, -1), |_| BlockType::Dirt)
@@ -151,38 +158,37 @@ pub fn pyramid_mess() -> World {
             .build((-1, 0)),
     ];
 
-    World::from_chunks(chunks)
+    MemoryTerrainSource::from_chunks(chunks.into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
 }
 
 /// Bottleneck for path finding
-pub fn bottleneck() -> World {
+pub fn bottleneck() -> MemoryTerrainSource {
     let half_y = CHUNK_SIZE.as_i32() / 2;
     let mut rng = thread_rng();
-    let chunks = (-2..2)
-        .map(|i| {
-            let hole = rng.gen_range(1, CHUNK_SIZE.as_i32() - 1);
-            ChunkBuilder::new()
-                .fill_range(
-                    (1, 0, 0),
-                    (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32(), 1),
-                    |(x, _, _)| {
-                        if x % 2 == 0 {
-                            BlockType::Grass
-                        } else {
-                            BlockType::Dirt
-                        }
-                    },
-                )
-                .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32(), half_y + 1, 5), |_| {
-                    BlockType::Stone
-                })
-                .fill_range((hole, half_y, 1), (hole + 2, half_y + 1, 5), |_| {
-                    BlockType::Air
-                })
-                .fill_slice(-5, BlockType::Stone)
-                .build((0, i))
-        })
-        .collect_vec();
+    let chunks = (-2..2).map(|i| {
+        let hole = rng.gen_range(1, CHUNK_SIZE.as_i32() - 1);
+        ChunkBuilder::new()
+            .fill_range(
+                (1, 0, 0),
+                (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32(), 1),
+                |(x, _, _)| {
+                    if x % 2 == 0 {
+                        BlockType::Grass
+                    } else {
+                        BlockType::Dirt
+                    }
+                },
+            )
+            .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32(), half_y + 1, 5), |_| {
+                BlockType::Stone
+            })
+            .fill_range((hole, half_y, 1), (hole + 2, half_y + 1, 5), |_| {
+                BlockType::Air
+            })
+            .fill_slice(-5, BlockType::Stone)
+            .build((0, i))
+    });
 
-    World::from_chunks(chunks)
+    MemoryTerrainSource::from_chunks(chunks).expect("hardcoded world preset is wrong??!!1!")
 }

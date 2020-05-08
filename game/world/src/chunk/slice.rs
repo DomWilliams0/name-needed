@@ -1,15 +1,13 @@
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-use crate::block::{Block, BlockType};
-use crate::CHUNK_SIZE;
+use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
+use crate::block::{Block, BlockType};
+
+#[derive(Clone)]
 pub struct Slice<'a> {
     slice: &'a [Block],
-}
-
-pub struct SliceOwned {
-    slice: Vec<Block>,
 }
 
 pub struct SliceMut<'a> {
@@ -58,23 +56,6 @@ impl<'a> Deref for Slice<'a> {
 
     fn deref(&self) -> &Self::Target {
         self.slice
-    }
-}
-
-impl<'a> Into<SliceOwned> for Slice<'a> {
-    fn into(self) -> SliceOwned {
-        let slice = self.slice.to_vec();
-        SliceOwned { slice }
-    }
-}
-
-// -------
-
-impl Deref for SliceOwned {
-    type Target = [Block];
-
-    fn deref(&self) -> &Self::Target {
-        &self.slice
     }
 }
 
@@ -136,14 +117,6 @@ impl<'a, I: Into<SliceBlock>> Index<I> for Slice<'a> {
     }
 }
 
-impl<I: Into<SliceBlock>> Index<I> for SliceOwned {
-    type Output = Block;
-
-    fn index(&self, index: I) -> &Self::Output {
-        &self.slice[flatten_coords(index.into())]
-    }
-}
-
 impl<'a, I: Into<SliceBlock>> Index<I> for SliceMut<'a> {
     type Output = Block;
 
@@ -168,7 +141,7 @@ pub fn unflatten_index(index: usize) -> SliceBlock {
 
 fn flatten_coords(block: SliceBlock) -> usize {
     let SliceBlock(x, y) = block;
-    ((y * CHUNK_SIZE.as_u16()) + x) as usize
+    ((y * CHUNK_SIZE.as_block_coord()) + x) as usize
 }
 
 #[cfg(test)]
@@ -185,7 +158,7 @@ mod tests {
         assert_eq!(unflatten_index(2), (2, 0).into());
 
         let size = CHUNK_SIZE.as_usize();
-        assert_eq!(unflatten_index(size + 0), (0, 1).into());
+        assert_eq!(unflatten_index(size), (0, 1).into());
         assert_eq!(unflatten_index(size + 1), (1, 1).into());
         assert_eq!(unflatten_index(size + 2), (2, 1).into());
     }

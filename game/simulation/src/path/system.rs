@@ -1,11 +1,12 @@
 use common::*;
 use unit::world::BlockPosition;
-use world::{WorldPathSlice, CHUNK_SIZE};
+use world::WorldPathSlice;
 
 use crate::ecs::*;
 use crate::path::follow::PathFollowing;
 use crate::steer::SteeringComponent;
 use crate::{TransformComponent, WorldRef};
+use unit::dim::CHUNK_SIZE;
 
 /// Holds the current path to follow
 #[derive(Default)]
@@ -102,10 +103,10 @@ impl<'a> System<'a> for TempPathAssignmentSystem {
                             .all_chunks()
                             .choose(&mut rand)
                             .expect("world should have >0 chunks");
-                        let x = rand.gen_range(0, CHUNK_SIZE.as_u16());
-                        let y = rand.gen_range(0, CHUNK_SIZE.as_u16());
+                        let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+                        let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                         let block = BlockPosition::from((x, y, 0));
-                        let world_pos = block.to_world_pos(random_chunk.pos());
+                        let world_pos = block.to_world_position(random_chunk.pos());
                         (world_pos.0, world_pos.1)
                     };
 
@@ -126,6 +127,8 @@ impl<'a> System<'a> for TempPathAssignmentSystem {
 
                 // calculate path and set as target
                 let position = transform.position;
+                todo!()
+                /*
                 let full_path = target.and_then(|target| world.find_path(position, target));
 
                 match full_path.as_ref() {
@@ -146,6 +149,7 @@ impl<'a> System<'a> for TempPathAssignmentSystem {
                         tgt.into(),
                     )));
                 }
+                */
             }
         }
     }

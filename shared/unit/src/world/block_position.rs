@@ -1,16 +1,16 @@
 use std::fmt::{Display, Error, Formatter};
 
-use derive_more::*;
+use common::derive_more::*;
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{BlockCoord, ChunkPosition, SliceIndex, WorldPoint, WorldPosition};
 
 /// A block in a chunk
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
 pub struct BlockPosition(pub BlockCoord, pub BlockCoord, pub SliceIndex);
 
 impl BlockPosition {
-    pub fn to_world_pos<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPosition {
+    pub fn to_world_position<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPosition {
         let ChunkPosition(cx, cy) = chunk_pos.into();
         let BlockPosition(x, y, SliceIndex(z)) = self;
         WorldPosition(
@@ -20,7 +20,7 @@ impl BlockPosition {
         )
     }
     pub fn to_world_point<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
-        let WorldPosition(x, y, z) = self.to_world_pos(chunk_pos);
+        let WorldPosition(x, y, z) = self.to_world_position(chunk_pos);
         WorldPoint(x as f32, y as f32, z as f32)
     }
 
@@ -31,6 +31,17 @@ impl BlockPosition {
 
     pub fn flatten(self) -> (BlockCoord, BlockCoord, SliceIndex) {
         self.into()
+    }
+
+    pub fn try_add(self, (dx, dy): (i16, i16)) -> Option<Self> {
+        let x = (self.0 as i16) + dx;
+        let y = (self.1 as i16) + dy;
+
+        if x >= 0 && x < CHUNK_SIZE.as_i16() && y >= 0 && y < CHUNK_SIZE.as_i16() {
+            Some(Self(x as BlockCoord, y as BlockCoord, self.2))
+        } else {
+            None
+        }
     }
 }
 

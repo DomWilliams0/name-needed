@@ -4,14 +4,15 @@ use std::mem::MaybeUninit;
 
 use nd_iter::iter_3d;
 
-use crate::block::Block;
-use crate::chunk::slice::SliceMut;
-use crate::chunk::terrain::{ChunkTerrain, SlabCreationPolicy};
-use crate::Chunk;
 use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
 
+use crate::block::Block;
+use crate::chunk::slice::SliceMut;
+use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
+use crate::chunk::BaseTerrain;
+
 pub struct ChunkBuilder {
-    terrain: ChunkTerrain,
+    terrain: RawChunkTerrain,
 }
 
 pub struct ChunkBuilderApply {
@@ -21,7 +22,7 @@ pub struct ChunkBuilderApply {
 impl ChunkBuilder {
     pub fn new() -> Self {
         Self {
-            terrain: ChunkTerrain::default(),
+            terrain: RawChunkTerrain::default(),
         }
     }
 
@@ -49,12 +50,12 @@ impl ChunkBuilder {
         self
     }
 
-    pub fn fill_range<F, T, B, C>(mut self, from: F, to: T, block: C) -> Self
+    pub fn fill_range<F, T, B, C>(mut self, from: F, to: T, mut block: C) -> Self
     where
         F: Into<BlockPosition>,
         T: Into<BlockPosition>,
         B: Into<Block>,
-        C: Fn((i32, i32, i32)) -> B,
+        C: FnMut((i32, i32, i32)) -> B,
     {
         let [fx, fy, fz]: [i32; 3] = from.into().into();
         let [tx, ty, tz]: [i32; 3] = to.into().into();
@@ -87,8 +88,16 @@ impl ChunkBuilder {
         apply.inner.into_inner()
     }
 
-    pub fn build<P: Into<ChunkPosition>>(self, pos: P) -> Chunk {
-        Chunk::with_terrain(pos.into(), self.terrain)
+    pub fn build<P: Into<ChunkPosition>>(self, pos: P) -> ChunkDescriptor {
+        ChunkDescriptor {
+            terrain: self.terrain,
+            chunk_pos: pos.into(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn into_inner(self) -> RawChunkTerrain {
+        self.terrain
     }
 }
 
@@ -125,17 +134,29 @@ impl Default for ChunkBuilder {
     }
 }
 
+#[derive(Clone)]
+pub struct ChunkDescriptor {
+    pub terrain: RawChunkTerrain,
+    pub chunk_pos: ChunkPosition,
+}
+
+impl Into<(ChunkPosition, RawChunkTerrain)> for ChunkDescriptor {
+    fn into(self) -> (ChunkPosition, RawChunkTerrain) {
+        (self.chunk_pos, self.terrain)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::block::{BlockHeight, BlockType};
-    use crate::chunk::ChunkBuilder;
+    use crate::block::BlockType;
+    use crate::chunk::{BaseTerrain, ChunkBuilder};
 
     #[test]
     fn fill_slice() {
         // check that filling a slice with a block really does
         let c = ChunkBuilder::new()
             .fill_slice(0, BlockType::Grass)
-            .build((0, 0));
+            .into_inner();
 
         assert!(c.slice(0).unwrap().all_blocks_are(BlockType::Grass));
         assert!(c.slice(1).unwrap().all_blocks_are(BlockType::Air));
@@ -146,25 +167,17 @@ mod tests {
         // check setting a specific block works
         let c = ChunkBuilder::new()
             .set_block((2, 2, 1), BlockType::Stone)
-            .set_block((3, 3, 3), (BlockType::Grass, BlockHeight::Half))
-            .build((0, 0));
+            .set_block((3, 3, 3), BlockType::Grass)
+            .into_inner();
 
         assert_eq!(
             c.get_block((2, 2, 1)).unwrap().block_type(),
             BlockType::Stone
         );
-        assert_eq!(
-            c.get_block((2, 2, 1)).unwrap().block_height(),
-            BlockHeight::Full
-        );
 
         assert_eq!(
             c.get_block((3, 3, 3)).unwrap().block_type(),
             BlockType::Grass
-        );
-        assert_eq!(
-            c.get_block((3, 3, 3)).unwrap().block_height(),
-            BlockHeight::Half
         );
     }
 
@@ -176,10 +189,16 @@ mod tests {
                 c.set_block((1, 1, 1), BlockType::Grass);
                 c.set_block((1, 2, 1), BlockType::Grass);
             })
-            .build((0, 0));
+            .into_inner();
 
-        assert_eq!(c.get_block_type((1, 1, 1)), Some(BlockType::Grass));
-        assert_eq!(c.get_block_type((1, 2, 1)), Some(BlockType::Grass));
+        assert_eq!(
+            c.get_block((1, 1, 1)).map(|b| b.block_type()),
+            Some(BlockType::Grass)
+        );
+        assert_eq!(
+            c.get_block((1, 2, 1)).map(|b| b.block_type()),
+            Some(BlockType::Grass)
+        );
     }
 
     #[test]
@@ -187,7 +206,7 @@ mod tests {
         // check that range filling works as intended
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (3, 3, 3), |_| BlockType::Stone)
-            .build((0, 0));
+            .into_inner();
         let mut blocks = Vec::new();
 
         // expected to have filled 0-2 on all 3 dimensions
@@ -202,7 +221,7 @@ mod tests {
         // annoyingly if any dimension has a width of 0, do nothing
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (10, 0, 0), |_| BlockType::Stone)
-            .build((0, 0));
+            .into_inner();
         assert_eq!(
             c.blocks(&mut blocks)
                 .iter()
@@ -214,7 +233,7 @@ mod tests {
         // alternatively with a width of 1, work as intended
         let c = ChunkBuilder::new()
             .fill_range((0, 0, 0), (10, 1, 1), |_| BlockType::Stone)
-            .build((0, 0));
+            .into_inner();
         assert_eq!(
             c.blocks(&mut blocks)
                 .iter()

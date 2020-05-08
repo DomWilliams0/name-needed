@@ -1,22 +1,21 @@
-use crate::area::SlabAreaIndex;
-use crate::occlusion::BlockOcclusion;
 use color::ColorRgb;
+
+use crate::area::SlabAreaIndex;
+use crate::occlusion::{BlockOcclusion, Opacity};
 
 /// A single block in a chunk
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Block {
     block_type: BlockType,
-    height: BlockHeight,
     area: SlabAreaIndex,
     occlusion: BlockOcclusion,
 }
 
 impl Block {
     /// Called by BlockBuilder
-    fn new(block_type: BlockType, height: BlockHeight) -> Self {
+    fn new(block_type: BlockType) -> Self {
         Self {
             block_type,
-            height,
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default(),
         }
@@ -30,16 +29,8 @@ impl Block {
         &mut self.block_type
     }
 
-    pub fn solid(self) -> bool {
-        self.block_type.solid()
-    }
-
-    pub const fn block_height(self) -> BlockHeight {
-        self.height
-    }
-
-    pub fn height(self) -> f32 {
-        self.height.height()
+    pub fn opacity(self) -> Opacity {
+        self.block_type.opacity()
     }
 
     pub fn walkable(self) -> bool {
@@ -80,8 +71,12 @@ impl BlockType {
         }
     }
 
-    pub fn solid(self) -> bool {
-        self != BlockType::Air
+    pub fn opacity(self) -> Opacity {
+        if let BlockType::Air = self {
+            Opacity::Transparent
+        } else {
+            Opacity::Solid
+        }
     }
 }
 
@@ -91,45 +86,10 @@ impl Default for BlockType {
     }
 }
 
-/// The additional height offset for a block
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BlockHeight {
-    Half = 0,
-    Full = 1,
-    // TODO Third?
-}
-
-impl BlockHeight {
-    pub fn height(self) -> f32 {
-        match self {
-            BlockHeight::Full => 1.0,
-            BlockHeight::Half => 0.5,
-        }
-    }
-
-    pub fn solid(self) -> bool {
-        self == BlockHeight::Full
-    }
-
-    /// Offset to subtract from z position to lower from the center of the block to the bottom
-    pub fn offset_from_center(self) -> f32 {
-        match self {
-            BlockHeight::Full => 0.0,
-            BlockHeight::Half => 0.25,
-        }
-    }
-}
-
-impl Default for BlockHeight {
-    fn default() -> Self {
-        BlockHeight::Full
-    }
-}
-
+// kinda useless now
 #[derive(Default)]
 pub struct BlockBuilder {
     block_type: BlockType,
-    height: BlockHeight,
 }
 
 impl BlockBuilder {
@@ -142,13 +102,8 @@ impl BlockBuilder {
         self
     }
 
-    pub fn with_height(mut self, height: BlockHeight) -> Self {
-        self.height = height;
-        self
-    }
-
     pub fn build(self) -> Block {
-        Block::new(self.block_type, self.height)
+        Block::new(self.block_type)
     }
 }
 
@@ -162,24 +117,5 @@ impl Into<Block> for BlockBuilder {
 impl Into<Block> for BlockType {
     fn into(self) -> Block {
         BlockBuilder::new().with_type(self).build()
-    }
-}
-
-impl Into<Block> for (BlockType, BlockHeight) {
-    fn into(self) -> Block {
-        BlockBuilder::new()
-            .with_type(self.0)
-            .with_height(self.1)
-            .build()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::block::BlockHeight;
-
-    #[test]
-    fn ordering() {
-        assert!(BlockHeight::Full > BlockHeight::Half);
     }
 }

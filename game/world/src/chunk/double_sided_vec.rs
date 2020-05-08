@@ -1,5 +1,6 @@
 use std::i32;
 
+// TODO refactor to use a single vec allocation
 pub struct DoubleSidedVec<T> {
     /// positive indices including 0
     positive: Vec<T>,
@@ -104,10 +105,42 @@ impl<T> DoubleSidedVec<T> {
     }
 
     pub fn indices_increasing(&self) -> impl Iterator<Item = i32> {
+        let (lowest, highest) = self.range();
+        lowest..highest
+    }
+
+    fn range(&self) -> (i32, i32) {
         let lowest = -(self.negative.len() as i32);
         let highest = self.positive.len() as i32;
 
-        lowest..highest
+        (lowest, highest)
+    }
+
+    pub fn index_range(&self) -> (i32, i32) {
+        let (lowest, highest) = self.range();
+        (lowest, highest - 1)
+    }
+
+    pub fn add_to_top<F: FnOnce(i32) -> T>(&mut self, f: F) {
+        let idx = self.positive.len() as i32;
+        let val = f(idx);
+        self.positive.push(val);
+    }
+
+    pub fn iter_mut_increasing_in_range(
+        &mut self,
+        start: i32,
+        end: i32,
+    ) -> impl Iterator<Item = Option<&mut T>> {
+        let range = self.range();
+
+        let empty_space_start = start..range.0;
+        let empty_space_end = range.1..end;
+
+        empty_space_start
+            .map(|_| None)
+            .chain(self.iter_mut_increasing().map(Some))
+            .chain(empty_space_end.map(|_| None))
     }
 
     pub fn iter_mut_increasing(&mut self) -> impl Iterator<Item = &mut T> {
@@ -122,6 +155,15 @@ impl<T> DoubleSidedVec<T> {
             .iter_mut()
             .rev()
             .chain(self.negative.iter_mut())
+    }
+}
+
+impl<T: Clone> Clone for DoubleSidedVec<T> {
+    fn clone(&self) -> Self {
+        Self {
+            positive: self.positive.clone(),
+            negative: self.negative.clone(),
+        }
     }
 }
 
@@ -256,5 +298,19 @@ mod tests {
             v.iter_mut_decreasing().map(|x| *x).collect::<Vec<_>>(),
             vec![1, 0, -1, -2]
         );
+    }
+
+    #[test]
+    fn index_range() {
+        let mut v = DoubleSidedVec::<Option<i32>>::with_capacity(4);
+
+        v.add(None, 0);
+        assert_eq!(v.index_range(), (0, 0));
+
+        v.add(None, 1);
+        assert_eq!(v.index_range(), (0, 1));
+
+        v.add(None, -1);
+        assert_eq!(v.index_range(), (-1, 1));
     }
 }

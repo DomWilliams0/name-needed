@@ -4,9 +4,9 @@ use common::*;
 use crate::chunk::slab::{Slab, SLAB_SIZE};
 use crate::chunk::Chunk;
 use crate::viewer::SliceRange;
-use crate::CHUNK_SIZE;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
+use unit::dim::CHUNK_SIZE;
 use unit::world::SliceBlock;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
@@ -97,7 +97,7 @@ pub(crate) fn make_collision_mesh(
 ) {
     let is_solid = |coord: &[i32; 3]| {
         let coord = [coord[0] as i32, coord[1] as i32, coord[2] as i32];
-        slab.grid()[&coord].solid()
+        slab.grid()[&coord].opacity().solid()
     };
 
     let mut add_vertex = |x: i32, y: i32, z: i32| {

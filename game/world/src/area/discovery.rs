@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
+use unit::dim::CHUNK_SIZE;
+use unit::world::BlockCoord;
+
 use crate::area::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
-use crate::block::{Block, BlockHeight};
+use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
-use crate::chunk::slice::SliceOwned;
+use crate::chunk::slice::Slice;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
-use crate::CHUNK_SIZE;
 
 grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
@@ -20,14 +22,11 @@ pub struct _AreaDiscoveryGridBlock {
     /// is material solid
     solid: bool,
 
-    /// is not a half step
-    height: BlockHeight,
-
     area: SlabAreaIndex,
 }
 
 #[derive(Default)]
-pub(crate) struct AreaDiscovery {
+pub(crate) struct AreaDiscovery<'a> {
     grid: _AreaDiscoveryGrid,
 
     /// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs
@@ -44,15 +43,14 @@ pub(crate) struct AreaDiscovery {
 
     slab_index: SlabIndex,
 
-    below_top_slice: Option<SliceOwned>,
-    above_bot_slice: Option<SliceOwned>,
+    below_top_slice: Option<Slice<'a>>,
+    above_bot_slice: Option<Slice<'a>>,
 }
 
 impl Into<_AreaDiscoveryGridBlock> for &Block {
     fn into(self) -> _AreaDiscoveryGridBlock {
         _AreaDiscoveryGridBlock {
-            solid: self.solid(),
-            height: self.block_height(),
+            solid: self.opacity().solid(),
             area: Default::default(),
         }
     }
@@ -63,11 +61,11 @@ enum VerticalOffset {
     Below,
 }
 
-impl AreaDiscovery {
+impl<'a> AreaDiscovery<'a> {
     pub fn from_slab(
         slab: &Slab,
-        below_top_slice: Option<SliceOwned>,
-        above_bot_slice: Option<SliceOwned>,
+        below_top_slice: Option<Slice<'a>>,
+        above_bot_slice: Option<Slice<'a>>,
     ) -> Self {
         let mut grid = _AreaDiscoveryGrid::default();
 
@@ -90,7 +88,7 @@ impl AreaDiscovery {
 
     /// Flood fills from every block, increment area index after each flood fill
     /// Returns area count
-    pub fn flood_fill_areas(&mut self) -> u8 {
+    pub fn flood_fill_areas(&mut self) -> u16 {
         let range = {
             let (s0_start, _) = _AreaDiscoveryGrid::slice_range(0);
             let end = _AreaDiscoveryGrid::FULL_SIZE;
@@ -151,12 +149,7 @@ impl AreaDiscovery {
 
             // add horizontal neighbours
             for n in Neighbours::new(current) {
-                let cost = {
-                    let from_height = self.grid[&current].height;
-                    let to_height = self.grid[&n].height;
-                    EdgeCost::from_height_diff(from_height, to_height, 0)
-                        .expect("horizontal neighbours should always be accessible")
-                };
+                let cost = EdgeCost::Walk;
                 let src = Some((current, cost));
                 self.queue.push((n, src));
             }
@@ -170,12 +163,7 @@ impl AreaDiscovery {
                 let above = [x, y, z + 1];
 
                 for n in Neighbours::new(above) {
-                    let from_height = self.grid[&current].height;
-                    let to_height = self.grid[&n].height;
-
-                    if let Some(cost) = EdgeCost::from_height_diff(from_height, to_height, 1) {
-                        self.queue.push((n, Some((current, cost))));
-                    }
+                    self.queue.push((n, Some((current, EdgeCost::JumpUp))));
                 }
             }
         }
@@ -199,20 +187,13 @@ impl AreaDiscovery {
         let marker = &self.grid[&pos];
 
         if marker.solid {
-            // solid and half block: yes
-            // solid and full block: no
-            return !marker.height.solid();
+            return false;
         }
 
         let below = self.get_vertical_offset(pos, VerticalOffset::Below);
 
         // below not solid either: nope
         if !below.solid {
-            return false;
-        }
-
-        // below is solid but half block: nope
-        if !below.height.solid() {
             return false;
         }
 
@@ -233,7 +214,7 @@ impl AreaDiscovery {
             TOP => {
                 if let Some(above_slice) = &self.above_bot_slice {
                     // it is present
-                    (&above_slice[(x as u16, y as u16)]).into()
+                    (&above_slice[(x as BlockCoord, y as BlockCoord)]).into()
                 } else {
                     // not present: this must be the top of the world
                     _AreaDiscoveryGridBlock {
@@ -247,7 +228,7 @@ impl AreaDiscovery {
             0 => {
                 if let Some(below_slice) = &self.below_top_slice {
                     // it is present
-                    (&below_slice[(x as u16, y as u16)]).into()
+                    (&below_slice[(x as BlockCoord, y as BlockCoord)]).into()
                 } else {
                     // not present: this must be the bottom of the world
                     _AreaDiscoveryGridBlock {
@@ -267,10 +248,6 @@ impl AreaDiscovery {
                 self.grid[&[x, y, offset_z]]
             }
         }
-    }
-
-    pub fn areas(&self) -> &[ChunkArea] {
-        &self.areas
     }
 
     /// Moves area->block graphs map out of self

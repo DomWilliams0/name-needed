@@ -1,6 +1,10 @@
 use std::marker::PhantomData;
 
+use crossbeam::crossbeam_channel::Receiver;
+use specs::{RunNow, WorldExt};
+
 use common::*;
+use world::loader::{ChunkUpdate, ThreadedWorkerPool, WorldLoader};
 use world::{SliceRange, WorldRef};
 
 use crate::ecs::{create_ecs_world, EcsWorld};
@@ -11,11 +15,15 @@ use crate::physics::PhysicsSystem;
 use crate::render::{PhysicalComponent, RenderSystem, Renderer};
 use crate::steer::{SteeringComponent, SteeringSystem};
 use crate::transform::TransformComponent;
-use specs::{RunNow, WorldExt};
+
+pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
+    world_loader: ThreadedWorldLoader,
+
+    chunk_updates: Receiver<ChunkUpdate>,
 
     renderer: PhantomData<R>,
     //debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
@@ -23,7 +31,7 @@ pub struct Simulation<R: Renderer> {
 }
 
 impl<R: Renderer> Simulation<R> {
-    pub fn new(world: WorldRef) -> Self {
+    pub fn new(mut world_loader: ThreadedWorldLoader) -> Self {
         let mut ecs_world = create_ecs_world();
 
         // register components
@@ -33,13 +41,21 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.register::<FollowPathComponent>();
         ecs_world.register::<SteeringComponent>();
 
+        // request all chunks to load
+        world_loader.request_all_chunks();
+
         // insert resources
-        ecs_world.insert(world.clone());
+        let voxel_world = world_loader.world();
+        ecs_world.insert(voxel_world.clone());
+
+        let chunk_updates = world_loader.chunk_updates_rx().unwrap();
 
         Self {
             ecs_world,
             renderer: PhantomData,
-            voxel_world: world,
+            voxel_world,
+            world_loader,
+            chunk_updates,
             // debug_renderers: vec![Box::new(DummyDebugRenderer), Box::new(PathDebugRenderer)],
             debug_physics: config::get().display.debug_physics,
         }
@@ -50,6 +66,10 @@ impl<R: Renderer> Simulation<R> {
     }
 
     pub fn tick(&mut self) {
+        // apply chunk updates
+        // TODO limit time/count
+        self.apply_chunk_updates();
+
         // tick systems
         let _span = enter_span(Span::Tick);
 
@@ -71,6 +91,13 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn world(&self) -> WorldRef {
         self.voxel_world.clone()
+    }
+
+    fn apply_chunk_updates(&mut self) {
+        let mut world = self.voxel_world.borrow_mut();
+        while let Ok(update) = self.chunk_updates.try_recv() {
+            world.apply_update(update);
+        }
     }
 
     // target is for this frame only

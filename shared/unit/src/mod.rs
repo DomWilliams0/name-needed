@@ -1,6 +1,6 @@
 pub mod world {
     use common::*;
-    use derive_more::*;
+    use common::derive_more::*;
     use std::convert::TryFrom;
     use std::fmt::{Display, Error, Formatter};
     use std::i32;

@@ -48,39 +48,44 @@ impl EventSink for IpcSink {
         let (tx, rx) = mpsc::channel();
 
         self.channel = Some(tx);
-        self.thread = Some(thread::spawn(move || {
-            let mut pipe = match make_pipe() {
-                Ok(pipe) => pipe,
-                Err(e) => {
+        self.thread = Some(
+            thread::Builder::new()
+                .name("struclog-ipc".to_owned())
+                .spawn(move || {
+                    let mut pipe = match make_pipe() {
+                        Ok(pipe) => pipe,
+                        Err(e) => {
+                            result_tx
+                                .send(Some(e))
+                                .expect("failed to send error message");
+                            return;
+                        }
+                    };
+
+                    // success
                     result_tx
-                        .send(Some(e))
-                        .expect("failed to send error message");
-                    return;
-                }
-            };
+                        .send(None)
+                        .expect("failed to send success message");
 
-            // success
-            result_tx
-                .send(None)
-                .expect("failed to send success message");
+                    let mut buffer = Vec::with_capacity(256);
+                    loop {
+                        match rx.recv() {
+                            Err(e) => panic!("failed to recv: {:?}", e),
+                            Ok(Message::Stop) => break,
+                            Ok(msg) => serde_json::to_writer(&mut buffer, &msg)
+                                .expect("failed to serialize message"),
+                        };
 
-            let mut buffer = Vec::with_capacity(256);
-            loop {
-                match rx.recv() {
-                    Err(e) => panic!("failed to recv: {:?}", e),
-                    Ok(Message::Stop) => break,
-                    Ok(msg) => serde_json::to_writer(&mut buffer, &msg)
-                        .expect("failed to serialize message"),
-                };
+                        //                buffer.push(b'\r');
+                        buffer.push(b'\n');
+                        pipe.write_all(&buffer).expect("failed to write to pipe");
+                        buffer.clear();
+                    }
 
-                //                buffer.push(b'\r');
-                buffer.push(b'\n');
-                pipe.write_all(&buffer).expect("failed to write to pipe");
-                buffer.clear();
-            }
-
-            info!("Stopping event thread cleanly");
-        }));
+                    info!("Stopping event thread cleanly");
+                })
+                .expect("failed to start ipc thread"),
+        );
 
         match result_rx.recv() {
             Err(e) => panic!("failed to recv result from event thread: {}", e),

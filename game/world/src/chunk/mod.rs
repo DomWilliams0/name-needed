@@ -1,5 +1,7 @@
-pub use self::builder::ChunkBuilder;
-pub use self::chunk::{Chunk, ChunkId, BLOCK_COUNT_SLICE, CHUNK_SIZE};
+pub use self::builder::{ChunkBuilder, ChunkDescriptor};
+pub use self::chunk::{Chunk, ChunkId, BLOCK_COUNT_SLICE};
+pub use self::terrain::BaseTerrain;
+pub(crate) use self::terrain::{ChunkTerrain, RawChunkTerrain, WhichChunk};
 
 mod builder;
 

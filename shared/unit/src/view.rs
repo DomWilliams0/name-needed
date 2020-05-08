@@ -1,4 +1,4 @@
-use derive_more::*;
+use common::derive_more::*;
 
 use crate::scale::BLOCK_DIAMETER;
 use crate::world::WorldPoint;

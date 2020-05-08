@@ -111,38 +111,41 @@ pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
     raw.watcher = Some(watcher);
 
     // start watcher thread
-    thread::spawn(move || {
-        let channel = rx;
-        let is_config = |p: &PathBuf| p.file_name().map(|f| f == watch_file).unwrap_or(false);
+    thread::Builder::new()
+        .name("cfg-watcher".to_owned())
+        .spawn(move || {
+            let channel = rx;
+            let is_config = |p: &PathBuf| p.file_name().map(|f| f == watch_file).unwrap_or(false);
 
-        loop {
-            let reload = match channel.recv() {
-                Ok(e) => match e {
-                    DebouncedEvent::Write(ref p) if is_config(p) => true,
-                    DebouncedEvent::Remove(ref p) if is_config(p) => {
-                        warn!("config was deleted");
-                        true
+            loop {
+                let reload = match channel.recv() {
+                    Ok(e) => match e {
+                        DebouncedEvent::Write(ref p) if is_config(p) => true,
+                        DebouncedEvent::Remove(ref p) if is_config(p) => {
+                            warn!("config was deleted");
+                            true
+                        }
+                        DebouncedEvent::Rename(ref a, ref b) if is_config(a) || is_config(b) => {
+                            warn!("config was renamed");
+                            true
+                        }
+                        _ => false,
+                    },
+                    Err(e) => {
+                        warn!("error while watching config: {}", e);
+                        continue;
                     }
-                    DebouncedEvent::Rename(ref a, ref b) if is_config(a) || is_config(b) => {
-                        warn!("config was renamed");
-                        true
-                    }
-                    _ => false,
-                },
-                Err(e) => {
-                    warn!("error while watching config: {}", e);
-                    continue;
-                }
-            };
+                };
 
-            if reload {
-                info!("config was modified, reloading");
-                if let Err(e) = lock().parse_file() {
-                    warn!("failed to reload config: {}", e);
+                if reload {
+                    info!("config was modified, reloading");
+                    if let Err(e) = lock().parse_file() {
+                        warn!("failed to reload config: {}", e);
+                    }
                 }
             }
-        }
-    });
+        })
+        .expect("failed to start watcher thread");
 
     raw.parse_file()
 }

@@ -5,11 +5,12 @@ Config(
         debug_physics: false,
     ),
     world: (
-        preset: Bottleneck,
+        preset: OneChunkWonder,
+        worker_threads: None,
     ),
     simulation: (
         random_seed: Some(12345),
-        random_count: 10,
+        random_count: 0,
         move_speed: 0.2,
         start_delay: 0,
      ),

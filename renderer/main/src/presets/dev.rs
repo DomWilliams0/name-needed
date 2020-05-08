@@ -1,7 +1,9 @@
 use std::path::Path;
 
 use common::*;
-use simulation::{Renderer, Simulation};
+use simulation::{
+    presets, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
+};
 
 use crate::GamePreset;
 use color::ColorRgb;
@@ -18,6 +20,16 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
 
     fn config(&self) -> Option<&Path> {
         Some(Path::new("config.ron"))
+    }
+
+    fn world(&self) -> ThreadedWorldLoader {
+        let thread_count = config::get()
+            .world
+            .worker_threads
+            .unwrap_or_else(|| (num_cpus::get() / 2).max(1));
+        debug!("using {} threads for world loader", thread_count);
+        let pool = ThreadedWorkerPool::new(thread_count);
+        WorldLoader::new(presets::from_config(), pool)
     }
 
     fn init(&self, sim: &mut Simulation<R>) {

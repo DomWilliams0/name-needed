@@ -1,3 +1,5 @@
+use crate::world::BlockCoord;
+
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct SmallUnsignedConstant(u32);
 
@@ -23,6 +25,11 @@ impl SmallUnsignedConstant {
 
     pub const fn as_usize(self) -> usize {
         self.0 as usize
+    }
+
+    pub const fn as_block_coord(self) -> BlockCoord {
+        // TODO helper for this-1
+        self.0 as BlockCoord
     }
 
     pub const fn new(u: u32) -> Self {

@@ -1,27 +1,22 @@
-pub use area_navigation::AreaGraph;
-pub use block_navigation::BlockGraph;
-pub use boundary::ChunkBoundary;
+pub use area_navigation::{AreaGraph, AreaNavEdge, AreaPathError};
+pub use block_navigation::{BlockGraph, BlockPathError};
 use common::Vector3;
 pub use cost::EdgeCost;
-pub(crate) use path::AreaPath;
-pub use path::{WorldPath, WorldPathSlice};
-
-#[cfg(test)]
-pub(crate) use path::AreaPathNode;
+pub use path::{AreaPath, BlockPath, BlockPathNode, WorldPath, WorldPathNode, WorldPathSlice};
+use unit::world::{ChunkPosition, WorldPosition};
 
 use crate::chunk::slab::SlabIndex;
-use unit::world::ChunkPosition;
 
 mod area_navigation;
+mod astar;
 mod block_navigation;
-mod boundary;
 mod cost;
 pub(crate) mod discovery;
 mod path;
 
 /// Area index in a slab. 0 is uninitialized, starts at 1
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct SlabAreaIndex(pub u8);
+pub struct SlabAreaIndex(pub u16);
 
 /// An area in a chunk
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -32,10 +27,22 @@ pub(crate) struct ChunkArea {
 
 /// An area in the world
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct WorldArea {
+pub struct WorldArea {
     pub chunk: ChunkPosition,
     pub slab: SlabIndex,
     pub area: SlabAreaIndex,
+}
+
+impl WorldArea {
+    /// Helper for less verbose tests
+    #[cfg(test)]
+    pub fn new<C: Into<ChunkPosition>>(chunk: C) -> Self {
+        Self {
+            chunk: chunk.into(),
+            slab: 0,
+            area: SlabAreaIndex::FIRST,
+        }
+    }
 }
 
 impl SlabAreaIndex {
@@ -77,5 +84,21 @@ impl From<WorldArea> for Vector3 {
             y: area.chunk.1 as f32,
             z: area.slab as f32,
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum NavigationError {
+    NotWalkable(WorldPosition),
+    NoWalkableBlockBelow(WorldPosition),
+    NoSuchArea(WorldArea),
+    ZeroLengthPath,
+    AreaError(AreaPathError),
+    BlockError(WorldArea, BlockPathError),
+}
+
+impl From<AreaPathError> for NavigationError {
+    fn from(e: AreaPathError) -> Self {
+        NavigationError::AreaError(e)
     }
 }
