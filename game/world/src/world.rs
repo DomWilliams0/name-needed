@@ -13,6 +13,9 @@ use crate::SliceRange;
 #[cfg(any(test, feature = "benchmarking"))]
 use crate::{chunk::ChunkDescriptor, WorldRef};
 
+#[cfg(test)]
+use crate::block::Block;
+
 #[cfg_attr(test, derive(Clone))]
 pub struct World {
     chunks: Vec<Chunk>,
