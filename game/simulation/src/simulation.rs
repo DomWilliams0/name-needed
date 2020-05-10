@@ -10,10 +10,11 @@ use world::{SliceRange, WorldRef};
 use crate::ecs::{create_ecs_world, EcsWorld};
 use crate::entity_builder::EntityBuilder;
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
-use crate::path::{FollowPathComponent, PathSteeringSystem, TempPathAssignmentSystem};
+use crate::path::{FollowPathComponent, PathSteeringSystem, RandomPathAssignmentSystem};
 use crate::physics::PhysicsSystem;
-use crate::render::{PhysicalComponent, RenderSystem, Renderer};
-use crate::steer::{SteeringComponent, SteeringSystem};
+use crate::render::dummy::AxesDebugRenderer;
+use crate::render::{DebugRenderer, PhysicalComponent, RenderSystem, Renderer};
+use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
@@ -21,16 +22,18 @@ pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
-    world_loader: ThreadedWorldLoader,
 
+    #[allow(dead_code)] // TODO will be used when world can be modified
+    world_loader: ThreadedWorldLoader,
     chunk_updates: Receiver<ChunkUpdate>,
 
     renderer: PhantomData<R>,
-    //debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
+    debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
     debug_physics: bool,
 }
 
 impl<R: Renderer> Simulation<R> {
+    /// world_loader should have had all chunks requested
     pub fn new(mut world_loader: ThreadedWorldLoader) -> Self {
         let mut ecs_world = create_ecs_world();
 
@@ -40,9 +43,6 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.register::<PhysicalComponent>();
         ecs_world.register::<FollowPathComponent>();
         ecs_world.register::<SteeringComponent>();
-
-        // request all chunks to load
-        world_loader.request_all_chunks();
 
         // insert resources
         let voxel_world = world_loader.world();
@@ -56,7 +56,7 @@ impl<R: Renderer> Simulation<R> {
             voxel_world,
             world_loader,
             chunk_updates,
-            // debug_renderers: vec![Box::new(DummyDebugRenderer), Box::new(PathDebugRenderer)],
+            debug_renderers: vec![Box::new(AxesDebugRenderer), Box::new(SteeringDebugRenderer)],
             debug_physics: config::get().display.debug_physics,
         }
     }
@@ -74,7 +74,7 @@ impl<R: Renderer> Simulation<R> {
         let _span = enter_span(Span::Tick);
 
         // assign paths
-        TempPathAssignmentSystem.run_now(&self.ecs_world);
+        RandomPathAssignmentSystem.run_now(&self.ecs_world);
 
         // follow paths with steering
         PathSteeringSystem.run_now(&self.ecs_world);
@@ -131,28 +131,9 @@ impl<R: Renderer> Simulation<R> {
         {
             renderer.debug_start();
 
-            // TODO debug renderers
-            /*
             for debug_renderer in self.debug_renderers.iter_mut() {
-                debug_renderer.render(
-                    renderer,
-                    self.voxel_world.clone(),
-                    &self.ecs_world,
-                    &frame_state,
-                );
+                debug_renderer.render(renderer, self.voxel_world.clone(), &self.ecs_world, slices);
             }
-            */
-            /*
-            if self.debug_physics {
-                DebugDrawer.render(
-                    renderer,
-                    self.voxel_world.clone(),
-                    &self.ecs_world,
-                    &frame_state,
-                );
-            }
-            */
-
             renderer.debug_finish();
         }
 

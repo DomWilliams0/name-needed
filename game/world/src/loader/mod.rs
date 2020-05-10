@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam::channel::{Receiver, Sender};
 use crossbeam::crossbeam_channel::unbounded;
@@ -8,10 +8,12 @@ use common::*;
 pub(crate) use terrain_source::MemoryTerrainSource;
 pub use terrain_source::TerrainSource;
 use unit::world::{BlockPosition, ChunkPosition};
-pub(crate) use worker_pool::BlockingWorkerPool;
+
+#[cfg(test)]
+pub use worker_pool::BlockingWorkerPool;
 pub use worker_pool::{ThreadedWorkerPool, WorkerPool};
 
-use crate::area::AreaNavEdge;
+use crate::navigation::AreaNavEdge;
 use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, WhichChunk};
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
@@ -29,11 +31,21 @@ pub struct WorldLoader<P: WorkerPool> {
     finalization_channel: Sender<LoadTerrainResult>,
     chunk_updates_rx: Option<Receiver<ChunkUpdate>>,
     world: WorldRef,
+    all_count: Option<usize>,
 }
 
 struct ChunkFinalizer {
     world: WorldRef,
     updates: Sender<ChunkUpdate>,
+}
+
+#[derive(Debug)]
+pub enum BlockForAllResult {
+    /// Terrain source needs to have had `request_all` called to know how many to wait for
+    Unsupported,
+    Success,
+    TimedOut,
+    Error(TerrainSourceError),
 }
 
 impl<P: WorkerPool> WorldLoader<P> {
@@ -50,6 +62,7 @@ impl<P: WorkerPool> WorldLoader<P> {
             finalization_channel: finalize_tx,
             chunk_updates_rx: Some(chunk_updates_rx),
             world,
+            all_count: None,
         }
     }
 
@@ -59,7 +72,13 @@ impl<P: WorkerPool> WorldLoader<P> {
 
     pub fn request_all_chunks(&mut self) {
         let chunks = self.source.lock().unwrap().all_chunks();
-        chunks.iter().for_each(|&c| self.request_chunk(c))
+        let mut all_count = 0;
+        chunks.iter().for_each(|&c| {
+            self.request_chunk(c);
+            all_count += 1;
+        });
+
+        self.all_count = Some(all_count);
     }
 
     pub fn request_chunk(&mut self, chunk: ChunkPosition) {
@@ -83,7 +102,6 @@ impl<P: WorkerPool> WorldLoader<P> {
                 };
 
                 // concurrently process in isolation
-                // std::thread::sleep(std::time::Duration::from_secs_f64(thread_rng().gen_range(0.2, 5.0)));
                 let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk);
                 Ok((chunk, terrain))
             },
@@ -96,6 +114,31 @@ impl<P: WorkerPool> WorldLoader<P> {
         timeout: Duration,
     ) -> Option<Result<ChunkPosition, TerrainSourceError>> {
         self.pool.block_on_next_finalize(timeout)
+    }
+
+    pub fn block_for_all(&mut self, timeout: Duration) -> BlockForAllResult {
+        match self.all_count {
+            None => BlockForAllResult::Unsupported,
+            Some(count) => {
+                let start_time = Instant::now();
+                for i in 0..count {
+                    let elapsed = start_time.elapsed();
+                    let timeout = match timeout.checked_sub(elapsed) {
+                        None => return BlockForAllResult::TimedOut,
+                        Some(t) => t,
+                    };
+
+                    trace!("waiting for chunk {}/{} for {:?}", (i + 1), count, timeout);
+                    match self.block_on_next_finalization(timeout) {
+                        None => return BlockForAllResult::TimedOut,
+                        Some(Err(e)) => return BlockForAllResult::Error(e),
+                        Some(Ok(_)) => continue,
+                    }
+                }
+
+                BlockForAllResult::Success
+            }
+        }
     }
 
     pub fn chunk_updates_rx(&mut self) -> Option<Receiver<ChunkUpdate>> {
@@ -256,7 +299,7 @@ mod tests {
         let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
         loader.request_chunk(ChunkPosition(0, 0));
 
-        let finalized = loader.block_on_next_finalization(Duration::from_secs(1));
+        let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
         assert_matches!(finalized, Some(Ok(ChunkPosition(0, 0))));
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);

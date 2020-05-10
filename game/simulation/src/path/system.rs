@@ -1,12 +1,15 @@
+use std::ops::DerefMut;
+
 use common::*;
-use unit::world::BlockPosition;
-use world::WorldPathSlice;
+use unit::dim::CHUNK_SIZE;
+use unit::world::{SliceBlock, WorldPosition};
+use world::InnerWorldRef;
+use world::NavigationError;
 
 use crate::ecs::*;
 use crate::path::follow::PathFollowing;
-use crate::steer::SteeringComponent;
+use crate::steer::{SteeringBehaviour, SteeringComponent};
 use crate::{TransformComponent, WorldRef};
-use unit::dim::CHUNK_SIZE;
 
 /// Holds the current path to follow
 #[derive(Default)]
@@ -18,139 +21,97 @@ impl Component for FollowPathComponent {
     type Storage = VecStorage<Self>;
 }
 
-impl FollowPathComponent {
-    /// As much of the path that has been calculated so far
-    pub fn path(&self) -> Option<WorldPathSlice> {
-        self.path.as_ref().map(|p| p.path_remaining())
-    }
-}
-
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
 
 impl<'a> System<'a> for PathSteeringSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        ReadStorage<'a, TransformComponent>,
+        WriteStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
         WriteStorage<'a, SteeringComponent>,
     );
 
-    fn run(&mut self, (entities, transform, mut path, mut steer): Self::SystemData) {
-        for (e, transform, mut path, steer) in (&entities, &transform, &mut path, &mut steer).join()
+    fn run(&mut self, (entities, mut transform, mut path, mut steer): Self::SystemData) {
+        for (e, transform, mut path, steer) in
+            (&entities, &mut transform, &mut path, &mut steer).join()
         {
-            let following = match path.path {
-                Some(ref mut path) => path,
-                None => return,
+            let following = match path.path.as_mut() {
+                Some(p) => p,
+                None => continue,
             };
 
-            *steer = match following.next_waypoint(&transform.position) {
-                // waypoint
-                Some((waypoint, false)) => {
-                    if following.changed() {
-                        trace!("{:?}: heading towards {:?}", e, waypoint);
-                    }
-                    SteeringComponent::seek(waypoint.into())
+            if steer.behaviour.is_nop() {
+                // assume entity is now at the same z level as the last waypoint
+                // FIXME GROSS HACK
+                if let Some(last) = following.last_waypoint() {
+                    transform.set_height(last.2);
                 }
 
-                // last waypoint
-                Some((waypoint, true)) => {
-                    if following.changed() {
-                        trace!("{:?}: heading towards final waypoint {:?}", e, waypoint);
+                // move onto next waypoint
+                match following.next_waypoint() {
+                    None => {
+                        trace!("{:?}: path finished", e);
+                        path.path = None;
                     }
-                    SteeringComponent::arrive(waypoint.into())
-                }
-
-                // path over
-                None => {
-                    trace!("{:?}: arrived at destination", e);
-                    event_trace(Event::Entity(EntityEvent::NavigationTargetReached(
-                        entity_id(e),
-                    )));
-                    path.path = None;
-                    SteeringComponent::default()
+                    Some((next_block, _cost)) => {
+                        trace!("{:?}: next waypoint: {:?}", e, next_block);
+                        steer.behaviour = SteeringBehaviour::seek(next_block);
+                    }
                 }
             }
         }
     }
 }
 
-/// Temporary (!!) system to assign a path. Will be replaced by a proper system (mark my words).
-/// Look it even has "Temp" in its name to show I'm serious
-pub struct TempPathAssignmentSystem;
+pub struct RandomPathAssignmentSystem;
 
-impl<'a> System<'a> for TempPathAssignmentSystem {
+impl<'a> System<'a> for RandomPathAssignmentSystem {
     type SystemData = (
-        ReadExpect<'a, WorldRef>,
         Read<'a, EntitiesRes>,
+        Read<'a, WorldRef>,
         ReadStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
     );
 
-    fn run(&mut self, (world, entities, transform, mut path): Self::SystemData) {
-        let mut rand = thread_rng();
-        let world = world.borrow();
-        for (e, transform, mut path) in (&entities, &transform, &mut path).join() {
-            if path.path.is_none() {
-                // uh oh, new path needed
+    fn run(&mut self, (entities, world, transform, mut path_follow): Self::SystemData) {
+        let world: InnerWorldRef = (*world).borrow();
 
-                // get random destination with limit on attempts
-                const ATTEMPTS: i32 = 10;
-                let mut attempts_left = ATTEMPTS;
-                let target = loop {
-                    let (x, y) = {
-                        let random_chunk = world
-                            .all_chunks()
-                            .choose(&mut rand)
-                            .expect("world should have >0 chunks");
-                        let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-                        let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-                        let block = BlockPosition::from((x, y, 0));
-                        let world_pos = block.to_world_position(random_chunk.pos());
-                        (world_pos.0, world_pos.1)
-                    };
-
-                    // find accessible place in world
-                    if let target @ Some(_) = world.find_accessible_block_in_column(x, y) {
-                        break target;
+        for (e, transform, mut path_follow) in (&entities, &transform, &mut path_follow).join() {
+            // only assign paths if not following one already
+            if path_follow.path.is_none() {
+                path_follow.path = choose_random_target(&world).and_then(|target| {
+                    match world.find_path(transform.position, target) {
+                        Err(NavigationError::SourceNotWalkable(_)) => {
+                            // TODO wander? or try to correct the position with collision resolution
+                            warn!("{:?}: stuck in a non walkable position", e);
+                            None
+                        }
+                        Err(err) => {
+                            trace!("{:?}: failed to find path between random positions: {:?}", e, err);
+                            None
+                        }
+                        Ok(path) => {
+                            debug!("{:?} new path to {:?}", e, path.target());
+                            Some(PathFollowing::new(path))
+                        }
                     }
-
-                    attempts_left -= 1;
-                    if attempts_left < 0 {
-                        warn!(
-                            "{:?}: tried and failed {} times to find a random place to path find to",
-                            e, ATTEMPTS,
-                        );
-                        break None;
-                    }
-                };
-
-                // calculate path and set as target
-                let position = transform.position;
-                todo!()
-                /*
-                let full_path = target.and_then(|target| world.find_path(position, target));
-
-                match full_path.as_ref() {
-                    Some(p) => {
-                        debug_assert!(!p.0.is_empty());
-                        info!("{:?}: found path from {:?} to {:?}", e, position, target)
-                    }
-                    None => debug!(
-                        "{:?}: failed to find a path from {:?} to {:?}",
-                        e, position, target
-                    ),
-                }
-
-                path.path = full_path.map(PathFollowing::new);
-                if let Some(tgt) = target {
-                    event_trace(Event::Entity(EntityEvent::NewNavigationTarget(
-                        entity_id(e),
-                        tgt.into(),
-                    )));
-                }
-                */
+                });
             }
         }
     }
+}
+
+fn choose_random_target(world: &InnerWorldRef) -> Option<WorldPosition> {
+    let mut rand = random::get();
+    for _ in 0..10 {
+        let chunk = world.all_chunks().choose(rand.deref_mut()).unwrap(); // chunks wont be empty
+
+        let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+        let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+        if let Some(block_pos) = chunk.find_accessible_block(SliceBlock(x, y), None) {
+            return Some(block_pos.to_world_position(chunk.pos()));
+        }
+    }
+    None
 }

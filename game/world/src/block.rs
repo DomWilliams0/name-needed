@@ -1,6 +1,6 @@
 use color::ColorRgb;
 
-use crate::area::SlabAreaIndex;
+use crate::navigation::SlabAreaIndex;
 use crate::occlusion::{BlockOcclusion, Opacity};
 
 /// A single block in a chunk

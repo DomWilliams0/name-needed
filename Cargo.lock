@@ -1355,6 +1355,7 @@ dependencies = [
  "crossbeam",
  "specs",
  "unit",
+ "ux",
  "world",
 ]
 
@@ -1518,6 +1519,12 @@ dependencies = [
  "errno",
  "libc",
 ]
+
+[[package]]
+name = "ux"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88dfeb711b61ce620c0cb6fd9f8e3e678622f0c971da2a63c4b3e25e88ed012f"
 
 [[package]]
 name = "vec_map"

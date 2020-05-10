@@ -1,132 +1,132 @@
-use num_traits::Zero;
-
 use common::*;
+use unit::world::WorldPosition;
 
-use crate::movement::DesiredMovementComponent;
+use crate::steer::context::InterestsContextMap;
 use crate::TransformComponent;
-use unit::world::WorldPoint;
 
 #[derive(Debug)]
 pub enum SteeringBehaviour {
     Nop(Nop),
     Seek(Seek),
-    Arrive(Arrive),
+    // TODO wander?
 }
 
 /// When steering is complete
-pub enum CompleteAction {
+pub enum SteeringResult {
     /// Not yet complete
-    Continue,
+    Ongoing,
 
     /// Complete
-    Stop,
+    Finished,
 }
 
 impl Default for SteeringBehaviour {
     fn default() -> Self {
+        // TODO wander? depends on steer, put in trait
         Self::Nop(Nop)
     }
 }
 
 impl SteeringBehaviour {
+    pub fn seek<P: Into<WorldPosition>>(target: P) -> Self {
+        SteeringBehaviour::Seek(Seek::with_target(target.into()))
+    }
+
     pub fn tick(
         &mut self,
         transform: &TransformComponent,
-        movement: &mut DesiredMovementComponent,
-    ) -> CompleteAction {
+        interests: &mut InterestsContextMap,
+    ) -> SteeringResult {
         match self {
-            SteeringBehaviour::Nop(behaviour) => behaviour.tick(transform, movement),
-            SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, movement),
-            SteeringBehaviour::Arrive(behaviour) => behaviour.tick(transform, movement),
+            SteeringBehaviour::Nop(behaviour) => behaviour.tick(transform, interests),
+            SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, interests),
         }
     }
-}
 
-// TODO populate "desired velocity" in DesiredVelocity component which is normalized
-// then movement system can use that on its current movement speed
+    pub fn is_nop(&self) -> bool {
+        matches!(self, SteeringBehaviour::Nop(_))
+    }
+}
 
 trait DoASteer {
     fn tick(
         &mut self,
         transform: &TransformComponent,
-        movement: &mut DesiredMovementComponent,
-    ) -> CompleteAction;
+        interests: &mut InterestsContextMap,
+    ) -> SteeringResult;
 }
 
-// nop
+// stand still
 #[derive(Default, Debug)]
 pub struct Nop;
 
 impl DoASteer for Nop {
-    fn tick(
-        &mut self,
-        _transform: &TransformComponent,
-        _movement: &mut DesiredMovementComponent,
-    ) -> CompleteAction {
-        // it never ends
-        CompleteAction::Continue
+    fn tick(&mut self, _: &TransformComponent, _: &mut InterestsContextMap) -> SteeringResult {
+        SteeringResult::Ongoing
     }
 }
 
-// seek
-#[derive(Default, Debug)]
+/// Seek to and stop when reached with no slowdown
+#[derive(Debug)]
 pub struct Seek {
-    pub target: WorldPoint,
+    target: WorldPosition,
+
+    // used to detect if the point has been passed
+    original_delta: Option<Vector2>,
+    original_sign: Option<bool>,
+}
+
+impl Seek {
+    pub fn with_target(target: WorldPosition) -> Self {
+        Self {
+            target,
+            original_delta: None,
+            original_sign: None,
+        }
+    }
 }
 
 impl DoASteer for Seek {
     fn tick(
         &mut self,
         transform: &TransformComponent,
-        movement: &mut DesiredMovementComponent,
-    ) -> CompleteAction {
-        let target: Vector3 = self.target.into();
-        let current_pos: Vector3 = transform.position.into();
+        interests: &mut InterestsContextMap,
+    ) -> SteeringResult {
+        // ignore z direction, assume the target is accessible and accurate.
+        // round to use block positions instead of points so the general direction to the target
+        // is used rather than point-to-point to the centre every time.
+        let tgt = Vector2::new(self.target.0 as f32, self.target.1 as f32);
+        let pos = Vector2::new(transform.position.0.floor(), transform.position.1.floor());
+        let delta = tgt - pos;
 
-        let delta = target - current_pos;
-        movement.desired_velocity = delta.truncate().normalize();
+        // use exact position for distance check though
+        if (tgt - Vector2::from(transform.position)).magnitude2() <= 1.8f32 {
+            return SteeringResult::Finished;
+        }
 
-        // seek forever
-        CompleteAction::Continue
-    }
-}
+        match (&self.original_delta, &self.original_sign) {
+            (None, _) => {
+                // first tick
+                self.original_delta = Some(delta);
+            }
+            (Some(original_delta), None) => {
+                // second tick
+                self.original_sign = Some(original_delta.dot(delta).is_sign_positive());
+            }
+            (Some(original_delta), Some(original_sign)) => {
+                // any other tick
+                let sign = original_delta.dot(delta).is_sign_positive();
+                if sign != *original_sign {
+                    // passed the point, seek is over
+                    return SteeringResult::Finished;
+                }
+            }
+        }
 
-// arrive
-#[derive(Default, Debug)]
-pub struct Arrive {
-    pub target: WorldPoint,
-    pub approach_radius: f32,
-    pub arrival_radius: f32,
-}
-
-impl DoASteer for Arrive {
-    fn tick(
-        &mut self,
-        transform: &TransformComponent,
-        movement: &mut DesiredMovementComponent,
-    ) -> CompleteAction {
-        let target: Vector3 = self.target.into();
-        let current_pos: Vector3 = transform.position.into();
-        let distance = current_pos.distance2(target);
-
-        let (new_vel, action) = if distance < self.arrival_radius.powi(2) {
-            // arrive
-            (Vector3::zero(), CompleteAction::Stop)
-        } else {
-            let delta = (target - current_pos).normalize();
-            let vel = if distance < self.approach_radius.powi(2) {
-                // approach
-                delta * (distance.sqrt() / self.approach_radius) // TODO expensive sqrt avoidable?
-            } else {
-                // seek as usual
-                delta
-            };
-
-            (vel, CompleteAction::Continue)
-        };
-
-        movement.desired_velocity = new_vel.truncate().normalize();
-
-        action
+        // keep seeking directly towards at full speed
+        // TODO use WorldPosition instead so aims for block instead of centre every time
+        let angle = delta.angle(AXIS_FWD.truncate());
+        interests.write_interest(angle, 1.0);
+        SteeringResult::Ongoing
     }
 }

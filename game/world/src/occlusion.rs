@@ -108,6 +108,14 @@ impl NeighbourOffset {
         }
     }
 
+    pub fn is_vertical(self) -> bool {
+        debug_assert!(self.is_aligned());
+        match self {
+            NeighbourOffset::North | NeighbourOffset::South => true,
+            _ => false,
+        }
+    }
+
     pub fn between_aligned(from: ChunkPosition, to: ChunkPosition) -> Self {
         let ChunkPosition(dx, dy) = to - from;
         let (dx, dy) = (dx.signum(), dy.signum());
@@ -118,22 +126,6 @@ impl NeighbourOffset {
             (1, 0) => NeighbourOffset::East,
             (-1, 0) => NeighbourOffset::West,
             _ => unreachable!(),
-        }
-    }
-
-    /// Anticlockwise
-    pub fn perpendicular_offset(self, length: i16) -> (i16, i16) {
-        debug_assert!(self.is_aligned());
-
-        match self {
-            NeighbourOffset::South => (length, 0),
-            NeighbourOffset::North => (-length, 0),
-            NeighbourOffset::East => (0, length),
-            NeighbourOffset::West => (0, -length),
-            _ => {
-                // safety: asserted self is aligned
-                unsafe { unreachable_unchecked() }
-            }
         }
     }
 

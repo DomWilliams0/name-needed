@@ -34,6 +34,8 @@ pub enum WorldPreset {
 pub struct Simulation {
     pub random_seed: Option<u64>,
     pub random_count: u32,
-    pub move_speed: f32,
+    pub acceleration: f32,
+    pub max_speed: f32,
+    pub friction: f32,
     pub start_delay: u32,
 }

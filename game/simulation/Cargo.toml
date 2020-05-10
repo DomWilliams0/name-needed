@@ -19,3 +19,4 @@ color = { path = "../../shared/color" }
 
 specs = {version = "^0.16", default-features = false} # no parallel
 crossbeam = "^0.7"
+ux = "^0.1"

@@ -1,8 +1,8 @@
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockPosition, ChunkPosition, SliceBlock, WorldPosition};
+use unit::world::{BlockPosition, ChunkPosition, SliceBlock, SliceIndex, WorldPosition};
 
-use crate::area::{
+use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, WorldArea, WorldPath,
     WorldPathNode,
 };
@@ -63,22 +63,20 @@ impl World {
         }
     }
 
-    fn find_chunk<P: Fn(&Chunk) -> bool>(&self, predicate: P) -> Option<&Chunk> {
-        // TODO spatial
-        self.chunks.iter().find(|c| predicate(c))
-    }
-
-    fn find_chunk_mut<P: Fn(&Chunk) -> bool>(&mut self, predicate: P) -> Option<&mut Chunk> {
-        // TODO spatial
-        self.chunks.iter_mut().find(|c| predicate(c))
+    fn find_chunk_index(&self, chunk_pos: ChunkPosition) -> Option<usize> {
+        self.chunks
+            .binary_search_by_key(&chunk_pos, |c| c.pos())
+            .ok()
     }
 
     pub(crate) fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
-        self.find_chunk(|c| c.pos() == chunk_pos)
+        self.find_chunk_index(chunk_pos)
+            .map(|idx| &self.chunks[idx])
     }
 
     pub fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkPosition) -> Option<&mut Chunk> {
-        self.find_chunk_mut(|c| c.pos() == chunk_pos)
+        self.find_chunk_index(chunk_pos)
+            .map(move |idx| &mut self.chunks[idx])
     }
 
     pub(crate) fn find_area_path<F: Into<WorldPosition>, T: Into<WorldPosition>>(
@@ -91,11 +89,17 @@ impl World {
             let chunk_pos: ChunkPosition = pos.into();
             self.find_chunk_with_pos(chunk_pos)
                 .and_then(|c| c.area_for_block(pos))
-                .ok_or_else(|| NavigationError::NotWalkable(pos))
+                // .ok_or_else(|| NavigationError::NotWalkable(pos))
         };
 
-        let from_area = resolve_area(from.into())?;
-        let to_area = resolve_area(to.into())?;
+        let from = from.into();
+        let to = to.into();
+
+        let from_area = resolve_area(from)
+            .ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+
+        let to_area = resolve_area(to)
+            .ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
 
         Ok(self.area_graph.find_area_path(from_area, to_area)?)
     }
@@ -127,10 +131,10 @@ impl World {
 
         let from = self
             .find_accessible_block_in_column_starting_from(from_pos)
-            .ok_or_else(|| NavigationError::NotWalkable(from_pos))?;
+            .ok_or_else(|| NavigationError::SourceNotWalkable(from_pos))?;
         let to = self
             .find_accessible_block_in_column_starting_from(to_pos)
-            .ok_or_else(|| NavigationError::NotWalkable(to_pos))?;
+            .ok_or_else(|| NavigationError::TargetNotWalkable(to_pos))?;
 
         // same blocks
         if from == to {
@@ -184,7 +188,7 @@ impl World {
         let block_path = self.find_block_path(final_area.area, start, to)?;
         full_path.extend(convert_block_path(final_area.area, block_path));
 
-        Ok(WorldPath(full_path))
+        Ok(WorldPath::new(full_path, to))
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
@@ -197,17 +201,9 @@ impl World {
     ) -> Option<WorldPosition> {
         let chunk_pos = ChunkPosition::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
-        self.find_chunk_with_pos(chunk_pos).and_then(|c| {
-            c.raw_terrain()
-                .slices_from_top_offset()
-                .skip_while(|(s, _)| s.0 > pos.2)
-                .find(|(_, slice)| slice[slice_block].walkable())
-                .map(|(z, _)| {
-                    slice_block
-                        .to_block_position(z)
-                        .to_world_position(chunk_pos)
-                })
-        })
+        self.find_chunk_with_pos(chunk_pos)
+            .and_then(|c| c.find_accessible_block(slice_block, Some(SliceIndex(pos.2))))
+            .map(|pos| pos.to_world_position(chunk_pos))
     }
 
     pub(crate) fn add_loaded_chunk(
@@ -220,6 +216,9 @@ impl World {
         }
 
         self.chunks.push(chunk);
+
+        // maintain sorted chunk order
+        self.chunks.sort_unstable_by_key(|c| c.pos());
 
         for &(src, dst, edge) in area_nav {
             self.area_graph.add_edge(src, dst, edge);
@@ -284,11 +283,12 @@ pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use unit::world::{BlockPosition, WorldPosition};
+    use unit::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPosition};
 
-    use crate::area::EdgeCost;
+    use crate::navigation::EdgeCost;
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
+    use crate::presets;
     use crate::world::world_from_chunks;
     use common::Itertools;
 
@@ -303,7 +303,7 @@ mod tests {
             .find_path((2, 2, 2), (3, 3, 2))
             .expect("path should succeed");
 
-        assert_eq!(path.0.len(), 2);
+        assert_eq!(path.path().len(), 2);
     }
 
     #[test]
@@ -354,11 +354,10 @@ mod tests {
 
         let path = world
             .find_path((0, 0, 4), (8, 8, 4))
-            .expect("path should succeed")
-            .0;
+            .expect("path should succeed");
 
-        assert_eq!(path.first().unwrap().exit_cost, EdgeCost::JumpDown);
-        assert_eq!(path.last().unwrap().exit_cost, EdgeCost::JumpUp);
+        assert_eq!(path.path().first().unwrap().exit_cost, EdgeCost::JumpDown);
+        assert_eq!(path.path().last().unwrap().exit_cost, EdgeCost::JumpUp);
     }
 
     #[test]
@@ -397,9 +396,10 @@ mod tests {
         let to = BlockPosition::from((5, 8, 7)).to_world_position((6, 3));
 
         let path = world.find_path(from, to).expect("path should succeed");
+        assert_eq!(*path.target(), to);
 
         // all should be adjacent
-        for (a, b) in path.0.iter().tuple_windows() {
+        for (a, b) in path.path().iter().tuple_windows() {
             eprintln!("{:?} {:?}", a, b);
             let dx = b.block.0 - a.block.0;
             let dy = b.block.1 - a.block.1;
@@ -409,11 +409,49 @@ mod tests {
 
         // expect 2 jumps
         assert_eq!(
-            path.0
+            path.path()
                 .iter()
                 .filter(|b| b.exit_cost == EdgeCost::JumpUp)
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn ring_path() {
+        use common::LevelFilter;
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+        let world = world_from_chunks(presets::ring()).into_inner();
+
+        let src = BlockPosition(5, 5, SliceIndex::MAX).to_world_position((0, 1));
+        let dst = BlockPosition(5, 5, SliceIndex::MAX).to_world_position((-1, 1));
+
+        let _ = world.find_path(src, dst).expect("path should succeed");
+    }
+
+    #[test]
+    fn find_chunk() {
+        let world = world_from_chunks(vec![
+            ChunkBuilder::new().build((0, 0)),
+            ChunkBuilder::new().build((1, 0)),
+            ChunkBuilder::new().build((2, 0)),
+            ChunkBuilder::new().build((3, 0)),
+            ChunkBuilder::new().build((0, 1)),
+            ChunkBuilder::new().build((0, -3)),
+            ChunkBuilder::new().build((2, 5)),
+        ])
+        .into_inner();
+
+        for chunk in world.all_chunks() {
+            assert_eq!(
+                world.find_chunk_with_pos(chunk.pos()).unwrap().pos(),
+                chunk.pos()
+            );
+        }
+
+        assert!(world.find_chunk_with_pos(ChunkPosition(10, 10)).is_none());
     }
 }

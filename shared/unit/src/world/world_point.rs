@@ -6,11 +6,17 @@ use common::derive_more::*;
 use common::{Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
-use crate::world::{ChunkPosition, WorldPosition};
+use crate::world::{ChunkPosition, SliceIndex, WorldPosition};
 
 /// A point anywhere in the world
 #[derive(Debug, Copy, Clone, PartialEq, Default, Into, From)]
 pub struct WorldPoint(pub f32, pub f32, pub f32);
+
+impl WorldPoint {
+    pub fn slice(&self) -> SliceIndex {
+        SliceIndex(self.2 as i32)
+    }
+}
 
 impl From<WorldPoint> for Vector3 {
     fn from(p: WorldPoint) -> Self {
@@ -22,15 +28,25 @@ impl From<WorldPoint> for Vector3 {
     }
 }
 
+impl From<WorldPoint> for Vector2 {
+    fn from(p: WorldPoint) -> Self {
+        Self {
+            x: p.0,
+            y: p.1,
+        }
+    }
+}
+
 impl From<Vector3> for WorldPoint {
     fn from(v: Vector3) -> Self {
         Self(v.x, v.y, v.z)
     }
 }
 
+/// Centre of block
 impl From<WorldPosition> for WorldPoint {
     fn from(pos: WorldPosition) -> Self {
-        Self(pos.0 as f32, pos.1 as f32, pos.2 as f32)
+        Self(pos.0 as f32 + 0.5, pos.1 as f32 + 0.5, pos.2 as f32)
     }
 }
 

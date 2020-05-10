@@ -14,8 +14,8 @@ impl EdgeCost {
     pub fn weight(self) -> f32 {
         // TODO currently arbitrary, should depend on physical attributes
         match self {
-            EdgeCost::JumpUp => 1.4,
-            EdgeCost::JumpDown => 1.3,
+            EdgeCost::JumpUp => 1.2,
+            EdgeCost::JumpDown => 1.1,
             EdgeCost::Walk => 1.0,
         }
     }

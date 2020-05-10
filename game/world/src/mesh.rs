@@ -10,7 +10,7 @@ use unit::dim::CHUNK_SIZE;
 use unit::world::SliceBlock;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
-const X: f32 = unit::scale::BLOCK_DIAMETER / 2.0;
+const X: f32 = unit::world::SCALE / 2.0;
 
 // 0, 1, 2 | 2, 3, 0
 const TILE_CORNERS: [(f32, f32); 4] = [(-X, -X), (X, -X), (X, X), (-X, X)];
@@ -42,10 +42,7 @@ pub fn make_simple_render_mesh<V: BaseVertex>(chunk: &Chunk, slice_range: SliceR
 
                 let color = color * ao_lightness;
                 block_corners[i] = MaybeUninit::new(V::new(
-                    (
-                        fx + bx * unit::scale::BLOCK_DIAMETER,
-                        fy + by * unit::scale::BLOCK_DIAMETER,
-                    ),
+                    (fx + bx * unit::world::SCALE, fy + by * unit::world::SCALE),
                     color,
                 ));
             }

@@ -1,24 +1,34 @@
+use std::ops::Deref;
+
+use specs::{Builder, WorldExt};
+
+use color::ColorRgb;
+use common::*;
+use unit::world::WorldPosition;
+use world::WorldRef;
+
 use crate::ecs::{entity_id, Component, EcsWorld, Entity};
 use crate::movement::DesiredMovementComponent;
 use crate::path::FollowPathComponent;
 use crate::steer::SteeringComponent;
 use crate::{PhysicalComponent, TransformComponent};
-use color::ColorRgb;
-use common::*;
-use specs::{Builder, WorldExt};
-use std::ops::Deref;
-use unit::world::WorldPosition;
-use world::WorldRef;
 
 pub struct EntityBuilder<'a> {
     ecs_world: &'a mut EcsWorld,
 
     block_pos: Option<(i32, i32, Option<i32>)>,
+    height: Option<f32>,
 
     physical: Option<PhysicalComponent>,
     steering: Option<SteeringComponent>,
     desired_movement: Option<DesiredMovementComponent>,
     follow_path: Option<FollowPathComponent>,
+}
+
+macro_rules! default {
+    ($comp:expr) => {
+        $comp = Some(Default::default())
+    };
 }
 
 impl<'a> EntityBuilder<'a> {
@@ -27,6 +37,7 @@ impl<'a> EntityBuilder<'a> {
             ecs_world,
 
             block_pos: None,
+            height: None,
             physical: None,
             steering: None,
             desired_movement: None,
@@ -35,19 +46,20 @@ impl<'a> EntityBuilder<'a> {
     }
 
     pub fn with_wandering_human_archetype(&mut self) -> &mut Self {
-        self.steering = Some(Default::default());
-        self.desired_movement = Some(Default::default());
-        self.follow_path = Some(Default::default());
+        default!(self.steering);
+        default!(self.desired_movement);
+        default!(self.follow_path);
         self
     }
 
-    pub fn with_transform(&mut self, block_pos: (i32, i32, Option<i32>)) -> &mut Self {
+    pub fn with_transform(&mut self, block_pos: (i32, i32, Option<i32>), height: f32) -> &mut Self {
         self.block_pos = Some(block_pos);
+        self.height = Some(height);
         self
     }
 
-    pub fn with_physical(&mut self, diameter: f32, color: ColorRgb) -> &mut Self {
-        self.physical = Some(PhysicalComponent::new(color, diameter, 1.0));
+    pub fn with_physical(&mut self, radius: f32, color: ColorRgb) -> &mut Self {
+        self.physical = Some(PhysicalComponent::new(color, radius));
         self
     }
 
@@ -67,14 +79,8 @@ impl<'a> EntityBuilder<'a> {
                     .ok_or("couldn't find highest safe point")?,
             };
 
-            let mut transform = TransformComponent::from_block_centre(world_pos);
-
-            if let Some(phys) = self.physical.as_ref() {
-                // stand on top
-                transform.position.2 += phys.height() / 2.0;
-            }
-
-            transform
+            let height = self.height.ok_or("no height")?;
+            TransformComponent::new(world_pos.into(), height)
         };
 
         let mut builder = self.ecs_world.create_entity().with(transform);

@@ -2,9 +2,26 @@ use std::fmt::{Display, Error, Formatter};
 
 use unit::world::{BlockPosition, WorldPosition};
 
-use crate::area::{AreaNavEdge, EdgeCost, WorldArea};
+use crate::navigation::{AreaNavEdge, EdgeCost, WorldArea, AreaPathError, BlockPathError};
 
 // TODO smallvecs
+
+
+#[derive(Debug)]
+pub enum NavigationError {
+    SourceNotWalkable(WorldPosition),
+    TargetNotWalkable(WorldPosition),
+    NoSuchArea(WorldArea),
+    ZeroLengthPath,
+    AreaError(AreaPathError),
+    BlockError(WorldArea, BlockPathError),
+}
+
+impl From<AreaPathError> for NavigationError {
+    fn from(e: AreaPathError) -> Self {
+        NavigationError::AreaError(e)
+    }
+}
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
@@ -54,7 +71,24 @@ pub struct WorldPathNode {
 }
 
 #[derive(Debug)]
-pub struct WorldPath(pub Vec<WorldPathNode>);
+pub struct WorldPath {
+    path: Vec<WorldPathNode>,
+    target: WorldPosition,
+}
+
+impl WorldPath {
+    pub fn new(path: Vec<WorldPathNode>, target: WorldPosition) -> Self {
+        Self { path, target }
+    }
+
+    pub fn path(&self) -> &[WorldPathNode] {
+        &self.path
+    }
+
+    pub fn target(&self) -> &WorldPosition {
+        &self.target
+    }
+}
 
 // TODO
 pub type WorldPathSlice<'a> = &'a [(WorldPosition, EdgeCost)];

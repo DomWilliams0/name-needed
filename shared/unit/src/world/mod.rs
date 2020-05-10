@@ -14,6 +14,9 @@ mod slice_index;
 mod world_point;
 mod world_position;
 
+/// 2 blocks per 1m
+pub const SCALE: f32 = 0.5;
+
 #[cfg(test)]
 mod tests {
     use std::f32::EPSILON;

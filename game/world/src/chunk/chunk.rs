@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut, Shl};
 
 use common::*;
 
-use crate::area::WorldArea;
+use crate::navigation::WorldArea;
 use crate::block::BlockType;
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::Slice;

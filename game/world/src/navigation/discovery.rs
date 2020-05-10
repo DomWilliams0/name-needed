@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use unit::dim::CHUNK_SIZE;
 use unit::world::BlockCoord;
 
-use crate::area::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
+use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::Slice;
@@ -309,7 +309,7 @@ impl Iterator for Neighbours {
 
 #[cfg(test)]
 mod tests {
-    use crate::area::discovery::Neighbours;
+    use crate::navigation::discovery::Neighbours;
 
     #[test]
     fn neighbours() {

@@ -5,7 +5,6 @@ use simulation::{
     EventsOutcome, ExitType, PhysicalComponent, Renderer, Simulation, SimulationBackend,
     TransformComponent, WorldViewer,
 };
-use unit::view::ViewPoint;
 
 pub struct DummyRenderer;
 

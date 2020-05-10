@@ -6,10 +6,10 @@ use std::ops::{Deref, DerefMut};
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceIndex};
+use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceBlock, SliceIndex};
 
-use crate::area::discovery::AreaDiscovery;
-use crate::area::{BlockGraph, ChunkArea, WorldArea};
+use crate::navigation::discovery::AreaDiscovery;
+use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
 use crate::block::{Block, BlockType};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
@@ -837,6 +837,19 @@ impl ChunkTerrain {
                 f(this_slab_top_slice, next_slab_bottom_slice);
             }
         }
+    }
+
+    pub fn find_accessible_block(
+        &self,
+        pos: SliceBlock,
+        start_from: Option<SliceIndex>,
+    ) -> Option<BlockPosition> {
+        let start_from = start_from.unwrap_or(SliceIndex::MAX);
+        self.raw_terrain()
+            .slices_from_top_offset()
+            .skip_while(|(s, _)| s.0 > start_from.0)
+            .find(|(_, slice)| slice[pos].walkable())
+            .map(|(z, _)| pos.to_block_position(z))
     }
 }
 

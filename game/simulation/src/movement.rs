@@ -1,53 +1,37 @@
-use num_traits::zero;
-
 use common::*;
 
 use crate::ecs::*;
-
-pub const AXIS_UP: Vector3 = Vector3::new(0.0, 0.0, 1.0);
-pub const AXIS_FWD: Vector3 = Vector3::new(0.0, 1.0, 0.0);
+use crate::steer::context::ContextMap;
+use std::hint::unreachable_unchecked;
 
 /// Desired movement by the brain, and practical movement to be realized by the body
-#[derive(Debug, Copy, Clone)]
-pub struct DesiredMovementComponent {
-    pub realized_velocity: Vector2,
-
-    pub desired_velocity: Vector2,
-
-    pub jump_behavior: DesiredJumpBehavior,
+#[derive(Copy, Clone)]
+pub enum DesiredMovementComponent {
+    Desired(ContextMap),
+    Realized(Vector2),
 }
 
 impl Component for DesiredMovementComponent {
     type Storage = VecStorage<Self>;
 }
 
-impl Default for DesiredMovementComponent {
-    fn default() -> Self {
-        Self {
-            realized_velocity: zero(),
-            desired_velocity: zero(),
-            jump_behavior: DesiredJumpBehavior::default(),
+impl DesiredMovementComponent {
+    pub unsafe fn context_map_mut_unchecked(&mut self) -> &mut ContextMap {
+        match self {
+            DesiredMovementComponent::Desired(map) => map,
+            _ => unreachable_unchecked(),
         }
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum DesiredJumpBehavior {
-    /// Only jump if possible and the jump sensor is occluded
-    OnSensorObstruction,
-
-    /// Ignore jump sensor and jump if possible now
-    #[allow(unused)]
-    ManuallyRightNow,
-}
-
-impl Default for DesiredJumpBehavior {
+/// Desired variant
+impl Default for DesiredMovementComponent {
     fn default() -> Self {
-        DesiredJumpBehavior::OnSensorObstruction
+        DesiredMovementComponent::Desired(ContextMap::default())
     }
 }
 
-/// Converts *desired* movement to *practical* movement.
+/// Converts *desired* movement from context steering map to *practical* movement.
 /// this will depend on the entity's health and presence of necessary limbs -
 /// you can't jump without legs, or see a jump without eyes
 pub struct MovementFulfilmentSystem;
@@ -59,11 +43,19 @@ impl<'a> System<'a> for MovementFulfilmentSystem {
     );
 
     fn run(&mut self, (entities, mut movement): Self::SystemData) {
-        for (e, mut movement) in (&entities, &mut movement).join() {
-            // scale velocity based on max speed
-            let vel = movement.desired_velocity * config::get().simulation.move_speed;
+        for (e, movement) in (&entities, &mut movement).join() {
+            let context_map = match movement {
+                DesiredMovementComponent::Desired(cm) => cm,
+                _ => unreachable!("movement fulfilment expects desired movement only"),
+            };
 
-            movement.realized_velocity = vel;
+            // resolve context map to a direction
+            let (angle, speed) = context_map.resolve();
+            let direction = forward_angle(angle);
+
+            // scale velocity based on acceleration
+            let vel = direction * (speed * config::get().simulation.acceleration);
+            *movement = DesiredMovementComponent::Realized(vel);
 
             event_trace(Event::Entity(EntityEvent::MovementIntention(
                 entity_id(e),

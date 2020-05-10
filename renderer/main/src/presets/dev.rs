@@ -33,14 +33,12 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
     }
 
     fn init(&self, sim: &mut Simulation<R>) {
-        let mut rng = if let Some(seed) = config::get().simulation.random_seed {
-            debug!("using rng seed {} from config", seed);
-            StdRng::seed_from_u64(seed)
-        } else {
-            StdRng::from_entropy()
-        };
+        if let Some(seed) = config::get().simulation.random_seed {
+            random::reseed(seed);
+            debug!("seeding random generator with seed {:?} from config", seed);
+        }
 
-        let mut colors = ColorRgb::unique_randoms(&mut rng, 0.85, 0.4).unwrap();
+        let mut colors = ColorRgb::unique_randoms(0.85, 0.4).unwrap();
 
         // add entities from config
         /*{
@@ -60,22 +58,22 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         if randoms > 0 {
             info!("adding {} random entities", randoms);
             for i in 0..randoms {
-                let pos = (4 + rng.gen_range(-4, 4), 4 + rng.gen_range(-4, 4), None);
+                let pos = (0, 0, None);
                 let color = colors.next().unwrap();
-                let diameter = rng.gen_range(0.5, 0.9);
+                let radius = random::get().gen_range(0.3, 0.5);
 
                 trace!(
                     "entity {}: pos {:?}, radius: {:?}, color: {:?}",
                     i,
                     pos,
-                    diameter,
+                    radius,
                     color
                 );
 
                 match sim
                     .add_entity()
-                    .with_transform(pos)
-                    .with_physical(diameter, color)
+                    .with_transform(pos, 1.0)
+                    .with_physical(radius, color)
                     .with_wandering_human_archetype()
                     .build()
                 {

@@ -156,7 +156,7 @@ impl WorkerPool for BlockingWorkerPool {
 
         // receive on "finalizer thread"
         let result = match finalize_rx
-            .recv_timeout(Duration::from_secs(30))
+            .recv_timeout(Duration::from_secs(60))
             .expect("expected finalized terrain by now")
         {
             Err(e) => {

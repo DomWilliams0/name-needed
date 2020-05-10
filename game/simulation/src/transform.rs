@@ -1,19 +1,25 @@
 use common::*;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 use crate::ecs::{Component, VecStorage};
 
 /// Position and rotation component
 #[derive(Debug, Copy, Clone)]
 pub struct TransformComponent {
-    /// World position, center of entity
+    /// Position in world, center of entity in x/y and bottom of entity in z
     pub position: WorldPoint,
 
-    /// 1d rotation around z axis
-    pub rotation: Quaternion,
+    /// Height in z axis
+    pub height: f32,
 
     /// Used for render interpolation
     pub last_position: WorldPoint,
+
+    /// 1d rotation around z axis
+    pub rotation: Basis2,
+
+    /// Current velocity
+    pub velocity: Vector2,
 }
 
 impl Component for TransformComponent {
@@ -21,25 +27,34 @@ impl Component for TransformComponent {
 }
 
 impl TransformComponent {
-    pub fn new(position: WorldPoint) -> Self {
+    pub fn new(position: WorldPoint, height: f32) -> Self {
         Self {
             position,
-            rotation: Quaternion::from_angle_z(Rad(0.0)), // TODO test
-            last_position: WorldPoint::default(),
+            height,
+            rotation: Basis2::from_angle(rad(0.0)),
+            last_position: position,
+            velocity: Zero::zero(),
         }
     }
 
-    pub fn from_block_centre(pos: WorldPosition) -> Self {
-        let mut point = WorldPoint::from(pos);
-        point.0 += 0.5;
-        point.1 += 0.5;
-        Self::new(point)
+    pub fn set_height(&mut self, z: i32) {
+        let z = z as f32;
+        // TODO
+        /*
+        assert!(
+            (self.position.2 - z as f32).abs() <= 1.0,
+            "teleport from {:?} to {:?}??!",
+            self.position.2,
+            z
+        );
+        */
+
+        self.position.2 = z as f32;
     }
 
-    pub fn slice(&self) -> i32 {
+    pub const fn slice(&self) -> i32 {
         self.position.2 as i32
     }
-
     pub const fn x(&self) -> f32 {
         self.position.0
     }

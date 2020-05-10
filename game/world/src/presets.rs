@@ -8,6 +8,9 @@ use crate::block::BlockType;
 use crate::chunk::ChunkBuilder;
 use crate::loader::MemoryTerrainSource;
 
+#[cfg(test)]
+use crate::ChunkDescriptor;
+
 pub fn from_config() -> MemoryTerrainSource {
     match config::get().world.preset {
         WorldPreset::OneChunkWonder => one_chunk_wonder(),
@@ -165,7 +168,7 @@ pub fn pyramid_mess() -> MemoryTerrainSource {
 /// Bottleneck for path finding
 pub fn bottleneck() -> MemoryTerrainSource {
     let half_y = CHUNK_SIZE.as_i32() / 2;
-    let mut rng = thread_rng();
+    let mut rng = random::get();
     let chunks = (-2..2).map(|i| {
         let hole = rng.gen_range(1, CHUNK_SIZE.as_i32() - 1);
         ChunkBuilder::new()
@@ -191,4 +194,40 @@ pub fn bottleneck() -> MemoryTerrainSource {
     });
 
     MemoryTerrainSource::from_chunks(chunks).expect("hardcoded world preset is wrong??!!1!")
+}
+
+#[cfg(test)]
+pub fn ring() -> Vec<ChunkDescriptor> {
+    let fill_except_outline = |z| {
+        ChunkBuilder::new().fill_range(
+            (1, 1, z),
+            (
+                CHUNK_SIZE.as_block_coord() - 1,
+                CHUNK_SIZE.as_block_coord() - 1,
+                z + 1,
+            ),
+            |_| BlockType::Stone,
+        )
+    };
+
+    vec![
+        // top left
+        fill_except_outline(3)
+            .set_block((3, 0, 3), BlockType::Grass) /* south bridge */
+            .build((-1, 1)), /* NO east bridge */
+        // top right
+        fill_except_outline(4)
+            .set_block((3, 0, 4), BlockType::Grass) /* south bridge */
+            .build((0, 1)), /* NO west bridge */
+        // bottom right
+        fill_except_outline(3)
+            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 3), BlockType::Grass) /* north bridge */
+            .set_block((0, 3, 3), BlockType::Grass) /* west bridge */
+            .build((0, 0)),
+        // bottom left
+        fill_except_outline(4)
+            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 4), BlockType::Grass) /* north bridge */
+            .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 4), BlockType::Grass) /* east bridge */
+            .build((-1, 0)),
+    ]
 }

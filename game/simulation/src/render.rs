@@ -1,10 +1,10 @@
 use color::ColorRgb;
+use common::{Vector3, VectorSpace};
 use unit::view::ViewPoint;
 use world::{SliceRange, WorldRef};
 
 use crate::ecs::*;
 use crate::TransformComponent;
-use common::{Vector3, VectorSpace};
 
 /// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
@@ -13,33 +13,22 @@ pub struct PhysicalComponent {
     color: ColorRgb,
 
     /// simple circle with diameter in x + y dims
-    diameter: f32,
-
-    /// height in z axis
-    height: f32,
+    radius: f32,
 }
 
 impl PhysicalComponent {
-    pub fn new(color: ColorRgb, diameter: f32, height: f32) -> Self {
+    pub fn new(color: ColorRgb, radius: f32) -> Self {
         // TODO result
-        assert!(diameter > 0.2);
-        assert!(height > 0.2);
+        assert!(radius > 0.2);
 
-        Self {
-            color,
-            diameter,
-            height,
-        }
+        Self { color, radius }
     }
 
     pub fn color(&self) -> ColorRgb {
         self.color
     }
     pub fn radius(&self) -> f32 {
-        self.diameter
-    }
-    pub fn height(&self) -> f32 {
-        self.height
+        self.radius
     }
 }
 
@@ -62,23 +51,18 @@ pub trait Renderer {
     /// Finish rendering simulation
     fn sim_finish(&mut self);
 
-    /// End rendering frame
-    fn deinit(&mut self) -> Self::Target;
-
-    // ---
-
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, _from: ViewPoint, _to: ViewPoint, _color: ColorRgb) {}
+    #[allow(unused_variables)]
+    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {}
 
-    fn debug_add_tri(&mut self, _points: [ViewPoint; 3], _color: ColorRgb) {}
+    #[allow(unused_variables)]
+    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb) {}
 
     fn debug_finish(&mut self) {}
-}
 
-pub struct FrameRenderState<'t, R: Renderer> {
-    pub target: &'t mut R::Target,
-    pub slices: SliceRange,
+    /// End rendering frame
+    fn deinit(&mut self) -> Self::Target;
 }
 
 /// Wrapper for calling generic Renderer in render system
@@ -118,31 +102,24 @@ pub trait DebugRenderer<R: Renderer> {
         renderer: &mut R,
         world: WorldRef,
         ecs_world: &EcsWorld,
-        frame_state: &FrameRenderState<R>,
+        slices: SliceRange,
     );
 }
 
-#[allow(dead_code)]
 pub mod dummy {
     use color::ColorRgb;
     use unit::view::ViewPoint;
-    use world::WorldRef;
+    use world::{SliceRange, WorldRef};
 
     use crate::ecs::EcsWorld;
-    use crate::render::{DebugRenderer, FrameRenderState};
+    use crate::render::DebugRenderer;
     use crate::Renderer;
 
     /// Example renderer that draws lines at the origin along the X and Y axes
-    pub struct DummyDebugRenderer;
+    pub struct AxesDebugRenderer;
 
-    impl<R: Renderer> DebugRenderer<R> for DummyDebugRenderer {
-        fn render(
-            &mut self,
-            renderer: &mut R,
-            _world: WorldRef,
-            _ecs_world: &EcsWorld,
-            _frame_state: &FrameRenderState<R>,
-        ) {
+    impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
+        fn render(&mut self, renderer: &mut R, _: WorldRef, _: &EcsWorld, _: SliceRange) {
             renderer.debug_add_line(
                 ViewPoint(0.0, 0.0, 0.0),
                 ViewPoint(1.0, 0.0, 0.0),
@@ -151,7 +128,7 @@ pub mod dummy {
             renderer.debug_add_line(
                 ViewPoint(0.0, 0.0, 0.0),
                 ViewPoint(0.0, 1.0, 0.0),
-                ColorRgb::new(255, 0, 0),
+                ColorRgb::new(0, 255, 0),
             );
         }
     }

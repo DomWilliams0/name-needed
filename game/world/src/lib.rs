@@ -3,7 +3,7 @@
 
 pub use petgraph::prelude::NodeIndex;
 
-pub use self::area::{EdgeCost, WorldPath, WorldPathSlice};
+pub use self::navigation::{EdgeCost, WorldPath, WorldPathSlice, NavigationError};
 pub use self::chunk::{BaseTerrain, Chunk};
 pub use self::mesh::BaseVertex;
 pub use self::viewer::{SliceRange, WorldViewer};
@@ -12,7 +12,7 @@ pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 #[cfg(any(test, feature = "benchmarking"))]
 pub use self::{chunk::ChunkBuilder, chunk::ChunkDescriptor, world::world_from_chunks};
 
-mod area;
+mod navigation;
 pub mod block;
 mod chunk;
 mod grid;

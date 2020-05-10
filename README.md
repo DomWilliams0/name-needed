@@ -9,6 +9,11 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 
 ## Progress log
 
+* 10 May 2020: <em>Random wandering with path finding, powered by context steering</em>
+<p style="margin: auto; width: 80%">
+    <img src=".screenshots/path-follow.gif"/>
+</p>
+
 * 26 Apr 2020: <em>Simplified 2D graphics in a 3D world without physics</em>
 <p style="margin: auto; width: 80%">
     <img src=".screenshots/simple-2d.gif"/>

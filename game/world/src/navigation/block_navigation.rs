@@ -4,9 +4,9 @@ use petgraph::graphmap::DiGraphMap;
 
 use unit::world::BlockPosition;
 
-use crate::area::astar::astar;
-use crate::area::path::{BlockPath, BlockPathNode};
-use crate::area::EdgeCost;
+use crate::navigation::astar::astar;
+use crate::navigation::path::{BlockPath, BlockPathNode};
+use crate::navigation::EdgeCost;
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
 
@@ -109,7 +109,7 @@ impl BlockGraph {
 mod tests {
     use unit::world::ChunkPosition;
 
-    use crate::area::{BlockPathNode, WorldArea};
+    use crate::navigation::{BlockPathNode, WorldArea};
     use crate::block::BlockType;
     use crate::{world_from_chunks, ChunkBuilder, EdgeCost};
 

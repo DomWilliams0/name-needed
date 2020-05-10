@@ -1,5 +1,5 @@
 pub use cgmath;
-pub use cgmath::{Angle, Deg, InnerSpace, MetricSpace, Rad, Rotation3, VectorSpace, Zero};
+pub use cgmath::{Angle, InnerSpace, MetricSpace, Rotation2, Rotation3, VectorSpace, Zero};
 #[cfg(feature = "binary")]
 pub use env_logger;
 pub use float_cmp::ApproxEq;
@@ -21,5 +21,36 @@ pub type Point3 = cgmath::Point3<F>;
 pub type Point2 = cgmath::Point2<F>;
 pub type Matrix4 = cgmath::Matrix4<F>;
 pub type Quaternion = cgmath::Quaternion<F>;
+pub type Basis2 = cgmath::Basis2<F>;
+pub type Rad = cgmath::Rad<F>;
+pub type Deg = cgmath::Deg<F>;
+
+#[inline]
+pub fn rad(f: F) -> Rad {
+    cgmath::Rad(f)
+}
+
+#[inline]
+pub fn deg(f: F) -> Deg {
+    cgmath::Deg(f)
+}
+
+pub const AXIS_UP: Vector3 = Vector3::new(0.0, 0.0, 1.0);
+pub const AXIS_FWD: Vector3 = Vector3::new(0.0, 1.0, 0.0);
+
+pub fn forward_angle(angle: Rad) -> Vector2 {
+    use cgmath::{Basis2, Rotation};
+    let rotation = Basis2::from_angle(-angle);
+    rotation.rotate_vector(AXIS_FWD.truncate())
+}
+
+pub fn truncate(vec: Vector2, max: F) -> Vector2 {
+    if vec.magnitude2() > (max * max) {
+        vec.normalize_to(max)
+    } else {
+        vec
+    }
+}
 
 pub mod input;
+pub mod random;

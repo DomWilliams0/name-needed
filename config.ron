@@ -9,9 +9,11 @@ Config(
         worker_threads: None,
     ),
     simulation: (
-        random_seed: Some(12345),
-        random_count: 0,
-        move_speed: 0.2,
+        random_seed: Some(6785345241953452419),
+        random_count: 10,
+        acceleration: 0.1,
+        friction: 0.7,
+        max_speed: 0.2,
         start_delay: 0,
      ),
 )

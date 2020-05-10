@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use common::Rng;
+use common::{random, Rng};
 use std::ops::Mul;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -35,15 +35,11 @@ impl ColorRgb {
         }
     }
 
-    pub fn unique_randoms<R: Rng + ?Sized>(
-        rng: &mut R,
-        saturation: f32,
-        luminance: f32,
-    ) -> Option<UniqueRandomColors> {
+    pub fn unique_randoms(saturation: f32, luminance: f32) -> Option<UniqueRandomColors> {
         let range = 0.0f32..=1.0;
         if range.contains(&saturation) && range.contains(&luminance) {
             Some(UniqueRandomColors {
-                next_hue: rng.gen_range(0.0, 1.0),
+                next_hue: random::get().gen_range(0.0, 1.0),
                 s: saturation,
                 l: luminance,
             })
@@ -176,7 +172,7 @@ impl From<ColorHsl> for ColorRgb {
 mod tests {
     use crate::ColorHsl;
     use crate::ColorRgb;
-    use common::{thread_rng, Itertools};
+    use common::Itertools;
     use std::convert::TryFrom;
 
     #[test]
@@ -238,9 +234,9 @@ mod tests {
 
     #[test]
     fn random_uniques() {
-        assert!(ColorRgb::unique_randoms(&mut thread_rng(), 2.2, -0.8).is_none());
+        assert!(ColorRgb::unique_randoms(2.2, -0.8).is_none());
 
-        let uniques = ColorRgb::unique_randoms(&mut thread_rng(), 0.2, 0.8)
+        let uniques = ColorRgb::unique_randoms(0.2, 0.8)
             .unwrap()
             .take(50)
             .collect_vec();

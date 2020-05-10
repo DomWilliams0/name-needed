@@ -1,7 +1,7 @@
-use world::WorldRef;
+use world::{SliceRange, WorldRef};
 
 use crate::ecs::*;
-use crate::render::{DebugRenderer, FrameRenderState};
+use crate::render::DebugRenderer;
 use crate::Renderer;
 
 pub struct PathDebugRenderer;
@@ -12,8 +12,9 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
         _renderer: &mut R,
         _world: WorldRef,
         _ecs_world: &EcsWorld,
-        _frame_state: &FrameRenderState<R>,
+        _slices: SliceRange,
     ) {
+        // TODO
         // let query = <(
         //     Read<FollowPathComponent>,
         //     Read<TransformComponent>,

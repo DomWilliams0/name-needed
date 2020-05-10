@@ -8,9 +8,9 @@ use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceIndex};
 
-use crate::area::astar::astar;
-use crate::area::path::AreaPathNode;
-use crate::area::{AreaPath, WorldArea};
+use crate::navigation::astar::astar;
+use crate::navigation::path::AreaPathNode;
+use crate::navigation::{AreaPath, WorldArea};
 use crate::occlusion::NeighbourOffset;
 use crate::EdgeCost;
 
@@ -120,10 +120,22 @@ impl AreaNavEdge {
     }
 
     pub fn exit_middle(self) -> BlockPosition {
-        let offset = self
-            .direction
-            .perpendicular_offset((self.width / 2).max(1) as i16);
-        self.exit.try_add(offset).expect("exit width is too wide")
+        let width = ((self.width - 1) / 2).max(0) as i16;
+        let offset = if self.direction.is_vertical() {
+            (width, 0)
+        } else {
+            (0, width)
+        };
+
+        match self.exit.try_add(offset) {
+            None => {
+                panic!(
+                    "exit width is too wide: {:?} with width {:?} and offset {:?}",
+                    self.exit, self.width, offset
+                );
+            }
+            Some(b) => b,
+        }
     }
 }
 
@@ -239,8 +251,8 @@ mod tests {
     use unit::dim::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
 
-    use crate::area::path::AreaPathNode;
-    use crate::area::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
+    use crate::navigation::path::AreaPathNode;
+    use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::block::BlockType;
     use crate::chunk::slab::SLAB_SIZE;
     use crate::chunk::ChunkBuilder;
@@ -529,41 +541,7 @@ mod tests {
             .is_test(true)
             .try_init();
 
-        let fill_except_outline = |z| {
-            ChunkBuilder::new().fill_range(
-                (1, 1, z),
-                (
-                    CHUNK_SIZE.as_block_coord() - 1,
-                    CHUNK_SIZE.as_block_coord() - 1,
-                    z + 1,
-                ),
-                |_| BlockType::Stone,
-            )
-        };
-
-        let graph = make_graph(vec![
-            // top left
-            fill_except_outline(3)
-                .set_block((3, 0, 3), BlockType::Stone) /* south bridge */
-                .build((-1, 1)), /* NO east bridge */
-
-            // top right
-            fill_except_outline(4)
-                .set_block((3, 0, 4), BlockType::Stone) /* south bridge */
-                .build((0, 1)), /* NO west bridge */
-
-            // bottom right
-            fill_except_outline(3)
-                .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 3), BlockType::Stone) /* north bridge */
-                .set_block((0, 3, 3), BlockType::Stone) /* west bridge */
-                .build((0, 0)),
-
-            // bottom left
-            fill_except_outline(4)
-                .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 4), BlockType::Stone) /* north bridge */
-                .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 4), BlockType::Stone) /* east bridge */
-                .build((-1, 0)),
-        ]);
+        let graph = make_graph(crate::presets::ring());
 
         {
             // from top left to top right
@@ -787,5 +765,41 @@ mod tests {
 
         assert_eq!(edge.reversed(), reversed);
         assert_eq!(reversed.reversed(), edge);
+    }
+
+    #[test]
+    fn port_exit_middle() {
+        assert_eq!(
+            AreaNavEdge {
+                direction: NeighbourOffset::South,
+                cost: EdgeCost::Walk,
+                exit: (4, 4, 4).into(),
+                width: 1
+            }
+            .exit_middle(),
+            (4, 4, 4).into()
+        );
+
+        assert_eq!(
+            AreaNavEdge {
+                direction: NeighbourOffset::South,
+                cost: EdgeCost::Walk,
+                exit: (4, 4, 4).into(),
+                width: 5
+            }
+            .exit_middle(),
+            (6, 4, 4).into()
+        );
+
+        assert_eq!(
+            AreaNavEdge {
+                direction: NeighbourOffset::West,
+                cost: EdgeCost::Walk,
+                exit: (0, 0, 1).into(),
+                width: 5
+            }
+            .exit_middle(),
+            (0, 2, 1).into()
+        );
     }
 }

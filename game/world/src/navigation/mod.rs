@@ -2,8 +2,8 @@ pub use area_navigation::{AreaGraph, AreaNavEdge, AreaPathError};
 pub use block_navigation::{BlockGraph, BlockPathError};
 use common::Vector3;
 pub use cost::EdgeCost;
-pub use path::{AreaPath, BlockPath, BlockPathNode, WorldPath, WorldPathNode, WorldPathSlice};
-use unit::world::{ChunkPosition, WorldPosition};
+pub use path::{AreaPath, BlockPath, BlockPathNode, WorldPath, WorldPathNode, WorldPathSlice, NavigationError};
+use unit::world::ChunkPosition;
 
 use crate::chunk::slab::SlabIndex;
 
@@ -84,21 +84,5 @@ impl From<WorldArea> for Vector3 {
             y: area.chunk.1 as f32,
             z: area.slab as f32,
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum NavigationError {
-    NotWalkable(WorldPosition),
-    NoWalkableBlockBelow(WorldPosition),
-    NoSuchArea(WorldArea),
-    ZeroLengthPath,
-    AreaError(AreaPathError),
-    BlockError(WorldArea, BlockPathError),
-}
-
-impl From<AreaPathError> for NavigationError {
-    fn from(e: AreaPathError) -> Self {
-        NavigationError::AreaError(e)
     }
 }
