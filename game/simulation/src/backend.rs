@@ -1,6 +1,7 @@
 use world::WorldViewer;
 
 use crate::{Renderer, Simulation};
+use std::fmt::Debug;
 
 pub enum ExitType {
     Stop,
@@ -13,10 +14,10 @@ pub enum EventsOutcome {
     Exit(ExitType),
 }
 
-pub trait SimulationBackend {
+pub trait SimulationBackend: Sized {
     type Renderer: Renderer;
-    // TODO result instead of panicking
-    fn new(world_viewer: WorldViewer) -> Self;
+    type Error: Debug;
+    fn new(world_viewer: WorldViewer) -> Result<Self, Self::Error>;
 
     fn consume_events(&mut self) -> EventsOutcome;
 

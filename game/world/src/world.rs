@@ -40,11 +40,6 @@ impl World {
         self.chunks.iter()
     }
 
-    pub fn visible_chunks(&self) -> impl Iterator<Item = &Chunk> {
-        // TODO filter visible
-        self.all_chunks()
-    }
-
     pub fn slice_bounds(&self) -> SliceRange {
         let min = self
             .chunks
@@ -89,17 +84,15 @@ impl World {
             let chunk_pos: ChunkPosition = pos.into();
             self.find_chunk_with_pos(chunk_pos)
                 .and_then(|c| c.area_for_block(pos))
-                // .ok_or_else(|| NavigationError::NotWalkable(pos))
         };
 
         let from = from.into();
         let to = to.into();
 
-        let from_area = resolve_area(from)
-            .ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+        let from_area =
+            resolve_area(from).ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
 
-        let to_area = resolve_area(to)
-            .ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
+        let to_area = resolve_area(to).ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
 
         Ok(self.area_graph.find_area_path(from_area, to_area)?)
     }
@@ -285,9 +278,9 @@ pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
 mod tests {
     use unit::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPosition};
 
-    use crate::navigation::EdgeCost;
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
+    use crate::navigation::EdgeCost;
     use crate::presets;
     use crate::world::world_from_chunks;
     use common::Itertools;

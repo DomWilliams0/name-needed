@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use unit::dim::CHUNK_SIZE;
 use unit::world::BlockCoord;
 
-use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::Slice;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
+use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 
 grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),

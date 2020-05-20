@@ -18,10 +18,11 @@ unit = {path = "../../shared/unit"}
 common = {path = "../../shared/common"}
 color = {path = "../../shared/color"}
 
-sfml = {version = "^0.15", git = "https://github.com/jeremyletang/rust-sfml", optional = true}
+sdl2 = {version = "^0.34", optional = true}
+gl = {version = "^0.14", optional = true}
 take_mut = "^0.2"
 
 [features]
 default = []
-use-sfml = ["sfml"]
+use-sdl = ["sdl2", "gl"]
 lite = []

@@ -1,8 +1,8 @@
-#[cfg(any(feature = "use-sfml"))]
+#[cfg(any(feature = "use-sdl"))]
 mod render;
 
-#[cfg(feature = "use-sfml")]
-pub use render::sfml::SfmlBackend;
+#[cfg(feature = "use-sdl")]
+pub use render::sdl::SdlBackend;
 
 #[cfg(feature = "lite")]
 mod lite;

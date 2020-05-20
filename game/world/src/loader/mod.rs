@@ -13,10 +13,10 @@ use unit::world::{BlockPosition, ChunkPosition};
 pub use worker_pool::BlockingWorkerPool;
 pub use worker_pool::{ThreadedWorkerPool, WorkerPool};
 
-use crate::navigation::AreaNavEdge;
 use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, WhichChunk};
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
+use crate::navigation::AreaNavEdge;
 use crate::occlusion::{NeighbourOffset, NeighbourOpacity};
 use crate::WorldRef;
 

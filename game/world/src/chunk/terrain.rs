@@ -8,12 +8,12 @@ pub(crate) use pair_walking::WhichChunk;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceBlock, SliceIndex};
 
-use crate::navigation::discovery::AreaDiscovery;
-use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
 use crate::block::{Block, BlockType};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut};
+use crate::navigation::discovery::AreaDiscovery;
+use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
 use crate::occlusion::{BlockOcclusion, NeighbourOffset, NeighbourOpacity};
 use crate::{EdgeCost, SliceRange};
 

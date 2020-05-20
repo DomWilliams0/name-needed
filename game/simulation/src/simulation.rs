@@ -123,7 +123,9 @@ impl<R: Renderer> Simulation<R> {
 
                 render_system.run_now(&self.ecs_world);
             }
-            renderer.sim_finish();
+            if let Err(e) = renderer.sim_finish() {
+                warn!("render sim_finish() failed: {:?}", e);
+            }
         }
 
         // render debug shapes
@@ -134,7 +136,9 @@ impl<R: Renderer> Simulation<R> {
             for debug_renderer in self.debug_renderers.iter_mut() {
                 debug_renderer.render(renderer, self.voxel_world.clone(), &self.ecs_world, slices);
             }
-            renderer.debug_finish();
+            if let Err(e) = renderer.debug_finish() {
+                warn!("render debug_finish() failed: {:?}", e);
+            }
         }
 
         // end frame

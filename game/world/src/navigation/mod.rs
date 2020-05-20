@@ -2,7 +2,9 @@ pub use area_navigation::{AreaGraph, AreaNavEdge, AreaPathError};
 pub use block_navigation::{BlockGraph, BlockPathError};
 use common::Vector3;
 pub use cost::EdgeCost;
-pub use path::{AreaPath, BlockPath, BlockPathNode, WorldPath, WorldPathNode, WorldPathSlice, NavigationError};
+pub use path::{
+    AreaPath, BlockPath, BlockPathNode, NavigationError, WorldPath, WorldPathNode, WorldPathSlice,
+};
 use unit::world::ChunkPosition;
 
 use crate::chunk::slab::SlabIndex;

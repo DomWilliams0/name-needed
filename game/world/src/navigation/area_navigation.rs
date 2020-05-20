@@ -251,11 +251,11 @@ mod tests {
     use unit::dim::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
 
-    use crate::navigation::path::AreaPathNode;
-    use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::block::BlockType;
     use crate::chunk::slab::SLAB_SIZE;
     use crate::chunk::ChunkBuilder;
+    use crate::navigation::path::AreaPathNode;
+    use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::occlusion::NeighbourOffset;
     use crate::{world_from_chunks, ChunkDescriptor, EdgeCost};
 

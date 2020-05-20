@@ -90,9 +90,11 @@ impl From<ColorRgb> for (u8, u8, u8) {
 }
 
 /// Includes alpha value of 255
+/// TODO will this work with big endian?
 impl From<ColorRgb> for u32 {
     fn from(c: ColorRgb) -> Self {
-        ((c.r as u32) << 24) | ((c.g as u32) << 16) | ((c.b as u32) << 8) | 0xff
+        let rgba: [u8; 4] = [c.r, c.g, c.b, u8::MAX];
+        u32::from_ne_bytes(rgba)
     }
 }
 

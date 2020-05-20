@@ -5,6 +5,7 @@ use world::{SliceRange, WorldRef};
 
 use crate::ecs::*;
 use crate::TransformComponent;
+use std::fmt::Debug;
 
 /// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
@@ -24,10 +25,10 @@ impl PhysicalComponent {
         Self { color, radius }
     }
 
-    pub fn color(&self) -> ColorRgb {
+    pub fn color(self) -> ColorRgb {
         self.color
     }
-    pub fn radius(&self) -> f32 {
+    pub fn radius(self) -> f32 {
         self.radius
     }
 }
@@ -38,6 +39,7 @@ impl Component for PhysicalComponent {
 
 pub trait Renderer {
     type Target;
+    type Error: Debug;
 
     /// Initialize frame rendering
     fn init(&mut self, target: Self::Target);
@@ -46,10 +48,10 @@ pub trait Renderer {
     fn sim_start(&mut self);
 
     /// `transform` is interpolated
-    fn sim_entity(&mut self, transform: &TransformComponent, physical: &PhysicalComponent);
+    fn sim_entity(&mut self, transform: &TransformComponent, physical: PhysicalComponent);
 
     /// Finish rendering simulation
-    fn sim_finish(&mut self);
+    fn sim_finish(&mut self) -> Result<(), Self::Error>;
 
     fn debug_start(&mut self) {}
 
@@ -59,7 +61,9 @@ pub trait Renderer {
     #[allow(unused_variables)]
     fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb) {}
 
-    fn debug_finish(&mut self) {}
+    fn debug_finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
     /// End rendering frame
     fn deinit(&mut self) -> Self::Target;
@@ -90,7 +94,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                     last_pos.lerp(curr_pos, self.interpolation).into()
                 };
 
-                self.renderer.sim_entity(&transform, &physical);
+                self.renderer.sim_entity(&transform, *physical);
             }
         }
     }
@@ -121,13 +125,13 @@ pub mod dummy {
     impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         fn render(&mut self, renderer: &mut R, _: WorldRef, _: &EcsWorld, _: SliceRange) {
             renderer.debug_add_line(
-                ViewPoint(0.0, 0.0, 0.0),
-                ViewPoint(1.0, 0.0, 0.0),
+                ViewPoint(0.0, 0.0, 1.0),
+                ViewPoint(1.0, 0.0, 1.0),
                 ColorRgb::new(255, 0, 0),
             );
             renderer.debug_add_line(
-                ViewPoint(0.0, 0.0, 0.0),
-                ViewPoint(0.0, 1.0, 0.0),
+                ViewPoint(0.0, 0.0, 1.0),
+                ViewPoint(0.0, 1.0, 1.0),
                 ColorRgb::new(0, 255, 0),
             );
         }

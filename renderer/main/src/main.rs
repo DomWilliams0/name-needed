@@ -41,8 +41,8 @@ fn do_main() -> i32 {
         )
         .get_matches();
 
-    #[cfg(feature = "use-sfml")]
-    type Backend = engine::SfmlBackend;
+    #[cfg(feature = "use-sdl")]
+    type Backend = engine::SdlBackend;
 
     #[cfg(feature = "lite")]
     type Backend = engine::DummyBackend;
@@ -88,7 +88,14 @@ fn do_main() -> i32 {
         let _span = enter_span(Span::Setup);
         preset.load()
     };
-    let engine = Engine::<Renderer, Backend>::new(sim);
+    let engine = match Engine::<Renderer, Backend>::new(sim) {
+        Err(e) => {
+            error!("failed to init engine: {:?}", e);
+            return 1;
+        }
+        Ok(eng) => eng,
+    };
+
     if let ExitType::Restart = engine.run() {
         info!("restarting renderer");
         // TODO preserve camera position and other runtime settings?

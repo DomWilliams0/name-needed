@@ -88,7 +88,11 @@ impl<'a> System<'a> for RandomPathAssignmentSystem {
                             None
                         }
                         Err(err) => {
-                            trace!("{:?}: failed to find path between random positions: {:?}", e, err);
+                            trace!(
+                                "{:?}: failed to find path between random positions: {:?}",
+                                e,
+                                err
+                            );
                             None
                         }
                         Ok(path) => {

@@ -109,8 +109,8 @@ impl BlockGraph {
 mod tests {
     use unit::world::ChunkPosition;
 
-    use crate::navigation::{BlockPathNode, WorldArea};
     use crate::block::BlockType;
+    use crate::navigation::{BlockPathNode, WorldArea};
     use crate::{world_from_chunks, ChunkBuilder, EdgeCost};
 
     #[test]

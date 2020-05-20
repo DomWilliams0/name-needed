@@ -30,10 +30,7 @@ impl From<WorldPoint> for Vector3 {
 
 impl From<WorldPoint> for Vector2 {
     fn from(p: WorldPoint) -> Self {
-        Self {
-            x: p.0,
-            y: p.1,
-        }
+        Self { x: p.0, y: p.1 }
     }
 }
 

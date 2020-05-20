@@ -1,7 +1,7 @@
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
     loader::{BlockForAllResult, ThreadedWorkerPool, WorkerPool, WorldLoader},
-    presets, BaseVertex, WorldRef, WorldViewer,
+    presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
 
 pub use crate::backend::{EventsOutcome, ExitType, SimulationBackend};

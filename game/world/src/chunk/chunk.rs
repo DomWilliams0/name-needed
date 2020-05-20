@@ -4,15 +4,15 @@ use std::ops::{Deref, DerefMut, Shl};
 
 use common::*;
 
-use crate::navigation::WorldArea;
 use crate::block::BlockType;
 use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::Slice;
 use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
 use crate::chunk::BaseTerrain;
+use crate::navigation::WorldArea;
 use crate::SliceRange;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockPosition, ChunkPosition, WorldPosition};
+use unit::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPosition};
 
 pub type ChunkId = u64;
 
@@ -87,8 +87,11 @@ impl Chunk {
         })
     }
 
-    pub fn slice_range(&self, range: SliceRange) -> impl Iterator<Item = Slice> {
-        range.as_range().map(move |i| self.slice(i)).while_some()
+    pub fn slice_range(&self, range: SliceRange) -> impl Iterator<Item = (SliceIndex, Slice)> {
+        range
+            .as_range()
+            .map(move |i| self.slice(i).map(|s| (i, s)))
+            .while_some()
     }
 }
 

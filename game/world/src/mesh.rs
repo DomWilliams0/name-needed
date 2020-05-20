@@ -16,13 +16,14 @@ const X: f32 = unit::world::SCALE / 2.0;
 const TILE_CORNERS: [(f32, f32); 4] = [(-X, -X), (X, -X), (X, X), (-X, X)];
 
 pub trait BaseVertex: Copy + Debug {
-    fn new(pos: (f32, f32), color: ColorRgb) -> Self;
+    fn new(pos: (f32, f32, f32), color: ColorRgb) -> Self;
 }
 
 pub fn make_simple_render_mesh<V: BaseVertex>(chunk: &Chunk, slice_range: SliceRange) -> Vec<V> {
     let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first
-    for slice in chunk.slice_range(slice_range) {
+    for (slice_index, slice) in chunk.slice_range(slice_range) {
         // TODO skip if slice knows it is empty
+        let slice_index = slice_index.0 as f32;
 
         for (block_pos, block) in slice.non_air_blocks() {
             let (bx, by) = {
@@ -42,7 +43,11 @@ pub fn make_simple_render_mesh<V: BaseVertex>(chunk: &Chunk, slice_range: SliceR
 
                 let color = color * ao_lightness;
                 block_corners[i] = MaybeUninit::new(V::new(
-                    (fx + bx * unit::world::SCALE, fy + by * unit::world::SCALE),
+                    (
+                        fx + bx * unit::world::SCALE,
+                        fy + by * unit::world::SCALE,
+                        slice_index * unit::world::SCALE,
+                    ),
                     color,
                 ));
             }

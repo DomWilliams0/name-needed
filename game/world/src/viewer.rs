@@ -4,7 +4,7 @@ use std::ops::Add;
 use common::*;
 
 use crate::mesh::BaseVertex;
-use crate::{mesh, WorldRef};
+use crate::{mesh, InnerWorldRef, WorldRef};
 use unit::world::{ChunkPosition, SliceIndex};
 
 /// Number of slices to see concurrently
@@ -14,6 +14,7 @@ const VIEW_RANGE: i32 = 3;
 pub struct WorldViewer {
     world: WorldRef,
     view_range: SliceRange,
+    chunk_range: (ChunkPosition, ChunkPosition),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -69,7 +70,6 @@ impl Add<i32> for SliceRange {
     type Output = SliceRange;
 
     fn add(self, rhs: i32) -> Self::Output {
-        let rhs = SliceIndex(rhs);
         SliceRange(self.0 + rhs, self.1 + rhs)
     }
 }
@@ -80,6 +80,7 @@ impl WorldViewer {
         Self {
             world,
             view_range: SliceRange::new(start, VIEW_RANGE),
+            chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
         }
     }
 
@@ -88,7 +89,12 @@ impl WorldViewer {
         mut f: F,
     ) {
         let range = self.view_range;
-        for dirty_chunk in self.world.borrow().visible_chunks().filter(|&c| c.dirty()) {
+        let world = self.world.borrow();
+        for dirty_chunk in self
+            .visible_chunks()
+            .filter_map(|pos| world.find_chunk_with_pos(pos))
+            .filter(|c| c.dirty())
+        {
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
             f(dirty_chunk.pos(), mesh);
         }
@@ -96,8 +102,11 @@ impl WorldViewer {
 
     fn invalidate_visible_chunks(&self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        for c in self.world.borrow_mut().visible_chunks() {
-            c.invalidate();
+        let world = self.world.borrow();
+        for c in self.visible_chunks() {
+            if let Some(c) = world.find_chunk_with_pos(c) {
+                c.invalidate()
+            }
         }
     }
 
@@ -125,6 +134,20 @@ impl WorldViewer {
         }
     }
 
+    pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkPosition> {
+        let (min, max) = self.chunk_range;
+        let xrange = min.0..=max.0;
+        let yrange = min.1..=max.1;
+
+        xrange
+            .cartesian_product(yrange)
+            .map(|(x, y)| ChunkPosition(x, y))
+    }
+
+    pub fn world(&self) -> InnerWorldRef {
+        self.world.borrow()
+    }
+
     /*
         pub fn move_up(&mut self) {
             if self.view_range.move_up(1) {
@@ -148,5 +171,9 @@ impl WorldViewer {
 
     pub fn range(&self) -> SliceRange {
         self.view_range
+    }
+
+    pub fn set_chunk_bounds(&mut self, range: (ChunkPosition, ChunkPosition)) {
+        self.chunk_range = range;
     }
 }

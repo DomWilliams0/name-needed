@@ -16,4 +16,4 @@ members = [
 ]
 
 [profile.dev]
-#debug = 0
+debug = 0

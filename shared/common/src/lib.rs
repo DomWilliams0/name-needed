@@ -1,5 +1,8 @@
 pub use cgmath;
-pub use cgmath::{Angle, InnerSpace, MetricSpace, Rotation2, Rotation3, VectorSpace, Zero};
+pub use cgmath::{
+    Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,
+    VectorSpace, Zero,
+};
 #[cfg(feature = "binary")]
 pub use env_logger;
 pub use float_cmp::ApproxEq;

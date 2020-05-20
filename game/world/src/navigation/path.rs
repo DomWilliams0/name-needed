@@ -2,10 +2,9 @@ use std::fmt::{Display, Error, Formatter};
 
 use unit::world::{BlockPosition, WorldPosition};
 
-use crate::navigation::{AreaNavEdge, EdgeCost, WorldArea, AreaPathError, BlockPathError};
+use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, WorldArea};
 
 // TODO smallvecs
-
 
 #[derive(Debug)]
 pub enum NavigationError {

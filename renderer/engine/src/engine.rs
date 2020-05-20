@@ -12,14 +12,14 @@ pub struct Engine<R: Renderer, B: SimulationBackend<Renderer = R>> {
 }
 
 impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
-    pub fn new(simulation: Simulation<R>) -> Self {
+    pub fn new(simulation: Simulation<R>) -> Result<Self, B::Error> {
         let viewer = WorldViewer::from_world(simulation.world());
-        let backend = B::new(viewer);
+        let backend = B::new(viewer)?;
 
-        Self {
+        Ok(Self {
             backend,
             simulation,
-        }
+        })
     }
 
     /// Game loop
