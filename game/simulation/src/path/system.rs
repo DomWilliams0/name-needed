@@ -2,14 +2,16 @@ use std::ops::DerefMut;
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{SliceBlock, WorldPosition};
-use world::InnerWorldRef;
+use unit::world::{SliceBlock, WorldPoint, WorldPosition};
 use world::NavigationError;
+use world::{InnerWorldRef, WorldPath};
 
 use crate::ecs::*;
 use crate::path::follow::PathFollowing;
 use crate::steer::{SteeringBehaviour, SteeringComponent};
 use crate::{TransformComponent, WorldRef};
+use std::iter::{once, once_with};
+use std::mem::MaybeUninit;
 
 /// Holds the current path to follow
 #[derive(Default)]
@@ -80,27 +82,27 @@ impl<'a> System<'a> for RandomPathAssignmentSystem {
         for (e, transform, mut path_follow) in (&entities, &transform, &mut path_follow).join() {
             // only assign paths if not following one already
             if path_follow.path.is_none() {
-                path_follow.path = choose_random_target(&world).and_then(|target| {
-                    match world.find_path(transform.position, target) {
-                        Err(NavigationError::SourceNotWalkable(_)) => {
-                            // TODO wander? or try to correct the position with collision resolution
-                            warn!("{:?}: stuck in a non walkable position", e);
-                            None
+                path_follow.path =
+                    choose_random_target(&world).and_then(|target| {
+                        match path_find(&world, transform.position, target) {
+                            Err(NavigationError::SourceNotWalkable(_)) => {
+                                warn!("{:?}: stuck in a non walkable position", e);
+                                None
+                            }
+                            Err(err) => {
+                                trace!(
+                                    "{:?}: failed to find path between random positions: {:?}",
+                                    e,
+                                    err
+                                );
+                                None
+                            }
+                            Ok(path) => {
+                                debug!("{:?} new path to {:?}", e, path.target());
+                                Some(PathFollowing::new(path))
+                            }
                         }
-                        Err(err) => {
-                            trace!(
-                                "{:?}: failed to find path between random positions: {:?}",
-                                e,
-                                err
-                            );
-                            None
-                        }
-                        Ok(path) => {
-                            debug!("{:?} new path to {:?}", e, path.target());
-                            Some(PathFollowing::new(path))
-                        }
-                    }
-                });
+                    });
             }
         }
     }
@@ -118,4 +120,29 @@ fn choose_random_target(world: &InnerWorldRef) -> Option<WorldPosition> {
         }
     }
     None
+}
+
+fn path_find(
+    world: &InnerWorldRef,
+    src: WorldPoint,
+    tgt: WorldPosition,
+) -> Result<WorldPath, NavigationError> {
+    // try floor'd pos first, then ceil'd if it fails
+    let srcs = once(src.floor()).chain(once_with(|| src.ceil()));
+
+    let mut last_err = MaybeUninit::uninit();
+    let mut results = srcs.map(|src| world.find_path(src, tgt)).skip_while(|res| {
+        if let Err(e) = res {
+            last_err = MaybeUninit::new(e.clone());
+        }
+        res.is_err()
+    });
+
+    results.next().unwrap_or_else(|| {
+        Err(
+            // Safety: if results is empty, it's because path navigation failed so last_err is
+            // definitely set
+            unsafe { last_err.assume_init() },
+        )
+    })
 }

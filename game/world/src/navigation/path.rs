@@ -6,7 +6,7 @@ use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, Wo
 
 // TODO smallvecs
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NavigationError {
     SourceNotWalkable(WorldPosition),
     TargetNotWalkable(WorldPosition),

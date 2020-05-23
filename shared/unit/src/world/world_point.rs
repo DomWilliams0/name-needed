@@ -16,6 +16,22 @@ impl WorldPoint {
     pub fn slice(&self) -> SliceIndex {
         SliceIndex(self.2 as i32)
     }
+
+    pub fn floor(self) -> WorldPosition {
+        WorldPosition(
+            self.0.floor() as i32,
+            self.1.floor() as i32,
+            self.2.floor() as i32,
+        )
+    }
+
+    pub fn ceil(self) -> WorldPosition {
+        WorldPosition(
+            self.0.ceil() as i32,
+            self.1.ceil() as i32,
+            self.2.ceil() as i32,
+        )
+    }
 }
 
 impl From<WorldPoint> for Vector3 {

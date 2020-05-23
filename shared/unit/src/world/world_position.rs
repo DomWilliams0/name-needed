@@ -18,16 +18,6 @@ impl Display for WorldPosition {
     }
 }
 
-impl From<WorldPoint> for WorldPosition {
-    fn from(pos: WorldPoint) -> Self {
-        Self(
-            pos.0.floor() as i32,
-            pos.1.floor() as i32,
-            pos.2.floor() as i32,
-        )
-    }
-}
-
 impl From<(u8, u8, i32)> for WorldPosition {
     fn from((x, y, z): (u8, u8, i32)) -> Self {
         Self(x as i32, y as i32, z)
@@ -36,7 +26,7 @@ impl From<(u8, u8, i32)> for WorldPosition {
 
 impl From<ChunkPosition> for WorldPosition {
     fn from(p: ChunkPosition) -> Self {
-        WorldPoint::from(p).into()
+        WorldPoint::from(p).floor()
     }
 }
 

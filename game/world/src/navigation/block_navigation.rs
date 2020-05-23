@@ -21,7 +21,7 @@ pub struct BlockGraph {
     graph: BlockNavGraph,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockPathError {
     NoPath(BlockPosition, BlockPosition),
 }

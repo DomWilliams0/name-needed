@@ -46,7 +46,7 @@ impl Default for AreaGraph {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AreaPathError {
     NoSuchNode(WorldArea),
     NoPath,

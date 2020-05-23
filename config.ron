@@ -5,15 +5,15 @@ Config(
         debug_physics: false,
     ),
     world: (
-        preset: MultiChunkWonder,
+        preset: OneChunkWonder,
         worker_threads: None,
     ),
     simulation: (
         random_seed: Some(678534524152419),
-        random_count: 15,
-        acceleration: 0.1,
-        friction: 0.7,
-        max_speed: 0.2,
+        random_count: 10,
+        acceleration: 0.08,
+        friction: 0.85,
+        max_speed: 0.22,
         start_delay: 0,
      ),
 )
