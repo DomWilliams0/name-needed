@@ -20,9 +20,9 @@ color = {path = "../../shared/color"}
 
 sdl2 = {version = "^0.34", optional = true}
 gl = {version = "^0.14", optional = true}
-take_mut = "^0.2"
 
 [features]
 default = []
 use-sdl = ["sdl2", "gl"]
 lite = []
+gl-trace-log = []

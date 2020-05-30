@@ -7,7 +7,7 @@ use gl::types::*;
 use common::warn;
 
 use crate::errchk;
-use crate::render::sdl::gl::GlResult;
+use crate::render::sdl::gl::{GlError, GlResult};
 
 #[derive(Copy, Clone)]
 pub enum AttribType {
@@ -111,23 +111,49 @@ impl<'a> ScopedBind<'a, Vao> {
     }
 }
 
+#[derive(Clone, Copy)]
+enum VboBind {
+    ArrayBuffer,
+    ElementArrayBuffer,
+}
+
+impl From<VboBind> for GLenum {
+    fn from(b: VboBind) -> Self {
+        match b {
+            VboBind::ArrayBuffer => gl::ARRAY_BUFFER,
+            VboBind::ElementArrayBuffer => gl::ELEMENT_ARRAY_BUFFER,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Vbo {
     obj: GLuint,
     /// Bytes
     len: Cell<usize>,
+
+    bind: VboBind,
 }
 
 impl Vbo {
-    pub fn new() -> Self {
+    fn new(bind: VboBind) -> Self {
         unsafe {
             let mut obj = 0;
             gl::GenBuffers(1, &mut obj as *mut GLuint);
             Self {
                 obj,
                 len: Cell::new(0),
+                bind,
             }
         }
+    }
+
+    pub fn array_buffer() -> Self {
+        Self::new(VboBind::ArrayBuffer)
+    }
+
+    pub fn index_buffer() -> Self {
+        Self::new(VboBind::ElementArrayBuffer)
     }
 }
 
@@ -141,11 +167,11 @@ impl Drop for Vbo {
 
 impl Bindable for Vbo {
     unsafe fn bind(&self) {
-        gl::BindBuffer(gl::ARRAY_BUFFER, self.obj);
+        gl::BindBuffer(self.bind.into(), self.obj);
     }
 
     unsafe fn unbind(&self) {
-        gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        gl::BindBuffer(self.bind.into(), 0);
     }
 }
 
@@ -165,6 +191,7 @@ impl From<BufferUsage> for GLenum {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum Primitive {
     Triangles,
     Lines,
@@ -188,12 +215,35 @@ impl<'a> ScopedBind<'a, Vbo> {
             let len = std::mem::size_of::<T>() * buf.len();
 
             errchk!(gl::BufferData(
-                gl::ARRAY_BUFFER,
+                self.bind.into(),
                 len as isize,
                 ptr as *const _,
                 usage.into(),
             ))
             .map(|_| self.len.set(len))
+        }
+    }
+
+    pub fn buffer_sub_data<T: Sized>(&self, offset: usize, buf: &[T]) -> GlResult<()> {
+        let len = std::mem::size_of::<T>() * buf.len();
+        let offset = std::mem::size_of::<T>() * offset;
+
+        if offset + len > self.len.get() {
+            return Err(GlError::BufferTooSmall {
+                real_len: self.len.get(),
+                requested_len: offset + len,
+            });
+        }
+
+        unsafe {
+            let ptr = if buf.is_empty() { null() } else { buf.as_ptr() };
+
+            errchk!(gl::BufferSubData(
+                self.bind.into(),
+                offset as GLintptr,
+                len as GLsizeiptr,
+                ptr as *const _,
+            ))
         }
     }
 
@@ -206,7 +256,7 @@ impl<'a> ScopedBind<'a, Vbo> {
             let len = std::mem::size_of::<T>() * len;
 
             errchk!(gl::BufferData(
-                gl::ARRAY_BUFFER,
+                self.bind.into(),
                 len as isize,
                 null(),
                 usage.into(),
@@ -221,14 +271,47 @@ impl<'a> ScopedBind<'a, Vbo> {
         }
     }
 
-    pub fn draw_array_instanced(&self, primitive: Primitive, count: usize) {
+    pub fn draw_array_instanced(
+        &self,
+        primitive: Primitive,
+        first: usize,
+        vertex_count: usize,
+        instance_count: usize,
+    ) -> GlResult<()> {
+        if first + vertex_count >= self.len.get() {
+            return Err(GlError::BufferTooSmall {
+                real_len: self.len.get(),
+                requested_len: first + vertex_count,
+            });
+        }
         unsafe {
-            gl::DrawArraysInstanced(
+            errchk!(gl::DrawArraysInstanced(
                 primitive.into(),
-                0,
-                self.len.get() as GLint,
-                count as GLsizei,
-            );
+                first as GLint,
+                vertex_count as GLsizei,
+                instance_count as GLsizei,
+            ))
+        }
+    }
+
+    /// Assumes indices are u16
+    pub fn draw_elements_instanced(
+        &self,
+        primitive: Primitive,
+        start_ptr: usize,
+        element_count: usize,
+        instance_start: usize,
+        instance_count: usize,
+    ) -> GlResult<()> {
+        unsafe {
+            errchk!(gl::DrawElementsInstancedBaseInstance(
+                primitive.into(),
+                element_count as GLsizei,
+                gl::UNSIGNED_SHORT,
+                (start_ptr * std::mem::size_of::<u16>()) as *const _,
+                instance_count as GLsizei,
+                instance_start as GLuint,
+            ))
         }
     }
 
@@ -242,11 +325,20 @@ impl<'a> ScopedBind<'a, Vbo> {
             let count = self.len.get() / sizeof;
             debug_assert_eq!(self.len.get() % sizeof, 0);
 
-            let ptr = errchk!(gl::MapBuffer(gl::ARRAY_BUFFER, gl::WRITE_ONLY))? as *mut T;
+            let ptr = errchk!(gl::MapBuffer(self.bind.into(), gl::WRITE_ONLY))? as *mut T;
             debug_assert!(!ptr.is_null());
 
-            Ok(Some(ScopedMapMut { ptr, len: count }))
+            Ok(Some(ScopedMapMut {
+                ptr,
+                len: count,
+                bind: self.bind,
+            }))
         }
+    }
+
+    pub fn replace<'b>(self, other: &'b Vbo) -> ScopedBind<'b, Vbo> {
+        std::mem::forget(self);
+        other.scoped_bind()
     }
 }
 
@@ -402,6 +494,7 @@ pub struct ScopedMapMut<T> {
     ptr: *mut T,
     /// Number of T
     len: usize,
+    bind: VboBind,
 }
 
 impl<T> Deref for ScopedMapMut<T> {
@@ -420,7 +513,7 @@ impl<T> DerefMut for ScopedMapMut<T> {
 impl<T> Drop for ScopedMapMut<T> {
     fn drop(&mut self) {
         unsafe {
-            gl::UnmapBuffer(gl::ARRAY_BUFFER);
+            gl::UnmapBuffer(self.bind.into());
             if let Err(e) = errchk!(()) {
                 warn!("glUnmapBuffer failed: {:?}", e);
             }

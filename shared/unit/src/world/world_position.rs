@@ -6,11 +6,18 @@ use common::derive_more::*;
 use common::Point3;
 
 use crate::view::ViewPoint;
-use crate::world::{ChunkPosition, WorldPoint, SCALE};
+use crate::world::{ChunkPosition, SliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From)]
 pub struct WorldPosition(pub i32, pub i32, pub i32);
+
+impl WorldPosition {
+    pub const fn slice(self) -> SliceIndex {
+        // TODO refactor self.2 usage to use this everywhere
+        SliceIndex(self.2)
+    }
+}
 
 impl Display for WorldPosition {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {

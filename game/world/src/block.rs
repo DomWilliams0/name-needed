@@ -1,7 +1,9 @@
 use color::ColorRgb;
 
-use crate::navigation::SlabAreaIndex;
+use crate::chunk::RawChunkTerrain;
+use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::{BlockOcclusion, Opacity};
+use unit::world::SliceIndex;
 
 /// A single block in a chunk
 #[derive(Debug, Default, Copy, Clone)]
@@ -42,6 +44,16 @@ impl Block {
     }
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
         &mut self.area
+    }
+    pub(crate) fn chunk_area(self, slice: SliceIndex) -> Option<ChunkArea> {
+        if self.area.initialized() {
+            Some(ChunkArea {
+                slab: RawChunkTerrain::slab_index_for_slice(slice),
+                area: self.area,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn occlusion_mut(&mut self) -> &mut BlockOcclusion {

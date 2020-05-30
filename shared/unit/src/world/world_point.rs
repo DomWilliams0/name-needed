@@ -7,6 +7,7 @@ use common::{Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{ChunkPosition, SliceIndex, WorldPosition};
+use std::iter::{once, once_with};
 
 /// A point anywhere in the world
 #[derive(Debug, Copy, Clone, PartialEq, Default, Into, From)]
@@ -17,6 +18,9 @@ impl WorldPoint {
         SliceIndex(self.2 as i32)
     }
 
+    pub fn floored(self) -> Self {
+        Self(self.0.floor(), self.1.floor(), self.2.floor())
+    }
     pub fn floor(self) -> WorldPosition {
         WorldPosition(
             self.0.floor() as i32,
@@ -31,6 +35,10 @@ impl WorldPoint {
             self.1.ceil() as i32,
             self.2.ceil() as i32,
         )
+    }
+
+    pub fn floor_then_ceil(self) -> impl Iterator<Item = WorldPosition> {
+        once(self.floor()).chain(once_with(move || self.ceil()))
     }
 }
 

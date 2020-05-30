@@ -58,7 +58,7 @@ impl TerrainRenderer {
             .entry(chunk_pos)
             .or_insert_with(|| ChunkMesh {
                 vao: Vao::new(),
-                vbo: Vbo::new(),
+                vbo: Vbo::array_buffer(),
                 chunk_pos,
             });
 

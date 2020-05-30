@@ -14,7 +14,7 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
         _ecs_world: &EcsWorld,
         _slices: SliceRange,
     ) {
-        // TODO
+        // TODO debug path renderer
         // let query = <(
         //     Read<FollowPathComponent>,
         //     Read<TransformComponent>,

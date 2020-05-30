@@ -38,4 +38,6 @@ pub struct Simulation {
     pub max_speed: f32,
     pub friction: f32,
     pub start_delay: u32,
+    pub food_nutrition: u16,
+    pub food_count: usize,
 }

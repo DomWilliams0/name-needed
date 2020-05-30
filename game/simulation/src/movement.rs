@@ -5,14 +5,11 @@ use crate::steer::context::ContextMap;
 use std::hint::unreachable_unchecked;
 
 /// Desired movement by the brain, and practical movement to be realized by the body
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Component)]
+#[storage(DenseVecStorage)]
 pub enum DesiredMovementComponent {
     Desired(ContextMap),
     Realized(Vector2),
-}
-
-impl Component for DesiredMovementComponent {
-    type Storage = VecStorage<Self>;
 }
 
 impl DesiredMovementComponent {

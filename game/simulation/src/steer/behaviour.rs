@@ -1,17 +1,31 @@
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::WorldPoint;
 
 use crate::steer::context::InterestsContextMap;
 use crate::TransformComponent;
 
 #[derive(Debug)]
 pub enum SteeringBehaviour {
-    Nop(Nop),
+    Stop(Stop),
     Seek(Seek),
-    // TODO wander?
+}
+
+/// Arrest current movement
+#[derive(Default, Debug)]
+pub struct Stop;
+
+/// Seek to and stop when reached with no slowdown
+#[derive(Debug)]
+pub struct Seek {
+    target: WorldPoint,
+    speed: NormalizedFloat,
+
+    /// Used to detect overshoot
+    original_sign: Option<bool>,
 }
 
 /// When steering is complete
+#[derive(Debug)]
 pub enum SteeringResult {
     /// Not yet complete
     Ongoing,
@@ -22,14 +36,13 @@ pub enum SteeringResult {
 
 impl Default for SteeringBehaviour {
     fn default() -> Self {
-        // TODO wander? depends on steer, put in trait
-        Self::Nop(Nop)
+        Self::Stop(Stop)
     }
 }
 
 impl SteeringBehaviour {
-    pub fn seek<P: Into<WorldPosition>>(target: P) -> Self {
-        SteeringBehaviour::Seek(Seek::with_target(target.into()))
+    pub fn seek<P: Into<WorldPoint>>(target: P, speed: NormalizedFloat) -> Self {
+        SteeringBehaviour::Seek(Seek::with_target(target.into(), speed))
     }
 
     pub fn tick(
@@ -38,13 +51,13 @@ impl SteeringBehaviour {
         interests: &mut InterestsContextMap,
     ) -> SteeringResult {
         match self {
-            SteeringBehaviour::Nop(behaviour) => behaviour.tick(transform, interests),
+            SteeringBehaviour::Stop(behaviour) => behaviour.tick(transform, interests),
             SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, interests),
         }
     }
 
     pub fn is_nop(&self) -> bool {
-        matches!(self, SteeringBehaviour::Nop(_))
+        matches!(self, SteeringBehaviour::Stop(_))
     }
 }
 
@@ -54,33 +67,40 @@ trait DoASteer {
         transform: &TransformComponent,
         interests: &mut InterestsContextMap,
     ) -> SteeringResult;
+
+    fn register_interest(
+        &self,
+        direction: Vector2,
+        speed: NormalizedFloat,
+        interests: &mut InterestsContextMap,
+    ) {
+        let angle = direction.angle(AXIS_FWD_2);
+        interests.write_interest(angle, speed.value());
+    }
 }
 
-// stand still
-#[derive(Default, Debug)]
-pub struct Nop;
+impl DoASteer for Stop {
+    fn tick(
+        &mut self,
+        transform: &TransformComponent,
+        interests: &mut InterestsContextMap,
+    ) -> SteeringResult {
+        const STOPPED: f32 = 0.04;
+        let velocity = transform.velocity;
+        if velocity.magnitude2() > STOPPED * STOPPED {
+            // apply braking force
+            self.register_interest(-velocity, NormalizedFloat::new(0.2), interests);
+        }
 
-impl DoASteer for Nop {
-    fn tick(&mut self, _: &TransformComponent, _: &mut InterestsContextMap) -> SteeringResult {
         SteeringResult::Ongoing
     }
 }
 
-/// Seek to and stop when reached with no slowdown
-#[derive(Debug)]
-pub struct Seek {
-    target: WorldPosition,
-
-    // used to detect if the point has been passed
-    original_delta: Option<Vector2>,
-    original_sign: Option<bool>,
-}
-
 impl Seek {
-    pub fn with_target(target: WorldPosition) -> Self {
+    pub fn with_target(target: WorldPoint, speed: NormalizedFloat) -> Self {
         Self {
             target,
-            original_delta: None,
+            speed,
             original_sign: None,
         }
     }
@@ -93,40 +113,99 @@ impl DoASteer for Seek {
         interests: &mut InterestsContextMap,
     ) -> SteeringResult {
         // ignore z direction, assume the target is accessible and accurate.
-        // round to use block positions instead of points so the general direction to the target
-        // is used rather than point-to-point to the centre every time.
-        let tgt = Vector2::new(self.target.0 as f32, self.target.1 as f32);
-        let pos = Vector2::new(transform.position.0.floor(), transform.position.1.floor());
-        let delta = tgt - pos;
+        let tgt = Vector2::from(self.target);
+        let pos = Vector2::from(transform.position);
 
-        // use exact position for distance check though
-        if (tgt - Vector2::from(transform.position)).magnitude2() <= 1.8f32 {
-            return SteeringResult::Finished;
-        }
+        let delta = match pos.distance2(tgt) {
+            dist if dist < transform.bounding_radius.powi(2) => {
+                // exact distance check, we're there
+                return SteeringResult::Finished;
+            }
 
-        match (&self.original_delta, &self.original_sign) {
-            (None, _) => {
+            dist if dist < 1.0 => {
+                // close enough to use exact direction now
+                tgt - pos
+            }
+
+            _ => {
+                // far away still, use block coords so the direction is generally towards the
+                // target without being exactly towards the centre of each block
+                let block_tgt = Vector2::from(self.target.floored());
+                let block_pos = Vector2::from(transform.position.floored());
+                block_tgt - block_pos
+            }
+        };
+
+        let direction = delta.perp_dot(Vector2::unit_y()).is_sign_positive();
+        match self.original_sign {
+            Some(dir) if dir != direction => {
+                // overshot, we're done
+                return SteeringResult::Finished;
+            }
+            None => {
                 // first tick
-                self.original_delta = Some(delta);
+                self.original_sign = Some(direction)
             }
-            (Some(original_delta), None) => {
-                // second tick
-                self.original_sign = Some(original_delta.dot(delta).is_sign_positive());
-            }
-            (Some(original_delta), Some(original_sign)) => {
-                // any other tick
-                let sign = original_delta.dot(delta).is_sign_positive();
-                if sign != *original_sign {
-                    // passed the point, seek is over
-                    return SteeringResult::Finished;
-                }
-            }
-        }
+            _ => {}
+        };
 
-        // keep seeking directly towards at full speed
-        // TODO use WorldPosition instead so aims for block instead of centre every time
-        let angle = delta.angle(AXIS_FWD.truncate());
-        interests.write_interest(angle, 1.0);
+        // keep seeking towards target
+        self.register_interest(delta, self.speed, interests);
         SteeringResult::Ongoing
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::steer::context::{ContextMap, Direction};
+    use crate::steer::Seek;
+    use crate::TransformComponent;
+    use common::NormalizedFloat;
+    use matches::assert_matches;
+    use std::f32::EPSILON;
+    use unit::world::WorldPoint;
+
+    #[test]
+    fn seek_overshoot() {
+        let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
+
+        // starts at 0,0 going to 10,0
+        let mut transform = TransformComponent::new(WorldPoint::default(), 0.5, 0.0);
+        let mut output = InterestsContextMap::default();
+
+        // first ticks takes us toward
+        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Ongoing);
+
+        // overshoot, but not in arrival range - should still finish because the direction changed
+        transform.position.0 = 12.0;
+        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Finished);
+    }
+    #[test]
+    fn seek_arrived_already() {
+        let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
+        let transform = TransformComponent::new(WorldPoint(9.8, 0.0, 0.0), 0.5, 0.0);
+        let mut output = InterestsContextMap::default();
+
+        // already arrived
+        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Finished);
+    }
+
+    #[test]
+    fn seek_exact_pos() {
+        // we are not exactly lined up with the target, and a tiny radius
+        let mut seek = Seek::with_target(WorldPoint(10.8, 0.6, 0.0), NormalizedFloat::one());
+        let transform = TransformComponent::new(WorldPoint(0.2, 0.9, 0.0), 0.2, 0.0);
+        let mut output = ContextMap::default();
+
+        // output should be towards the block
+        assert_matches!(
+            seek.tick(&transform, output.interests_mut()),
+            SteeringResult::Ongoing
+        );
+        let (dir, _) = output.resolve();
+        assert!(dir
+            .0
+            .approx_eq(Into::<Rad>::into(Direction::East).0, (EPSILON, 2)));
     }
 }

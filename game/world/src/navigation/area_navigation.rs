@@ -184,6 +184,11 @@ impl AreaGraph {
         Ok(AreaPath(out_path))
     }
 
+    pub(crate) fn path_exists(&self, start: WorldArea, goal: WorldArea) -> bool {
+        // TODO dont allocate and throw away path
+        self.find_area_path(start, goal).is_ok()
+    }
+
     pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
         info!("edge {:?} <-> {:?} | {:?}", from, to, edge);
 

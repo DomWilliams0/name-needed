@@ -4,13 +4,17 @@ use unit::world::WorldPoint;
 use crate::ecs::{Component, VecStorage};
 
 /// Position and rotation component
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Component)]
+#[storage(VecStorage)]
 pub struct TransformComponent {
     /// Position in world, center of entity in x/y and bottom of entity in z
     pub position: WorldPoint,
 
     /// Height in z axis
     pub height: f32,
+
+    /// Bounding box radius
+    pub bounding_radius: f32,
 
     /// Used for render interpolation
     pub last_position: WorldPoint,
@@ -22,14 +26,11 @@ pub struct TransformComponent {
     pub velocity: Vector2,
 }
 
-impl Component for TransformComponent {
-    type Storage = VecStorage<Self>;
-}
-
 impl TransformComponent {
-    pub fn new(position: WorldPoint, height: f32) -> Self {
+    pub fn new(position: WorldPoint, bounding_radius: f32, height: f32) -> Self {
         Self {
             position,
+            bounding_radius,
             height,
             rotation: Basis2::from_angle(rad(0.0)),
             last_position: position,
@@ -39,16 +40,6 @@ impl TransformComponent {
 
     pub fn set_height(&mut self, z: i32) {
         let z = z as f32;
-        // TODO
-        /*
-        assert!(
-            (self.position.2 - z as f32).abs() <= 1.0,
-            "teleport from {:?} to {:?}??!",
-            self.position.2,
-            z
-        );
-        */
-
         self.position.2 = z as f32;
     }
 

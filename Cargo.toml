@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+	"game/ai",
 	"game/simulation",
 	"game/world",
 

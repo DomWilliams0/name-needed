@@ -31,6 +31,10 @@ pub enum GlError {
     LinkingProgram,
     UnknownUniform(&'static str),
     Gl(GLenum),
+    BufferTooSmall {
+        real_len: usize,
+        requested_len: usize,
+    },
 }
 
 pub type GlResult<T> = Result<T, GlError>;
@@ -62,7 +66,13 @@ extern "system" fn on_debug_message(
             gl::DEBUG_SEVERITY_HIGH => Level::Error,
             gl::DEBUG_SEVERITY_MEDIUM => Level::Info,
             gl::DEBUG_SEVERITY_LOW => Level::Debug,
-            gl::DEBUG_SEVERITY_NOTIFICATION => Level::Trace,
+            gl::DEBUG_SEVERITY_NOTIFICATION => {
+                if cfg!(feature = "gl-trace-log") {
+                    Level::Trace
+                } else {
+                    return;
+                }
+            }
             _ => Level::Debug,
         };
 
@@ -120,7 +130,7 @@ impl Pipeline {
         Self {
             program,
             vao: Vao::new(),
-            vbo: Vbo::new(),
+            vbo: Vbo::array_buffer(),
         }
     }
     pub fn bind_all(&self) -> (ScopedBind<Program>, ScopedBind<Vao>, ScopedBind<Vbo>) {
@@ -159,6 +169,15 @@ pub fn generate_circle_mesh(n: usize) -> Vec<[f32; 3]> {
     vec
 }
 
+pub fn generate_quad_mesh() -> [[f32; 3]; 4] {
+    [
+        [-1.0, -1.0, 0.0],
+        [1.0, -1.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [-1.0, 1.0, 0.0],
+    ]
+}
+
 pub struct InstancedPipeline {
     pub program: Program,
     pub vao: Vao,
@@ -171,8 +190,8 @@ impl InstancedPipeline {
         Self {
             program,
             vao: Vao::new(),
-            shared_vbo: Vbo::new(),
-            instanced_vbo: Vbo::new(),
+            shared_vbo: Vbo::array_buffer(),
+            instanced_vbo: Vbo::array_buffer(),
         }
     }
 }

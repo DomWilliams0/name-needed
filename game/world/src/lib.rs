@@ -5,7 +5,7 @@ pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{BaseTerrain, Chunk};
 pub use self::mesh::BaseVertex;
-pub use self::navigation::{EdgeCost, NavigationError, WorldPath, WorldPathSlice};
+pub use self::navigation::{EdgeCost, NavigationError, WorldArea, WorldPath};
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::World;
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};

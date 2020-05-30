@@ -22,7 +22,7 @@ pub struct SliceRange(SliceIndex, SliceIndex);
 
 impl SliceRange {
     fn new(start: SliceIndex, size: i32) -> Self {
-        assert!(size > 0); // TODO Result?
+        assert!(size > 0); // TODO Result
         Self(start, SliceIndex(start.0 + size))
     }
 

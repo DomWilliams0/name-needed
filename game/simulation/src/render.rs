@@ -7,34 +7,64 @@ use crate::ecs::*;
 use crate::TransformComponent;
 use std::fmt::Debug;
 
-/// Physical attributes to be rendered
 #[derive(Debug, Copy, Clone)]
-pub struct PhysicalComponent {
-    /// temporary simple color
+pub enum PhysicalShape {
+    /// Ordinal 0
+    Circle { radius: f32 },
+    /// Ordinal 1
+    Rectangle { rx: f32, ry: f32 },
+}
+
+impl PhysicalShape {
+    /// For simple sorting
+    pub fn ord(self) -> usize {
+        match self {
+            PhysicalShape::Circle { .. } => 0,
+            PhysicalShape::Rectangle { .. } => 1,
+        }
+    }
+
+    pub fn circle(radius: f32) -> Self {
+        PhysicalShape::Circle { radius }
+    }
+
+    pub fn rect(rx: f32, ry: f32) -> Self {
+        PhysicalShape::Rectangle { rx, ry }
+    }
+
+    pub fn square(r: f32) -> Self {
+        PhysicalShape::Rectangle { rx: r, ry: r }
+    }
+
+    pub fn radius(&self) -> f32 {
+        match self {
+            PhysicalShape::Circle { radius } => *radius,
+            PhysicalShape::Rectangle { rx, ry } => rx.max(*ry),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Component)]
+#[storage(VecStorage)]
+pub struct RenderComponent {
+    /// simple color
     color: ColorRgb,
 
-    /// simple circle with diameter in x + y dims
-    radius: f32,
+    /// simple 2D shape
+    shape: PhysicalShape,
 }
 
-impl PhysicalComponent {
-    pub fn new(color: ColorRgb, radius: f32) -> Self {
-        // TODO result
-        assert!(radius > 0.2);
-
-        Self { color, radius }
+impl RenderComponent {
+    pub fn new(color: ColorRgb, shape: PhysicalShape) -> Self {
+        Self { color, shape }
     }
 
-    pub fn color(self) -> ColorRgb {
+    pub fn color(&self) -> ColorRgb {
         self.color
     }
-    pub fn radius(self) -> f32 {
-        self.radius
+    pub fn shape(&self) -> PhysicalShape {
+        self.shape
     }
-}
-
-impl Component for PhysicalComponent {
-    type Storage = VecStorage<Self>;
 }
 
 pub trait Renderer {
@@ -48,7 +78,7 @@ pub trait Renderer {
     fn sim_start(&mut self);
 
     /// `transform` is interpolated
-    fn sim_entity(&mut self, transform: &TransformComponent, physical: PhysicalComponent);
+    fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent);
 
     /// Finish rendering simulation
     fn sim_finish(&mut self) -> Result<(), Self::Error>;
@@ -79,11 +109,11 @@ pub(crate) struct RenderSystem<'a, R: Renderer> {
 impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         ReadStorage<'a, TransformComponent>,
-        ReadStorage<'a, PhysicalComponent>,
+        ReadStorage<'a, RenderComponent>,
     );
 
-    fn run(&mut self, (transform, physical): Self::SystemData) {
-        for (transform, physical) in (&transform, &physical).join() {
+    fn run(&mut self, (transform, render): Self::SystemData) {
+        for (transform, render) in (&transform, &render).join() {
             if self.slices.contains(transform.slice()) {
                 // make copy to mutate for interpolation
                 let mut transform = *transform;
@@ -94,7 +124,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                     last_pos.lerp(curr_pos, self.interpolation).into()
                 };
 
-                self.renderer.sim_entity(&transform, *physical);
+                self.renderer.sim_entity(&transform, render);
             }
         }
     }

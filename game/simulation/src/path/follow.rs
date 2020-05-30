@@ -1,27 +1,38 @@
-use unit::world::WorldPosition;
+use unit::world::WorldPoint;
 use world::{EdgeCost, WorldPath};
 
 pub struct PathFollowing {
     path: WorldPath,
+    final_target: WorldPoint,
     next: usize,
 }
 
 impl PathFollowing {
-    pub fn new(path: WorldPath) -> Self {
-        Self { path, next: 0 }
-    }
-
-    pub fn last_waypoint(&self) -> Option<WorldPosition> {
-        if self.next == 0 {
-            None
-        } else {
-            self.path.path().get(self.next - 1).map(|node| node.block)
+    pub fn new(path: WorldPath, target: WorldPoint) -> Self {
+        Self {
+            path,
+            final_target: target,
+            next: 0,
         }
     }
 
-    pub fn next_waypoint(&mut self) -> Option<(WorldPosition, EdgeCost)> {
+    pub fn next_waypoint(&mut self) -> Option<(WorldPoint, EdgeCost)> {
+        let path_len = self.path.path().len();
+
         let node = self.path.path().get(self.next)?;
+
+        let waypoint = if self.next == path_len - 1 {
+            // last waypoint, use exact target point instead of waypoint block pos
+            self.final_target
+        } else {
+            node.block.into()
+        };
+
         self.next += 1;
-        Some((node.block, node.exit_cost))
+        Some((waypoint, node.exit_cost))
+    }
+
+    pub const fn target(&self) -> WorldPoint {
+        self.final_target
     }
 }

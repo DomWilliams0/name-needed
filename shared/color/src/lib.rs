@@ -47,6 +47,15 @@ impl ColorRgb {
             None
         }
     }
+
+    pub fn new_hsl(hue: f32, saturation: f32, luminance: f32) -> Self {
+        ColorHsl {
+            h: hue,
+            s: saturation,
+            l: luminance,
+        }
+        .into()
+    }
 }
 
 pub struct UniqueRandomColors {

@@ -6,6 +6,7 @@ use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, Wo
 
 // TODO smallvecs
 
+// TODO derive(Error)
 #[derive(Debug, Clone)]
 pub enum NavigationError {
     SourceNotWalkable(WorldPosition),
@@ -84,10 +85,7 @@ impl WorldPath {
         &self.path
     }
 
-    pub fn target(&self) -> &WorldPosition {
-        &self.target
+    pub const fn target(&self) -> WorldPosition {
+        self.target
     }
 }
-
-// TODO
-pub type WorldPathSlice<'a> = &'a [(WorldPosition, EdgeCost)];

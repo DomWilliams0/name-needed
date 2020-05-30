@@ -18,6 +18,8 @@ rand = "^0.7"
 env_logger = {version = "^0.7", optional = true}
 float-cmp = "^0.5"
 derive_more = "^0.99"
+ordered-float = "^1.0"
+thiserror = "1.0"
 
 # TODO feature for cgmath
 [features]

@@ -7,13 +7,10 @@ use crate::steer::SteeringBehaviour;
 use crate::TransformComponent;
 
 /// Steering context
-#[derive(Default)]
+#[derive(Default, Component)]
+#[storage(DenseVecStorage)]
 pub struct SteeringComponent {
     pub behaviour: SteeringBehaviour,
-}
-
-impl Component for SteeringComponent {
-    type Storage = VecStorage<Self>;
 }
 
 pub struct SteeringSystem;

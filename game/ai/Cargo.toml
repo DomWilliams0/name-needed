@@ -1,0 +1,17 @@
+[package]
+name = "ai"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+config = {path = "../../shared/config"}
+common = { path = "../../shared/common", features=["library"] }
+unit = {path = "../../shared/unit"}
+
+float-ord = "^0.2"
+
+[dev-dependencies]
+matches = "^0.1"

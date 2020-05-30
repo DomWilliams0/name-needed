@@ -9,11 +9,13 @@ Config(
         worker_threads: None,
     ),
     simulation: (
-        random_seed: Some(678534524152419),
-        random_count: 10,
+        random_seed: Some(67853452415419),
+        random_count: 1,
         acceleration: 0.08,
         friction: 0.85,
         max_speed: 0.22,
         start_delay: 0,
+        food_nutrition: 20,
+        food_count: 300,
      ),
 )

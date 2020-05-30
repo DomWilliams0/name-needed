@@ -1,110 +1,133 @@
-use std::ops::Deref;
-
-use specs::{Builder, WorldExt};
-
 use color::ColorRgb;
 use common::*;
 use unit::world::WorldPosition;
-use world::WorldRef;
+use world::InnerWorldRef;
 
-use crate::ecs::{entity_id, Component, EcsWorld, Entity};
+use crate::ai::{ActivityComponent, AiComponent};
+use crate::ecs::{entity_id, ComponentBuilder, ComponentWorld, Entity};
+use crate::item::{
+    BaseItemComponent, EdibleItemComponent, InventoryComponent, ItemClass, ItemCondition,
+    ThrowableItemComponent,
+};
 use crate::movement::DesiredMovementComponent;
+use crate::needs::HungerComponent;
 use crate::path::FollowPathComponent;
+use crate::render::PhysicalShape;
 use crate::steer::SteeringComponent;
-use crate::{PhysicalComponent, TransformComponent};
+use crate::{RenderComponent, TransformComponent};
 
-pub struct EntityBuilder<'a> {
-    ecs_world: &'a mut EcsWorld,
+// TODO add must_use to all builder patterns
+#[must_use = "Use a build_* function to create the entity"]
+pub struct EntityBuilder<'a, W: ComponentWorld> {
+    world: &'a mut W,
 
-    block_pos: Option<(i32, i32, Option<i32>)>,
+    block_pos: Option<Box<dyn EntityPosition>>,
     height: Option<f32>,
-
-    physical: Option<PhysicalComponent>,
-    steering: Option<SteeringComponent>,
-    desired_movement: Option<DesiredMovementComponent>,
-    follow_path: Option<FollowPathComponent>,
+    shape: Option<PhysicalShape>,
+    color: Option<ColorRgb>,
 }
 
-macro_rules! default {
-    ($comp:expr) => {
-        $comp = Some(Default::default())
-    };
-}
-
-impl<'a> EntityBuilder<'a> {
-    pub fn new(ecs_world: &'a mut EcsWorld) -> Self {
+impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
+    pub fn new(world: &'a mut W) -> Self {
         Self {
-            ecs_world,
+            world,
 
             block_pos: None,
             height: None,
-            physical: None,
-            steering: None,
-            desired_movement: None,
-            follow_path: None,
+            shape: None,
+            color: None,
         }
     }
 
-    pub fn with_wandering_human_archetype(&mut self) -> &mut Self {
-        default!(self.steering);
-        default!(self.desired_movement);
-        default!(self.follow_path);
+    pub fn with_pos<P: EntityPosition + 'static>(mut self, pos: P) -> Self {
+        self.block_pos = Some(Box::new(pos));
         self
     }
 
-    pub fn with_transform(&mut self, block_pos: (i32, i32, Option<i32>), height: f32) -> &mut Self {
-        self.block_pos = Some(block_pos);
+    pub fn with_height(mut self, height: f32) -> Self {
         self.height = Some(height);
         self
     }
 
-    pub fn with_physical(&mut self, radius: f32, color: ColorRgb) -> &mut Self {
-        self.physical = Some(PhysicalComponent::new(color, radius));
+    pub fn with_shape(mut self, shape: PhysicalShape) -> Self {
+        self.shape = Some(shape);
         self
     }
 
-    pub fn build(&mut self) -> Result<Entity, &'static str> {
-        let voxel_world: WorldRef = {
-            let voxel_world_resource = self.ecs_world.read_resource::<WorldRef>();
-            voxel_world_resource.deref().clone()
-        };
+    pub fn with_color(mut self, color: ColorRgb) -> Self {
+        self.color = Some(color);
+        self
+    }
 
-        let transform = {
-            let world_pos = match self.block_pos {
-                None => return Err("no transform"),
-                Some((x, y, Some(z))) => WorldPosition(x, y, z),
-                Some((x, y, None)) => voxel_world
-                    .borrow()
-                    .find_accessible_block_in_column(x, y)
-                    .ok_or("couldn't find highest safe point")?,
-            };
+    pub fn build_human(self, starting_hunger: NormalizedFloat) -> Result<Entity, &'static str> {
+        let entity = self
+            .build()?
+            .with_(DesiredMovementComponent::default())
+            .with_(SteeringComponent::default())
+            .with_(FollowPathComponent::default())
+            .with_(HungerComponent::new(starting_hunger, 3000))
+            .with_(ActivityComponent::default())
+            .with_(AiComponent::human())
+            .with_(InventoryComponent::new(2 /* 2 hands */, 2, Some(0)))
+            .build_();
 
-            let height = self.height.ok_or("no height")?;
-            TransformComponent::new(world_pos.into(), height)
-        };
-
-        let mut builder = self.ecs_world.create_entity().with(transform);
-
-        // disgusting
-        builder = add_component(builder, self.physical.take());
-        builder = add_component(builder, self.steering.take());
-        builder = add_component(builder, self.desired_movement.take());
-        builder = add_component(builder, self.follow_path.take());
-
-        let entity = builder.build();
         event_verbose(Event::Entity(EntityEvent::Create(entity_id(entity))));
         Ok(entity)
     }
-}
 
-// helper
-fn add_component<C: Component>(
-    mut builder: specs::EntityBuilder,
-    comp: Option<C>,
-) -> specs::EntityBuilder {
-    if let Some(comp) = comp {
-        builder = builder.with(comp);
+    pub fn build_food_item(
+        self,
+        nutrition: u16, /* TODO Fuel */
+    ) -> Result<Entity, &'static str> {
+        self.build().map(|b| {
+            b.with_(BaseItemComponent::new(
+                "Food",
+                ItemCondition::new_perfect(10),
+                0.5,
+                ItemClass::Food,
+                1,
+                1,
+            ))
+            .with_(EdibleItemComponent::new(nutrition))
+            .with_(ThrowableItemComponent::default()) // like all good food should be
+            .build_()
+        })
     }
 
-    builder
+    pub fn build(self) -> Result<W::Builder, &'static str> {
+        let shape = self.shape.ok_or("no shape")?;
+        let transform = {
+            let pos = self.block_pos.ok_or("no position")?;
+            let height = self.height.ok_or("no height")?;
+
+            let world = self.world.voxel_world();
+            let pos = pos.resolve(&world.borrow())?;
+            TransformComponent::new(pos.into(), shape.radius(), height)
+        };
+
+        let render = RenderComponent::new(self.color.ok_or("no color")?, shape);
+
+        Ok(self.world.create_entity().with_(transform).with_(render))
+    }
+}
+
+pub trait EntityPosition {
+    fn resolve(&self, world: &InnerWorldRef) -> Result<WorldPosition, &'static str>;
+}
+
+impl EntityPosition for WorldPosition {
+    fn resolve(&self, _: &InnerWorldRef) -> Result<WorldPosition, &'static str> {
+        Ok(*self)
+    }
+}
+
+impl EntityPosition for (i32, i32, Option<i32>) {
+    fn resolve(&self, world: &InnerWorldRef) -> Result<WorldPosition, &'static str> {
+        match *self {
+            (x, y, Some(z)) => Ok(WorldPosition(x, y, z)),
+            (x, y, None) => world
+                .find_accessible_block_in_column(x, y)
+                .ok_or("couldn't find highest safe point"),
+        }
+    }
 }

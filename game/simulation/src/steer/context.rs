@@ -11,7 +11,7 @@ use unit::dim::SmallUnsignedConstant;
 /// North is 0, goes clockwise
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
-enum Direction {
+pub(crate) enum Direction {
     North,
     NorthEast,
     East,
@@ -59,7 +59,7 @@ impl From<Rad> for Direction {
         let normalized_value = angle.normalize().0 / (2.0 * PI);
         let dir = (normalized_value / divisor) * divisor;
         let dir = (dir * divisor) as u8;
-        dir.into()
+        dir.min(Direction::COUNT.as_u8() - 1).into()
     }
 }
 

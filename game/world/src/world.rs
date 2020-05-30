@@ -1,6 +1,8 @@
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockPosition, ChunkPosition, SliceBlock, SliceIndex, WorldPosition};
+use unit::world::{
+    BlockPosition, ChunkPosition, SliceBlock, SliceIndex, WorldPoint, WorldPosition,
+};
 
 use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, WorldArea, WorldPath,
@@ -15,6 +17,7 @@ use crate::{chunk::ChunkDescriptor, WorldRef};
 
 #[cfg(test)]
 use crate::block::Block;
+use std::ops::DerefMut;
 
 #[cfg_attr(test, derive(Clone))]
 pub struct World {
@@ -184,6 +187,11 @@ impl World {
         Ok(WorldPath::new(full_path, to))
     }
 
+    /// Cheap check if an path exists between the 2 areas
+    pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
+        self.area_graph.path_exists(from, to)
+    }
+
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
         self.find_accessible_block_in_column_starting_from(WorldPosition(x, y, i32::MAX))
     }
@@ -245,6 +253,36 @@ impl World {
     pub(crate) fn area_graph(&self) -> &AreaGraph {
         &self.area_graph
     }
+
+    pub fn choose_random_walkable_block(&self, max_attempts: usize) -> Option<WorldPosition> {
+        let mut rand = random::get();
+        for _ in 0..max_attempts {
+            let chunk = self.all_chunks().choose(rand.deref_mut()).unwrap(); // chunks wont be empty
+
+            let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+            let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+            if let Some(block_pos) = chunk.find_accessible_block(SliceBlock(x, y), None) {
+                return Some(block_pos.to_world_position(chunk.pos()));
+            }
+        }
+        None
+    }
+
+    pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> Option<WorldArea> {
+        let block_pos = pos.into();
+        let chunk_pos = ChunkPosition::from(block_pos);
+        self.find_chunk_with_pos(chunk_pos)
+            .and_then(|chunk| chunk.get_block(block_pos))
+            .and_then(|block| block.chunk_area(block_pos.slice()))
+            .map(|chunk_area| chunk_area.into_world_area(chunk_pos))
+    }
+
+    /// Returns first area that point.floor then ceil returns
+    pub fn area_for_point(&self, point: WorldPoint) -> Option<(WorldPosition, WorldArea)> {
+        point
+            .floor_then_ceil()
+            .find_map(|pos| self.area(pos).map(|area| (pos, area)))
+    }
 }
 
 #[cfg(any(test, feature = "benchmarking"))]
@@ -261,7 +299,7 @@ pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
     let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
     for pos in chunks_pos {
         loader.request_chunk(pos);
-        let _ = loader.block_on_next_finalization(Duration::from_secs(10));
+        let _ = loader.block_on_next_finalization(Duration::from_secs(20));
     }
 
     // apply all chunk updates
@@ -389,7 +427,7 @@ mod tests {
         let to = BlockPosition::from((5, 8, 7)).to_world_position((6, 3));
 
         let path = world.find_path(from, to).expect("path should succeed");
-        assert_eq!(*path.target(), to);
+        assert_eq!(path.target(), to);
 
         // all should be adjacent
         for (a, b) in path.path().iter().tuple_windows() {

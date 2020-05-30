@@ -14,7 +14,13 @@ pub fn reseed(seed: u64) {
     *randy.deref_mut() = StdRng::seed_from_u64(seed);
 }
 
-/// May block!!
+/// May block!! In debug builds panics on deadlock
 pub fn get<'a>() -> MutexGuard<'a, StdRng> {
-    RANDY.lock().unwrap()
+    if cfg!(debug_assertions) {
+        RANDY
+            .try_lock()
+            .unwrap_or_else(|e| panic!("can't take the random mutex: {}", e))
+    } else {
+        RANDY.lock().unwrap()
+    }
 }

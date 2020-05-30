@@ -9,6 +9,7 @@ pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use log::*;
 pub use num_traits;
+pub use ordered_float::OrderedFloat;
 pub use rand::prelude::*;
 pub use struclog::{
     self, enter_span, event_error, event_info, event_trace, event_verbose, EntityEvent, Event, Span,
@@ -16,6 +17,7 @@ pub use struclog::{
 
 pub use derive_more;
 pub use lazy_static::lazy_static;
+pub use thiserror::Error;
 
 pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;
@@ -40,11 +42,12 @@ pub fn deg(f: F) -> Deg {
 
 pub const AXIS_UP: Vector3 = Vector3::new(0.0, 0.0, 1.0);
 pub const AXIS_FWD: Vector3 = Vector3::new(0.0, 1.0, 0.0);
+pub const AXIS_FWD_2: Vector2 = Vector2::new(0.0, 1.0);
 
 pub fn forward_angle(angle: Rad) -> Vector2 {
     use cgmath::{Basis2, Rotation};
     let rotation = Basis2::from_angle(-angle);
-    rotation.rotate_vector(AXIS_FWD.truncate())
+    rotation.rotate_vector(AXIS_FWD_2)
 }
 
 pub fn truncate(vec: Vector2, max: F) -> Vector2 {
@@ -55,5 +58,8 @@ pub fn truncate(vec: Vector2, max: F) -> Vector2 {
     }
 }
 
+pub use newtype::{NormalizedFloat, Proportion};
+
 pub mod input;
+pub mod newtype;
 pub mod random;

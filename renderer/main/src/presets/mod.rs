@@ -19,7 +19,7 @@ pub trait GamePreset<R: Renderer> {
 
         debug!("waiting for world to load before initializing simulation");
         world.request_all_chunks();
-        match world.block_for_all(Duration::from_secs(10)) {
+        match world.block_for_all(Duration::from_secs(30)) {
             BlockForAllResult::Success => {}
             err => {
                 error!("failed to wait for world to load: {:?}", err);

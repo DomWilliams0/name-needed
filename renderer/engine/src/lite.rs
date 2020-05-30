@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use simulation::{
-    EventsOutcome, ExitType, PhysicalComponent, Renderer, Simulation, SimulationBackend,
+    EventsOutcome, ExitType, RenderComponent, Renderer, Simulation, SimulationBackend,
     TransformComponent, WorldViewer,
 };
 
@@ -19,7 +19,7 @@ impl Renderer for DummyRenderer {
 
     fn sim_start(&mut self) {}
 
-    fn sim_entity(&mut self, _transform: &TransformComponent, _physical: PhysicalComponent) {}
+    fn sim_entity(&mut self, _transform: &TransformComponent, _render: &RenderComponent) {}
 
     fn sim_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
