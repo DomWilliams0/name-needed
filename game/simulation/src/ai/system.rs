@@ -27,12 +27,13 @@ impl AiComponent {
     }
 }
 
-pub struct AiSystem<'a>(pub &'a EcsWorld);
+pub struct AiSystem;
 
-impl<'a> System<'a> for AiSystem<'a> {
+impl<'a> System<'a> for AiSystem {
     type SystemData = (
         Read<'a, Tick>,
         Read<'a, EntitiesRes>,
+        Read<'a, EcsWorldFrameRef>,
         Write<'a, QueuedUpdates>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
@@ -43,12 +44,14 @@ impl<'a> System<'a> for AiSystem<'a> {
 
     fn run(
         &mut self,
-        (tick, entities, updates, transform, hunger, inventory, mut ai, mut activity): Self::SystemData,
+        (tick, entities, ecs_world, updates, transform, hunger, inventory, mut ai, mut activity): Self::SystemData,
     ) {
         // TODO only run occasionally - FIXME TERRIBLE HACK
         if tick.0 % 10 != 0 {
             return;
         }
+
+        let ecs_world: &EcsWorld = &*ecs_world;
 
         let mut shared_bb = SharedBlackboard {
             area_link_cache: HashMap::new(),
@@ -66,7 +69,7 @@ impl<'a> System<'a> for AiSystem<'a> {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory.get(e),
-                world: self.0,
+                world: ecs_world,
                 shared: &mut shared_bb,
             };
 
@@ -75,7 +78,7 @@ impl<'a> System<'a> for AiSystem<'a> {
             let bb_ref: &mut Blackboard = unsafe { std::mem::transmute(&mut bb) };
             let ctx = ActivityContext {
                 entity: e,
-                world: self.0,
+                world: ecs_world,
                 updates: &updates,
             };
 
@@ -106,8 +109,6 @@ impl<'a> System<'a> for AiSystem<'a> {
                     }
                 }
             }
-
-            // TODO struclog events
         }
     }
 }

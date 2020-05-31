@@ -1,5 +1,6 @@
 use common::*;
 
+use crate::consideration::InputCache;
 use crate::{AiBox, Consideration, Context};
 
 #[derive(Copy, Clone)]
@@ -19,7 +20,12 @@ pub trait Dse<C: Context> {
     fn weight(&self) -> DecisionWeight;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
 
-    fn score(&self, blackboard: &mut C::Blackboard, bonus: f32) -> f32 {
+    fn score(
+        &self,
+        blackboard: &mut C::Blackboard,
+        input_cache: &mut InputCache<C>,
+        bonus: f32,
+    ) -> f32 {
         let mut final_score = bonus;
 
         let considerations = self.considerations();
@@ -27,7 +33,7 @@ pub trait Dse<C: Context> {
         for c in considerations.iter() {
             // TODO optimization: dont consider all considerations every time
 
-            let score = c.consider(blackboard).value();
+            let score = c.consider(blackboard, input_cache).value();
 
             // compensation factor balances overall drop when multiplying multiple floats by
             // taking into account the number of considerations
@@ -45,6 +51,12 @@ pub trait Dse<C: Context> {
                 score,
                 evaluated_score
             );
+
+            #[cfg(feature = "logging")]
+            {
+                use crate::Blackboard;
+                c.log_metric(&blackboard.entity(), evaluated_score);
+            }
 
             final_score *= evaluated_score;
         }
@@ -67,6 +79,7 @@ impl DecisionWeight {
 
 #[cfg(test)]
 mod tests {
+    use crate::consideration::InputCache;
     use crate::intelligence::Smarts;
     use crate::{
         AiBox, Blackboard, Consideration, ConsiderationParameter, Context, Curve, DecisionWeight,
@@ -90,6 +103,7 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Hash, Eq, PartialEq)]
     enum TestInput {
         MyHunger,
         DoAnythingElse,
@@ -109,8 +123,9 @@ mod tests {
     }
 
     impl Blackboard for TestBlackboard {
-        fn entity(&self) -> &dyn Debug {
-            &"e"
+        #[cfg(feature = "logging")]
+        fn entity(&self) -> String {
+            String::new()
         }
     }
 
@@ -136,6 +151,9 @@ mod tests {
         fn parameter(&self) -> ConsiderationParameter {
             ConsiderationParameter::Nop
         }
+
+        #[cfg(feature = "logging")]
+        fn log_metric(&self, entity: &str, value: f32) {}
     }
 
     struct CancelExistenceConsideration;
@@ -155,6 +173,9 @@ mod tests {
                 max: 20.0,
             }
         }
+
+        #[cfg(feature = "logging")]
+        fn log_metric(&self, entity: &str, value: f32) {}
     }
 
     struct EatDse;
@@ -200,9 +221,10 @@ mod tests {
     #[test]
     fn score() {
         let mut blackboard = TestBlackboard { my_hunger: 0.5 };
+        let mut cache = InputCache::default();
 
-        assert!(EatDse.score(&mut blackboard, 1.0) > 0.9);
-        assert!(BadDse.score(&mut blackboard, 1.0) < 0.1);
+        assert!(EatDse.score(&mut blackboard, &mut cache, 1.0) > 0.9);
+        assert!(BadDse.score(&mut blackboard, &mut cache, 1.0) < 0.1);
 
         let smarts = Smarts::new(
             vec![

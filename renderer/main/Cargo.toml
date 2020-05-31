@@ -21,7 +21,8 @@ num_cpus = "1.13"
 clap = "^2.33"
 
 [features]
-default = ["use-sdl"]
+default = ["use-sdl", "metrics"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 count-allocs = ["alloc_counter"]
+metrics = ["simulation/metrics"]

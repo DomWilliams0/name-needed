@@ -1,6 +1,9 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
 
 use crate::ai::{AiContext, AiInput};
+use common::*;
+
+declare_entity_metric!(AI_HUNGER, "ai_hunger", "Hunger level");
 
 pub struct HungerConsideration;
 
@@ -16,13 +19,18 @@ impl Consideration<AiContext> for HungerConsideration {
     fn parameter(&self) -> ConsiderationParameter {
         ConsiderationParameter::Nop // already normalized
     }
+
+    #[cfg(feature = "metrics")]
+    fn log_metric(&self, entity: &str, value: f32) {
+        entity_metric!(AI_HUNGER, entity, value);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ai::consideration::HungerConsideration;
     use crate::ai::Blackboard;
-    use ai::Consideration;
+    use ai::{Consideration, InputCache};
     use common::NormalizedFloat;
     use std::mem::MaybeUninit;
 
@@ -31,17 +39,27 @@ mod tests {
         // initialize blackboard with only what we want
         let blackboard = MaybeUninit::<Blackboard>::zeroed();
         let mut blackboard = unsafe { blackboard.assume_init() };
+        let mut cache = InputCache::default();
 
         let hunger = HungerConsideration;
 
         blackboard.hunger = NormalizedFloat::one();
-        let score_when_full = hunger.curve().evaluate(hunger.consider(&mut blackboard));
+        let score_when_full = hunger
+            .curve()
+            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        cache.reset();
 
         blackboard.hunger = NormalizedFloat::new(0.2);
-        let score_when_hungry = hunger.curve().evaluate(hunger.consider(&mut blackboard));
+        let score_when_hungry = hunger
+            .curve()
+            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        cache.reset();
 
         blackboard.hunger = NormalizedFloat::new(0.01);
-        let score_when_empty = hunger.curve().evaluate(hunger.consider(&mut blackboard));
+        let score_when_empty = hunger
+            .curve()
+            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        cache.reset();
 
         assert!(
             score_when_hungry > score_when_full,

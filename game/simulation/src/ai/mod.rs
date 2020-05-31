@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::NormalizedFloat;
+use common::*;
 pub use input::AiInput;
 pub use system::{ActivityComponent, AiComponent, AiSystem};
 use unit::world::WorldPoint;
@@ -9,7 +9,6 @@ use crate::ai::activity::AiAction;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
-use std::fmt::Debug;
 use world::WorldArea;
 
 mod activity;
@@ -48,7 +47,9 @@ pub struct SharedBlackboard {
 }
 
 impl ai::Blackboard for Blackboard<'_> {
-    fn entity(&self) -> &dyn Debug {
-        &self.entity
+    #[cfg(feature = "metrics")]
+    fn entity(&self) -> String {
+        use crate::entity_pretty;
+        format!("{}", entity_pretty!(self.entity))
     }
 }

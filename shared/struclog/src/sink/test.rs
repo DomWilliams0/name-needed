@@ -1,5 +1,5 @@
 use crate::sink::EventSink;
-use crate::{EntityEvent, EntityId, Event, Span};
+use crate::{Event, Span};
 
 #[derive(Default)]
 pub struct TestSink {
@@ -22,20 +22,5 @@ impl EventSink for TestSink {
 
     fn post(&mut self, e: Event) {
         self.events.push((self.spans.clone(), e));
-    }
-}
-
-impl TestSink {
-    pub fn filter_entity(
-        &self,
-        entity_id: EntityId,
-    ) -> impl Iterator<Item = (&Vec<Span>, &EntityEvent)> {
-        self.events
-            .iter()
-            .filter_map(|(spans, event)| match event {
-                Event::Entity(e) => Some((spans, e)),
-                _ => None,
-            })
-            .filter(move |(_, e)| e.entity_id() == entity_id)
     }
 }

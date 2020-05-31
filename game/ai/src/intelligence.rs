@@ -1,5 +1,6 @@
 use float_ord::FloatOrd;
 
+use crate::consideration::InputCache;
 use crate::decision::Dse;
 use crate::{AiBox, Context};
 use common::*;
@@ -17,6 +18,7 @@ pub struct Intelligence<C: Context> {
     base: Smarts<C>,
     additional: Vec<Smarts<C>>,
     last_decision: C::Action,
+    input_cache: InputCache<C>,
 }
 
 pub enum IntelligentDecision<'a, C: Context> {
@@ -37,13 +39,13 @@ impl<C: Context> Smarts<C> {
         }
     }
 
-    pub fn score(&mut self, blackboard: &mut C::Blackboard) {
+    pub fn score(&mut self, input_cache: &mut InputCache<C>, blackboard: &mut C::Blackboard) {
         // TODO optimize
         for Decision { dse, score } in &mut self.0 {
             // TODO + momentum to discourage changing so often
             let bonus = dse.weight().multiplier();
 
-            *score = dse.score(blackboard, bonus);
+            *score = dse.score(blackboard, input_cache, bonus);
             trace!("DSE '{}' scored {:?}", dse.name(), *score);
         }
     }
@@ -54,15 +56,18 @@ impl<C: Context> Intelligence<C> {
         Self {
             base: base_smarts,
             additional: Vec::new(),
-            last_decision: C::Action::default(),
+            last_decision: Default::default(),
+            input_cache: InputCache::default(),
         }
     }
 
     pub fn choose(&mut self, blackboard: &mut C::Blackboard) -> IntelligentDecision<C> {
+        self.input_cache.reset();
+
         // score all possible decisions
-        self.base.score(blackboard);
+        self.base.score(&mut self.input_cache, blackboard);
         for dse in self.additional.iter_mut() {
-            dse.score(blackboard)
+            dse.score(&mut self.input_cache, blackboard)
         }
 
         // choose the best
@@ -90,5 +95,9 @@ impl<C: Context> Intelligence<C> {
                 action,
             }
         }
+    }
+
+    pub fn drain_input_cache(&mut self) -> impl Iterator<Item = (C::Input, f32)> + '_ {
+        self.input_cache.drain()
     }
 }

@@ -71,7 +71,7 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
             .with_(InventoryComponent::new(2 /* 2 hands */, 2, Some(0)))
             .build_();
 
-        event_verbose(Event::Entity(EntityEvent::Create(entity_id(entity))));
+        event_verbose!(Event::CreateEntity(entity_id(entity)));
         Ok(entity)
     }
 

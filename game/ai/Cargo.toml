@@ -15,3 +15,7 @@ float-ord = "^0.2"
 
 [dev-dependencies]
 matches = "^0.1"
+
+[features]
+default = []
+logging = []

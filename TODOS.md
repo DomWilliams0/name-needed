@@ -1,4 +1,4 @@
-# TODOs (140)
+# TODOs (138)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (3)
@@ -32,10 +32,9 @@
    * `// TODO clearly needs some spatial partitioning here`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (3)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (2)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
-   * `// TODO struclog events`
  * [game/simulation/src/dev.rs](game/simulation/src/dev.rs) (1)
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (2)
@@ -85,8 +84,8 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `#[allow(dead_code)] // TODO will be used when world can be modified`
+   * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
-   * `// TODO sort out systems so they always have a ecs_world reference`
    * `// TODO needs interpolation?`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
@@ -190,8 +189,6 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/struclog/Cargo.toml](shared/struclog/Cargo.toml) (1)
-   * `# TODO bincode = {version = "^1.2", optional = true}`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
    * `// TODO helper for this-1`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (2)

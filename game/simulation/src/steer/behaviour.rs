@@ -19,9 +19,6 @@ pub struct Stop;
 pub struct Seek {
     target: WorldPoint,
     speed: NormalizedFloat,
-
-    /// Used to detect overshoot
-    original_sign: Option<bool>,
 }
 
 /// When steering is complete
@@ -98,11 +95,7 @@ impl DoASteer for Stop {
 
 impl Seek {
     pub fn with_target(target: WorldPoint, speed: NormalizedFloat) -> Self {
-        Self {
-            target,
-            speed,
-            original_sign: None,
-        }
+        Self { target, speed }
     }
 }
 
@@ -116,37 +109,21 @@ impl DoASteer for Seek {
         let tgt = Vector2::from(self.target);
         let pos = Vector2::from(transform.position);
 
-        let delta = match pos.distance2(tgt) {
-            dist if dist < transform.bounding_radius.powi(2) => {
-                // exact distance check, we're there
-                return SteeringResult::Finished;
-            }
+        let distance = pos.distance(tgt);
+        if distance < transform.bounding_radius + transform.velocity.magnitude() {
+            // we've arrived
+            return SteeringResult::Finished;
+        }
 
-            dist if dist < 1.0 => {
-                // close enough to use exact direction now
-                tgt - pos
-            }
-
-            _ => {
-                // far away still, use block coords so the direction is generally towards the
-                // target without being exactly towards the centre of each block
-                let block_tgt = Vector2::from(self.target.floored());
-                let block_pos = Vector2::from(transform.position.floored());
-                block_tgt - block_pos
-            }
-        };
-
-        let direction = delta.perp_dot(Vector2::unit_y()).is_sign_positive();
-        match self.original_sign {
-            Some(dir) if dir != direction => {
-                // overshot, we're done
-                return SteeringResult::Finished;
-            }
-            None => {
-                // first tick
-                self.original_sign = Some(direction)
-            }
-            _ => {}
+        let delta = if distance < 1.0 {
+            // close enough to use exact direction now
+            tgt - pos
+        } else {
+            // far away still, use block coords so the direction is generally towards the
+            // target without being exactly towards the centre of each block
+            let block_tgt = Vector2::from(self.target.floored());
+            let block_pos = Vector2::from(transform.position.floored());
+            block_tgt - block_pos
         };
 
         // keep seeking towards target
@@ -167,7 +144,7 @@ mod tests {
     use unit::world::WorldPoint;
 
     #[test]
-    fn seek_overshoot() {
+    fn seek_dynamic_radius() {
         let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
 
         // starts at 0,0 going to 10,0
@@ -178,7 +155,9 @@ mod tests {
         assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Ongoing);
 
         // overshoot, but not in arrival range - should still finish because the direction changed
-        transform.position.0 = 12.0;
+        // we're halfway there but going fast enough to arrive next tick
+        transform.position.0 = 5.0;
+        transform.velocity.x = 4.8;
         assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Finished);
     }
     #[test]

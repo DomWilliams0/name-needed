@@ -28,3 +28,7 @@ permutation = "^0.2"
 [dev-dependencies]
 polymap = "^0.3"
 matches = "^0.1"
+
+[features]
+default = []
+metrics = ["ai/logging"]

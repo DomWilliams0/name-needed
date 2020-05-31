@@ -13,12 +13,23 @@ pub use dummy::DummyComponentReceptacle;
 use smallvec::alloc::fmt::Formatter;
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::ops::Deref;
 use world::WorldRef;
 
 pub type EcsWorld = World;
 
+/// World reference for the current frame only - very unsafe, don't store!
+pub struct EcsWorldFrameRef(&'static EcsWorld);
+
 pub fn entity_id(e: Entity) -> struclog::EntityId {
     ((e.gen().id() as u64) << 32) | e.id() as u64
+}
+
+#[macro_export]
+macro_rules! entity_pretty {
+    ($e:expr) => {
+        format_args!("{}:{}", $e.gen().id(), $e.id())
+    };
 }
 
 #[derive(Debug)]
@@ -233,5 +244,24 @@ impl Error for NoSuchComponent {}
 impl NoSuchComponent {
     fn new<T>(entity: Entity) -> Self {
         Self(entity, std::any::type_name::<T>())
+    }
+}
+
+impl EcsWorldFrameRef {
+    pub unsafe fn init(world_ref: &EcsWorld) -> Self {
+        Self(std::mem::transmute(world_ref))
+    }
+}
+
+impl Default for EcsWorldFrameRef {
+    fn default() -> Self {
+        unreachable!("ecs world ref missing")
+    }
+}
+impl Deref for EcsWorldFrameRef {
+    type Target = EcsWorld;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }

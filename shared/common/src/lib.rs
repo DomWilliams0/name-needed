@@ -8,12 +8,11 @@ pub use env_logger;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use log::*;
+pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
 pub use rand::prelude::*;
-pub use struclog::{
-    self, enter_span, event_error, event_info, event_trace, event_verbose, EntityEvent, Event, Span,
-};
+pub use struclog::{self, *};
 
 pub use derive_more;
 pub use lazy_static::lazy_static;

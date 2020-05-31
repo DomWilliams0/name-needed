@@ -1,9 +1,9 @@
 //! Infinite axis utility system
 
-pub use consideration::{Consideration, ConsiderationParameter, Curve};
+pub use consideration::{Consideration, ConsiderationParameter, Curve, InputCache};
 pub use decision::{DecisionWeight, Dse};
 pub use intelligence::{Intelligence, IntelligentDecision, Smarts};
-use std::fmt::Debug;
+use std::hash::Hash;
 
 mod consideration;
 mod decision;
@@ -15,12 +15,13 @@ pub trait Context: Sized {
     type Action: Default + Eq + Clone;
 }
 
-pub trait Input<C: Context> {
+pub trait Input<C: Context>: Hash + Clone + Eq {
     fn get(&self, blackboard: &mut C::Blackboard) -> f32;
 }
 
 pub trait Blackboard {
-    fn entity(&self) -> &dyn Debug;
+    #[cfg(feature = "logging")]
+    fn entity(&self) -> String;
 }
 
 // TODO pool/slab

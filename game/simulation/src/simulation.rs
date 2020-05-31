@@ -9,7 +9,7 @@ use world::{SliceRange, WorldRef};
 
 use crate::ai::{ActivityComponent, AiComponent, AiSystem};
 use crate::dev::SimulationDevExt;
-use crate::ecs::{EcsWorld, WorldExt};
+use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
@@ -78,23 +78,26 @@ impl<R: Renderer> Simulation<R> {
     }
 
     pub fn tick(&mut self) {
+        let _span = Span::Tick.begin();
+
         // update tick resource
         self.current_tick.0 += 1;
         self.ecs_world.insert(self.current_tick);
 
+        // TODO sort out systems so they all have an ecs_world reference and can keep state
+        // safety: only lives for the duration of this tick
+        let ecs_ref = unsafe { EcsWorldFrameRef::init(&self.ecs_world) };
+        self.ecs_world.insert(ecs_ref);
+
         // TODO limit time/count
         self.apply_chunk_updates();
-
-        let _span = enter_span(Span::Tick);
-
-        // TODO sort out systems so they always have a ecs_world reference
 
         // needs
         HungerSystem.run_now(&self.ecs_world);
         EatingSystem.run_now(&self.ecs_world);
 
         // choose activity
-        AiSystem(&self.ecs_world).run_now(&self.ecs_world);
+        AiSystem.run_now(&self.ecs_world);
 
         // assign paths for wandering
         WanderPathAssignmentSystem.run_now(&self.ecs_world);
@@ -117,6 +120,9 @@ impl<R: Renderer> Simulation<R> {
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
+
+        // we're about to go mutable, drop this fuzzy ball of unsafeness
+        let _ = self.ecs_world.remove::<EcsWorldFrameRef>();
 
         // per tick maintenance
         // must remove resource from world first so we can use &mut ecs_world
@@ -147,6 +153,7 @@ impl<R: Renderer> Simulation<R> {
         interpolation: f64,
     ) -> R::Target {
         // start frame
+        let _span = Span::Render(interpolation).begin();
         renderer.init(target);
 
         // render simulation

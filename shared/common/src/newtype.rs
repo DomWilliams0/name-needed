@@ -1,7 +1,7 @@
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
 use std::fmt::{Debug, Formatter};
-use std::ops::{AddAssign, SubAssign};
+use std::ops::{AddAssign, Mul, SubAssign};
 
 #[derive(Copy, Clone)]
 pub struct Proportion<T> {
@@ -68,6 +68,10 @@ impl NormalizedFloat {
     pub const fn value(self) -> f32 {
         self.0
     }
+
+    pub fn clamp_max(self, max: Self) -> Self {
+        Self(self.0.max(max.0))
+    }
 }
 
 impl From<NormalizedFloat> for f32 {
@@ -85,6 +89,14 @@ impl SubAssign<f32> for NormalizedFloat {
 impl<T: Debug> Debug for Proportion<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Proportion({:?}/{:?})", self.value, self.max)
+    }
+}
+
+impl Mul<Self> for NormalizedFloat {
+    type Output = Self;
+
+    fn mul(self, rhs: NormalizedFloat) -> Self::Output {
+        dbg!(Self::new(self.0 * rhs.0))
     }
 }
 

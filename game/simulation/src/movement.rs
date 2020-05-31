@@ -34,13 +34,10 @@ impl Default for DesiredMovementComponent {
 pub struct MovementFulfilmentSystem;
 
 impl<'a> System<'a> for MovementFulfilmentSystem {
-    type SystemData = (
-        Read<'a, EntitiesRes>,
-        WriteStorage<'a, DesiredMovementComponent>,
-    );
+    type SystemData = (WriteStorage<'a, DesiredMovementComponent>,);
 
-    fn run(&mut self, (entities, mut movement): Self::SystemData) {
-        for (e, movement) in (&entities, &mut movement).join() {
+    fn run(&mut self, (mut movement,): Self::SystemData) {
+        for (movement,) in (&mut movement,).join() {
             let context_map = match movement {
                 DesiredMovementComponent::Desired(cm) => cm,
                 _ => unreachable!("movement fulfilment expects desired movement only"),
@@ -53,11 +50,6 @@ impl<'a> System<'a> for MovementFulfilmentSystem {
             // scale velocity based on acceleration
             let vel = direction * (speed * config::get().simulation.acceleration);
             *movement = DesiredMovementComponent::Realized(vel);
-
-            event_trace(Event::Entity(EntityEvent::MovementIntention(
-                entity_id(e),
-                (vel.x, vel.y),
-            )));
         }
     }
 }

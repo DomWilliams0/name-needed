@@ -1,0 +1,12 @@
+[package]
+name = "metrics"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prometheus = "^0.8" # needs to be 0.8 for exporter
+prometheus_exporter ="^0.5"
+log = "^0.4"

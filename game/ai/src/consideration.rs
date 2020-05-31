@@ -1,6 +1,7 @@
 use common::NormalizedFloat;
 
 use crate::{Context, Input};
+use std::collections::HashMap;
 
 pub enum ConsiderationParameter {
     /// Already normalized
@@ -15,13 +16,21 @@ pub trait Consideration<C: Context> {
     fn curve(&self) -> Curve;
     fn input(&self) -> C::Input;
     fn parameter(&self) -> ConsiderationParameter;
-    fn consider(&self, blackboard: &mut C::Blackboard) -> NormalizedFloat {
-        self.parameter().apply(self.input().get(blackboard))
+    fn consider(
+        &self,
+        blackboard: &mut C::Blackboard,
+        input_cache: &mut InputCache<C>,
+    ) -> NormalizedFloat {
+        let input = input_cache.get(self.input(), blackboard);
+        self.parameter().apply(input)
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    #[cfg(feature = "logging")]
+    fn log_metric(&self, entity: &str, value: f32);
 }
 
 impl ConsiderationParameter {
@@ -54,6 +63,35 @@ impl Curve {
             Curve::Quadratic(a, b, c) => (a * x.powi(2) + (b * x) + c),
             Curve::Exponential(a, b, c, d, e) => (a.powf((b * x) + c) * d) + e,
         })
+    }
+}
+
+pub struct InputCache<C: Context> {
+    cache: HashMap<C::Input, f32>,
+}
+
+impl<C: Context> Default for InputCache<C> {
+    fn default() -> Self {
+        Self {
+            cache: HashMap::new(),
+        }
+    }
+}
+
+impl<C: Context> InputCache<C> {
+    pub fn get(&mut self, input: C::Input, blackboard: &mut C::Blackboard) -> f32 {
+        *self
+            .cache
+            .entry(input.clone())
+            .or_insert_with(|| input.get(blackboard))
+    }
+
+    pub fn reset(&mut self) {
+        self.cache.clear();
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = (C::Input, f32)> + '_ {
+        self.cache.drain()
     }
 }
 

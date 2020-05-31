@@ -7,9 +7,12 @@ use crate::ecs::*;
 use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable};
 use crate::{InventoryComponent, TransformComponent};
 use common::*;
+use smallvec::alloc::fmt::Formatter;
+use std::fmt::Display;
 use unit::world::WorldPoint;
 use world::WorldRef;
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
     /// Hunger level, 0=starving 1=completely full
     Hunger,
@@ -24,14 +27,14 @@ pub enum AiInput {
         max_count: u32,
     },
 
-    Constant(f32),
+    Constant(OrderedFloat<f32>),
 }
 
 impl ai::Input<AiContext> for AiInput {
     fn get(&self, blackboard: &mut <AiContext as Context>::Blackboard) -> f32 {
         match self {
             AiInput::Hunger => blackboard.hunger.into(),
-            AiInput::Constant(c) => *c,
+            AiInput::Constant(c) => c.0,
             AiInput::HasInInventory(filter) => match blackboard.inventory {
                 None => 0.0,
                 Some(inv) => {
@@ -218,4 +221,23 @@ fn search_local_area(
         });
 
     output.extend(results);
+}
+
+impl Display for AiInput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AiInput::Hunger => write!(f, "Hunger"),
+            AiInput::HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
+            AiInput::CanFindLocally {
+                filter,
+                max_radius,
+                max_count,
+            } => write!(
+                f,
+                "Can find max {} items in {} radius if {}",
+                max_count, max_radius, filter
+            ),
+            AiInput::Constant(_) => write!(f, "Constant"),
+        }
+    }
 }

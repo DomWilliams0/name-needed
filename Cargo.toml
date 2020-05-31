@@ -12,6 +12,7 @@ members = [
 	"shared/color",
 	"shared/common",
 	"shared/config",
+	"shared/metrics",
 	"shared/struclog",
 	"shared/unit",
 ]

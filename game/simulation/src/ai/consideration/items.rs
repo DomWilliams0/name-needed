@@ -2,6 +2,16 @@ use ai::{Consideration, ConsiderationParameter, Context, Curve};
 
 use crate::ai::{AiContext, AiInput};
 use crate::item::ItemFilter;
+use common::*;
+
+declare_entity_metric!(HOLD_ITEM, "ai_item_holding", "Is holding an item", "filter");
+declare_entity_metric!(
+    FIND_ITEM,
+    "ai_item_find",
+    "Can find a local item",
+    "filter",
+    "radius"
+);
 
 pub struct HoldingItemConsideration(pub ItemFilter);
 
@@ -26,6 +36,11 @@ impl Consideration<AiContext> for HoldingItemConsideration {
     fn parameter(&self) -> ConsiderationParameter {
         ConsiderationParameter::Nop // bounded already
     }
+
+    #[cfg(feature = "metrics")]
+    fn log_metric(&self, entity: &str, value: f32) {
+        entity_metric!(HOLD_ITEM, entity, value, &format!("{}", self.0));
+    }
 }
 
 impl Consideration<AiContext> for FindLocalItemConsideration {
@@ -48,5 +63,16 @@ impl Consideration<AiContext> for FindLocalItemConsideration {
             min: 0.0,
             max: self.normalize_range,
         }
+    }
+
+    #[cfg(feature = "metrics")]
+    fn log_metric(&self, entity: &str, value: f32) {
+        entity_metric!(
+            FIND_ITEM,
+            entity,
+            value,
+            &format!("{}", self.filter),
+            &format!("{}", self.max_radius)
+        );
     }
 }

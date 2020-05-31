@@ -6,7 +6,6 @@ use simulation::{ExitType, SimulationBackend};
 
 use std::path::PathBuf;
 use std::process::Command;
-use struclog::sink::ipc::IpcSink;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -60,6 +59,8 @@ fn do_main() -> i32 {
     // init logger
     env_logger::Builder::from_env(env_logger::Env::default().filter_or("NN_LOG", "info"))
         .target(env_logger::Target::Stdout)
+        .filter_module("hyper", LevelFilter::Info) // keep it down will you
+        .filter_module("tokio_reactor", LevelFilter::Info)
         .init();
 
     info!("using game preset '{}'", preset.name());
@@ -81,11 +82,15 @@ fn do_main() -> i32 {
     }
 
     // enable structured logging
-    struclog::init(Some(Box::new(IpcSink::default())));
+    struclog::init();
+
+    // start metrics server
+    #[cfg(feature = "metrics")]
+    metrics::start_serving();
 
     // and away we go
     let sim = {
-        let _span = enter_span(Span::Setup);
+        let _span = Span::Setup.begin();
         preset.load()
     };
     let engine = match Engine::<Renderer, Backend>::new(sim) {

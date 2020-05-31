@@ -11,6 +11,7 @@ use unit::dim::SmallUnsignedConstant;
 /// North is 0, goes clockwise
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
+#[allow(dead_code)]
 pub(crate) enum Direction {
     North,
     NorthEast,

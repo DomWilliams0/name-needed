@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 struclog = { path = "../struclog" }
+metrics = { path = "../metrics" }
 
 lazy_static = "^1.4"
 log = "^0.4"
@@ -24,5 +25,6 @@ thiserror = "1.0"
 # TODO feature for cgmath
 [features]
 default = []
-binary = ["log/release_max_level_info", "env_logger", "struclog/trace"]
-library = ["struclog/trace"]
+# struclog sinks must be the same for both
+binary = ["log/release_max_level_info", "env_logger", "struclog/trace", "struclog/null"]
+library = ["struclog/trace", "struclog/null"]
