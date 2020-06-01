@@ -24,5 +24,4 @@ pub trait Blackboard {
     fn entity(&self) -> String;
 }
 
-// TODO pool/slab
 pub type AiBox<T> = Box<T>;

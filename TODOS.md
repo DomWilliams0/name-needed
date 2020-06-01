@@ -1,17 +1,15 @@
-# TODOs (138)
+# TODOs (137)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (3)
-   * `fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>; // TODO pooled vec/slice`
+   * `/// TODO pooled vec/slice rather than Vec each time`
    * `// TODO optimization: dont consider all considerations every time`
-   * `// TODO put in common test utils?`
+   * `// TODO put this in common test utils?`
  * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (4)
-   * `// TODO pool/arena`
-   * `// TODO optimize`
-   * `// TODO + momentum to discourage changing so often`
+   * `// TODO pool/arena allocator`
+   * `// TODO optimize: not all decisions need to be checked each time`
+   * `// TODO add momentum to discourage changing mind so often`
    * `// TODO dumber agents shouldn't always choose the best`
- * [game/ai/src/lib.rs](game/ai/src/lib.rs) (1)
-   * `// TODO pool/slab`
  * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`

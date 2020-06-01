@@ -10,7 +10,7 @@ struct Decision<C: Context> {
     score: f32,
 }
 
-// TODO pool/arena
+// TODO pool/arena allocator
 /// Non-empty collection of DSEs and scores
 pub struct Smarts<C: Context>(Vec<Decision<C>>);
 
@@ -40,9 +40,9 @@ impl<C: Context> Smarts<C> {
     }
 
     pub fn score(&mut self, input_cache: &mut InputCache<C>, blackboard: &mut C::Blackboard) {
-        // TODO optimize
+        // TODO optimize: not all decisions need to be checked each time
         for Decision { dse, score } in &mut self.0 {
-            // TODO + momentum to discourage changing so often
+            // TODO add momentum to discourage changing mind so often
             let bonus = dse.weight().multiplier();
 
             *score = dse.score(blackboard, input_cache, bonus);

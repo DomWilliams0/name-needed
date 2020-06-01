@@ -16,7 +16,8 @@ pub enum DecisionWeight {
 
 pub trait Dse<C: Context> {
     fn name(&self) -> &str;
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>; // TODO pooled vec/slice
+    /// TODO pooled vec/slice rather than Vec each time
+    fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;
     fn weight(&self) -> DecisionWeight;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
 
@@ -88,7 +89,7 @@ mod tests {
     use matches::assert_matches;
     use std::fmt::Debug;
 
-    // TODO put in common test utils?
+    // TODO put this in common test utils?
 
     #[derive(Eq, PartialEq, Clone, Debug)]
     enum TestAction {
