@@ -1,8 +1,10 @@
 use common::{NormalizedFloat, Proportion};
+use smallvec::alloc::fmt::Formatter;
+use std::fmt::Display;
 
 type Durability = u16;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum ItemConditionGrade {
     Broken,
     Terrible,
@@ -25,12 +27,16 @@ impl ItemCondition {
         Self::new(max, max)
     }
 
+    pub fn with_proportion(durability: Proportion<Durability>) -> Self {
+        Self {
+            value: durability,
+            grade: ItemConditionGrade::from_proportion(durability.proportion()),
+        }
+    }
+
     pub fn new(value: Durability, max: Durability) -> Self {
         let value = Proportion::with_value(value, max);
-        Self {
-            value,
-            grade: ItemConditionGrade::from_proportion(value.proportion()),
-        }
+        Self::with_proportion(value)
     }
 
     /*
@@ -55,10 +61,16 @@ impl ItemConditionGrade {
         match proportion {
             v if v <= 0.0 => ItemConditionGrade::Broken,
             v if v <= 0.2 => ItemConditionGrade::Terrible,
-            v if v <= 0.4 => ItemConditionGrade::Reasonable,
-            v if v <= 0.6 => ItemConditionGrade::Good,
-            v if v <= 0.8 => ItemConditionGrade::Superb,
+            v if v <= 0.55 => ItemConditionGrade::Reasonable,
+            v if v <= 0.8 => ItemConditionGrade::Good,
+            v if v <= 0.95 => ItemConditionGrade::Superb,
             _ => ItemConditionGrade::Perfect,
         }
+    }
+}
+
+impl Display for ItemCondition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({:?})", self.value, self.grade)
     }
 }

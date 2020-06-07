@@ -126,10 +126,10 @@ impl World {
         let to_pos = to.into();
 
         let from = self
-            .find_accessible_block_in_column_starting_from(from_pos)
+            .find_accessible_block_in_column_with_range(from_pos, None)
             .ok_or_else(|| NavigationError::SourceNotWalkable(from_pos))?;
         let to = self
-            .find_accessible_block_in_column_starting_from(to_pos)
+            .find_accessible_block_in_column_with_range(to_pos, None)
             .ok_or_else(|| NavigationError::TargetNotWalkable(to_pos))?;
 
         // same blocks
@@ -193,17 +193,18 @@ impl World {
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
-        self.find_accessible_block_in_column_starting_from(WorldPosition(x, y, i32::MAX))
+        self.find_accessible_block_in_column_with_range(WorldPosition(x, y, i32::MAX), None)
     }
 
-    pub fn find_accessible_block_in_column_starting_from(
+    pub fn find_accessible_block_in_column_with_range(
         &self,
         pos: WorldPosition,
+        z_min: Option<SliceIndex>,
     ) -> Option<WorldPosition> {
         let chunk_pos = ChunkPosition::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
-            .and_then(|c| c.find_accessible_block(slice_block, Some(SliceIndex(pos.2))))
+            .and_then(|c| c.find_accessible_block(slice_block, Some(SliceIndex(pos.2)), z_min))
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
@@ -261,7 +262,7 @@ impl World {
 
             let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
             let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-            if let Some(block_pos) = chunk.find_accessible_block(SliceBlock(x, y), None) {
+            if let Some(block_pos) = chunk.find_accessible_block(SliceBlock(x, y), None, None) {
                 return Some(block_pos.to_world_position(chunk.pos()));
             }
         }
@@ -354,13 +355,22 @@ mod tests {
 
         // ...but not when we start searching from a lower point
         assert_eq!(
-            w.find_accessible_block_in_column_starting_from(WorldPosition(4, 4, 8)),
+            w.find_accessible_block_in_column_with_range(WorldPosition(4, 4, 8), None),
+            Some(WorldPosition(4, 4, 7))
+        );
+
+        // ...or when the lower bound is set to exactly that
+        assert_eq!(
+            w.find_accessible_block_in_column_with_range(
+                WorldPosition(4, 4, 8),
+                Some(SliceIndex(7))
+            ),
             Some(WorldPosition(4, 4, 7))
         );
 
         // even when starting from the slice itself
         assert_eq!(
-            w.find_accessible_block_in_column_starting_from(WorldPosition(4, 4, 7)),
+            w.find_accessible_block_in_column_with_range(WorldPosition(4, 4, 7), None),
             Some(WorldPosition(4, 4, 7))
         );
 
@@ -368,6 +378,15 @@ mod tests {
         assert_eq!(
             w.find_accessible_block_in_column(10, 10),
             Some(WorldPosition(10, 10, 7))
+        );
+
+        // ...but not when the lower bound prevents it
+        assert_eq!(
+            w.find_accessible_block_in_column_with_range(
+                WorldPosition(10, 10, 20),
+                Some(SliceIndex(8))
+            ),
+            None
         );
 
         // non existent

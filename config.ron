@@ -1,21 +1,23 @@
 Config(
     display: (
-        resolution: (800, 600),
+        resolution: (1280, 720),
+        resizable: false,
         camera_speed: 0.5,
         debug_physics: false,
+        zoom: 1.0
     ),
     world: (
-        preset: OneChunkWonder,
+        preset: MultiChunkWonder,
         worker_threads: None,
     ),
     simulation: (
-        random_seed: Some(67853452415419),
-        random_count: 2,
+        random_seed: Some(67853852415419),
+        random_count: 10,
         acceleration: 0.08,
         friction: 0.85,
         max_speed: 0.22,
         start_delay: 0,
-        food_nutrition: 100,
-        food_count: 50,
+        food_nutrition: 90,
+        food_count: 200,
      ),
 )

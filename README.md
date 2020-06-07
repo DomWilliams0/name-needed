@@ -9,6 +9,11 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 
 ## Progress log
 
+* 07 Jun 2020: <em>A debugging UI with imgui as an experiment in game <--> UI communication.</em>
+<p style="margin: auto">
+    <img src=".screenshots/debug-ui.png"/>
+</p>
+
 * 31 May 2020: <em>AI utility system choosing between wandering, going to find food, and eating held food. Utility values are graphed in a Grafana dashboard - the need for hunger increases over time and is satisfied by sprinting to food and eating, look at them go!</em>
 <p style="margin: auto">
     <img src=".screenshots/ai-wander-graph.gif"/>

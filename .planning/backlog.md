@@ -14,10 +14,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 
 ## UI
 * cascading input handlers
-* imgui gui
-	* performance info (fps, avg. tick time, avg. render time)
-	* details about selected entity
-* entity selection and debug information
+* graph for fps/tps history
+	* measure ticks per second in perf window
 * tile selection and debug information
 	* tile region?
 
@@ -28,6 +26,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## World generation
 * simple terrain generation
 * features e.g. trees, hills
+	* trees are entities, not blocks
 
 ## Voxel world mechanics
 * fluid blocks
@@ -47,6 +46,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * periodic and staggered systems
 * slice-aware chunk mesh caching
 * influence map for density, sound
+* remove unneeded Debug impls/cfg_attr them to speed up compilation
 
 ## Crate release
 * gameloop
@@ -87,3 +87,4 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * distinct body parts
 * wellbeing of individual parts affects stats
 * gradual healing and tending
+* track injury causes e.g. arrow in leg, fired by X at time Y with weapon Z

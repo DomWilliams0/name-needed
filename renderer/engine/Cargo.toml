@@ -18,11 +18,14 @@ unit = {path = "../../shared/unit"}
 common = {path = "../../shared/common"}
 color = {path = "../../shared/color"}
 
-sdl2 = {version = "^0.34", optional = true}
+sdl2 = {version = "^0.33", optional = true}
 gl = {version = "^0.14", optional = true}
+imgui-sdl2 = {version = "^0.10", optional = true}
+imgui-opengl-renderer = {version = "^0.8", optional = true}
+imgui = {version = "^0.4", optional = true}
 
 [features]
 default = []
-use-sdl = ["sdl2", "gl"]
+use-sdl = ["sdl2", "gl", "imgui-sdl2", "imgui-opengl-renderer", "imgui"]
 lite = []
 gl-trace-log = []

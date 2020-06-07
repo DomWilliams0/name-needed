@@ -3,10 +3,11 @@ use std::ops::{Add, AddAssign};
 
 use common::derive_more::*;
 
-use common::{Vector2, Vector3};
+use common::{Point3, Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{ChunkPosition, SliceIndex, WorldPosition};
+use std::fmt::{Display, Formatter};
 use std::iter::{once, once_with};
 
 /// A point anywhere in the world
@@ -55,6 +56,16 @@ impl From<WorldPoint> for Vector3 {
 impl From<WorldPoint> for Vector2 {
     fn from(p: WorldPoint) -> Self {
         Self { x: p.0, y: p.1 }
+    }
+}
+
+impl From<WorldPoint> for Point3 {
+    fn from(p: WorldPoint) -> Self {
+        Self {
+            x: p.0,
+            y: p.1,
+            z: p.2,
+        }
     }
 }
 
@@ -121,5 +132,11 @@ impl TryFrom<&[f32]> for WorldPoint {
         } else {
             Err(())
         }
+    }
+}
+
+impl Display for WorldPoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:.2}, {:.2}, {:.2})", self.0, self.1, self.2)
     }
 }

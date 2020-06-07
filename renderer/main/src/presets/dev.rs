@@ -2,13 +2,12 @@ use std::path::Path;
 
 use common::*;
 use simulation::{
-    presets, ComponentWorld, InventoryComponent, PhysicalShape, Renderer, Simulation,
-    ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
+    presets, PhysicalShape, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader,
+    WorldLoader,
 };
 
 use crate::GamePreset;
 use color::ColorRgb;
-use simulation::dev::SimulationDevExt;
 use std::marker::PhantomData;
 
 pub struct DevGamePreset<R: Renderer> {
@@ -59,7 +58,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         let randoms = config::get().simulation.random_count;
         if randoms > 0 {
             info!("adding {} random entities", randoms);
-            let human = (0..randoms)
+            let _human = (0..randoms)
                 .map(|i| {
                     let (pos, radius) = {
                         let mut randy = random::get();
@@ -106,22 +105,21 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             for _ in 0..food_count {
                 let nutrition = config::get().simulation.food_nutrition;
                 if let Some(pos) = world.choose_random_walkable_block(20) {
+                    let mut randy = random::get();
                     match sim
                         .add_entity()
                         .with_pos(pos)
                         .with_height(0.5)
                         .with_shape(PhysicalShape::square(0.15))
-                        .with_color(ColorRgb::new_hsl(
-                            0.3,
-                            0.64,
-                            random::get().gen_range(0.4, 0.9),
-                        ))
-                        .build_food_item(nutrition)
-                    {
+                        .with_color(ColorRgb::new_hsl(0.3, 0.64, randy.gen_range(0.4, 0.9)))
+                        .build_food_item(
+                            ((nutrition as f32) * randy.gen_range(0.8, 1.2)) as u16,
+                            randy.gen_range(0.2, 1.0),
+                        ) {
                         Err(e) => {
                             warn!("failed to create random food entity: {}", e);
                         }
-                        Ok(item) => {
+                        Ok(_item) => {
                             // if i == 0 {
                             //     sim.make_food_bag_and_give_to(item, human);
                             // }

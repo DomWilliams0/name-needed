@@ -14,9 +14,10 @@ pub use ordered_float::OrderedFloat;
 pub use rand::prelude::*;
 pub use struclog::{self, *};
 
+pub use bumpalo;
 pub use derive_more;
 pub use lazy_static::lazy_static;
-pub use thiserror::Error;
+pub use thiserror::{self, Error};
 
 pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;

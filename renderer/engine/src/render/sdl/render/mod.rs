@@ -2,12 +2,11 @@ use color::ColorRgb;
 use common::*;
 use simulation::{RenderComponent, Renderer, TransformComponent};
 use unit::view::ViewPoint;
-use unit::world::{WorldPoint, SCALE};
 
 use crate::render::debug::DebugShape;
 use crate::render::sdl::gl::{
-    generate_circle_mesh, AttribType, BufferUsage, Capability, Divisor, GlError, GlResult,
-    InstancedPipeline, Normalized, Pipeline, Primitive, Program, ScopedBindable,
+    AttribType, BufferUsage, Capability, GlError, GlResult, Normalized, Pipeline, Primitive,
+    Program, ScopedBindable,
 };
 use crate::render::sdl::render::entity::EntityPipeline;
 use crate::render::sdl::render::terrain::TerrainRenderer;
@@ -92,14 +91,24 @@ impl Renderer for GlRenderer {
             .add_entity((transform.position, render.clone()));
     }
 
+    fn sim_selected(&mut self, transform: &TransformComponent) {
+        // simple underline
+        const PAD: f32 = 0.2;
+        let radius = transform.bounding_radius + PAD;
+        let from = transform.position + -Vector2::new(radius, radius);
+        let to = from + Vector2::new(radius * 2.0, 0.0);
+        self.debug_shapes.push(DebugShape::Line {
+            points: [from.into(), to.into()],
+            color: ColorRgb::new(250, 250, 250),
+        })
+    }
+
     fn sim_finish(&mut self) -> GlResult<()> {
         let frame = self.frame_target.as_mut().unwrap();
         self.entity_pipeline.render_entities(frame)
     }
 
-    fn debug_start(&mut self) {
-        self.debug_shapes.clear();
-    }
+    fn debug_start(&mut self) {}
 
     fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {
         self.debug_shapes.push(DebugShape::Line {
@@ -141,6 +150,9 @@ impl Renderer for GlRenderer {
 
         let _no_depth = Capability::DepthTest.scoped_disable();
         vbo.draw_array(Primitive::Lines);
+
+        self.debug_shapes.clear();
+
         Ok(())
     }
 

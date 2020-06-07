@@ -10,8 +10,10 @@ pub struct Config {
 #[derive(Deserialize)]
 pub struct Display {
     pub resolution: (u32, u32),
+    pub resizable: bool,
     pub camera_speed: f32,
     pub debug_physics: bool,
+    pub zoom: f32,
 }
 
 #[derive(Deserialize)]

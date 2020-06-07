@@ -1,4 +1,4 @@
-use unit::world::WorldPoint;
+use unit::world::{WorldPoint, WorldPosition};
 use world::{EdgeCost, WorldPath};
 
 pub struct PathFollowing {
@@ -34,5 +34,13 @@ impl PathFollowing {
 
     pub const fn target(&self) -> WorldPoint {
         self.final_target
+    }
+
+    pub fn waypoints(&self) -> impl Iterator<Item = &WorldPosition> {
+        self.path
+            .path()
+            .iter()
+            .skip(self.next)
+            .map(|node| &node.block)
     }
 }

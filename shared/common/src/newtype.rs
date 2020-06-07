@@ -1,6 +1,6 @@
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{AddAssign, Mul, SubAssign};
 
 #[derive(Copy, Clone)]
@@ -89,6 +89,12 @@ impl SubAssign<f32> for NormalizedFloat {
 impl<T: Debug> Debug for Proportion<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Proportion({:?}/{:?})", self.value, self.max)
+    }
+}
+
+impl<T: Display> Display for Proportion<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.value, self.max)
     }
 }
 

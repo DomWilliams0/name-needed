@@ -40,6 +40,9 @@ pub trait ComponentWorld {
     fn component<T: Component>(&self, entity: Entity) -> Result<&T, NoSuchComponent>;
     fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, NoSuchComponent>;
 
+    fn resource<T: Resource>(&self) -> &T;
+    fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, f: F) -> R;
+
     fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T>;
     fn remove_now<T: Component>(&mut self, entity: Entity) -> Option<T>;
 
@@ -74,6 +77,15 @@ impl ComponentWorld for EcsWorld {
         // lifetime from that of the storage to that of self
         let result: Option<&mut T> = unsafe { std::mem::transmute(storage.get_mut(entity)) };
         result.ok_or_else(|| NoSuchComponent::new::<T>(entity))
+    }
+
+    fn resource<T: Resource>(&self) -> &T {
+        *self.read_resource()
+    }
+
+    fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, f: F) -> R {
+        let mut res = self.write_resource::<T>();
+        f(&mut *res)
     }
 
     fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T> {
@@ -138,6 +150,7 @@ mod dummy {
     use crate::ecs::{
         Component, ComponentBuilder, ComponentWorld, EcsWorld, Entity, NoSuchComponent, WorldExt,
     };
+    use specs::prelude::Resource;
 
     pub struct DummyComponentReceptacle {
         world: WorldRef,
@@ -171,6 +184,14 @@ mod dummy {
         }
 
         fn component_mut<T: Component>(&self, _entity: Entity) -> Result<&mut T, NoSuchComponent> {
+            unimplemented!()
+        }
+
+        fn resource<T: Resource>(&self) -> &T {
+            unimplemented!()
+        }
+
+        fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, _f: F) -> R {
             unimplemented!()
         }
 

@@ -7,7 +7,7 @@ use unit::view::ViewPoint;
 use unit::world::{ChunkPosition, WorldPoint, WorldPosition, SCALE};
 
 pub struct Camera {
-    /// Camera pos in screen space
+    /// Camera pos in metres
     pos: Point2,
     velocity: Vector2,
     last_extrapolated_pos: Point2,
@@ -26,7 +26,7 @@ impl Camera {
             velocity: Vector2::zero(),
             pos: Point2::new(0.0, 0.0),
             last_extrapolated_pos: Point2::new(0.0, 0.0),
-            zoom: 1.0,
+            zoom: config::get().display.zoom,
             window_size: Vector2::zero(), // set in on_resize
         };
         cam.on_resize(width, height);
@@ -49,9 +49,11 @@ impl Camera {
         let new_sz = Vector2::new(w, h);
         let old_sz = std::mem::replace(&mut self.window_size, new_sz);
 
-        // keep screen centre in the same place TODO only sometimes?
-        let delta = (new_sz - old_sz) / SCREEN_SCALE;
+        // keep screen centre in the same place
+        let delta = (new_sz - old_sz) / SCREEN_SCALE / 2.0 * self.zoom;
+
         self.pos -= delta;
+        self.last_extrapolated_pos = self.pos;
     }
 
     pub fn handle_key(&mut self, event: KeyEvent) -> EventHandled {
@@ -121,5 +123,16 @@ impl Camera {
             0.0,
             100.0,
         )
+    }
+
+    /// Returns (x, y) in world scale
+    pub fn screen_to_world(&self, screen_pos: (i32, i32)) -> (f32, f32) {
+        let offset = {
+            let xpixels = screen_pos.0 as f32;
+            let ypixels = self.window_size.y - screen_pos.1 as f32;
+            let to_metres = self.zoom / SCREEN_SCALE;
+            Vector2::new(xpixels * to_metres, ypixels * to_metres)
+        };
+        ((self.pos + offset) / SCALE).into()
     }
 }

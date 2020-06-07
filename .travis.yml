@@ -13,6 +13,7 @@ branches:
         - /.*/
 
 install:
+    - if [[ "$TRAVIS_BRANCH" = "develop" && -f .planning/active.md ]]; then echo "develop should not have an active.md"; exit 1; fi
     - bash .travis-install-sdl2.sh
 
 env:

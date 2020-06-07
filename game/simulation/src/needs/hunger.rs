@@ -18,7 +18,7 @@ const BASE_METABOLISM: f32 = 0.5;
 const BASE_EAT_RATE: Fuel = 5;
 
 // TODO generic needs component with hunger/thirst/toilet/social etc
-#[derive(Component)]
+#[derive(Component, Clone)]
 #[storage(VecStorage)]
 pub struct HungerComponent {
     current_fuel: AccumulativeInt<Fuel>,
@@ -160,5 +160,10 @@ impl HungerComponent {
 
     pub fn hunger(&self) -> NormalizedFloat {
         NormalizedFloat::new(self.current_fuel.value() as f32 / self.max_fuel as f32)
+    }
+
+    /// (a, b) -> a/b fuel
+    pub fn satiety(&self) -> (Fuel, Fuel) {
+        (self.current_fuel.value(), self.max_fuel)
     }
 }

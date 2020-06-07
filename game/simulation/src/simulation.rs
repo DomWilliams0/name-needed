@@ -11,6 +11,9 @@ use crate::ai::{ActivityComponent, AiComponent, AiSystem};
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
+use crate::input::{
+    Blackboard, InputCommand, InputEvent, InputSystem, SelectedComponent, SelectedEntity,
+};
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
     PickupItemSystem, ThrowableItemComponent, UsingItemComponent,
@@ -18,12 +21,13 @@ use crate::item::{
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
-    FollowPathComponent, PathSteeringSystem, WanderComponent, WanderPathAssignmentSystem,
+    FollowPathComponent, PathDebugRenderer, PathSteeringSystem, WanderComponent,
+    WanderPathAssignmentSystem,
 };
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
-use crate::render::dummy::AxesDebugRenderer;
-use crate::render::{DebugRenderer, RenderComponent, RenderSystem, Renderer};
+use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
+use crate::render::{RenderComponent, RenderSystem, Renderer};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 
@@ -41,8 +45,7 @@ pub struct Simulation<R: Renderer> {
     chunk_updates: Receiver<ChunkUpdate>,
 
     renderer: PhantomData<R>,
-    debug_renderers: Vec<Box<dyn DebugRenderer<R>>>,
-    debug_physics: bool,
+    debug_renderers: DebugRenderers<R>,
     current_tick: Tick,
 }
 
@@ -56,10 +59,14 @@ impl<R: Renderer> Simulation<R> {
         // insert resources
         let voxel_world = world_loader.world();
         ecs_world.insert(voxel_world.clone());
-        ecs_world.insert(Tick::default());
-        ecs_world.insert(QueuedUpdates::default());
+        register_resources(&mut ecs_world);
 
         let chunk_updates = world_loader.chunk_updates_rx().unwrap();
+        let mut debug_renderers = DebugRenderers::new();
+        if let Err(e) = register_debug_renderers(&mut debug_renderers) {
+            // TODO return Result instead of panic!, even though this only happens during game init
+            panic!("failed to register debug renderers: {}", e);
+        }
 
         Self {
             ecs_world,
@@ -67,8 +74,7 @@ impl<R: Renderer> Simulation<R> {
             voxel_world,
             world_loader,
             chunk_updates,
-            debug_renderers: vec![Box::new(AxesDebugRenderer), Box::new(SteeringDebugRenderer)],
-            debug_physics: config::get().display.debug_physics,
+            debug_renderers,
             current_tick: Tick::default(),
         }
     }
@@ -77,7 +83,7 @@ impl<R: Renderer> Simulation<R> {
         EntityBuilder::new(&mut self.ecs_world)
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, commands: &[InputCommand]) {
         let _span = Span::Tick.begin();
 
         // update tick resource
@@ -91,6 +97,9 @@ impl<R: Renderer> Simulation<R> {
 
         // TODO limit time/count
         self.apply_chunk_updates();
+
+        // apply player inputs
+        self.process_input_commands(commands);
 
         // needs
         HungerSystem.run_now(&self.ecs_world);
@@ -144,6 +153,18 @@ impl<R: Renderer> Simulation<R> {
         }
     }
 
+    fn process_input_commands(&mut self, commands: &[InputCommand]) {
+        for cmd in commands {
+            match *cmd {
+                InputCommand::ToggleDebugRenderer { ident, enabled } => {
+                    if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
+                        warn!("failed to toggle debug renderer: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
     // target is for this frame only
     pub fn render(
         &mut self,
@@ -151,9 +172,14 @@ impl<R: Renderer> Simulation<R> {
         target: R::Target,
         renderer: &mut R,
         interpolation: f64,
-    ) -> R::Target {
-        // start frame
+        input: &[InputEvent],
+    ) -> (R::Target, Blackboard) {
         let _span = Span::Render(interpolation).begin();
+
+        // process input before rendering
+        InputSystem { events: input }.run_now(&self.ecs_world);
+
+        // start frame
         renderer.init(target);
 
         // render simulation
@@ -174,26 +200,27 @@ impl<R: Renderer> Simulation<R> {
         }
 
         // render debug shapes
-        // TODO needs interpolation?
         {
             renderer.debug_start();
+            let ecs_world = &self.ecs_world;
+            let voxel_world = self.voxel_world.borrow();
 
-            for debug_renderer in self.debug_renderers.iter_mut() {
-                debug_renderer.render(renderer, self.voxel_world.clone(), &self.ecs_world, slices);
-            }
+            self.debug_renderers
+                .iter_enabled()
+                .for_each(|r| r.render(renderer, &voxel_world, ecs_world, slices));
+
             if let Err(e) = renderer.debug_finish() {
                 warn!("render debug_finish() failed: {:?}", e);
             }
         }
 
         // end frame
-        renderer.deinit()
-    }
+        let target = renderer.deinit();
 
-    /// Toggles and returns new enabled state
-    pub fn toggle_physics_debug_rendering(&mut self) -> bool {
-        self.debug_physics = !self.debug_physics;
-        self.debug_physics
+        // gather blackboard for ui
+        let blackboard = Blackboard::fetch(&self.ecs_world, &self.debug_renderers.summarise());
+
+        (target, blackboard)
     }
 }
 
@@ -227,6 +254,24 @@ fn register_components(_world: &mut EcsWorld) {
     register!(InventoryComponent);
     register!(UsingItemComponent);
     register!(PickupItemComponent);
+
+    // input
+    register!(SelectedComponent);
+}
+
+fn register_resources(world: &mut EcsWorld) {
+    world.insert(Tick::default());
+    world.insert(QueuedUpdates::default());
+    world.insert(SelectedEntity::default());
+}
+
+fn register_debug_renderers<R: Renderer>(
+    r: &mut DebugRenderers<R>,
+) -> Result<(), DebugRendererError> {
+    r.register(AxesDebugRenderer, true)?;
+    r.register(SteeringDebugRenderer, true)?;
+    r.register(PathDebugRenderer::default(), false)?;
+    Ok(())
 }
 
 impl<R: Renderer> SimulationDevExt for Simulation<R> {

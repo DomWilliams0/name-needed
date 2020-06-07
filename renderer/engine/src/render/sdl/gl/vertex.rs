@@ -271,6 +271,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         }
     }
 
+    /*
     pub fn draw_array_instanced(
         &self,
         primitive: Primitive,
@@ -293,6 +294,7 @@ impl<'a> ScopedBind<'a, Vbo> {
             ))
         }
     }
+    */
 
     /// Assumes indices are u16
     pub fn draw_elements_instanced(
@@ -336,10 +338,12 @@ impl<'a> ScopedBind<'a, Vbo> {
         }
     }
 
+    /*
     pub fn replace<'b>(self, other: &'b Vbo) -> ScopedBind<'b, Vbo> {
         std::mem::forget(self);
         other.scoped_bind()
     }
+    */
 }
 
 pub trait Bindable {

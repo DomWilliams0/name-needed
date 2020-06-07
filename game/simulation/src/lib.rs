@@ -12,6 +12,7 @@ pub use crate::simulation::{Simulation, ThreadedWorldLoader};
 pub use crate::transform::TransformComponent;
 pub use ecs::ComponentWorld;
 pub use item::InventoryComponent;
+pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
@@ -20,10 +21,12 @@ mod backend;
 pub mod dev;
 mod ecs;
 mod entity_builder;
+pub mod input;
 mod item;
 mod movement;
 mod needs;
 mod path;
+mod perf;
 mod physics;
 mod queued_update;
 mod render;

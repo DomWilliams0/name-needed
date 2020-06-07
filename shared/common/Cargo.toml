@@ -20,11 +20,12 @@ env_logger = {version = "^0.7", optional = true}
 float-cmp = "^0.5"
 derive_more = "^0.99"
 ordered-float = "^1.0"
-thiserror = "1.0"
+thiserror = "^1.0"
+bumpalo = {version = "^3.4", features = ["collections"]}
 
 # TODO feature for cgmath
 [features]
-default = []
+default = ["struclog/null"]
 # struclog sinks must be the same for both
-binary = ["log/release_max_level_info", "env_logger", "struclog/trace", "struclog/null"]
-library = ["struclog/trace", "struclog/null"]
+binary = ["log/release_max_level_info", "env_logger", "struclog/trace"]
+library = ["struclog/trace"]

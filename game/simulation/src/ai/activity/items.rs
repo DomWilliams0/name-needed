@@ -9,10 +9,13 @@ use crate::item::{
 use crate::path::FollowPathComponent;
 use crate::TransformComponent;
 use common::derive_more::Constructor;
+use smallvec::alloc::fmt::Formatter;
+use std::fmt::Display;
 use unit::world::WorldPoint;
 
 pub struct UseHeldItemActivity {
     item: Entity,
+    item_class: Option<ItemClass>,
     /// Initially set to wherever the item is in inventory, then reset to None in on_start
     initial_slot: Option<SlotReference>,
     exertion: f32,
@@ -41,6 +44,7 @@ impl UseHeldItemActivity {
         let ItemReference(slot, item) = item.0;
         Self {
             item,
+            item_class: None,
             initial_slot: Some(slot),
             exertion: 0.0,
         }
@@ -54,6 +58,8 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
             Ok(base) => base,
             Err(_) => return,
         };
+
+        self.item_class = Some(base_item.class);
 
         // TODO proper exertion calculation for item use
         self.exertion = match base_item.class {
@@ -216,6 +222,23 @@ impl GoPickUpItemActivity {
 
             Ok(())
         });
+    }
+}
+
+impl Display for GoPickUpItemActivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Going to pick up item")
+    }
+}
+
+impl Display for UseHeldItemActivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Using held item")?;
+        if let Some(class) = self.item_class {
+            write!(f, " ({:?})", class)?;
+        }
+
+        Ok(())
     }
 }
 

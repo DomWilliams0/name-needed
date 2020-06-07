@@ -24,6 +24,8 @@ crossbeam = "^0.7"
 ux = "^0.1"
 smallvec = "^1.4"
 permutation = "^0.2"
+arraydeque = "^0.4"
+
 
 [dev-dependencies]
 polymap = "^0.3"

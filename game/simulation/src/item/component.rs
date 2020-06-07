@@ -26,7 +26,7 @@ pub struct BaseItemComponent {
     pub mounted_slots: u8,
 }
 
-#[derive(Component, Constructor)]
+#[derive(Component, Constructor, Clone)]
 #[storage(DenseVecStorage)]
 pub struct EdibleItemComponent {
     /// All fuel available from this item - never changes, decrease base item condition instead

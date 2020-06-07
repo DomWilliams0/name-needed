@@ -9,12 +9,15 @@ use sdl2::{EventPump, Sdl, VideoSubsystem};
 use color::ColorRgb;
 use common::input::{CameraDirection, Key, KeyEvent};
 use common::*;
-use simulation::{EventsOutcome, ExitType, Simulation, SimulationBackend, WorldViewer};
+use simulation::{EventsOutcome, ExitType, PerfAvg, Simulation, SimulationBackend, WorldViewer};
 
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
 use crate::render::sdl::render::FrameTarget;
+use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
+use sdl2::mouse::MouseButton;
+use simulation::input::{InputCommand, InputEvent, WorldColumn};
 
 pub struct SdlBackend {
     world_viewer: WorldViewer,
@@ -26,6 +29,9 @@ pub struct SdlBackend {
     window: Window,
 
     renderer: GlRenderer,
+    ui: Ui,
+    /// Events from game -> UI, queued up and passed to sim on each frame
+    sim_input_events: Vec<InputEvent>,
 }
 
 /// Unused fields but need to be kept alive
@@ -61,14 +67,21 @@ impl SimulationBackend for SdlBackend {
         let (w, h) = config::get().display.resolution;
         info!("window size is {}x{}", w, h);
 
-        let window = video
-            .window("Name Needed", w, h)
-            .position_centered()
-            .opengl()
-            .build()?;
+        let window = {
+            let mut builder = video.window("Name Needed", w, h);
+
+            builder.position_centered().allow_highdpi().opengl();
+
+            if config::get().display.resizable {
+                builder.resizable();
+            }
+            builder.build()?
+        };
 
         let gl = Gl::new(&window, &video)?;
         Gl::set_clear_color(ColorRgb::new(17, 17, 20));
+
+        let ui = Ui::new(&window, &video);
 
         // enable vsync
         video.gl_set_swap_interval(1)?;
@@ -84,6 +97,8 @@ impl SimulationBackend for SdlBackend {
             keep_alive: GraphicsKeepAlive { sdl, video, gl },
             window,
             renderer,
+            ui,
+            sim_input_events: Vec::with_capacity(32),
         })
     }
 
@@ -92,6 +107,10 @@ impl SimulationBackend for SdlBackend {
 
         let mut events = StealysEventPump::steal(&mut self.sdl_events);
         for event in events.poll_iter() {
+            if let EventConsumed::Consumed = self.ui.handle_event(&event) {
+                continue;
+            }
+
             match event {
                 Event::Quit { .. } => {
                     outcome = EventsOutcome::Exit(ExitType::Stop);
@@ -128,6 +147,30 @@ impl SimulationBackend for SdlBackend {
                     }
                 }
 
+                Event::MouseButtonDown {
+                    mouse_btn, x, y, ..
+                } => {
+                    let (wx, wy) = match mouse_btn {
+                        MouseButton::Left | MouseButton::Right => {
+                            self.camera.screen_to_world((x, y))
+                        }
+                        _ => continue,
+                    };
+
+                    let selected = WorldColumn {
+                        x: wx,
+                        y: wy,
+                        slice_range: self.world_viewer.range(),
+                    };
+
+                    let event = match mouse_btn {
+                        MouseButton::Left => InputEvent::LeftClick(selected),
+                        MouseButton::Right => InputEvent::RightClick(selected),
+                        _ => unreachable!(),
+                    };
+                    self.sim_input_events.push(event);
+                }
+
                 _ => {}
             };
         }
@@ -154,7 +197,13 @@ impl SimulationBackend for SdlBackend {
             });
     }
 
-    fn render(&mut self, simulation: &mut Simulation<Self::Renderer>, interpolation: f64) {
+    fn render(
+        &mut self,
+        simulation: &mut Simulation<Self::Renderer>,
+        interpolation: f64,
+        perf: &PerfAvg,
+        commands: &mut Vec<InputCommand>,
+    ) {
         // clear window
         Gl::clear();
 
@@ -172,11 +221,25 @@ impl SimulationBackend for SdlBackend {
             proj: projection.as_ptr(),
             view: view.as_ptr(),
         };
-        simulation.render(
+
+        let (_, blackboard) = simulation.render(
             self.world_viewer.range(),
             frame_target,
             &mut self.renderer,
             interpolation,
+            &self.sim_input_events,
+        );
+
+        // input events were for this frame only
+        self.sim_input_events.clear();
+
+        // render ui and collect input commands
+        self.ui.render(
+            &self.window,
+            &self.sdl_events.mouse_state(),
+            perf,
+            blackboard,
+            commands,
         );
 
         self.window.gl_swap_window();

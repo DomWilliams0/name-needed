@@ -18,4 +18,7 @@ members = [
 ]
 
 [profile.dev]
-debug = 0
+debug = 0 # for fasting build times
+
+[profile.release]
+debug = 1 # for profiling

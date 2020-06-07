@@ -1,6 +1,9 @@
 use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish};
 use crate::ecs::ComponentWorld;
+use common::derive_more::Display;
 
+#[derive(Display)]
+#[display(fmt = "Doing nothing")]
 pub struct NopActivity;
 
 impl<W: ComponentWorld> Activity<W> for NopActivity {

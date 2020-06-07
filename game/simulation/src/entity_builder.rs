@@ -75,14 +75,11 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
         Ok(entity)
     }
 
-    pub fn build_food_item(
-        self,
-        nutrition: u16, /* TODO Fuel */
-    ) -> Result<Entity, &'static str> {
+    pub fn build_food_item(self, nutrition: u16, condition: f32) -> Result<Entity, &'static str> {
         self.build().map(|b| {
             b.with_(BaseItemComponent::new(
                 "Food",
-                ItemCondition::new_perfect(10),
+                ItemCondition::with_proportion(Proportion::with_proportion(condition, nutrition)),
                 0.5,
                 ItemClass::Food,
                 1,

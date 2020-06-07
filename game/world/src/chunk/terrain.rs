@@ -843,11 +843,14 @@ impl ChunkTerrain {
         &self,
         pos: SliceBlock,
         start_from: Option<SliceIndex>,
+        end_at: Option<SliceIndex>,
     ) -> Option<BlockPosition> {
         let start_from = start_from.unwrap_or(SliceIndex::MAX);
+        let end_at = end_at.unwrap_or(SliceIndex::MIN);
         self.raw_terrain()
             .slices_from_top_offset()
             .skip_while(|(s, _)| s.0 > start_from.0)
+            .take_while(|(s, _)| s.0 >= end_at.0)
             .find(|(_, slice)| slice[pos].walkable())
             .map(|(z, _)| pos.to_block_position(z))
     }

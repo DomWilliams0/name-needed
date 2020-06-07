@@ -35,9 +35,11 @@
    * `// TODO use arena/bump allocator and share instance between entities`
  * [game/simulation/src/dev.rs](game/simulation/src/dev.rs) (1)
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
- * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (2)
+ * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (1)
    * `// TODO add must_use to all builder patterns`
-   * `nutrition: u16, /* TODO Fuel */`
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (2)
+   * `// TODO spatial query rather than checking every entity ever`
+   * `// TODO make selected entity go to pos`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (10)
    * `// TODO this could do with a builder`
    * `pub class: ItemClass, // TODO possible for an item to have multiple classes?`
@@ -71,20 +73,20 @@
    * `// TODO compensate multipliers`
    * `let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
- * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
-   * `// TODO debug path renderer`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
  * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
    * `warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error`
    * `// FIXME GROSS HACK`
+ * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
+   * `// TODO detect if changed`
  * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `#[allow(dead_code)] // TODO will be used when world can be modified`
+   * `// TODO return Result instead of panic!, even though this only happens during game init`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
-   * `// TODO needs interpolation?`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
@@ -165,8 +167,7 @@
    * `// TODO separate faster rate for physics?`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
    * `// TODO cascade through other handlers`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (3)
-   * `// keep screen centre in the same place TODO only sometimes?`
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)

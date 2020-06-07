@@ -1,5 +1,7 @@
 use world::WorldViewer;
 
+use crate::input::InputCommand;
+use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation};
 use std::fmt::Debug;
 
@@ -23,5 +25,11 @@ pub trait SimulationBackend: Sized {
 
     fn tick(&mut self);
 
-    fn render(&mut self, simulation: &mut Simulation<Self::Renderer>, interpolation: f64);
+    fn render(
+        &mut self,
+        simulation: &mut Simulation<Self::Renderer>,
+        interpolation: f64,
+        perf: &PerfAvg,
+        commands: &mut Vec<InputCommand>,
+    );
 }

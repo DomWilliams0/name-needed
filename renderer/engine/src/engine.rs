@@ -2,13 +2,17 @@ use std::time::Duration;
 
 use common::*;
 use gameloop::{FrameAction, GameLoop};
+use simulation::input::InputCommand;
 use simulation::{
-    self, EventsOutcome, ExitType, Renderer, Simulation, SimulationBackend, WorldViewer,
+    self, EventsOutcome, ExitType, Perf, Renderer, Simulation, SimulationBackend, WorldViewer,
 };
 
 pub struct Engine<R: Renderer, B: SimulationBackend<Renderer = R>> {
     backend: B,
     simulation: Simulation<R>,
+    perf: Perf,
+    /// Commands from UI -> game, accumulated over render frames and passed to sim on each tick
+    sim_input_commands: Vec<InputCommand>,
 }
 
 impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
@@ -19,6 +23,8 @@ impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
         Ok(Self {
             backend,
             simulation,
+            perf: Default::default(),
+            sim_input_commands: Vec::with_capacity(32),
         })
     }
 
@@ -53,12 +59,25 @@ impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
 
     fn tick(&mut self) {
         trace!("tick");
-        self.simulation.tick();
+        let _timer = self.perf.tick.time();
+
+        self.simulation.tick(&self.sim_input_commands);
+        self.sim_input_commands.clear();
+
         self.backend.tick();
     }
 
     fn render(&mut self, interpolation: f64) {
+        let perf = self.perf.calculate();
+
         trace!("render (interpolation={})", interpolation);
-        self.backend.render(&mut self.simulation, interpolation);
+        let _timer = self.perf.render.time();
+
+        self.backend.render(
+            &mut self.simulation,
+            interpolation,
+            &perf,
+            &mut self.sim_input_commands,
+        );
     }
 }

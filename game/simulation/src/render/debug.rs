@@ -1,0 +1,124 @@
+use crate::ecs::EcsWorld;
+use crate::{Renderer, SliceRange};
+use color::ColorRgb;
+use common::*;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::ops::DerefMut;
+use unit::view::ViewPoint;
+use world::InnerWorldRef;
+
+pub trait DebugRenderer<R: Renderer> {
+    fn identifier(&self) -> &'static str;
+    fn render(
+        &mut self,
+        renderer: &mut R,
+        world: &InnerWorldRef,
+        ecs_world: &EcsWorld,
+        slices: SliceRange,
+    );
+}
+
+pub struct DebugRenderers<R: Renderer> {
+    map: HashMap<&'static str, (bool, Box<dyn DebugRenderer<R>>)>,
+    summary: HashSet<&'static str>,
+}
+
+#[derive(Error, Debug)]
+pub enum DebugRendererError {
+    #[error("'{0}' already registered")]
+    AlreadyRegistered(&'static str),
+    #[error("no such renderer '{0}'")]
+    NoSuchRenderer(&'static str),
+}
+
+/// Example renderer that draws lines at the origin along the X and Y axes
+pub struct AxesDebugRenderer;
+
+impl<R: Renderer> DebugRenderers<R> {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+            summary: HashSet::with_capacity(32),
+        }
+    }
+
+    pub fn register<T: DebugRenderer<R> + 'static>(
+        &mut self,
+        renderer: T,
+        enabled: bool,
+    ) -> Result<(), DebugRendererError> {
+        match self.map.entry(renderer.identifier()) {
+            Entry::Occupied(_) => Err(DebugRendererError::AlreadyRegistered(renderer.identifier())),
+            Entry::Vacant(e) => {
+                debug!(
+                    "registered {} debug renderer '{}'",
+                    if enabled { "enabled" } else { "disabled" },
+                    e.key()
+                );
+                e.insert((enabled, Box::new(renderer)));
+                Ok(())
+            }
+        }
+    }
+
+    pub fn set_enabled(
+        &mut self,
+        identifier: &'static str,
+        enabled: bool,
+    ) -> Result<(), DebugRendererError> {
+        self.map
+            .get_mut(identifier)
+            .map(|(e, _)| {
+                *e = enabled;
+                debug!(
+                    "{} debug renderer '{}'",
+                    if enabled { "enabled" } else { "disabled" },
+                    identifier
+                );
+            })
+            .ok_or_else(|| DebugRendererError::NoSuchRenderer(identifier))
+    }
+
+    pub fn iter_enabled(&mut self) -> impl Iterator<Item = &mut dyn DebugRenderer<R>> {
+        self.map.values_mut().filter_map(|(enabled, renderer)| {
+            if *enabled {
+                Some(renderer.deref_mut() as &mut dyn DebugRenderer<R>)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn summarise(&mut self) -> &HashSet<&'static str> {
+        self.summary.clear();
+        self.summary
+            .extend(self.map.values().filter_map(|(enabled, renderer)| {
+                if *enabled {
+                    Some(renderer.identifier())
+                } else {
+                    None
+                }
+            }));
+        &self.summary
+    }
+}
+
+impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
+    fn identifier(&self) -> &'static str {
+        "axes"
+    }
+
+    fn render(&mut self, renderer: &mut R, _: &InnerWorldRef, _: &EcsWorld, _: SliceRange) {
+        renderer.debug_add_line(
+            ViewPoint(0.0, 0.0, 1.0),
+            ViewPoint(1.0, 0.0, 1.0),
+            ColorRgb::new(255, 0, 0),
+        );
+        renderer.debug_add_line(
+            ViewPoint(0.0, 0.0, 1.0),
+            ViewPoint(0.0, 1.0, 1.0),
+            ColorRgb::new(0, 255, 0),
+        );
+    }
+}

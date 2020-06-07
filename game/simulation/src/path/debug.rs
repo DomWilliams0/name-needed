@@ -1,39 +1,61 @@
-use world::{SliceRange, WorldRef};
+use world::{InnerWorldRef, SliceRange};
 
 use crate::ecs::*;
+use crate::path::FollowPathComponent;
 use crate::render::DebugRenderer;
-use crate::Renderer;
+use crate::{RenderComponent, Renderer, TransformComponent};
+use unit::world::WorldPoint;
 
-pub struct PathDebugRenderer;
+pub struct PathDebugRenderer {
+    waypoints: Vec<WorldPoint>,
+}
+
+impl Default for PathDebugRenderer {
+    fn default() -> Self {
+        Self {
+            waypoints: Vec::with_capacity(128),
+        }
+    }
+}
 
 impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
+    fn identifier(&self) -> &'static str {
+        "navigation path"
+    }
+
     fn render(
         &mut self,
-        _renderer: &mut R,
-        _world: WorldRef,
-        _ecs_world: &EcsWorld,
-        _slices: SliceRange,
+        renderer: &mut R,
+        _: &InnerWorldRef,
+        ecs_world: &EcsWorld,
+        slices: SliceRange,
     ) {
-        // TODO debug path renderer
-        // let query = <(
-        //     Read<FollowPathComponent>,
-        //     Read<TransformComponent>,
-        //     Read<PhysicalComponent>,
-        // )>::query();
-        // for (follow_path, transform, physical) in query.iter_immutable(ecs_world) {
-        //     if let Some(path) = follow_path.path() {
-        //         let mut line_from = transform.position;
-        //         for (next_point, _) in path.iter() {
-        //             let line_to = WorldPoint::from(*next_point);
-        //             renderer.debug_add_line(
-        //                 ViewPoint::from(line_from),
-        //                 ViewPoint::from(line_to),
-        //                 physical.color,
-        //             );
-        //
-        //             line_from = line_to;
-        //         }
-        //     }
-        // }
+        type Query<'a> = (
+            ReadStorage<'a, FollowPathComponent>,
+            ReadStorage<'a, TransformComponent>,
+            ReadStorage<'a, RenderComponent>,
+        );
+
+        let (path, transform, render) = <Query as SystemData>::fetch(ecs_world);
+
+        for (follow_path, transform, render) in (&path, &transform, &render).join() {
+            if !slices.contains(transform.slice()) {
+                continue;
+            }
+
+            follow_path.waypoints(&mut self.waypoints);
+            if self.waypoints.is_empty() {
+                continue;
+            }
+
+            let mut line_from = transform.position;
+            for line_to in self.waypoints.iter().copied() {
+                renderer.debug_add_line(line_from.into(), line_to.into(), render.color());
+
+                line_from = line_to;
+            }
+
+            self.waypoints.clear();
+        }
     }
 }

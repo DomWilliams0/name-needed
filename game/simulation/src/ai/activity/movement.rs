@@ -2,7 +2,10 @@ use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish};
 use crate::ecs::ComponentWorld;
 use crate::path::{FollowPathComponent, WanderComponent, WANDER_SPEED};
 use crate::steer::SteeringComponent;
+use common::derive_more::Display;
 
+#[derive(Display)]
+#[display(fmt = "Wandering aimlessly")]
 pub struct WanderActivity;
 
 impl<W: ComponentWorld> Activity<W> for WanderActivity {

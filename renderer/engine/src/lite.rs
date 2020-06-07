@@ -1,7 +1,8 @@
 use std::time::{Duration, Instant};
 
+use simulation::input::InputCommand;
 use simulation::{
-    EventsOutcome, ExitType, RenderComponent, Renderer, Simulation, SimulationBackend,
+    EventsOutcome, ExitType, PerfAvg, RenderComponent, Renderer, Simulation, SimulationBackend,
     TransformComponent, WorldViewer,
 };
 
@@ -20,6 +21,8 @@ impl Renderer for DummyRenderer {
     fn sim_start(&mut self) {}
 
     fn sim_entity(&mut self, _transform: &TransformComponent, _render: &RenderComponent) {}
+
+    fn sim_selected(&mut self, _transform: &TransformComponent) {}
 
     fn sim_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -48,5 +51,12 @@ impl SimulationBackend for DummyBackend {
 
     fn tick(&mut self) {}
 
-    fn render(&mut self, _simulation: &mut Simulation<Self::Renderer>, _interpolation: f64) {}
+    fn render(
+        &mut self,
+        _simulation: &mut Simulation<Self::Renderer>,
+        _interpolation: f64,
+        _perf: &PerfAvg,
+        _commands: &mut Vec<InputCommand>,
+    ) {
+    }
 }

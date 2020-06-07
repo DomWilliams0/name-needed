@@ -1,5 +1,6 @@
 use ai::AiBox;
 pub use misc::NopActivity;
+use std::fmt::Display;
 
 use crate::ai::activity::items::{GoPickUpItemActivity, UseHeldItemActivity};
 use crate::ai::activity::movement::WanderActivity;
@@ -28,7 +29,7 @@ pub struct ActivityContext<'a, W: ComponentWorld> {
     pub updates: &'a QueuedUpdates,
 }
 
-pub trait Activity<W: ComponentWorld> {
+pub trait Activity<W: ComponentWorld>: Display {
     fn on_start(&mut self, ctx: &ActivityContext<W>);
     fn on_tick(&mut self, ctx: &ActivityContext<W>) -> ActivityResult;
     fn on_finish(&mut self, finish: Finish, ctx: &ActivityContext<W>);

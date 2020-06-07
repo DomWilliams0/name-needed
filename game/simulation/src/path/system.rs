@@ -1,3 +1,4 @@
+use std::iter::once;
 use std::mem::MaybeUninit;
 
 use common::*;
@@ -185,6 +186,20 @@ impl FollowPathComponent {
 
         self.follow_speed = speed;
         self.prev_z = None;
+    }
+
+    pub fn target(&self) -> Option<WorldPoint> {
+        self.path.as_ref().map(|path| path.target())
+    }
+
+    pub fn waypoints(&self, out: &mut Vec<WorldPoint>) {
+        if let Some(path) = self.path.as_ref() {
+            out.extend(
+                path.waypoints()
+                    .map(|&pos| pos.into())
+                    .chain(once(path.target())),
+            );
+        }
     }
     /*
     pub fn new_path_to_pos(&mut self, target: WorldPosition, speed: NormalizedFloat) {
