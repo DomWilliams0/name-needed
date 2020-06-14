@@ -24,9 +24,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * order something to be picked up/carried, a suitable entity will choose to do it
 
 ## World generation
-* simple terrain generation
+* biomes
 * features e.g. trees, hills
 	* trees are entities, not blocks
+	* accurate-ish rivers, caves
+	* magma very low down, or it just gets too hot
 
 ## Voxel world mechanics
 * fluid blocks
@@ -49,15 +51,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
 
 ## Crate release
-* gameloop
 * voxel world
 * iaus ai
 
 ## Rendering
 * textures/sprites/animations
 * improved terrain colour palette
-* z slice boundary interpolation (instead of black void)
-* fix camera zoom centering bug
 
 ## Building and testing
 * separate config and preset for tests
