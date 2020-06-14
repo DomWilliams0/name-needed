@@ -19,13 +19,13 @@ impl WorldColumn {
         let block = WorldPosition(
             self.x.floor() as i32,
             self.y.floor() as i32,
-            self.slice_range.top().0,
+            self.slice_range.top(),
         );
         world
             .find_accessible_block_in_column_with_range(block, Some(self.slice_range.bottom()))
             .map(|WorldPosition(_, _, z)| {
                 // only use z from result, keep input precision
-                WorldPoint(self.x, self.y, z as f32)
+                WorldPoint(self.x, self.y, z.slice() as f32)
             })
     }
 }

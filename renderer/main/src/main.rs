@@ -1,11 +1,13 @@
 use clap::{App, Arg};
 use common::*;
-use engine::Engine;
 use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
-use simulation::{ExitType, SimulationBackend};
+use simulation::state::BackendState;
+use simulation::{
+    ExitType, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
+};
 
+use engine::Engine;
 use std::path::PathBuf;
-use std::process::Command;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -20,6 +22,15 @@ mod count_allocs {
 }
 
 mod presets;
+
+#[cfg(feature = "use-sdl")]
+type Backend = engine::SdlBackendPersistent;
+
+#[cfg(feature = "lite")]
+type Backend = engine::DummyBackendPersistent;
+
+type BackendInit = <Backend as PersistentSimulationBackend>::Initialized;
+type Renderer = <BackendInit as InitializedSimulationBackend>::Renderer;
 
 fn do_main() -> i32 {
     let args = App::new(env!("CARGO_PKG_NAME"))
@@ -40,14 +51,6 @@ fn do_main() -> i32 {
         )
         .get_matches();
 
-    #[cfg(feature = "use-sdl")]
-    type Backend = engine::SdlBackend;
-
-    #[cfg(feature = "lite")]
-    type Backend = engine::DummyBackend;
-
-    type Renderer = <Backend as SimulationBackend>::Renderer;
-
     let preset: Box<dyn GamePreset<Renderer>> = match args.value_of("preset") {
         None | Some("dev") => Box::new(DevGamePreset::<Renderer>::default()),
         Some("empty") => Box::new(EmptyGamePreset::default()),
@@ -61,9 +64,18 @@ fn do_main() -> i32 {
         .target(env_logger::Target::Stdout)
         .filter_module("hyper", LevelFilter::Info) // keep it down will you
         .filter_module("tokio_reactor", LevelFilter::Info)
+        .filter_module("tokio_threadpool", LevelFilter::Info)
+        .filter_module("mio", LevelFilter::Info)
         .init();
 
     info!("using game preset '{}'", preset.name());
+
+    // enable structured logging
+    struclog::init();
+
+    // start metrics server
+    #[cfg(feature = "metrics")]
+    metrics::start_serving();
 
     // load config
     if let Some(config_file_name) = preset.config() {
@@ -76,35 +88,41 @@ fn do_main() -> i32 {
 
         info!("loading config from '{:?}'", config_path);
         if let Err(e) = config::init(config_path) {
-            error!("failed to load config initially: {}", e);
+            error!("failed to load config: {}", e);
             return 1;
         }
     }
 
-    // enable structured logging
-    struclog::init();
-
-    // start metrics server
-    #[cfg(feature = "metrics")]
-    metrics::start_serving();
-
-    // and away we go
-    let sim = {
-        let _span = Span::Setup.begin();
-        preset.load()
-    };
-    let engine = match Engine::<Renderer, Backend>::new(sim) {
+    // initialize persistent backend
+    let mut backend_state = match BackendState::<Backend>::new() {
         Err(e) => {
-            error!("failed to init engine: {:?}", e);
-            return 1;
+            error!("failed to initialize engine: {:?}", e);
+            return 2;
         }
-        Ok(eng) => eng,
+        Ok(b) => b,
     };
 
-    if let ExitType::Restart = engine.run() {
-        info!("restarting renderer");
-        // TODO preserve camera position and other runtime settings?
-        restart();
+    loop {
+        // create simulation
+        let simulation = {
+            let _span = Span::Setup.begin();
+            preset.load()
+        };
+
+        // initialize backend with simulation world
+        let world_viewer = WorldViewer::from_world(simulation.world());
+        let backend = backend_state.start(world_viewer);
+
+        // create and run engine
+        let engine = Engine::new(simulation, backend);
+        let exit = engine.run();
+
+        // uninitialize backend
+        backend_state.end();
+
+        if let ExitType::Stop = exit {
+            break;
+        }
     }
 
     0
@@ -128,19 +146,4 @@ fn main() {
 
     info!("exiting cleanly with exit code {}", exit);
     std::process::exit(exit);
-}
-
-#[cfg(unix)]
-fn restart() -> ! {
-    use std::os::unix::process::CommandExt;
-
-    // get current exe without the (deleted) prefix
-    let cmd = std::env::current_exe().expect("failed to get current exe");
-    let cmd_s = cmd.to_str().expect("bad current exe");
-    let exe = cmd_s.split(" (deleted)").next().unwrap();
-    let err = Command::new(exe)
-        .args(std::env::args_os().skip(1))
-        .envs(std::env::vars_os())
-        .exec(); // won't return on success
-    unreachable!("failed to restart: {}", err);
 }

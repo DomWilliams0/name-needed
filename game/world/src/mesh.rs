@@ -1,13 +1,16 @@
 use color::ColorRgb;
 use common::*;
 
-use crate::chunk::slab::{Slab, SLAB_SIZE};
+use crate::chunk::slab::Slab;
+use crate::chunk::slice::unflatten_index;
 use crate::chunk::Chunk;
+use crate::occlusion::BlockOcclusion;
 use crate::viewer::SliceRange;
+use crate::BaseTerrain;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use unit::dim::CHUNK_SIZE;
-use unit::world::SliceBlock;
+use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::SCALE / 2.0;
@@ -21,65 +24,145 @@ pub trait BaseVertex: Copy + Debug {
 
 pub fn make_simple_render_mesh<V: BaseVertex>(chunk: &Chunk, slice_range: SliceRange) -> Vec<V> {
     let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first
+
+    let shifted_slice_index = |slice_index: GlobalSliceIndex| {
+        // shift slice range down to 0..size, to keep render z position low and near 0
+        (slice_index - slice_range.bottom()).slice() as f32
+    };
+
     for (slice_index, slice) in chunk.slice_range(slice_range) {
         // TODO skip if slice knows it is empty
-        let slice_index = slice_index.0 as f32;
 
-        for (block_pos, block) in slice.non_air_blocks() {
-            let (bx, by) = {
-                let SliceBlock(x, y) = block_pos;
-                (
-                    // +0.5 to render in the center of the block, which is the block mesh's origin
-                    f32::from(x) + 0.5,
-                    f32::from(y) + 0.5,
+        let slice_above = chunk.slice_or_dummy(slice_index + 1);
+        let slice_index = shifted_slice_index(slice_index);
+
+        for (i, block_pos, block) in slice.non_air_blocks() {
+            // if above is solid, render a "blocked" colour
+            let tile = if slice_above
+                .index_unchecked(i)
+                .block_type()
+                .opacity()
+                .solid()
+            {
+                let color = ColorRgb::new(50, 50, 50);
+                make_corners(block_pos, color, slice_index)
+            } else {
+                // render as normal
+                make_corners_with_ao(
+                    block_pos,
+                    block.block_type().color(),
+                    block.occlusion(),
+                    slice_index,
                 )
             };
-            let color = block.block_type().color();
 
-            let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
-
-            for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
-                let ao_lightness = f32::from(block.occlusion().corner(i));
-
-                let color = color * ao_lightness;
-                block_corners[i] = MaybeUninit::new(V::new(
-                    (
-                        fx + bx * unit::world::SCALE,
-                        fy + by * unit::world::SCALE,
-                        slice_index * unit::world::SCALE,
-                    ),
-                    color,
-                ));
-            }
-
-            // flip quad if necessary for AO
-            if block.occlusion().should_flip() {
-                // TODO also rotate texture
-
-                let last = block_corners[3];
-                block_corners.copy_within(0..3, 1);
-                block_corners[0] = last;
-            }
-
-            // convert corners to vertices
-            // safety: all corners have been initialized
-            let block_vertices = unsafe {
-                [
-                    // tri 1
-                    block_corners[0].assume_init(),
-                    block_corners[1].assume_init(),
-                    block_corners[2].assume_init(),
-                    // tri 2
-                    block_corners[2].assume_init(),
-                    block_corners[3].assume_init(),
-                    block_corners[0].assume_init(),
-                ]
-            };
-            vertices.extend_from_slice(&block_vertices);
+            vertices.extend_from_slice(&tile);
         }
     }
 
+    // render 1 slice below in shadow to indicate where there are blocks out of view
+    // TODO blocks filling in gaps should be tinted the colour of the block they're suggesting
+    // TODO consider rendering a blurred buffer of slices below
+    if let Some(slice_bottom) = chunk.slice(slice_range.bottom()) {
+        let slice_below = chunk.slice_or_dummy(slice_range.bottom() - 1);
+
+        slice_bottom
+            .slice()
+            .iter()
+            .zip(slice_below.slice())
+            .enumerate()
+            .filter(|&(_, (bottom, below))| {
+                bottom.opacity().transparent() && below.opacity().solid()
+            })
+            .for_each(|(i, (_, _))| {
+                let color = ColorRgb::new(70, 70, 70);
+                vertices.extend_from_slice(&make_corners(
+                    unflatten_index(i),
+                    color,
+                    shifted_slice_index(slice_range.bottom()),
+                ));
+            });
+    }
+
     vertices
+}
+
+fn block_centre(block: SliceBlock) -> (f32, f32) {
+    let SliceBlock(x, y) = block;
+    (
+        // +0.5 to render in the center of the block, which is the block mesh's origin
+        f32::from(x) + 0.5,
+        f32::from(y) + 0.5,
+    )
+}
+
+fn make_corners_with_ao<V: BaseVertex>(
+    block_pos: SliceBlock,
+    color: ColorRgb,
+    occlusion: &BlockOcclusion,
+    slice_index: f32,
+) -> [V; 6] {
+    let (bx, by) = block_centre(block_pos);
+
+    let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
+
+    for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
+        let ao_lightness = f32::from(occlusion.corner(i));
+
+        let color = color * ao_lightness;
+        block_corners[i] = MaybeUninit::new(V::new(
+            (
+                fx + bx * unit::world::SCALE,
+                fy + by * unit::world::SCALE,
+                slice_index * unit::world::SCALE,
+            ),
+            color,
+        ));
+    }
+
+    // flip quad if necessary for AO
+    if occlusion.should_flip() {
+        // TODO also rotate texture
+
+        let last = block_corners[3];
+        block_corners.copy_within(0..3, 1);
+        block_corners[0] = last;
+    }
+
+    // safety: all corners have been initialized
+    unsafe { corners_to_vertices(block_corners) }
+}
+fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: ColorRgb, slice_index: f32) -> [V; 6] {
+    let (bx, by) = block_centre(block_pos);
+
+    let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
+
+    for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
+        block_corners[i] = MaybeUninit::new(V::new(
+            (
+                fx + bx * unit::world::SCALE,
+                fy + by * unit::world::SCALE,
+                slice_index * unit::world::SCALE,
+            ),
+            color,
+        ));
+    }
+
+    // safety: all corners have been initialized
+    unsafe { corners_to_vertices(block_corners) }
+}
+
+unsafe fn corners_to_vertices<V: BaseVertex>(block_corners: [MaybeUninit<V>; 4]) -> [V; 6] {
+    [
+        // tri 1
+        block_corners[0].assume_init(),
+        block_corners[1].assume_init(),
+        block_corners[2].assume_init(),
+        // tri 2
+        block_corners[2].assume_init(),
+        block_corners[3].assume_init(),
+        block_corners[0].assume_init(),
+    ]
 }
 
 /// Compile time `min`...
@@ -107,8 +190,6 @@ pub(crate) fn make_collision_mesh(
         out_vertices.extend(&[x as f32, y as f32, z as f32]);
         old_size
     };
-
-    // TODO half blocks
 
     let dims = [CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32(), SLAB_SIZE.as_i32()];
     let mut mask = {
@@ -250,12 +331,14 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::slab::Slab;
     use crate::mesh::make_collision_mesh;
+    use unit::world::LocalSliceIndex;
 
     #[test]
     fn greedy_single_block() {
         let slab = {
             let mut slab = Slab::empty(0);
-            slab.slice_mut(0).set_block((0, 0), BlockType::Stone);
+            slab.slice_mut(LocalSliceIndex::new(0))
+                .set_block((0, 0), BlockType::Stone);
             slab
         };
 
@@ -277,8 +360,10 @@ mod tests {
     fn greedy_column() {
         let slab = {
             let mut slab = Slab::empty(0);
-            slab.slice_mut(1).set_block((1, 1), BlockType::Stone);
-            slab.slice_mut(2).set_block((1, 1), BlockType::Stone);
+            slab.slice_mut(LocalSliceIndex::new(1))
+                .set_block((1, 1), BlockType::Stone);
+            slab.slice_mut(LocalSliceIndex::new(2))
+                .set_block((1, 1), BlockType::Stone);
             slab
         };
 
@@ -295,8 +380,10 @@ mod tests {
     fn greedy_plane() {
         let slab = {
             let mut slab = Slab::empty(0);
-            slab.slice_mut(0).fill(BlockType::Stone);
-            slab.slice_mut(1).set_block((1, 1), BlockType::Grass);
+            slab.slice_mut(LocalSliceIndex::new(0))
+                .fill(BlockType::Stone);
+            slab.slice_mut(LocalSliceIndex::new(1))
+                .set_block((1, 1), BlockType::Grass);
             slab
         };
 

@@ -6,27 +6,38 @@ use common::derive_more::*;
 use common::Point3;
 
 use crate::view::ViewPoint;
-use crate::world::{ChunkPosition, SliceIndex, WorldPoint, SCALE};
+use crate::world::{ChunkPosition, GlobalSliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From)]
-pub struct WorldPosition(pub i32, pub i32, pub i32);
+pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
-    pub const fn slice(self) -> SliceIndex {
-        // TODO refactor self.2 usage to use this everywhere
-        SliceIndex(self.2)
+    pub const fn slice(self) -> GlobalSliceIndex {
+        self.2
     }
 }
 
 impl Display for WorldPosition {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "WorldPosition({}, {}, {})", self.0, self.1, self.2)
+        write!(
+            f,
+            "WorldPosition({}, {}, {})",
+            self.0,
+            self.1,
+            self.2.slice()
+        )
     }
 }
 
-impl From<(u8, u8, i32)> for WorldPosition {
-    fn from((x, y, z): (u8, u8, i32)) -> Self {
+impl From<(i32, i32, i32)> for WorldPosition {
+    fn from((x, y, z): (i32, i32, i32)) -> Self {
+        Self(x, y, GlobalSliceIndex::new(z))
+    }
+}
+
+impl From<(u8, u8, GlobalSliceIndex)> for WorldPosition {
+    fn from((x, y, z): (u8, u8, GlobalSliceIndex)) -> Self {
         Self(x as i32, y as i32, z)
     }
 }
@@ -42,7 +53,7 @@ impl From<ViewPoint> for WorldPosition {
         Self(
             (v.0 / SCALE).floor() as i32,
             (v.1 / SCALE).floor() as i32,
-            (v.2 / SCALE).floor() as i32,
+            GlobalSliceIndex::new((v.2 / SCALE).floor() as i32),
         )
     }
 }
@@ -60,7 +71,7 @@ impl From<&WorldPosition> for Point3 {
         Self {
             x: pos.0 as f32,
             y: pos.1 as f32,
-            z: pos.2 as f32,
+            z: pos.2.slice() as f32,
         }
     }
 }

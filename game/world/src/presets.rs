@@ -11,13 +11,12 @@ use crate::loader::MemoryTerrainSource;
 #[cfg(test)]
 use crate::ChunkDescriptor;
 
-pub fn from_config() -> MemoryTerrainSource {
-    match config::get().world.preset {
+pub fn from_preset(preset: WorldPreset) -> MemoryTerrainSource {
+    match preset {
         WorldPreset::OneChunkWonder => one_chunk_wonder(),
         WorldPreset::MultiChunkWonder => multi_chunk_wonder(),
         WorldPreset::OneBlockWonder => one_block_wonder(),
         WorldPreset::FlatLands => flat_lands(),
-        WorldPreset::PyramidMess => pyramid_mess(),
         WorldPreset::Bottleneck => bottleneck(),
     }
 }
@@ -48,7 +47,7 @@ pub fn multi_chunk_wonder() -> MemoryTerrainSource {
             .build((-1, -1)),
         // 2, 0 is very deep
         ChunkBuilder::new()
-            .fill_range((4, 4, -40), (10, 10, 40), |p| match p {
+            .fill_range((4, 4, -40), (9, 9, 40), |p| match p {
                 (_, _, -40) => BlockType::Dirt,
                 (_, _, 39) => BlockType::Stone,
                 (_, _, z) if z < 0 => BlockType::Stone,
@@ -143,28 +142,6 @@ pub fn flat_lands() -> MemoryTerrainSource {
     MemoryTerrainSource::from_chunks(chunks).expect("hardcoded world preset is wrong??!!1!")
 }
 
-/// Pyramid with some mess to test ambient occlusion across slab and chunk boundaries
-pub fn pyramid_mess() -> MemoryTerrainSource {
-    let chunks = vec![
-        ChunkBuilder::new()
-            .fill_range((0, 0, -2), (9, 9, -1), |_| BlockType::Dirt)
-            .fill_range((1, 1, -1), (8, 8, 0), |_| BlockType::Stone)
-            .fill_range((2, 2, 0), (7, 7, 1), |_| BlockType::Grass)
-            .fill_range((3, 3, 1), (6, 6, 2), |_| BlockType::Stone)
-            .fill_range((4, 4, 2), (5, 5, 3), |_| BlockType::Dirt)
-            // chunk bridge
-            .fill_range((0, 4, 2), (3, 5, 3), |_| BlockType::Grass)
-            .set_block((0, 4, 3), BlockType::Stone)
-            .build((0, 0)),
-        ChunkBuilder::new()
-            .fill_slice(2, BlockType::Dirt)
-            .build((-1, 0)),
-    ];
-
-    MemoryTerrainSource::from_chunks(chunks.into_iter())
-        .expect("hardcoded world preset is wrong??!!1!")
-}
-
 /// Bottleneck for path finding
 pub fn bottleneck() -> MemoryTerrainSource {
     let half_y = CHUNK_SIZE.as_i32() / 2;
@@ -174,7 +151,7 @@ pub fn bottleneck() -> MemoryTerrainSource {
         ChunkBuilder::new()
             .fill_range(
                 (1, 0, 0),
-                (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32(), 1),
+                (CHUNK_SIZE.as_i32() - 2, CHUNK_SIZE.as_i32() - 1, 0),
                 |(x, _, _)| {
                     if x % 2 == 0 {
                         BlockType::Grass
@@ -183,12 +160,10 @@ pub fn bottleneck() -> MemoryTerrainSource {
                     }
                 },
             )
-            .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32(), half_y + 1, 5), |_| {
+            .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32() - 1, half_y, 4), |_| {
                 BlockType::Stone
             })
-            .fill_range((hole, half_y, 1), (hole + 2, half_y + 1, 5), |_| {
-                BlockType::Air
-            })
+            .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| BlockType::Air)
             .fill_slice(-5, BlockType::Stone)
             .build((0, i))
     });
@@ -204,7 +179,7 @@ pub fn ring() -> Vec<ChunkDescriptor> {
             (
                 CHUNK_SIZE.as_block_coord() - 1,
                 CHUNK_SIZE.as_block_coord() - 1,
-                z + 1,
+                z,
             ),
             |_| BlockType::Stone,
         )
@@ -212,22 +187,22 @@ pub fn ring() -> Vec<ChunkDescriptor> {
 
     vec![
         // top left
-        fill_except_outline(3)
-            .set_block((3, 0, 3), BlockType::Grass) /* south bridge */
+        fill_except_outline(300)
+            .set_block((3, 0, 300), BlockType::Grass) /* south bridge */
             .build((-1, 1)), /* NO east bridge */
         // top right
-        fill_except_outline(4)
-            .set_block((3, 0, 4), BlockType::Grass) /* south bridge */
+        fill_except_outline(301)
+            .set_block((3, 0, 301), BlockType::Grass) /* south bridge */
             .build((0, 1)), /* NO west bridge */
         // bottom right
-        fill_except_outline(3)
-            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 3), BlockType::Grass) /* north bridge */
-            .set_block((0, 3, 3), BlockType::Grass) /* west bridge */
+        fill_except_outline(300)
+            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 300), BlockType::Grass) /* north bridge */
+            .set_block((0, 3, 300), BlockType::Grass) /* west bridge */
             .build((0, 0)),
         // bottom left
-        fill_except_outline(4)
-            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 4), BlockType::Grass) /* north bridge */
-            .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 4), BlockType::Grass) /* east bridge */
+        fill_except_outline(301)
+            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 301), BlockType::Grass) /* north bridge */
+            .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 301), BlockType::Grass) /* east bridge */
             .build((-1, 0)),
     ]
 }

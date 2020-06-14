@@ -154,7 +154,7 @@ mod tests {
         }
 
         #[cfg(feature = "logging")]
-        fn log_metric(&self, entity: &str, value: f32) {}
+        fn log_metric(&self, _: &str, _: f32) {}
     }
 
     struct CancelExistenceConsideration;
@@ -176,7 +176,7 @@ mod tests {
         }
 
         #[cfg(feature = "logging")]
-        fn log_metric(&self, entity: &str, value: f32) {}
+        fn log_metric(&self, _: &str, _: f32) {}
     }
 
     struct EatDse;

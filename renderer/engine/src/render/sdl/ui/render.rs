@@ -100,7 +100,7 @@ impl Ui {
 
 impl State {
     fn render(&mut self, mut bundle: UiBundle) {
-        self.perf.render(&mut bundle);
+        self.perf.render(&bundle);
         self.selection.render(&mut bundle);
         self.debug.render(&mut bundle);
     }

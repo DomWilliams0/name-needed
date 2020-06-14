@@ -4,12 +4,13 @@ use std::mem::MaybeUninit;
 
 use nd_iter::iter_3d;
 
-use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
+use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
 use crate::block::Block;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
 use crate::chunk::BaseTerrain;
+use common::warn;
 
 pub struct ChunkBuilder {
     terrain: RawChunkTerrain,
@@ -39,12 +40,16 @@ impl ChunkBuilder {
 
     pub fn fill_slice<S, B>(mut self, slice: S, block: B) -> Self
     where
-        S: Into<SliceIndex>,
+        S: Into<GlobalSliceIndex>,
         B: Into<Block>,
     {
-        // TODO create slice if missing
-        if let Some(mut slice) = self.terrain.slice_mut(slice) {
-            slice.fill(block);
+        let do_fill = |mut slice: SliceMut| slice.fill(block);
+        let slice = slice.into();
+        if !self
+            .terrain
+            .slice_mut_with_policy(slice, SlabCreationPolicy::CreateAll, do_fill)
+        {
+            warn!("failed to create slice {:?} to fill", slice);
         }
 
         self
@@ -60,7 +65,7 @@ impl ChunkBuilder {
         let [fx, fy, fz]: [i32; 3] = from.into().into();
         let [tx, ty, tz]: [i32; 3] = to.into().into();
 
-        for (x, y, z) in iter_3d(fx..tx, fy..ty, fz..tz) {
+        for (x, y, z) in iter_3d(fx..tx + 1, fy..ty + 1, fz..tz + 1) {
             let pos = (x, y, z);
             self = self.set_block(pos, block(pos));
         }
@@ -70,7 +75,7 @@ impl ChunkBuilder {
 
     pub fn with_slice<S, F>(mut self, slice: S, mut f: F) -> Self
     where
-        S: Into<SliceIndex>,
+        S: Into<GlobalSliceIndex>,
         F: FnMut(SliceMut),
     {
         if let Some(slice) = self.terrain.slice_mut(slice) {
@@ -95,7 +100,6 @@ impl ChunkBuilder {
         }
     }
 
-    #[cfg(test)]
     pub fn into_inner(self) -> RawChunkTerrain {
         self.terrain
     }
@@ -150,6 +154,7 @@ impl Into<(ChunkPosition, RawChunkTerrain)> for ChunkDescriptor {
 mod tests {
     use crate::block::BlockType;
     use crate::chunk::{BaseTerrain, ChunkBuilder};
+    use unit::world::GlobalSliceIndex;
 
     #[test]
     fn fill_slice() {
@@ -158,8 +163,14 @@ mod tests {
             .fill_slice(0, BlockType::Grass)
             .into_inner();
 
-        assert!(c.slice(0).unwrap().all_blocks_are(BlockType::Grass));
-        assert!(c.slice(1).unwrap().all_blocks_are(BlockType::Air));
+        assert!(c
+            .slice(GlobalSliceIndex::new(0))
+            .unwrap()
+            .all_blocks_are(BlockType::Grass));
+        assert!(c
+            .slice(GlobalSliceIndex::new(1))
+            .unwrap()
+            .all_blocks_are(BlockType::Air));
     }
 
     #[test]
@@ -205,7 +216,7 @@ mod tests {
     fn fill_range() {
         // check that range filling works as intended
         let c = ChunkBuilder::new()
-            .fill_range((0, 0, 0), (3, 3, 3), |_| BlockType::Stone)
+            .fill_range((0, 0, 0), (2, 2, 2), |_| BlockType::Stone)
             .into_inner();
         let mut blocks = Vec::new();
 
@@ -218,21 +229,8 @@ mod tests {
             3 * 3 * 3
         );
 
-        // annoyingly if any dimension has a width of 0, do nothing
         let c = ChunkBuilder::new()
-            .fill_range((0, 0, 0), (10, 0, 0), |_| BlockType::Stone)
-            .into_inner();
-        assert_eq!(
-            c.blocks(&mut blocks)
-                .iter()
-                .filter(|(_, b)| b.block_type() == BlockType::Stone)
-                .count(),
-            0
-        );
-
-        // alternatively with a width of 1, work as intended
-        let c = ChunkBuilder::new()
-            .fill_range((0, 0, 0), (10, 1, 1), |_| BlockType::Stone)
+            .fill_range((0, 0, 0), (9, 0, 0), |_| BlockType::Stone)
             .into_inner();
         assert_eq!(
             c.blocks(&mut blocks)

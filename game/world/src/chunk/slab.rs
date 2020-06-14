@@ -2,8 +2,8 @@ use std::iter::once;
 use std::ops::Deref;
 
 use common::Itertools;
-use unit::dim::{SmallUnsignedConstant, CHUNK_SIZE};
-use unit::world::SliceIndex;
+use unit::dim::CHUNK_SIZE;
+use unit::world::{LocalSliceIndex, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
@@ -11,10 +11,6 @@ use crate::{
     grid::{Grid, GridImpl},
     grid_declare,
 };
-
-pub(crate) const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
-
-pub(crate) type SlabIndex = i32;
 
 grid_declare!(struct SlabGrid<SlabGridImpl, Block>,
     CHUNK_SIZE.as_usize(),
@@ -25,43 +21,37 @@ grid_declare!(struct SlabGrid<SlabGridImpl, Block>,
 #[derive(Clone)]
 pub(crate) struct Slab {
     grid: SlabGrid,
-    // TODO does a slab really need to know this?
+    // TODO does a slab really need to know its index?
     index: SlabIndex,
-    // collider: SlabCollider,
 }
 
 impl Slab {
-    pub fn empty(index: SlabIndex) -> Self {
+    pub fn empty<I: Into<SlabIndex>>(index: I) -> Self {
         Self {
             grid: SlabGrid::default(),
-            index,
-            // collider: SlabCollider::default(),
+            index: index.into(),
         }
     }
 
-    pub fn slice<S: Into<SliceIndex>>(&self, index: S) -> Slice {
-        let SliceIndex(index) = index.into();
-        let (from, to) = SlabGrid::slice_range(index);
+    pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
+        let index = index.into();
+        let (from, to) = SlabGrid::slice_range(index.slice());
         Slice::new(&(*self.grid)[from..to])
     }
 
-    pub fn slice_mut<S: Into<SliceIndex>>(&mut self, index: S) -> SliceMut {
-        let SliceIndex(index) = index.into();
-        let (from, to) = SlabGrid::slice_range(index);
+    pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
+        let index = index.into();
+        let (from, to) = SlabGrid::slice_range(index.slice());
         SliceMut::new(&mut (*self.grid)[from..to])
     }
 
     /// (slice index *relative to this slab*, slice)
-    pub fn slices_from_bottom(&self) -> impl DoubleEndedIterator<Item = (SliceIndex, Slice)> {
-        (0..Self::slice_count()).map(move |idx| (SliceIndex(idx), self.slice(idx)))
+    pub fn slices_from_bottom(&self) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice)> {
+        LocalSliceIndex::slices().map(move |idx| (idx, self.slice(idx)))
     }
 
     pub const fn block_count() -> usize {
         SlabGrid::FULL_SIZE
-    }
-
-    pub const fn slice_count() -> i32 {
-        SlabGrid::SLICE_COUNT
     }
 
     pub(crate) const fn index(&self) -> SlabIndex {
@@ -89,11 +79,11 @@ impl Slab {
             Option<SliceSource<'a>>,
         ),
     > {
-        let first = below.map(|slab| SliceSource::BelowSlab(slab.slice(SLAB_SIZE.as_i32() - 1)));
+        let first = below.map(|slab| SliceSource::BelowSlab(slab.slice(LocalSliceIndex::top())));
         let middle = self
             .slices_from_bottom()
             .map(|(_, slice)| Some(SliceSource::ThisSlab(slice)));
-        let last = above.map(|slab| SliceSource::AboveSlab(slab.slice(0)));
+        let last = above.map(|slab| SliceSource::AboveSlab(slab.slice(LocalSliceIndex::bottom())));
 
         once(first).chain(middle).chain(once(last)).tuple_windows()
     }

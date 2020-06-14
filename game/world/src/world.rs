@@ -1,7 +1,8 @@
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkPosition, SliceBlock, SliceIndex, WorldPoint, WorldPosition,
+    BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock, SliceIndex, WorldPoint,
+    WorldPosition,
 };
 
 use crate::navigation::{
@@ -13,7 +14,7 @@ use crate::chunk::{BaseTerrain, Chunk};
 use crate::loader::ChunkUpdate;
 use crate::SliceRange;
 #[cfg(any(test, feature = "benchmarking"))]
-use crate::{chunk::ChunkDescriptor, WorldRef};
+use crate::{chunk::ChunkDescriptor, loader::MemoryTerrainSource, WorldRef};
 
 #[cfg(test)]
 use crate::block::Block;
@@ -43,7 +44,7 @@ impl World {
         self.chunks.iter()
     }
 
-    pub fn slice_bounds(&self) -> SliceRange {
+    pub fn slice_bounds(&self) -> Option<SliceRange> {
         let min = self
             .chunks
             .iter()
@@ -56,8 +57,8 @@ impl World {
             .max();
 
         match (min, max) {
-            (Some(min), Some(max)) => SliceRange::from_bounds(min, max),
-            _ => SliceRange::null(),
+            (Some(min), Some(max)) => Some(SliceRange::from_bounds_unchecked(min, max)),
+            _ => None,
         }
     }
 
@@ -193,18 +194,21 @@ impl World {
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
-        self.find_accessible_block_in_column_with_range(WorldPosition(x, y, i32::MAX), None)
+        self.find_accessible_block_in_column_with_range(
+            WorldPosition(x, y, SliceIndex::top()),
+            None,
+        )
     }
 
     pub fn find_accessible_block_in_column_with_range(
         &self,
         pos: WorldPosition,
-        z_min: Option<SliceIndex>,
+        z_min: Option<GlobalSliceIndex>,
     ) -> Option<WorldPosition> {
         let chunk_pos = ChunkPosition::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
-            .and_then(|c| c.find_accessible_block(slice_block, Some(SliceIndex(pos.2)), z_min))
+            .and_then(|c| c.find_accessible_block(slice_block, Some(pos.2), z_min))
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
@@ -288,11 +292,16 @@ impl World {
 
 #[cfg(any(test, feature = "benchmarking"))]
 pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
-    use crate::loader::{BlockingWorkerPool, MemoryTerrainSource, WorldLoader};
+    let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
+    world_from_preset(source)
+}
+
+#[cfg(any(test, feature = "benchmarking"))]
+pub fn world_from_preset(mut source: MemoryTerrainSource) -> WorldRef {
+    use crate::loader::{BlockingWorkerPool, TerrainSource, WorldLoader};
     use std::time::Duration;
 
-    let chunks_pos = chunks.iter().map(|c| c.chunk_pos).collect_vec();
-    let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
+    let chunks_pos = source.all_chunks();
 
     // TODO build area graph in loader
     // let area_graph = AreaGraph::from_chunks(&[]);
@@ -315,7 +324,7 @@ pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use unit::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPosition};
+    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -350,41 +359,41 @@ mod tests {
         // finds higher slice
         assert_eq!(
             w.find_accessible_block_in_column(4, 4),
-            Some(WorldPosition(4, 4, 10))
+            Some((4, 4, 10).into())
         );
 
         // ...but not when we start searching from a lower point
         assert_eq!(
-            w.find_accessible_block_in_column_with_range(WorldPosition(4, 4, 8), None),
-            Some(WorldPosition(4, 4, 7))
+            w.find_accessible_block_in_column_with_range((4, 4, 8).into(), None),
+            Some((4, 4, 7).into())
         );
 
         // ...or when the lower bound is set to exactly that
         assert_eq!(
             w.find_accessible_block_in_column_with_range(
-                WorldPosition(4, 4, 8),
-                Some(SliceIndex(7))
+                (4, 4, 8).into(),
+                Some(GlobalSliceIndex::new(7))
             ),
-            Some(WorldPosition(4, 4, 7))
+            Some((4, 4, 7).into())
         );
 
         // even when starting from the slice itself
         assert_eq!(
-            w.find_accessible_block_in_column_with_range(WorldPosition(4, 4, 7), None),
-            Some(WorldPosition(4, 4, 7))
+            w.find_accessible_block_in_column_with_range((4, 4, 7).into(), None),
+            Some((4, 4, 7).into())
         );
 
         // finds lower slice through hole
         assert_eq!(
             w.find_accessible_block_in_column(10, 10),
-            Some(WorldPosition(10, 10, 7))
+            Some((10, 10, 7).into())
         );
 
         // ...but not when the lower bound prevents it
         assert_eq!(
             w.find_accessible_block_in_column_with_range(
-                WorldPosition(10, 10, 20),
-                Some(SliceIndex(8))
+                (10, 10, 20).into(),
+                Some(GlobalSliceIndex::new(8))
             ),
             None
         );
@@ -476,8 +485,8 @@ mod tests {
             .try_init();
         let world = world_from_chunks(presets::ring()).into_inner();
 
-        let src = BlockPosition(5, 5, SliceIndex::MAX).to_world_position((0, 1));
-        let dst = BlockPosition(5, 5, SliceIndex::MAX).to_world_position((-1, 1));
+        let src = BlockPosition(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
+        let dst = BlockPosition(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
 
         let _ = world.find_path(src, dst).expect("path should succeed");
     }

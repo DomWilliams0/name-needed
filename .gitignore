@@ -13,3 +13,4 @@
 *.trace
 cmake-build-*
 *.so
+procgen.png

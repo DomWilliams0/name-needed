@@ -102,12 +102,14 @@ impl Program {
         Self::with_shaders(&[vertex, fragment])
     }
 
+    /*
     pub fn from_source(vertex: &str, fragment: &str) -> GlResult<Self> {
         let vertex = Shader::from_source(vertex, ShaderType::Vertex)?;
         let fragment = Shader::from_source(fragment, ShaderType::Fragment)?;
 
         Self::with_shaders(&[vertex, fragment])
     }
+    */
 
     fn with_shaders(shaders: &[Shader]) -> GlResult<Self> {
         unsafe {

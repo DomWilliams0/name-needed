@@ -1,5 +1,6 @@
 use crate::render::sdl::ui::windows::UiBundle;
-use imgui::{im_str, Condition, ImStr, Window};
+use crate::ui_str;
+use imgui::{im_str, CollapsingHeader, Condition, ImStr, Window};
 use simulation::input::InputCommand;
 
 pub struct DebugWindow;
@@ -20,8 +21,17 @@ impl DebugWindow {
             .always_auto_resize(true)
             .bg_alpha(0.65)
             .build(bundle.ui, || {
-                checkbox(bundle, im_str!("Navigation paths"), "navigation path");
-                checkbox(bundle, im_str!("Steering direction"), "steering");
+                let view_range = bundle.blackboard.world_view.expect("blackboard world view range not populated");
+                // TODO helpers in Bundle
+                bundle.ui.text(ui_str!(in bundle.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
+
+                if CollapsingHeader::new(im_str!("Debug renderers"))
+                    .default_open(true)
+                    .build(bundle.ui) {
+                    checkbox(bundle, im_str!("Navigation paths"), "navigation path");
+                    checkbox(bundle, im_str!("Steering direction"), "steering");
+                }
+
             });
     }
 }

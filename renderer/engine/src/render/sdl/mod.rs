@@ -1,4 +1,4 @@
-pub use backend::SdlBackend;
+pub use backend::{SdlBackendInit, SdlBackendPersistent};
 pub use render::GlRenderer;
 
 mod backend;

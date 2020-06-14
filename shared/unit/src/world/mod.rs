@@ -1,6 +1,8 @@
 pub use block_position::*;
 pub use chunk_point::*;
 pub use chunk_position::*;
+pub use slab_index::*;
+pub use slab_position::*;
 pub use slice_block::*;
 pub use slice_index::*;
 pub use world_point::*;
@@ -9,6 +11,8 @@ pub use world_position::*;
 mod block_position;
 mod chunk_point;
 mod chunk_position;
+mod slab_index;
+mod slab_position;
 mod slice_block;
 mod slice_index;
 mod world_point;
@@ -29,7 +33,7 @@ mod tests {
     #[test]
     fn block_to_world() {
         // ensure block positions convert to the expected world position
-        let b = BlockPosition(1, 2, SliceIndex(3));
+        let b = BlockPosition(1, 2, SliceIndex::new(3));
 
         // at origin
         let WorldPoint(x, y, z) = b.to_world_point((0, 0));
@@ -59,16 +63,16 @@ mod tests {
     #[test]
     fn world_to_chunk() {
         assert_eq!(
-            ChunkPosition::from(WorldPosition(10, 20, 50)),
+            ChunkPosition::from(WorldPosition(10, 20, SliceIndex::new(50))),
             ChunkPosition(0, 1)
         );
         assert_eq!(
-            ChunkPosition::from(WorldPosition(-20, -40, 50)),
+            ChunkPosition::from(WorldPosition(-20, -40, SliceIndex::new(50))),
             ChunkPosition(-2, -3)
         );
 
         assert_eq!(
-            ChunkPosition::from(WorldPosition(-2, 2, 0)),
+            ChunkPosition::from(WorldPosition(-2, 2, SliceIndex::new(0))),
             ChunkPosition(-1, 0)
         );
     }
@@ -76,8 +80,8 @@ mod tests {
     #[test]
     fn negative_world_to_block() {
         assert_eq!(
-            BlockPosition::from(WorldPosition(-10, -10, -10)),
-            BlockPosition::from((6, 6, -10))
+            BlockPosition::from(WorldPosition(-10, -10, SliceIndex::new(-10))),
+            BlockPosition::from((6, 6, SliceIndex::new(-10)))
         );
     }
 }

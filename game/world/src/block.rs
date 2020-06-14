@@ -1,9 +1,8 @@
 use color::ColorRgb;
 
-use crate::chunk::RawChunkTerrain;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::{BlockOcclusion, Opacity};
-use unit::world::SliceIndex;
+use unit::world::GlobalSliceIndex;
 
 /// A single block in a chunk
 #[derive(Debug, Default, Copy, Clone)]
@@ -20,6 +19,14 @@ impl Block {
             block_type,
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default(),
+        }
+    }
+
+    pub const fn default_const() -> Self {
+        Self {
+            block_type: BlockType::Air,
+            area: SlabAreaIndex::UNINITIALIZED,
+            occlusion: BlockOcclusion::default_const(),
         }
     }
 
@@ -45,10 +52,10 @@ impl Block {
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
         &mut self.area
     }
-    pub(crate) fn chunk_area(self, slice: SliceIndex) -> Option<ChunkArea> {
+    pub(crate) fn chunk_area(self, slice: GlobalSliceIndex) -> Option<ChunkArea> {
         if self.area.initialized() {
             Some(ChunkArea {
-                slab: RawChunkTerrain::slab_index_for_slice(slice),
+                slab: slice.slab_index(),
                 area: self.area,
             })
         } else {
@@ -70,6 +77,7 @@ pub enum BlockType {
     Air,
     Dirt,
     Grass,
+    LightGrass,
     Stone,
 }
 
@@ -77,8 +85,9 @@ impl BlockType {
     pub fn color(self) -> ColorRgb {
         match self {
             BlockType::Air => ColorRgb::new(0, 0, 0),
-            BlockType::Dirt => ColorRgb::new(192, 57, 43),
-            BlockType::Grass => ColorRgb::new(40, 102, 25),
+            BlockType::Dirt => ColorRgb::new(86, 38, 23),
+            BlockType::Grass => ColorRgb::new(49, 152, 56),
+            BlockType::LightGrass => ColorRgb::new(91, 152, 51),
             BlockType::Stone => ColorRgb::new(106, 106, 117),
         }
     }

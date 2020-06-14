@@ -16,7 +16,6 @@ pub struct Camera {
     window_size: Vector2,
 }
 
-const CAMERA_Z: f32 = 10.0;
 const SCREEN_SCALE: f32 = 64.0;
 
 impl Camera {
@@ -101,13 +100,13 @@ impl Camera {
         (bottom_left.into(), top_right.into())
     }
 
-    fn position(&self, interpolation: f64) -> Point3 {
+    fn position(&self, interpolation: f64, z: f32) -> Point3 {
         let pos = self.pos + (self.velocity * interpolation as f32);
-        Point3::new(pos.x, pos.y, CAMERA_Z)
+        Point3::new(pos.x, pos.y, z)
     }
 
-    pub fn view_matrix(&mut self, interpolation: f64) -> Matrix4 {
-        let pos = self.position(interpolation);
+    pub fn view_matrix(&mut self, interpolation: f64, z: f32) -> Matrix4 {
+        let pos = self.position(interpolation, z);
         self.last_extrapolated_pos = Point2::new(pos.x, pos.y);
         Matrix4::look_at_dir(pos, -AXIS_UP, AXIS_FWD)
     }

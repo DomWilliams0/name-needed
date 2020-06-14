@@ -46,7 +46,7 @@ const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
 const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
 
 impl SelectionWindow {
-    pub fn render<'ui>(&mut self, bundle: &mut UiBundle) {
+    pub fn render(&mut self, bundle: &mut UiBundle) {
         let ui = bundle.ui;
         let strings = bundle.strings;
 

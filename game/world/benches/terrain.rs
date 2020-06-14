@@ -14,7 +14,7 @@ fn small_world_chunks(sz: i32) -> Vec<ChunkDescriptor> {
             ChunkBuilder::new()
                 .fill_range(
                     (0, 0, 0),
-                    (CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32(), 50),
+                    (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32() - 1, 49),
                     |_| match rand.gen_range(0i32, 3) {
                         0 => BlockType::Grass,
                         1 => BlockType::Stone,

@@ -7,11 +7,15 @@ use crate::path::FollowPathComponent;
 use crate::{ComponentWorld, TransformComponent};
 use std::collections::HashSet;
 use unit::world::WorldPoint;
+use world::SliceRange;
 
 /// Dump of game info for the UI to render
 pub struct Blackboard<'a> {
     pub selected: Option<SelectedEntityDetails>,
     pub enabled_debug_renderers: &'a HashSet<&'static str>,
+
+    /// Populated by backend engine
+    pub world_view: Option<SliceRange>,
 }
 
 pub struct SelectedEntityDetails {
@@ -66,6 +70,7 @@ impl<'a> Blackboard<'a> {
         Self {
             selected,
             enabled_debug_renderers: debug_renderers,
+            world_view: None,
         }
     }
 }

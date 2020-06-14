@@ -4,28 +4,25 @@ use common::*;
 use gameloop::{FrameAction, GameLoop};
 use simulation::input::InputCommand;
 use simulation::{
-    self, EventsOutcome, ExitType, Perf, Renderer, Simulation, SimulationBackend, WorldViewer,
+    self, EventsOutcome, ExitType, InitializedSimulationBackend, Perf, Renderer, Simulation,
 };
 
-pub struct Engine<R: Renderer, B: SimulationBackend<Renderer = R>> {
-    backend: B,
+pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
+    backend: &'b mut B,
     simulation: Simulation<R>,
     perf: Perf,
     /// Commands from UI -> game, accumulated over render frames and passed to sim on each tick
     sim_input_commands: Vec<InputCommand>,
 }
 
-impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
-    pub fn new(simulation: Simulation<R>) -> Result<Self, B::Error> {
-        let viewer = WorldViewer::from_world(simulation.world());
-        let backend = B::new(viewer)?;
-
-        Ok(Self {
+impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, R, B> {
+    pub fn new(simulation: Simulation<R>, backend: &'b mut B) -> Self {
+        Self {
             backend,
             simulation,
             perf: Default::default(),
             sim_input_commands: Vec::with_capacity(32),
-        })
+        }
     }
 
     /// Game loop
@@ -37,18 +34,20 @@ impl<R: Renderer, B: SimulationBackend<Renderer = R>> Engine<R, B> {
             std::thread::sleep(Duration::from_millis(delay as u64));
         }
 
-        // TODO separate faster rate for physics?
-        let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5);
+        let game_loop = match GameLoop::new(simulation::TICKS_PER_SECOND, 5) {
+            Err(e) => {
+                panic!("game loop initialization failed: {}", e);
+            }
+            Ok(gl) => gl,
+        };
 
         loop {
-            let frame = game_loop.start_frame();
-
             match self.backend.consume_events() {
                 EventsOutcome::Continue => {}
                 EventsOutcome::Exit(e) => break e,
             }
 
-            for action in frame.actions() {
+            for action in game_loop.actions() {
                 match action {
                     FrameAction::Tick => self.tick(),
                     FrameAction::Render { interpolation } => self.render(interpolation),

@@ -21,7 +21,8 @@ impl<T> DoubleSidedVec<T> {
         self.positive.len() + self.negative.len()
     }
 
-    pub fn get(&self, index: i32) -> Option<&T> {
+    pub fn get<I: Into<i32>>(&self, index: I) -> Option<&T> {
+        let index = index.into();
         match index.signum() {
             0 => self.positive.get(0),
             1 => self.positive.get(index as usize),
@@ -30,7 +31,8 @@ impl<T> DoubleSidedVec<T> {
         }
     }
 
-    pub fn get_mut(&mut self, index: i32) -> Option<&mut T> {
+    pub fn get_mut<I: Into<i32>>(&mut self, index: I) -> Option<&mut T> {
+        let index = index.into();
         match index.signum() {
             0 => self.positive.get_mut(0),
             1 => self.positive.get_mut(index as usize),
@@ -39,7 +41,8 @@ impl<T> DoubleSidedVec<T> {
         }
     }
 
-    pub fn add(&mut self, value: T, index: i32) {
+    pub fn add<I: Into<i32>>(&mut self, value: T, index: I) {
+        let index = index.into();
         let (idx, vec, expected_idx) = match index.signum() {
             0 => {
                 let vec = &mut self.positive;
@@ -74,7 +77,8 @@ impl<T> DoubleSidedVec<T> {
         vec.push(value);
     }
 
-    pub fn fill_until<F: Fn(i32) -> T>(&mut self, index: i32, val: F) {
+    pub fn fill_until<F: Fn(i32) -> T, I: Into<i32>>(&mut self, index: I, val: F) {
+        let index = index.into();
         match index.signum() {
             0 => {
                 // just zero
@@ -127,12 +131,14 @@ impl<T> DoubleSidedVec<T> {
         self.positive.push(val);
     }
 
-    pub fn iter_mut_increasing_in_range(
+    pub fn iter_mut_increasing_in_range<I: Into<i32>>(
         &mut self,
-        start: i32,
-        end: i32,
+        start: I,
+        end: I,
     ) -> impl Iterator<Item = Option<&mut T>> {
         let range = self.range();
+        let start = start.into();
+        let end = end.into();
 
         let empty_space_start = start..range.0;
         let empty_space_end = range.1..end;

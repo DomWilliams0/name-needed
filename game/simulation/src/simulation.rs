@@ -270,7 +270,7 @@ fn register_debug_renderers<R: Renderer>(
 ) -> Result<(), DebugRendererError> {
     r.register(AxesDebugRenderer, true)?;
     r.register(SteeringDebugRenderer, true)?;
-    r.register(PathDebugRenderer::default(), false)?;
+    r.register(PathDebugRenderer::default(), true)?;
     Ok(())
 }
 

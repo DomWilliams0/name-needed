@@ -1,7 +1,6 @@
 use color::ColorRgb;
 use common::*;
 use simulation::{RenderComponent, Renderer, TransformComponent};
-use unit::view::ViewPoint;
 
 use crate::render::debug::DebugShape;
 use crate::render::sdl::gl::{
@@ -10,6 +9,7 @@ use crate::render::sdl::gl::{
 };
 use crate::render::sdl::render::entity::EntityPipeline;
 use crate::render::sdl::render::terrain::TerrainRenderer;
+use unit::world::WorldPoint;
 
 mod entity;
 pub mod terrain;
@@ -68,6 +68,8 @@ impl GlRenderer {
 pub struct FrameTarget {
     pub proj: *const F,
     pub view: *const F,
+    /// Amount to subtract from every entity's z pos, to normalize z around 0
+    pub z_offset: f32,
 }
 
 #[repr(C)]
@@ -87,8 +89,15 @@ impl Renderer for GlRenderer {
     fn sim_start(&mut self) {}
 
     fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent) {
-        self.entity_pipeline
-            .add_entity((transform.position, render.clone()));
+        let frame_target = self.frame_target.as_ref().unwrap();
+        let mut position = transform.position;
+
+        // tweak z position to keep normalized around 0
+        position.2 -= frame_target.z_offset;
+        // ...plus a tiny amount to always render above the terrain, not in it
+        position.2 += 0.001;
+
+        self.entity_pipeline.add_entity((position, render.clone()));
     }
 
     fn sim_selected(&mut self, transform: &TransformComponent) {
@@ -97,10 +106,7 @@ impl Renderer for GlRenderer {
         let radius = transform.bounding_radius + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
-        self.debug_shapes.push(DebugShape::Line {
-            points: [from.into(), to.into()],
-            color: ColorRgb::new(250, 250, 250),
-        })
+        self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));
     }
 
     fn sim_finish(&mut self) -> GlResult<()> {
@@ -110,14 +116,19 @@ impl Renderer for GlRenderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {
+    fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: ColorRgb) {
+        // keep z normalized around 0
+        let frame_target = self.frame_target.as_ref().unwrap();
+        from.2 -= frame_target.z_offset;
+        to.2 -= frame_target.z_offset;
+
         self.debug_shapes.push(DebugShape::Line {
-            points: [from, to],
+            points: [from.into(), to.into()],
             color,
         });
     }
 
-    fn debug_add_tri(&mut self, _points: [ViewPoint; 3], _color: ColorRgb) {
+    fn debug_add_tri(&mut self, _: [WorldPoint; 3], _: ColorRgb) {
         unimplemented!()
     }
 

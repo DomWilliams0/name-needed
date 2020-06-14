@@ -1,4 +1,5 @@
 //! http://www.gameaipro.com/GameAIPro2/GameAIPro2_Chapter18_Context_Steering_Behavior-Driven_Steering_at_the_Macro_Scale.pdf
+#![allow(dead_code)]
 
 use std::f32::consts::PI;
 use std::marker::PhantomData;

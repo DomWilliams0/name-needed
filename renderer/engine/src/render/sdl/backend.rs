@@ -2,14 +2,17 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 
 use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Keycode;
+use sdl2::keyboard::{Keycode, Mod};
 use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
 use color::ColorRgb;
 use common::input::{CameraDirection, Key, KeyEvent};
 use common::*;
-use simulation::{EventsOutcome, ExitType, PerfAvg, Simulation, SimulationBackend, WorldViewer};
+use simulation::{
+    EventsOutcome, ExitType, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
+    Simulation, WorldViewer,
+};
 
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
@@ -19,8 +22,7 @@ use crate::render::sdl::GlRenderer;
 use sdl2::mouse::MouseButton;
 use simulation::input::{InputCommand, InputEvent, WorldColumn};
 
-pub struct SdlBackend {
-    world_viewer: WorldViewer,
+pub struct SdlBackendPersistent {
     camera: Camera,
 
     sdl_events: EventPump,
@@ -32,6 +34,11 @@ pub struct SdlBackend {
     ui: Ui,
     /// Events from game -> UI, queued up and passed to sim on each frame
     sim_input_events: Vec<InputEvent>,
+}
+
+pub struct SdlBackendInit {
+    backend: SdlBackendPersistent,
+    world_viewer: WorldViewer,
 }
 
 /// Unused fields but need to be kept alive
@@ -49,11 +56,11 @@ pub enum SdlBackendError {
     Gl(GlError),
 }
 
-impl SimulationBackend for SdlBackend {
-    type Renderer = GlRenderer;
+impl PersistentSimulationBackend for SdlBackendPersistent {
     type Error = SdlBackendError;
+    type Initialized = SdlBackendInit;
 
-    fn new(world_viewer: WorldViewer) -> Result<Self, SdlBackendError> {
+    fn new() -> Result<Self, Self::Error> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
         video.gl_attr().set_context_version(3, 0);
@@ -91,7 +98,6 @@ impl SimulationBackend for SdlBackend {
         let camera = Camera::new(w as i32, h as i32);
 
         Ok(Self {
-            world_viewer,
             camera,
             sdl_events: events,
             keep_alive: GraphicsKeepAlive { sdl, video, gl },
@@ -101,6 +107,18 @@ impl SimulationBackend for SdlBackend {
             sim_input_events: Vec::with_capacity(32),
         })
     }
+
+    fn start(self, world: WorldViewer) -> Self::Initialized {
+        SdlBackendInit {
+            backend: self,
+            world_viewer: world,
+        }
+    }
+}
+
+impl InitializedSimulationBackend for SdlBackendInit {
+    type Renderer = GlRenderer;
+    type Persistent = SdlBackendPersistent;
 
     fn consume_events(&mut self) -> EventsOutcome {
         let mut outcome = EventsOutcome::Continue;
@@ -160,7 +178,7 @@ impl SimulationBackend for SdlBackend {
                     let selected = WorldColumn {
                         x: wx,
                         y: wy,
-                        slice_range: self.world_viewer.range(),
+                        slice_range: self.world_viewer.entity_range(),
                     };
 
                     let event = match mouse_btn {
@@ -185,7 +203,7 @@ impl SimulationBackend for SdlBackend {
         let chunk_bounds = self.camera.tick();
         self.world_viewer.set_chunk_bounds(chunk_bounds);
 
-        let renderer = self.renderer.terrain_mut();
+        let renderer = self.backend.renderer.terrain_mut();
         self.world_viewer
             .regenerate_dirty_chunk_meshes(|chunk_pos, mesh| {
                 if let Err(e) = renderer.update_chunk_mesh(chunk_pos, mesh) {
@@ -209,7 +227,13 @@ impl SimulationBackend for SdlBackend {
 
         // calculate projection and view matrices
         let projection = self.camera.projection_matrix();
-        let view = self.camera.view_matrix(interpolation);
+
+        // position camera a fixed distance above the top of the terrain
+        const CAMERA_Z_OFFSET: f32 = 20.0;
+        let terrain_range = self.world_viewer.terrain_range();
+        let view = self
+            .camera
+            .view_matrix(interpolation, terrain_range.size() as f32 + CAMERA_Z_OFFSET);
 
         // render world
         self.renderer
@@ -217,26 +241,32 @@ impl SimulationBackend for SdlBackend {
             .render(&projection, &view, &self.world_viewer);
 
         // render simulation
+        let entity_lower_limit = terrain_range.bottom().slice() as f32;
         let frame_target = FrameTarget {
             proj: projection.as_ptr(),
             view: view.as_ptr(),
+            z_offset: entity_lower_limit,
         };
 
-        let (_, blackboard) = simulation.render(
-            self.world_viewer.range(),
+        let (_, mut blackboard) = simulation.render(
+            self.world_viewer.entity_range(),
             frame_target,
-            &mut self.renderer,
+            &mut self.backend.renderer,
             interpolation,
-            &self.sim_input_events,
+            &self.backend.sim_input_events,
         );
 
         // input events were for this frame only
         self.sim_input_events.clear();
 
+        // populate blackboard with backend info
+        blackboard.world_view = Some(terrain_range);
+
         // render ui and collect input commands
-        self.ui.render(
-            &self.window,
-            &self.sdl_events.mouse_state(),
+        let backend = &mut self.backend;
+        backend.ui.render(
+            &backend.window,
+            &backend.sdl_events.mouse_state(),
             perf,
             blackboard,
             commands,
@@ -244,18 +274,60 @@ impl SimulationBackend for SdlBackend {
 
         self.window.gl_swap_window();
     }
+
+    fn end(mut self) -> Self::Persistent {
+        self.sim_input_events.clear();
+        self.backend
+    }
 }
 
-impl SdlBackend {
+/// Helper to ease accessing self.backend
+impl Deref for SdlBackendInit {
+    type Target = SdlBackendPersistent;
+
+    fn deref(&self) -> &Self::Target {
+        &self.backend
+    }
+}
+
+/// Helper to ease accessing self.backend
+impl DerefMut for SdlBackendInit {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.backend
+    }
+}
+
+impl SdlBackendInit {
     fn handle_key(&mut self, event: KeyEvent) {
         match event {
-            KeyEvent::Down(Key::SliceDown) => self.world_viewer.move_by(-1),
-            KeyEvent::Down(Key::SliceUp) => self.world_viewer.move_by(1),
+            KeyEvent::Down(Key::SliceDown) | KeyEvent::Down(Key::SliceUp) => {
+                let delta = if let KeyEvent::Down(Key::SliceDown) = event {
+                    -1
+                } else {
+                    1
+                };
+                let modifiers = self.modifier_state();
+
+                if modifiers & (Mod::LCTRLMOD | Mod::RCTRLMOD) != Mod::NOMOD {
+                    // stretch world viewer
+                    self.world_viewer.stretch_by(delta);
+                } else if modifiers & (Mod::LSHIFTMOD | Mod::RSHIFTMOD) != Mod::NOMOD {
+                    // move by larger amount
+                    self.world_viewer.move_by_multiple(delta);
+                } else {
+                    // move by 1 slice
+                    self.world_viewer.move_by(delta);
+                }
+            }
             other => {
                 let _handled = self.camera.handle_key(other);
                 // TODO cascade through other handlers
             }
         }
+    }
+
+    fn modifier_state(&self) -> Mod {
+        self.keep_alive.sdl.keyboard().mod_state()
     }
 }
 

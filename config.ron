@@ -4,15 +4,18 @@ Config(
         resizable: false,
         camera_speed: 0.5,
         debug_physics: false,
-        zoom: 1.0
+        zoom: 1.0,
+        initial_view_range: 5,
     ),
     world: (
-        preset: MultiChunkWonder,
+        // source: Preset(MultiChunkWonder),
+        source: Generate (radius: 2, seed: Some(342878)),
         worker_threads: None,
+        generation_height_scale: 15.0,
     ),
     simulation: (
         random_seed: Some(67853852415419),
-        random_count: 10,
+        random_count: 5,
         acceleration: 0.08,
         friction: 0.85,
         max_speed: 0.22,

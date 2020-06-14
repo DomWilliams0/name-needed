@@ -2,13 +2,14 @@ use std::time::{Duration, Instant};
 
 use simulation::input::InputCommand;
 use simulation::{
-    EventsOutcome, ExitType, PerfAvg, RenderComponent, Renderer, Simulation, SimulationBackend,
-    TransformComponent, WorldViewer,
+    EventsOutcome, ExitType, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
+    RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
 };
 
 pub struct DummyRenderer;
 
-pub struct DummyBackend {
+pub struct DummyBackendPersistent;
+pub struct DummyBackendInit {
     end_time: Instant,
 }
 
@@ -31,15 +32,9 @@ impl Renderer for DummyRenderer {
     fn deinit(&mut self) -> Self::Target {}
 }
 
-impl SimulationBackend for DummyBackend {
+impl InitializedSimulationBackend for DummyBackendInit {
     type Renderer = DummyRenderer;
-    type Error = ();
-
-    fn new(_world_viewer: WorldViewer) -> Result<Self, Self::Error> {
-        Ok(Self {
-            end_time: Instant::now() + Duration::from_secs(5),
-        })
-    }
+    type Persistent = DummyBackendPersistent;
 
     fn consume_events(&mut self) -> EventsOutcome {
         if Instant::now() > self.end_time {
@@ -53,10 +48,29 @@ impl SimulationBackend for DummyBackend {
 
     fn render(
         &mut self,
-        _simulation: &mut Simulation<Self::Renderer>,
-        _interpolation: f64,
-        _perf: &PerfAvg,
-        _commands: &mut Vec<InputCommand>,
+        _: &mut Simulation<Self::Renderer>,
+        _: f64,
+        _: &PerfAvg,
+        _: &mut Vec<InputCommand>,
     ) {
+    }
+
+    fn end(self) -> Self::Persistent {
+        DummyBackendPersistent
+    }
+}
+
+impl PersistentSimulationBackend for DummyBackendPersistent {
+    type Error = ();
+    type Initialized = DummyBackendInit;
+
+    fn new() -> Result<Self, Self::Error> {
+        Ok(Self)
+    }
+
+    fn start(self, _: WorldViewer) -> Self::Initialized {
+        DummyBackendInit {
+            end_time: Instant::now() + Duration::from_secs(10),
+        }
     }
 }

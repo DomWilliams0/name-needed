@@ -2,7 +2,7 @@
 
 use petgraph::graphmap::DiGraphMap;
 
-use unit::world::BlockPosition;
+use unit::world::{BlockPosition, SlabIndex, SlabPosition};
 
 use crate::navigation::astar::astar;
 use crate::navigation::path::{BlockPath, BlockPathNode};
@@ -33,13 +33,13 @@ impl BlockGraph {
         }
     }
 
-    pub fn add_edge<F, T>(&mut self, from: F, to: T, cost: EdgeCost)
+    pub fn add_edge<F, T>(&mut self, from: F, to: T, cost: EdgeCost, slab: SlabIndex)
     where
-        F: Into<BlockPosition>,
-        T: Into<BlockPosition>,
+        F: Into<SlabPosition>,
+        T: Into<SlabPosition>,
     {
-        let from = BlockNavNode(from.into());
-        let to = BlockNavNode(to.into());
+        let from = BlockNavNode(from.into().to_block_position(slab));
+        let to = BlockNavNode(to.into().to_block_position(slab));
 
         self.graph.add_edge(from, to, BlockNavEdge(cost));
         self.graph.add_edge(to, from, BlockNavEdge(cost.opposite()));

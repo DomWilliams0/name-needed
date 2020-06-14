@@ -5,14 +5,15 @@ use std::ops::{Deref, DerefMut, Shl};
 use common::*;
 
 use crate::block::BlockType;
-use crate::chunk::slab::{SlabIndex, SLAB_SIZE};
 use crate::chunk::slice::Slice;
 use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
 use crate::chunk::BaseTerrain;
 use crate::navigation::WorldArea;
 use crate::SliceRange;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPosition};
+use unit::world::{
+    BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
+};
 
 pub type ChunkId = u64;
 
@@ -52,7 +53,7 @@ impl Chunk {
 
     pub(crate) fn slab_pos(chunk_pos: ChunkPosition, slab: SlabIndex) -> WorldPosition {
         let mut pos = WorldPosition::from(chunk_pos);
-        pos.2 = slab * SLAB_SIZE.as_i32();
+        pos.2 = LocalSliceIndex::bottom().to_global(slab);
         pos
     }
 
@@ -81,17 +82,25 @@ impl Chunk {
             let block_pos: BlockPosition = pos.into();
             WorldArea {
                 chunk: self.pos,
-                slab: RawChunkTerrain::slab_index_for_slice(block_pos.2),
+                slab: block_pos.2.slab_index(),
                 area: area_index,
             }
         })
     }
 
-    pub fn slice_range(&self, range: SliceRange) -> impl Iterator<Item = (SliceIndex, Slice)> {
+    pub fn slice_range(
+        &self,
+        range: SliceRange,
+    ) -> impl Iterator<Item = (GlobalSliceIndex, Slice)> {
         range
             .as_range()
-            .map(move |i| self.slice(i).map(|s| (i, s)))
+            .map(move |i| self.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
+            .skip_while(|s| s.is_none())
             .while_some()
+    }
+
+    pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice {
+        self.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 }
 
@@ -124,6 +133,7 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder, BLOCK_COUNT_SLICE};
+    use unit::world::GlobalSliceIndex;
 
     #[test]
     fn chunk_ops() {
@@ -143,7 +153,7 @@ mod tests {
 
         // collect slice
         let slice: Vec<BlockType> = chunk
-            .slice(0)
+            .slice(GlobalSliceIndex::new(0))
             .unwrap()
             .iter()
             .map(|b| b.block_type())

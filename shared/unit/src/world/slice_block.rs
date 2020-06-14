@@ -1,7 +1,7 @@
 use common::derive_more::*;
 
 use crate::dim::CHUNK_SIZE;
-use crate::world::{BlockPosition, SliceIndex};
+use crate::world::{BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition};
 
 /// A block in a chunk x/y coordinate. Must be < chunk size
 pub type BlockCoord = u8;
@@ -11,8 +11,12 @@ pub type BlockCoord = u8;
 pub struct SliceBlock(pub BlockCoord, pub BlockCoord);
 
 impl SliceBlock {
-    pub fn to_block_position(self, slice: SliceIndex) -> BlockPosition {
+    pub fn to_block_position(self, slice: GlobalSliceIndex) -> BlockPosition {
         BlockPosition(self.0, self.1, slice)
+    }
+
+    pub fn to_slab_position(self, slice: LocalSliceIndex) -> SlabPosition {
+        SlabPosition::new(self.0, self.1, slice)
     }
 
     /// Returns None on overflow around 0..CHUNK_SIZE
@@ -31,5 +35,10 @@ impl SliceBlock {
 impl From<BlockPosition> for SliceBlock {
     fn from(b: BlockPosition) -> Self {
         Self(b.0, b.1)
+    }
+}
+impl From<SlabPosition> for SliceBlock {
+    fn from(s: SlabPosition) -> Self {
+        Self(s.x(), s.y())
     }
 }

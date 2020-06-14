@@ -9,13 +9,26 @@ pub enum TerrainSourceError {
     OutOfBounds,
 }
 
+pub trait PreprocessedTerrain: Send {
+    fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain;
+}
+
 pub trait TerrainSource: Send {
     /// Bounding box, not necessarily full
     fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition);
 
     fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross
 
-    fn load_chunk(&mut self, chunk: ChunkPosition) -> Result<RawChunkTerrain, TerrainSourceError>;
+    fn preprocess(
+        &self,
+        chunk: ChunkPosition,
+    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>>;
+
+    fn load_chunk(
+        &mut self,
+        chunk: ChunkPosition,
+        preprocess_result: Box<dyn PreprocessedTerrain>,
+    ) -> Result<RawChunkTerrain, TerrainSourceError>;
 
     /*
     fn unload_chunk(
@@ -31,7 +44,9 @@ pub trait TerrainSource: Send {
     }
 }
 
+mod generate;
 mod memory;
+pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
 #[cfg(test)]
@@ -67,9 +82,14 @@ mod tests {
         assert!(!just_one.is_in_bounds(ChunkPosition(1, 1)));
 
         // make sure impl fails too
-        assert!(just_one.load_chunk(ChunkPosition(0, 0)).is_ok());
+        assert!(just_one
+            .load_chunk(ChunkPosition(0, 0), Box::new(()))
+            .is_ok());
         assert_matches!(
-            just_one.load_chunk(ChunkPosition(1, 1)).err().unwrap(),
+            just_one
+                .load_chunk(ChunkPosition(1, 1), Box::new(()))
+                .err()
+                .unwrap(),
             TerrainSourceError::OutOfBounds
         );
 

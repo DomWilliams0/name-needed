@@ -14,21 +14,28 @@ pub struct Display {
     pub camera_speed: f32,
     pub debug_physics: bool,
     pub zoom: f32,
+    pub initial_view_range: u16,
 }
 
 #[derive(Deserialize)]
 pub struct World {
-    pub preset: WorldPreset,
+    pub source: WorldSource,
     pub worker_threads: Option<usize>,
+    pub generation_height_scale: f64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+pub enum WorldSource {
+    Preset(WorldPreset),
+    Generate { radius: u32, seed: Option<u64> },
+}
+
+#[derive(Deserialize, Clone, Debug)]
 pub enum WorldPreset {
     OneChunkWonder,
     MultiChunkWonder,
     OneBlockWonder,
     FlatLands,
-    PyramidMess,
     Bottleneck,
 }
 

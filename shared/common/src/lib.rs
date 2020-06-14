@@ -63,3 +63,10 @@ pub use newtype::{NormalizedFloat, Proportion};
 pub mod input;
 pub mod newtype;
 pub mod random;
+
+pub fn seeded_rng(seed: Option<u64>) -> StdRng {
+    match seed {
+        Some(seed) => StdRng::seed_from_u64(seed),
+        None => StdRng::from_entropy(),
+    }
+}

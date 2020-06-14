@@ -10,7 +10,6 @@ edition = "2018"
 # default-run = "engine"
 
 [dependencies]
-gameloop = {path = "../gameloop"}
 simulation = {path = "../../game/simulation"}
 
 config = {path = "../../shared/config"}
@@ -18,6 +17,7 @@ unit = {path = "../../shared/unit"}
 common = {path = "../../shared/common"}
 color = {path = "../../shared/color"}
 
+gameloop = "^0.1"
 sdl2 = {version = "^0.33", optional = true}
 gl = {version = "^0.14", optional = true}
 imgui-sdl2 = {version = "^0.10", optional = true}

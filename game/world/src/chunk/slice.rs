@@ -5,6 +5,9 @@ use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::{Block, BlockType};
 
+const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
+    [Block::default_const(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
+
 #[derive(Clone)]
 pub struct Slice<'a> {
     slice: &'a [Block],
@@ -19,11 +22,21 @@ impl<'a> Slice<'a> {
         Self { slice }
     }
 
-    pub fn non_air_blocks(&self) -> impl Iterator<Item = (SliceBlock, &Block)> {
+    pub fn dummy() -> Slice<'static> {
+        Slice {
+            slice: &DUMMY_SLICE_BLOCKS,
+        }
+    }
+
+    pub fn non_air_blocks(&self) -> impl Iterator<Item = (usize, SliceBlock, &Block)> {
         self.filter_blocks(move |&b| b.block_type() != BlockType::Air)
     }
 
-    pub fn filter_blocks<F>(&self, f: F) -> impl Iterator<Item = (SliceBlock, &Block)>
+    pub fn slice(&self) -> &[Block] {
+        self.slice
+    }
+
+    pub fn filter_blocks<F>(&self, f: F) -> impl Iterator<Item = (usize, SliceBlock, &Block)>
     where
         F: Fn(&Block) -> bool,
     {
@@ -33,7 +46,7 @@ impl<'a> Slice<'a> {
             .filter(move |(_i, b)| f(b))
             .map(|(i, b)| {
                 let pos = unflatten_index(i);
-                (pos, b)
+                (i, pos, b)
             })
     }
 
@@ -48,6 +61,11 @@ impl<'a> Slice<'a> {
             let pos = unflatten_index(i);
             (pos, b)
         })
+    }
+
+    pub fn index_unchecked(&self, idx: usize) -> &Block {
+        debug_assert!(idx < self.slice.len());
+        unsafe { self.slice.get_unchecked(idx) }
     }
 }
 
@@ -93,7 +111,7 @@ impl<'a> SliceMut<'a> {
     }
 }
 
-impl<'a> Deref for SliceMut<'a> {
+impl Deref for SliceMut<'_> {
     type Target = [Block];
 
     fn deref(&self) -> &Self::Target {
@@ -101,7 +119,7 @@ impl<'a> Deref for SliceMut<'a> {
     }
 }
 
-impl<'a> DerefMut for SliceMut<'a> {
+impl DerefMut for SliceMut<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.slice
     }
@@ -109,7 +127,7 @@ impl<'a> DerefMut for SliceMut<'a> {
 
 // -------
 
-impl<'a, I: Into<SliceBlock>> Index<I> for Slice<'a> {
+impl<I: Into<SliceBlock>> Index<I> for Slice<'_> {
     type Output = Block;
 
     fn index(&self, index: I) -> &Self::Output {
@@ -117,7 +135,7 @@ impl<'a, I: Into<SliceBlock>> Index<I> for Slice<'a> {
     }
 }
 
-impl<'a, I: Into<SliceBlock>> Index<I> for SliceMut<'a> {
+impl<I: Into<SliceBlock>> Index<I> for SliceMut<'_> {
     type Output = Block;
 
     fn index(&self, index: I) -> &Self::Output {
@@ -125,7 +143,7 @@ impl<'a, I: Into<SliceBlock>> Index<I> for SliceMut<'a> {
     }
 }
 
-impl<'a, I: Into<SliceBlock>> IndexMut<I> for SliceMut<'a> {
+impl<I: Into<SliceBlock>> IndexMut<I> for SliceMut<'_> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         &mut self.slice[flatten_coords(index.into())]
     }

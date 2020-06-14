@@ -1,7 +1,7 @@
 use crate::{RenderComponent, TransformComponent};
 use color::ColorRgb;
 use std::fmt::Debug;
-use unit::view::ViewPoint;
+use unit::world::WorldPoint;
 
 pub trait Renderer {
     type Target;
@@ -26,10 +26,10 @@ pub trait Renderer {
     fn debug_start(&mut self) {}
 
     #[allow(unused_variables)]
-    fn debug_add_line(&mut self, from: ViewPoint, to: ViewPoint, color: ColorRgb) {}
+    fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: ColorRgb) {}
 
     #[allow(unused_variables)]
-    fn debug_add_tri(&mut self, points: [ViewPoint; 3], color: ColorRgb) {}
+    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: ColorRgb) {}
 
     fn debug_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use unit::dim::CHUNK_SIZE;
-use unit::world::BlockCoord;
+use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
+use crate::chunk::slab::Slab;
 use crate::chunk::slice::Slice;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
@@ -56,6 +56,7 @@ impl Into<_AreaDiscoveryGridBlock> for &Block {
     }
 }
 
+#[derive(Eq, PartialEq)]
 enum VerticalOffset {
     Above,
     Below,
@@ -135,7 +136,7 @@ impl<'a> AreaDiscovery<'a> {
 
             // create edges
             if let Some((src, src_cost)) = src {
-                graph.add_edge(&src, &current, src_cost);
+                graph.add_edge(&src, &current, src_cost, self.slab_index);
             }
 
             if !check_neighbours {
@@ -154,16 +155,21 @@ impl<'a> AreaDiscovery<'a> {
                 self.queue.push((n, src));
             }
 
-            // check vertical neighbours for jump access only if above is not blocked
-            if !self
-                .get_vertical_offset(current, VerticalOffset::Above)
-                .solid
-            {
-                let [x, y, z] = current;
-                let above = [x, y, z + 1];
+            // check vertical neighbours for jump access only
 
-                for n in Neighbours::new(above) {
-                    self.queue.push((n, Some((current, EdgeCost::JumpUp))));
+            // don't queue the slab above's neighbours if we're at the top of the slab
+            if current[2] < SLAB_SIZE.as_i32() - 1 {
+                // only check the above slab if its not solid and a jump is possible
+                if !self
+                    .get_vertical_offset(current, VerticalOffset::Above)
+                    .solid
+                {
+                    let [x, y, z] = current;
+                    let above = [x, y, z + 1];
+
+                    for n in Neighbours::new(above) {
+                        self.queue.push((n, Some((current, EdgeCost::JumpUp))));
+                    }
                 }
             }
         }
@@ -211,7 +217,7 @@ impl<'a> AreaDiscovery<'a> {
 
         match z {
             // top of the slab: check slab above
-            TOP => {
+            TOP if offset == VerticalOffset::Above => {
                 if let Some(above_slice) = &self.above_bot_slice {
                     // it is present
                     (&above_slice[(x as BlockCoord, y as BlockCoord)]).into()
@@ -224,8 +230,8 @@ impl<'a> AreaDiscovery<'a> {
                 }
             }
 
-            // bottom of the slab: check slab above
-            0 => {
+            // bottom of the slab: check slab below
+            0 if offset == VerticalOffset::Below => {
                 if let Some(below_slice) = &self.below_top_slice {
                     // it is present
                     (&below_slice[(x as BlockCoord, y as BlockCoord)]).into()

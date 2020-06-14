@@ -6,7 +6,7 @@ use common::derive_more::*;
 use common::{Point3, Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
-use crate::world::{ChunkPosition, SliceIndex, WorldPosition};
+use crate::world::{ChunkPosition, GlobalSliceIndex, SliceIndex, WorldPosition};
 use std::fmt::{Display, Formatter};
 use std::iter::{once, once_with};
 
@@ -15,8 +15,8 @@ use std::iter::{once, once_with};
 pub struct WorldPoint(pub f32, pub f32, pub f32);
 
 impl WorldPoint {
-    pub fn slice(&self) -> SliceIndex {
-        SliceIndex(self.2 as i32)
+    pub fn slice(&self) -> GlobalSliceIndex {
+        SliceIndex::new(self.2 as i32)
     }
 
     pub fn floored(self) -> Self {
@@ -26,7 +26,7 @@ impl WorldPoint {
         WorldPosition(
             self.0.floor() as i32,
             self.1.floor() as i32,
-            self.2.floor() as i32,
+            SliceIndex::new(self.2.floor() as i32),
         )
     }
 
@@ -34,11 +34,12 @@ impl WorldPoint {
         WorldPosition(
             self.0.ceil() as i32,
             self.1.ceil() as i32,
-            self.2.ceil() as i32,
+            SliceIndex::new(self.2.ceil() as i32),
         )
     }
 
     pub fn floor_then_ceil(self) -> impl Iterator<Item = WorldPosition> {
+        // TODO floor_then_ceil is terribly inefficient, try without the lazy eval
         once(self.floor()).chain(once_with(move || self.ceil()))
     }
 }
@@ -78,7 +79,7 @@ impl From<Vector3> for WorldPoint {
 /// Centre of block
 impl From<WorldPosition> for WorldPoint {
     fn from(pos: WorldPosition) -> Self {
-        Self(pos.0 as f32 + 0.5, pos.1 as f32 + 0.5, pos.2 as f32)
+        Self(pos.0 as f32 + 0.5, pos.1 as f32 + 0.5, pos.2.slice() as f32)
     }
 }
 

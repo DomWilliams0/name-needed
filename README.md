@@ -8,6 +8,10 @@ An effort to produce an **open source**, **intuitive** and **high performance** 
 * * *
 
 ## Progress log
+* 14 Jun 2020: <em>Basic, boring procedural terrain generation.</em>
+<p style="margin: auto">
+    <img src=".screenshots/procgen-basic.png"/>
+</p>
 
 * 07 Jun 2020: <em>A debugging UI with imgui as an experiment in game <--> UI communication.</em>
 <p style="margin: auto">

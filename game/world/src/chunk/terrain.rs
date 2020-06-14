@@ -6,11 +6,14 @@ use std::ops::{Deref, DerefMut};
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceBlock, SliceIndex};
+use unit::world::{
+    BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
+    SliceBlock, SLAB_SIZE,
+};
 
 use crate::block::{Block, BlockType};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
-use crate::chunk::slab::{Slab, SlabIndex, SLAB_SIZE};
+use crate::chunk::slab::Slab;
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
@@ -36,22 +39,22 @@ pub trait BaseTerrain {
     fn raw_terrain(&self) -> &RawChunkTerrain;
     fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain;
 
-    fn slice<S: Into<SliceIndex>>(&self, index: S) -> Option<Slice> {
-        let index = index.into();
-        let slab_idx = RawChunkTerrain::slab_index_for_slice(index);
+    fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice> {
+        let chunk_slice_idx = index.into();
+        let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain()
             .slabs
             .get(slab_idx)
-            .map(|ptr| ptr.slice(RawChunkTerrain::slice_index_in_slab(index)))
+            .map(|ptr| ptr.slice(chunk_slice_idx.to_local()))
     }
 
-    fn slice_mut<S: Into<SliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
-        let index = index.into();
-        let slab_idx = RawChunkTerrain::slab_index_for_slice(index);
+    fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
+        let chunk_slice_idx = index.into();
+        let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain_mut()
             .slabs
             .get_mut(slab_idx)
-            .map(|ptr| ptr.slice_mut(RawChunkTerrain::slice_index_in_slab(index)))
+            .map(|ptr| ptr.slice_mut(chunk_slice_idx.to_local()))
     }
 
     fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Option<Block> {
@@ -69,7 +72,7 @@ pub trait BaseTerrain {
         let bottom = slabs.next().unwrap_or(0);
         let top = slabs.last().unwrap_or(0) + 1;
 
-        SliceRange::from_bounds(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
+        SliceRange::from_bounds_unchecked(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
     }
 
     /// Only for tests
@@ -82,10 +85,10 @@ pub trait BaseTerrain {
 
         let bottom_slab = self.raw_terrain().slabs_from_bottom().next().unwrap();
 
-        let low_z = bottom_slab.index() * SLAB_SIZE.as_i32();
+        let SlabIndex(low_z) = bottom_slab.index() * SLAB_SIZE;
         let high_z = low_z + (self.raw_terrain().slab_count() * SLAB_SIZE.as_usize()) as i32;
 
-        let total_size: usize = ((high_z - low_z) * BLOCK_COUNT_SLICE as i32) as usize;
+        let total_size = (high_z - low_z) as usize * BLOCK_COUNT_SLICE;
         out.reserve(total_size);
         out.clear();
 
@@ -94,7 +97,8 @@ pub trait BaseTerrain {
         for z in iter_from..high_z {
             for y in 0..CHUNK_SIZE.as_block_coord() {
                 for x in 0..CHUNK_SIZE.as_block_coord() {
-                    let pos: BlockPosition = (x, y, z).into();
+                    let z = GlobalSliceIndex::new(z);
+                    let pos = BlockPosition::from((x, y, z));
                     let block = self.get_block(pos);
                     out.push((pos, block.unwrap()));
                 }
@@ -162,20 +166,6 @@ impl RawChunkTerrain {
             .fill_until(target, |idx| SlabPointer::new(Slab::empty(idx)));
     }
 
-    pub(crate) fn slab_index_for_slice(slice: SliceIndex) -> SlabIndex {
-        (slice.0 as f32 / SLAB_SIZE.as_f32()).floor() as SlabIndex
-    }
-
-    pub(crate) fn slice_index_in_slab(slice: SliceIndex) -> SliceIndex {
-        let SliceIndex(mut idx) = slice;
-        idx %= SLAB_SIZE.as_i32(); // cap at slab size
-        if idx.is_negative() {
-            // negative slices flip
-            idx += SLAB_SIZE.as_i32();
-        }
-        SliceIndex(idx)
-    }
-
     pub fn slab_count(&self) -> usize {
         self.slabs.len()
     }
@@ -186,23 +176,20 @@ impl RawChunkTerrain {
         let bottom = slabs.next().unwrap_or(0);
         let top = slabs.last().unwrap_or(0) + 1;
 
-        SliceRange::from_bounds(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
+        SliceRange::from_bounds_unchecked(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
     }
 
-    pub fn slices_from_bottom(&self) -> impl Iterator<Item = (SliceIndex, Slice)> {
+    pub fn slices_from_bottom(&self) -> impl Iterator<Item = (LocalSliceIndex, Slice)> {
         self.slabs_from_bottom()
             .flat_map(|slab| slab.slices_from_bottom())
     }
 
     /// (global slice index, slice)
-    pub fn slices_from_top_offset(&self) -> impl Iterator<Item = (SliceIndex, Slice)> {
+    pub fn slices_from_top_offset(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice)> {
         self.slabs_from_top().flat_map(|slab| {
-            slab.slices_from_bottom().rev().map(move |(z, slice)| {
-                (
-                    RawChunkTerrain::slice_index_in_chunk(slab.index(), z),
-                    slice,
-                )
-            })
+            slab.slices_from_bottom()
+                .rev()
+                .map(move |(z, slice)| (z.to_global(slab.index()), slice))
         })
     }
 
@@ -223,43 +210,39 @@ impl RawChunkTerrain {
     {
         let pos = pos.into();
         let block = block.into();
+        self.slice_mut_with_policy(pos.2, policy, |mut slice| slice[pos] = block)
+    }
+
+    pub fn slice_mut_with_policy<S: Into<GlobalSliceIndex>, F: FnOnce(SliceMut)>(
+        &mut self,
+        slice: S,
+        policy: SlabCreationPolicy,
+        f: F,
+    ) -> bool {
         let mut try_again = true;
+        let slice = slice.into();
 
         loop {
-            if let Some(mut slice) = self.slice_mut(pos.2) {
+            if let Some(slice) = self.slice_mut(slice) {
                 // nice, slice exists: we're done
-                slice[pos] = block;
+                f(slice);
                 return true;
             }
 
             // slice doesn't exist
 
-            // we tried twice and failed both times, to shame
-            if !try_again {
-                return false;
-            }
-
             match policy {
-                SlabCreationPolicy::PleaseDont => {
-                    // oh well we tried
-                    return false;
-                }
-                SlabCreationPolicy::CreateAll => {
+                SlabCreationPolicy::CreateAll if try_again => {
                     // create slabs
-                    let target_slab = Self::slab_index_for_slice(pos.2);
-                    self.create_slabs_until(target_slab);
+                    self.create_slabs_until(slice.slab_index());
 
                     // try again once more
                     try_again = false;
                     continue;
                 }
+                _ => return false,
             };
         }
-    }
-
-    pub(crate) fn slice_index_in_chunk(slab: SlabIndex, slice: SliceIndex) -> SliceIndex {
-        let z_offset = slab * SLAB_SIZE.as_i32();
-        slice + z_offset
     }
 
     pub fn with_block_mut_unchecked<F: FnMut(&mut Block)>(&mut self, pos: BlockPosition, mut f: F) {
@@ -286,8 +269,12 @@ impl RawChunkTerrain {
         };
 
         // find slab range
-        let (my_min, my_max) = self.slabs.index_range();
-        let (ur_min, ur_max) = other.slabs.index_range();
+        fn range_to_slab_indices(slabs: &DoubleSidedVec<SlabPointer>) -> (SlabIndex, SlabIndex) {
+            let (min, max) = slabs.index_range();
+            (SlabIndex(min), SlabIndex(max))
+        }
+        let (my_min, my_max) = range_to_slab_indices(&self.slabs);
+        let (ur_min, ur_max) = range_to_slab_indices(&other.slabs);
 
         // one chunk starts lower than the other
         if my_min != ur_min {
@@ -301,14 +288,16 @@ impl RawChunkTerrain {
             let lower_slab_index = higher_min - 1;
 
             // compare top slice of this vs bottom slice of other
-            let lower_slice_above = lower.slab(lower_slab_index + 1).map(|slab| slab.slice(0));
+            let lower_slice_above = lower
+                .slab(lower_slab_index + 1)
+                .map(|slab| slab.slice(LocalSliceIndex::bottom()));
 
             let (_, bottom_slice) = higher.slices_from_bottom().next().unwrap();
             yield_(
                 which_lower,
                 lower_slice_above,
                 lower_slab_index,
-                SliceIndex(SLAB_SIZE.as_i32() - 1),
+                LocalSliceIndex::top(),
                 bottom_slice,
                 dir,
                 &mut f,
@@ -321,23 +310,23 @@ impl RawChunkTerrain {
         // yield slices up until first max
         let first_max = my_max.min(ur_max);
 
-        for (slab_index, next_slab_index) in (first_common_slab..=first_max)
+        for (slab_index, next_slab_index) in (first_common_slab.as_i32()..=first_max.as_i32())
             .map(Some)
             .chain(once(None))
             .tuple_windows()
         {
-            let slab_index = slab_index.unwrap(); // always Some
+            let slab_index = SlabIndex(slab_index.unwrap()); // always Some
             let this_slab = self.slab(slab_index).unwrap();
             let other_slab = other.slab(slab_index).unwrap();
 
-            for z in 0..SLAB_SIZE.as_i32() - 1 {
+            for z in LocalSliceIndex::slices_except_last() {
                 let this_slice_above = this_slab.slice(z + 1);
                 let upper_slice = other_slab.slice(z + 1);
                 yield_(
                     WhichChunk::ThisChunk,
                     Some(this_slice_above),
                     slab_index,
-                    SliceIndex(z),
+                    z,
                     upper_slice,
                     offset,
                     &mut f,
@@ -349,7 +338,7 @@ impl RawChunkTerrain {
                     WhichChunk::OtherChunk,
                     Some(other_slice_above),
                     slab_index,
-                    SliceIndex(z),
+                    z,
                     upper_slice,
                     offset_opposite,
                     &mut f,
@@ -358,26 +347,37 @@ impl RawChunkTerrain {
 
             // special case of top slice of one and bottom slice of next
             if let Some(next_slab_index) = next_slab_index {
-                let this_slice_above = self.slab(next_slab_index).map(|slab| slab.slice(0));
-                let next_slice = other.slab(next_slab_index).unwrap().slice(0);
+                let next_slab_index = SlabIndex(next_slab_index);
+                let this_slice_above = self
+                    .slab(next_slab_index)
+                    .map(|slab| slab.slice(LocalSliceIndex::bottom()));
+                let next_slice = other
+                    .slab(next_slab_index)
+                    .unwrap()
+                    .slice(LocalSliceIndex::bottom());
                 yield_(
                     WhichChunk::ThisChunk,
                     this_slice_above,
                     slab_index,
-                    SliceIndex(SLAB_SIZE.as_i32() - 1),
+                    LocalSliceIndex::top(),
                     next_slice,
                     offset,
                     &mut f,
                 );
 
                 // let top_slice = other_slab.slice(SLAB_SIZE.as_i32() - 1);
-                let other_slice_above = other.slab(next_slab_index).map(|slab| slab.slice(0));
-                let next_slice = self.slab(next_slab_index).unwrap().slice(0);
+                let other_slice_above = other
+                    .slab(next_slab_index)
+                    .map(|slab| slab.slice(LocalSliceIndex::bottom()));
+                let next_slice = self
+                    .slab(next_slab_index)
+                    .unwrap()
+                    .slice(LocalSliceIndex::bottom());
                 yield_(
                     WhichChunk::OtherChunk,
                     other_slice_above,
                     slab_index,
-                    SliceIndex(SLAB_SIZE.as_i32() - 1),
+                    LocalSliceIndex::top(),
                     next_slice,
                     offset_opposite,
                     &mut f,
@@ -395,13 +395,18 @@ impl RawChunkTerrain {
 
             // top slice of lower and the bottom slice of next higher
             // let top_slice = lower.slab(lower_max).unwrap().slice(SLAB_SIZE.as_i32() - 1);
-            let lower_slice_above = lower.slab(lower_max + 1).map(|slab| slab.slice(0));
-            let bottom_slice = higher.slab(lower_max + 1).unwrap().slice(0);
+            let lower_slice_above = lower
+                .slab(lower_max + 1)
+                .map(|slab| slab.slice(LocalSliceIndex::bottom()));
+            let bottom_slice = higher
+                .slab(lower_max + 1)
+                .unwrap()
+                .slice(LocalSliceIndex::bottom());
             yield_(
                 which_lower,
                 lower_slice_above,
                 lower_max,
-                SliceIndex(SLAB_SIZE.as_i32() - 1),
+                LocalSliceIndex::top(),
                 bottom_slice,
                 dir,
                 &mut f,
@@ -412,7 +417,7 @@ impl RawChunkTerrain {
     }
 
     pub(crate) fn cross_chunk_pairs_nav_foreach<
-        F: FnMut(ChunkArea, ChunkArea, EdgeCost, BlockCoord, SliceIndex),
+        F: FnMut(ChunkArea, ChunkArea, EdgeCost, BlockCoord, GlobalSliceIndex),
     >(
         &'_ self,
         other: &'_ Self,
@@ -465,6 +470,8 @@ impl RawChunkTerrain {
                         .filter_map(|(s, e)| s.clone().map(|s| (s, e)))
                     {
                         if let Some(other_area) = ur_slice[ur_sliceblock].area_index().ok() {
+                            let slab_idx = SlabIndex(slab_idx);
+
                             // link found
                             let src = ChunkArea {
                                 slab: slab_idx,
@@ -476,7 +483,7 @@ impl RawChunkTerrain {
                             };
 
                             let coord = if x_coord_changes { wx } else { wy };
-                            f(src, dst, cost, coord, slice_idx);
+                            f(src, dst, cost, coord, slice_idx.to_global(slab_idx));
 
                             // done with this slice
                             // TODO could skip next slice because it cant be walkable if this one was?
@@ -513,8 +520,10 @@ impl RawChunkTerrain {
             unsafe {
                 let below = self
                     .slab_with_lifetime(slab_index - 1)
-                    .map(|s| s.slice(SLAB_SIZE.as_i32() - 1));
-                let above = self.slab_with_lifetime(slab_index + 1).map(|s| s.slice(0));
+                    .map(|s| s.slice(LocalSliceIndex::top()));
+                let above = self
+                    .slab_with_lifetime(slab_index + 1)
+                    .map(|s| s.slice(LocalSliceIndex::bottom()));
                 (slab, below, above)
             }
         }
@@ -526,6 +535,7 @@ impl RawChunkTerrain {
 mod pair_walking {
     //! Helpers for cross_chunk_pairs_*
     use super::*;
+    use unit::world::SlabIndex;
 
     #[derive(Copy, Clone)]
     pub enum WhichChunk {
@@ -537,7 +547,7 @@ mod pair_walking {
         which_chunk: WhichChunk,
         lower_slice_above: Option<Slice>,
         lower_slab: SlabIndex,
-        lower_slice: SliceIndex,
+        lower_slice: LocalSliceIndex,
         upper: Slice,
         direction: NeighbourOffset,
         f: &mut F,
@@ -575,7 +585,7 @@ mod pair_walking {
 
             // get block pos in this chunk
             let block_pos = {
-                let slice_idx = RawChunkTerrain::slice_index_in_chunk(lower_slab, lower_slice);
+                let slice_idx = lower_slice.to_global(lower_slab);
                 BlockPosition(this_pos.0, this_pos.1, slice_idx)
             };
 
@@ -639,7 +649,7 @@ mod pair_walking {
         which_chunk: WhichChunk,
         lower_slice_above: Option<Slice>,
         lower_slab: SlabIndex,
-        lower_slice: SliceIndex,
+        lower_slice: LocalSliceIndex,
         upper: Slice,
         direction: NeighbourOffset,
         f: &mut F,
@@ -682,7 +692,7 @@ mod pair_walking {
 
             // get block pos in this chunk
             let block_pos = {
-                let slice_idx = RawChunkTerrain::slice_index_in_chunk(lower_slab, lower_slice);
+                let slice_idx = lower_slice.to_global(lower_slab);
                 BlockPosition(coord.0, coord.1, slice_idx)
             };
 
@@ -731,7 +741,7 @@ impl ChunkTerrain {
         // per slab
         for idx in self.raw_terrain.slabs.indices_increasing() {
             let (slab, slice_below, slice_above) =
-                self.raw_terrain.slab_with_surrounding_slices(idx);
+                self.raw_terrain.slab_with_surrounding_slices(idx.into());
             let slab = slab.unwrap();
 
             // collect slab into local grid
@@ -809,7 +819,7 @@ impl ChunkTerrain {
             let this_slab = self.raw_terrain.slabs.get_mut(this_slab_idx).unwrap();
 
             // exhaust this slab first
-            for (this_slice_idx, next_slice_idx) in (0..Slab::slice_count()).tuple_windows() {
+            for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
                 let mut this_slice_mut = this_slab.slice_mut(this_slice_idx);
 
                 // Safety: slices don't overlap and this_slice_idx != next_slice_idx
@@ -827,13 +837,17 @@ impl ChunkTerrain {
                 // safety: mutable and immutable slices don't overlap
                 let this_slab_top_slice = unsafe {
                     // can't have a mut and immut ref to self.raw_terrain
-                    let mut slice = this_slab.slice_mut(Slab::slice_count() - 1);
+                    let mut slice = this_slab.slice_mut(LocalSliceIndex::top());
                     let ptr = slice.as_mut_ptr();
                     SliceMut::from_ptr(ptr)
                 };
 
-                let next_slab_bottom_slice =
-                    self.raw_terrain.slabs.get(next_slab_idx).unwrap().slice(0);
+                let next_slab_bottom_slice = self
+                    .raw_terrain
+                    .slabs
+                    .get(next_slab_idx)
+                    .unwrap()
+                    .slice(LocalSliceIndex::bottom());
                 f(this_slab_top_slice, next_slab_bottom_slice);
             }
         }
@@ -842,15 +856,15 @@ impl ChunkTerrain {
     pub fn find_accessible_block(
         &self,
         pos: SliceBlock,
-        start_from: Option<SliceIndex>,
-        end_at: Option<SliceIndex>,
+        start_from: Option<GlobalSliceIndex>,
+        end_at: Option<GlobalSliceIndex>,
     ) -> Option<BlockPosition> {
-        let start_from = start_from.unwrap_or(SliceIndex::MAX);
-        let end_at = end_at.unwrap_or(SliceIndex::MIN);
+        let start_from = start_from.unwrap_or(GlobalSliceIndex::top());
+        let end_at = end_at.unwrap_or(GlobalSliceIndex::bottom());
         self.raw_terrain()
             .slices_from_top_offset()
-            .skip_while(|(s, _)| s.0 > start_from.0)
-            .take_while(|(s, _)| s.0 >= end_at.0)
+            .skip_while(|(s, _)| *s > start_from)
+            .take_while(|(s, _)| *s >= end_at)
             .find(|(_, slice)| slice[pos].walkable())
             .map(|(z, _)| pos.to_block_position(z))
     }
@@ -877,10 +891,10 @@ mod tests {
     use matches::assert_matches;
 
     use unit::dim::CHUNK_SIZE;
-    use unit::world::SliceIndex;
+    use unit::world::{GlobalSliceIndex, SLAB_SIZE};
 
     use crate::block::BlockType;
-    use crate::chunk::slab::{Slab, SLAB_SIZE};
+    use crate::chunk::slab::Slab;
     use crate::chunk::terrain::{BaseTerrain, ChunkTerrain, SlabPointer};
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
@@ -912,20 +926,26 @@ mod tests {
         terrain.add_slab(SlabPointer::new(Slab::empty(-1)));
         terrain.add_slab(SlabPointer::new(Slab::empty(-2)));
 
-        let slabs: Vec<_> = terrain.slabs_from_top().map(|s| s.index()).collect();
+        let slabs: Vec<i32> = terrain
+            .slabs_from_top()
+            .map(|s| s.index().as_i32())
+            .collect();
         assert_eq!(slabs, vec![2, 1, 0, -1, -2]);
 
-        let slabs: Vec<_> = terrain.slabs_from_bottom().map(|s| s.index()).collect();
+        let slabs: Vec<i32> = terrain
+            .slabs_from_bottom()
+            .map(|s| s.index().as_i32())
+            .collect();
         assert_eq!(slabs, vec![-2, -1, 0, 1, 2]);
     }
 
     #[test]
     fn slab_index() {
-        assert_eq!(RawChunkTerrain::slab_index_for_slice(SliceIndex(4)), 0);
-        assert_eq!(RawChunkTerrain::slab_index_for_slice(SliceIndex(0)), 0);
-        assert_eq!(RawChunkTerrain::slab_index_for_slice(SliceIndex(-3)), -1);
-        assert_eq!(RawChunkTerrain::slab_index_for_slice(SliceIndex(-20)), -1);
-        assert_eq!(RawChunkTerrain::slab_index_for_slice(SliceIndex(100)), 3);
+        assert_eq!(GlobalSliceIndex::new(4).slab_index(), SlabIndex(0));
+        assert_eq!(GlobalSliceIndex::new(0).slab_index(), SlabIndex(0));
+        assert_eq!(GlobalSliceIndex::new(-3).slab_index(), SlabIndex(-1));
+        assert_eq!(GlobalSliceIndex::new(-20).slab_index(), SlabIndex(-1));
+        assert_eq!(GlobalSliceIndex::new(100).slab_index(), SlabIndex(3));
     }
 
     #[test]
@@ -934,7 +954,7 @@ mod tests {
 
         *terrain.slice_mut(0).unwrap()[(0, 0)].block_type_mut() = BlockType::Stone;
         assert_eq!(
-            terrain.slice(0).unwrap()[(0, 0)].block_type(),
+            terrain.slice(GlobalSliceIndex::new(0)).unwrap()[(0, 0)].block_type(),
             BlockType::Stone
         );
         assert_eq!(
@@ -977,15 +997,18 @@ mod tests {
     fn slab_areas() {
         // slab with flat slice 0 should have 1 area
         let mut slab = Slab::empty(0);
-        slab.slice_mut(0).fill(BlockType::Stone);
+        slab.slice_mut(LocalSliceIndex::new(0))
+            .fill(BlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, None, None).flood_fill_areas();
         assert_eq!(area_count, 1);
 
         // slab with 2 unconnected floors should have 2
         let mut slab = Slab::empty(0);
-        slab.slice_mut(0).fill(BlockType::Stone);
-        slab.slice_mut(5).fill(BlockType::Stone);
+        slab.slice_mut(LocalSliceIndex::new(0))
+            .fill(BlockType::Stone);
+        slab.slice_mut(LocalSliceIndex::new(5))
+            .fill(BlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, None, None).flood_fill_areas();
         assert_eq!(area_count, 2);
@@ -1059,7 +1082,7 @@ mod tests {
         assert_eq!(terrain.slab_count(), 1);
         assert_eq!(
             terrain.slice_bounds_as_slabs(),
-            SliceRange::from_bounds(0, SLAB_SIZE_I32)
+            SliceRange::from_bounds_unchecked(0, SLAB_SIZE_I32)
         );
 
         // now really set
@@ -1074,7 +1097,7 @@ mod tests {
         assert_eq!(terrain.slab_count(), 2);
         assert_eq!(
             terrain.slice_bounds_as_slabs(),
-            SliceRange::from_bounds(-SLAB_SIZE_I32, SLAB_SIZE_I32)
+            SliceRange::from_bounds_unchecked(-SLAB_SIZE_I32, SLAB_SIZE_I32)
         );
 
         // set a high block that will fill the rest in with air
@@ -1117,47 +1140,52 @@ mod tests {
 
     #[test]
     fn discovery_block_graph() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
         let terrain = ChunkBuilder::new()
-            .fill_slice(1, BlockType::Stone)
-            .set_block((2, 2, 2), BlockType::Grass)
+            .fill_slice(51, BlockType::Stone)
+            .set_block((2, 2, 52), BlockType::Grass)
             .into_inner();
 
         let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
 
         let graph = terrain
-            .block_graph_for_area(WorldArea::new((0, 0)))
+            .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
             .unwrap();
 
         // 4 flat connections
         assert_eq!(
-            graph.edges((5, 5, 2).into()),
+            graph.edges((5, 5, 52).into()),
             vec![
-                ((4, 5, 2).into(), EdgeCost::Walk),
-                ((5, 4, 2).into(), EdgeCost::Walk),
-                ((5, 6, 2).into(), EdgeCost::Walk),
-                ((6, 5, 2).into(), EdgeCost::Walk),
+                ((4, 5, 52).into(), EdgeCost::Walk),
+                ((5, 4, 52).into(), EdgeCost::Walk),
+                ((5, 6, 52).into(), EdgeCost::Walk),
+                ((6, 5, 52).into(), EdgeCost::Walk),
             ]
         );
 
         // step up on 1 side
         assert_eq!(
-            graph.edges((2, 3, 2).into()),
+            graph.edges((2, 3, 52).into()),
             vec![
-                ((1, 3, 2).into(), EdgeCost::Walk),
-                ((2, 2, 3).into(), EdgeCost::JumpUp),
-                ((2, 4, 2).into(), EdgeCost::Walk),
-                ((3, 3, 2).into(), EdgeCost::Walk),
+                ((1, 3, 52).into(), EdgeCost::Walk),
+                ((2, 2, 53).into(), EdgeCost::JumpUp),
+                ((2, 4, 52).into(), EdgeCost::Walk),
+                ((3, 3, 52).into(), EdgeCost::Walk),
             ]
         );
 
         // step down on all sides
         assert_eq!(
-            graph.edges((2, 2, 3).into()),
+            graph.edges((2, 2, 53).into()),
             vec![
-                ((1, 2, 2).into(), EdgeCost::JumpDown),
-                ((2, 1, 2).into(), EdgeCost::JumpDown),
-                ((2, 3, 2).into(), EdgeCost::JumpDown),
-                ((3, 2, 2).into(), EdgeCost::JumpDown),
+                ((1, 2, 52).into(), EdgeCost::JumpDown),
+                ((2, 1, 52).into(), EdgeCost::JumpDown),
+                ((2, 3, 52).into(), EdgeCost::JumpDown),
+                ((3, 2, 52).into(), EdgeCost::JumpDown),
             ]
         );
     }
@@ -1165,40 +1193,34 @@ mod tests {
     #[test]
     fn slice_index_in_slab() {
         // positives are simple modulus
+        assert_eq!(GlobalSliceIndex::new(5).to_local(), LocalSliceIndex::new(5));
         assert_eq!(
-            RawChunkTerrain::slice_index_in_slab(SliceIndex(5)),
-            SliceIndex(5)
-        );
-        assert_eq!(
-            RawChunkTerrain::slice_index_in_slab(SliceIndex(SLAB_SIZE.as_i32() + 4)),
-            SliceIndex(4)
+            GlobalSliceIndex::new(SLAB_SIZE.as_i32() + 4).to_local(),
+            LocalSliceIndex::new(4)
         );
 
         // negatives work backwards
-        assert_eq!(
-            RawChunkTerrain::slice_index_in_slab(SliceIndex(-1)),
-            SliceIndex(SLAB_SIZE.as_i32() - 1)
-        );
+        assert_eq!(GlobalSliceIndex::new(-1).to_local(), LocalSliceIndex::top());
     }
 
     #[test]
     fn slice_index_in_chunk() {
         assert_eq!(
-            RawChunkTerrain::slice_index_in_chunk(0, SliceIndex(5)),
-            SliceIndex(5)
+            LocalSliceIndex::new(5).to_global(SlabIndex(0)),
+            GlobalSliceIndex::new(5)
         );
         assert_eq!(
-            RawChunkTerrain::slice_index_in_chunk(1, SliceIndex(5)),
-            SliceIndex(SLAB_SIZE.as_i32() + 5)
+            LocalSliceIndex::new(5).to_global(SlabIndex(1)),
+            GlobalSliceIndex::new(SLAB_SIZE.as_i32() + 5),
         );
 
         assert_eq!(
-            RawChunkTerrain::slice_index_in_chunk(-1, SliceIndex(0)),
-            SliceIndex(-SLAB_SIZE.as_i32())
+            LocalSliceIndex::new(0).to_global(SlabIndex(-1)),
+            GlobalSliceIndex::new(-SLAB_SIZE.as_i32()),
         );
         assert_eq!(
-            RawChunkTerrain::slice_index_in_chunk(-1, SliceIndex(1)),
-            SliceIndex(-SLAB_SIZE.as_i32() + 1)
+            LocalSliceIndex::new(1).to_global(SlabIndex(-1)),
+            GlobalSliceIndex::new(-SLAB_SIZE.as_i32() + 1),
         );
     }
 

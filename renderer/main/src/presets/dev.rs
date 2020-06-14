@@ -2,12 +2,13 @@ use std::path::Path;
 
 use common::*;
 use simulation::{
-    presets, PhysicalShape, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader,
-    WorldLoader,
+    presets, GeneratedTerrainSource, PhysicalShape, Renderer, Simulation, ThreadedWorkerPool,
+    ThreadedWorldLoader, WorldLoader,
 };
 
 use crate::GamePreset;
 use color::ColorRgb;
+use config::WorldSource;
 use std::marker::PhantomData;
 
 pub struct DevGamePreset<R: Renderer> {
@@ -30,7 +31,22 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             .unwrap_or_else(|| (num_cpus::get() / 2).max(1));
         debug!("using {} threads for world loader", thread_count);
         let pool = ThreadedWorkerPool::new(thread_count);
-        WorldLoader::new(presets::from_config(), pool)
+
+        match config::get().world.source.clone() {
+            WorldSource::Preset(preset) => {
+                debug!("loading world preset '{:?}'", preset);
+                let source = presets::from_preset(preset);
+                WorldLoader::new(source, pool)
+            }
+            WorldSource::Generate { seed, radius } => {
+                debug!("generating world with radius {}", radius);
+                match GeneratedTerrainSource::new(seed, radius) {
+                    // TODO GamePreset::world() should return a Result
+                    Err(e) => panic!("bad params for world generation: {}", e),
+                    Ok(source) => WorldLoader::new(source, pool),
+                }
+            }
+        }
     }
 
     fn init(&self, sim: &mut Simulation<R>) {
@@ -56,14 +72,17 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         */
         // add random entities
         let randoms = config::get().simulation.random_count;
+        let worldref = sim.world();
+        let world = worldref.borrow();
         if randoms > 0 {
             info!("adding {} random entities", randoms);
             let _human = (0..randoms)
                 .map(|i| {
                     let (pos, radius) = {
-                        let mut randy = random::get();
-                        let pos = (randy.gen_range(0, 5), randy.gen_range(0, 5), None);
-                        let radius = randy.gen_range(0.3, 0.5);
+                        let pos = world
+                            .choose_random_walkable_block(50)
+                            .expect("random entity placement failed");
+                        let radius = random::get().gen_range(0.3, 0.5);
                         (pos, radius)
                     };
                     let color = colors.next().unwrap();
@@ -99,8 +118,6 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
                 .expect("surely one human succeeded");
 
             // add some random food items too
-            let worldref = sim.world();
-            let world = worldref.borrow();
             let food_count = config::get().simulation.food_count;
             for _ in 0..food_count {
                 let nutrition = config::get().simulation.food_nutrition;

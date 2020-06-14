@@ -2,7 +2,7 @@ use std::iter::once;
 use std::mem::MaybeUninit;
 
 use common::*;
-use unit::world::{SliceIndex, WorldPoint};
+use unit::world::{GlobalSliceIndex, WorldPoint};
 use world::NavigationError;
 use world::{InnerWorldRef, WorldPath};
 
@@ -20,7 +20,7 @@ pub struct FollowPathComponent {
     /// If set, will be popped in next tick and `path` updated
     new_target: Option<WorldPoint>,
     follow_speed: NormalizedFloat,
-    prev_z: Option<SliceIndex>,
+    prev_z: Option<GlobalSliceIndex>,
 }
 
 #[derive(Component, Default)]
@@ -70,7 +70,7 @@ impl<'a> System<'a> for PathSteeringSystem {
                 // assume entity is now at the same z level as the last waypoint
                 // FIXME GROSS HACK
                 if let Some(last) = path.prev_z.take() {
-                    transform.set_height(last.0);
+                    transform.set_height(last.slice());
                 }
 
                 // move onto next waypoint

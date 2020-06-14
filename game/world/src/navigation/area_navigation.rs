@@ -6,7 +6,7 @@ use petgraph::Directed;
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition, SliceIndex};
+use unit::world::{BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock};
 
 use crate::navigation::astar::astar;
 use crate::navigation::path::AreaPathNode;
@@ -14,8 +14,8 @@ use crate::navigation::{AreaPath, WorldArea};
 use crate::occlusion::NeighbourOffset;
 use crate::EdgeCost;
 
-type AreaNavGraph = StableGraph<AreaNavNode, AreaNavEdge, Directed, u16>;
-type NodeIndex = petgraph::prelude::NodeIndex<u16>;
+type AreaNavGraph = StableGraph<AreaNavNode, AreaNavEdge, Directed, u32>;
+type NodeIndex = petgraph::prelude::NodeIndex<u32>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
 pub(crate) struct AreaNavNode(pub WorldArea);
@@ -56,16 +56,19 @@ impl AreaNavEdge {
     /// Should be sorted so BlockCoords are ascending
     pub fn discover_ports_between(
         direction: NeighbourOffset,
-        connecting_blocks: impl Iterator<Item = (EdgeCost, BlockCoord, SliceIndex)>,
+        connecting_blocks: impl Iterator<Item = (EdgeCost, BlockCoord, GlobalSliceIndex)>,
         out: &mut Vec<Self>,
     ) {
         let mut group_id = 0;
         connecting_blocks
-            .chain(once((EdgeCost::Walk, 255, SliceIndex(999)))) // dummy last
+            .map(|(edge, coord, slice)| (edge, coord, Some(slice)))
+            .chain(once((EdgeCost::Walk, 255, None))) // dummy last
             .tuple_windows()
             .map(|((a_cost, a_coord, a_z), (b_cost, b_coord, b_z))| {
+                let a_z = a_z.unwrap(); // always Some
+
                 let diff = b_coord - a_coord;
-                let this_group_id = if diff == 1 && a_cost == b_cost && a_z == b_z {
+                let this_group_id = if diff == 1 && a_cost == b_cost && Some(a_z) == b_z {
                     // group
                     group_id
                 } else {
@@ -98,23 +101,21 @@ impl AreaNavEdge {
         let cost = self.cost.opposite();
         let direction = self.direction.opposite();
 
-        let mut exit = self.exit;
+        let [mut x, mut y, mut z]: [i32; 3] = self.exit.into();
 
         // move to other side of the chunk
         match direction {
-            NeighbourOffset::North | NeighbourOffset::South => {
-                exit.1 = CHUNK_SIZE.as_block_coord() - 1 - exit.1
-            }
-            _ => exit.0 = CHUNK_SIZE.as_block_coord() - 1 - exit.0,
+            NeighbourOffset::North | NeighbourOffset::South => y = CHUNK_SIZE.as_i32() - 1 - y,
+            _ => x = CHUNK_SIZE.as_i32() - 1 - x,
         };
 
         // a reversed jump up/down requires the exit point moving down or up
-        exit.2 -= cost.z_offset();
+        z -= cost.z_offset();
 
         Self {
             direction,
             cost,
-            exit,
+            exit: BlockPosition::from((x, y, z)),
             ..self
         }
     }
@@ -127,14 +128,14 @@ impl AreaNavEdge {
             (0, width)
         };
 
-        match self.exit.try_add(offset) {
+        match SliceBlock::from(self.exit).try_add(offset) {
             None => {
                 panic!(
                     "exit width is too wide: {:?} with width {:?} and offset {:?}",
                     self.exit, self.width, offset
                 );
             }
-            Some(b) => b,
+            Some(slice_block) => slice_block.to_block_position(self.exit.slice()),
         }
     }
 }
@@ -254,10 +255,9 @@ mod tests {
 
     use common::*;
     use unit::dim::CHUNK_SIZE;
-    use unit::world::{BlockPosition, ChunkPosition, SliceIndex};
+    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
     use crate::block::BlockType;
-    use crate::chunk::slab::SLAB_SIZE;
     use crate::chunk::ChunkBuilder;
     use crate::navigation::path::AreaPathNode;
     use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
@@ -373,22 +373,36 @@ mod tests {
                 .build((-1, 0)),
         ]);
 
-        assert_eq!(graph.node_count(), 3); // 1 area in (0,0) and 1 in each of the 2 slabs in (-1, 0)
-        assert_eq!(graph.edge_count(), 2 * 2); // 2 each way
+        assert_eq!(graph.node_count(), 2); // 1 area in (0,0) and 1 in (-1,0)
+        assert_eq!(graph.edge_count(), 1 * 2); // 1 each way
 
         let a = WorldArea {
             chunk: ChunkPosition(0, 0),
-            slab: 1,
+            slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
         let b = WorldArea {
             chunk: ChunkPosition(-1, 0),
-            slab: 1,
+            slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
 
         let _ = get_edge(&graph, a, b).expect("edge should exist");
         let _ = get_edge(&graph, b, a).expect("node should exist both ways");
+    }
+    #[test]
+    fn empty_slab_no_areas() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        let graph = make_graph(vec![ChunkBuilder::new()
+            // 1 block in second slab
+            .set_block((2, 2, SLAB_SIZE.as_i32()), BlockType::Stone)
+            .build((0, 0))]);
+
+        assert_eq!(graph.node_count(), 1); // just one area in slab idx 1
     }
 
     #[test]
@@ -432,20 +446,20 @@ mod tests {
         // pure = isolated test
         let link_blocks = vec![
             // one group
-            (EdgeCost::Walk, 0, SliceIndex(0)),
-            (EdgeCost::Walk, 1, SliceIndex(0)),
-            (EdgeCost::Walk, 2, SliceIndex(0)),
+            (EdgeCost::Walk, 0, GlobalSliceIndex::new(0)),
+            (EdgeCost::Walk, 1, GlobalSliceIndex::new(0)),
+            (EdgeCost::Walk, 2, GlobalSliceIndex::new(0)),
             // another group
-            (EdgeCost::Walk, 4, SliceIndex(0)),
-            (EdgeCost::Walk, 5, SliceIndex(0)),
-            (EdgeCost::Walk, 6, SliceIndex(0)),
+            (EdgeCost::Walk, 4, GlobalSliceIndex::new(0)),
+            (EdgeCost::Walk, 5, GlobalSliceIndex::new(0)),
+            (EdgeCost::Walk, 6, GlobalSliceIndex::new(0)),
             // another group
-            (EdgeCost::JumpUp, 7, SliceIndex(0)),
-            (EdgeCost::JumpUp, 8, SliceIndex(0)),
+            (EdgeCost::JumpUp, 7, GlobalSliceIndex::new(0)),
+            (EdgeCost::JumpUp, 8, GlobalSliceIndex::new(0)),
             // all alone groups
-            (EdgeCost::JumpUp, 10, SliceIndex(0)),
-            (EdgeCost::JumpUp, 11, SliceIndex(5)), // different z
-            (EdgeCost::JumpDown, 12, SliceIndex(5)), // different cost
+            (EdgeCost::JumpUp, 10, GlobalSliceIndex::new(0)),
+            (EdgeCost::JumpUp, 11, GlobalSliceIndex::new(5)), // different z
+            (EdgeCost::JumpDown, 12, GlobalSliceIndex::new(5)), // different cost
         ];
 
         let direction = NeighbourOffset::West;
@@ -456,37 +470,37 @@ mod tests {
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition(0, 0, SliceIndex(0)),
+                exit: BlockPosition(0, 0, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition(0, 4, SliceIndex(0)),
+                exit: BlockPosition(0, 4, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 2,
-                exit: BlockPosition(0, 7, SliceIndex(0)),
+                exit: BlockPosition(0, 7, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition(0, 10, SliceIndex(0)),
+                exit: BlockPosition(0, 10, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition(0, 11, SliceIndex(5)),
+                exit: BlockPosition(0, 11, GlobalSliceIndex::new(5)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpDown,
                 width: 1,
-                exit: BlockPosition(0, 12, SliceIndex(5)),
+                exit: BlockPosition(0, 12, GlobalSliceIndex::new(5)),
                 direction,
             },
         ];
@@ -533,8 +547,8 @@ mod tests {
             },
         ];
 
-        edges.sort_by_key(|e| e.exit.1);
-        expected.sort_by_key(|e| e.exit.1);
+        edges.sort_by_key(|e| e.exit.y());
+        expected.sort_by_key(|e| e.exit.y());
 
         assert_eq!(edges, expected);
     }
@@ -548,42 +562,48 @@ mod tests {
 
         let graph = make_graph(crate::presets::ring());
 
+        // world is based at z=300
+        const SLAB: SlabIndex = SlabIndex(300 / SLAB_SIZE.as_i32());
+
         {
             // from top left to top right
             // path crosses south,east,north boundaries because theres no east/west bridge between top 2
             let path = graph
-                .find_area_path(WorldArea::new((-1, 1)), WorldArea::new((0, 1)))
+                .find_area_path(
+                    WorldArea::new_with_slab((-1, 1), SLAB),
+                    WorldArea::new_with_slab((0, 1), SLAB),
+                )
                 .expect("path should succeed");
 
             let expected = vec![
-                AreaPathNode::new_start(WorldArea::new((-1, 1))),
+                AreaPathNode::new_start(WorldArea::new_with_slab((-1, 1), SLAB)),
                 // south
                 AreaPathNode::new(
-                    WorldArea::new((-1, 0)),
+                    WorldArea::new_with_slab((-1, 0), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::South,
                         cost: EdgeCost::JumpUp,
-                        exit: (3, 0, 4).into(),
+                        exit: (3, 0, 301).into(),
                         width: 1,
                     },
                 ),
                 // east
                 AreaPathNode::new(
-                    WorldArea::new((0, 0)),
+                    WorldArea::new_with_slab((0, 0), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::East,
                         cost: EdgeCost::JumpDown,
-                        exit: (CHUNK_SIZE.as_block_coord() - 1, 3, 5).into(),
+                        exit: (CHUNK_SIZE.as_block_coord() - 1, 3, 302).into(),
                         width: 1,
                     },
                 ),
                 // north
                 AreaPathNode::new(
-                    WorldArea::new((0, 1)),
+                    WorldArea::new_with_slab((0, 1), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::North,
                         cost: EdgeCost::JumpUp,
-                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 4).into(),
+                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 301).into(),
                         width: 1,
                     },
                 ),
@@ -596,38 +616,41 @@ mod tests {
             // from top right to top left
             // path crosses south,west,north boundaries this time
             let path = graph
-                .find_area_path(WorldArea::new((0, 1)), WorldArea::new((-1, 1)))
+                .find_area_path(
+                    WorldArea::new_with_slab((0, 1), SLAB),
+                    WorldArea::new_with_slab((-1, 1), SLAB),
+                )
                 .expect("path should succeed");
 
             let expected = vec![
-                AreaPathNode::new_start(WorldArea::new((0, 1))),
+                AreaPathNode::new_start(WorldArea::new_with_slab((0, 1), SLAB)),
                 // south
                 AreaPathNode::new(
-                    WorldArea::new((0, 0)),
+                    WorldArea::new_with_slab((0, 0), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::South,
                         cost: EdgeCost::JumpDown,
-                        exit: (3, 0, 5).into(),
+                        exit: (3, 0, 302).into(),
                         width: 1,
                     },
                 ),
                 // west
                 AreaPathNode::new(
-                    WorldArea::new((-1, 0)),
+                    WorldArea::new_with_slab((-1, 0), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::West,
                         cost: EdgeCost::JumpUp,
-                        exit: (0, 3, 4).into(),
+                        exit: (0, 3, 301).into(),
                         width: 1,
                     },
                 ),
                 // north
                 AreaPathNode::new(
-                    WorldArea::new((-1, 1)),
+                    WorldArea::new_with_slab((-1, 1), SLAB),
                     AreaNavEdge {
                         direction: NeighbourOffset::North,
                         cost: EdgeCost::JumpDown,
-                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 5).into(),
+                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 302).into(),
                         width: 1,
                     },
                 ),
@@ -667,7 +690,7 @@ mod tests {
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::JumpUp,
-                    exit: BlockPosition(15, 2, SliceIndex(3)),
+                    exit: (15, 2, 3).into(),
                     width: 2,
                 },
             ),
@@ -676,7 +699,7 @@ mod tests {
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::JumpDown,
-                    exit: BlockPosition(15, 5, SliceIndex(4)),
+                    exit: (15, 5, 4).into(),
                     width: 1,
                 },
             ),
@@ -687,32 +710,35 @@ mod tests {
 
     #[test]
     fn area_path_across_two_chunks() {
+        // also the blocks are ridiculously high and not in slab 0
+        const SLAB: SlabIndex = SlabIndex(201 / SLAB_SIZE.as_i32());
+
         let w = world_from_chunks(vec![
             ChunkBuilder::new()
-                .set_block((14, 2, 1), BlockType::Stone)
-                .set_block((15, 2, 1), BlockType::Stone)
+                .set_block((14, 2, 201), BlockType::Stone)
+                .set_block((15, 2, 201), BlockType::Stone)
                 .build((-1, 0)),
             ChunkBuilder::new()
-                .fill_slice(1, BlockType::Grass)
+                .fill_slice(201, BlockType::Grass)
                 .build((0, 0)),
         ])
         .into_inner();
 
         let path = w
             .find_area_path(
-                (-2, 2, 2),  // chunk -1, 0
-                (10, 10, 2), // chunk 0, 0
+                (-2, 2, 202),  // chunk -1, 0
+                (10, 10, 202), // chunk 0, 0
             )
             .expect("path should succeed");
 
         let expected = vec![
-            AreaPathNode::new_start(WorldArea::new((-1, 0))),
+            AreaPathNode::new_start(WorldArea::new_with_slab((-1, 0), SLAB)),
             AreaPathNode::new(
-                WorldArea::new((0, 0)),
+                WorldArea::new_with_slab((0, 0), SLAB),
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::Walk,
-                    exit: BlockPosition(15, 2, SliceIndex(2)),
+                    exit: (15, 2, 202).into(),
                     width: 1,
                 },
             ),
@@ -723,21 +749,27 @@ mod tests {
 
     #[test]
     fn area_path_within_single_chunk() {
+        // also the blocks are ridiculously high and not in slab 0
+        const SLAB: SlabIndex = SlabIndex(202 / SLAB_SIZE.as_i32());
+
         let w = world_from_chunks(vec![ChunkBuilder::new()
-            .fill_slice(1, BlockType::Grass)
+            .fill_slice(201, BlockType::Grass)
             .build((0, 0))])
         .into_inner();
 
         let path = w
             .find_area_path(
-                (2, 2, 2), // chunk 0, 0
-                (8, 3, 2), // also chunk 0, 0
+                (2, 2, 202), // chunk 0, 0
+                (8, 3, 202), // also chunk 0, 0
             )
             .expect("path should succeed");
 
         assert_eq!(
             path.0,
-            vec![AreaPathNode::new_start(WorldArea::new((0, 0)))]
+            vec![AreaPathNode::new_start(WorldArea::new_with_slab(
+                (0, 0),
+                SLAB
+            ))]
         );
     }
 
@@ -764,7 +796,7 @@ mod tests {
         let reversed = AreaNavEdge {
             direction: NeighbourOffset::North,
             cost: EdgeCost::JumpDown,
-            exit: BlockPosition(5, CHUNK_SIZE.as_block_coord() - 1, SliceIndex(6)),
+            exit: BlockPosition(5, CHUNK_SIZE.as_block_coord() - 1, GlobalSliceIndex::new(6)),
             width: 2,
         };
 

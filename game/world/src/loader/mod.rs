@@ -2,11 +2,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crossbeam::channel::{Receiver, Sender};
-use crossbeam::crossbeam_channel::unbounded;
+use crossbeam::crossbeam_channel::{bounded, unbounded};
 
 use common::*;
-pub(crate) use terrain_source::MemoryTerrainSource;
 pub use terrain_source::TerrainSource;
+pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::{BlockPosition, ChunkPosition};
 
 #[cfg(test)]
@@ -50,7 +50,7 @@ pub enum BlockForAllResult {
 
 impl<P: WorkerPool> WorldLoader<P> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
-        let (finalize_tx, finalize_rx) = unbounded();
+        let (finalize_tx, finalize_rx) = bounded(16);
         let (chunk_updates_tx, chunk_updates_rx) = unbounded();
 
         let world = WorldRef::default();
@@ -89,19 +89,29 @@ impl<P: WorkerPool> WorldLoader<P> {
         // load raw terrain and do as much processing in isolation as possible on a worker thread
         self.pool.submit(
             move || {
-                let terrain = {
-                    let mut terrain_source = source.lock().unwrap();
+                // briefly hold the source lock to get a preprocess closure to run
+                let preprocess_work = {
+                    let terrain_source = source.lock().unwrap();
 
-                    // quick validity check
+                    // fail fast if bad chunk position
                     if !terrain_source.is_in_bounds(chunk) {
                         return Err(TerrainSourceError::OutOfBounds);
                     }
 
-                    // load raw terrain NOT in parallel (reading from a file etc)
-                    terrain_source.load_chunk(chunk)?
+                    terrain_source.preprocess(chunk)
                 };
 
-                // concurrently process in isolation
+                // run preprocessing work concurrently
+                let preprocess_result = preprocess_work()?;
+
+                // take the source lock again to convert preprocessing output into raw terrain.
+                // e.g. reading from a file cannot be done in parallel
+                let terrain = {
+                    let mut terrain_source = source.lock().unwrap();
+                    terrain_source.load_chunk(chunk, preprocess_result)?
+                };
+
+                // concurrently process raw terrain into chunk terrain
                 let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk);
                 Ok((chunk, terrain))
             },
@@ -225,8 +235,8 @@ impl ChunkFinalizer {
                 neighbour_terrain,
                 direction,
                 |src_area, dst_area, edge_cost, i, z| {
-                    // debug!("{:?} link from chunk {:?} area {:?} ---------> chunk {:?} area {:?} ============= direction {:?} {}",
-                    //       edge_cost, chunk, from_area, neighbour_offset, to_area, direction, i);
+                    trace!("{:?} link from chunk {:?} area {:?} ----> chunk {:?} area {:?} ============= direction {:?} {}",
+                          edge_cost, chunk, src_area, neighbour_offset, dst_area, direction, i);
 
                     let src_area = src_area.into_world_area(chunk);
                     let dst_area = dst_area.into_world_area(neighbour_offset);

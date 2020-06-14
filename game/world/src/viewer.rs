@@ -1,14 +1,11 @@
 use std::fmt::{Display, Error, Formatter};
-use std::ops::Add;
+use std::ops::{Add, Range};
 
 use common::*;
 
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldRef};
-use unit::world::{ChunkPosition, SliceIndex};
-
-/// Number of slices to see concurrently
-const VIEW_RANGE: i32 = 3;
+use unit::world::{ChunkPosition, GlobalSliceIndex};
 
 #[derive(Clone)]
 pub struct WorldViewer {
@@ -18,51 +15,66 @@ pub struct WorldViewer {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct SliceRange(SliceIndex, SliceIndex);
+pub struct SliceRange(GlobalSliceIndex, GlobalSliceIndex);
 
 impl SliceRange {
-    fn new(start: SliceIndex, size: i32) -> Self {
+    fn new(top: GlobalSliceIndex, size: i32) -> Self {
         assert!(size > 0); // TODO Result
-        Self(start, SliceIndex(start.0 + size))
+        Self::from_bounds_unchecked(top - size, top)
     }
 
-    pub fn from_bounds<F: Into<SliceIndex>, T: Into<SliceIndex>>(from: F, to: T) -> Self {
-        Self(from.into(), to.into())
+    pub fn from_bounds<F: Into<GlobalSliceIndex>, T: Into<GlobalSliceIndex>>(
+        from: F,
+        to: T,
+    ) -> Option<Self> {
+        let from = from.into();
+        let to = to.into();
+
+        if from < to {
+            Some(Self::from_bounds_unchecked(from, to))
+        } else {
+            None
+        }
+    }
+
+    pub fn from_bounds_unchecked<F: Into<GlobalSliceIndex>, T: Into<GlobalSliceIndex>>(
+        from: F,
+        to: T,
+    ) -> Self {
+        let from = from.into();
+        let to = to.into();
+        debug_assert!(from < to);
+        Self(from, to)
     }
 
     pub fn all() -> Self {
-        Self(SliceIndex::MIN, SliceIndex::MAX)
+        Self::from_bounds_unchecked(GlobalSliceIndex::bottom(), GlobalSliceIndex::top())
     }
 
-    pub fn null() -> Self {
-        Self(SliceIndex(0), SliceIndex(0))
+    pub fn contains<S: Into<GlobalSliceIndex>>(self, slice: S) -> bool {
+        let slice = slice.into();
+        self.as_range().contains(&slice.slice())
     }
 
-    pub fn contains<S: Into<SliceIndex>>(self, slice: S) -> bool {
-        let SliceIndex(slice) = slice.into();
-        let SliceIndex(lower) = self.0;
-        let SliceIndex(upper) = self.1;
-        slice >= lower && slice <= upper
-    }
-
-    pub fn bottom(self) -> SliceIndex {
+    pub const fn bottom(self) -> GlobalSliceIndex {
         self.0
     }
-    pub fn top(self) -> SliceIndex {
+    pub const fn top(self) -> GlobalSliceIndex {
         self.1
     }
 
-    pub fn as_range(self) -> impl Iterator<Item = SliceIndex> {
-        let SliceIndex(from) = self.0;
-        let SliceIndex(to) = self.1;
-        (from..=to).map(SliceIndex)
+    pub fn as_range(self) -> Range<i32> {
+        self.0.slice()..self.1.slice()
+    }
+
+    pub fn size(self) -> u32 {
+        (self.1.slice() - self.0.slice()) as u32
     }
 }
 
 impl Display for SliceRange {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let SliceRange(SliceIndex(from), SliceIndex(to)) = self;
-        write!(f, "[{} => {}]", from, to)
+        write!(f, "[{} => {}]", self.0.slice(), self.1.slice())
     }
 }
 
@@ -76,10 +88,28 @@ impl Add<i32> for SliceRange {
 
 impl WorldViewer {
     pub fn from_world(world: WorldRef) -> Self {
-        let start = SliceIndex(0);
+        let world_borrowed = world.borrow();
+
+        // TODO return Result from from_world
+        let start = world_borrowed
+            .find_accessible_block_in_column(0, 0)
+            .expect("there's a hole at 0,0??")
+            .2;
+
+        let world_bounds = world_borrowed.slice_bounds().unwrap(); // world has at least 1 slice as above
+        drop(world_borrowed);
+
+        // TODO intelligently choose an initial view range
+        let range_size = config::get().display.initial_view_range;
+        let half_range = (range_size / 2) as i32;
+        let view_range = SliceRange::from_bounds(
+            (start - half_range).max(world_bounds.bottom()),
+            (start + half_range).min(world_bounds.top()),
+        )
+        .expect("bad view range");
         Self {
             world,
-            view_range: SliceRange::new(start, VIEW_RANGE),
+            view_range,
             chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
         }
     }
@@ -88,7 +118,7 @@ impl WorldViewer {
         &self,
         mut f: F,
     ) {
-        let range = self.view_range;
+        let range = self.terrain_range();
         let world = self.world.borrow();
         for dirty_chunk in self
             .visible_chunks()
@@ -96,6 +126,11 @@ impl WorldViewer {
             .filter(|c| c.dirty())
         {
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
+            trace!(
+                "chunk mesh {:?} has {} vertices",
+                dirty_chunk.pos(),
+                mesh.len()
+            );
             f(dirty_chunk.pos(), mesh);
         }
     }
@@ -110,28 +145,42 @@ impl WorldViewer {
         }
     }
 
-    pub fn move_by(&mut self, delta: i32) {
-        let new_range = self.view_range + delta;
-        let new_max = match delta.signum() {
-            0 => return, // nop
-            1 => new_range.1,
-            -1 => new_range.0,
-            _ => unreachable!(),
-        };
-
-        // TODO cache?
+    fn update_range(&mut self, new_range: SliceRange, past_participle: &str, infinitive: &str) {
+        // TODO cache world slice_bounds()
         let bounds = self.world.borrow().slice_bounds();
-        if bounds.contains(new_max) {
-            // in range
-            self.view_range = new_range;
-            self.invalidate_visible_chunks();
-            info!("moved view range to {}", self.view_range);
-        } else {
-            info!(
-                "cannot move view range, it remains at {} (world range is {})",
-                self.view_range, bounds
-            );
+        if let Some(slice_bounds) = bounds {
+            if slice_bounds.contains(new_range.0) && slice_bounds.contains(new_range.1) {
+                self.view_range = new_range;
+                self.invalidate_visible_chunks();
+                info!(
+                    "{} view range, new range is {}",
+                    past_participle, self.view_range
+                );
+            } else {
+                info!(
+                    "cannot {} view range, it remains at {} (world range is {})",
+                    infinitive, self.view_range, slice_bounds
+                );
+            }
         }
+    }
+
+    // TODO which direction to stretch view range in? automatically determine or player input?
+    pub fn stretch_by(&mut self, delta: i32) {
+        let bottom = self.view_range.bottom();
+        let new_top = self.view_range.top() + delta;
+        if let Some(new_range) = SliceRange::from_bounds(bottom, new_top) {
+            self.update_range(new_range, "stretched", "stretch")
+        }
+    }
+
+    pub fn move_by(&mut self, delta: i32) {
+        self.update_range(self.view_range + delta, "moved", "move");
+    }
+
+    pub fn move_by_multiple(&mut self, delta: i32) {
+        let size = self.view_range.size();
+        self.move_by(delta * size as i32);
     }
 
     pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkPosition> {
@@ -148,29 +197,16 @@ impl WorldViewer {
         self.world.borrow()
     }
 
-    /*
-        pub fn move_up(&mut self) {
-            if self.view_range.move_up(1) {
-                info!("moved view range to {}", self.view_range);
-                self.invalidate_visible_chunks();
-            } else {
-                info!("cannot move view range, it remains at {}", self.view_range);
-            }
-        }
-        pub fn move_down(&mut self) {
-            if self.view_range.move_down(1) {
-                info!("moved view range to {}", self.view_range);
-                self.invalidate_visible_chunks();
-            } else {
-                info!("cannot move view range, it remains at {}", self.view_range);
-            }
-        }
-    */
-
-    //    pub fn goto(&mut self, new_slice: SliceIndex) { unimplemented!() }
-
-    pub fn range(&self) -> SliceRange {
+    /// Slice range for terrain rendering
+    pub fn terrain_range(&self) -> SliceRange {
         self.view_range
+    }
+
+    /// Slice range for entity rendering: 1 above the terrain. This means we will
+    /// always be able to see entities walking above the bottom slice of terrain (never floating),
+    /// and on top of the highest slice.
+    pub fn entity_range(&self) -> SliceRange {
+        self.view_range + 1
     }
 
     pub fn set_chunk_bounds(&mut self, range: (ChunkPosition, ChunkPosition)) {

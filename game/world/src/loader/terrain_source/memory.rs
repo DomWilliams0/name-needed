@@ -4,7 +4,7 @@ use common::*;
 use unit::world::ChunkPosition;
 
 use crate::chunk::RawChunkTerrain;
-use crate::loader::terrain_source::{TerrainSource, TerrainSourceError};
+use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
 
 /// Used for testing
 pub struct MemoryTerrainSource {
@@ -60,10 +60,28 @@ impl TerrainSource for MemoryTerrainSource {
         self.chunk_map.keys().copied().collect_vec()
     }
 
-    fn load_chunk(&mut self, chunk: ChunkPosition) -> Result<RawChunkTerrain, TerrainSourceError> {
+    fn preprocess(
+        &self,
+        _: ChunkPosition,
+    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
+        // nothing to do
+        Box::new(|| Ok(Box::new(())))
+    }
+
+    fn load_chunk(
+        &mut self,
+        chunk: ChunkPosition,
+        _: Box<dyn PreprocessedTerrain>,
+    ) -> Result<RawChunkTerrain, TerrainSourceError> {
         self.chunk_map
             .get(&chunk)
             .ok_or(TerrainSourceError::OutOfBounds)
             .map(|terrain| terrain.clone()) // expensive but not too important for this
+    }
+}
+
+impl PreprocessedTerrain for () {
+    fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain {
+        unreachable!()
     }
 }

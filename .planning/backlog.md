@@ -68,6 +68,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## Code quality
 * track down unwraps/expects and replace with results
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
+* on panic in any thread, process should exit with backtrace
 
 ## Entity diversity
 * animal species

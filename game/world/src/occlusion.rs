@@ -258,7 +258,7 @@ impl Add<VertexOcclusion> for VertexOcclusion {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct BlockOcclusion([VertexOcclusion; 4]);
 
 impl BlockOcclusion {
@@ -286,6 +286,10 @@ impl BlockOcclusion {
         ])
     }
 
+    pub const fn default_const() -> Self {
+        Self([VertexOcclusion::NotAtAll; 4])
+    }
+
     pub fn should_flip(self) -> bool {
         let v = &self.0;
         v[0] + v[2] < v[1] + v[3]
@@ -303,6 +307,12 @@ impl BlockOcclusion {
             .iter_mut()
             .zip(new.0.iter())
             .for_each(|(a, b)| *a = (*a).combine(*b));
+    }
+}
+
+impl Default for BlockOcclusion {
+    fn default() -> Self {
+        Self::default_const()
     }
 }
 

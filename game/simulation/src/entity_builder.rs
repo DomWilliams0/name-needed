@@ -1,6 +1,6 @@
 use color::ColorRgb;
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::{GlobalSliceIndex, WorldPosition};
 use world::InnerWorldRef;
 
 use crate::ai::{ActivityComponent, AiComponent};
@@ -99,6 +99,7 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
 
             let world = self.world.voxel_world();
             let pos = pos.resolve(&world.borrow())?;
+            debug_assert!(world.borrow().area(pos).is_some());
             TransformComponent::new(pos.into(), shape.radius(), height)
         };
 
@@ -121,7 +122,7 @@ impl EntityPosition for WorldPosition {
 impl EntityPosition for (i32, i32, Option<i32>) {
     fn resolve(&self, world: &InnerWorldRef) -> Result<WorldPosition, &'static str> {
         match *self {
-            (x, y, Some(z)) => Ok(WorldPosition(x, y, z)),
+            (x, y, Some(z)) => Ok(WorldPosition(x, y, GlobalSliceIndex::new(z))),
             (x, y, None) => world
                 .find_accessible_block_in_column(x, y)
                 .ok_or("couldn't find highest safe point"),

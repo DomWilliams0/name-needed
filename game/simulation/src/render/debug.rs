@@ -5,7 +5,7 @@ use common::*;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::ops::DerefMut;
-use unit::view::ViewPoint;
+use unit::world::WorldPoint;
 use world::InnerWorldRef;
 
 pub trait DebugRenderer<R: Renderer> {
@@ -111,13 +111,13 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
 
     fn render(&mut self, renderer: &mut R, _: &InnerWorldRef, _: &EcsWorld, _: SliceRange) {
         renderer.debug_add_line(
-            ViewPoint(0.0, 0.0, 1.0),
-            ViewPoint(1.0, 0.0, 1.0),
+            WorldPoint(0.0, 0.0, 1.0),
+            WorldPoint(1.0, 0.0, 1.0),
             ColorRgb::new(255, 0, 0),
         );
         renderer.debug_add_line(
-            ViewPoint(0.0, 0.0, 1.0),
-            ViewPoint(0.0, 1.0, 1.0),
+            WorldPoint(0.0, 0.0, 1.0),
+            WorldPoint(0.0, 1.0, 1.0),
             ColorRgb::new(0, 255, 0),
         );
     }

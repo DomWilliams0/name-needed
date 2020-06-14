@@ -3,9 +3,7 @@ pub use block_navigation::{BlockGraph, BlockPathError};
 use common::Vector3;
 pub use cost::EdgeCost;
 pub use path::{AreaPath, BlockPath, BlockPathNode, NavigationError, WorldPath, WorldPathNode};
-use unit::world::ChunkPosition;
-
-use crate::chunk::slab::SlabIndex;
+use unit::world::{ChunkPosition, SlabIndex};
 
 mod area_navigation;
 mod astar;
@@ -37,9 +35,15 @@ impl WorldArea {
     /// Helper for less verbose tests
     #[cfg(test)]
     pub fn new<C: Into<ChunkPosition>>(chunk: C) -> Self {
+        Self::new_with_slab(chunk, SlabIndex(0))
+    }
+
+    /// Helper for less verbose tests
+    #[cfg(test)]
+    pub fn new_with_slab<C: Into<ChunkPosition>>(chunk: C, slab: SlabIndex) -> Self {
         Self {
             chunk: chunk.into(),
-            slab: 0,
+            slab,
             area: SlabAreaIndex::FIRST,
         }
     }
@@ -82,7 +86,7 @@ impl From<WorldArea> for Vector3 {
         Vector3 {
             x: area.chunk.0 as f32,
             y: area.chunk.1 as f32,
-            z: area.slab as f32,
+            z: area.slab.into(),
         }
     }
 }

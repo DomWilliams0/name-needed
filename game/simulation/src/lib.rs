@@ -2,11 +2,15 @@
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
-    loader::{BlockForAllResult, ThreadedWorkerPool, WorkerPool, WorldLoader},
+    loader::{
+        BlockForAllResult, GeneratedTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
+    },
     presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
 
-pub use crate::backend::{EventsOutcome, ExitType, SimulationBackend};
+pub use crate::backend::{
+    state, EventsOutcome, ExitType, InitializedSimulationBackend, PersistentSimulationBackend,
+};
 pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
 pub use crate::transform::TransformComponent;

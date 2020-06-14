@@ -6,6 +6,7 @@ pub enum DebugShape {
         points: [ViewPoint; 2],
         color: ColorRgb,
     },
+    #[allow(dead_code)]
     Tri {
         points: [ViewPoint; 3],
         color: ColorRgb,

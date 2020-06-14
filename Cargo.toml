@@ -2,11 +2,11 @@
 
 members = [
 	"game/ai",
+	"game/procgen",
 	"game/simulation",
 	"game/world",
 
 	"renderer/engine",
-	"renderer/gameloop",
 	"renderer/main",
 
 	"shared/color",
