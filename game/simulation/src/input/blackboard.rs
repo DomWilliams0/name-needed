@@ -1,6 +1,6 @@
 use crate::ai::ActivityComponent;
 use crate::ecs::Entity;
-use crate::input::SelectedEntity;
+use crate::input::{SelectedEntity, SelectedTiles};
 use crate::item::{BaseItemComponent, EdibleItemComponent};
 use crate::needs::HungerComponent;
 use crate::path::FollowPathComponent;
@@ -11,7 +11,8 @@ use world::SliceRange;
 
 /// Dump of game info for the UI to render
 pub struct Blackboard<'a> {
-    pub selected: Option<SelectedEntityDetails>,
+    pub selected_entity: Option<SelectedEntityDetails>,
+    pub selected_tiles: SelectedTiles,
     pub enabled_debug_renderers: &'a HashSet<&'static str>,
 
     /// Populated by backend engine
@@ -38,7 +39,7 @@ pub enum EntityDetails {
 
 impl<'a> Blackboard<'a> {
     pub fn fetch<W: ComponentWorld>(world: &W, debug_renderers: &'a HashSet<&'static str>) -> Self {
-        let selected = world
+        let selected_entity = world
             .resource_mut(|selected: &mut SelectedEntity| selected.get(world))
             .map(|e| {
                 let transform = *world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
@@ -67,8 +68,11 @@ impl<'a> Blackboard<'a> {
                 }
             });
 
+        let selected_tiles = world.resource::<SelectedTiles>();
+
         Self {
-            selected,
+            selected_entity,
+            selected_tiles: selected_tiles.clone(),
             enabled_debug_renderers: debug_renderers,
             world_view: None,
         }

@@ -129,21 +129,22 @@ impl NeighbourOffset {
         }
     }
 
-    pub fn extend_across_boundary(self, mut pos: BlockPosition) -> BlockPosition {
+    pub fn extend_across_boundary(self, pos: BlockPosition) -> BlockPosition {
         debug_assert!(self.is_aligned());
 
+        let (mut x, mut y, z) = pos.into();
         match self {
-            NeighbourOffset::South => pos.1 = CHUNK_SIZE.as_block_coord() - 1,
-            NeighbourOffset::North => pos.1 = 0,
-            NeighbourOffset::East => pos.0 = 0,
-            NeighbourOffset::West => pos.0 = CHUNK_SIZE.as_block_coord() - 1,
+            NeighbourOffset::South => y = CHUNK_SIZE.as_block_coord() - 1,
+            NeighbourOffset::North => y = 0,
+            NeighbourOffset::East => x = 0,
+            NeighbourOffset::West => x = CHUNK_SIZE.as_block_coord() - 1,
             _ => {
                 // safety: asserted self is aligned
                 unsafe { unreachable_unchecked() }
             }
         };
 
-        pos
+        BlockPosition::new(x, y, z)
     }
 
     pub fn position_on_boundary(self, other_coord: BlockCoord) -> (BlockCoord, BlockCoord) {

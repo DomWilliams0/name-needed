@@ -82,7 +82,7 @@ impl Chunk {
             let block_pos: BlockPosition = pos.into();
             WorldArea {
                 chunk: self.pos,
-                slab: block_pos.2.slab_index(),
+                slab: block_pos.z().slab_index(),
                 area: area_index,
             }
         })
@@ -100,6 +100,7 @@ impl Chunk {
     }
 
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice {
+        #[allow(clippy::redundant_closure)]
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 }

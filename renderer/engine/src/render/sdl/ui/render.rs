@@ -1,6 +1,6 @@
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow, SelectionWindow, UiBundle};
-use imgui::{Context, FontConfig, FontSource, Style};
+use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -34,7 +34,12 @@ pub struct State {
 impl Ui {
     pub fn new(window: &Window, video: &VideoSubsystem) -> Self {
         let mut imgui = Context::create();
-        imgui.set_ini_filename(None);
+
+        // load settings
+        if let Ok(settings) = std::fs::read_to_string(imgui.ini_filename().unwrap()) {
+            imgui.load_ini_settings(&settings);
+        }
+
         Style::use_dark_colors(imgui.style_mut());
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
             config: Some(FontConfig {
@@ -47,7 +52,7 @@ impl Ui {
         let renderer = Renderer::new(&mut imgui, |s| video.gl_get_proc_address(s) as _);
         let state = State {
             perf: PerformanceWindow,
-            selection: SelectionWindow,
+            selection: SelectionWindow::default(),
             debug: DebugWindow,
         };
 
@@ -101,7 +106,14 @@ impl Ui {
 impl State {
     fn render(&mut self, mut bundle: UiBundle) {
         self.perf.render(&bundle);
-        self.selection.render(&mut bundle);
-        self.debug.render(&mut bundle);
+
+        imgui::Window::new(im_str!("Debug"))
+            .always_auto_resize(true)
+            .position([10.0, 112.0], Condition::FirstUseEver)
+            .always_use_window_padding(true)
+            .build(bundle.ui, || {
+                self.selection.render(&mut bundle);
+                self.debug.render(&mut bundle);
+            });
     }
 }

@@ -22,7 +22,7 @@ num_cpus = "1.13"
 clap = "^2.33"
 
 [features]
-default = ["use-sdl", "metrics"]
+default = ["use-sdl"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 count-allocs = ["alloc_counter"]

@@ -25,7 +25,7 @@ impl PathFollowing {
             // last waypoint, use exact target point instead of waypoint block pos
             self.final_target
         } else {
-            node.block.into()
+            node.block.centred()
         };
 
         self.next += 1;

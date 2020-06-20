@@ -25,11 +25,7 @@ impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
         for (transform,) in (&transform,).join() {
             if slices.contains(transform.position.slice()) {
                 let vel_pos = transform.position + (transform.velocity * 5.0);
-                renderer.debug_add_line(
-                    transform.position.into(),
-                    vel_pos.into(),
-                    ColorRgb::new(255, 0, 50),
-                )
+                renderer.debug_add_line(transform.position, vel_pos, ColorRgb::new(255, 0, 50))
             }
         }
     }

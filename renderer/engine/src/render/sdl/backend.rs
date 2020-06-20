@@ -17,10 +17,11 @@ use simulation::{
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
 use crate::render::sdl::render::FrameTarget;
+use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
 use sdl2::mouse::MouseButton;
-use simulation::input::{InputCommand, InputEvent, WorldColumn};
+use simulation::input::{InputCommand, InputEvent, SelectType, WorldColumn};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
@@ -34,6 +35,7 @@ pub struct SdlBackendPersistent {
     ui: Ui,
     /// Events from game -> UI, queued up and passed to sim on each frame
     sim_input_events: Vec<InputEvent>,
+    selection: Selection,
 }
 
 pub struct SdlBackendInit {
@@ -105,6 +107,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             renderer,
             ui,
             sim_input_events: Vec::with_capacity(32),
+            selection: Selection::default(),
         })
     }
 
@@ -168,25 +171,31 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 Event::MouseButtonDown {
                     mouse_btn, x, y, ..
                 } => {
-                    let (wx, wy) = match mouse_btn {
-                        MouseButton::Left | MouseButton::Right => {
-                            self.camera.screen_to_world((x, y))
+                    if let Some((sel, col)) = self.parse_mouse_event(mouse_btn, x, y) {
+                        self.selection.mouse_down(sel, col);
+                    }
+                }
+
+                Event::MouseButtonUp {
+                    mouse_btn, x, y, ..
+                } => {
+                    let evt = self
+                        .parse_mouse_event(mouse_btn, x, y)
+                        .and_then(|(select, col)| self.selection.mouse_up(select, col));
+
+                    if let Some(evt) = evt {
+                        self.sim_input_events.push(evt);
+                    }
+                }
+
+                Event::MouseMotion {
+                    mousestate, x, y, ..
+                } => {
+                    if let Some(mouse_btn) = mousestate.pressed_mouse_buttons().next() {
+                        if let Some((select, col)) = self.parse_mouse_event(mouse_btn, x, y) {
+                            self.selection.mouse_move(select, col);
                         }
-                        _ => continue,
-                    };
-
-                    let selected = WorldColumn {
-                        x: wx,
-                        y: wy,
-                        slice_range: self.world_viewer.entity_range(),
-                    };
-
-                    let event = match mouse_btn {
-                        MouseButton::Left => InputEvent::LeftClick(selected),
-                        MouseButton::Right => InputEvent::RightClick(selected),
-                        _ => unreachable!(),
-                    };
-                    self.sim_input_events.push(event);
+                    }
                 }
 
                 _ => {}
@@ -328,6 +337,23 @@ impl SdlBackendInit {
 
     fn modifier_state(&self) -> Mod {
         self.keep_alive.sdl.keyboard().mod_state()
+    }
+
+    fn parse_mouse_event(
+        &self,
+        button: MouseButton,
+        x: i32,
+        y: i32,
+    ) -> Option<(SelectType, WorldColumn)> {
+        Selection::select_type(button).map(|select| {
+            let (wx, wy) = self.camera.screen_to_world((x, y));
+            let col = WorldColumn {
+                x: wx,
+                y: wy,
+                slice_range: self.world_viewer.entity_range(),
+            };
+            (select, col)
+        })
     }
 }
 

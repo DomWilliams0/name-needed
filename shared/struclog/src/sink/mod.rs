@@ -33,7 +33,7 @@ lazy_static! {
     static ref GLOBAL_SINK: Mutex<Option<Box<dyn EventSink>>> = Mutex::new(None);
 }
 
-pub fn do_with<F: FnOnce(&mut Box<dyn EventSink>) -> ()>(f: F) {
+pub fn do_with<F: FnOnce(&mut Box<dyn EventSink>)>(f: F) {
     let global: &mut Option<Box<dyn EventSink>> = &mut GLOBAL_SINK.lock();
 
     if let Some(sink) = global.as_mut() {

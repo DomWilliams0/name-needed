@@ -2,6 +2,7 @@
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
+    block::{BlockType, IntoEnumIterator},
     loader::{
         BlockForAllResult, GeneratedTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
     },

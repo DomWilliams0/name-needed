@@ -100,7 +100,7 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
             let world = self.world.voxel_world();
             let pos = pos.resolve(&world.borrow())?;
             debug_assert!(world.borrow().area(pos).is_some());
-            TransformComponent::new(pos.into(), shape.radius(), height)
+            TransformComponent::new(pos.centred(), shape.radius(), height)
         };
 
         let render = RenderComponent::new(self.color.ok_or("no color")?, shape);

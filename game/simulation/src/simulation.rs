@@ -4,15 +4,16 @@ use crossbeam::crossbeam_channel::Receiver;
 use specs::RunNow;
 
 use common::*;
-use world::loader::{ChunkUpdate, ThreadedWorkerPool, WorldLoader};
-use world::{SliceRange, WorldRef};
+use world::loader::{ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
+use world::{OcclusionChunkUpdate, SliceRange, WorldRef};
 
 use crate::ai::{ActivityComponent, AiComponent, AiSystem};
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
 use crate::input::{
-    Blackboard, InputCommand, InputEvent, InputSystem, SelectedComponent, SelectedEntity,
+    Blackboard, BlockPlacement, InputCommand, InputEvent, InputSystem, SelectedComponent,
+    SelectedEntity, SelectedTiles,
 };
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
@@ -30,6 +31,7 @@ use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
 use crate::render::{RenderComponent, RenderSystem, Renderer};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
+use crate::ComponentWorld;
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
@@ -42,7 +44,11 @@ pub struct Simulation<R: Renderer> {
 
     #[allow(dead_code)] // TODO will be used when world can be modified
     world_loader: ThreadedWorldLoader,
-    chunk_updates: Receiver<ChunkUpdate>,
+    /// Occlusion updates received from world loader
+    chunk_updates: Receiver<OcclusionChunkUpdate>,
+
+    /// Terrain updates, queued and applied per tick
+    terrain_changes: Vec<WorldTerrainUpdate>,
 
     renderer: PhantomData<R>,
     debug_renderers: DebugRenderers<R>,
@@ -76,6 +82,7 @@ impl<R: Renderer> Simulation<R> {
             chunk_updates,
             debug_renderers,
             current_tick: Tick::default(),
+            terrain_changes: Vec::with_capacity(1024),
         }
     }
 
@@ -148,8 +155,31 @@ impl<R: Renderer> Simulation<R> {
 
     fn apply_chunk_updates(&mut self) {
         let mut world = self.voxel_world.borrow_mut();
+
+        // occlusion updates
         while let Ok(update) = self.chunk_updates.try_recv() {
-            world.apply_update(update);
+            world.apply_occlusion_update(update);
+        }
+
+        // terrain changes, apply per chunk
+        // TODO per tick alloc/reuse buf
+        let groups = self
+            .terrain_changes
+            .drain(..)
+            .flat_map(|world_update| world_update.into_chunk_updates())
+            .sorted_by_key(|(chunk_pos, _)| *chunk_pos)
+            .group_by(|(chunk_pos, _)| *chunk_pos);
+
+        for (chunk, updates) in &groups {
+            if let Some(new_terrain) =
+                world.apply_terrain_updates(chunk, updates.map(|(_, update)| update))
+            {
+                trace!(
+                    "submitting updated chunk terrain to worker pool for {:?}",
+                    chunk
+                );
+                self.world_loader.update_chunk(chunk, new_terrain);
+            }
         }
     }
 
@@ -159,6 +189,20 @@ impl<R: Renderer> Simulation<R> {
                 InputCommand::ToggleDebugRenderer { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
                         warn!("failed to toggle debug renderer: {}", e);
+                    }
+                }
+
+                InputCommand::FillSelectedTiles(placement, block_type) => {
+                    let selection = self.ecs_world.resource::<SelectedTiles>();
+                    if let Some((mut from, mut to)) = selection.bounds() {
+                        if let BlockPlacement::Set = placement {
+                            // move the range down 1 block to set those blocks instead of the air
+                            // blocks above
+                            from.2 -= 1;
+                            to.2 -= 1;
+                        }
+                        self.terrain_changes
+                            .push(WorldTerrainUpdate::with_range(from, to, block_type));
                     }
                 }
             }
@@ -263,6 +307,7 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(Tick::default());
     world.insert(QueuedUpdates::default());
     world.insert(SelectedEntity::default());
+    world.insert(SelectedTiles::default());
 }
 
 fn register_debug_renderers<R: Renderer>(
@@ -270,7 +315,10 @@ fn register_debug_renderers<R: Renderer>(
 ) -> Result<(), DebugRendererError> {
     r.register(AxesDebugRenderer, true)?;
     r.register(SteeringDebugRenderer, true)?;
-    r.register(PathDebugRenderer::default(), true)?;
+    r.register(
+        PathDebugRenderer::default(),
+        config::get().display.nav_paths_by_default,
+    )?;
     Ok(())
 }
 

@@ -189,7 +189,7 @@ impl InventoryComponent {
                 // nice, swap them
                 return self
                     .swap(SlotReference::Base(base_slot), mounted_slot)
-                    .and_then(|_| Ok(base_slot))
+                    .map(|_| base_slot)
                     .ok();
             }
         }

@@ -2,6 +2,8 @@ use color::ColorRgb;
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::{BlockOcclusion, Opacity};
+use common::derive_more::Display;
+pub use enum_iterator::IntoEnumIterator;
 use unit::world::GlobalSliceIndex;
 
 /// A single block in a chunk
@@ -72,11 +74,12 @@ impl Block {
 }
 
 /// The type of a block
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, IntoEnumIterator, Display)]
 pub enum BlockType {
     Air,
     Dirt,
     Grass,
+    #[display(fmt = "Light grass")]
     LightGrass,
     Stone,
 }

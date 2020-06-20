@@ -29,7 +29,7 @@ impl SlabPosition {
     }
 
     pub fn to_block_position(self, slab_index: SlabIndex) -> BlockPosition {
-        BlockPosition(self.0, self.1, self.2.to_global(slab_index))
+        BlockPosition::new(self.0, self.1, self.2.to_global(slab_index))
     }
 
     pub const fn x(self) -> BlockCoord {
@@ -66,6 +66,6 @@ impl From<SlabPosition> for [i32; 3] {
 
 impl From<BlockPosition> for SlabPosition {
     fn from(p: BlockPosition) -> Self {
-        Self::new(p.0, p.1, p.2.to_local())
+        Self::new(p.x(), p.y(), p.z().to_local())
     }
 }

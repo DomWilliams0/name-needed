@@ -49,6 +49,7 @@ pub mod state {
     use crate::{InitializedSimulationBackend, PersistentSimulationBackend};
     use world::WorldViewer;
 
+    #[allow(clippy::manual_non_exhaustive)]
     enum State<B: PersistentSimulationBackend> {
         /// Temporary value to use in place of uninitialized memory, for safe handling of panics
         #[doc(hidden)]

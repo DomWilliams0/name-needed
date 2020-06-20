@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::input::SelectedComponent;
+use crate::input::{SelectedComponent, SelectedTiles};
 use crate::render::renderer::Renderer;
 use crate::render::shape::PhysicalShape;
 use crate::{SliceRange, TransformComponent};
@@ -39,12 +39,13 @@ pub struct RenderSystem<'a, R: Renderer> {
 
 impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
+        Read<'a, SelectedTiles>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
         ReadStorage<'a, SelectedComponent>,
     );
 
-    fn run(&mut self, (transform, render, selected): Self::SystemData) {
+    fn run(&mut self, (selected_block, transform, render, selected): Self::SystemData) {
         for (transform, render, selected) in (&transform, &render, selected.maybe()).join() {
             if self.slices.contains(transform.slice()) {
                 // make copy to mutate for interpolation
@@ -62,6 +63,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                     self.renderer.sim_selected(&transform);
                 }
             }
+        }
+
+        if let Some((from, to)) = selected_block.bounds() {
+            self.renderer
+                .tile_selection(from, to, ColorRgb::new(230, 240, 230));
         }
     }
 }

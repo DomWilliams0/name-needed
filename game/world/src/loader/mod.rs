@@ -7,36 +7,34 @@ use crossbeam::crossbeam_channel::{bounded, unbounded};
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::{BlockPosition, ChunkPosition};
+use unit::world::ChunkPosition;
 
-#[cfg(test)]
-pub use worker_pool::BlockingWorkerPool;
-pub use worker_pool::{ThreadedWorkerPool, WorkerPool};
+pub use update::{ChunkTerrainUpdate, WorldTerrainUpdate};
+pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
-use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, WhichChunk};
+use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, RawChunkTerrain, WhichChunk};
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::navigation::AreaNavEdge;
-use crate::occlusion::{NeighbourOffset, NeighbourOpacity};
-use crate::WorldRef;
+use crate::occlusion::NeighbourOffset;
+use crate::{OcclusionChunkUpdate, WorldRef};
 
 mod terrain_source;
+mod update;
 mod worker_pool;
-
-pub type ChunkUpdate = (ChunkPosition, Vec<(BlockPosition, NeighbourOpacity)>);
 
 pub struct WorldLoader<P: WorkerPool> {
     source: Arc<Mutex<dyn TerrainSource>>,
     pool: P,
     finalization_channel: Sender<LoadTerrainResult>,
-    chunk_updates_rx: Option<Receiver<ChunkUpdate>>,
+    chunk_updates_rx: Option<Receiver<OcclusionChunkUpdate>>,
     world: WorldRef,
     all_count: Option<usize>,
 }
 
 struct ChunkFinalizer {
     world: WorldRef,
-    updates: Sender<ChunkUpdate>,
+    updates: Sender<OcclusionChunkUpdate>,
 }
 
 #[derive(Debug)]
@@ -119,6 +117,17 @@ impl<P: WorkerPool> WorldLoader<P> {
         );
     }
 
+    pub fn update_chunk(&mut self, chunk: ChunkPosition, terrain: RawChunkTerrain) {
+        self.pool.submit(
+            move || {
+                // concurrently process raw terrain into chunk terrain
+                let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk);
+                Ok((chunk, terrain))
+            },
+            self.finalization_channel.clone(),
+        )
+    }
+
     pub fn block_on_next_finalization(
         &mut self,
         timeout: Duration,
@@ -151,13 +160,13 @@ impl<P: WorkerPool> WorldLoader<P> {
         }
     }
 
-    pub fn chunk_updates_rx(&mut self) -> Option<Receiver<ChunkUpdate>> {
+    pub fn chunk_updates_rx(&mut self) -> Option<Receiver<OcclusionChunkUpdate>> {
         self.chunk_updates_rx.take()
     }
 }
 
 impl ChunkFinalizer {
-    fn new(world: WorldRef, updates: Sender<ChunkUpdate>) -> Self {
+    fn new(world: WorldRef, updates: Sender<OcclusionChunkUpdate>) -> Self {
         Self { world, updates }
     }
 
@@ -210,7 +219,10 @@ impl ChunkFinalizer {
 
             // queue changes to existing chunks in world
             self.updates
-                .send((neighbour_offset, other_terrain_updates))
+                .send(OcclusionChunkUpdate(
+                    neighbour_offset,
+                    other_terrain_updates,
+                ))
                 .unwrap();
         }
 
@@ -265,12 +277,9 @@ impl ChunkFinalizer {
             }
         }
 
-        // TODO build up area graph nodes and edges (using a map in self of all loaded chunks->edge opacity/walkability?)
-
-        // TODO finally take WorldRef write lock and 1) update nav graph 2) add chunk
-
         let chunk = Chunk::with_completed_terrain(chunk, terrain);
         {
+            // finally take WorldRef write lock and post new chunk
             let mut world = self.world.borrow_mut();
             debug!("adding completed chunk {:?} to world", chunk.pos());
             world.add_loaded_chunk(chunk, &area_edges);

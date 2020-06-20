@@ -9,8 +9,8 @@ use unit::world::ChunkPosition;
 
 use crate::chunk::ChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::loader::{ChunkFinalizer, ChunkUpdate};
-use crate::WorldRef;
+use crate::loader::ChunkFinalizer;
+use crate::{OcclusionChunkUpdate, WorldRef};
 
 pub type LoadTerrainResult = Result<(ChunkPosition, ChunkTerrain), TerrainSourceError>;
 
@@ -19,7 +19,7 @@ pub trait WorkerPool {
         &mut self,
         world: WorldRef,
         finalize_rx: Receiver<LoadTerrainResult>,
-        chunk_updates_tx: Sender<ChunkUpdate>,
+        chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     );
 
     fn block_on_next_finalize(
@@ -56,7 +56,7 @@ impl WorkerPool for ThreadedWorkerPool {
         &mut self,
         world: WorldRef,
         finalize_rx: Receiver<LoadTerrainResult>,
-        chunk_updates_tx: Sender<ChunkUpdate>,
+        chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     ) {
         let success_tx = self.success_tx.clone();
         // TODO if this thread panics, propagate to main game thread
@@ -72,7 +72,7 @@ impl WorkerPool for ThreadedWorkerPool {
                             Err(e)
                         }
                         Err(e) => {
-                            error!("failed to load requested chunk: {:?}", e);
+                            error!("failed to load requested chunk: {}", e);
                             Err(e)
                         }
                         Ok((chunk, terrain)) => {
@@ -127,7 +127,7 @@ impl WorkerPool for BlockingWorkerPool {
         &mut self,
         world: WorldRef,
         finalize_rx: Receiver<LoadTerrainResult>,
-        chunk_updates_tx: Sender<ChunkUpdate>,
+        chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     ) {
         self.finalizer_magic = Some((finalize_rx, ChunkFinalizer::new(world, chunk_updates_tx)));
     }
@@ -160,7 +160,7 @@ impl WorkerPool for BlockingWorkerPool {
             .expect("expected finalized terrain by now")
         {
             Err(e) => {
-                error!("failed to load chunk: {:?}", e);
+                error!("failed to load chunk: {}", e);
                 Err(e)
             }
             Ok((chunk, terrain)) => {

@@ -11,7 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::{once, once_with};
 
 /// A point anywhere in the world
-#[derive(Debug, Copy, Clone, PartialEq, Default, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Default, Into, From, PartialOrd)]
 pub struct WorldPoint(pub f32, pub f32, pub f32);
 
 impl WorldPoint {
@@ -41,6 +41,14 @@ impl WorldPoint {
     pub fn floor_then_ceil(self) -> impl Iterator<Item = WorldPosition> {
         // TODO floor_then_ceil is terribly inefficient, try without the lazy eval
         once(self.floor()).chain(once_with(move || self.ceil()))
+    }
+
+    pub fn round(self) -> WorldPosition {
+        WorldPosition(
+            self.0.round() as i32,
+            self.1.round() as i32,
+            SliceIndex::new(self.2.round() as i32),
+        )
     }
 }
 
@@ -76,10 +84,9 @@ impl From<Vector3> for WorldPoint {
     }
 }
 
-/// Centre of block
 impl From<WorldPosition> for WorldPoint {
     fn from(pos: WorldPosition) -> Self {
-        Self(pos.0 as f32 + 0.5, pos.1 as f32 + 0.5, pos.2.slice() as f32)
+        Self(pos.0 as f32, pos.1 as f32, pos.2.slice() as f32)
     }
 }
 
@@ -133,6 +140,14 @@ impl TryFrom<&[f32]> for WorldPoint {
         } else {
             Err(())
         }
+    }
+}
+
+impl Add<GlobalSliceIndex> for WorldPoint {
+    type Output = Self;
+
+    fn add(self, rhs: GlobalSliceIndex) -> Self::Output {
+        Self(self.0, self.1, self.2 + rhs.slice() as f32)
     }
 }
 

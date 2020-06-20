@@ -11,13 +11,16 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* fixed most of the time but still possible to sometimes get fully lodged
 * lazy path evaluation (area at a time)
 * path optimisation (line of sight)
+* wandering should choose a close location instead of random in the world
+* path invalidation on world change
 
 ## UI
-* cascading input handlers
 * graph for fps/tps history
 	* measure ticks per second in perf window
-* tile selection and debug information
-	* tile region?
+* better tile selection
+	* live updating selection region
+	* selection shows if selected blocks are occluded
+	* depth selection
 
 ## Entity control
 * select entity and walk to block
@@ -39,16 +42,23 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * puddles/spills/splatters on the ground
 	* picked up and spread by entities
 
-## Performance
+## Optimizations
+### Performance
 * allocation reuse
 * pooled allocations
 * per-tick arena allocator
 * spatial queries for entities
 * path finding worker thread
 * periodic and staggered systems
+	* preserve determinism if possible
 * slice-aware chunk mesh caching
 * influence map for density, sound
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
+* slab-level terrain updates instead of chunk-level
+
+### Memory usage
+* CoW terrain slabs
+* store sparse block metadata in the chunk/slab instead of in each block
 
 ## Crate release
 * voxel world

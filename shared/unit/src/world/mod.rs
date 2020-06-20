@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn block_to_world() {
         // ensure block positions convert to the expected world position
-        let b = BlockPosition(1, 2, SliceIndex::new(3));
+        let b = BlockPosition::new(1, 2, SliceIndex::new(3));
 
         // at origin
         let WorldPoint(x, y, z) = b.to_world_point((0, 0));

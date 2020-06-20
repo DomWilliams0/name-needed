@@ -15,6 +15,7 @@ pub struct Display {
     pub debug_physics: bool,
     pub zoom: f32,
     pub initial_view_range: u16,
+    pub nav_paths_by_default: bool,
 }
 
 #[derive(Deserialize)]

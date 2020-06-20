@@ -12,7 +12,7 @@ pub struct SliceBlock(pub BlockCoord, pub BlockCoord);
 
 impl SliceBlock {
     pub fn to_block_position(self, slice: GlobalSliceIndex) -> BlockPosition {
-        BlockPosition(self.0, self.1, slice)
+        BlockPosition::new(self.0, self.1, slice)
     }
 
     pub fn to_slab_position(self, slice: LocalSliceIndex) -> SlabPosition {
@@ -34,7 +34,7 @@ impl SliceBlock {
 
 impl From<BlockPosition> for SliceBlock {
     fn from(b: BlockPosition) -> Self {
-        Self(b.0, b.1)
+        Self(b.x(), b.y())
     }
 }
 impl From<SlabPosition> for SliceBlock {

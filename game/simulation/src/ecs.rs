@@ -80,10 +80,14 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn resource<T: Resource>(&self) -> &T {
-        *self.read_resource()
+        let res = self.read_resource::<T>();
+        // safety: storage has the same lifetime as self, so its ok to "upcast" the resource's
+        // lifetime from that of the storage to that of self
+        unsafe { std::mem::transmute(res.deref()) }
     }
 
     fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, f: F) -> R {
+        // TODO transmute magic to remove closure
         let mut res = self.write_resource::<T>();
         f(&mut *res)
     }

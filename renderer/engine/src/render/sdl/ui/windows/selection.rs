@@ -1,60 +1,27 @@
-use imgui::{im_str, CollapsingHeader, Condition, ImStr, Ui, Window};
+use imgui::{im_str, CollapsingHeader, TreeNode};
 
-use common::InnerSpace;
-use simulation::input::EntityDetails;
+use common::{InnerSpace, Itertools};
+use simulation::input::{BlockPlacement, EntityDetails, InputCommand};
 
-use crate::render::sdl::ui::windows::UiBundle;
+use crate::render::sdl::ui::windows::{
+    UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
+};
 use crate::ui_str;
+use simulation::{BlockType, IntoEnumIterator};
 
-pub struct SelectionWindow;
-
-enum Value<'a> {
-    Hide,
-    None(&'static str),
-    Some(&'a ImStr),
-    Wrapped(&'a ImStr),
+pub struct SelectionWindow {
+    block_placement: BlockPlacement,
 }
-
-trait UiExt {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(&'a self, key: &ImStr, value: F, color: [f32; 4]);
-}
-
-impl UiExt for Ui<'_> {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(&'a self, key: &ImStr, value: F, color: [f32; 4]) {
-        let value = value();
-        if let Value::Hide = value {
-            return;
-        }
-
-        self.text_colored(color, key);
-        self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 20.0);
-        match value {
-            Value::Some(val) => {
-                self.text(val);
-            }
-            Value::Wrapped(val) => {
-                self.text_wrapped(&val);
-            }
-            Value::None(val) => self.text_disabled(val),
-            _ => unreachable!(),
-        }
-    }
-}
-
-const COLOR_GREEN: [f32; 4] = [0.4, 0.77, 0.33, 1.0];
-const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
-const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
 
 impl SelectionWindow {
     pub fn render(&mut self, bundle: &mut UiBundle) {
         let ui = bundle.ui;
         let strings = bundle.strings;
 
-        Window::new(im_str!("Selection"))
-            .position([10.0, 140.0], Condition::Appearing)
-            .always_auto_resize(true)
+        TreeNode::new(im_str!("Entity selection"))
+            .frame_padding(true)
             .build(ui, || {
-                let selection = match &bundle.blackboard.selected {
+                let selection = match &bundle.blackboard.selected_entity {
                     None => {
                         ui.text_disabled(im_str!("No entity selected"));
                         return;
@@ -78,11 +45,7 @@ impl SelectionWindow {
                     EntityDetails::Item { .. } => im_str!("Item"),
                 };
 
-                if CollapsingHeader::new(title)
-                    .default_open(true)
-                    .frame_padding(true)
-                    .build(ui)
-                {
+                if CollapsingHeader::new(title).frame_padding(true).build(ui) {
                     match &selection.details {
                         EntityDetails::Living {
                             activity,
@@ -176,5 +139,83 @@ impl SelectionWindow {
                     };
                 }
             });
+
+        TreeNode::new(im_str!("Tile selection"))
+            .frame_padding(true)
+            .build(ui, || {
+                let bounds = match bundle.blackboard.selected_tiles.bounds() {
+                    None => {
+                        ui.text_disabled(im_str!("No tile selection"));
+                        return;
+                    }
+                    Some(bounds) => bounds,
+                };
+
+                let (from, to) = bounds;
+                let w = (to.0 - from.0).abs() + 1;
+                let h = (to.1 - from.1).abs() + 1;
+                let z = (to.2 - from.2).abs().slice() + 1;
+
+                ui.key_value(
+                    im_str!("Size:"),
+                    || {
+                        if z == 1 {
+                            Value::Some(ui_str!(in strings, "{}x{} ({})", w, h, w*h))
+                        } else {
+                            Value::Some(ui_str!(in strings, "{}x{}x{} ({})", w, h,z, w*h*z))
+                        }
+                    },
+                    COLOR_BLUE,
+                );
+
+                ui.key_value(
+                    im_str!("From:"),
+                    || Value::Some(ui_str!(in strings, "{}", from)),
+                    COLOR_ORANGE,
+                );
+
+                ui.key_value(
+                    im_str!("To:  "),
+                    || Value::Some(ui_str!(in strings, "{}", to)),
+                    COLOR_ORANGE,
+                );
+
+                ui.separator();
+                ui.radio_button(
+                    im_str!("Set blocks"),
+                    &mut self.block_placement,
+                    BlockPlacement::Set,
+                );
+                ui.same_line(0.0);
+                ui.radio_button(
+                    im_str!("Place blocks"),
+                    &mut self.block_placement,
+                    BlockPlacement::PlaceAbove,
+                );
+
+                let mut mk_button = |bt: BlockType| {
+                    if ui.button(ui_str!(in strings, "{}", bt), [0.0, 0.0]) {
+                        bundle
+                            .commands
+                            .push(InputCommand::FillSelectedTiles(self.block_placement, bt));
+                    }
+                };
+
+                for mut types in BlockType::into_enum_iter().chunks(3).into_iter() {
+                    types.next().map(|bt| mk_button(bt));
+                    for bt in types {
+                        ui.same_line(0.0);
+                        mk_button(bt);
+                    }
+                }
+            });
+    }
+}
+
+impl Default for SelectionWindow {
+    fn default() -> Self {
+        Self {
+            block_placement: BlockPlacement::Set,
+        }
     }
 }

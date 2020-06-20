@@ -4,6 +4,6 @@ mod event;
 mod system;
 
 pub use blackboard::{Blackboard, EntityDetails};
-pub use command::InputCommand;
-pub use event::{InputEvent, WorldColumn};
-pub use system::{InputSystem, SelectedComponent, SelectedEntity};
+pub use command::{BlockPlacement, InputCommand};
+pub use event::{InputEvent, SelectType, WorldColumn};
+pub use system::{InputSystem, SelectedComponent, SelectedEntity, SelectedTiles};

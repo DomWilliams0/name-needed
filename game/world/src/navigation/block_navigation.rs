@@ -111,7 +111,8 @@ mod tests {
 
     use crate::block::BlockType;
     use crate::navigation::{BlockPathNode, WorldArea};
-    use crate::{world_from_chunks, ChunkBuilder, EdgeCost};
+    use crate::world::helpers::world_from_chunks;
+    use crate::{ChunkBuilder, EdgeCost};
 
     #[test]
     fn simple_path() {

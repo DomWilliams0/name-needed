@@ -1,7 +1,10 @@
-use crate::{RenderComponent, TransformComponent};
-use color::ColorRgb;
 use std::fmt::Debug;
-use unit::world::WorldPoint;
+
+use color::ColorRgb;
+use common::Vector2;
+use unit::world::{WorldPoint, WorldPosition};
+
+use crate::{RenderComponent, TransformComponent};
 
 pub trait Renderer {
     type Target;
@@ -37,4 +40,37 @@ pub trait Renderer {
 
     /// End rendering frame
     fn deinit(&mut self) -> Self::Target;
+
+    // ----
+
+    fn tile_selection(&mut self, a: WorldPosition, b: WorldPosition, color: ColorRgb) {
+        let a = WorldPoint::from(a);
+        let b = WorldPoint::from(b);
+
+        let bl = {
+            let x = a.0.min(b.0);
+            let y = a.1.min(b.1);
+            let z = a.2.min(b.2);
+            WorldPoint(x, y, z)
+        };
+        let tr = {
+            let x = a.0.max(b.0) + 1.0;
+            let y = a.1.max(b.1) + 1.0;
+            let z = a.2.max(b.2);
+            WorldPoint(x, y, z)
+        };
+
+        let w = tr.0 - bl.0;
+        let h = tr.1 - bl.1;
+
+        let br = bl + Vector2::new(w, 0.0);
+        let tl = bl + Vector2::new(0.0, h);
+
+        self.debug_add_line(bl, br, color);
+        self.debug_add_line(br, tr, color);
+        self.debug_add_line(tl, tr, color);
+        self.debug_add_line(bl, tl, color);
+
+        // TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh
+    }
 }

@@ -59,7 +59,7 @@ pub trait BaseTerrain {
 
     fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Option<Block> {
         let pos = pos.into();
-        self.slice(pos.2).map(|slice| slice[pos])
+        self.slice(pos.z()).map(|slice| slice[pos])
     }
 
     fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> Option<BlockType> {
@@ -108,6 +108,11 @@ pub trait BaseTerrain {
         out
     }
 }
+
+pub struct OcclusionChunkUpdate(
+    pub ChunkPosition,
+    pub Vec<(BlockPosition, NeighbourOpacity)>,
+);
 
 impl BaseTerrain for RawChunkTerrain {
     fn raw_terrain(&self) -> &RawChunkTerrain {
@@ -210,7 +215,7 @@ impl RawChunkTerrain {
     {
         let pos = pos.into();
         let block = block.into();
-        self.slice_mut_with_policy(pos.2, policy, |mut slice| slice[pos] = block)
+        self.slice_mut_with_policy(pos.z(), policy, |mut slice| slice[pos] = block)
     }
 
     pub fn slice_mut_with_policy<S: Into<GlobalSliceIndex>, F: FnOnce(SliceMut)>(
@@ -246,7 +251,7 @@ impl RawChunkTerrain {
     }
 
     pub fn with_block_mut_unchecked<F: FnMut(&mut Block)>(&mut self, pos: BlockPosition, mut f: F) {
-        let mut slice = self.slice_mut(pos.2).unwrap();
+        let mut slice = self.slice_mut(pos.z()).unwrap();
         let block = &mut slice[pos];
         f(block);
     }
@@ -586,7 +591,7 @@ mod pair_walking {
             // get block pos in this chunk
             let block_pos = {
                 let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition(this_pos.0, this_pos.1, slice_idx)
+                BlockPosition::new(this_pos.0, this_pos.1, slice_idx)
             };
 
             f(which_chunk, block_pos, opacities);
@@ -693,7 +698,7 @@ mod pair_walking {
             // get block pos in this chunk
             let block_pos = {
                 let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition(coord.0, coord.1, slice_idx)
+                BlockPosition::new(coord.0, coord.1, slice_idx)
             };
 
             f(which_chunk, block_pos, opacities)
@@ -859,8 +864,8 @@ impl ChunkTerrain {
         start_from: Option<GlobalSliceIndex>,
         end_at: Option<GlobalSliceIndex>,
     ) -> Option<BlockPosition> {
-        let start_from = start_from.unwrap_or(GlobalSliceIndex::top());
-        let end_at = end_at.unwrap_or(GlobalSliceIndex::bottom());
+        let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
+        let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
         self.raw_terrain()
             .slices_from_top_offset()
             .skip_while(|(s, _)| *s > start_from)
@@ -898,10 +903,10 @@ mod tests {
     use crate::chunk::terrain::{BaseTerrain, ChunkTerrain, SlabPointer};
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
-    use crate::world::world_from_chunks;
     use crate::World;
 
     use super::*;
+    use crate::world::helpers::world_from_chunks;
 
     #[test]
     fn empty() {

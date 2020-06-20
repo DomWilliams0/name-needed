@@ -1,4 +1,4 @@
-# TODOs (142)
+# TODOs (146)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (3)
@@ -39,11 +39,13 @@
    * `type Error: Debug; // TODO Error!!`
  * [game/simulation/src/dev.rs](game/simulation/src/dev.rs) (1)
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
+ * [game/simulation/src/ecs.rs](game/simulation/src/ecs.rs) (1)
+   * `// TODO transmute magic to remove closure`
  * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (1)
    * `// TODO add must_use to all builder patterns`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (2)
    * `// TODO spatial query rather than checking every entity ever`
-   * `// TODO make selected entity go to pos`
+   * `// TODO select multiple entities`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (10)
    * `// TODO this could do with a builder`
    * `pub class: ItemClass, // TODO possible for an item to have multiple classes?`
@@ -86,11 +88,14 @@
    * `// TODO detect if changed`
  * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
    * `// TODO pool/reuse these boxes`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
+   * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `#[allow(dead_code)] // TODO will be used when world can be modified`
    * `// TODO return Result instead of panic!, even though this only happens during game init`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
+   * `// TODO per tick alloc/reuse buf`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
@@ -117,16 +122,17 @@
  * [game/world/src/grid.rs](game/world/src/grid.rs) (2)
    * `// TODO pub hardcoded :(`
    * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
    * `// TODO cache full finalized chunks`
    * `// TODO reuse/pool bufs`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
-   * `// TODO build up area graph nodes and edges (using a map in self of all loaded chunks->edge opacity/walkability?)`
-   * `// TODO finally take WorldRef write lock and 1) update nav graph 2) add chunk`
  * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
    * `fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross`
+ * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (2)
+   * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
+   * `// TODO SlabTerrainUpdate instead of chunk level`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
    * `// TODO if this thread panics, propagate to main game thread`
    * `// TODO detect this err condition?`
@@ -162,10 +168,12 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (4)
+ * [game/world/src/world.rs](game/world/src/world.rs) (6)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
+   * `// TODO reuse hashset allocation`
    * `// TODO only invalidate lighting`
+   * `// TODO only update modified slabs, not the full chunk`
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
@@ -181,7 +189,7 @@
    * `// TODO cursor interface in ScopedMap`
  * [renderer/engine/src/render/sdl/render/mod.rs](renderer/engine/src/render/sdl/render/mod.rs) (1)
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/ui/windows/debug.rs](renderer/engine/src/render/sdl/ui/windows/debug.rs) (1)
+ * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO helpers in Bundle`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (1)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
@@ -197,8 +205,6 @@
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
    * `// TODO helper for this-1`
- * [shared/unit/src/world/block_position.rs](shared/unit/src/world/block_position.rs) (1)
-   * `// TODO assert limits in constructor`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)

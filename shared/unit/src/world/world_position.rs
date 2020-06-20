@@ -9,24 +9,26 @@ use crate::view::ViewPoint;
 use crate::world::{ChunkPosition, GlobalSliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd)]
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
     pub const fn slice(self) -> GlobalSliceIndex {
         self.2
     }
+
+    pub fn centred(self) -> WorldPoint {
+        WorldPoint(
+            self.0 as f32 + 0.5,
+            self.1 as f32 + 0.5,
+            self.2.slice() as f32,
+        )
+    }
 }
 
 impl Display for WorldPosition {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(
-            f,
-            "WorldPosition({}, {}, {})",
-            self.0,
-            self.1,
-            self.2.slice()
-        )
+        write!(f, "({}, {}, {})", self.0, self.1, self.2.slice())
     }
 }
 

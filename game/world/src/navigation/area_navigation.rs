@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::iter::once;
 
+use petgraph::prelude::EdgeRef;
 use petgraph::stable_graph::StableGraph;
 use petgraph::Directed;
 
@@ -135,7 +136,7 @@ impl AreaNavEdge {
                     self.exit, self.width, offset
                 );
             }
-            Some(slice_block) => slice_block.to_block_position(self.exit.slice()),
+            Some(slice_block) => slice_block.to_block_position(self.exit.z()),
         }
     }
 }
@@ -216,6 +217,20 @@ impl AreaGraph {
         }
     }
 
+    pub(crate) fn remove_node(&mut self, area: &WorldArea) {
+        if let Some(node) = self.node_lookup.remove(area) {
+            // invalidate edges first
+            let edges: Vec<_> = self.graph.edges(node).map(|e| e.id()).collect();
+            for edge in edges {
+                self.graph.remove_edge(edge);
+            }
+
+            // invalidate node
+            let old = self.graph.remove_node(node);
+            debug_assert!(old.is_some(), "node was not in both lookup and graph")
+        }
+    }
+
     fn get_node(&self, area: WorldArea) -> Result<NodeIndex, AreaPathError> {
         self.node_lookup
             .get(&area)
@@ -225,7 +240,7 @@ impl AreaGraph {
 
     #[cfg(test)]
     fn get_edges(&self, from: WorldArea, to: WorldArea) -> Vec<AreaNavEdge> {
-        use petgraph::prelude::{Direction, EdgeRef};
+        use petgraph::prelude::Direction;
 
         match (self.get_node(from), self.get_node(to)) {
             (Ok(from), Ok(to)) => self
@@ -262,7 +277,8 @@ mod tests {
     use crate::navigation::path::AreaPathNode;
     use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::occlusion::NeighbourOffset;
-    use crate::{world_from_chunks, ChunkDescriptor, EdgeCost};
+    use crate::world::helpers::world_from_chunks;
+    use crate::{ChunkDescriptor, EdgeCost};
 
     fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
         // gross but allows for neater tests
@@ -470,37 +486,37 @@ mod tests {
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition(0, 0, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new(0, 0, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition(0, 4, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new(0, 4, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 2,
-                exit: BlockPosition(0, 7, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new(0, 7, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition(0, 10, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new(0, 10, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition(0, 11, GlobalSliceIndex::new(5)),
+                exit: BlockPosition::new(0, 11, GlobalSliceIndex::new(5)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpDown,
                 width: 1,
-                exit: BlockPosition(0, 12, GlobalSliceIndex::new(5)),
+                exit: BlockPosition::new(0, 12, GlobalSliceIndex::new(5)),
                 direction,
             },
         ];
@@ -796,7 +812,7 @@ mod tests {
         let reversed = AreaNavEdge {
             direction: NeighbourOffset::North,
             cost: EdgeCost::JumpDown,
-            exit: BlockPosition(5, CHUNK_SIZE.as_block_coord() - 1, GlobalSliceIndex::new(6)),
+            exit: BlockPosition::new(5, CHUNK_SIZE.as_block_coord() - 1, GlobalSliceIndex::new(6)),
             width: 2,
         };
 

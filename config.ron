@@ -6,6 +6,7 @@ Config(
         debug_physics: false,
         zoom: 1.0,
         initial_view_range: 5,
+        nav_paths_by_default: false,
     ),
     world: (
         // source: Preset(MultiChunkWonder),

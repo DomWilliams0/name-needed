@@ -5,4 +5,5 @@ mod backend;
 mod camera;
 mod gl;
 mod render;
+mod selection;
 mod ui;

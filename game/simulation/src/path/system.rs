@@ -112,7 +112,7 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                 // may take a few iterations to find a valid wander target, so do the path finding
                 // manually here rather than setting path.new_target and maybe waiting a few ticks
                 path_follow.path = world.choose_random_walkable_block(10).and_then(|target| {
-                    let target = WorldPoint::from(target);
+                    let target = target.centred();
                     match path_find(&world, transform.position, target) {
                         Err(NavigationError::SourceNotWalkable(_)) => {
                             warn!("{:?}: stuck in a non walkable position", e);
@@ -196,7 +196,7 @@ impl FollowPathComponent {
         if let Some(path) = self.path.as_ref() {
             out.extend(
                 path.waypoints()
-                    .map(|&pos| pos.into())
+                    .map(|&pos| pos.centred())
                     .chain(once(path.target())),
             );
         }
