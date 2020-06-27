@@ -7,8 +7,10 @@ use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
 
 /// Used for testing
+#[derive(Clone)]
 pub struct MemoryTerrainSource {
-    chunk_map: HashMap<ChunkPosition, RawChunkTerrain>,
+    /// Terrain is `take`n on load
+    chunk_map: HashMap<ChunkPosition, Option<RawChunkTerrain>>,
     bounds: (ChunkPosition, ChunkPosition),
 }
 
@@ -22,7 +24,7 @@ impl MemoryTerrainSource {
         for it in chunks {
             let (chunk, terrain) = it.into();
             let chunk = chunk.into();
-            if chunk_map.insert(chunk, terrain).is_some() {
+            if chunk_map.insert(chunk, Some(terrain)).is_some() {
                 return Err(TerrainSourceError::Duplicate(chunk));
             }
         }
@@ -74,9 +76,13 @@ impl TerrainSource for MemoryTerrainSource {
         _: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError> {
         self.chunk_map
-            .get(&chunk)
+            .get_mut(&chunk)
             .ok_or(TerrainSourceError::OutOfBounds)
-            .map(|terrain| terrain.clone()) // expensive but not too important for this
+            .and_then(|terrain| {
+                terrain
+                    .take()
+                    .ok_or_else(|| TerrainSourceError::Duplicate(chunk))
+            })
     }
 }
 

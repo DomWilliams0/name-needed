@@ -1,4 +1,3 @@
-use std::collections::LinkedList;
 use std::time::Duration;
 
 use crossbeam::channel::{unbounded, Receiver, Sender};
@@ -9,10 +8,11 @@ use unit::world::ChunkPosition;
 
 use crate::chunk::ChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::loader::ChunkFinalizer;
+use crate::loader::{ChunkFinalizer, UpdateBatch};
 use crate::{OcclusionChunkUpdate, WorldRef};
+use std::collections::VecDeque;
 
-pub type LoadTerrainResult = Result<(ChunkPosition, ChunkTerrain), TerrainSourceError>;
+pub type LoadTerrainResult = Result<(ChunkPosition, ChunkTerrain, UpdateBatch), TerrainSourceError>;
 
 pub trait WorkerPool {
     fn start_finalizer(
@@ -75,8 +75,9 @@ impl WorkerPool for ThreadedWorkerPool {
                             error!("failed to load requested chunk: {}", e);
                             Err(e)
                         }
-                        Ok((chunk, terrain)) => {
-                            finalizer.finalize((chunk, terrain));
+                        Ok(result) => {
+                            let chunk = result.0;
+                            finalizer.finalize(result);
                             Ok(chunk)
                         }
                     };
@@ -119,7 +120,11 @@ impl WorkerPool for ThreadedWorkerPool {
 #[derive(Default)]
 pub struct BlockingWorkerPool {
     finalizer_magic: Option<(Receiver<LoadTerrainResult>, ChunkFinalizer)>,
-    done_queue: LinkedList<Result<ChunkPosition, TerrainSourceError>>,
+
+    task_queue: VecDeque<(
+        Box<dyn FnOnce() -> LoadTerrainResult>,
+        Sender<LoadTerrainResult>,
+    )>,
 }
 
 impl WorkerPool for BlockingWorkerPool {
@@ -134,16 +139,11 @@ impl WorkerPool for BlockingWorkerPool {
 
     fn block_on_next_finalize(
         &mut self,
-        _timeout: Duration,
+        _: Duration,
     ) -> Option<Result<ChunkPosition, TerrainSourceError>> {
-        self.done_queue.pop_back()
-    }
+        // time to actually do the work
+        let (task, done_channel) = self.task_queue.pop_front()?;
 
-    fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
-        &mut self,
-        task: T,
-        done_channel: Sender<LoadTerrainResult>,
-    ) {
         let (finalize_rx, finalizer) = self.finalizer_magic.as_mut().unwrap(); // set in start_finalizer
 
         // load chunk right here right now
@@ -163,14 +163,25 @@ impl WorkerPool for BlockingWorkerPool {
                 error!("failed to load chunk: {}", e);
                 Err(e)
             }
-            Ok((chunk, terrain)) => {
+            Ok(result) => {
+                let chunk = result.0;
+
                 // finalize on "finalizer thread"
-                finalizer.finalize((chunk, terrain));
+                finalizer.finalize(result);
                 Ok(chunk)
             }
         };
 
         // send back to "main thread"
-        self.done_queue.push_front(result);
+        Some(result)
+    }
+
+    fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
+        &mut self,
+        task: T,
+        done_channel: Sender<LoadTerrainResult>,
+    ) {
+        // naaah, do the work later when we're asked for it
+        self.task_queue.push_back((Box::new(task), done_channel));
     }
 }

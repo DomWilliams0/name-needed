@@ -3,30 +3,52 @@ use color::ColorRgb;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::{BlockOcclusion, Opacity};
 use common::derive_more::Display;
+use common::Proportion;
 pub use enum_iterator::IntoEnumIterator;
 use unit::world::GlobalSliceIndex;
 
 /// A single block in a chunk
-#[derive(Debug, Default, Copy, Clone)]
+// TODO store sparse block data in the slab instead of inline in the block
+#[derive(Debug, Copy, Clone)]
 pub struct Block {
     block_type: BlockType,
+
+    /// How damaged the block is
+    durability: Proportion<BlockDurability>,
+
+    /// Navigability
     area: SlabAreaIndex,
+    /// Lighting
     occlusion: BlockOcclusion,
 }
 
+pub type BlockDurability = u8;
+
+/// The type of a block
+#[derive(Debug, Copy, Clone, Eq, PartialEq, IntoEnumIterator, Display)]
+pub enum BlockType {
+    Air,
+    Dirt,
+    Grass,
+    #[display(fmt = "Light grass")]
+    LightGrass,
+    Stone,
+}
+
 impl Block {
-    /// Called by BlockBuilder
-    fn new(block_type: BlockType) -> Self {
+    fn with_block_type(block_type: BlockType) -> Self {
         Self {
             block_type,
+            durability: block_type.durability(),
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default(),
         }
     }
 
-    pub const fn default_const() -> Self {
+    pub const fn air() -> Self {
         Self {
             block_type: BlockType::Air,
+            durability: Proportion::default_empty(),
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default_const(),
         }
@@ -71,17 +93,16 @@ impl Block {
     pub fn occlusion(&self) -> &BlockOcclusion {
         &self.occlusion
     }
+
+    pub(crate) fn durability_mut(&mut self) -> &mut Proportion<BlockDurability> {
+        &mut self.durability
+    }
 }
 
-/// The type of a block
-#[derive(Debug, Copy, Clone, Eq, PartialEq, IntoEnumIterator, Display)]
-pub enum BlockType {
-    Air,
-    Dirt,
-    Grass,
-    #[display(fmt = "Light grass")]
-    LightGrass,
-    Stone,
+impl Default for Block {
+    fn default() -> Self {
+        Self::with_block_type(BlockType::Air)
+    }
 }
 
 impl BlockType {
@@ -102,44 +123,21 @@ impl BlockType {
             Opacity::Solid
         }
     }
-}
 
-impl Default for BlockType {
-    fn default() -> Self {
-        BlockType::Air
+    fn durability(self) -> Proportion<BlockDurability> {
+        let max = match self {
+            BlockType::Air => 0,
+            BlockType::Dirt | BlockType::Grass | BlockType::LightGrass => 40,
+            BlockType::Stone => 90,
+        };
+
+        Proportion::with_value(max, max)
     }
 }
 
-// kinda useless now
-#[derive(Default)]
-pub struct BlockBuilder {
-    block_type: BlockType,
-}
-
-impl BlockBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_type(mut self, block_type: BlockType) -> Self {
-        self.block_type = block_type;
-        self
-    }
-
-    pub fn build(self) -> Block {
-        Block::new(self.block_type)
-    }
-}
-
-impl Into<Block> for BlockBuilder {
-    fn into(self) -> Block {
-        self.build()
-    }
-}
-
-// helpful
+/// Helper
 impl Into<Block> for BlockType {
     fn into(self) -> Block {
-        BlockBuilder::new().with_type(self).build()
+        Block::with_block_type(self)
     }
 }

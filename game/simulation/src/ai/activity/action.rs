@@ -1,3 +1,5 @@
+use unit::world::{WorldPoint, WorldPosition};
+
 use crate::ai::activity::ItemsToPickUp;
 use crate::item::LooseItemReference;
 
@@ -7,9 +9,13 @@ pub enum AiAction {
 
     Wander,
 
+    Goto(WorldPoint),
+
     GoPickUp(ItemsToPickUp),
 
     UseHeldItem(LooseItemReference),
+
+    GoBreakBlock(WorldPosition),
 }
 
 impl Default for AiAction {

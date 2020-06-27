@@ -9,6 +9,7 @@ use crate::chunk::slice::Slice;
 use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
+use crate::neighbour::SlabNeighbours;
 
 grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
@@ -149,7 +150,7 @@ impl<'a> AreaDiscovery<'a> {
             count += 1;
 
             // add horizontal neighbours
-            for n in Neighbours::new(current) {
+            for n in SlabNeighbours::new(current) {
                 let cost = EdgeCost::Walk;
                 let src = Some((current, cost));
                 self.queue.push((n, src));
@@ -167,7 +168,7 @@ impl<'a> AreaDiscovery<'a> {
                     let [x, y, z] = current;
                     let above = [x, y, z + 1];
 
-                    for n in Neighbours::new(above) {
+                    for n in SlabNeighbours::new(above) {
                         self.queue.push((n, Some((current, EdgeCost::JumpUp))));
                     }
                 }
@@ -267,59 +268,5 @@ impl<'a> AreaDiscovery<'a> {
         for i in self.grid.indices() {
             *grid[i].area_mut() = self.grid[i].area;
         }
-    }
-}
-
-struct Neighbours {
-    block: CoordType,
-    idx: usize,
-}
-
-impl Neighbours {
-    const HORIZONTAL_OFFSETS: [(i32, i32); 4] = [(-1, 0), (0, -1), (0, 1), (1, 0)];
-
-    fn new(block: CoordType) -> Self {
-        Self { block, idx: 0 }
-    }
-}
-
-impl Iterator for Neighbours {
-    type Item = CoordType;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let [x, y, z] = self.block;
-
-        for (i, &(dx, dy)) in Self::HORIZONTAL_OFFSETS.iter().enumerate().skip(self.idx) {
-            self.idx = i + 1;
-
-            let n = {
-                let (nx, ny) = (x + dx, y + dy);
-
-                if nx < 0 || nx >= CHUNK_SIZE.as_i32() {
-                    continue;
-                }
-
-                if ny < 0 || ny >= CHUNK_SIZE.as_i32() {
-                    continue;
-                }
-
-                [nx, ny, z]
-            };
-
-            return Some(n);
-        }
-
-        None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::navigation::discovery::Neighbours;
-
-    #[test]
-    fn neighbours() {
-        let n = Neighbours::new([2, 2, 2]);
-        assert_eq!(n.count(), 4);
     }
 }

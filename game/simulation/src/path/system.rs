@@ -3,8 +3,8 @@ use std::mem::MaybeUninit;
 
 use common::*;
 use unit::world::{GlobalSliceIndex, WorldPoint};
-use world::NavigationError;
 use world::{InnerWorldRef, WorldPath};
+use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
 use crate::path::follow::PathFollowing;
@@ -18,7 +18,7 @@ use crate::{TransformComponent, WorldRef};
 pub struct FollowPathComponent {
     path: Option<PathFollowing>,
     /// If set, will be popped in next tick and `path` updated
-    new_target: Option<WorldPoint>,
+    new_target: Option<(WorldPoint, SearchGoal)>,
     follow_speed: NormalizedFloat,
     prev_z: Option<GlobalSliceIndex>,
 }
@@ -30,25 +30,35 @@ pub struct WanderComponent;
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
 
+/// Event component to indicate arrival at the given target position
+/// TODO should be an enum and represent interruption too, i.e. path was invalidated
+#[derive(Component, Default)]
+#[storage(HashMapStorage)]
+pub struct ArrivedAtTargetEventComponent(pub WorldPoint);
+
 impl<'a> System<'a> for PathSteeringSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, WorldRef>,
+        Read<'a, LazyUpdate>,
         WriteStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
         WriteStorage<'a, SteeringComponent>,
     );
 
-    fn run(&mut self, (entities, world, mut transform, mut path, mut steer): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, world, lazy_update, mut transform, mut path, mut steer): Self::SystemData,
+    ) {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
         {
             // new path request
-            if let Some(target) = path.new_target.take() {
+            if let Some((target, goal)) = path.new_target.take() {
                 // skip path finding if destination is the same
                 if Some(target) != path.path.as_ref().map(|path| path.target()) {
                     let world = (*world).borrow();
-                    let new_path = match path_find(&world, transform.position, target) {
+                    let new_path = match path_find(&world, transform.position, target, goal) {
                         Err(e) => {
                             warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error
                             continue;
@@ -56,8 +66,13 @@ impl<'a> System<'a> for PathSteeringSystem {
                         Ok(path) => path,
                     };
 
-                    debug!("{:?}: following new path to {:?}", e, transform.position);
-                    path.path.replace(PathFollowing::new(new_path, target));
+                    let new_following = PathFollowing::new(new_path, target, goal);
+                    debug!(
+                        "{:?}: following new path to {:?}",
+                        e,
+                        new_following.target()
+                    );
+                    path.path.replace(new_following);
                 }
             }
 
@@ -76,7 +91,16 @@ impl<'a> System<'a> for PathSteeringSystem {
                 // move onto next waypoint
                 match following.next_waypoint() {
                     None => {
-                        trace!("{:?}: path finished", e);
+                        trace!(
+                            "{:?}: path finished, arrived at {}",
+                            e,
+                            path.target().unwrap(),
+                        );
+
+                        // indicate arrival to other systems
+                        lazy_update
+                            .insert(e, ArrivedAtTargetEventComponent(path.target().unwrap()));
+
                         path.path = None;
                     }
                     Some((next_block, _cost)) => {
@@ -113,7 +137,7 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                 // manually here rather than setting path.new_target and maybe waiting a few ticks
                 path_follow.path = world.choose_random_walkable_block(10).and_then(|target| {
                     let target = target.centred();
-                    match path_find(&world, transform.position, target) {
+                    match path_find(&world, transform.position, target, SearchGoal::Arrive) {
                         Err(NavigationError::SourceNotWalkable(_)) => {
                             warn!("{:?}: stuck in a non walkable position", e);
                             None
@@ -128,7 +152,7 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                         }
                         Ok(path) => {
                             debug!("{:?} new wander path to {:?}", e, path.target());
-                            Some(PathFollowing::new(path, target))
+                            Some(PathFollowing::new(path, target, SearchGoal::Arrive))
                         }
                     }
                 });
@@ -144,13 +168,14 @@ fn path_find(
     world: &InnerWorldRef,
     src: WorldPoint,
     tgt: WorldPoint,
+    goal: SearchGoal,
 ) -> Result<WorldPath, NavigationError> {
     // try floor'd pos first, then ceil'd if it fails
     let srcs = src.floor_then_ceil();
 
     let mut last_err = MaybeUninit::uninit();
     let mut results = srcs
-        .map(|src| world.find_path(src, tgt.floor()))
+        .map(|src| world.find_path_with_goal(src, tgt.floor(), goal))
         .skip_while(|res| {
             if let Err(e) = res {
                 last_err = MaybeUninit::new(e.clone());
@@ -179,8 +204,8 @@ impl Default for FollowPathComponent {
 }
 
 impl FollowPathComponent {
-    pub fn new_path(&mut self, target: WorldPoint, speed: NormalizedFloat) {
-        if let Some(old) = self.new_target.replace(target) {
+    pub fn new_path(&mut self, target: WorldPoint, goal: SearchGoal, speed: NormalizedFloat) {
+        if let Some((old, _)) = self.new_target.replace((target, goal)) {
             warn!("follow path target was overwritten before it could be used (prev: {:?}, overwritten with: {:?})", old, target);
         }
 

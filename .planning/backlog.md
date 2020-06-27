@@ -13,6 +13,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * path optimisation (line of sight)
 * wandering should choose a close location instead of random in the world
 * path invalidation on world change
+* walk speed enum scale (wander, dawdle, walk, sprint, etc)
+* bug: area path finding seems to needlessly poke into other areas
 
 ## UI
 * graph for fps/tps history
@@ -23,8 +25,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* depth selection
 
 ## Entity control
-* select entity and walk to block
-* order something to be picked up/carried, a suitable entity will choose to do it
+* society-level job list, populated by player actions
+	* select block(s) to destroy
+	* pick up/haul an item
+
 
 ## World generation
 * biomes
@@ -35,6 +39,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 
 ## Voxel world mechanics
 * fluid blocks
+	* infinite sources/flows at the world edges
 * modification
 	* entities digging/building
 	* block damage e.g. from explosion
@@ -54,15 +59,20 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * slice-aware chunk mesh caching
 * influence map for density, sound
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
-* slab-level terrain updates instead of chunk-level
+* mesh generation on worker thread
+* replace all hashmaps with faster non crypto hashes
+* terrain finalizer should not propogate to neighbours if single block changes arent on boundary
+* unchecked_unwrap
 
 ### Memory usage
 * CoW terrain slabs
-* store sparse block metadata in the chunk/slab instead of in each block
+* store sparse block metadata in the containing slab instead of in each block
 
 ## Crate release
 * voxel world
+* world update batcher
 * iaus ai
+* config with watcher
 
 ## Rendering
 * textures/sprites/animations
@@ -78,6 +88,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * track down unwraps/expects and replace with results
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * on panic in any thread, process should exit with backtrace
+* define rates, scales, units etc in unit crate e.g. metabolism, durabilities
 
 ## Entity diversity
 * animal species
@@ -98,3 +109,4 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * wellbeing of individual parts affects stats
 * gradual healing and tending
 * track injury causes e.g. arrow in leg, fired by X at time Y with weapon Z
+* blood flow that can be blocked off

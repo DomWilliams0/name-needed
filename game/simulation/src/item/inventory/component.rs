@@ -1,13 +1,14 @@
-use smallvec::SmallVec;
+use std::error::Error;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
+use common::SmallVec;
 
 use crate::ecs::*;
 use crate::item::inventory::Contents;
 use crate::item::{
     ContentsGetError, ContentsPutError, ItemFilter, ItemSlot, MountedInventoryIndex, SlotIndex,
 };
-use smallvec::alloc::fmt::Formatter;
-use std::error::Error;
-use std::fmt::Display;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SlotReference {

@@ -1,12 +1,13 @@
 //! Navigation inside an area
 
 use petgraph::graphmap::DiGraphMap;
+use petgraph::prelude::EdgeRef;
 
 use unit::world::{BlockPosition, SlabIndex, SlabPosition};
 
 use crate::navigation::astar::astar;
 use crate::navigation::path::{BlockPath, BlockPathNode};
-use crate::navigation::EdgeCost;
+use crate::navigation::{EdgeCost, SearchGoal};
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
 
@@ -64,17 +65,34 @@ impl BlockGraph {
         &self,
         from: F,
         to: T,
+        goal: SearchGoal,
     ) -> Result<BlockPath, BlockPathError> {
         let from = from.into();
         let to = to.into();
 
+        // same source and dest is a success, if not a pointless one
+        if from == to {
+            common::warn!("pointless block path to same block {:?}", from);
+            return Ok(BlockPath {
+                path: vec![],
+                target: to,
+            });
+        }
+
         let src = BlockNavNode(from);
         let dst = BlockNavNode(to);
+
+        let is_goal: Box<dyn FnMut(BlockNavNode) -> bool> = match goal {
+            SearchGoal::Arrive => Box::new(|n| n == dst),
+            SearchGoal::Adjacent => {
+                Box::new(|n: BlockNavNode| self.graph.edges(n).any(|e| e.target() == dst))
+            }
+        };
 
         let path = astar(
             &self.graph,
             src,
-            |n| n == dst,
+            is_goal,
             |(_, _, e)| e.0.weight(),
             |n| {
                 // manhattan distance
@@ -93,6 +111,10 @@ impl BlockGraph {
         // TODO reuse vec allocation
         let mut out_path = Vec::with_capacity(path.len());
 
+        let target = path
+            .last()
+            .map(|(_, (_, target))| target.0)
+            .expect("path expected to be non-zero length");
         for (_, (from, to)) in path {
             let edge = self.graph.edge_weight(from, to).unwrap();
             out_path.push(BlockPathNode {
@@ -101,7 +123,10 @@ impl BlockGraph {
             });
         }
 
-        Ok(BlockPath(out_path))
+        Ok(BlockPath {
+            path: out_path,
+            target,
+        })
     }
 }
 
@@ -110,7 +135,7 @@ mod tests {
     use unit::world::ChunkPosition;
 
     use crate::block::BlockType;
-    use crate::navigation::{BlockPathNode, WorldArea};
+    use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
     use crate::world::helpers::world_from_chunks;
     use crate::{ChunkBuilder, EdgeCost};
 
@@ -126,7 +151,7 @@ mod tests {
         let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
 
         let path = graph
-            .find_block_path((3, 5, 2), (6, 5, 4))
+            .find_block_path((3, 5, 2), (6, 5, 4), SearchGoal::Arrive)
             .expect("path should succeed");
         let expected = vec![
             BlockPathNode {
@@ -144,11 +169,11 @@ mod tests {
             // goal omitted
         ];
 
-        assert_eq!(path.0, expected);
+        assert_eq!(path.path, expected);
 
         // in reverse
         let path = graph
-            .find_block_path((6, 5, 4), (3, 5, 2))
+            .find_block_path((6, 5, 4), (3, 5, 2), SearchGoal::Arrive)
             .expect("reverse path should succeed");
 
         let expected = vec![
@@ -167,6 +192,6 @@ mod tests {
             // goal omitted
         ];
 
-        assert_eq!(path.0, expected);
+        assert_eq!(path.path, expected);
     }
 }

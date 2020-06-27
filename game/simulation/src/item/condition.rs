@@ -1,6 +1,7 @@
-use common::{NormalizedFloat, Proportion};
-use smallvec::alloc::fmt::Formatter;
 use std::fmt::Display;
+use std::fmt::Formatter;
+
+use common::{NormalizedFloat, Proportion};
 
 type Durability = u16;
 

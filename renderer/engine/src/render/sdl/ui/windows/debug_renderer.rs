@@ -1,7 +1,9 @@
+use imgui::{im_str, CollapsingHeader, ImStr, TreeNode};
+
+use simulation::input::InputCommand;
+
 use crate::render::sdl::ui::windows::UiBundle;
 use crate::ui_str;
-use imgui::{im_str, CollapsingHeader, ImStr, TreeNode};
-use simulation::input::InputCommand;
 
 pub struct DebugWindow;
 
@@ -17,7 +19,7 @@ impl UiBundle<'_> {
 
 impl DebugWindow {
     pub fn render(&mut self, bundle: &mut UiBundle) {
-        TreeNode::new(im_str!("Debug renderers"))
+        TreeNode::new(im_str!("Debug"))
             .frame_padding(true)
             .build(bundle.ui, || {
                 let view_range = bundle.blackboard.world_view.expect("blackboard world view range not populated");

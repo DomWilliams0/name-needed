@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
@@ -11,25 +12,25 @@ use unit::world::{
     SliceBlock, SLAB_SIZE,
 };
 
-use crate::block::{Block, BlockType};
+use crate::block::{Block, BlockDurability, BlockType};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::Slab;
+use crate::chunk::slab_pointer::{DeepClone, SlabPointer};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut};
+use crate::loader::ChunkRequest;
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
-use crate::occlusion::{BlockOcclusion, NeighbourOffset, NeighbourOpacity};
+use crate::neighbour::NeighbourOffset;
+use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
 use crate::{EdgeCost, SliceRange};
 
-pub(crate) type SlabPointer = Box<Slab>;
-
-// TODO expensive to clone, use Cow if actually necessary
-/// Terrain only
+/// Terrain only. Cloning is cheap SlabPointer/Arc copies, unless `deep_clone` is used
 #[derive(Clone)]
 pub struct RawChunkTerrain {
     slabs: DoubleSidedVec<SlabPointer>,
 }
 
-#[cfg_attr(test, derive(Clone))]
+// #[cfg_attr(test, derive(Clone))]
 pub struct ChunkTerrain {
     raw_terrain: RawChunkTerrain,
     areas: HashMap<WorldArea, BlockGraph>,
@@ -48,13 +49,34 @@ pub trait BaseTerrain {
             .map(|ptr| ptr.slice(chunk_slice_idx.to_local()))
     }
 
+    fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice {
+        // TODO actually add get_{mut_}unchecked to slabs for performance
+        self.slice(index).unwrap()
+    }
+
+    /// Calls `SlabPointer::expect_mut`, panics if not the exclusive reference
     fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain_mut()
             .slabs
             .get_mut(slab_idx)
-            .map(|ptr| ptr.slice_mut(chunk_slice_idx.to_local()))
+            .map(|ptr| ptr.expect_mut().slice_mut(chunk_slice_idx.to_local()))
+    }
+
+    /// Calls `SlabPointer::cow_clone`, triggering a slab copy if necessary
+    fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
+        let chunk_slice_idx = index.into();
+        let slab_idx = chunk_slice_idx.slab_index();
+        self.raw_terrain_mut()
+            .slabs
+            .get_mut(slab_idx)
+            .map(|ptr| ptr.cow_clone().slice_mut(chunk_slice_idx.to_local()))
+    }
+
+    /// Will clone CoW slab if necessary
+    fn slice_mut_unchecked_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> SliceMut {
+        self.slice_mut_with_cow(index).unwrap()
     }
 
     fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Option<Block> {
@@ -133,6 +155,11 @@ pub enum SlabCreationPolicy {
     CreateAll,
 }
 
+pub enum BlockDamageResult {
+    Broken,
+    Unbroken,
+}
+
 impl RawChunkTerrain {
     fn slabs_from_top(&self) -> impl Iterator<Item = &Slab> {
         self.slabs.iter_decreasing().map(|ptr| ptr.deref())
@@ -142,20 +169,6 @@ impl RawChunkTerrain {
         self.slabs.iter_increasing().map(|ptr| ptr.deref())
     }
 
-    pub(crate) fn slabs_from_bottom_mut(&mut self) -> impl Iterator<Item = (SlabIndex, &mut Slab)> {
-        self.slabs
-            .iter_mut_increasing()
-            .map(|ptr| ptr.deref_mut())
-            .map(|slab| (slab.index(), slab))
-    }
-
-    pub(crate) fn slabs_from_top_mut(&mut self) -> impl Iterator<Item = (SlabIndex, &mut Slab)> {
-        self.slabs
-            .iter_mut_decreasing()
-            .map(|ptr| ptr.deref_mut())
-            .map(|slab| (slab.index(), slab))
-    }
-
     fn add_slab(&mut self, slab: SlabPointer) {
         let idx = slab.index();
         self.slabs.add(slab, idx);
@@ -163,6 +176,16 @@ impl RawChunkTerrain {
 
     pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab> {
         self.slabs.get(index).map(|s| s.deref())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn slab_ptr(&self, index: SlabIndex) -> Option<&SlabPointer> {
+        self.slabs.get(index)
+    }
+
+    /// Cow-copies the slab if not already the exclusive holder
+    pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab> {
+        self.slabs.get_mut(index).map(|s| s.cow_clone())
     }
 
     /// Creates slabs up to and including target
@@ -254,6 +277,26 @@ impl RawChunkTerrain {
         let mut slice = self.slice_mut(pos.z()).unwrap();
         let block = &mut slice[pos];
         f(block);
+    }
+
+    pub fn apply_block_damage(
+        &mut self,
+        pos: BlockPosition,
+        damage: BlockDurability,
+    ) -> Option<BlockDamageResult> {
+        if let Some(mut slice) = self.slice_mut(pos.z()) {
+            let block = &mut slice[pos];
+            let durability = block.durability_mut();
+            *durability -= damage;
+
+            Some(if durability.proportion() < EPSILON {
+                BlockDamageResult::Broken
+            } else {
+                BlockDamageResult::Unbroken
+            })
+        } else {
+            None
+        }
     }
 
     /// offset: self->other
@@ -506,7 +549,7 @@ impl RawChunkTerrain {
     }
 
     unsafe fn slab_with_lifetime_mut<'s>(&'_ mut self, idx: SlabIndex) -> Option<&'s mut Slab> {
-        let slab = self.slabs.get_mut(idx).map(|s| s.deref_mut());
+        let slab = self.slabs.get_mut(idx).map(|s| s.expect_mut());
         std::mem::transmute(slab)
     }
 
@@ -534,13 +577,66 @@ impl RawChunkTerrain {
         }
     }
 
+    pub(crate) fn is_slab_exclusive(&self, slab: SlabIndex) -> bool {
+        self.slabs
+            .get(slab)
+            .map(|s| s.is_exclusive())
+            .unwrap_or(false)
+    }
+
+    pub fn deep_clone(&self) -> Self {
+        Self {
+            slabs: self.slabs.deep_clone(),
+        }
+    }
+
+    pub fn apply_occlusion_updates(
+        &mut self,
+        updates: &[(BlockPosition, NeighbourOpacity)],
+    ) -> usize {
+        updates
+            .iter()
+            .map(|&(block_pos, new_opacities)| {
+                let raw_terrain = self.raw_terrain_mut();
+
+                // obtain immutable slice for checking, to avoid unnecessary CoW slab copying
+                let slice = raw_terrain.slice_unchecked(block_pos.z());
+
+                if *slice[block_pos].occlusion() != new_opacities {
+                    // opacities have changed, promote slice to mutable, possibly triggering a slab copy
+                    let block_mut =
+                        &mut raw_terrain.slice_mut_unchecked_with_cow(block_pos.z())[block_pos];
+
+                    // for trace logging only
+                    let _old_occlusion = *block_mut.occlusion();
+
+                    block_mut
+                        .occlusion_mut()
+                        .update_from_neighbour_opacities(new_opacities);
+
+                    trace!(
+                        "new AO for block {:?}: old {:?} | new {:?} | updated {:?}",
+                        block_pos,
+                        _old_occlusion,
+                        new_opacities,
+                        block_mut.occlusion()
+                    );
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum()
+    }
+
     // TODO set_block trait to reuse in ChunkBuilder (#46)
 }
 
 mod pair_walking {
     //! Helpers for cross_chunk_pairs_*
-    use super::*;
     use unit::world::SlabIndex;
+
+    use super::*;
 
     #[derive(Copy, Clone)]
     pub enum WhichChunk {
@@ -720,33 +816,53 @@ impl Default for RawChunkTerrain {
 }
 
 impl ChunkTerrain {
-    pub fn from_raw_terrain(mut raw_terrain: RawChunkTerrain, chunk_pos: ChunkPosition) -> Self {
-        // ensure there's an empty slab at the top of each chunk, for simplified nav detection
-        // TODO cow for empty slab
-        raw_terrain
-            .slabs
-            .add_to_top(|i| SlabPointer::new(Slab::empty(i)));
-
+    pub fn from_raw_terrain(
+        raw_terrain: RawChunkTerrain,
+        chunk_pos: ChunkPosition,
+        request: ChunkRequest,
+    ) -> Self {
         let mut terrain = Self {
             raw_terrain,
             areas: HashMap::with_capacity(32),
         };
 
-        terrain.discover_areas(chunk_pos);
-        terrain.init_occlusion();
+        if request.is_new() {
+            // ensure there's an empty slab at the top of each chunk, for simplified nav detection
+            // TODO shared cow instance for empty slab
+
+            terrain
+                .raw_terrain
+                .slabs
+                .add_to_top(|i| SlabPointer::new(Slab::empty(i)));
+        }
+
+        terrain.discover_areas(chunk_pos, request);
+        terrain.init_occlusion(request);
 
         terrain
     }
 
-    fn discover_areas(&mut self, chunk_pos: ChunkPosition) {
+    pub fn from_new_raw_terrain(raw_terrain: RawChunkTerrain, chunk_pos: ChunkPosition) -> Self {
+        Self::from_raw_terrain(raw_terrain, chunk_pos, ChunkRequest::New)
+    }
+
+    fn discover_areas(&mut self, chunk_pos: ChunkPosition, request: ChunkRequest) {
         debug!("discovering areas for chunk {:?}", chunk_pos);
 
         // TODO reuse a buffer for each slab
 
         // per slab
         for idx in self.raw_terrain.slabs.indices_increasing() {
+            let idx = SlabIndex(idx);
+
+            if !request.is_new() && !self.raw_terrain.is_slab_exclusive(idx) {
+                // skip
+                debug!("skipping area discovery on untouched slab {:?}", idx);
+                continue;
+            }
+
             let (slab, slice_below, slice_above) =
-                self.raw_terrain.slab_with_surrounding_slices(idx.into());
+                self.raw_terrain.slab_with_surrounding_slices(idx);
             let slab = slab.unwrap();
 
             // collect slab into local grid
@@ -754,7 +870,7 @@ impl ChunkTerrain {
 
             // flood fill and assign areas
             let area_count = discovery.flood_fill_areas();
-            debug!("chunk {:?} slab {}: {} areas", chunk_pos, idx, area_count);
+            debug!("chunk {:?} slab {:?}: {} areas", chunk_pos, idx, area_count);
 
             // collect areas and graphs
             self.areas.extend(
@@ -779,8 +895,8 @@ impl ChunkTerrain {
         self.areas.get(&area)
     }
 
-    fn init_occlusion(&mut self) {
-        self.ascending_slice_pairs_foreach(|mut slice_this, slice_next| {
+    fn init_occlusion(&mut self, request: ChunkRequest) {
+        self.ascending_slice_pairs_foreach(request, |mut slice_this, slice_next| {
             for (i, b) in slice_this
                 .iter_mut()
                 .enumerate()
@@ -808,7 +924,11 @@ impl ChunkTerrain {
     // (slab0 slice0 mut, slab0 slice1 immut), (slab0 slice1 mut, slab0 slice2 immut) ...
     // ... (slab0 sliceN mut, slab1 slice0), (slab1 slice0 mut, slab1 slice1) ...
     // ... (slabN sliceN-1 mut, slabN sliceN)
-    pub fn ascending_slice_pairs_foreach<F: FnMut(SliceMut, Slice)>(&mut self, mut f: F) {
+    pub(crate) fn ascending_slice_pairs_foreach<F: FnMut(SliceMut, Slice)>(
+        &mut self,
+        request: ChunkRequest,
+        mut f: F,
+    ) {
         // need to include a null slab at the end so the last slab is iterated too
         let indices = self
             .raw_terrain
@@ -822,6 +942,16 @@ impl ChunkTerrain {
             let this_slab_idx = this_slab_idx.unwrap(); // first slab is always Some
 
             let this_slab = self.raw_terrain.slabs.get_mut(this_slab_idx).unwrap();
+
+            if !request.is_new() && !this_slab.is_exclusive() {
+                trace!(
+                    "ascending_slice_pairs: skipping non exclusive slab {}",
+                    this_slab_idx
+                );
+                continue;
+            }
+
+            let this_slab = this_slab.expect_mut();
 
             // exhaust this slab first
             for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
@@ -900,13 +1030,14 @@ mod tests {
 
     use crate::block::BlockType;
     use crate::chunk::slab::Slab;
-    use crate::chunk::terrain::{BaseTerrain, ChunkTerrain, SlabPointer};
+    use crate::chunk::slab_pointer::SlabPointer;
+    use crate::chunk::terrain::{BaseTerrain, ChunkTerrain};
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
-    use crate::World;
+    use crate::world::helpers::world_from_chunks;
+    use crate::{World, WorldRef};
 
     use super::*;
-    use crate::world::helpers::world_from_chunks;
 
     #[test]
     fn empty() {
@@ -1032,7 +1163,7 @@ mod tests {
         terrain.set_block((5, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
 
         // 1 area still
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
         assert_eq!(terrain.areas.len(), 1);
 
         // too big jump out of reach is still unreachable
@@ -1041,7 +1172,7 @@ mod tests {
         terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
         terrain.set_block((4, 2, 7), BlockType::Stone, SlabCreationPolicy::CreateAll);
 
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
         assert_eq!(terrain.areas.len(), 2);
 
         // if above is blocked, can't jump
@@ -1051,7 +1182,7 @@ mod tests {
         terrain.set_block((2, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll); // blocks jump!
 
         // so 2 areas expected
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
         assert_eq!(terrain.areas.len(), 2);
     }
 
@@ -1068,7 +1199,7 @@ mod tests {
             .unwrap()
             .fill(BlockType::Stone);
 
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
         // TODO 1 area at z=0
         assert_eq!(terrain.areas.len(), 1);
@@ -1139,7 +1270,7 @@ mod tests {
             .set_block((3, 2, 4), BlockType::Stone)
             .into_inner();
 
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
         assert_eq!(terrain.areas.len(), 2); // 2 disconnected areas
     }
 
@@ -1155,7 +1286,7 @@ mod tests {
             .set_block((2, 2, 52), BlockType::Grass)
             .into_inner();
 
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
         let graph = terrain
             .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
@@ -1236,24 +1367,44 @@ mod tests {
         assert!(terrain.set_block((2, 2, 2), BlockType::Dirt, SlabCreationPolicy::CreateAll));
         assert!(terrain.set_block((2, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll));
         assert!(terrain.set_block((2, 3, 3), BlockType::Dirt, SlabCreationPolicy::CreateAll));
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
-        let occlusion = *terrain.get_block((2, 2, 2)).unwrap().occlusion();
-        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(2), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(3), VertexOcclusion::NotAtAll);
+        let (occlusion, _) = terrain
+            .get_block((2, 2, 2))
+            .unwrap()
+            .occlusion()
+            .resolve_vertices();
+
+        assert_eq!(
+            occlusion,
+            [
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::NotAtAll
+            ]
+        );
 
         // occlusion will be populated if block directly above it is air
         let mut terrain: RawChunkTerrain = terrain.into();
         assert!(terrain.set_block((2, 2, 3), BlockType::Air, SlabCreationPolicy::CreateAll));
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
-        let occlusion = *terrain.get_block((2, 2, 2)).unwrap().occlusion();
-        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(2), VertexOcclusion::Mildly);
-        assert_matches!(occlusion.corner(3), VertexOcclusion::Mildly);
+        let (occlusion, _) = terrain
+            .get_block((2, 2, 2))
+            .unwrap()
+            .occlusion()
+            .resolve_vertices();
+
+        assert_eq!(
+            occlusion,
+            [
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::Mildly,
+                VertexOcclusion::Mildly
+            ]
+        );
     }
 
     #[test]
@@ -1270,16 +1421,23 @@ mod tests {
             SlabCreationPolicy::CreateAll,
         )); // next slab up
 
-        let terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
-        let occlusion = *terrain
+        let (occlusion, _) = terrain
             .get_block((2, 2, SLAB_SIZE.as_i32() - 1))
             .unwrap()
-            .occlusion();
-        assert_matches!(occlusion.corner(0), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(1), VertexOcclusion::NotAtAll);
-        assert_matches!(occlusion.corner(2), VertexOcclusion::Mildly);
-        assert_matches!(occlusion.corner(3), VertexOcclusion::Mildly);
+            .occlusion()
+            .resolve_vertices();
+
+        assert_eq!(
+            occlusion,
+            [
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::Mildly,
+                VertexOcclusion::Mildly
+            ]
+        );
     }
 
     fn occlusion(
@@ -1289,14 +1447,8 @@ mod tests {
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
         let block = chunk.get_block(block).unwrap();
-        let occlusion = block.occlusion();
-
-        [
-            occlusion.corner(0),
-            occlusion.corner(1),
-            occlusion.corner(2),
-            occlusion.corner(3),
-        ]
+        let (occlusion, _) = block.occlusion().resolve_vertices();
+        occlusion
     }
 
     #[test]
@@ -1329,7 +1481,7 @@ mod tests {
         assert_matches!(
             occlusion(&world, ChunkPosition(0, 0), (0, 0, 0)),
             [
-                VertexOcclusion::Mostly,
+                VertexOcclusion::Full,
                 VertexOcclusion::Mildly,
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly
@@ -1344,7 +1496,7 @@ mod tests {
             .is_test(true)
             .try_init();
 
-        fn mk_chunks(block_off: bool) -> World {
+        fn mk_chunks(block_off: bool) -> WorldRef {
             let a = ChunkBuilder::new()
                 .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), BlockType::Grass)
                 .build((-1, 0));
@@ -1361,10 +1513,11 @@ mod tests {
                 .set_block((0, 0, 0), blockage)
                 .build((0, 0));
 
-            world_from_chunks(vec![a, b]).into_inner()
+            world_from_chunks(vec![a, b])
         }
 
-        let world = mk_chunks(false);
+        let world_ref = mk_chunks(false);
+        let world = world_ref.borrow();
 
         // 0, 0, -1 occluded by (-1, 0, 0) in other chunk and (1, 0, 0) in other slab
         assert!(world.block((0, 0, -1)).unwrap().opacity().solid());
@@ -1381,7 +1534,8 @@ mod tests {
         );
 
         // ... but when (0,0,0) is solid, (0,0,-1) is hidden so it shouldnt be updated
-        let world = mk_chunks(true);
+        let world_ref = mk_chunks(true);
+        let world = world_ref.borrow();
 
         assert!(world.block((0, 0, 0)).unwrap().opacity().solid());
         assert_matches!(
@@ -1470,13 +1624,13 @@ mod tests {
         let mut count = 0;
         let mut expected = PATTERN.iter().cycle().copied().peekable();
 
-        let mut terrain = ChunkTerrain::from_raw_terrain(terrain, (0, 0).into());
+        let mut terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
         assert_eq!(terrain.raw_terrain().slab_count(), 3 + 1); // 3 + 1 empty at the top
 
         const EXPECTED_COUNT: i32 = (SLAB_SIZE.as_i32() * 4) - 1;
         const PATTERN_SLICE_LIMIT: i32 = (SLAB_SIZE.as_i32() * 3) - 1;
 
-        terrain.ascending_slice_pairs_foreach(|a, b| {
+        terrain.ascending_slice_pairs_foreach(ChunkRequest::New, |a, b| {
             count += 1;
 
             let expected_next = if count > PATTERN_SLICE_LIMIT {
@@ -1497,5 +1651,19 @@ mod tests {
         });
 
         assert_eq!(count, EXPECTED_COUNT);
+    }
+
+    #[test]
+    fn cloned_slab_cow_is_updated() {
+        let mut terrain = RawChunkTerrain::default();
+        let old = terrain.slabs.get(0).unwrap().clone(); // reference to force a cow clone
+
+        let slab = terrain.slab_mut(SlabIndex(0)).unwrap();
+        slab.set_block_type((0, 0, 0).into(), BlockType::Stone);
+
+        // old reference is "dangling", pointing to old
+        let immut = terrain.slab(SlabIndex(0)).unwrap();
+        assert_eq!(old.slice(0)[(0, 0)].block_type(), BlockType::Air);
+        assert_eq!(immut.slice(0)[(0, 0)].block_type(), BlockType::Stone);
     }
 }

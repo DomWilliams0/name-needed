@@ -38,6 +38,13 @@ where
     }
 }
 
+impl Proportion<u8> {
+    /// 0/0
+    pub const fn default_empty() -> Self {
+        Self { value: 0, max: 0 }
+    }
+}
+
 impl<T: Saturating + Copy> SubAssign<T> for Proportion<T> {
     fn sub_assign(&mut self, rhs: T) {
         self.value = self.value.saturating_sub(rhs);

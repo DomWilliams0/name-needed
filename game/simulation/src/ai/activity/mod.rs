@@ -1,12 +1,15 @@
-use ai::AiBox;
-pub use misc::NopActivity;
 use std::fmt::Display;
+
+pub use action::AiAction;
+use ai::AiBox;
+pub(crate) use items::ItemsToPickUp;
+pub use misc::NopActivity;
 
 use crate::ai::activity::items::{GoPickUpItemActivity, UseHeldItemActivity};
 use crate::ai::activity::movement::WanderActivity;
+use crate::ai::activity::world::BreakBlockActivity;
 use crate::ecs::{ComponentWorld, Entity};
 use crate::queued_update::QueuedUpdates;
-pub use action::AiAction;
 
 #[derive(Copy, Clone)]
 pub enum ActivityResult {
@@ -37,7 +40,7 @@ pub trait Activity<W: ComponentWorld>: Display {
     fn exertion(&self) -> f32;
 }
 
-impl<W: ComponentWorld> From<AiAction> for AiBox<dyn Activity<W>> {
+impl<W: ComponentWorld + 'static> From<AiAction> for AiBox<dyn Activity<W>> {
     fn from(a: AiAction) -> Self {
         macro_rules! activity {
             ($act:expr) => {
@@ -51,6 +54,8 @@ impl<W: ComponentWorld> From<AiAction> for AiBox<dyn Activity<W>> {
                 activity!(GoPickUpItemActivity::new(items))
             }
             AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::new(item)),
+            AiAction::Goto(target) => activity!(movement::goto::<W>(target)),
+            AiAction::GoBreakBlock(block) => activity!(BreakBlockActivity::new(block)),
         }
     }
 }
@@ -59,5 +64,4 @@ mod action;
 mod items;
 mod misc;
 mod movement;
-
-pub(crate) use items::ItemsToPickUp;
+mod world;

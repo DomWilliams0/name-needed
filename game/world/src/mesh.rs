@@ -4,7 +4,7 @@ use common::*;
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::Chunk;
-use crate::occlusion::BlockOcclusion;
+use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::BaseTerrain;
 use std::fmt::Debug;
@@ -105,9 +105,10 @@ fn make_corners_with_ao<V: BaseVertex>(
     let (bx, by) = block_centre(block_pos);
 
     let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
+    let (ao_corners, ao_flip) = occlusion.resolve_vertices();
 
     for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
-        let ao_lightness = f32::from(occlusion.corner(i));
+        let ao_lightness = f32::from(ao_corners[i]);
 
         let color = color * ao_lightness;
         block_corners[i] = MaybeUninit::new(V::new(
@@ -121,7 +122,7 @@ fn make_corners_with_ao<V: BaseVertex>(
     }
 
     // flip quad if necessary for AO
-    if occlusion.should_flip() {
+    if let OcclusionFlip::Flip = ao_flip {
         // TODO also rotate texture
 
         let last = block_corners[3];

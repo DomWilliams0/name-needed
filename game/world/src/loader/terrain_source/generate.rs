@@ -10,10 +10,11 @@ use unit::world::ChunkPosition;
 pub struct GeneratedTerrainSource {
     bounds: (ChunkPosition, ChunkPosition),
     seed: u64,
+    height_scale: f64,
 }
 
 impl GeneratedTerrainSource {
-    pub fn new(seed: Option<u64>, radius: u32) -> Result<Self, &'static str> {
+    pub fn new(seed: Option<u64>, radius: u32, height_scale: f64) -> Result<Self, &'static str> {
         if radius < 1 {
             return Err("radius should be >0");
         }
@@ -34,7 +35,11 @@ impl GeneratedTerrainSource {
             ChunkPosition(radius, radius),
         );
 
-        Ok(Self { seed, bounds })
+        Ok(Self {
+            seed,
+            bounds,
+            height_scale,
+        })
     }
 }
 
@@ -55,7 +60,7 @@ impl TerrainSource for GeneratedTerrainSource {
         chunk: ChunkPosition,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
         let seed = self.seed;
-        let height_scale = config::get().world.generation_height_scale;
+        let height_scale = self.height_scale;
         Box::new(move || {
             let chunk = chunk.into();
             let terrain_desc = procgen::generate_chunk(chunk, CHUNK_SIZE.as_usize(), seed, 30.0);

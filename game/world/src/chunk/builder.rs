@@ -4,13 +4,14 @@ use std::mem::MaybeUninit;
 
 use nd_iter::iter_3d;
 
+use common::warn;
 use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
 use crate::block::Block;
+use crate::chunk::slab_pointer::DeepClone;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
 use crate::chunk::BaseTerrain;
-use common::warn;
 
 pub struct ChunkBuilder {
     terrain: RawChunkTerrain,
@@ -150,11 +151,21 @@ impl Into<(ChunkPosition, RawChunkTerrain)> for ChunkDescriptor {
     }
 }
 
+impl DeepClone for ChunkDescriptor {
+    fn deep_clone(&self) -> Self {
+        Self {
+            chunk_pos: self.chunk_pos,
+            terrain: self.terrain.deep_clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use unit::world::GlobalSliceIndex;
+
     use crate::block::BlockType;
     use crate::chunk::{BaseTerrain, ChunkBuilder};
-    use unit::world::GlobalSliceIndex;
 
     #[test]
     fn fill_slice() {

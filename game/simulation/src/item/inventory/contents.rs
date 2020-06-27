@@ -1,7 +1,6 @@
 use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::hint::unreachable_unchecked;
-
-use smallvec::alloc::fmt::Formatter;
 
 use crate::ecs::{ComponentWorld, EcsWorld, Entity};
 use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable, SlotIndex};

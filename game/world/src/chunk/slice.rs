@@ -6,7 +6,7 @@ use unit::world::{BlockCoord, SliceBlock};
 use crate::block::{Block, BlockType};
 
 const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
-    [Block::default_const(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
+    [Block::air(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
 
 #[derive(Clone)]
 pub struct Slice<'a> {
@@ -139,7 +139,8 @@ impl<I: Into<SliceBlock>> Index<I> for SliceMut<'_> {
     type Output = Block;
 
     fn index(&self, index: I) -> &Self::Output {
-        &self.slice[flatten_coords(index.into())]
+        let i = flatten_coords(index.into());
+        &self.slice[i]
     }
 }
 

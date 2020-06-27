@@ -1,4 +1,4 @@
-# TODOs (146)
+# TODOs (156)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (3)
@@ -20,9 +20,16 @@
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
    * `// TODO failure/interrupt reason`
- * [game/simulation/src/ai/activity/movement.rs](game/simulation/src/ai/activity/movement.rs) (2)
+ * [game/simulation/src/ai/activity/movement.rs](game/simulation/src/ai/activity/movement.rs) (3)
+   * `// TODO exertion depends on speed`
    * `// TODO wander *activity* exertion should be 0, but added to the exertion of walking at X speed`
    * `// TODO remove WANDER_SPEED constant when this is done`
+ * [game/simulation/src/ai/activity/world.rs](game/simulation/src/ai/activity/world.rs) (5)
+   * `// TODO get block type we're about to break, and equip the best tool for it`
+   * `// TODO get current held tool to determine how fast the block can be broken`
+   * `// TODO breaking blocks with your hand hurts!`
+   * `// TODO define proper scale/enum/consts for block and tool durability`
+   * `// TODO exertion depends on the tool and block`
  * [game/simulation/src/ai/dse/items.rs](game/simulation/src/ai/dse/items.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
@@ -81,7 +88,8 @@
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (3)
+   * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
    * `warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error`
    * `// FIXME GROSS HACK`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
@@ -90,8 +98,7 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
-   * `#[allow(dead_code)] // TODO will be used when world can be modified`
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO return Result instead of panic!, even though this only happens during game init`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
@@ -102,6 +109,8 @@
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (2)
    * `// TODO struclog event`
    * `// TODO populate danger interests from world/other entity collisions`
+ * [game/world/src/block.rs](game/world/src/block.rs) (1)
+   * `// TODO store sparse block data in the slab instead of inline in the block`
  * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
    * `// TODO still does a lot of unnecessary initialization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
@@ -111,10 +120,10 @@
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
    * `// TODO make not pub`
  * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (8)
-   * `// TODO expensive to clone, use Cow if actually necessary`
+   * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
-   * `// TODO cow for empty slab`
+   * `// TODO shared cow instance for empty slab`
    * `// TODO reuse a buffer for each slab`
    * `// TODO discover internal area links`
    * `// TODO transmute lifetimes instead`
@@ -122,17 +131,18 @@
  * [game/world/src/grid.rs](game/world/src/grid.rs) (2)
    * `// TODO pub hardcoded :(`
    * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
    * `// TODO cache full finalized chunks`
-   * `// TODO reuse/pool bufs`
+   * `// TODO sort out the lifetimes instead of cheating and using transmute`
+   * `// TODO reuse/pool bufs, and initialize with proper expected size`
+   * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
  * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
    * `fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross`
- * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (2)
+ * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
-   * `// TODO SlabTerrainUpdate instead of chunk level`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
    * `// TODO if this thread panics, propagate to main game thread`
    * `// TODO detect this err condition?`
@@ -160,20 +170,22 @@
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (2)
    * `// TODO smallvecs`
-   * `// TODO derive(Error)`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (6)
+   * `// TODO derive(Error) for NavigationError`
+ * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (2)
+   * `/// TODO bitset of Opacitys will be much smaller, 2 bits each`
+   * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (7)
    * `assert!(size > 0); // TODO Result`
    * `// TODO return Result from from_world`
    * `// TODO intelligently choose an initial view range`
+   * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (6)
+ * [game/world/src/world.rs](game/world/src/world.rs) (4)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO reuse hashset allocation`
-   * `// TODO only invalidate lighting`
-   * `// TODO only update modified slabs, not the full chunk`
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
@@ -207,5 +219,6 @@
    * `// TODO helper for this-1`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
- * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)
+ * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (2)
+   * `// TODO assert fields are not NaN in points`
    * `// TODO floor_then_ceil is terribly inefficient, try without the lazy eval`

@@ -11,6 +11,7 @@ pub struct DummyRenderer;
 pub struct DummyBackendPersistent;
 pub struct DummyBackendInit {
     end_time: Instant,
+    world_viewer: WorldViewer,
 }
 
 impl Renderer for DummyRenderer {
@@ -55,6 +56,10 @@ impl InitializedSimulationBackend for DummyBackendInit {
     ) {
     }
 
+    fn world_viewer(&mut self) -> &mut WorldViewer {
+        &mut self.world_viewer
+    }
+
     fn end(self) -> Self::Persistent {
         DummyBackendPersistent
     }
@@ -68,9 +73,10 @@ impl PersistentSimulationBackend for DummyBackendPersistent {
         Ok(Self)
     }
 
-    fn start(self, _: WorldViewer) -> Self::Initialized {
+    fn start(self, world_viewer: WorldViewer) -> Self::Initialized {
         DummyBackendInit {
-            end_time: Instant::now() + Duration::from_secs(10),
+            end_time: Instant::now() + Duration::from_secs(30),
+            world_viewer,
         }
     }
 }

@@ -38,7 +38,7 @@ impl SlabPosition {
     pub const fn y(self) -> BlockCoord {
         self.1
     }
-    pub const fn slice(self) -> LocalSliceIndex {
+    pub const fn z(self) -> LocalSliceIndex {
         self.2
     }
 }
@@ -66,6 +66,13 @@ impl From<SlabPosition> for [i32; 3] {
 
 impl From<BlockPosition> for SlabPosition {
     fn from(p: BlockPosition) -> Self {
+        Self::new(p.x(), p.y(), p.z().to_local())
+    }
+}
+
+impl From<WorldPosition> for SlabPosition {
+    fn from(p: WorldPosition) -> Self {
+        let p = BlockPosition::from(p);
         Self::new(p.x(), p.y(), p.z().to_local())
     }
 }

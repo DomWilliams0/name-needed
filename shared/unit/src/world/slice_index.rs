@@ -1,9 +1,10 @@
-use std::ops::{Add, AddAssign, Sub, SubAssign};
-
-use crate::world::{SlabIndex, SLAB_SIZE};
-use common::derive_more::*;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
+
+use common::derive_more::*;
+
+use crate::world::{SlabIndex, SLAB_SIZE};
 
 /// A slice in the world
 pub type GlobalSliceIndex = SliceIndex<Chunk>;
@@ -134,6 +135,12 @@ impl<S: SliceIndexScale> Sub<Self> for SliceIndex<S> {
 }
 
 impl From<i32> for GlobalSliceIndex {
+    fn from(slice: i32) -> Self {
+        Self::new(slice)
+    }
+}
+
+impl From<i32> for LocalSliceIndex {
     fn from(slice: i32) -> Self {
         Self::new(slice)
     }

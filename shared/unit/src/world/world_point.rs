@@ -11,6 +11,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::{once, once_with};
 
 /// A point anywhere in the world
+// TODO assert fields are not NaN in points
 #[derive(Debug, Copy, Clone, PartialEq, Default, Into, From, PartialOrd)]
 pub struct WorldPoint(pub f32, pub f32, pub f32);
 
@@ -49,6 +50,12 @@ impl WorldPoint {
             self.1.round() as i32,
             SliceIndex::new(self.2.round() as i32),
         )
+    }
+
+    pub fn is_almost(self, other: Self, horizontal_distance: f32) -> bool {
+        (self.2 - other.2).abs() <= 1.0
+            && ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2))
+                <= horizontal_distance.powi(2)
     }
 }
 
@@ -156,3 +163,6 @@ impl Display for WorldPoint {
         write!(f, "({:.2}, {:.2}, {:.2})", self.0, self.1, self.2)
     }
 }
+
+/// No NaNs allowed (sorry grandma)
+impl Eq for WorldPoint {}

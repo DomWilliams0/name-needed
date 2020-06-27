@@ -1,19 +1,18 @@
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+
 use specs::prelude::*;
 use specs::storage::InsertResult;
 pub use specs::{
-    world::EntitiesRes, Component, DenseVecStorage, Entity, HashMapStorage, Join, NullStorage,
-    Read, ReadExpect, ReadStorage, System, SystemData, VecStorage, WorldExt, Write, WriteExpect,
-    WriteStorage,
+    world::EntitiesRes, Component, DenseVecStorage, Entity, HashMapStorage, Join, LazyUpdate,
+    NullStorage, Read, ReadExpect, ReadStorage, System, SystemData, VecStorage, WorldExt, Write,
+    WriteExpect, WriteStorage,
 };
 pub use specs_derive::Component;
 
 use common::*;
 #[cfg(test)]
 pub use dummy::DummyComponentReceptacle;
-use smallvec::alloc::fmt::Formatter;
-use std::error::Error;
-use std::fmt::{Debug, Display};
-use std::ops::Deref;
 use world::WorldRef;
 
 pub type EcsWorld = World;
@@ -32,16 +31,22 @@ macro_rules! entity_pretty {
     };
 }
 
-#[derive(Debug)]
-pub struct NoSuchComponent(Entity, &'static str);
+#[derive(Debug, Error)]
+pub enum ComponentGetError {
+    #[error("The entity {:?} doesn't exist", .0)]
+    NoSuchEntity(Entity),
+    #[error("The entity {:?} doesn't have the given component '{}'", .0, .1)]
+    NoSuchComponent(Entity, &'static str),
+}
 
 pub trait ComponentWorld {
     type Builder: ComponentBuilder;
-    fn component<T: Component>(&self, entity: Entity) -> Result<&T, NoSuchComponent>;
-    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, NoSuchComponent>;
+    fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError>;
+    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError>;
 
     fn resource<T: Resource>(&self) -> &T;
-    fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, f: F) -> R;
+    #[allow(clippy::mut_from_ref)]
+    fn resource_mut<T: Resource>(&self) -> &mut T;
 
     fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T>;
     fn remove_now<T: Component>(&mut self, entity: Entity) -> Option<T>;
@@ -53,6 +58,16 @@ pub trait ComponentWorld {
     fn voxel_world(&self) -> WorldRef;
     fn create_entity(&mut self) -> Self::Builder;
     fn kill_entity(&self, entity: Entity);
+    fn is_entity_alive(&self, entity: Entity) -> bool;
+
+    // ---
+    fn mk_component_error<T: Component>(&self, entity: Entity) -> ComponentGetError {
+        if self.is_entity_alive(entity) {
+            ComponentGetError::NoSuchComponent(entity, std::any::type_name::<T>())
+        } else {
+            ComponentGetError::NoSuchEntity(entity)
+        }
+    }
 }
 
 pub trait ComponentBuilder {
@@ -63,20 +78,20 @@ pub trait ComponentBuilder {
 impl ComponentWorld for EcsWorld {
     type Builder = EntityBuilder<'static>; // not really static OwO sorry
 
-    fn component<T: Component>(&self, entity: Entity) -> Result<&T, NoSuchComponent> {
+    fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError> {
         let storage = self.read_storage::<T>();
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self
         let result: Option<&T> = unsafe { std::mem::transmute(storage.get(entity)) };
-        result.ok_or_else(|| NoSuchComponent::new::<T>(entity))
+        result.ok_or_else(|| self.mk_component_error::<T>(entity))
     }
 
-    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, NoSuchComponent> {
+    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError> {
         let mut storage = self.write_storage::<T>();
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self
         let result: Option<&mut T> = unsafe { std::mem::transmute(storage.get_mut(entity)) };
-        result.ok_or_else(|| NoSuchComponent::new::<T>(entity))
+        result.ok_or_else(|| self.mk_component_error::<T>(entity))
     }
 
     fn resource<T: Resource>(&self) -> &T {
@@ -86,10 +101,13 @@ impl ComponentWorld for EcsWorld {
         unsafe { std::mem::transmute(res.deref()) }
     }
 
-    fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, f: F) -> R {
+    fn resource_mut<T: Resource>(&self) -> &mut T {
         // TODO transmute magic to remove closure
         let mut res = self.write_resource::<T>();
-        f(&mut *res)
+        // safety: storage has the same lifetime as self, so its ok to "upcast" the components
+        // lifetime from that of the storage to that of self
+        let res: &mut T = unsafe { std::mem::transmute(res.deref_mut()) };
+        res
     }
 
     fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T> {
@@ -128,6 +146,11 @@ impl ComponentWorld for EcsWorld {
             warn!("failed to delete entity {:?}: {}", entity, e);
         }
     }
+
+    fn is_entity_alive(&self, entity: Entity) -> bool {
+        // must check if generation is alive first to avoid panic
+        entity.gen().is_alive() && self.is_alive(entity)
+    }
 }
 
 impl<'a> ComponentBuilder for EntityBuilder<'a> {
@@ -146,15 +169,15 @@ mod dummy {
     use std::collections::HashMap;
 
     use polymap::TypeMap;
+    use specs::prelude::Resource;
     use specs::storage::InsertResult;
     use specs::Builder;
 
     use world::WorldRef;
 
     use crate::ecs::{
-        Component, ComponentBuilder, ComponentWorld, EcsWorld, Entity, NoSuchComponent, WorldExt,
+        Component, ComponentBuilder, ComponentGetError, ComponentWorld, EcsWorld, Entity, WorldExt,
     };
-    use specs::prelude::Resource;
 
     pub struct DummyComponentReceptacle {
         world: WorldRef,
@@ -175,19 +198,22 @@ mod dummy {
     impl ComponentWorld for DummyComponentReceptacle {
         type Builder = DummyEntityBuilder<'static>;
 
-        fn component<T: Component>(&self, entity: Entity) -> Result<&T, NoSuchComponent> {
+        fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError> {
             let comps = self.components.borrow();
             let comp: &T = comps
                 .get(&entity)
                 .and_then(|comps| comps.get::<T>())
-                .ok_or_else(|| NoSuchComponent::new::<T>(entity))?;
+                .ok_or_else(|| self.mk_component_error::<T>(entity))?;
 
-            let ok = Result::<&T, NoSuchComponent>::Ok(comp);
+            let ok = Result::<&T, ComponentGetError>::Ok(comp);
             // safety: transmute lifetime to outlive the `comps` borrow
             unsafe { std::mem::transmute(ok) }
         }
 
-        fn component_mut<T: Component>(&self, _entity: Entity) -> Result<&mut T, NoSuchComponent> {
+        fn component_mut<T: Component>(
+            &self,
+            _entity: Entity,
+        ) -> Result<&mut T, ComponentGetError> {
             unimplemented!()
         }
 
@@ -195,7 +221,7 @@ mod dummy {
             unimplemented!()
         }
 
-        fn resource_mut<T: Resource, F: FnOnce(&mut T) -> R, R>(&self, _f: F) -> R {
+        fn resource_mut<T: Resource>(&self) -> &mut T {
             unimplemented!()
         }
 
@@ -234,6 +260,10 @@ mod dummy {
         fn kill_entity(&self, _entity: Entity) {
             unimplemented!()
         }
+
+        fn is_entity_alive(&self, _entity: Entity) -> bool {
+            unimplemented!()
+        }
     }
 
     pub struct DummyEntityBuilder<'a> {
@@ -252,23 +282,6 @@ mod dummy {
         fn build_(self) -> Entity {
             self.entity
         }
-    }
-}
-impl Display for NoSuchComponent {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Either entity {:?} is dead or has no such component {}",
-            self.0, self.1
-        )
-    }
-}
-
-impl Error for NoSuchComponent {}
-
-impl NoSuchComponent {
-    fn new<T>(entity: Entity) -> Self {
-        Self(entity, std::any::type_name::<T>())
     }
 }
 

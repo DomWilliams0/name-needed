@@ -1,8 +1,11 @@
-use std::cell::Cell;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Shl};
 
 use common::*;
+use unit::dim::CHUNK_SIZE;
+use unit::world::{
+    BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
+};
 
 use crate::block::BlockType;
 use crate::chunk::slice::Slice;
@@ -10,41 +13,29 @@ use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
 use crate::chunk::BaseTerrain;
 use crate::navigation::WorldArea;
 use crate::SliceRange;
-use unit::dim::CHUNK_SIZE;
-use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
-};
 
 pub type ChunkId = u64;
 
 pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
-#[cfg_attr(test, derive(Clone))]
 pub struct Chunk {
-    /// unique for each chunk
+    /// Unique for each chunk
     pos: ChunkPosition,
 
     terrain: ChunkTerrain,
-
-    dirty: Cell<bool>,
-    // nav: Navigation,
 }
 
 impl Chunk {
     pub fn empty<P: Into<ChunkPosition>>(pos: P) -> Self {
         let pos = pos.into();
         // TODO still does a lot of unnecessary initialization
-        let terrain = ChunkTerrain::from_raw_terrain(RawChunkTerrain::default(), pos);
+        let terrain = ChunkTerrain::from_new_raw_terrain(RawChunkTerrain::default(), pos);
         Self::with_completed_terrain(pos, terrain)
     }
 
     /// Called by ChunkBuilder when terrain has been finalized
     pub(crate) fn with_completed_terrain(pos: ChunkPosition, terrain: ChunkTerrain) -> Self {
-        Self {
-            pos,
-            terrain,
-            dirty: Cell::new(true),
-        }
+        Self { pos, terrain }
     }
 
     pub const fn pos(&self) -> ChunkPosition {
@@ -60,16 +51,6 @@ impl Chunk {
     pub fn id(&self) -> ChunkId {
         let ChunkPosition(x, y) = self.pos;
         (u64::try_from(x).unwrap()).shl(32) | u64::try_from(y).unwrap()
-    }
-
-    /// Clears dirty bit before returning it
-    pub fn dirty(&self) -> bool {
-        self.dirty.replace(false)
-    }
-
-    /// Sets dirty bit
-    pub fn invalidate(&self) {
-        self.dirty.set(true)
     }
 
     pub fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> Option<BlockType> {
@@ -131,10 +112,11 @@ impl BaseTerrain for Chunk {
 
 #[cfg(test)]
 mod tests {
+    use unit::world::GlobalSliceIndex;
+
     use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder, BLOCK_COUNT_SLICE};
-    use unit::world::GlobalSliceIndex;
 
     #[test]
     fn chunk_ops() {

@@ -1,12 +1,10 @@
-use std::fmt::{Display, Error, Formatter};
-
 use unit::world::{BlockPosition, WorldPosition};
 
 use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, WorldArea};
 
 // TODO smallvecs
 
-// TODO derive(Error)
+// TODO derive(Error) for NavigationError
 #[derive(Debug, Clone)]
 pub enum NavigationError {
     SourceNotWalkable(WorldPosition),
@@ -30,14 +28,13 @@ pub struct BlockPathNode {
     pub exit_cost: EdgeCost,
 }
 
-/// Doesnt include goal node
 #[derive(Debug)]
-pub struct BlockPath(pub Vec<BlockPathNode>);
+pub struct BlockPath {
+    /// Doesnt include target node
+    pub path: Vec<BlockPathNode>,
 
-impl Display for BlockPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "BlockPath({:?})", self.0)
-    }
+    /// The actual target, might be different from the requested because of `SearchGoal`
+    pub target: BlockPosition,
 }
 
 #[derive(Debug)]
@@ -48,16 +45,13 @@ pub(crate) struct AreaPathNode {
     pub entry: Option<AreaNavEdge>,
 }
 
-impl AreaPathNode {
-    pub fn new_start(area: WorldArea) -> Self {
-        Self { area, entry: None }
-    }
-    pub fn new(area: WorldArea, entry: AreaNavEdge) -> Self {
-        Self {
-            area,
-            entry: Some(entry),
-        }
-    }
+#[derive(Copy, Clone)]
+pub enum SearchGoal {
+    /// Arrive exactly at the target
+    Arrive,
+
+    /// Arrive within 1 block of the target
+    Adjacent,
 }
 
 #[derive(Debug)]
@@ -74,6 +68,18 @@ pub struct WorldPathNode {
 pub struct WorldPath {
     path: Vec<WorldPathNode>,
     target: WorldPosition,
+}
+
+impl AreaPathNode {
+    pub fn new_start(area: WorldArea) -> Self {
+        Self { area, entry: None }
+    }
+    pub fn new(area: WorldArea, entry: AreaNavEdge) -> Self {
+        Self {
+            area,
+            entry: Some(entry),
+        }
+    }
 }
 
 impl WorldPath {

@@ -1,191 +1,23 @@
 use std::fmt::{Debug, Formatter};
-use std::hint::unreachable_unchecked;
 use std::ops::Add;
 
-use num_enum::TryFromPrimitive;
-
 use common::derive_more::{Deref, DerefMut};
-use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition};
 
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
-#[repr(u8)]
-pub enum NeighbourOffset {
-    South,
-    SouthEast,
-    East,
-    NorthEast,
-    North,
-    NorthWest,
-    West,
-    SouthWest,
-}
+use crate::neighbour::NeighbourOffset;
 
-const OFFSETS: [(NeighbourOffset, (i16, i16)); 8] = [
-    (NeighbourOffset::South, (0, -1)),
-    (NeighbourOffset::SouthEast, (1, -1)),
-    (NeighbourOffset::East, (1, 0)),
-    (NeighbourOffset::NorthEast, (1, 1)),
-    (NeighbourOffset::North, (0, 1)),
-    (NeighbourOffset::NorthWest, (-1, 1)),
-    (NeighbourOffset::West, (-1, 0)),
-    (NeighbourOffset::SouthWest, (-1, -1)),
-];
-
-impl NeighbourOffset {
-    pub const COUNT: usize = 8;
-
-    pub fn offsets() -> impl Iterator<Item = (NeighbourOffset, (i16, i16))> {
-        OFFSETS.iter().copied()
-    }
-
-    /// SENW
-    pub fn aligned() -> impl Iterator<Item = (NeighbourOffset, (i16, i16))> {
-        OFFSETS.iter().step_by(2).copied()
-    }
-
-    /// SE NE NW SW
-    pub fn corners() -> impl Iterator<Item = (NeighbourOffset, (i16, i16))> {
-        OFFSETS.iter().skip(1).step_by(2).copied()
-    }
-
-    //noinspection DuplicatedCode
-    /// Clockwise
-    pub(crate) fn next(self) -> Self {
-        match self {
-            NeighbourOffset::North => NeighbourOffset::NorthEast,
-            NeighbourOffset::NorthEast => NeighbourOffset::East,
-            NeighbourOffset::East => NeighbourOffset::SouthEast,
-            NeighbourOffset::SouthEast => NeighbourOffset::South,
-            NeighbourOffset::South => NeighbourOffset::SouthWest,
-            NeighbourOffset::SouthWest => NeighbourOffset::West,
-            NeighbourOffset::West => NeighbourOffset::NorthWest,
-            NeighbourOffset::NorthWest => NeighbourOffset::North,
-        }
-    }
-
-    //noinspection DuplicatedCode
-    /// Anti-clockwise
-    pub(crate) fn prev(self) -> Self {
-        match self {
-            NeighbourOffset::North => NeighbourOffset::NorthWest,
-            NeighbourOffset::NorthEast => NeighbourOffset::North,
-            NeighbourOffset::East => NeighbourOffset::NorthEast,
-            NeighbourOffset::SouthEast => NeighbourOffset::East,
-            NeighbourOffset::South => NeighbourOffset::SouthEast,
-            NeighbourOffset::SouthWest => NeighbourOffset::South,
-            NeighbourOffset::West => NeighbourOffset::SouthWest,
-            NeighbourOffset::NorthWest => NeighbourOffset::West,
-        }
-    }
-
-    //noinspection DuplicatedCode
-    pub(crate) fn opposite(self) -> Self {
-        match self {
-            NeighbourOffset::North => NeighbourOffset::South,
-            NeighbourOffset::NorthEast => NeighbourOffset::SouthWest,
-            NeighbourOffset::East => NeighbourOffset::West,
-            NeighbourOffset::SouthEast => NeighbourOffset::NorthWest,
-            NeighbourOffset::South => NeighbourOffset::North,
-            NeighbourOffset::SouthWest => NeighbourOffset::NorthEast,
-            NeighbourOffset::West => NeighbourOffset::East,
-            NeighbourOffset::NorthWest => NeighbourOffset::SouthEast,
-        }
-    }
-
-    pub(crate) fn offset(self) -> (i16, i16) {
-        OFFSETS[self as usize].1
-    }
-
-    pub fn is_aligned(self) -> bool {
-        match self {
-            NeighbourOffset::South
-            | NeighbourOffset::East
-            | NeighbourOffset::North
-            | NeighbourOffset::West => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_vertical(self) -> bool {
-        debug_assert!(self.is_aligned());
-        match self {
-            NeighbourOffset::North | NeighbourOffset::South => true,
-            _ => false,
-        }
-    }
-
-    pub fn between_aligned(from: ChunkPosition, to: ChunkPosition) -> Self {
-        let ChunkPosition(dx, dy) = to - from;
-        let (dx, dy) = (dx.signum(), dy.signum());
-
-        match (dx, dy) {
-            (0, 1) => NeighbourOffset::North,
-            (0, -1) => NeighbourOffset::South,
-            (1, 0) => NeighbourOffset::East,
-            (-1, 0) => NeighbourOffset::West,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn extend_across_boundary(self, pos: BlockPosition) -> BlockPosition {
-        debug_assert!(self.is_aligned());
-
-        let (mut x, mut y, z) = pos.into();
-        match self {
-            NeighbourOffset::South => y = CHUNK_SIZE.as_block_coord() - 1,
-            NeighbourOffset::North => y = 0,
-            NeighbourOffset::East => x = 0,
-            NeighbourOffset::West => x = CHUNK_SIZE.as_block_coord() - 1,
-            _ => {
-                // safety: asserted self is aligned
-                unsafe { unreachable_unchecked() }
-            }
-        };
-
-        BlockPosition::new(x, y, z)
-    }
-
-    pub fn position_on_boundary(self, other_coord: BlockCoord) -> (BlockCoord, BlockCoord) {
-        debug_assert!(self.is_aligned());
-        match self {
-            NeighbourOffset::South => (other_coord, 0),
-            NeighbourOffset::East => (CHUNK_SIZE.as_block_coord() - 1, other_coord),
-            NeighbourOffset::North => (other_coord, CHUNK_SIZE.as_block_coord() - 1),
-            NeighbourOffset::West => (0, other_coord),
-            _ => {
-                // safety: asserted self is aligned
-                unsafe { unreachable_unchecked() }
-            }
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord, TryFromPrimitive)]
-#[repr(u8)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {
     /// Darkest
-    Full = 0,
-    Mostly = 1,
-    Mildly = 2,
+    Full,
+    Mostly,
+    Mildly,
     /// No occlusion
-    NotAtAll = 3,
+    NotAtAll,
 }
 
 impl Default for VertexOcclusion {
     fn default() -> Self {
         VertexOcclusion::NotAtAll
-    }
-}
-
-impl VertexOcclusion {
-    fn combine(self, other: Self) -> Self {
-        if let (VertexOcclusion::Mildly, VertexOcclusion::Mildly) = (self, other) {
-            VertexOcclusion::Mostly
-        } else {
-            self.min(other)
-        }
     }
 }
 
@@ -200,8 +32,35 @@ impl From<VertexOcclusion> for f32 {
     }
 }
 
+/// TODO bitset of Opacitys will be much smaller, 2 bits each
 #[derive(Deref, DerefMut, Default, Copy, Clone)]
-pub struct NeighbourOpacity(pub [Opacity; NeighbourOffset::COUNT]);
+pub struct NeighbourOpacity([Opacity; NeighbourOffset::COUNT]);
+
+impl NeighbourOpacity {
+    pub const fn default_const() -> Self {
+        Self([Opacity::Transparent; NeighbourOffset::COUNT])
+    }
+
+    /// Reduce to `[0 = transparent/unknown, 1 = solid]`
+    fn opacities(&self) -> [u8; NeighbourOffset::COUNT] {
+        // TODO return a transmuted u16 when bitset is used, much cheaper to create and compare
+        [
+            self.0[0].as_u8(),
+            self.0[1].as_u8(),
+            self.0[2].as_u8(),
+            self.0[3].as_u8(),
+            self.0[4].as_u8(),
+            self.0[5].as_u8(),
+            self.0[6].as_u8(),
+            self.0[7].as_u8(),
+        ]
+    }
+
+    #[cfg(test)]
+    pub fn all_solid() -> Self {
+        Self([Opacity::Solid; NeighbourOffset::COUNT])
+    }
+}
 
 impl Debug for NeighbourOpacity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -220,13 +79,15 @@ impl Debug for NeighbourOpacity {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Opacity {
-    Transparent = 0, // false
-    Solid = 1,       // true
+    /// Across a chunk boundary, treated as transparent
+    Unknown,
+    Transparent,
+    Solid,
 }
 
 impl Default for Opacity {
     fn default() -> Self {
-        Opacity::Transparent
+        Opacity::Unknown
     }
 }
 
@@ -241,6 +102,21 @@ impl Opacity {
 
     pub fn transparent(self) -> bool {
         !self.solid()
+    }
+
+    fn as_u8(self) -> u8 {
+        if self.solid() {
+            1
+        } else {
+            0
+        }
+    }
+
+    fn update(self, new: Self) -> Self {
+        match (self, new) {
+            (Opacity::Unknown, known) | (known, Opacity::Unknown) => known,
+            (_, new) => new,
+        }
     }
 }
 
@@ -259,55 +135,67 @@ impl Add<VertexOcclusion> for VertexOcclusion {
     }
 }
 
+/// If a quad should be flipped for nicer AO
+pub(crate) enum OcclusionFlip {
+    Flip,
+    DontFlip,
+}
+
 #[derive(Copy, Clone, Debug)]
-pub struct BlockOcclusion([VertexOcclusion; 4]);
+pub struct BlockOcclusion(NeighbourOpacity);
 
 impl BlockOcclusion {
     pub fn from_neighbour_opacities(neighbours: NeighbourOpacity) -> Self {
+        Self(neighbours)
+    }
+
+    pub(crate) fn resolve_vertices(&self) -> ([VertexOcclusion; 4], OcclusionFlip) {
         let get_vertex = |corner_offset: NeighbourOffset| -> VertexOcclusion {
-            let s1 = neighbours[corner_offset.next() as usize];
-            let s2 = neighbours[corner_offset.prev() as usize];
+            let s1 = self.0[corner_offset.next() as usize];
+            let s2 = self.0[corner_offset.prev() as usize];
 
             let int_value = if s1.into() && s2.into() {
                 0
             } else {
-                let corner = neighbours[corner_offset as usize];
-                3 - (s1 as u8 + s2 as u8 + corner as u8)
+                let corner = self.0[corner_offset as usize];
+                3 - (s1.as_u8() + s2.as_u8() + corner.as_u8())
             };
 
             // Safety: value is 0 - 3
             unsafe { std::mem::transmute(int_value) }
         };
 
-        Self([
+        let vertices = [
             get_vertex(NeighbourOffset::SouthWest), // vertices 0 and 5
             get_vertex(NeighbourOffset::SouthEast), // vertex 1
             get_vertex(NeighbourOffset::NorthEast), // vertices 2 and 3
             get_vertex(NeighbourOffset::NorthWest), // vertex 4
-        ])
+        ];
+
+        let flip = if vertices[0] + vertices[2] < vertices[1] + vertices[3] {
+            OcclusionFlip::Flip
+        } else {
+            OcclusionFlip::DontFlip
+        };
+        (vertices, flip)
     }
 
     pub const fn default_const() -> Self {
-        Self([VertexOcclusion::NotAtAll; 4])
-    }
-
-    pub fn should_flip(self) -> bool {
-        let v = &self.0;
-        v[0] + v[2] < v[1] + v[3]
-    }
-
-    /// Index must be <4. 0 is bottom left corner, goes anti clockwise
-    pub fn corner(self, index: usize) -> VertexOcclusion {
-        debug_assert!(index < 4);
-        self.0[index]
+        Self(NeighbourOpacity::default_const())
     }
 
     pub fn update_from_neighbour_opacities(&mut self, neighbours: NeighbourOpacity) {
-        let new = Self::from_neighbour_opacities(neighbours);
-        self.0
+        (self.0)
+            .0
             .iter_mut()
-            .zip(new.0.iter())
-            .for_each(|(a, b)| *a = (*a).combine(*b));
+            .zip(neighbours.0.iter())
+            .for_each(|(a, b)| *a = (*a).update(*b));
+    }
+
+    #[cfg(test)]
+    pub fn corner(&self, i: usize) -> VertexOcclusion {
+        let (vertices, _) = self.resolve_vertices();
+        vertices[i]
     }
 }
 
@@ -317,9 +205,19 @@ impl Default for BlockOcclusion {
     }
 }
 
+impl PartialEq<NeighbourOpacity> for BlockOcclusion {
+    fn eq(&self, other: &NeighbourOpacity) -> bool {
+        let my_opacities = self.0.opacities();
+        let ur_opacities = other.opacities();
+        my_opacities == ur_opacities
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use matches::assert_matches;
+
+    use unit::world::ChunkPosition;
 
     use super::*;
 
@@ -342,5 +240,25 @@ mod tests {
             NeighbourOffset::between_aligned(ChunkPosition(-2, 5), ChunkPosition(33, 5)),
             NeighbourOffset::East
         );
+    }
+
+    #[test]
+    fn after_block_removed() {
+        let neighbour_occluded = {
+            let mut o = NeighbourOpacity::default();
+            o.0[0] = Opacity::Solid;
+            o
+        };
+        let neighbour_not_occluded = {
+            let mut o = NeighbourOpacity::default();
+            o.0[0] = Opacity::Transparent;
+            o
+        };
+
+        let mut occlusion = BlockOcclusion::from_neighbour_opacities(neighbour_occluded);
+        assert_eq!(occlusion.corner(0), VertexOcclusion::Mildly);
+
+        occlusion.update_from_neighbour_opacities(neighbour_not_occluded);
+        assert_eq!(occlusion.corner(0), VertexOcclusion::NotAtAll);
     }
 }

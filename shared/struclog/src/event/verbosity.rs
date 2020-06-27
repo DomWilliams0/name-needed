@@ -24,6 +24,7 @@ impl Verbosity {
     }
 
     #[inline]
+    #[allow(clippy::absurd_extreme_comparisons)]
     pub const fn should_log_static(self) -> bool {
         const LEVEL: u8 = VERBOSITY as u8;
         (self as u8) <= LEVEL

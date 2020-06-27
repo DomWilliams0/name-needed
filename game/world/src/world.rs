@@ -4,24 +4,25 @@ use std::ops::DerefMut;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock, SliceIndex, WorldPoint,
+    BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SliceBlock, SliceIndex, WorldPoint,
     WorldPosition,
 };
 
-#[cfg(test)]
-use crate::block::Block;
-use crate::chunk::{BaseTerrain, Chunk, RawChunkTerrain, SlabCreationPolicy};
-use crate::loader::ChunkTerrainUpdate;
+use crate::block::{Block, BlockDurability};
+use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, RawChunkTerrain};
+use crate::loader::SlabTerrainUpdate;
 use crate::navigation::{
-    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, WorldArea, WorldPath,
+    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
     WorldPathNode,
 };
+use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
 
-#[cfg_attr(test, derive(Clone))]
+// #[cfg_attr(test, derive(Clone))]
 pub struct World {
     chunks: Vec<Chunk>,
     area_graph: AreaGraph,
+    dirty_chunks: HashSet<ChunkPosition>,
 }
 
 impl Default for World {
@@ -35,6 +36,7 @@ impl World {
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
+            dirty_chunks: HashSet::with_capacity(32),
         }
     }
 
@@ -64,6 +66,10 @@ impl World {
         self.chunks
             .binary_search_by_key(&chunk_pos, |c| c.pos())
             .ok()
+    }
+
+    pub fn has_chunk(&self, chunk_pos: ChunkPosition) -> bool {
+        self.find_chunk_index(chunk_pos).is_some()
     }
 
     pub(crate) fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
@@ -104,6 +110,7 @@ impl World {
         area: WorldArea,
         from: F,
         to: T,
+        target: SearchGoal,
     ) -> Result<BlockPath, NavigationError> {
         let block_graph = self
             .find_chunk_with_pos(area.chunk)
@@ -111,7 +118,7 @@ impl World {
             .ok_or_else(|| NavigationError::NoSuchArea(area))?;
 
         block_graph
-            .find_block_path(from, to)
+            .find_block_path(from, to, target)
             .map_err(|e| NavigationError::BlockError(area, e))
     }
 
@@ -121,15 +128,45 @@ impl World {
         from: F,
         to: T,
     ) -> Result<WorldPath, NavigationError> {
-        let from_pos = from.into();
-        let to_pos = to.into();
+        self.find_path_with_goal(from.into(), to.into(), SearchGoal::Arrive)
+    }
 
+    pub fn find_path_with_goal(
+        &self,
+        from: WorldPosition,
+        to: WorldPosition,
+        goal: SearchGoal,
+    ) -> Result<WorldPath, NavigationError> {
         let from = self
-            .find_accessible_block_in_column_with_range(from_pos, None)
-            .ok_or_else(|| NavigationError::SourceNotWalkable(from_pos))?;
-        let to = self
-            .find_accessible_block_in_column_with_range(to_pos, None)
-            .ok_or_else(|| NavigationError::TargetNotWalkable(to_pos))?;
+            .find_accessible_block_in_column_with_range(from, None)
+            .ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+
+        let to_accessible = self.find_accessible_block_in_column_with_range(to, None);
+        let (to, goal) = match goal {
+            SearchGoal::Arrive => {
+                // target block must be accessible to arrive at
+                to_accessible.map(|pos| (pos, goal))
+            }
+            SearchGoal::Adjacent => {
+                // only need to be adjacent, try neighbours first
+                let mut neighbours = WorldNeighbours::new(to)
+                    .chain(WorldNeighbours::new(to.above()))
+                    .chain(WorldNeighbours::new(to.below()));
+
+                let accessible_neighbour = neighbours.find_map(|pos| {
+                    self.find_accessible_block_in_column_with_range(pos, Some(pos.2 - 1))
+                });
+
+                if let Some(neighbour) = accessible_neighbour {
+                    // arrive at neighbour
+                    Some((neighbour, SearchGoal::Arrive))
+                } else {
+                    // arrive adjacent to target
+                    to_accessible.map(|pos| (pos, SearchGoal::Arrive))
+                }
+            }
+        }
+        .ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
 
         // same blocks
         if from == to {
@@ -147,7 +184,7 @@ impl World {
         let mut start = BlockPosition::from(from);
 
         let convert_block_path = |area: WorldArea, path: BlockPath| {
-            path.0.into_iter().map(move |n| WorldPathNode {
+            path.path.into_iter().map(move |n| WorldPathNode {
                 block: n.block.to_world_position(area.chunk),
                 exit_cost: n.exit_cost,
             })
@@ -159,7 +196,7 @@ impl World {
             let exit = b_entry.exit_middle();
 
             // block path from last point to exiting this area
-            let block_path = self.find_block_path(a.area, start, exit)?;
+            let block_path = self.find_block_path(a.area, start, exit, SearchGoal::Arrive)?;
             full_path.extend(convert_block_path(a.area, block_path));
 
             // add transition edge from exit of this area to entering the next
@@ -177,10 +214,11 @@ impl World {
 
         // final block path from entry of final area to goal
         let final_area = area_path.0.last().unwrap();
-        let block_path = self.find_block_path(final_area.area, start, to)?;
+        let block_path = self.find_block_path(final_area.area, start, to, goal)?;
+        let real_target = block_path.target.to_world_position(final_area.area.chunk);
         full_path.extend(convert_block_path(final_area.area, block_path));
 
-        Ok(WorldPath::new(full_path, to))
+        Ok(WorldPath::new(full_path, real_target))
     }
 
     /// Cheap check if an path exists between the 2 areas
@@ -212,7 +250,8 @@ impl World {
         chunk: Chunk,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
     ) {
-        if let Some(idx) = self.find_chunk_index(chunk.pos()) {
+        let chunk_pos = chunk.pos();
+        if let Some(idx) = self.find_chunk_index(chunk_pos) {
             // chunk already exists
 
             // swap out the chunk inline, no need to push it or resort the vec
@@ -252,92 +291,124 @@ impl World {
         for &(src, dst, edge) in area_nav {
             self.area_graph.add_edge(src, dst, edge);
         }
+
+        // mark chunk as dirty
+        self.dirty_chunks.insert(chunk_pos);
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
         let OcclusionChunkUpdate(chunk_pos, updates) = update;
         if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
-            for (block_pos, opacities) in &updates {
-                chunk
-                    .raw_terrain_mut()
-                    .with_block_mut_unchecked(*block_pos, |b| {
-                        b.occlusion_mut()
-                            .update_from_neighbour_opacities(*opacities);
-                    })
-            }
+            let applied_count = chunk.raw_terrain_mut().apply_occlusion_updates(&updates);
+            if applied_count > 0 {
+                debug!(
+                    "applied {:?}/{:?} queued occlusion updates to chunk {:?}",
+                    applied_count,
+                    updates.len(),
+                    chunk_pos
+                );
 
-            // TODO only invalidate lighting
-            chunk.invalidate();
+                // mark chunk as dirty
+                self.dirty_chunks.insert(chunk_pos);
+            }
         }
     }
 
+    /// Panics if chunk is not found - check it exists with `world.has_chunk` first
     pub fn apply_terrain_updates(
         &self,
-        chunk: ChunkPosition,
-        updates: impl Iterator<Item = ChunkTerrainUpdate>,
-    ) -> Option<RawChunkTerrain> {
-        let chunk = match self.find_chunk_with_pos(chunk) {
-            Some(c) => c,
-            None => {
-                warn!(
-                    "can't apply {} updates to missing chunk {:?}",
-                    updates.count(),
-                    chunk
-                );
-                return None;
-            }
-        };
+        chunk_pos: ChunkPosition,
+        updates: impl Iterator<Item = (SlabIndex, SlabTerrainUpdate)>,
+    ) -> RawChunkTerrain {
+        let chunk = self
+            .find_chunk_with_pos(chunk_pos)
+            .expect("chunk expected to be loaded");
 
-        // TODO only update modified slabs, not the full chunk
+        // shallow clone terrain, no terrain is copied yet
         let mut terrain = chunk.raw_terrain().clone();
 
-        // modify terrain copy
-        for update in updates {
-            match update {
-                ChunkTerrainUpdate::Block(pos, bt) => {
-                    terrain.set_block(pos, bt, SlabCreationPolicy::CreateAll);
-                }
-                ChunkTerrainUpdate::Range((from, to), bt) => {
-                    macro_rules! sorted {
-                        ($a:expr, $b:expr) => {
-                            if $a < $b {
-                                ($a, $b)
-                            } else {
-                                ($b, $a)
-                            };
-                        };
-                    }
-                    let (xa, xb) = sorted!(from.x(), to.x());
-                    let (ya, yb) = sorted!(from.y(), to.y());
-                    let (za, zb) = sorted!(from.z().slice(), to.z().slice());
+        // debug_assert!(
+        //     IsSorted::is_sorted_by_key(&mut updates.clone(), |(slab, _)| *slab),
+        //     "slab updates should be sorted by slab index for maximum efficiency"
+        // );
 
-                    for z in za..=zb {
-                        terrain.slice_mut_with_policy(
-                            z,
-                            SlabCreationPolicy::CreateAll,
-                            |mut slice| {
-                                for x in xa..=xb {
-                                    for y in ya..=yb {
-                                        slice.set_block((x, y), bt);
-                                    }
+        for (slab, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
+            // copy slab for modification
+            let slab = match terrain.slab_mut(slab) {
+                None => {
+                    warn!("ignoring {} slab updates because the slab {:?} in chunk {:?} doesn't exist",
+                          updates.count(), slab, chunk_pos);
+                    continue;
+                }
+                Some(s) => {
+                    debug!(
+                        "apply terrain updates to chunk {:?} slab {:?}",
+                        chunk_pos, slab
+                    );
+                    s
+                }
+            };
+
+            for (_, update) in updates {
+                match update {
+                    SlabTerrainUpdate::Block(pos, bt) => {
+                        slab.set_block_type(pos, bt);
+                    }
+                    SlabTerrainUpdate::Range((from, to), bt) => {
+                        macro_rules! sorted {
+                            ($a:expr, $b:expr) => {
+                                if $a < $b {
+                                    ($a, $b)
+                                } else {
+                                    ($b, $a)
+                                };
+                            };
+                        }
+                        let (xa, xb) = sorted!(from.x(), to.x());
+                        let (ya, yb) = sorted!(from.y(), to.y());
+                        let (za, zb) = sorted!(from.z().slice(), to.z().slice());
+
+                        for z in za..=zb {
+                            let mut slice = slab.slice_mut(z);
+                            for x in xa..=xb {
+                                for y in ya..=yb {
+                                    slice.set_block((x, y), bt);
                                 }
-                            },
-                        );
+                            }
+                        }
                     }
                 }
             }
         }
 
         // to be submitted to world loader
-        Some(terrain)
+        terrain
     }
 
-    #[cfg(test)]
-    pub(crate) fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
+    /// Drains all dirty chunks
+    pub fn dirty_chunks(&mut self) -> impl Iterator<Item = ChunkPosition> + '_ {
+        self.dirty_chunks.drain()
+    }
+
+    pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
         let pos = pos.into();
         self.find_chunk_with_pos(ChunkPosition::from(pos))
             .and_then(|chunk| chunk.get_block(pos))
     }
+
+    pub fn damage_block(
+        &mut self,
+        pos: WorldPosition,
+        damage: BlockDurability,
+    ) -> Option<BlockDamageResult> {
+        self.find_chunk_with_pos_mut(ChunkPosition::from(pos))
+            .and_then(|chunk| {
+                chunk
+                    .raw_terrain_mut()
+                    .apply_block_damage(pos.into(), damage)
+            })
+    }
+
     #[cfg(test)]
     pub(crate) fn area_graph(&self) -> &AreaGraph {
         &self.area_graph
@@ -376,24 +447,20 @@ impl World {
 
 /// Helpers to create a world synchronously for tests and benchmarks
 pub mod helpers {
+    use std::time::Duration;
+
     use crate::loader::{
-        BlockingWorkerPool, ChunkTerrainUpdate, MemoryTerrainSource, TerrainSource, WorldLoader,
-        WorldTerrainUpdate,
+        BlockingWorkerPool, MemoryTerrainSource, TerrainSource, WorldLoader, WorldTerrainUpdate,
     };
     use crate::{ChunkDescriptor, WorldRef};
-    use common::*;
-    use std::time::Duration;
-    use unit::world::ChunkPosition;
 
     pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
         loader_from_chunks(chunks).world()
     }
 
-    pub(crate) fn loader_from_chunks(
-        chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<BlockingWorkerPool> {
+    pub fn loader_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldLoader<BlockingWorkerPool> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world(source)
+        load_world_blocking(source)
     }
 
     pub fn apply_updates(
@@ -402,75 +469,39 @@ pub mod helpers {
     ) -> Result<(), String> {
         let world = loader.world();
 
-        for (chunk, updates) in &updates
-            .iter()
-            .flat_map(|u| u.clone().into_chunk_updates())
-            .sorted_by_key(|(chunk, _)| *chunk)
-            .group_by(|(chunk, _)| *chunk)
-        {
-            let w = world.borrow();
-            let updated = w
-                .apply_terrain_updates(chunk, updates.map(|(_, update)| update))
-                .unwrap_or_else(|| panic!("bad chunk {:?}", chunk));
-            drop(w); // to allow the finalizer to take the write lock without blocking
+        loader.apply_terrain_updates(updates.iter().cloned());
 
-            loader.update_chunk(chunk, updated);
-
-            let result = loader.block_on_next_finalization(Duration::from_secs(20));
-            match result {
-                None => return Err(format!("timed out applying updates to chunk {:?}", chunk)),
-                Some(Err(e)) => {
-                    return Err(format!(
-                        "error applying updates to chunk {:?}: {}",
-                        chunk, e
-                    ))
-                }
-                Some(Ok(_)) => {}
+        // blocking pool doesn't use timeout
+        while let Some(result) = loader.block_on_next_finalization(Duration::default()) {
+            if let Err(e) = result {
+                return Err(format!("error applying updates: {}", e));
             }
+        }
+
+        // apply all occlusion updates
+        let occlusion_updates = loader.chunk_updates_rx_clone().unwrap();
+        let mut w = world.borrow_mut();
+        while let Ok(update) = occlusion_updates.try_recv() {
+            w.apply_occlusion_update(update);
         }
 
         Ok(())
     }
 
-    pub fn world_from_chunks_with_updates(
-        chunks: Vec<ChunkDescriptor>,
-        updates: &[(ChunkPosition, Vec<ChunkTerrainUpdate>)],
-    ) -> WorldRef {
-        let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        let mut loader = load_world(source);
-        let world = loader.world();
-
-        {
-            for (chunk, updates) in updates {
-                let w = world.borrow();
-                let updated = w
-                    .apply_terrain_updates(*chunk, updates.iter().cloned())
-                    .unwrap_or_else(|| panic!("bad chunk {:?}", chunk));
-                drop(w); // to allow the finalizer to take the write lock without blocking
-                loader.update_chunk(*chunk, updated);
-
-                let result = loader.block_on_next_finalization(Duration::from_secs(2));
-                assert!(matches!(result, Some(Ok(_))));
-            }
-        }
-
-        world
-    }
-
-    fn load_world(mut source: MemoryTerrainSource) -> WorldLoader<BlockingWorkerPool> {
+    pub fn load_world_blocking(mut source: MemoryTerrainSource) -> WorldLoader<BlockingWorkerPool> {
         let chunks_pos = source.all_chunks();
 
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
         let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
-        for pos in chunks_pos {
-            loader.request_chunk(pos);
+        loader.request_chunks(chunks_pos.iter().copied());
+        for _ in chunks_pos {
             let _ = loader.block_on_next_finalization(Duration::from_secs(20));
         }
 
         // apply all chunk updates
-        let updates = loader.chunk_updates_rx().unwrap();
+        let updates = loader.chunk_updates_rx_clone().unwrap();
         while let Ok(update) = updates.try_recv() {
             loader.world().borrow_mut().apply_occlusion_update(update);
         }
@@ -482,15 +513,22 @@ pub mod helpers {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use common::Itertools;
+    use common::{seeded_rng, Itertools, LevelFilter, Rng};
+    use unit::dim::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
-    use crate::loader::WorldTerrainUpdate;
+    use crate::loader::{
+        BlockForAllResult, BlockingWorkerPool, GeneratedTerrainSource, WorldLoader,
+        WorldTerrainUpdate,
+    };
     use crate::navigation::EdgeCost;
-    use crate::presets;
+    use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
     use crate::world::helpers::{apply_updates, loader_from_chunks, world_from_chunks};
+    use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
+    use std::ops::Deref;
+    use std::time::Duration;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -580,7 +618,6 @@ mod tests {
 
     #[test]
     fn world_path_cross_areas() {
-        use common::LevelFilter;
         let _ = env_logger::builder()
             .filter_level(LevelFilter::Trace)
             .is_test(true)
@@ -637,7 +674,6 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        use common::LevelFilter;
         let _ = env_logger::builder()
             .filter_level(LevelFilter::Trace)
             .is_test(true)
@@ -648,6 +684,22 @@ mod tests {
         let dst = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
 
         let _ = world.find_path(src, dst).expect("path should succeed");
+    }
+
+    #[test]
+    fn world_path_adjacent_goal() {
+        let world = world_from_chunks(vec![ChunkBuilder::new()
+            .fill_range((2, 2, 2), (6, 2, 2), |_| BlockType::Stone)
+            .build((0, 0))])
+        .into_inner();
+
+        let path = world
+            .find_path_with_goal((2, 2, 3).into(), (6, 2, 3).into(), SearchGoal::Adjacent)
+            .expect("path should succeed");
+
+        // target should be the adjacent block, not the given target
+        assert_eq!(path.target(), (5, 2, 3).into());
+        assert_eq!(path.path().len(), 3);
     }
 
     #[test]
@@ -675,14 +727,25 @@ mod tests {
 
     #[test]
     fn terrain_updates_applied() {
-        let chunks = vec![ChunkBuilder::new()
-            .fill_range((0, 0, 0), (5, 5, 5), |_| BlockType::Stone)
-            .set_block((10, 10, 200), BlockType::Air) // to add the chunk and slabs
-            .build((0, 0))];
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+        let chunks = vec![
+            ChunkBuilder::new()
+                .fill_range((0, 0, 0), (5, 5, 5), |_| BlockType::Stone)
+                .set_block((10, 10, 200), BlockType::Air) // to add the slabs inbetween
+                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 5), BlockType::Stone) // occludes the block below
+                .build((0, 0)),
+            ChunkBuilder::new()
+                .set_block((0, 5, 4), BlockType::Stone) // occluded by the block above
+                .build((1, 0)),
+        ];
 
         let updates = vec![
             WorldTerrainUpdate::with_block((1, 1, 1).into(), BlockType::Grass),
             WorldTerrainUpdate::with_block((10, 10, 200).into(), BlockType::LightGrass),
+            WorldTerrainUpdate::with_block((CHUNK_SIZE.as_i32() - 1, 5, 5).into(), BlockType::Air),
         ];
         let mut loader = loader_from_chunks(chunks);
         let world = loader.world();
@@ -697,6 +760,13 @@ mod tests {
             assert_eq!(
                 w.block((10, 10, 200)).unwrap().block_type(), // high up block empty
                 BlockType::Air
+            );
+            assert_eq!(
+                w.block((CHUNK_SIZE.as_i32(), 5, 4))
+                    .unwrap()
+                    .occlusion()
+                    .corner(3), // occluded by other chunk
+                VertexOcclusion::Mildly
             );
         }
 
@@ -722,6 +792,140 @@ mod tests {
                 w.block((2, 2, 2)).unwrap().block_type(), // stone untouched
                 BlockType::Stone
             );
+            assert_eq!(
+                w.block((CHUNK_SIZE.as_i32(), 5, 4))
+                    .unwrap()
+                    .occlusion()
+                    .corner(3), // no longer occluded by other chunk
+                VertexOcclusion::NotAtAll
+            );
+        }
+    }
+
+    #[test]
+    fn occlusion_updates_applied() {
+        let pos = (0, 0, 50);
+        let chunks = vec![ChunkBuilder::new()
+            .set_block(pos, BlockType::Stone)
+            .build((0, 0))];
+
+        let loader = loader_from_chunks(chunks);
+        let world = loader.world();
+
+        let mut w = world.borrow_mut();
+        assert_eq!(
+            w.block(pos).unwrap().occlusion().corner(0),
+            VertexOcclusion::NotAtAll
+        );
+
+        // hold a reference to slab to trigger CoW
+        let slab = w.chunks[0]
+            .raw_terrain()
+            .slab_ptr(GlobalSliceIndex::new(pos.2).slab_index())
+            .unwrap()
+            .clone();
+
+        w.apply_occlusion_update(OcclusionChunkUpdate(
+            ChunkPosition(0, 0),
+            vec![(pos.into(), NeighbourOpacity::all_solid())],
+        ));
+
+        // use old slab reference to keep it alive until here
+        assert_eq!(
+            w.block(pos).unwrap().occlusion().corner(0),
+            VertexOcclusion::Full
+        );
+
+        // check world uses new CoW slab
+        assert_eq!(
+            w.block(pos).unwrap().occlusion().corner(0),
+            VertexOcclusion::Full
+        );
+
+        // make sure CoW was triggered
+        let new_slab = w.chunks[0]
+            .raw_terrain()
+            .slab(GlobalSliceIndex::new(pos.2).slab_index())
+            .unwrap();
+
+        assert!(!std::ptr::eq(slab.deref(), new_slab));
+    }
+
+    #[test]
+    fn load_world_blocking() {
+        let world = world_from_chunks(vec![ChunkBuilder::new().build((0, 0))]);
+        let mut w = world.borrow_mut();
+
+        assert_eq!(w.block((0, 0, 0)).unwrap().block_type(), BlockType::Air);
+
+        *w.find_chunk_with_pos_mut(ChunkPosition(0, 0))
+            .unwrap()
+            .slice_mut(0)
+            .unwrap()[(0, 0)]
+            .block_type_mut() = BlockType::Stone;
+
+        assert_eq!(w.block((0, 0, 0)).unwrap().block_type(), BlockType::Stone);
+    }
+
+    #[ignore]
+    #[test]
+    fn random_terrain_updates_stresser() {
+        const CHUNK_RADIUS: u32 = 8;
+        const TERRAIN_HEIGHT: f64 = 400.0;
+
+        const UPDATE_SETS: usize = 100;
+        const UPDATE_REPS: usize = 10;
+
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        let pool = BlockingWorkerPool::default();
+        let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
+        let mut loader = WorldLoader::new(source, pool);
+        loader.request_all_chunks();
+
+        assert!(matches!(
+            loader.block_for_all(Duration::from_secs(60)),
+            BlockForAllResult::Success
+        ));
+
+        let world = loader.world();
+
+        let mut randy = seeded_rng(None);
+        for i in 0..UPDATE_SETS {
+            let updates = (0..UPDATE_REPS)
+                .map(|_| {
+                    let w = world.borrow();
+                    let pos = w
+                        .choose_random_walkable_block(1000)
+                        .expect("ran out of walkable blocks");
+                    let blocktype = if randy.gen_bool(0.5) {
+                        BlockType::Stone
+                    } else {
+                        BlockType::Air
+                    };
+                    if randy.gen_bool(0.2) {
+                        WorldTerrainUpdate::with_block(pos, blocktype)
+                    } else {
+                        let w = randy.gen_range(1, 10);
+                        let h = randy.gen_range(1, 10);
+                        let d = randy.gen_range(1, 10);
+
+                        WorldTerrainUpdate::with_range(pos, pos + (w, h, d), blocktype)
+                    }
+                })
+                .collect_vec();
+
+            common::info!(
+                "STRESSER ({}/{}) applying {} updates...\n{:#?}",
+                i,
+                UPDATE_SETS,
+                UPDATE_REPS,
+                updates
+            );
+            apply_updates(&mut loader, updates.as_slice()).expect("updates failed");
         }
     }
 }

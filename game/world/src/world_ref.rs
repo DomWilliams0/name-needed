@@ -1,5 +1,6 @@
-use crate::World;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+use crate::World;
 
 /// Reference counted reference to the world
 #[derive(Default, Clone)]
@@ -29,6 +30,8 @@ impl WorldRef {
 
     #[cfg(test)]
     pub fn into_inner(self) -> World {
-        self.borrow().clone()
+        let mutex =
+            Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("exclusive world reference needed"));
+        mutex.into_inner().expect("world lock is poisoned")
     }
 }

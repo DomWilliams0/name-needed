@@ -5,14 +5,16 @@ pub use input::AiInput;
 pub use system::{ActivityComponent, AiComponent, AiSystem};
 use unit::world::WorldPoint;
 
-use crate::ai::activity::AiAction;
+pub use crate::ai::activity::AiAction;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
+pub use dev::{DivineCommandCompletionSystem, DivineCommandComponent};
 use world::WorldArea;
 
 mod activity;
 mod consideration;
+mod dev;
 mod dse;
 mod input;
 mod system;

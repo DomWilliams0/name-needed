@@ -32,6 +32,8 @@ pub trait InitializedSimulationBackend: Sized {
         commands: &mut Vec<InputCommand>,
     );
 
+    fn world_viewer(&mut self) -> &mut WorldViewer;
+
     fn end(self) -> Self::Persistent;
 }
 

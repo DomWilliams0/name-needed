@@ -5,7 +5,7 @@ use common::*;
 
 use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish, NopActivity};
 use crate::ai::dse::human_dses;
-use crate::ai::{AiContext, Blackboard, SharedBlackboard};
+use crate::ai::{AiAction, AiContext, Blackboard, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
@@ -17,12 +17,16 @@ use crate::TransformComponent;
 #[storage(DenseVecStorage)]
 pub struct AiComponent {
     pub intelligence: ai::Intelligence<AiContext>,
+    pub last_completed_action: Option<AiAction>,
+    current_action: Option<AiAction>,
 }
 
 impl AiComponent {
     pub fn human() -> Self {
         Self {
             intelligence: Intelligence::new(Smarts::new(human_dses()).expect("empty human DSEs")),
+            last_completed_action: None,
+            current_action: None,
         }
     }
 }
@@ -89,10 +93,13 @@ impl<'a> System<'a> for AiSystem {
                     trace!("activity: {:?}", action);
 
                     let (mut old, new) = {
-                        let new_activity = action.into();
+                        let new_activity = action.clone().into();
                         let old_activity = std::mem::replace(&mut activity.current, new_activity);
                         (old_activity, &mut activity.current)
                     };
+
+                    ai.current_action = Some(action);
+                    ai.last_completed_action = None; // interrupted
 
                     old.on_finish(Finish::Interrupted, &ctx);
                     new.on_start(&ctx)
@@ -106,6 +113,8 @@ impl<'a> System<'a> for AiSystem {
 
                         old.on_finish(finish, &ctx);
                         // no need to nop.on_start()
+
+                        ai.last_completed_action = std::mem::take(&mut ai.current_action);
                     }
                 }
             }

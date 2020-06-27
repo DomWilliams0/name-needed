@@ -1,7 +1,7 @@
 use imgui::{im_str, CollapsingHeader, TreeNode};
 
 use common::{InnerSpace, Itertools};
-use simulation::input::{BlockPlacement, EntityDetails, InputCommand};
+use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, InputCommand};
 
 use crate::render::sdl::ui::windows::{
     UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
@@ -99,6 +99,30 @@ impl SelectionWindow {
                                 },
                                 COLOR_ORANGE,
                             );
+
+                            if CollapsingHeader::new(im_str!("Divine control"))
+                                .leaf(true)
+                                .build(ui)
+                            {
+                                if let Some((tile, other_tile)) =
+                                    bundle.blackboard.selected_tiles.bounds()
+                                {
+                                    // single block only
+                                    if tile == other_tile {
+                                        if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
+                                            bundle.commands.push(InputCommand::IssueDivineCommand(
+                                                DivineInputCommand::Goto(tile),
+                                            ));
+                                        }
+                                    }
+
+                                    if ui.button(im_str!("Break selected block"), [0.0, 0.0]) {
+                                        bundle.commands.push(InputCommand::IssueDivineCommand(
+                                            DivineInputCommand::Break(tile),
+                                        ));
+                                    }
+                                }
+                            }
                         }
                         EntityDetails::Item { item, edible } => {
                             ui.key_value(

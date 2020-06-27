@@ -4,16 +4,19 @@ use crossbeam::crossbeam_channel::Receiver;
 use specs::RunNow;
 
 use common::*;
-use world::loader::{ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
-use world::{OcclusionChunkUpdate, SliceRange, WorldRef};
+use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
+use world::{OcclusionChunkUpdate, SliceRange, WorldRef, WorldViewer};
 
-use crate::ai::{ActivityComponent, AiComponent, AiSystem};
+use crate::ai::{
+    ActivityComponent, AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem,
+    DivineCommandComponent,
+};
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
 use crate::input::{
-    Blackboard, BlockPlacement, InputCommand, InputEvent, InputSystem, SelectedComponent,
-    SelectedEntity, SelectedTiles,
+    Blackboard, BlockPlacement, DivineInputCommand, InputCommand, InputEvent, InputSystem,
+    SelectedComponent, SelectedEntity, SelectedTiles,
 };
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
@@ -22,8 +25,8 @@ use crate::item::{
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
-    FollowPathComponent, PathDebugRenderer, PathSteeringSystem, WanderComponent,
-    WanderPathAssignmentSystem,
+    ArrivedAtTargetEventComponent, FollowPathComponent, PathDebugRenderer, PathSteeringSystem,
+    WanderComponent, WanderPathAssignmentSystem,
 };
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
@@ -42,7 +45,6 @@ pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
 
-    #[allow(dead_code)] // TODO will be used when world can be modified
     world_loader: ThreadedWorldLoader,
     /// Occlusion updates received from world loader
     chunk_updates: Receiver<OcclusionChunkUpdate>,
@@ -90,7 +92,7 @@ impl<R: Renderer> Simulation<R> {
         EntityBuilder::new(&mut self.ecs_world)
     }
 
-    pub fn tick(&mut self, commands: &[InputCommand]) {
+    pub fn tick(&mut self, commands: &[InputCommand], world_viewer: &mut WorldViewer) {
         let _span = Span::Tick.begin();
 
         // update tick resource
@@ -103,7 +105,7 @@ impl<R: Renderer> Simulation<R> {
         self.ecs_world.insert(ecs_ref);
 
         // TODO limit time/count
-        self.apply_chunk_updates();
+        self.apply_world_updates(world_viewer);
 
         // apply player inputs
         self.process_input_commands(commands);
@@ -130,6 +132,9 @@ impl<R: Renderer> Simulation<R> {
         // pick up items
         PickupItemSystem.run_now(&self.ecs_world);
 
+        // remove completed divine commands
+        DivineCommandCompletionSystem.run_now(&self.ecs_world);
+
         #[cfg(debug_assertions)]
         crate::item::validation::InventoryValidationSystem(&self.ecs_world)
             .run_now(&self.ecs_world);
@@ -142,9 +147,9 @@ impl<R: Renderer> Simulation<R> {
 
         // per tick maintenance
         // must remove resource from world first so we can use &mut ecs_world
-        let mut entity_updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
-        entity_updates.execute(&mut self.ecs_world);
-        self.ecs_world.insert(entity_updates);
+        let mut updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
+        updates.execute(&mut self.ecs_world);
+        self.ecs_world.insert(updates);
 
         self.ecs_world.maintain();
     }
@@ -153,34 +158,31 @@ impl<R: Renderer> Simulation<R> {
         self.voxel_world.clone()
     }
 
-    fn apply_chunk_updates(&mut self) {
-        let mut world = self.voxel_world.borrow_mut();
+    fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
+        {
+            let mut world = self.voxel_world.borrow_mut();
 
-        // occlusion updates
-        while let Ok(update) = self.chunk_updates.try_recv() {
-            world.apply_occlusion_update(update);
-        }
-
-        // terrain changes, apply per chunk
-        // TODO per tick alloc/reuse buf
-        let groups = self
-            .terrain_changes
-            .drain(..)
-            .flat_map(|world_update| world_update.into_chunk_updates())
-            .sorted_by_key(|(chunk_pos, _)| *chunk_pos)
-            .group_by(|(chunk_pos, _)| *chunk_pos);
-
-        for (chunk, updates) in &groups {
-            if let Some(new_terrain) =
-                world.apply_terrain_updates(chunk, updates.map(|(_, update)| update))
-            {
-                trace!(
-                    "submitting updated chunk terrain to worker pool for {:?}",
-                    chunk
-                );
-                self.world_loader.update_chunk(chunk, new_terrain);
+            // occlusion updates
+            while let Ok(update) = self.chunk_updates.try_recv() {
+                world.apply_occlusion_update(update);
             }
+
+            // mark modified chunks as dirty in world viewer
+            world
+                .dirty_chunks()
+                .for_each(|c| world_viewer.mark_dirty(c));
         }
+
+        // terrain changes
+        // TODO per tick alloc/reuse buf
+        let terrain_updates = self.terrain_changes.drain(..).chain(
+            self.ecs_world
+                .resource_mut::<TerrainUpdatesRes>()
+                .0
+                .drain(..),
+        );
+
+        self.world_loader.apply_terrain_updates(terrain_updates);
     }
 
     fn process_input_commands(&mut self, commands: &[InputCommand]) {
@@ -198,12 +200,33 @@ impl<R: Renderer> Simulation<R> {
                         if let BlockPlacement::Set = placement {
                             // move the range down 1 block to set those blocks instead of the air
                             // blocks above
-                            from.2 -= 1;
-                            to.2 -= 1;
+                            from = from.below();
+                            to = to.below();
                         }
                         self.terrain_changes
                             .push(WorldTerrainUpdate::with_range(from, to, block_type));
                     }
+                }
+                InputCommand::IssueDivineCommand(ref divine_command) => {
+                    let entity = match self
+                        .ecs_world
+                        .resource_mut::<SelectedEntity>()
+                        .get(&self.ecs_world)
+                    {
+                        Some(e) => e,
+                        None => {
+                            warn!("no selected entity to issue divine command to");
+                            continue;
+                        }
+                    };
+
+                    let command = match divine_command {
+                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
+                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos.below()),
+                    };
+
+                    self.ecs_world
+                        .add_lazy(entity, DivineCommandComponent(command));
                 }
             }
         }
@@ -282,6 +305,7 @@ fn register_components(_world: &mut EcsWorld) {
     // movement
     register!(DesiredMovementComponent);
     register!(FollowPathComponent);
+    register!(ArrivedAtTargetEventComponent);
     register!(SteeringComponent);
     register!(DesiredMovementComponent);
     register!(WanderComponent);
@@ -301,6 +325,9 @@ fn register_components(_world: &mut EcsWorld) {
 
     // input
     register!(SelectedComponent);
+
+    // dev
+    register!(DivineCommandComponent);
 }
 
 fn register_resources(world: &mut EcsWorld) {
@@ -308,6 +335,7 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(QueuedUpdates::default());
     world.insert(SelectedEntity::default());
     world.insert(SelectedTiles::default());
+    world.insert(TerrainUpdatesRes::default());
 }
 
 fn register_debug_renderers<R: Renderer>(

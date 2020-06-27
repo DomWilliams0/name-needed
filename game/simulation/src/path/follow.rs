@@ -1,5 +1,5 @@
 use unit::world::{WorldPoint, WorldPosition};
-use world::{EdgeCost, WorldPath};
+use world::{EdgeCost, SearchGoal, WorldPath};
 
 pub struct PathFollowing {
     path: WorldPath,
@@ -8,10 +8,17 @@ pub struct PathFollowing {
 }
 
 impl PathFollowing {
-    pub fn new(path: WorldPath, target: WorldPoint) -> Self {
+    pub fn new(path: WorldPath, requested_target: WorldPoint, goal: SearchGoal) -> Self {
+        let final_target = if let SearchGoal::Adjacent = goal {
+            // follow to new, adjacent target instead
+            path.target().centred()
+        } else {
+            // keep precision from requested target
+            requested_target
+        };
         Self {
             path,
-            final_target: target,
+            final_target,
             next: 0,
         }
     }

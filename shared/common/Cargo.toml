@@ -22,6 +22,7 @@ derive_more = "^0.99"
 ordered-float = "^1.0"
 thiserror = "^1.0"
 bumpalo = {version = "^3.4", features = ["collections"]}
+smallvec = "^1.4"
 
 # TODO feature for cgmath
 [features]

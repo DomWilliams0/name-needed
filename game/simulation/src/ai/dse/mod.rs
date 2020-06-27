@@ -1,11 +1,13 @@
 use ai::{AiBox, Dse};
+pub use dev::ObeyDivineCommandDse;
 pub use items::{FindLocalFoodDse, UseHeldFoodDse};
-pub use wander::WanderDse;
+pub use movement::WanderDse;
 
 use crate::ai::AiContext;
 
+mod dev;
 mod items;
-mod wander;
+mod movement;
 
 macro_rules! dse {
     ($dse:expr) => {
@@ -15,6 +17,7 @@ macro_rules! dse {
 
 pub fn human_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
     vec![
+        dse!(ObeyDivineCommandDse),
         dse!(WanderDse),
         dse!(UseHeldFoodDse),
         dse!(FindLocalFoodDse),

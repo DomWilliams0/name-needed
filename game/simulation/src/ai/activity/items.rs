@@ -1,4 +1,9 @@
+use std::fmt::{Display, Formatter};
+
+use common::derive_more::Constructor;
 use common::*;
+use unit::world::WorldPoint;
+use world::SearchGoal;
 
 use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish};
 use crate::ecs::{ComponentWorld, Entity};
@@ -8,10 +13,6 @@ use crate::item::{
 };
 use crate::path::FollowPathComponent;
 use crate::TransformComponent;
-use common::derive_more::Constructor;
-use smallvec::alloc::fmt::Formatter;
-use std::fmt::Display;
-use unit::world::WorldPoint;
 
 pub struct UseHeldItemActivity {
     item: Entity,
@@ -215,7 +216,7 @@ impl GoPickUpItemActivity {
                 .map_err(|_| Box::new(PickupError::NoFollowPathComponent))?;
 
             // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
-            follow.new_path(target, NormalizedFloat::one());
+            follow.new_path(target, SearchGoal::Arrive, NormalizedFloat::one());
 
             // attempt to pickup the item when close
             world.add_lazy(holder, PickupItemComponent(item));

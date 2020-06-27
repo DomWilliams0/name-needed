@@ -24,6 +24,14 @@ impl WorldPosition {
             self.2.slice() as f32,
         )
     }
+
+    pub fn below(self) -> WorldPosition {
+        Self(self.0, self.1, self.2 - 1)
+    }
+
+    pub fn above(self) -> WorldPosition {
+        Self(self.0, self.1, self.2 + 1)
+    }
 }
 
 impl Display for WorldPosition {
@@ -75,5 +83,17 @@ impl From<&WorldPosition> for Point3 {
             y: pos.1 as f32,
             z: pos.2.slice() as f32,
         }
+    }
+}
+
+impl From<WorldPosition> for [i32; 3] {
+    fn from(pos: WorldPosition) -> Self {
+        [pos.0, pos.1, pos.2.slice()]
+    }
+}
+
+impl From<[i32; 3]> for WorldPosition {
+    fn from([x, y, z]: [i32; 3]) -> Self {
+        (x, y, z).into()
     }
 }

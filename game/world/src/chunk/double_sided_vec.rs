@@ -1,4 +1,7 @@
+use std::fmt::{Debug, Formatter};
 use std::i32;
+
+use crate::chunk::slab_pointer::DeepClone;
 
 // TODO refactor to use a single vec allocation
 pub struct DoubleSidedVec<T> {
@@ -164,11 +167,27 @@ impl<T> DoubleSidedVec<T> {
     }
 }
 
+impl<T: Debug> Debug for DoubleSidedVec<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoubleSidedVec({} items, ", self.len())?;
+        f.debug_list().entries(self.iter_increasing()).finish()?;
+        write!(f, ")")
+    }
+}
+
 impl<T: Clone> Clone for DoubleSidedVec<T> {
     fn clone(&self) -> Self {
         Self {
             positive: self.positive.clone(),
             negative: self.negative.clone(),
+        }
+    }
+}
+impl<T: DeepClone> DeepClone for DoubleSidedVec<T> {
+    fn deep_clone(&self) -> Self {
+        Self {
+            positive: self.positive.iter().map(T::deep_clone).collect(),
+            negative: self.negative.iter().map(T::deep_clone).collect(),
         }
     }
 }

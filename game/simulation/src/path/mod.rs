@@ -1,6 +1,7 @@
 pub use debug::PathDebugRenderer;
 pub use system::{
-    FollowPathComponent, PathSteeringSystem, WanderComponent, WanderPathAssignmentSystem,
+    ArrivedAtTargetEventComponent, FollowPathComponent, PathSteeringSystem, WanderComponent,
+    WanderPathAssignmentSystem,
 };
 
 mod debug;

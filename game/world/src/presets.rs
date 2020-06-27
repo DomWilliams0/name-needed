@@ -7,7 +7,6 @@ use unit::dim::CHUNK_SIZE;
 use crate::block::BlockType;
 use crate::chunk::ChunkBuilder;
 use crate::loader::MemoryTerrainSource;
-
 #[cfg(test)]
 use crate::ChunkDescriptor;
 

@@ -30,7 +30,7 @@ pub trait Consideration<C: Context> {
     }
 
     #[cfg(feature = "logging")]
-    fn log_metric(&self, entity: &str, value: f32);
+    fn log_metric(&self, entity: &str, value: f32) {}
 }
 
 impl ConsiderationParameter {

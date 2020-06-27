@@ -60,7 +60,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         trace!("tick");
         let _timer = self.perf.tick.time();
 
-        self.simulation.tick(&self.sim_input_commands);
+        let world_viewer = self.backend.world_viewer();
+        self.simulation.tick(&self.sim_input_commands, world_viewer);
         self.sim_input_commands.clear();
 
         self.backend.tick();

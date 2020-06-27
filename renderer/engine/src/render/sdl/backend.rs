@@ -250,11 +250,11 @@ impl InitializedSimulationBackend for SdlBackendInit {
             .render(&projection, &view, &self.world_viewer);
 
         // render simulation
-        let entity_lower_limit = terrain_range.bottom().slice() as f32;
+        let lower_limit = terrain_range.bottom().slice() as f32;
         let frame_target = FrameTarget {
             proj: projection.as_ptr(),
             view: view.as_ptr(),
-            z_offset: entity_lower_limit,
+            z_offset: lower_limit,
         };
 
         let (_, mut blackboard) = simulation.render(
@@ -282,6 +282,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
         );
 
         self.window.gl_swap_window();
+    }
+
+    fn world_viewer(&mut self) -> &mut WorldViewer {
+        &mut self.world_viewer
     }
 
     fn end(mut self) -> Self::Persistent {

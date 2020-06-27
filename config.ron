@@ -10,13 +10,13 @@ Config(
     ),
     world: (
         // source: Preset(MultiChunkWonder),
-        source: Generate (radius: 2, seed: Some(342878)),
+        source: Generate (radius: 2, seed: Some(342879)),
         worker_threads: None,
         generation_height_scale: 15.0,
     ),
     simulation: (
         random_seed: Some(67853852415419),
-        random_count: 5,
+        random_count: 1,
         acceleration: 0.08,
         friction: 0.85,
         max_speed: 0.22,

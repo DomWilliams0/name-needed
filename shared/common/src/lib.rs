@@ -1,23 +1,25 @@
+pub use bumpalo;
 pub use cgmath;
 pub use cgmath::{
     Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,
     VectorSpace, Zero,
 };
+pub use derive_more;
 #[cfg(feature = "binary")]
 pub use env_logger;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use log::*;
-pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
 pub use rand::prelude::*;
-pub use struclog::{self, *};
-
-pub use bumpalo;
-pub use derive_more;
-pub use lazy_static::lazy_static;
+pub use smallvec::*;
 pub use thiserror::{self, Error};
+
+pub use lazy_static::lazy_static;
+pub use metrics::{self, declare_entity_metric, entity_metric};
+pub use newtype::{NormalizedFloat, Proportion};
+pub use struclog::{self, *};
 
 pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;
@@ -57,8 +59,6 @@ pub fn truncate(vec: Vector2, max: F) -> Vector2 {
         vec
     }
 }
-
-pub use newtype::{NormalizedFloat, Proportion};
 
 pub mod input;
 pub mod newtype;

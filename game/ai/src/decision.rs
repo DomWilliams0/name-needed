@@ -12,6 +12,8 @@ pub enum DecisionWeight {
     Dependent,
     BasicNeeds,
     Emergency,
+    /// Obedience without question, for dev mode and debugging
+    AbsoluteOverride,
 }
 
 pub trait Dse<C: Context> {
@@ -74,6 +76,7 @@ impl DecisionWeight {
             DecisionWeight::Dependent => 2.5,
             DecisionWeight::BasicNeeds => 3.5,
             DecisionWeight::Emergency => 4.0,
+            DecisionWeight::AbsoluteOverride => 1000.0,
         }
     }
 }

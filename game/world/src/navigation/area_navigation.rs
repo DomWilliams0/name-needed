@@ -12,7 +12,7 @@ use unit::world::{BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, Sl
 use crate::navigation::astar::astar;
 use crate::navigation::path::AreaPathNode;
 use crate::navigation::{AreaPath, WorldArea};
-use crate::occlusion::NeighbourOffset;
+use crate::neighbour::NeighbourOffset;
 use crate::EdgeCost;
 
 type AreaNavGraph = StableGraph<AreaNavNode, AreaNavEdge, Directed, u32>;
@@ -192,11 +192,11 @@ impl AreaGraph {
     }
 
     pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
-        info!("edge {:?} <-> {:?} | {:?}", from, to, edge);
+        info!("edge {:?} -> {:?} | {:?}", from, to, edge);
 
         let (a, b) = (self.add_node(from), self.add_node(to));
         self.graph.add_edge(a, b, edge);
-        self.graph.add_edge(b, a, edge.reversed());
+        // self.graph.add_edge(b, a, edge.reversed());
     }
 
     pub(crate) fn add_node(&mut self, area: WorldArea) -> NodeIndex {
@@ -276,7 +276,7 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::navigation::path::AreaPathNode;
     use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
-    use crate::occlusion::NeighbourOffset;
+    use crate::neighbour::NeighbourOffset;
     use crate::world::helpers::world_from_chunks;
     use crate::{ChunkDescriptor, EdgeCost};
 
@@ -299,6 +299,10 @@ mod tests {
 
     #[test]
     fn one_block_one_side_flat() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
         let chunks = vec![
             ChunkBuilder::new()
                 .set_block((15, 5, 0), BlockType::Stone)

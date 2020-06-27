@@ -32,7 +32,8 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         debug!("using {} threads for world loader", thread_count);
         let pool = ThreadedWorkerPool::new(thread_count);
 
-        match config::get().world.source.clone() {
+        let which_source = config::get().world.source.clone();
+        match which_source {
             WorldSource::Preset(preset) => {
                 debug!("loading world preset '{:?}'", preset);
                 let source = presets::from_preset(preset);
@@ -40,7 +41,8 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             }
             WorldSource::Generate { seed, radius } => {
                 debug!("generating world with radius {}", radius);
-                match GeneratedTerrainSource::new(seed, radius) {
+                let height_scale = config::get().world.generation_height_scale;
+                match GeneratedTerrainSource::new(seed, radius, height_scale) {
                     // TODO GamePreset::world() should return a Result
                     Err(e) => panic!("bad params for world generation: {}", e),
                     Ok(source) => WorldLoader::new(source, pool),

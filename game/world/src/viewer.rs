@@ -5,6 +5,7 @@ use common::*;
 
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldRef};
+use std::collections::HashSet;
 use unit::world::{ChunkPosition, GlobalSliceIndex};
 
 #[derive(Clone)]
@@ -12,6 +13,7 @@ pub struct WorldViewer {
     world: WorldRef,
     view_range: SliceRange,
     chunk_range: (ChunkPosition, ChunkPosition),
+    clean_chunks: HashSet<ChunkPosition>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -111,38 +113,34 @@ impl WorldViewer {
             world,
             view_range,
             chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
+            clean_chunks: HashSet::with_capacity(128),
         }
     }
 
     pub fn regenerate_dirty_chunk_meshes<F: FnMut(ChunkPosition, Vec<V>), V: BaseVertex>(
-        &self,
+        &mut self,
         mut f: F,
     ) {
         let range = self.terrain_range();
         let world = self.world.borrow();
-        for dirty_chunk in self
-            .visible_chunks()
-            .filter_map(|pos| world.find_chunk_with_pos(pos))
-            .filter(|c| c.dirty())
-        {
-            let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
-            trace!(
-                "chunk mesh {:?} has {} vertices",
-                dirty_chunk.pos(),
-                mesh.len()
-            );
-            f(dirty_chunk.pos(), mesh);
-        }
+        self.visible_chunks()
+            .filter(|c| self.is_chunk_dirty(c))
+            .filter_map(|c| world.find_chunk_with_pos(c))
+            .for_each(|chunk| {
+                // TODO do mesh generation on a worker thread
+                let mesh = mesh::make_simple_render_mesh(chunk, range);
+                trace!("chunk mesh {:?} has {} vertices", chunk.pos(), mesh.len());
+                f(chunk.pos(), mesh);
+            });
+
+        drop(world);
+
+        self.clean_chunks.extend(self.visible_chunks());
     }
 
-    fn invalidate_visible_chunks(&self) {
+    fn invalidate_meshes(&mut self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        let world = self.world.borrow();
-        for c in self.visible_chunks() {
-            if let Some(c) = world.find_chunk_with_pos(c) {
-                c.invalidate()
-            }
-        }
+        self.clean_chunks.clear();
     }
 
     fn update_range(&mut self, new_range: SliceRange, past_participle: &str, infinitive: &str) {
@@ -151,7 +149,7 @@ impl WorldViewer {
         if let Some(slice_bounds) = bounds {
             if slice_bounds.contains(new_range.0) && slice_bounds.contains(new_range.1) {
                 self.view_range = new_range;
-                self.invalidate_visible_chunks();
+                self.invalidate_meshes();
                 info!(
                     "{} view range, new range is {}",
                     past_participle, self.view_range
@@ -185,8 +183,8 @@ impl WorldViewer {
 
     pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkPosition> {
         let (min, max) = self.chunk_range;
-        let xrange = min.0..=max.0;
-        let yrange = min.1..=max.1;
+        let xrange = min.0 - 1..=max.0 + 1; // +1 for little buffer
+        let yrange = min.1 - 1..=max.1 + 1;
 
         xrange
             .cartesian_product(yrange)
@@ -211,5 +209,13 @@ impl WorldViewer {
 
     pub fn set_chunk_bounds(&mut self, range: (ChunkPosition, ChunkPosition)) {
         self.chunk_range = range;
+    }
+
+    fn is_chunk_dirty(&self, chunk: &ChunkPosition) -> bool {
+        !self.clean_chunks.contains(chunk)
+    }
+
+    pub fn mark_dirty(&mut self, chunk: ChunkPosition) {
+        self.clean_chunks.remove(&chunk);
     }
 }

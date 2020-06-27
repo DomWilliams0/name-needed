@@ -1,16 +1,15 @@
 use std::collections::hash_map::Entry;
+use std::fmt::{Display, Formatter};
 
 use ai::Context;
+use common::*;
+use unit::world::WorldPoint;
+use world::WorldRef;
 
-use crate::ai::{AiContext, Blackboard, SharedBlackboard};
+use crate::ai::{AiContext, Blackboard, DivineCommandComponent, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable};
 use crate::{InventoryComponent, TransformComponent};
-use common::*;
-use smallvec::alloc::fmt::Formatter;
-use std::fmt::Display;
-use unit::world::WorldPoint;
-use world::WorldRef;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
@@ -28,6 +27,8 @@ pub enum AiInput {
     },
 
     Constant(OrderedFloat<f32>),
+
+    DivineCommand,
 }
 
 impl ai::Input<AiContext> for AiInput {
@@ -50,6 +51,18 @@ impl ai::Input<AiContext> for AiInput {
                 max_radius,
                 max_count,
             } => search_local_area_with_cache(blackboard, filter, *max_radius, *max_count),
+
+            AiInput::DivineCommand => {
+                if blackboard
+                    .world
+                    .component::<DivineCommandComponent>(blackboard.entity)
+                    .is_ok()
+                {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
         }
     }
 }
@@ -238,6 +251,7 @@ impl Display for AiInput {
                 max_count, max_radius, filter
             ),
             AiInput::Constant(_) => write!(f, "Constant"),
+            AiInput::DivineCommand => write!(f, "Has divine command"),
         }
     }
 }

@@ -1,7 +1,14 @@
-use crate::ecs::EcsWorld;
-use common::*;
 use std::cell::RefCell;
 use std::error::Error;
+
+use common::*;
+use unit::world::WorldPosition;
+use world::block::{BlockDurability, BlockType};
+use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
+use world::BlockDamageResult;
+
+use crate::ecs::EcsWorld;
+use crate::ComponentWorld;
 
 type Update = dyn FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>;
 type Entry = (&'static str, Box<Update>);
@@ -41,5 +48,19 @@ impl QueuedUpdates {
                 }
             }
         }
+    }
+
+    pub fn queue_block_damage(&self, block: WorldPosition, damage: BlockDurability) {
+        self.queue("damage block", move |world| {
+            let world_ref = world.voxel_world();
+            let mut voxel_world = world_ref.borrow_mut();
+
+            if let Some(BlockDamageResult::Broken) = voxel_world.damage_block(block, damage) {
+                let terrain_updates = world.resource_mut::<TerrainUpdatesRes>();
+                terrain_updates.push(WorldTerrainUpdate::with_block(block, BlockType::Air))
+            }
+
+            Ok(())
+        });
     }
 }

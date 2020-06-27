@@ -1,24 +1,30 @@
+use std::cell::{Cell, RefCell};
+use std::mem::MaybeUninit;
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crossbeam::channel::{Receiver, Sender};
 use crossbeam::crossbeam_channel::{bounded, unbounded};
 
+pub use batch::UpdateBatch;
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::ChunkPosition;
-
-pub use update::{ChunkTerrainUpdate, WorldTerrainUpdate};
+pub use update::{SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
 use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, RawChunkTerrain, WhichChunk};
+use crate::loader::batch::{UpdateBatchUniqueId, UpdateBatcher};
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::navigation::AreaNavEdge;
-use crate::occlusion::NeighbourOffset;
-use crate::{OcclusionChunkUpdate, WorldRef};
+use crate::neighbour::NeighbourOffset;
+use crate::{InnerWorldRef, OcclusionChunkUpdate, WorldRef};
+use std::fmt::{Debug, Formatter};
 
+mod batch;
 mod terrain_source;
 mod update;
 mod worker_pool;
@@ -30,11 +36,19 @@ pub struct WorldLoader<P: WorkerPool> {
     chunk_updates_rx: Option<Receiver<OcclusionChunkUpdate>>,
     world: WorldRef,
     all_count: Option<usize>,
+    batch_ids: UpdateBatchUniqueId,
 }
 
 struct ChunkFinalizer {
     world: WorldRef,
     updates: Sender<OcclusionChunkUpdate>,
+    batcher: UpdateBatcher<FinalizeBatchItem>,
+}
+
+struct FinalizeBatchItem {
+    chunk: ChunkPosition,
+    terrain: RefCell<MaybeUninit<ChunkTerrain>>,
+    consumed: Cell<bool>,
 }
 
 #[derive(Debug)]
@@ -44,6 +58,12 @@ pub enum BlockForAllResult {
     Success,
     TimedOut,
     Error(TerrainSourceError),
+}
+
+#[derive(Copy, Clone)]
+pub enum ChunkRequest {
+    New,
+    UpdateExisting,
 }
 
 impl<P: WorkerPool> WorldLoader<P> {
@@ -61,6 +81,7 @@ impl<P: WorkerPool> WorldLoader<P> {
             chunk_updates_rx: Some(chunk_updates_rx),
             world,
             all_count: None,
+            batch_ids: UpdateBatchUniqueId::default(),
         }
     }
 
@@ -70,62 +91,142 @@ impl<P: WorkerPool> WorldLoader<P> {
 
     pub fn request_all_chunks(&mut self) {
         let chunks = self.source.lock().unwrap().all_chunks();
-        let mut all_count = 0;
-        chunks.iter().for_each(|&c| {
-            self.request_chunk(c);
-            all_count += 1;
-        });
+        let count = chunks.len();
+        self.request_chunks(chunks.into_iter());
 
-        self.all_count = Some(all_count);
+        self.all_count = Some(count);
     }
 
-    pub fn request_chunk(&mut self, chunk: ChunkPosition) {
+    /// Requests chunks as a single batch
+    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item = ChunkPosition>) {
         // TODO cache full finalized chunks
 
-        let source = self.source.clone();
+        let mut batches = UpdateBatch::builder(&mut self.batch_ids, chunks.len());
 
-        // load raw terrain and do as much processing in isolation as possible on a worker thread
-        self.pool.submit(
-            move || {
-                // briefly hold the source lock to get a preprocess closure to run
-                let preprocess_work = {
-                    let terrain_source = source.lock().unwrap();
+        for chunk in chunks {
+            let source = self.source.clone();
+            let batch = batches.next_batch();
 
-                    // fail fast if bad chunk position
-                    if !terrain_source.is_in_bounds(chunk) {
-                        return Err(TerrainSourceError::OutOfBounds);
-                    }
+            debug!(
+                "submitting chunk {:?} request to pool in batch {:?}",
+                chunk, batch
+            );
 
-                    terrain_source.preprocess(chunk)
-                };
+            // load raw terrain and do as much processing in isolation as possible on a worker thread
+            self.pool.submit(
+                move || {
+                    // briefly hold the source lock to get a preprocess closure to run
+                    let preprocess_work = {
+                        let terrain_source = source.lock().unwrap();
 
-                // run preprocessing work concurrently
-                let preprocess_result = preprocess_work()?;
+                        // fail fast if bad chunk position
+                        if !terrain_source.is_in_bounds(chunk) {
+                            return Err(TerrainSourceError::OutOfBounds);
+                        }
 
-                // take the source lock again to convert preprocessing output into raw terrain.
-                // e.g. reading from a file cannot be done in parallel
-                let terrain = {
-                    let mut terrain_source = source.lock().unwrap();
-                    terrain_source.load_chunk(chunk, preprocess_result)?
-                };
+                        terrain_source.preprocess(chunk)
+                    };
 
-                // concurrently process raw terrain into chunk terrain
-                let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk);
-                Ok((chunk, terrain))
-            },
-            self.finalization_channel.clone(),
-        );
+                    // run preprocessing work concurrently
+                    let preprocess_result = preprocess_work()?;
+
+                    // take the source lock again to convert preprocessing output into raw terrain.
+                    // e.g. reading from a file cannot be done in parallel
+                    let terrain = {
+                        let mut terrain_source = source.lock().unwrap();
+                        terrain_source.load_chunk(chunk, preprocess_result)?
+                    };
+
+                    // concurrently process raw terrain into chunk terrain
+                    let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk, ChunkRequest::New);
+                    Ok((chunk, terrain, batch))
+                },
+                self.finalization_channel.clone(),
+            );
+        }
     }
 
-    pub fn update_chunk(&mut self, chunk: ChunkPosition, terrain: RawChunkTerrain) {
-        self.pool.submit(
-            move || {
-                // concurrently process raw terrain into chunk terrain
-                let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk);
-                Ok((chunk, terrain))
-            },
-            self.finalization_channel.clone(),
-        )
+    fn update_chunks_with_len(
+        &mut self,
+        updates: impl Iterator<Item = (ChunkPosition, RawChunkTerrain)>,
+        count: usize,
+    ) {
+        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
+        for (chunk, terrain) in updates {
+            let batch = batches.next_batch();
+
+            debug!(
+                "submitting chunk {:?} update to pool in batch {:?}",
+                chunk, batch
+            );
+            self.pool.submit(
+                move || {
+                    // concurrently process raw terrain into chunk terrain
+                    let terrain = ChunkTerrain::from_raw_terrain(
+                        terrain,
+                        chunk,
+                        ChunkRequest::UpdateExisting,
+                    );
+                    Ok((chunk, terrain, batch))
+                },
+                self.finalization_channel.clone(),
+            );
+        }
+
+        if let Err((n, m)) = batches.is_complete() {
+            panic!(
+                "incorrect batch size, only produced {}/{} updates in batch",
+                n, m
+            );
+        }
+    }
+
+    pub fn apply_terrain_updates(
+        &mut self,
+        terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
+    ) {
+        let world_ref = self.world.clone();
+        let world = world_ref.borrow();
+
+        let (slab_updates, chunk_count) = {
+            // translate world -> slab updates
+            let mut slab_updates = terrain_updates
+                .flat_map(|world_update| world_update.into_slab_updates())
+                .collect_vec();
+
+            // sort then group by chunk and slab, so each slab is touched only once
+            slab_updates.sort_unstable_by(|(chunk_a, slab_a, _), (chunk_b, slab_b, _)| {
+                chunk_a.cmp(chunk_b).then(slab_a.cmp(slab_b))
+            });
+
+            // filter out unloaded chunks
+            slab_updates.retain(|(chunk, _, _)| world.has_chunk(*chunk));
+
+            // count chunk count for batch size
+            let chunk_count = slab_updates
+                .iter()
+                .dedup_by(|(chunk_a, _, _), (chunk_b, _, _)| chunk_a == chunk_b)
+                .count();
+
+            (slab_updates, chunk_count)
+        };
+
+        let grouped_chunk_updates = slab_updates.into_iter().group_by(|(chunk, _, _)| *chunk);
+
+        let chunk_updates = grouped_chunk_updates
+            .into_iter()
+            .filter(|(chunk, _)| world.has_chunk(*chunk))
+            // apply updates to world but don't submit them to the loader yet
+            .map(|(chunk, updates)| {
+                let updates = updates.map(|(_, slab, update)| (slab, update));
+                let new_terrain = world.apply_terrain_updates(chunk, updates);
+                (chunk, new_terrain)
+            });
+
+        // submit all new terrain as a single batch
+        if chunk_count > 0 {
+            self.update_chunks_with_len(chunk_updates, chunk_count);
+        }
     }
 
     pub fn block_on_next_finalization(
@@ -160,46 +261,116 @@ impl<P: WorkerPool> WorldLoader<P> {
         }
     }
 
+    /// Takes `Receiver` out of loader
     pub fn chunk_updates_rx(&mut self) -> Option<Receiver<OcclusionChunkUpdate>> {
         self.chunk_updates_rx.take()
+    }
+
+    /// Borrows a clone of `Receiver`, leaving it in the loader
+    pub fn chunk_updates_rx_clone(&mut self) -> Option<Receiver<OcclusionChunkUpdate>> {
+        self.chunk_updates_rx.clone()
+    }
+}
+
+impl ChunkRequest {
+    pub fn is_new(self) -> bool {
+        matches!(self, ChunkRequest::New)
     }
 }
 
 impl ChunkFinalizer {
     fn new(world: WorldRef, updates: Sender<OcclusionChunkUpdate>) -> Self {
-        Self { world, updates }
+        Self {
+            world,
+            updates,
+            batcher: UpdateBatcher::default(),
+        }
     }
 
-    fn finalize(&mut self, (chunk, mut terrain): (ChunkPosition, ChunkTerrain)) {
+    fn finalize(&mut self, (chunk, terrain, batch): (ChunkPosition, ChunkTerrain, UpdateBatch)) {
         // world lock is taken and released often to prevent holding up the main thread
+
+        debug!(
+            "submitting completed chunk {:?} for finalization in batch {:?}",
+            chunk, batch
+        );
+        self.batcher
+            .submit(batch, FinalizeBatchItem::initialized(chunk, terrain));
+
+        // finalize completed batches only, which might not include this update.
+        for (batch_id, batch_size) in self.batcher.complete_batches() {
+            debug!("finalizing {} items in batch id={}", batch_size, batch_id);
+
+            // we know that all dependent chunks (read: chunks in the same batch) are present now
+            let batch = self.batcher.pop_batch(batch_id);
+            trace!("batch: {:#?}", batch);
+            debug_assert_eq!(batch.len(), batch_size);
+
+            for idx in 0..batch_size {
+                // pop this chunk from the dependent list
+                let (chunk, terrain) = unsafe { batch.get_unchecked(idx) }.consume();
+
+                // finalize this chunk
+                debug!("finalizing chunk {:?}", chunk);
+                self.do_finalize(chunk, terrain, &batch);
+            }
+        }
+    }
+
+    fn do_finalize<'func, 'dependents: 'func>(
+        &'func mut self,
+        chunk: ChunkPosition,
+        mut terrain: ChunkTerrain,
+        dependents: &'dependents [FinalizeBatchItem],
+    ) {
+        let lookup_neighbour =
+            |chunk_pos, world: &InnerWorldRef| -> Option<&'dependents RawChunkTerrain> {
+                // check finalize queue in case this chunk is dependent on the one being processed currently
+                let dependent = dependents.iter().find_map(|item| item.get(chunk_pos));
+
+                dependent.or_else(move || {
+                    // check world as normal if its not a dependent
+                    world
+                        .find_chunk_with_pos(chunk_pos)
+                        .map(|c| c.raw_terrain())
+                        .map(|c| {
+                            // TODO sort out the lifetimes instead of cheating and using transmute
+                            // I can't get these lifetimes to agree, perhaps you the future reader can help
+                            //  - dependents outlives this function
+                            //  - this function returns terrain either from dependents or from the world
+                            //  - the returned reference is only used for a single iteration of a loop
+                            unsafe { std::mem::transmute(c) }
+                        })
+                })
+            };
 
         for (direction, offset) in NeighbourOffset::offsets() {
             let world = self.world.borrow();
 
             let neighbour_offset = chunk + offset;
-            let neighbour_terrain = match world
-                .find_chunk_with_pos(neighbour_offset)
-                .map(|c| c.raw_terrain())
-            {
+            let neighbour_terrain = match lookup_neighbour(neighbour_offset, &world) {
                 Some(terrain) => terrain,
                 // chunk is not loaded
                 None => continue,
             };
 
-            // TODO reuse/pool bufs
-            let mut this_terrain_updates = Vec::new();
-            let mut other_terrain_updates = Vec::new();
+            // TODO reuse/pool bufs, and initialize with proper expected size
+            let mut this_terrain_updates = Vec::with_capacity(1200);
+            let mut other_terrain_updates = Vec::with_capacity(1200);
 
             terrain.raw_terrain().cross_chunk_pairs_foreach(
                 neighbour_terrain,
                 direction,
                 |which, block_pos, opacity| {
+                    // TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead
+                    //
                     match which {
                         WhichChunk::ThisChunk => {
                             // update opacity now for this chunk being loaded
                             this_terrain_updates.push((block_pos, opacity));
                         }
                         WhichChunk::OtherChunk => {
+                            // queue opacity changes for the other chunk
                             other_terrain_updates.push((block_pos, opacity));
                         }
                     }
@@ -207,23 +378,37 @@ impl ChunkFinalizer {
             );
 
             // apply opacity changes to this chunk now
-            this_terrain_updates
-                .drain(..)
-                .for_each(|(block_pos, opacity)| {
-                    terrain
-                        .raw_terrain_mut()
-                        .with_block_mut_unchecked(block_pos, |b| {
-                            b.occlusion_mut().update_from_neighbour_opacities(opacity);
-                        });
-                });
+            {
+                let applied = terrain
+                    .raw_terrain_mut()
+                    .apply_occlusion_updates(&this_terrain_updates);
+
+                if applied > 0 {
+                    debug!(
+                        "applied {:?}/{:?} occlusion updates to chunk {:?}",
+                        applied,
+                        this_terrain_updates.len(),
+                        chunk
+                    );
+                }
+
+                this_terrain_updates.clear();
+            }
 
             // queue changes to existing chunks in world
-            self.updates
-                .send(OcclusionChunkUpdate(
-                    neighbour_offset,
-                    other_terrain_updates,
-                ))
-                .unwrap();
+            if !other_terrain_updates.is_empty() {
+                debug!(
+                    "queueing {:?} occlusion updates to apply to chunk {:?} next tick",
+                    other_terrain_updates.len(),
+                    neighbour_offset
+                );
+                self.updates
+                    .send(OcclusionChunkUpdate(
+                        neighbour_offset,
+                        other_terrain_updates,
+                    ))
+                    .unwrap();
+            }
         }
 
         // navigation
@@ -232,10 +417,7 @@ impl ChunkFinalizer {
             let world = self.world.borrow();
 
             let neighbour_offset = chunk + offset;
-            let neighbour_terrain = match world
-                .find_chunk_with_pos(neighbour_offset)
-                .map(|c| c.raw_terrain())
-            {
+            let neighbour_terrain = match lookup_neighbour(neighbour_offset, &world) {
                 Some(terrain) => terrain,
                 // chunk is not loaded
                 None => continue,
@@ -244,18 +426,18 @@ impl ChunkFinalizer {
             let mut links = Vec::new(); // TODO reuse buf
             let mut ports = Vec::new(); // TODO reuse buf
             terrain.raw_terrain().cross_chunk_pairs_nav_foreach(
-                neighbour_terrain,
-                direction,
-                |src_area, dst_area, edge_cost, i, z| {
-                    trace!("{:?} link from chunk {:?} area {:?} ----> chunk {:?} area {:?} ============= direction {:?} {}",
-                          edge_cost, chunk, src_area, neighbour_offset, dst_area, direction, i);
+                    neighbour_terrain,
+                    direction,
+                    |src_area, dst_area, edge_cost, i, z| {
+                        trace!("{:?} link from chunk {:?} area {:?} ----> chunk {:?} area {:?} ============= direction {:?} {}",
+                               edge_cost, chunk, src_area, neighbour_offset, dst_area, direction, i);
 
-                    let src_area = src_area.into_world_area(chunk);
-                    let dst_area = dst_area.into_world_area(neighbour_offset);
+                        let src_area = src_area.into_world_area(chunk);
+                        let dst_area = dst_area.into_world_area(neighbour_offset);
 
-                    links.push((src_area, dst_area, edge_cost, i, z));
-                },
-            );
+                        links.push((src_area, dst_area, edge_cost, i, z));
+                    },
+                );
 
             links.sort_unstable_by_key(|(_, _, _, i, _)| *i);
 
@@ -287,8 +469,53 @@ impl ChunkFinalizer {
     }
 }
 
+impl FinalizeBatchItem {
+    fn initialized(chunk: ChunkPosition, terrain: ChunkTerrain) -> Self {
+        Self {
+            chunk,
+            terrain: RefCell::new(MaybeUninit::new(terrain)),
+            consumed: Cell::new(false),
+        }
+    }
+
+    fn consume(&self) -> (ChunkPosition, ChunkTerrain) {
+        let was_consumed = self.consumed.replace(true);
+        assert!(!was_consumed, "chunk has already been consumed");
+
+        // steal terrain
+        let terrain = unsafe {
+            let mut t = self.terrain.borrow_mut();
+            std::mem::replace(t.deref_mut(), MaybeUninit::uninit()).assume_init()
+        };
+
+        (self.chunk, terrain)
+    }
+
+    fn get(&self, chunk_pos: ChunkPosition) -> Option<&RawChunkTerrain> {
+        if self.consumed.get() || self.chunk != chunk_pos {
+            None
+        } else {
+            let terrain_ref = self.terrain.borrow();
+            let chunk_terrain = unsafe { &*terrain_ref.as_ptr() };
+            Some(chunk_terrain.raw_terrain())
+        }
+    }
+}
+
+impl Debug for FinalizeBatchItem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FinalizeBatchItem(chunk={:?}, consumed={:?})",
+            self.chunk,
+            self.consumed.get()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::iter::once;
     use std::time::Duration;
 
     use matches::assert_matches;
@@ -316,7 +543,7 @@ mod tests {
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
         let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
-        loader.request_chunk(ChunkPosition(0, 0));
+        loader.request_chunks(once(ChunkPosition(0, 0)));
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
         assert_matches!(finalized, Some(Ok(ChunkPosition(0, 0))));
