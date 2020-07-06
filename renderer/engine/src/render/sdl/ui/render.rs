@@ -1,5 +1,7 @@
 use crate::render::sdl::ui::memory::PerFrameStrings;
-use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow, SelectionWindow, UiBundle};
+use crate::render::sdl::ui::windows::{
+    DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow, UiBundle,
+};
 use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
@@ -7,7 +9,7 @@ use sdl2::event::Event;
 use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
-use simulation::input::{Blackboard, InputCommand};
+use simulation::input::{InputCommand, UiBlackboard};
 use simulation::PerfAvg;
 
 pub struct Ui {
@@ -28,6 +30,7 @@ pub enum EventConsumed {
 pub struct State {
     perf: PerformanceWindow,
     selection: SelectionWindow,
+    society: SocietyWindow,
     debug: DebugWindow,
 }
 
@@ -53,6 +56,7 @@ impl Ui {
         let state = State {
             perf: PerformanceWindow,
             selection: SelectionWindow::default(),
+            society: SocietyWindow,
             debug: DebugWindow,
         };
 
@@ -79,7 +83,7 @@ impl Ui {
         window: &Window,
         mouse_state: &MouseState,
         perf: &PerfAvg,
-        blackboard: Blackboard,
+        blackboard: UiBlackboard,
         input_commands: &mut Vec<InputCommand>,
     ) {
         self.imgui_sdl2
@@ -113,6 +117,7 @@ impl State {
             .always_use_window_padding(true)
             .build(bundle.ui, || {
                 self.selection.render(&mut bundle);
+                self.society.render(&mut bundle);
                 self.debug.render(&mut bundle);
             });
     }

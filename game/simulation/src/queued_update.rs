@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::error::Error;
 
 use common::*;
 use unit::world::WorldPosition;

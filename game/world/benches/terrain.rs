@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
@@ -52,9 +52,12 @@ fn deep_clone(chunks: &Vec<ChunkDescriptor>) -> Vec<ChunkDescriptor> {
 }
 
 pub fn small_world(c: &mut Criterion) {
+    let mut group = c.benchmark_group("world initialization");
+    group.sample_size(10);
+
     for i in 1..=4 {
         let chunks = small_world_chunks(i);
-        c.bench_with_input(BenchmarkId::new("small world", i), &i, |b, _| {
+        group.bench_with_input(BenchmarkId::new("chunk radius", i), &i, |b, _| {
             let chunks = &chunks;
             b.iter(move || {
                 let _ = world_from_chunks(deep_clone(chunks));
@@ -65,6 +68,7 @@ pub fn small_world(c: &mut Criterion) {
 
 pub fn tall_world(c: &mut Criterion) {
     let mut group = c.benchmark_group("tall world");
+    group.sample_size(10);
 
     for z in &[100, 1000, 10_000] {
         let chunks = tall_world_chunks(*z);
@@ -95,9 +99,31 @@ pub fn tall_world(c: &mut Criterion) {
     }
 }
 
-criterion_group!(
-    name = benches;
-    config = Criterion::default().sample_size(10);
-    targets = small_world, tall_world
-);
+pub fn access_block(c: &mut Criterion) {
+    const CHUNKS: i32 = 20;
+    let world = world_from_chunks(small_world_chunks(CHUNKS));
+    let w = world.borrow();
+
+    let mut rng = thread_rng();
+    let blocks: Vec<(i32, i32, i32)> = (0..1000)
+        .map(|_| {
+            (
+                rng.gen_range(-CHUNKS * CHUNK_SIZE.as_i32(), CHUNKS * CHUNK_SIZE.as_i32()),
+                rng.gen_range(-CHUNKS * CHUNK_SIZE.as_i32(), CHUNKS * CHUNK_SIZE.as_i32()),
+                rng.gen_range(-2, 50),
+            )
+        })
+        .collect();
+
+    c.bench_function("block access", |b| {
+        let mut positions = blocks.iter().cycle();
+        b.iter(|| {
+            let pos = *positions.next().unwrap();
+            let block = w.block(pos);
+            black_box(block);
+        });
+    });
+}
+
+criterion_group!(benches, small_world, tall_world, access_block);
 criterion_main!(benches);

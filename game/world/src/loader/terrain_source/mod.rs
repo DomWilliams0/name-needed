@@ -1,5 +1,6 @@
 use crate::chunk::RawChunkTerrain;
 use common::derive_more::Display;
+use std::error::Error;
 use unit::world::ChunkPosition;
 
 #[derive(Debug, Display)]
@@ -55,7 +56,6 @@ mod generate;
 mod memory;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
-use std::error::Error;
 
 #[cfg(test)]
 mod tests {

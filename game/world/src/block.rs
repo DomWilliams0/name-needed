@@ -25,7 +25,7 @@ pub struct Block {
 pub type BlockDurability = u8;
 
 /// The type of a block
-#[derive(Debug, Copy, Clone, Eq, PartialEq, IntoEnumIterator, Display)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, IntoEnumIterator, Display)]
 pub enum BlockType {
     Air,
     Dirt,

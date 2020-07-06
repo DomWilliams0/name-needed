@@ -7,7 +7,6 @@ use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::BaseTerrain;
-use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
@@ -183,7 +182,7 @@ pub(crate) fn make_collision_mesh(
 ) {
     let is_solid = |coord: &[i32; 3]| {
         let coord = [coord[0] as i32, coord[1] as i32, coord[2] as i32];
-        slab.grid()[&coord].opacity().solid()
+        slab[&coord].opacity().solid()
     };
 
     let mut add_vertex = |x: i32, y: i32, z: i32| {
@@ -337,7 +336,7 @@ mod tests {
     #[test]
     fn greedy_single_block() {
         let slab = {
-            let mut slab = Slab::empty(0);
+            let mut slab = Slab::empty();
             slab.slice_mut(LocalSliceIndex::new(0))
                 .set_block((0, 0), BlockType::Stone);
             slab
@@ -360,7 +359,7 @@ mod tests {
     #[test]
     fn greedy_column() {
         let slab = {
-            let mut slab = Slab::empty(0);
+            let mut slab = Slab::empty();
             slab.slice_mut(LocalSliceIndex::new(1))
                 .set_block((1, 1), BlockType::Stone);
             slab.slice_mut(LocalSliceIndex::new(2))
@@ -380,7 +379,7 @@ mod tests {
     #[test]
     fn greedy_plane() {
         let slab = {
-            let mut slab = Slab::empty(0);
+            let mut slab = Slab::empty();
             slab.slice_mut(LocalSliceIndex::new(0))
                 .fill(BlockType::Stone);
             slab.slice_mut(LocalSliceIndex::new(1))

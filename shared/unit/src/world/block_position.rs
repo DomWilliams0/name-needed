@@ -1,6 +1,5 @@
-use std::fmt::{Display, Error, Formatter};
-
 use common::derive_more::*;
+use common::*;
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{
@@ -65,7 +64,7 @@ impl BlockPosition {
 }
 
 impl Display for BlockPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
             "BlockPosition({}, {}, {})",

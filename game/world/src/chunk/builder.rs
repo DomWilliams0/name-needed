@@ -1,31 +1,35 @@
-use std::cell::Cell;
-use std::mem;
-use std::mem::MaybeUninit;
-
 use nd_iter::iter_3d;
 
 use common::warn;
 use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
 use crate::block::Block;
-use crate::chunk::slab_pointer::DeepClone;
+use crate::chunk::slab::DeepClone;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
 use crate::chunk::BaseTerrain;
 
-pub struct ChunkBuilder {
-    terrain: RawChunkTerrain,
-}
+pub struct ChunkBuilder(Option<RawChunkTerrain>);
 
-pub struct ChunkBuilderApply {
-    inner: Cell<ChunkBuilder>,
-}
+pub struct ChunkBuilderApply(RawChunkTerrain);
 
 impl ChunkBuilder {
     pub fn new() -> Self {
-        Self {
-            terrain: RawChunkTerrain::default(),
-        }
+        Self::with_terrain(RawChunkTerrain::default())
+    }
+
+    fn with_terrain(terrain: RawChunkTerrain) -> Self {
+        Self(Some(terrain))
+    }
+
+    fn terrain(&mut self) -> &mut RawChunkTerrain {
+        self.0
+            .as_mut()
+            .expect("builder is in an uninitialized state")
+    }
+
+    fn take_terrain(&mut self) -> RawChunkTerrain {
+        self.0.take().expect("builder is in an uninitialized state")
     }
 
     /// Will create slabs as necessary
@@ -34,7 +38,7 @@ impl ChunkBuilder {
         P: Into<BlockPosition>,
         B: Into<Block>,
     {
-        self.terrain
+        self.terrain()
             .set_block(pos, block, SlabCreationPolicy::CreateAll);
         self
     }
@@ -47,7 +51,7 @@ impl ChunkBuilder {
         let do_fill = |mut slice: SliceMut| slice.fill(block);
         let slice = slice.into();
         if !self
-            .terrain
+            .terrain()
             .slice_mut_with_policy(slice, SlabCreationPolicy::CreateAll, do_fill)
         {
             warn!("failed to create slice {:?} to fill", slice);
@@ -66,8 +70,7 @@ impl ChunkBuilder {
         let [fx, fy, fz]: [i32; 3] = from.into().into();
         let [tx, ty, tz]: [i32; 3] = to.into().into();
 
-        for (x, y, z) in iter_3d(fx..tx + 1, fy..ty + 1, fz..tz + 1) {
-            let pos = (x, y, z);
+        for pos in iter_3d(fx..=tx, fy..=ty, fz..=tz) {
             self = self.set_block(pos, block(pos));
         }
 
@@ -79,56 +82,45 @@ impl ChunkBuilder {
         S: Into<GlobalSliceIndex>,
         F: FnMut(SliceMut),
     {
-        if let Some(slice) = self.terrain.slice_mut(slice) {
+        if let Some(slice) = self.terrain().slice_mut(slice) {
             f(slice);
         }
 
         self
     }
 
-    pub fn apply<F: FnMut(&mut ChunkBuilderApply)>(self, mut f: F) -> Self {
-        let mut apply = ChunkBuilderApply {
-            inner: Cell::new(self),
-        };
+    pub fn apply<F: FnMut(&mut ChunkBuilderApply)>(mut self, mut f: F) -> Self {
+        // steal terrain out of self
+        let terrain = self.take_terrain();
+        let mut apply = ChunkBuilderApply(terrain);
+
         f(&mut apply);
-        apply.inner.into_inner()
+
+        // steal back from apply
+        Self::with_terrain(apply.0)
     }
 
     pub fn build<P: Into<ChunkPosition>>(self, pos: P) -> ChunkDescriptor {
         ChunkDescriptor {
-            terrain: self.terrain,
+            terrain: self.into_inner(),
             chunk_pos: pos.into(),
         }
     }
 
-    pub fn into_inner(self) -> RawChunkTerrain {
-        self.terrain
+    pub fn into_inner(mut self) -> RawChunkTerrain {
+        self.take_terrain()
     }
 }
 
 impl ChunkBuilderApply {
+    /// Needs to take self by reference instead of value like ChunkBuilder, so can't simply
+    /// use DerefMut
     pub fn set_block<P, B>(&mut self, pos: P, block: B) -> &mut Self
     where
         P: Into<BlockPosition>,
         B: Into<Block>,
     {
-        // swap out inner with dAnGeRoUs uNdEfInEd bEhAvIoUr - it's fine we put it back
-        #[allow(clippy::uninit_assumed_init, invalid_value)]
-        let dummy_uninit = unsafe { MaybeUninit::uninit().assume_init() };
-        let chunk_builder = self.inner.replace(dummy_uninit);
-
-        // self.inner is currently undefined
-
-        // process and get new builder
-        let new = chunk_builder.set_block(pos, block);
-
-        // swap them back
-        let dummy_uninit = self.inner.replace(new);
-
-        // forget about the dummy, otherwise it will be dropped
-        mem::forget(dummy_uninit);
-
-        // tada, back to being safe
+        self.0.set_block(pos, block, SlabCreationPolicy::CreateAll);
         self
     }
 }

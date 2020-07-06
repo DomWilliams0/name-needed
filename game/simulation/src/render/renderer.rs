@@ -1,7 +1,5 @@
-use std::fmt::Debug;
-
 use color::ColorRgb;
-use common::Vector2;
+use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::{RenderComponent, TransformComponent};

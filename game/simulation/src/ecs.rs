@@ -1,6 +1,3 @@
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-
 use specs::prelude::*;
 use specs::storage::InsertResult;
 pub use specs::{
@@ -13,6 +10,7 @@ pub use specs_derive::Component;
 use common::*;
 #[cfg(test)]
 pub use dummy::DummyComponentReceptacle;
+use std::ops::{Deref, DerefMut};
 use world::WorldRef;
 
 pub type EcsWorld = World;
@@ -102,7 +100,6 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn resource_mut<T: Resource>(&self) -> &mut T {
-        // TODO transmute magic to remove closure
         let mut res = self.write_resource::<T>();
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self

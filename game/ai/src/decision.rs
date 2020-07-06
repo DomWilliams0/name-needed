@@ -3,7 +3,7 @@ use common::*;
 use crate::consideration::InputCache;
 use crate::{AiBox, Consideration, Context};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum DecisionWeight {
     Idle,
     Normal,
@@ -68,6 +68,16 @@ pub trait Dse<C: Context> {
     }
 }
 
+impl<C: Context> Debug for dyn Dse<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("Dse")
+            .field("name", &self.name())
+            .field("weight", &self.weight())
+            .field("considerations", &self.considerations().len())
+            .finish()
+    }
+}
+
 impl DecisionWeight {
     pub fn multiplier(self) -> f32 {
         match self {
@@ -84,143 +94,9 @@ impl DecisionWeight {
 #[cfg(test)]
 mod tests {
     use crate::consideration::InputCache;
-    use crate::intelligence::Smarts;
-    use crate::{
-        AiBox, Blackboard, Consideration, ConsiderationParameter, Context, Curve, DecisionWeight,
-        Dse, Input, Intelligence, IntelligentDecision,
-    };
-    use matches::assert_matches;
-    use std::fmt::Debug;
 
-    // TODO put this in common test utils?
-
-    #[derive(Eq, PartialEq, Clone, Debug)]
-    enum TestAction {
-        Nop,
-        Eat,
-        CancelExistence,
-    }
-
-    impl Default for TestAction {
-        fn default() -> Self {
-            TestAction::Nop
-        }
-    }
-
-    #[derive(Clone, Hash, Eq, PartialEq)]
-    enum TestInput {
-        MyHunger,
-        DoAnythingElse,
-    }
-
-    impl Input<TestContext> for TestInput {
-        fn get(&self, blackboard: &mut <TestContext as Context>::Blackboard) -> f32 {
-            match self {
-                TestInput::MyHunger => blackboard.my_hunger,
-                TestInput::DoAnythingElse => 0.001,
-            }
-        }
-    }
-
-    struct TestBlackboard {
-        my_hunger: f32,
-    }
-
-    impl Blackboard for TestBlackboard {
-        #[cfg(feature = "logging")]
-        fn entity(&self) -> String {
-            String::new()
-        }
-    }
-
-    struct TestContext;
-
-    impl Context for TestContext {
-        type Blackboard = TestBlackboard;
-        type Input = TestInput;
-        type Action = TestAction;
-    }
-
-    struct MyHungerConsideration;
-
-    impl Consideration<TestContext> for MyHungerConsideration {
-        fn curve(&self) -> Curve {
-            Curve::Linear(1.0, 0.0)
-        }
-
-        fn input(&self) -> <TestContext as Context>::Input {
-            TestInput::MyHunger
-        }
-
-        fn parameter(&self) -> ConsiderationParameter {
-            ConsiderationParameter::Nop
-        }
-
-        #[cfg(feature = "logging")]
-        fn log_metric(&self, _: &str, _: f32) {}
-    }
-
-    struct CancelExistenceConsideration;
-
-    impl Consideration<TestContext> for CancelExistenceConsideration {
-        fn curve(&self) -> Curve {
-            Curve::Linear(0.0, 0.0)
-        }
-
-        fn input(&self) -> <TestContext as Context>::Input {
-            TestInput::DoAnythingElse
-        }
-
-        fn parameter(&self) -> ConsiderationParameter {
-            ConsiderationParameter::Range {
-                min: 0.0,
-                max: 20.0,
-            }
-        }
-
-        #[cfg(feature = "logging")]
-        fn log_metric(&self, _: &str, _: f32) {}
-    }
-
-    struct EatDse;
-
-    impl Dse<TestContext> for EatDse {
-        fn name(&self) -> &str {
-            "Eat"
-        }
-
-        fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-            vec![AiBox::new(MyHungerConsideration)]
-        }
-
-        fn weight(&self) -> DecisionWeight {
-            DecisionWeight::Normal
-        }
-
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
-            TestAction::Eat
-        }
-    }
-
-    struct BadDse;
-
-    impl Dse<TestContext> for BadDse {
-        fn name(&self) -> &str {
-            unimplemented!()
-        }
-
-        fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-            vec![AiBox::new(CancelExistenceConsideration)]
-        }
-
-        fn weight(&self) -> DecisionWeight {
-            DecisionWeight::Emergency
-        }
-
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
-            TestAction::CancelExistence
-        }
-    }
+    use crate::test_utils::*;
+    use crate::*;
 
     #[test]
     fn score() {
@@ -229,21 +105,5 @@ mod tests {
 
         assert!(EatDse.score(&mut blackboard, &mut cache, 1.0) > 0.9);
         assert!(BadDse.score(&mut blackboard, &mut cache, 1.0) < 0.1);
-
-        let smarts = Smarts::new(
-            vec![
-                AiBox::new(EatDse) as AiBox<dyn Dse<TestContext>>,
-                AiBox::new(BadDse) as AiBox<dyn Dse<TestContext>>,
-            ]
-            .into_iter(),
-        )
-        .unwrap();
-
-        let mut intelligence = Intelligence::new(smarts);
-        if let IntelligentDecision::New { action, .. } = intelligence.choose(&mut blackboard) {
-            assert_matches!(action, TestAction::Eat); // phew
-        } else {
-            panic!()
-        }
     }
 }

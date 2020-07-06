@@ -1,8 +1,9 @@
-use common::derive_more::*;
+use common::derive_more::{From, Into};
+use common::*;
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::WorldPosition;
-use std::fmt::{Debug, Formatter};
+use std::convert::From;
 use std::ops::{Add, Sub};
 
 /// A chunk in the world
@@ -35,7 +36,7 @@ impl Add<(i16, i16)> for ChunkPosition {
 }
 
 impl Debug for ChunkPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "[{}, {}]", self.0, self.1)
     }
 }

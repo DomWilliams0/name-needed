@@ -2,10 +2,8 @@ use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Shl};
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
-use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
-};
+
+use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition};
 
 use crate::block::BlockType;
 use crate::chunk::slice::Slice;
@@ -15,8 +13,6 @@ use crate::navigation::WorldArea;
 use crate::SliceRange;
 
 pub type ChunkId = u64;
-
-pub const BLOCK_COUNT_SLICE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
 pub struct Chunk {
     /// Unique for each chunk
@@ -40,12 +36,6 @@ impl Chunk {
 
     pub const fn pos(&self) -> ChunkPosition {
         self.pos
-    }
-
-    pub(crate) fn slab_pos(chunk_pos: ChunkPosition, slab: SlabIndex) -> WorldPosition {
-        let mut pos = WorldPosition::from(chunk_pos);
-        pos.2 = LocalSliceIndex::bottom().to_global(slab);
-        pos
     }
 
     pub fn id(&self) -> ChunkId {
@@ -116,7 +106,8 @@ mod tests {
 
     use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
-    use crate::chunk::{Chunk, ChunkBuilder, BLOCK_COUNT_SLICE};
+    use crate::chunk::{Chunk, ChunkBuilder};
+    use unit::dim::CHUNK_SIZE;
 
     #[test]
     fn chunk_ops() {
@@ -141,7 +132,7 @@ mod tests {
             .iter()
             .map(|b| b.block_type())
             .collect();
-        assert_eq!(slice.len(), BLOCK_COUNT_SLICE); // ensure exact length
+        assert_eq!(slice.len(), CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()); // ensure exact length
         assert_eq!(slice.iter().filter(|b| **b != BlockType::Air).count(), 3); // ensure exact number of filled blocks
 
         // ensure each exact coord was filled

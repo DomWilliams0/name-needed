@@ -32,11 +32,13 @@ impl SelectionWindow {
                 ui.key_value(
                     im_str!("Entity:"),
                     || Value::Some(ui_str!(in strings, "{:?}", selection.entity)),
+                    None,
                     COLOR_GREEN,
                 );
                 ui.key_value(
                     im_str!("Position:"),
                     || Value::Some(ui_str!(in strings, "{}", selection.transform.position)),
+                    None,
                     COLOR_GREEN,
                 );
 
@@ -51,6 +53,7 @@ impl SelectionWindow {
                             activity,
                             hunger,
                             path_target,
+                            society,
                         } => {
                             ui.key_value(
                                 im_str!("Velocity:"),
@@ -60,6 +63,7 @@ impl SelectionWindow {
                                         selection.transform.velocity.magnitude()
                                     ))
                                 },
+                                None,
                                 COLOR_ORANGE,
                             );
 
@@ -73,6 +77,7 @@ impl SelectionWindow {
                                         Value::Hide
                                     }
                                 },
+                                None,
                                 COLOR_ORANGE,
                             );
 
@@ -85,6 +90,7 @@ impl SelectionWindow {
                                         Value::None("Nowhere")
                                     }
                                 },
+                                None,
                                 COLOR_ORANGE,
                             );
 
@@ -97,6 +103,31 @@ impl SelectionWindow {
                                         Value::None("None")
                                     }
                                 },
+                                None,
+                                COLOR_ORANGE,
+                            );
+
+                            let society_name = society.and_then(|handle| {
+                                bundle
+                                    .blackboard
+                                    .societies
+                                    .society_by_handle(handle)
+                                    .map(|s| s.name())
+                            });
+                            ui.key_value(
+                                im_str!("Society:"),
+                                || {
+                                    if society.is_some() {
+                                        Value::Some(if let Some(name) = society_name {
+                                            ui_str!(in strings, "{}", name)
+                                        } else {
+                                            im_str!("Invalid handle")
+                                        })
+                                    } else {
+                                        Value::None("None")
+                                    }
+                                },
+                                society.map(|handle| ui_str!(in strings, "{:?}", handle)),
                                 COLOR_ORANGE,
                             );
 
@@ -104,16 +135,13 @@ impl SelectionWindow {
                                 .leaf(true)
                                 .build(ui)
                             {
-                                if let Some((tile, other_tile)) =
-                                    bundle.blackboard.selected_tiles.bounds()
+                                if let Some(tile) =
+                                    bundle.blackboard.selected_tiles.bounds_single_tile()
                                 {
-                                    // single block only
-                                    if tile == other_tile {
-                                        if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
-                                            bundle.commands.push(InputCommand::IssueDivineCommand(
-                                                DivineInputCommand::Goto(tile),
-                                            ));
-                                        }
+                                    if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
+                                        bundle.commands.push(InputCommand::IssueDivineCommand(
+                                            DivineInputCommand::Goto(tile),
+                                        ));
                                     }
 
                                     if ui.button(im_str!("Break selected block"), [0.0, 0.0]) {
@@ -128,21 +156,25 @@ impl SelectionWindow {
                             ui.key_value(
                                 im_str!("Name:"),
                                 || Value::Some(ui_str!(in strings, "{}", item.name)),
+                                None,
                                 COLOR_BLUE,
                             );
                             ui.key_value(
                                 im_str!("Class:"),
                                 || Value::Some(ui_str!(in strings, "{:?}", item.class)),
+                                None,
                                 COLOR_BLUE,
                             );
                             ui.key_value(
                                 im_str!("Condition:"),
                                 || Value::Some(ui_str!(in strings, "{}", item.condition)),
+                                None,
                                 COLOR_BLUE,
                             );
                             ui.key_value(
                                 im_str!("Mass:"),
                                 || Value::Some(ui_str!(in strings, "{}kg", item.mass)),
+                                None,
                                 COLOR_BLUE,
                             );
 
@@ -157,6 +189,7 @@ impl SelectionWindow {
                                         Value::None("Inedible")
                                     }
                                 },
+                                None,
                                 COLOR_BLUE,
                             );
                         }
@@ -189,18 +222,21 @@ impl SelectionWindow {
                             Value::Some(ui_str!(in strings, "{}x{}x{} ({})", w, h,z, w*h*z))
                         }
                     },
+                    None,
                     COLOR_BLUE,
                 );
 
                 ui.key_value(
                     im_str!("From:"),
                     || Value::Some(ui_str!(in strings, "{}", from)),
+                    None,
                     COLOR_ORANGE,
                 );
 
                 ui.key_value(
                     im_str!("To:  "),
                     || Value::Some(ui_str!(in strings, "{}", to)),
+                    None,
                     COLOR_ORANGE,
                 );
 
@@ -226,7 +262,7 @@ impl SelectionWindow {
                 };
 
                 for mut types in BlockType::into_enum_iter().chunks(3).into_iter() {
-                    types.next().map(|bt| mk_button(bt));
+                    types.next().map(&mut mk_button);
                     for bt in types {
                         ui.same_line(0.0);
                         mk_button(bt);

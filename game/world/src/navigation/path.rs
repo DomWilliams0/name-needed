@@ -10,7 +10,6 @@ pub enum NavigationError {
     SourceNotWalkable(WorldPosition),
     TargetNotWalkable(WorldPosition),
     NoSuchArea(WorldArea),
-    ZeroLengthPath,
     AreaError(AreaPathError),
     BlockError(WorldArea, BlockPathError),
 }

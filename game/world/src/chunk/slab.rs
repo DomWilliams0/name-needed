@@ -11,59 +11,69 @@ use crate::{
     grid::{Grid, GridImpl},
     grid_declare,
 };
+use std::sync::Arc;
 
-grid_declare!(struct SlabGrid<SlabGridImpl, Block>,
+grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
     CHUNK_SIZE.as_usize(),
     CHUNK_SIZE.as_usize(),
     SLAB_SIZE.as_usize()
 );
 
+/// CoW
 #[derive(Clone)]
-pub(crate) struct Slab {
-    grid: SlabGrid,
-    // TODO does a slab really need to know its index?
-    index: SlabIndex,
+#[repr(transparent)]
+pub(crate) struct Slab(Arc<SlabGridImpl>);
+
+pub trait DeepClone {
+    fn deep_clone(&self) -> Self;
 }
 
 impl Slab {
-    pub fn empty<I: Into<SlabIndex>>(index: I) -> Self {
-        Self {
-            grid: SlabGrid::default(),
-            index: index.into(),
-        }
+    pub fn empty() -> Self {
+        let terrain = SlabGrid::default().into_boxed_impl();
+        let arc = Arc::from(terrain);
+        Self(arc)
+    }
+
+    pub fn cow_clone(&mut self) -> &mut Slab {
+        let _ = Arc::make_mut(&mut self.0);
+        self
+    }
+
+    pub fn expect_mut(&mut self) -> &mut SlabGridImpl {
+        Arc::get_mut(&mut self.0).expect("expected to be the only slab reference")
+    }
+
+    pub fn expect_mut_self(&mut self) -> &mut Slab {
+        let _ = self.expect_mut();
+        self
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        Arc::strong_count(&self.0) == 1
+    }
+
+    /// Leaks
+    #[cfg(test)]
+    pub fn raw(&self) -> *const SlabGridImpl {
+        Arc::into_raw(Arc::clone(&self.0))
     }
 
     pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
         let index = index.into();
-        let (from, to) = SlabGrid::slice_range(index.slice());
-        Slice::new(&(*self.grid)[from..to])
+        let (from, to) = self.slice_range(index.slice());
+        Slice::new(&self.array()[from..to])
     }
 
     pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
         let index = index.into();
-        let (from, to) = SlabGrid::slice_range(index.slice());
-        SliceMut::new(&mut (*self.grid)[from..to])
+        let (from, to) = self.slice_range(index.slice());
+        SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 
     /// (slice index *relative to this slab*, slice)
     pub fn slices_from_bottom(&self) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice)> {
         LocalSliceIndex::slices().map(move |idx| (idx, self.slice(idx)))
-    }
-
-    pub const fn block_count() -> usize {
-        SlabGrid::FULL_SIZE
-    }
-
-    pub(crate) const fn index(&self) -> SlabIndex {
-        self.index
-    }
-
-    pub(crate) fn grid(&self) -> &SlabGrid {
-        &self.grid
-    }
-
-    pub(crate) fn grid_mut(&mut self) -> &mut SlabGrid {
-        &mut self.grid
     }
 
     // (below sliceN, this slice0, this slice1), (this slice0, this slice1, this slice2) ...
@@ -94,6 +104,23 @@ impl Slab {
     }
 }
 
+impl DeepClone for Slab {
+    fn deep_clone(&self) -> Self {
+        let grid: SlabGridImpl = (*self.0).clone();
+        Self(Arc::from(grid))
+    }
+}
+
+impl Deref for Slab {
+    type Target = SlabGridImpl;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+// ---------
+
 #[derive(Clone)]
 pub enum SliceSource<'a> {
     BelowSlab(Slice<'a>),
@@ -120,5 +147,21 @@ impl SliceSource<'_> {
             SliceSource::ThisSlab(_) => this_slab,
             SliceSource::AboveSlab(_) => this_slab + 1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::chunk::slab::Slab;
+    use crate::DeepClone;
+
+    #[test]
+    fn deep_clone() {
+        let a = Slab::empty();
+        let b = a.clone();
+        let c = a.deep_clone();
+
+        assert!(std::ptr::eq(a.raw(), b.raw()));
+        assert!(!std::ptr::eq(a.raw(), c.raw()));
     }
 }

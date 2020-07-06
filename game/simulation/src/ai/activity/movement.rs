@@ -1,7 +1,3 @@
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::marker::PhantomData;
-
 use common::derive_more::*;
 use common::*;
 use unit::world::WorldPoint;
@@ -33,7 +29,7 @@ pub struct GotoThen<W: ComponentWorld, A: Activity<W> + GoingToActivity> {
 pub type GotoActivity<W> = GotoThen<W, OneShotNopActivity>;
 
 pub trait GoingToActivity {
-    fn display_with_target(&self, f: &mut Formatter<'_>, target: WorldPoint) -> std::fmt::Result;
+    fn display_with_target(&self, f: &mut Formatter<'_>, target: WorldPoint) -> FmtResult;
 }
 
 impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> Activity<W> for GotoThen<W, A> {
@@ -66,7 +62,7 @@ impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> Activity<W> for GotoTh
                 .world
                 .component::<ArrivedAtTargetEventComponent>(ctx.entity)
             {
-                if dest.is_almost(target, 1.5) {
+                if dest.is_almost(&target, 1.5) {
                     // we've arrived - now we can start our sub action
                     debug!("arrived at activity target, beginning activity '{}'", self);
                     self.arrived = true;
@@ -77,7 +73,7 @@ impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> Activity<W> for GotoTh
 
             // check we actually found a path
             return match ctx.world.component::<FollowPathComponent>(ctx.entity) {
-                Ok(follow) if follow.target().map(|t| t.is_almost(target, 1.5)) == Some(true) => {
+                Ok(follow) if follow.target().map(|t| t.is_almost(&target, 1.5)) == Some(true) => {
                     // still path finding
                     ActivityResult::Ongoing
                 }
@@ -137,7 +133,7 @@ impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> GotoThen<W, A> {
 }
 
 impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> Display for GotoThen<W, A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         self.activity.display_with_target(f, self.target)
     }
 }
@@ -174,7 +170,7 @@ pub fn goto<W: ComponentWorld>(target: WorldPoint) -> GotoActivity<W> {
 }
 
 impl GoingToActivity for OneShotNopActivity {
-    fn display_with_target(&self, f: &mut Formatter<'_>, target: WorldPoint) -> std::fmt::Result {
+    fn display_with_target(&self, f: &mut Formatter<'_>, target: WorldPoint) -> FmtResult {
         write!(f, "Going to {}", target)
     }
 }

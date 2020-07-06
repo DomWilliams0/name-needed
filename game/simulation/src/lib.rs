@@ -18,6 +18,7 @@ pub use crate::transform::TransformComponent;
 pub use ecs::ComponentWorld;
 pub use item::InventoryComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
+pub use society::{Societies, SocietyHandle};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
@@ -36,5 +37,6 @@ mod physics;
 mod queued_update;
 mod render;
 mod simulation;
+mod society;
 mod steer;
 mod transform;

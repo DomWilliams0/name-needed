@@ -1,6 +1,4 @@
-use std::cell::{Cell, RefCell};
 use std::mem::MaybeUninit;
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -12,7 +10,7 @@ use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::ChunkPosition;
-pub use update::{SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
+pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
 use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, RawChunkTerrain, WhichChunk};
@@ -22,7 +20,8 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
 use crate::{InnerWorldRef, OcclusionChunkUpdate, WorldRef};
-use std::fmt::{Debug, Formatter};
+use std::cell::{Cell, RefCell};
+use std::ops::DerefMut;
 
 mod batch;
 mod terrain_source;
@@ -503,7 +502,7 @@ impl FinalizeBatchItem {
 }
 
 impl Debug for FinalizeBatchItem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
             "FinalizeBatchItem(chunk={:?}, consumed={:?})",

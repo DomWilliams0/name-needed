@@ -1,5 +1,4 @@
-use std::fmt::Debug;
-use std::fmt::Formatter;
+use common::*;
 use std::hint::unreachable_unchecked;
 
 use crate::ecs::{ComponentWorld, EcsWorld, Entity};
@@ -249,7 +248,7 @@ impl ItemSlot {
 }
 
 impl Debug for Contents {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Contents({} slots, ", self.size())?;
         f.debug_list().entries(self.slots.iter()).finish()?;
         write!(f, ")")

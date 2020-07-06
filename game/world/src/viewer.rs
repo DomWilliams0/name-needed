@@ -1,11 +1,9 @@
-use std::fmt::{Display, Error, Formatter};
-use std::ops::{Add, Range};
-
 use common::*;
 
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldRef};
 use std::collections::HashSet;
+use std::ops::{Add, Range};
 use unit::world::{ChunkPosition, GlobalSliceIndex};
 
 #[derive(Clone)]
@@ -75,7 +73,7 @@ impl SliceRange {
 }
 
 impl Display for SliceRange {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "[{} => {}]", self.0.slice(), self.1.slice())
     }
 }

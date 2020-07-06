@@ -1,6 +1,7 @@
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::activity::ItemsToPickUp;
+
 use crate::item::LooseItemReference;
 
 #[derive(Eq, PartialEq, Debug, Clone)]

@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use crossbeam::crossbeam_channel::Receiver;
 use specs::RunNow;
 
+use common::derive_more::Deref;
 use common::*;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
 use world::{OcclusionChunkUpdate, SliceRange, WorldRef, WorldViewer};
@@ -15,8 +16,8 @@ use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
 use crate::input::{
-    Blackboard, BlockPlacement, DivineInputCommand, InputCommand, InputEvent, InputSystem,
-    SelectedComponent, SelectedEntity, SelectedTiles,
+    BlockPlacement, DivineInputCommand, InputCommand, InputEvent, InputSystem, SelectedComponent,
+    SelectedEntity, SelectedTiles, SocietyInputCommand, UiBlackboard,
 };
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
@@ -32,14 +33,17 @@ use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
 use crate::render::{RenderComponent, RenderSystem, Renderer};
+use crate::society::job::{BreakBlocksJob, Job};
+use crate::society::{PlayerSociety, SocietyComponent};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
-use crate::ComponentWorld;
+use crate::{ComponentWorld, Societies, SocietyHandle};
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
-#[derive(Copy, Clone, Default)]
-pub struct Tick(pub u32);
+/// Monotonically increasing tick counter
+#[derive(Copy, Clone, Eq, PartialEq, Deref)]
+pub struct Tick(u32);
 
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
@@ -55,6 +59,13 @@ pub struct Simulation<R: Renderer> {
     renderer: PhantomData<R>,
     debug_renderers: DebugRenderers<R>,
     current_tick: Tick,
+}
+
+/// The tick BEFORE the game starts, never produced in tick()
+impl Default for Tick {
+    fn default() -> Self {
+        Self(0)
+    }
 }
 
 impl<R: Renderer> Simulation<R> {
@@ -158,6 +169,14 @@ impl<R: Renderer> Simulation<R> {
         self.voxel_world.clone()
     }
 
+    pub fn societies(&mut self) -> &mut Societies {
+        self.ecs_world.resource_mut()
+    }
+
+    pub fn player_society(&mut self) -> &mut Option<SocietyHandle> {
+        &mut self.ecs_world.resource_mut::<PlayerSociety>().0
+    }
+
     fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
         {
             let mut world = self.voxel_world.borrow_mut();
@@ -225,8 +244,35 @@ impl<R: Renderer> Simulation<R> {
                         DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos.below()),
                     };
 
-                    self.ecs_world
-                        .add_lazy(entity, DivineCommandComponent(command));
+                    match self.ecs_world.component_mut::<AiComponent>(entity) {
+                        Err(e) => warn!("can't issue divine command: {}", e),
+                        Ok(ai) => {
+                            // add DSE
+                            ai.add_divine_command(command.clone());
+
+                            // add component for tracking completion
+                            self.ecs_world
+                                .add_lazy(entity, DivineCommandComponent(command));
+                        }
+                    }
+                }
+                InputCommand::IssueSocietyCommand(society, ref command) => {
+                    let society = match self.societies().society_by_handle_mut(society) {
+                        Some(s) => s,
+                        None => {
+                            warn!("unknown society with handle {:?}", society);
+                            continue;
+                        }
+                    };
+
+                    let job: Box<dyn Job> = Box::new(match command {
+                        SocietyInputCommand::BreakBlocks(range) => {
+                            BreakBlocksJob::new(range.clone().below())
+                        }
+                    });
+
+                    debug!("submitting job {:?} to society {:?}", job, society);
+                    society.jobs_mut().submit(job);
                 }
             }
         }
@@ -240,7 +286,7 @@ impl<R: Renderer> Simulation<R> {
         renderer: &mut R,
         interpolation: f64,
         input: &[InputEvent],
-    ) -> (R::Target, Blackboard) {
+    ) -> (R::Target, UiBlackboard) {
         let _span = Span::Render(interpolation).begin();
 
         // process input before rendering
@@ -285,7 +331,7 @@ impl<R: Renderer> Simulation<R> {
         let target = renderer.deinit();
 
         // gather blackboard for ui
-        let blackboard = Blackboard::fetch(&self.ecs_world, &self.debug_renderers.summarise());
+        let blackboard = UiBlackboard::fetch(&self.ecs_world, &self.debug_renderers.summarise());
 
         (target, blackboard)
     }
@@ -314,6 +360,7 @@ fn register_components(_world: &mut EcsWorld) {
     register!(AiComponent);
     register!(HungerComponent);
     register!(ActivityComponent);
+    register!(SocietyComponent);
 
     // items
     register!(BaseItemComponent);
@@ -336,6 +383,8 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(SelectedEntity::default());
     world.insert(SelectedTiles::default());
     world.insert(TerrainUpdatesRes::default());
+    world.insert(Societies::default());
+    world.insert(PlayerSociety::default());
 }
 
 fn register_debug_renderers<R: Renderer>(

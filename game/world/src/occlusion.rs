@@ -1,9 +1,8 @@
-use std::fmt::{Debug, Formatter};
-use std::ops::Add;
-
 use common::derive_more::{Deref, DerefMut};
+use common::*;
 
 use crate::neighbour::NeighbourOffset;
+use std::ops::Add;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {
@@ -63,7 +62,7 @@ impl NeighbourOpacity {
 }
 
 impl Debug for NeighbourOpacity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let solids = self
             .0
             .iter()

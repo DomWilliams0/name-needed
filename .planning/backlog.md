@@ -6,7 +6,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## Entity movement
 * explicit jumping instead of teleporting to target z position
 * avoid walls/needless collisions with danger context
-* height aware path finding
+* navigation graph edges for larger step sizes
+	* can fall e.g. 2 or 3m
+	* cats can jump 2m
+	* humans can jump 1m
 * need to be able to recover if they get stuck on the edge of a ledge
 	* fixed most of the time but still possible to sometimes get fully lodged
 * lazy path evaluation (area at a time)
@@ -15,6 +18,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
 * bug: area path finding seems to needlessly poke into other areas
+* gravity
 
 ## UI
 * graph for fps/tps history
@@ -23,12 +27,18 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* live updating selection region
 	* selection shows if selected blocks are occluded
 	* depth selection
+* better entity selection
+	* click and drag to select multiple
+	* multiple clicks in the same place to iterate through overlapping entities
 
-## Entity control
-* society-level job list, populated by player actions
-	* select block(s) to destroy
+
+## Entity behaviour
+* more society level jobs
 	* pick up/haul an item
-
+	* place blocks, destroying what's currently there (DAG for dependencies)
+	* place walls (hollow rectangle)
+		* specify wall thickness and height
+* ai incentive to choose the same action as last tick
 
 ## World generation
 * biomes
@@ -50,10 +60,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## Optimizations
 ### Performance
 * allocation reuse
+	* cap cached alloc size so memory usage doesnt only go upwards
 * pooled allocations
 * per-tick arena allocator
 * spatial queries for entities
 * path finding worker thread
+	* short term path cache for src -> dst: e.g. ai system requests path for calculating cost, then movement reuses that path for following
 * periodic and staggered systems
 	* preserve determinism if possible
 * slice-aware chunk mesh caching
@@ -77,6 +89,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## Rendering
 * textures/sprites/animations
 * improved terrain colour palette
+* very simple oval shadows beneath entities to show height
 
 ## Building and testing
 * separate config and preset for tests

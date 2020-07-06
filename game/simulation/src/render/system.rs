@@ -5,7 +5,6 @@ use crate::render::shape::PhysicalShape;
 use crate::{SliceRange, TransformComponent};
 use color::ColorRgb;
 use common::*;
-use std::fmt::Debug;
 
 #[derive(Debug, Clone, Component)]
 #[storage(VecStorage)]

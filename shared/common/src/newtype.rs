@@ -1,6 +1,6 @@
+use crate::*;
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
-use std::fmt::{Debug, Display, Formatter};
 use std::ops::{AddAssign, Mul, SubAssign};
 
 #[derive(Copy, Clone)]
@@ -56,8 +56,11 @@ pub struct NormalizedFloat(f32);
 
 impl NormalizedFloat {
     pub fn new(f: f32) -> Self {
-        debug_assert!(f >= 0.0);
-        debug_assert!(f <= 1.0);
+        debug_assert!(
+            f >= 0.0 && f <= 1.0,
+            "{} out of range for normalized float",
+            f
+        );
         Self(f)
     }
 
@@ -94,13 +97,13 @@ impl SubAssign<f32> for NormalizedFloat {
 }
 
 impl<T: Debug> Debug for Proportion<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Proportion({:?}/{:?})", self.value, self.max)
     }
 }
 
 impl<T: Display> Display for Proportion<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{}/{}", self.value, self.max)
     }
 }

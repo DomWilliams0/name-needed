@@ -6,6 +6,7 @@ pub use system::{ActivityComponent, AiComponent, AiSystem};
 use unit::world::WorldPoint;
 
 pub use crate::ai::activity::AiAction;
+use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
@@ -15,7 +16,7 @@ use world::WorldArea;
 mod activity;
 mod consideration;
 mod dev;
-mod dse;
+pub mod dse;
 mod input;
 mod system;
 
@@ -23,13 +24,14 @@ pub struct AiContext;
 
 impl ai::Context for AiContext {
     /// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265
-    type Blackboard = Blackboard<'static>;
+    type Blackboard = AiBlackboard<'static>;
     type Input = AiInput;
     type Action = AiAction;
+    type AdditionalDseId = AdditionalDse;
 }
 
 /// 'a: only as long as this AI tick
-pub struct Blackboard<'a> {
+pub struct AiBlackboard<'a> {
     pub entity: Entity,
     pub position: WorldPoint,
     pub hunger: NormalizedFloat,
@@ -48,10 +50,17 @@ pub struct SharedBlackboard {
     pub area_link_cache: HashMap<(WorldArea, WorldArea), bool>,
 }
 
-impl ai::Blackboard for Blackboard<'_> {
+impl ai::Blackboard for AiBlackboard<'_> {
     #[cfg(feature = "metrics")]
     fn entity(&self) -> String {
         use crate::entity_pretty;
         format!("{}", entity_pretty!(self.entity))
     }
+}
+
+#[macro_export]
+macro_rules! dse {
+    ($dse:expr) => {
+        AiBox::new($dse) as Box<dyn Dse<AiContext>>
+    };
 }

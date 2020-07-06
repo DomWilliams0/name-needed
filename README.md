@@ -1,9 +1,11 @@
 # name-needed
 
 [![Build Status](https://travis-ci.org/DomWilliams0/name-needed.svg?branch=develop)](https://travis-ci.org/DomWilliams0/name-needed)
+[![Devlog](https://img.shields.io/badge/devlog-domwillia.ms-orange)](https://domwillia.ms)
 [![Lines](https://tokei.rs/b1/github/DomWilliams0/name-needed)](https://github.com/XAMPPRocky/tokei)
+[![Files](https://tokei.rs/b1/github/DomWilliams0/name-needed?category=files)](https://github.com/XAMPPRocky/tokei)
 
-An effort to produce an **open source**, **intuitive** and **high performance**  Dwarf Fortress-esque game. Needs a name.
+A one man effort to produce an **open source**, **intuitive** and **high performance**  Dwarf Fortress-esque game. Needs a name.
 
 * * *
 

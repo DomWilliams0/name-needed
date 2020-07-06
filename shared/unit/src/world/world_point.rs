@@ -3,11 +3,10 @@ use std::ops::{Add, AddAssign};
 
 use common::derive_more::*;
 
-use common::{Point3, Vector2, Vector3};
+use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{ChunkPosition, GlobalSliceIndex, SliceIndex, WorldPosition};
-use std::fmt::{Display, Formatter};
 use std::iter::{once, once_with};
 
 /// A point anywhere in the world
@@ -20,10 +19,10 @@ impl WorldPoint {
         SliceIndex::new(self.2 as i32)
     }
 
-    pub fn floored(self) -> Self {
+    pub fn floored(&self) -> Self {
         Self(self.0.floor(), self.1.floor(), self.2.floor())
     }
-    pub fn floor(self) -> WorldPosition {
+    pub fn floor(&self) -> WorldPosition {
         WorldPosition(
             self.0.floor() as i32,
             self.1.floor() as i32,
@@ -31,7 +30,7 @@ impl WorldPoint {
         )
     }
 
-    pub fn ceil(self) -> WorldPosition {
+    pub fn ceil(&self) -> WorldPosition {
         WorldPosition(
             self.0.ceil() as i32,
             self.1.ceil() as i32,
@@ -39,12 +38,12 @@ impl WorldPoint {
         )
     }
 
-    pub fn floor_then_ceil(self) -> impl Iterator<Item = WorldPosition> {
+    pub fn floor_then_ceil(&self) -> impl Iterator<Item = WorldPosition> + '_ {
         // TODO floor_then_ceil is terribly inefficient, try without the lazy eval
         once(self.floor()).chain(once_with(move || self.ceil()))
     }
 
-    pub fn round(self) -> WorldPosition {
+    pub fn round(&self) -> WorldPosition {
         WorldPosition(
             self.0.round() as i32,
             self.1.round() as i32,
@@ -52,10 +51,15 @@ impl WorldPoint {
         )
     }
 
-    pub fn is_almost(self, other: Self, horizontal_distance: f32) -> bool {
+    pub fn is_almost(&self, other: &Self, horizontal_distance: f32) -> bool {
         (self.2 - other.2).abs() <= 1.0
             && ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2))
                 <= horizontal_distance.powi(2)
+    }
+
+    pub fn distance2(&self, other: impl Into<Self>) -> f32 {
+        let other = other.into();
+        (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2) + (self.2 - other.2).powi(2)
     }
 }
 
@@ -159,7 +163,7 @@ impl Add<GlobalSliceIndex> for WorldPoint {
 }
 
 impl Display for WorldPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "({:.2}, {:.2}, {:.2})", self.0, self.1, self.2)
     }
 }

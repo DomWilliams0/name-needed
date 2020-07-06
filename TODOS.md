@@ -1,22 +1,23 @@
-# TODOs (156)
+# TODOs (169)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (3)
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
    * `/// TODO pooled vec/slice rather than Vec each time`
    * `// TODO optimization: dont consider all considerations every time`
-   * `// TODO put this in common test utils?`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (4)
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (7)
    * `// TODO pool/arena allocator`
-   * `// TODO optimize: not all decisions need to be checked each time`
+   * `// TODO optimize: not all decisions need to be checked each time, but at least zero all scores`
+   * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO dumber agents shouldn't always choose the best`
+   * `// TODO reuse allocation`
+   * `// TODO benchmark adding and popping smarts`
+   * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
- * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
+ * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (4)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
    * `// TODO add ItemUseType which hints at which slot to use`
-   * `// TODO the item moved while going to pick it up, what do`
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
    * `// TODO failure/interrupt reason`
@@ -32,27 +33,37 @@
    * `// TODO exertion depends on the tool and block`
  * [game/simulation/src/ai/dse/items.rs](game/simulation/src/ai/dse/items.rs) (1)
    * `// TODO "I can/want to move" consideration`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
+ * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
+   * `// TODO calculate path and use length, cache path which can be reused by movement system`
+   * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO arena allocated vec return value`
    * `// TODO clearly needs some spatial partitioning here`
+   * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (2)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (4)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
+   * `// TODO provide READ ONLY DSEs to ai intelligence`
+   * `// TODO use dynstack to avoid so many small temporary allocations?`
  * [game/simulation/src/backend.rs](game/simulation/src/backend.rs) (1)
    * `type Error: Debug; // TODO Error!!`
  * [game/simulation/src/dev.rs](game/simulation/src/dev.rs) (1)
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
- * [game/simulation/src/ecs.rs](game/simulation/src/ecs.rs) (1)
-   * `// TODO transmute magic to remove closure`
  * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (1)
    * `// TODO add must_use to all builder patterns`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (2)
+ * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
+   * `// TODO use ui allocation arena here too`
+ * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
+   * `// TODO just use a dyn Job instead of redefining jobs as an identical enum?`
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
    * `// TODO spatial query rather than checking every entity ever`
+   * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
+   * `// TODO can no longer select a single block, its always 2x2`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (10)
    * `// TODO this could do with a builder`
    * `pub class: ItemClass, // TODO possible for an item to have multiple classes?`
@@ -103,6 +114,12 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `// TODO per tick alloc/reuse buf`
+ * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)
+   * `// TODO reuse allocation`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
+   * `// TODO HaulBlocks(block type, near position)`
+   * `// TODO PlaceBlocks(block type, at position)`
+   * `// TODO temporary box allocation is gross`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
@@ -115,8 +132,6 @@
    * `// TODO still does a lot of unnecessary initialization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (1)
-   * `// TODO does a slab really need to know its index?`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
    * `// TODO make not pub`
  * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (8)
@@ -128,8 +143,7 @@
    * `// TODO discover internal area links`
    * `// TODO transmute lifetimes instead`
    * `// TODO 1 area at z=0`
- * [game/world/src/grid.rs](game/world/src/grid.rs) (2)
-   * `// TODO pub hardcoded :(`
+ * [game/world/src/grid.rs](game/world/src/grid.rs) (1)
    * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
  * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
    * `// TODO cache full finalized chunks`
@@ -165,8 +179,7 @@
    * `// TODO reuse vec allocation`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
- * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (2)
-   * `// TODO shouldnt be pub`
+ * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (1)
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (2)
    * `// TODO smallvecs`
@@ -182,10 +195,12 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (4)
+ * [game/world/src/world.rs](game/world/src/world.rs) (6)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO reuse hashset allocation`
+   * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
+   * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
@@ -217,6 +232,8 @@
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
    * `// TODO helper for this-1`
+ * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)
+   * `// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (2)

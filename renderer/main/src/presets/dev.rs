@@ -9,7 +9,6 @@ use simulation::{
 use crate::GamePreset;
 use color::ColorRgb;
 use config::WorldSource;
-use std::marker::PhantomData;
 
 pub struct DevGamePreset<R: Renderer> {
     _phantom: PhantomData<R>,
@@ -78,6 +77,13 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         let world = worldref.borrow();
         if randoms > 0 {
             info!("adding {} random entities", randoms);
+
+            let society = sim
+                .societies()
+                .new_society("Nice People".to_owned())
+                .unwrap();
+            *sim.player_society() = Some(society);
+
             let _human = (0..randoms)
                 .map(|i| {
                     let (pos, radius) = {
@@ -103,6 +109,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
                         .with_height(1.0)
                         .with_shape(PhysicalShape::circle(radius))
                         .with_color(color)
+                        .with_society(society)
                         .build_human(NormalizedFloat::new(random::get().gen_range(0.4, 0.5)))
                     {
                         Err(e) => {

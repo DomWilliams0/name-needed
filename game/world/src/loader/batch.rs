@@ -1,17 +1,16 @@
+use common::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::fmt::{Debug, Formatter};
-
-use common::*;
 
 type BatchId = u16;
+type BatchSize = u16;
 
 #[derive(Copy, Clone)]
 pub struct UpdateBatch {
     batch_id: BatchId,
 
-    batch_size: u8,
-    my_idx: u8,
+    batch_size: BatchSize,
+    my_idx: BatchSize,
 }
 
 pub struct UpdateBatchBuilder {
@@ -39,7 +38,8 @@ impl UpdateBatch {
 
         let batch_size = batch_size.try_into().unwrap_or_else(|_| {
             panic!(
-                "max batch size is too small for batch of size {}",
+                "max batch size ({}) is too small for batch of size {}",
+                BatchSize::MAX,
                 batch_size
             )
         });
@@ -133,7 +133,7 @@ impl<U> Default for UpdateBatcher<U> {
 }
 
 impl Debug for UpdateBatch {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(
             f,
             "UpdateBatch(id={}, {}/{})",

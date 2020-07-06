@@ -22,7 +22,7 @@ pub trait Consideration<C: Context> {
         input_cache: &mut InputCache<C>,
     ) -> NormalizedFloat {
         let input = input_cache.get(self.input(), blackboard);
-        self.parameter().apply(input)
+        self.consider_input(input)
     }
 
     fn name(&self) -> &'static str {
@@ -31,6 +31,10 @@ pub trait Consideration<C: Context> {
 
     #[cfg(feature = "logging")]
     fn log_metric(&self, entity: &str, value: f32) {}
+
+    fn consider_input(&self, input: f32) -> NormalizedFloat {
+        self.parameter().apply(input)
+    }
 }
 
 impl ConsiderationParameter {
@@ -49,8 +53,12 @@ pub enum Curve {
     Identity,
     Linear(f32, f32),
     Quadratic(f32, f32, f32),
-    // d(a^(bx+c)) + e
+
+    /// d(a^(bx+c)) + e
     Exponential(f32, f32, f32, f32, f32),
+
+    /// a + (b * sqrt(c * x))
+    SquareRoot(f32, f32, f32),
 }
 
 impl Curve {
@@ -62,6 +70,7 @@ impl Curve {
             Curve::Linear(m, c) => (m * x) + c,
             Curve::Quadratic(a, b, c) => (a * x.powi(2) + (b * x) + c),
             Curve::Exponential(a, b, c, d, e) => (a.powf((b * x) + c) * d) + e,
+            Curve::SquareRoot(a, b, c) => (a + (b * (c * x).sqrt())),
         })
     }
 }

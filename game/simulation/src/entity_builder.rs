@@ -1,7 +1,7 @@
 use color::ColorRgb;
 use common::*;
 use unit::world::{GlobalSliceIndex, WorldPosition};
-use world::InnerWorldRef;
+use world::{InnerWorldRef, WorldArea};
 
 use crate::ai::{ActivityComponent, AiComponent};
 use crate::ecs::{entity_id, ComponentBuilder, ComponentWorld, Entity};
@@ -13,6 +13,7 @@ use crate::movement::DesiredMovementComponent;
 use crate::needs::HungerComponent;
 use crate::path::FollowPathComponent;
 use crate::render::PhysicalShape;
+use crate::society::{SocietyComponent, SocietyHandle};
 use crate::steer::SteeringComponent;
 use crate::{RenderComponent, TransformComponent};
 
@@ -25,6 +26,7 @@ pub struct EntityBuilder<'a, W: ComponentWorld> {
     height: Option<f32>,
     shape: Option<PhysicalShape>,
     color: Option<ColorRgb>,
+    society: Option<SocietyHandle>,
 }
 
 impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
@@ -36,6 +38,7 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
             height: None,
             shape: None,
             color: None,
+            society: None,
         }
     }
 
@@ -59,8 +62,15 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
         self
     }
 
+    pub fn with_society(mut self, society: SocietyHandle) -> Self {
+        self.society = Some(society);
+        self
+    }
+
     pub fn build_human(self, starting_hunger: NormalizedFloat) -> Result<Entity, &'static str> {
-        let entity = self
+        let society = self.society;
+
+        let mut builder = self
             .build()?
             .with_(DesiredMovementComponent::default())
             .with_(SteeringComponent::default())
@@ -68,8 +78,13 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
             .with_(HungerComponent::new(starting_hunger, 3000))
             .with_(ActivityComponent::default())
             .with_(AiComponent::human())
-            .with_(InventoryComponent::new(2 /* 2 hands */, 2, Some(0)))
-            .build_();
+            .with_(InventoryComponent::new(2 /* 2 hands */, 2, Some(0)));
+
+        if let Some(society) = society {
+            builder = builder.with_(SocietyComponent { handle: society });
+        }
+
+        let entity = builder.build_();
 
         event_verbose!(Event::CreateEntity(entity_id(entity)));
         Ok(entity)
@@ -99,7 +114,7 @@ impl<'a, W: ComponentWorld> EntityBuilder<'a, W> {
 
             let world = self.world.voxel_world();
             let pos = pos.resolve(&world.borrow())?;
-            debug_assert!(world.borrow().area(pos).is_some());
+            debug_assert!(Option::<WorldArea>::from(world.borrow().area(pos)).is_some());
             TransformComponent::new(pos.centred(), shape.radius(), height)
         };
 

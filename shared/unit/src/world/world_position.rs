@@ -1,15 +1,14 @@
-use std::fmt::{Display, Error, Formatter};
 use std::ops::Add;
 
 use common::derive_more::*;
 
-use common::Point3;
+use common::*;
 
 use crate::view::ViewPoint;
 use crate::world::{ChunkPosition, GlobalSliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
@@ -35,7 +34,7 @@ impl WorldPosition {
 }
 
 impl Display for WorldPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "({}, {}, {})", self.0, self.1, self.2.slice())
     }
 }

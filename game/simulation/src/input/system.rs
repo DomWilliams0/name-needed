@@ -2,7 +2,7 @@ use crate::ecs::*;
 use crate::input::{InputEvent, SelectType, WorldColumn};
 use crate::{RenderComponent, TransformComponent};
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::{WorldPosition, WorldPositionRange};
 use world::WorldRef;
 
 pub struct InputSystem<'a> {
@@ -19,12 +19,8 @@ pub struct SelectedComponent;
 #[derive(Default)]
 pub struct SelectedEntity(Option<Entity>);
 
-#[derive(Clone)]
-pub enum SelectedTiles {
-    None,
-    Single(WorldPosition),
-    Range(WorldPosition, WorldPosition),
-}
+#[derive(Default, Clone)]
+pub struct SelectedTiles(Option<WorldPositionRange>);
 
 const TILE_SELECTION_LIMIT: i32 = 64;
 
@@ -51,14 +47,14 @@ impl<'a> System<'a> for InputSystem<'a> {
         let resolve_entity = |select_pos: &WorldColumn| {
             resolve_walkable_pos(select_pos).and_then(|point| {
                 // TODO spatial query rather than checking every entity ever
+                // TODO multiple clicks in the same place should iterate through all entities in selection range
 
-                const SELECT_THRESHOLD: f32 = 1.0;
-                let point = Point3::from(point);
+                const SELECT_THRESHOLD: f32 = 1.25;
                 (&entities, &transform, &render)
                     .join()
                     .find(|(_, transform, _)| {
-                        point.distance2(transform.position.into()) < SELECT_THRESHOLD.powi(2)
-                    }) // just choose the first in range
+                        transform.position.is_almost(&point, SELECT_THRESHOLD)
+                    }) // just choose the first in range for now
                     .map(|(e, _, _)| e)
             })
         };
@@ -83,12 +79,13 @@ impl<'a> System<'a> for InputSystem<'a> {
 
                 InputEvent::Click(SelectType::Right, _) => {
                     // unselect tile selection
-                    *selected_block = SelectedTiles::None
+                    selected_block.0 = None;
                 }
 
                 InputEvent::Select(SelectType::Right, from, to) => {
                     // select tiles
-                    *selected_block = match (resolve_walkable_pos(from), resolve_walkable_pos(to)) {
+                    selected_block.0 = match (resolve_walkable_pos(from), resolve_walkable_pos(to))
+                    {
                         (Some(from), Some(to)) => {
                             let (to, from) = {
                                 // round away from first point
@@ -123,13 +120,14 @@ impl<'a> System<'a> for InputSystem<'a> {
                                     y -= (dy - TILE_SELECTION_LIMIT) * mul_y;
                                 }
 
+                                // TODO can no longer select a single block, its always 2x2
                                 (WorldPosition(x, y, to.slice()), from)
                             };
 
                             debug!("selected block region {:?} -> {:?}", from, to);
-                            SelectedTiles::Range(from, to)
+                            Some(WorldPositionRange::Range(from, to))
                         }
-                        _ => SelectedTiles::None,
+                        _ => None,
                     }
                 }
             }
@@ -157,25 +155,18 @@ impl SelectedEntity {
         }
     }
 }
-
-impl Default for SelectedTiles {
-    fn default() -> Self {
-        SelectedTiles::None
-    }
-}
-
 impl SelectedTiles {
-    /// Inclusive
+    pub fn range(&self) -> Option<WorldPositionRange> {
+        self.0.as_ref().cloned()
+    }
     pub fn bounds(&self) -> Option<(WorldPosition, WorldPosition)> {
-        match *self {
-            SelectedTiles::None => None,
-            SelectedTiles::Single(pos) => Some((pos, pos)),
-            SelectedTiles::Range(from, to) => {
-                let dx = (to.0 - from.0).signum();
-                let dy = (to.1 - from.1).signum();
+        self.0.as_ref().map(|range| range.bounds())
+    }
 
-                Some((from, to + (-dx, -dy, 0)))
-            }
-        }
+    pub fn bounds_single_tile(&self) -> Option<WorldPosition> {
+        self.0
+            .as_ref()
+            .filter(|range| matches!(range, WorldPositionRange::Single(_)))
+            .map(|range| range.bounds().0)
     }
 }

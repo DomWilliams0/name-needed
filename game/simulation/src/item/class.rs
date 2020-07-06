@@ -1,7 +1,7 @@
 use crate::ecs::Entity;
 use crate::item::{BaseItemComponent, ItemSlot};
 use crate::{entity_pretty, ComponentWorld};
-use std::fmt::{Display, Formatter};
+use common::*;
 
 #[derive(Eq, PartialEq, Copy, Clone, Hash, Debug, Ord, PartialOrd)]
 pub enum ItemClass {
@@ -61,7 +61,7 @@ impl<W: ComponentWorld> ItemFilterable for (&ItemSlot, Option<&W>) {
 }
 
 impl Display for ItemFilter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             ItemFilter::Class(c) => write!(f, "item.class == {:?}", c),
             ItemFilter::SpecificEntity(e) => write!(f, "item == {}", entity_pretty!(e)),

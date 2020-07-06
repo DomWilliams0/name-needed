@@ -17,7 +17,7 @@ pub enum ActivityResult {
     Finished(Finish),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Finish {
     Succeeded,
     Failed,

@@ -21,6 +21,16 @@ pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use newtype::{NormalizedFloat, Proportion};
 pub use struclog::{self, *};
 
+// common imports that annoyingly get resolved to other pub exports of std/core
+// https://github.com/intellij-rust/intellij-rust/issues/5654
+pub use std::{
+    error::Error,
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    hash::Hash,
+    iter::{empty, once},
+    marker::PhantomData,
+};
+
 pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;
 pub type Vector2 = cgmath::Vector2<F>;

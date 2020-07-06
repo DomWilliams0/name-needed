@@ -1,9 +1,8 @@
-use crate::ai::consideration::HasDivineCommandConsideration;
-use crate::ai::{AiContext, DivineCommandComponent};
-use crate::ComponentWorld;
+use crate::ai::consideration::ConstantConsideration;
+use crate::ai::{AiAction, AiContext};
 use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 
-pub struct ObeyDivineCommandDse;
+pub struct ObeyDivineCommandDse(pub AiAction);
 
 impl Dse<AiContext> for ObeyDivineCommandDse {
     fn name(&self) -> &str {
@@ -11,22 +10,14 @@ impl Dse<AiContext> for ObeyDivineCommandDse {
     }
 
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![AiBox::new(HasDivineCommandConsideration)]
+        vec![AiBox::new(ConstantConsideration(1.0))]
     }
 
     fn weight(&self) -> DecisionWeight {
         DecisionWeight::AbsoluteOverride
     }
 
-    fn action(
-        &self,
-        blackboard: &mut <AiContext as Context>::Blackboard,
-    ) -> <AiContext as Context>::Action {
-        let divine_command = blackboard
-            .world
-            .component::<DivineCommandComponent>(blackboard.entity)
-            .expect("divine command expected to be present");
-
-        divine_command.0.clone()
+    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
+        self.0.clone()
     }
 }

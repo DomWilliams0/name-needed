@@ -1,10 +1,8 @@
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
-
 use common::derive_more::*;
+use common::*;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A slice in the world
 pub type GlobalSliceIndex = SliceIndex<Chunk>;
@@ -147,13 +145,13 @@ impl From<i32> for LocalSliceIndex {
 }
 
 impl Debug for SliceIndex<Chunk> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("GlobalSliceIndex").field(&self.0).finish()
     }
 }
 
 impl Debug for SliceIndex<Slab> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("LocalSliceIndex").field(&self.0).finish()
     }
 }

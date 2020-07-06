@@ -29,7 +29,7 @@ impl Consideration<AiContext> for HungerConsideration {
 #[cfg(test)]
 mod tests {
     use crate::ai::consideration::HungerConsideration;
-    use crate::ai::Blackboard;
+    use crate::ai::AiBlackboard;
     use ai::{Consideration, InputCache};
     use common::NormalizedFloat;
     use std::mem::MaybeUninit;
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn hunger() {
         // initialize blackboard with only what we want
-        let blackboard = MaybeUninit::<Blackboard>::zeroed();
+        let blackboard = MaybeUninit::<AiBlackboard>::zeroed();
         let mut blackboard = unsafe { blackboard.assume_init() };
         let mut cache = InputCache::default();
 

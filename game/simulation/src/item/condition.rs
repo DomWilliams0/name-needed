@@ -1,7 +1,4 @@
-use std::fmt::Display;
-use std::fmt::Formatter;
-
-use common::{NormalizedFloat, Proportion};
+use common::*;
 
 type Durability = u16;
 
@@ -71,7 +68,7 @@ impl ItemConditionGrade {
 }
 
 impl Display for ItemCondition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{} ({:?})", self.value, self.grade)
     }
 }

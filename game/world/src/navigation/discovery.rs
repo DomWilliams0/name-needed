@@ -11,15 +11,14 @@ use crate::grid_declare;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 
-grid_declare!(struct _AreaDiscoveryGrid<AreaDiscoveryGridImpl, _AreaDiscoveryGridBlock>,
+grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
     CHUNK_SIZE.as_usize(),
     SLAB_SIZE.as_usize()
 );
 
-// TODO shouldnt be pub
 #[derive(Default, Copy, Clone)]
-pub struct _AreaDiscoveryGridBlock {
+struct AreaDiscoveryGridBlock {
     /// is material solid
     solid: bool,
 
@@ -28,7 +27,7 @@ pub struct _AreaDiscoveryGridBlock {
 
 #[derive(Default)]
 pub(crate) struct AreaDiscovery<'a> {
-    grid: _AreaDiscoveryGrid,
+    grid: AreaDiscoveryGrid,
 
     /// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs
     queue: Vec<(CoordType, Option<(CoordType, EdgeCost)>)>,
@@ -48,9 +47,9 @@ pub(crate) struct AreaDiscovery<'a> {
     above_bot_slice: Option<Slice<'a>>,
 }
 
-impl Into<_AreaDiscoveryGridBlock> for &Block {
-    fn into(self) -> _AreaDiscoveryGridBlock {
-        _AreaDiscoveryGridBlock {
+impl Into<AreaDiscoveryGridBlock> for &Block {
+    fn into(self) -> AreaDiscoveryGridBlock {
+        AreaDiscoveryGridBlock {
             solid: self.opacity().solid(),
             area: Default::default(),
         }
@@ -66,13 +65,14 @@ enum VerticalOffset {
 impl<'a> AreaDiscovery<'a> {
     pub fn from_slab(
         slab: &Slab,
+        slab_index: SlabIndex,
         below_top_slice: Option<Slice<'a>>,
         above_bot_slice: Option<Slice<'a>>,
     ) -> Self {
-        let mut grid = _AreaDiscoveryGrid::default();
+        let mut grid = AreaDiscoveryGrid::default();
 
         for i in grid.indices() {
-            let b: &Block = &slab.grid()[i];
+            let b: &Block = &slab[i];
             grid[i] = b.into();
         }
 
@@ -82,7 +82,7 @@ impl<'a> AreaDiscovery<'a> {
             current: SlabAreaIndex::FIRST,
             areas: Vec::new(),
             block_graphs: HashMap::new(),
-            slab_index: slab.index(),
+            slab_index,
             below_top_slice,
             above_bot_slice,
         }
@@ -92,8 +92,8 @@ impl<'a> AreaDiscovery<'a> {
     /// Returns area count
     pub fn flood_fill_areas(&mut self) -> u16 {
         let range = {
-            let (s0_start, _) = _AreaDiscoveryGrid::slice_range(0);
-            let end = _AreaDiscoveryGrid::FULL_SIZE;
+            let (s0_start, _) = self.grid.slice_range(0);
+            let end = AreaDiscoveryGrid::FULL_SIZE;
             s0_start..end
         };
 
@@ -111,7 +111,7 @@ impl<'a> AreaDiscovery<'a> {
         let mut count = 0;
 
         self.queue.clear();
-        self.queue.push((self.grid.unflatten_index(start), None));
+        self.queue.push((self.grid.unflatten(start), None));
         let mut graph = BlockGraph::new();
 
         while let Some((current, src)) = self.queue.pop() {
@@ -212,7 +212,7 @@ impl<'a> AreaDiscovery<'a> {
         &self,
         block: CoordType,
         offset: VerticalOffset,
-    ) -> _AreaDiscoveryGridBlock {
+    ) -> AreaDiscoveryGridBlock {
         let [x, y, z] = block;
         const TOP: i32 = SLAB_SIZE.as_i32() - 1;
 
@@ -224,7 +224,7 @@ impl<'a> AreaDiscovery<'a> {
                     (&above_slice[(x as BlockCoord, y as BlockCoord)]).into()
                 } else {
                     // not present: this must be the top of the world
-                    _AreaDiscoveryGridBlock {
+                    AreaDiscoveryGridBlock {
                         solid: false,
                         ..Default::default()
                     }
@@ -238,7 +238,7 @@ impl<'a> AreaDiscovery<'a> {
                     (&below_slice[(x as BlockCoord, y as BlockCoord)]).into()
                 } else {
                     // not present: this must be the bottom of the world
-                    _AreaDiscoveryGridBlock {
+                    AreaDiscoveryGridBlock {
                         solid: false,
                         ..Default::default()
                     }
@@ -264,9 +264,9 @@ impl<'a> AreaDiscovery<'a> {
     }
 
     pub fn apply(self, slab: &mut Slab) {
-        let grid = slab.grid_mut();
-        for i in self.grid.indices() {
-            *grid[i].area_mut() = self.grid[i].area;
+        for i in slab.indices() {
+            let slab = slab.expect_mut();
+            *slab[i].area_mut() = self.grid[i].area;
         }
     }
 }

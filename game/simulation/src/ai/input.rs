@@ -1,15 +1,14 @@
-use std::collections::hash_map::Entry;
-use std::fmt::{Display, Formatter};
-
 use ai::Context;
 use common::*;
-use unit::world::WorldPoint;
+use unit::world::{WorldPoint, WorldPosition};
 use world::WorldRef;
 
-use crate::ai::{AiContext, Blackboard, DivineCommandComponent, SharedBlackboard};
+use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable};
 use crate::{InventoryComponent, TransformComponent};
+use std::collections::hash_map::Entry;
+use world::block::BlockType;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
@@ -28,7 +27,15 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
-    DivineCommand,
+    MyDistance2To(WorldPosition),
+
+    BlockTypeMatches(WorldPosition, BlockTypeMatch),
+}
+
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BlockTypeMatch {
+    Is(BlockType),
+    IsNot(BlockType),
 }
 
 impl ai::Input<AiContext> for AiInput {
@@ -52,12 +59,18 @@ impl ai::Input<AiContext> for AiInput {
                 max_count,
             } => search_local_area_with_cache(blackboard, filter, *max_radius, *max_count),
 
-            AiInput::DivineCommand => {
-                if blackboard
-                    .world
-                    .component::<DivineCommandComponent>(blackboard.entity)
-                    .is_ok()
-                {
+            AiInput::MyDistance2To(pos) => {
+                let target = pos.centred();
+                blackboard.position.distance2(target)
+            }
+            AiInput::BlockTypeMatches(pos, bt_match) => {
+                let world = blackboard.world.voxel_world();
+                let block_type = world
+                    .borrow()
+                    .block(*pos)
+                    .map(|b| b.block_type())
+                    .unwrap_or(BlockType::Air);
+                if *bt_match == block_type {
                     1.0
                 } else {
                     0.0
@@ -68,7 +81,7 @@ impl ai::Input<AiContext> for AiInput {
 }
 
 fn search_inventory_with_cache(
-    blackboard: &mut Blackboard,
+    blackboard: &mut AiBlackboard,
     inventory: &InventoryComponent,
     filter: &ItemFilter,
 ) -> bool {
@@ -89,7 +102,7 @@ fn search_inventory_with_cache(
 pub type LocalAreaSearch = Vec<(Entity, WorldPoint, f32, NormalizedFloat)>;
 
 fn search_local_area_with_cache(
-    blackboard: &mut Blackboard,
+    blackboard: &mut AiBlackboard,
     filter: &ItemFilter,
     max_radius: u32,
     max_count: u32,
@@ -237,7 +250,7 @@ fn search_local_area(
 }
 
 impl Display for AiInput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             AiInput::Hunger => write!(f, "Hunger"),
             AiInput::HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
@@ -251,7 +264,29 @@ impl Display for AiInput {
                 max_count, max_radius, filter
             ),
             AiInput::Constant(_) => write!(f, "Constant"),
-            AiInput::DivineCommand => write!(f, "Has divine command"),
+
+            AiInput::MyDistance2To(pos) => write!(f, "Distance to {}", pos),
+
+            // TODO lowercase BlockType
+            AiInput::BlockTypeMatches(pos, bt_match) => write!(f, "{} at {}", bt_match, pos),
+        }
+    }
+}
+
+impl Display for BlockTypeMatch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            BlockTypeMatch::Is(bt) => write!(f, "Is block {}", bt),
+            BlockTypeMatch::IsNot(bt) => write!(f, "Is block not {}", bt),
+        }
+    }
+}
+
+impl PartialEq<BlockType> for BlockTypeMatch {
+    fn eq(&self, other: &BlockType) -> bool {
+        match self {
+            BlockTypeMatch::Is(bt) => bt == other,
+            BlockTypeMatch::IsNot(bt) => bt != other,
         }
     }
 }

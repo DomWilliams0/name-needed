@@ -1,5 +1,3 @@
-use std::fmt::Formatter;
-
 use common::derive_more::Display;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -51,7 +49,7 @@ impl<W: ComponentWorld> Activity<W> for BreakBlockActivity {
 
     fn exertion(&self) -> f32 {
         // TODO exertion depends on the tool and block
-        2.0
+        1.4
     }
 }
 
@@ -68,7 +66,7 @@ impl BreakBlockActivity {
 }
 
 impl GoingToActivity for BreakBlockActivity {
-    fn display_with_target(&self, f: &mut Formatter<'_>, _: WorldPoint) -> std::fmt::Result {
+    fn display_with_target(&self, f: &mut Formatter<'_>, _: WorldPoint) -> FmtResult {
         write!(f, "Breaking block at {}", self.pos)
     }
 }

@@ -1,6 +1,6 @@
 use imgui::{ImStr, Ui};
 
-use simulation::input::{Blackboard, InputCommand};
+use simulation::input::{InputCommand, UiBlackboard};
 use simulation::PerfAvg;
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
@@ -8,16 +8,18 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 mod debug_renderer;
 mod perf;
 mod selection;
+mod society;
 
 pub(crate) use debug_renderer::DebugWindow;
 pub(crate) use perf::PerformanceWindow;
 pub(crate) use selection::SelectionWindow;
+pub(crate) use society::SocietyWindow;
 
 pub struct UiBundle<'a> {
     pub ui: &'a imgui::Ui<'a>,
     pub strings: &'a PerFrameStrings,
     pub perf: &'a PerfAvg,
-    pub blackboard: &'a Blackboard<'a>,
+    pub blackboard: &'a UiBlackboard<'a>,
     pub commands: &'a mut Vec<InputCommand>,
 }
 
@@ -29,11 +31,23 @@ enum Value<'a> {
 }
 
 trait UiExt {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(&'a self, key: &ImStr, value: F, color: [f32; 4]);
+    fn key_value<'a, F: FnOnce() -> Value<'a>>(
+        &'a self,
+        key: &ImStr,
+        value: F,
+        tooltip: Option<&ImStr>,
+        color: [f32; 4],
+    );
 }
 
 impl UiExt for Ui<'_> {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(&'a self, key: &ImStr, value: F, color: [f32; 4]) {
+    fn key_value<'a, F: FnOnce() -> Value<'a>>(
+        &'a self,
+        key: &ImStr,
+        value: F,
+        tooltip: Option<&ImStr>,
+        color: [f32; 4],
+    ) {
         let value = value();
         if let Value::Hide = value {
             return;
@@ -50,6 +64,12 @@ impl UiExt for Ui<'_> {
             }
             Value::None(val) => self.text_disabled(val),
             _ => unreachable!(),
+        };
+
+        if let Some(tooltip) = tooltip {
+            if self.is_item_hovered() {
+                self.tooltip_text(tooltip);
+            }
         }
     }
 }
@@ -57,3 +77,4 @@ impl UiExt for Ui<'_> {
 const COLOR_GREEN: [f32; 4] = [0.4, 0.77, 0.33, 1.0];
 const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
 const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
+const COLOR_RED: [f32; 4] = [0.9, 0.3, 0.2, 1.0];

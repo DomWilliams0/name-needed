@@ -1,5 +1,3 @@
-use std::fmt::{Display, Formatter};
-
 use common::derive_more::Constructor;
 use common::*;
 use unit::world::WorldPoint;
@@ -181,14 +179,11 @@ impl GoPickUpItemActivity {
                     // still got a transform
                     voxel_world.area_for_point(transform.position)
                 }) {
-                Some((current_pos, _)) => {
-                    // TODO the item moved while going to pick it up, what do
-                    assert_eq!(current_pos, known_pos.floor(), "item moved");
-
-                    // this item is good to path find to
+                Some((current_pos, _)) if current_pos == known_pos.floor() => {
+                    // this item is good to path find to and still in the same place we expect
                     true
                 }
-                None => false, // move onto next item because this one is not accessible anymore
+                _ => false, // move onto next item because this one is not accessible anymore
             }
         });
 
@@ -227,13 +222,13 @@ impl GoPickUpItemActivity {
 }
 
 impl Display for GoPickUpItemActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Going to pick up item")
     }
 }
 
 impl Display for UseHeldItemActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Using held item")?;
         if let Some(class) = self.item_class {
             write!(f, " ({:?})", class)?;

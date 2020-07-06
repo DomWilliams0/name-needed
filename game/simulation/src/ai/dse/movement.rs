@@ -12,11 +12,11 @@ impl Dse<AiContext> for WanderDse {
     }
 
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![AiBox::new(ConstantConsideration(0.5))]
+        vec![AiBox::new(ConstantConsideration(0.2))]
     }
 
     fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
+        DecisionWeight::Idle
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {

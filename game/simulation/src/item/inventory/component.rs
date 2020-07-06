@@ -1,8 +1,4 @@
-use std::error::Error;
-use std::fmt::Display;
-use std::fmt::Formatter;
-
-use common::SmallVec;
+use common::*;
 
 use crate::ecs::*;
 use crate::item::inventory::Contents;
@@ -364,7 +360,7 @@ impl From<ContentsGetError> for InventoryError {
 }
 
 impl Display for InventoryError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{:?}", self)
     }
 }

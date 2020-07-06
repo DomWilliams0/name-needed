@@ -2,7 +2,6 @@
 #![allow(dead_code)]
 
 use std::f32::consts::PI;
-use std::marker::PhantomData;
 
 use ux::u3;
 

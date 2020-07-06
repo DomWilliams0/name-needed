@@ -5,18 +5,19 @@ use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
     BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SliceBlock, SliceIndex, WorldPoint,
-    WorldPosition,
+    WorldPosition, WorldPositionRange, WorldRange,
 };
 
-use crate::block::{Block, BlockDurability};
+use crate::block::{Block, BlockDurability, BlockType};
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, RawChunkTerrain};
-use crate::loader::SlabTerrainUpdate;
+use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
     WorldPathNode,
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
+use std::iter::once;
 
 // #[cfg_attr(test, derive(Clone))]
 pub struct World {
@@ -29,6 +30,17 @@ impl Default for World {
     fn default() -> Self {
         Self::empty()
     }
+}
+
+pub enum AreaLookup {
+    /// Block doesn't exist
+    BadPosition,
+
+    /// Block exists but has no area
+    NoArea,
+
+    /// Block has area
+    Area(WorldArea),
 }
 
 impl World {
@@ -170,7 +182,7 @@ impl World {
 
         // same blocks
         if from == to {
-            return Err(NavigationError::ZeroLengthPath);
+            return Ok(WorldPath::new(Vec::new(), to));
         }
 
         // find area path
@@ -350,29 +362,18 @@ impl World {
             };
 
             for (_, update) in updates {
-                match update {
-                    SlabTerrainUpdate::Block(pos, bt) => {
-                        slab.set_block_type(pos, bt);
+                let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
+                match range {
+                    WorldRange::Single(pos) => {
+                        slab.set_block_type(pos, block_type);
                     }
-                    SlabTerrainUpdate::Range((from, to), bt) => {
-                        macro_rules! sorted {
-                            ($a:expr, $b:expr) => {
-                                if $a < $b {
-                                    ($a, $b)
-                                } else {
-                                    ($b, $a)
-                                };
-                            };
-                        }
-                        let (xa, xb) = sorted!(from.x(), to.x());
-                        let (ya, yb) = sorted!(from.y(), to.y());
-                        let (za, zb) = sorted!(from.z().slice(), to.z().slice());
-
+                    range @ WorldRange::Range(_, _) => {
+                        let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
                         for z in za..=zb {
                             let mut slice = slab.slice_mut(z);
                             for x in xa..=xb {
                                 for y in ya..=yb {
-                                    slice.set_block((x, y), bt);
+                                    slice.set_block((x, y), block_type);
                                 }
                             }
                         }
@@ -428,20 +429,84 @@ impl World {
         None
     }
 
-    pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> Option<WorldArea> {
+    pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {
         let block_pos = pos.into();
         let chunk_pos = ChunkPosition::from(block_pos);
-        self.find_chunk_with_pos(chunk_pos)
-            .and_then(|chunk| chunk.get_block(block_pos))
-            .and_then(|block| block.chunk_area(block_pos.slice()))
-            .map(|chunk_area| chunk_area.into_world_area(chunk_pos))
+        let block = self
+            .find_chunk_with_pos(chunk_pos)
+            .and_then(|chunk| chunk.get_block(block_pos));
+
+        let area = match block {
+            None => return AreaLookup::BadPosition,
+            Some(b) => b.chunk_area(block_pos.slice()),
+        };
+
+        match area {
+            None => AreaLookup::NoArea,
+            Some(area) => AreaLookup::Area(area.into_world_area(chunk_pos)),
+        }
     }
 
     /// Returns first area that point.floor then ceil returns
     pub fn area_for_point(&self, point: WorldPoint) -> Option<(WorldPosition, WorldArea)> {
         point
             .floor_then_ceil()
-            .find_map(|pos| self.area(pos).map(|area| (pos, area)))
+            .find_map(|pos| Option::<WorldArea>::from(self.area(pos)).map(|area| (pos, area)))
+    }
+
+    pub fn filter_blocks_in_range<'a>(
+        &'a self,
+        range: WorldPositionRange,
+        mut f: impl FnMut(Block, &WorldPosition) -> bool + 'a,
+    ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
+        // TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups
+
+        let ((ax, bx), (ay, by), (az, bz)) = range.ranges();
+        (az..=bz)
+            .cartesian_product(ay..=by)
+            .cartesian_product(ax..=bx)
+            .map(move |((z, y), x)| (self.block((x, y, z)), (x, y, z).into()))
+            .filter_map(move |(block, pos)| {
+                block.and_then(|b| if f(b, &pos) { Some((b, pos)) } else { None })
+            })
+    }
+
+    /// Filters blocks in the range that are 1) pass the blocktype test, and 2) are adjacent to a walkable
+    /// accessible block
+    pub fn filter_reachable_blocks_in_range<'a>(
+        &'a self,
+        range: WorldPositionRange,
+        mut f: impl FnMut(BlockType) -> bool + 'a,
+    ) -> impl Iterator<Item = WorldPosition> + 'a {
+        self.filter_blocks_in_range(range, move |b, pos| {
+            // check block type
+            if !f(b.block_type()) {
+                return false;
+            }
+
+            // check neighbours for reachability
+            // TODO filter_blocks_in_range should pass chunk+slab reference to predicate
+            let mut neighbours = WorldNeighbours::new(*pos)
+                .chain(once(pos.above())) // above and below too
+                .chain(once(pos.below()));
+
+            if neighbours.any(|pos| matches!(self.area(pos), AreaLookup::Area(_))) {
+                // at least one neighbour is walkable
+                return true;
+            }
+
+            false
+        })
+        .map(|(_, pos)| pos)
+    }
+}
+
+impl From<AreaLookup> for Option<WorldArea> {
+    fn from(a: AreaLookup) -> Self {
+        match a {
+            AreaLookup::Area(area) => Some(area),
+            _ => None,
+        }
     }
 }
 
@@ -515,7 +580,7 @@ pub mod helpers {
 mod tests {
     use common::{seeded_rng, Itertools, LevelFilter, Rng};
     use unit::dim::CHUNK_SIZE;
-    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
+    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPositionRange};
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -527,7 +592,6 @@ mod tests {
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
     use crate::world::helpers::{apply_updates, loader_from_chunks, world_from_chunks};
     use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
-    use std::ops::Deref;
     use std::time::Duration;
 
     #[test]
@@ -848,7 +912,7 @@ mod tests {
             .slab(GlobalSliceIndex::new(pos.2).slab_index())
             .unwrap();
 
-        assert!(!std::ptr::eq(slab.deref(), new_slab));
+        assert!(!std::ptr::eq(slab.raw(), new_slab.raw()));
     }
 
     #[test]
@@ -927,5 +991,74 @@ mod tests {
             );
             apply_updates(&mut loader, updates.as_slice()).expect("updates failed");
         }
+    }
+
+    #[test]
+    fn filter_blocks() {
+        let chunks = vec![ChunkBuilder::new()
+            .set_block((5, 6, 4), BlockType::Stone)
+            .set_block((5, 5, 5), BlockType::LightGrass)
+            .set_block((5, 5, 8), BlockType::Grass)
+            .build((0, 0))];
+
+        let loader = loader_from_chunks(chunks);
+        let world = loader.world();
+        let w = world.borrow();
+
+        let range = WorldPositionRange::Range((4, 7, 4).into(), (6, 3, 9).into());
+        let filtered = w
+            .filter_blocks_in_range(range, |b, pos| {
+                b.block_type() != BlockType::Air && pos.slice().slice() < 6
+            })
+            .sorted_by_key(|(_, pos)| pos.slice())
+            .collect_vec();
+
+        assert_eq!(filtered.len(), 2);
+
+        let (block, pos) = filtered[0];
+        assert_eq!(block.block_type(), BlockType::Stone);
+        assert_eq!(pos, (5, 6, 4).into());
+
+        let (block, pos) = filtered[1];
+        assert_eq!(block.block_type(), BlockType::LightGrass);
+        assert_eq!(pos, (5, 5, 5).into());
+    }
+
+    #[test]
+    fn filter_reachable_blocks() {
+        let chunks = vec![ChunkBuilder::new()
+            .fill_range((0, 0, 0), (8, 8, 3), |_| BlockType::Stone) // floor
+            .fill_range((5, 0, 4), (8, 8, 8), |_| BlockType::Stone) // big wall
+            .fill_range((0, 0, 5), (8, 8, 8), |_| BlockType::Stone) // ceiling
+            .build((0, 0))];
+
+        let loader = loader_from_chunks(chunks);
+        let world = loader.world();
+        let w = world.borrow();
+
+        let is_reachable = |xyz: (i32, i32, i32)| {
+            let range = WorldPositionRange::Single(xyz.into());
+            w.filter_reachable_blocks_in_range(range, |bt| bt != BlockType::Air)
+                .count()
+                == 1
+        };
+
+        // block in the floor can be stood on
+        assert!(is_reachable((1, 1, 3)));
+
+        // ... under the floor cannot
+        assert!(!is_reachable((1, 1, 2)));
+
+        // ... under the world is technically visible but not reachable
+        assert!(!is_reachable((1, 1, 0)));
+
+        // block exposed in the wall on ground level can be accessed from the side
+        assert!(is_reachable((5, 0, 4)));
+
+        // ... not the when its too high though
+        assert!(!is_reachable((5, 0, 5)));
+
+        // block exposed in the ceiling can be reached from below
+        assert!(is_reachable((1, 1, 5)));
     }
 }
