@@ -1,4 +1,3 @@
-use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 
 use sdl2::event::{Event, WindowEvent};
@@ -20,13 +19,14 @@ use crate::render::sdl::render::FrameTarget;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
-use sdl2::mouse::MouseButton;
+use sdl2::mouse::{MouseButton, MouseState};
 use simulation::input::{InputCommand, InputEvent, SelectType, WorldColumn};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
 
-    sdl_events: EventPump,
+    /// `take`n out and replaced each tick
+    sdl_events: Option<EventPump>,
     #[allow(dead_code)]
     keep_alive: GraphicsKeepAlive,
     window: Window,
@@ -101,7 +101,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
 
         Ok(Self {
             camera,
-            sdl_events: events,
+            sdl_events: Some(events),
             keep_alive: GraphicsKeepAlive { sdl, video, gl },
             window,
             renderer,
@@ -126,7 +126,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
     fn consume_events(&mut self) -> EventsOutcome {
         let mut outcome = EventsOutcome::Continue;
 
-        let mut events = StealysEventPump::steal(&mut self.sdl_events);
+        let mut events = self.sdl_events.take().unwrap(); // replaced at the end
         for event in events.poll_iter() {
             if let EventConsumed::Consumed = self.ui.handle_event(&event) {
                 continue;
@@ -203,7 +203,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         }
 
         // put back event pump like we never took it
-        events.steal_back(&mut self.sdl_events);
+        self.sdl_events = Some(events);
 
         outcome
     }
@@ -273,13 +273,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
         // render ui and collect input commands
         let backend = &mut self.backend;
-        backend.ui.render(
-            &backend.window,
-            &backend.sdl_events.mouse_state(),
-            perf,
-            blackboard,
-            commands,
-        );
+        let mouse_state = backend.mouse_state();
+        backend
+            .ui
+            .render(&backend.window, &mouse_state, perf, blackboard, commands);
 
         self.window.gl_swap_window();
     }
@@ -361,6 +358,15 @@ impl SdlBackendInit {
     }
 }
 
+impl SdlBackendPersistent {
+    fn mouse_state(&self) -> MouseState {
+        self.sdl_events
+            .as_ref()
+            .unwrap() // always Some outside of consume_events
+            .mouse_state()
+    }
+}
+
 /// can't use TryInto/TryFrom for now
 // -----
 // error[E0119]: conflicting implementations of trait `std::convert::TryInto<common::input::Key>` for type `sdl2::keyboard::keycode::Keycode`:
@@ -385,41 +391,6 @@ fn map_sdl_keycode(keycode: Keycode) -> Option<Key> {
         Keycode::S => Some(Key::Camera(CameraDirection::Down)),
         Keycode::D => Some(Key::Camera(CameraDirection::Right)),
         _ => None,
-    }
-}
-
-struct StealysEventPump {
-    pump: EventPump,
-}
-
-impl StealysEventPump {
-    fn steal(pump: &mut EventPump) -> Self {
-        let dummy = MaybeUninit::uninit();
-        let pump = std::mem::replace(pump, unsafe { dummy.assume_init() });
-
-        // the given reference is now uninitialized!
-
-        Self { pump }
-    }
-
-    fn steal_back(self, original: &mut EventPump) {
-        // steal back real pump, forgetting about the uninitialized dummy
-        let dummy = std::mem::replace(original, self.pump);
-        std::mem::forget(dummy);
-    }
-}
-
-impl Deref for StealysEventPump {
-    type Target = EventPump;
-
-    fn deref(&self) -> &Self::Target {
-        &self.pump
-    }
-}
-
-impl DerefMut for StealysEventPump {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.pump
     }
 }
 
