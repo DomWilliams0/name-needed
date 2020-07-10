@@ -2,9 +2,7 @@ use clap::{App, Arg};
 use common::*;
 use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::state::BackendState;
-use simulation::{
-    ExitType, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
-};
+use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
 
 use engine::Engine;
 use std::path::PathBuf;
@@ -120,7 +118,7 @@ fn do_main() -> i32 {
         // uninitialize backend
         backend_state.end();
 
-        if let ExitType::Stop = exit {
+        if let Exit::Stop = exit {
             break;
         }
     }

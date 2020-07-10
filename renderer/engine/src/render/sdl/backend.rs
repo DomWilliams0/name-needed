@@ -9,8 +9,8 @@ use color::ColorRgb;
 use common::input::{CameraDirection, Key, KeyEvent};
 use common::*;
 use simulation::{
-    EventsOutcome, ExitType, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
-    Simulation, WorldViewer,
+    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, Simulation,
+    WorldViewer,
 };
 
 use crate::render::sdl::camera::Camera;
@@ -123,8 +123,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
     type Renderer = GlRenderer;
     type Persistent = SdlBackendPersistent;
 
-    fn consume_events(&mut self) -> EventsOutcome {
-        let mut outcome = EventsOutcome::Continue;
+    fn consume_events(&mut self) -> Option<Exit> {
+        let mut exit = None;
 
         let mut events = self.sdl_events.take().unwrap(); // replaced at the end
         for event in events.poll_iter() {
@@ -134,7 +134,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             match event {
                 Event::Quit { .. } => {
-                    outcome = EventsOutcome::Exit(ExitType::Stop);
+                    exit = Some(Exit::Stop);
                     break;
                 }
                 Event::Window {
@@ -150,11 +150,11 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     keycode: Some(key), ..
                 } => match map_sdl_keycode(key) {
                     Some(Key::Exit) => {
-                        outcome = EventsOutcome::Exit(ExitType::Stop);
+                        exit = Some(Exit::Stop);
                         break;
                     }
                     Some(Key::Restart) => {
-                        outcome = EventsOutcome::Exit(ExitType::Restart);
+                        exit = Some(Exit::Restart);
                         break;
                     }
                     Some(key) => self.handle_key(KeyEvent::Down(key)),
@@ -205,7 +205,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         // put back event pump like we never took it
         self.sdl_events = Some(events);
 
-        outcome
+        exit
     }
 
     fn tick(&mut self) {

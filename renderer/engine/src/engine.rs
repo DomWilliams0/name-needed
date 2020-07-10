@@ -3,9 +3,7 @@ use std::time::Duration;
 use common::*;
 use gameloop::{FrameAction, GameLoop};
 use simulation::input::InputCommand;
-use simulation::{
-    self, EventsOutcome, ExitType, InitializedSimulationBackend, Perf, Renderer, Simulation,
-};
+use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
 
 pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
     backend: &'b mut B,
@@ -26,7 +24,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
     }
 
     /// Game loop
-    pub fn run(mut self) -> ExitType {
+    pub fn run(mut self) -> Exit {
         // initial sleep
         let delay = config::get().simulation.start_delay;
         if delay > 0 {
@@ -42,9 +40,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         };
 
         loop {
-            match self.backend.consume_events() {
-                EventsOutcome::Continue => {}
-                EventsOutcome::Exit(e) => break e,
+            if let Some(exit) = self.backend.consume_events() {
+                break exit;
             }
 
             for action in game_loop.actions() {

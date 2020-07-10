@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use simulation::input::InputCommand;
 use simulation::{
-    EventsOutcome, ExitType, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
-    RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
+    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, RenderComponent,
+    Renderer, Simulation, TransformComponent, WorldViewer,
 };
 
 pub struct DummyRenderer;
@@ -37,11 +37,11 @@ impl InitializedSimulationBackend for DummyBackendInit {
     type Renderer = DummyRenderer;
     type Persistent = DummyBackendPersistent;
 
-    fn consume_events(&mut self) -> EventsOutcome {
+    fn consume_events(&mut self) -> Option<Exit> {
         if Instant::now() > self.end_time {
-            EventsOutcome::Exit(ExitType::Stop)
+            Some(Exit::Stop)
         } else {
-            EventsOutcome::Continue
+            None
         }
     }
 

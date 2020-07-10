@@ -5,22 +5,16 @@ use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation};
 use std::fmt::Debug;
 
-pub enum ExitType {
+pub enum Exit {
     Stop,
     Restart,
-}
-
-/// Action to take after consuming events
-pub enum EventsOutcome {
-    Continue,
-    Exit(ExitType),
 }
 
 pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
 
-    fn consume_events(&mut self) -> EventsOutcome;
+    fn consume_events(&mut self) -> Option<Exit>;
 
     fn tick(&mut self);
 

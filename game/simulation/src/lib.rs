@@ -9,9 +9,7 @@ pub use world::{
     presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
 
-pub use crate::backend::{
-    state, EventsOutcome, ExitType, InitializedSimulationBackend, PersistentSimulationBackend,
-};
+pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
 pub use crate::transform::TransformComponent;
