@@ -32,23 +32,27 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             std::thread::sleep(Duration::from_millis(delay as u64));
         }
 
-        let game_loop = match GameLoop::new(simulation::TICKS_PER_SECOND, 5) {
-            Err(e) => {
-                panic!("game loop initialization failed: {}", e);
-            }
-            Ok(gl) => gl,
-        };
+        #[cfg(not(feature = "lite"))]
+        let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5)
+            .expect("game loop initialization failed");
 
         loop {
             if let Some(exit) = self.backend.consume_events() {
                 break exit;
             }
 
+            #[cfg(not(feature = "lite"))]
             for action in game_loop.actions() {
                 match action {
                     FrameAction::Tick => self.tick(),
                     FrameAction::Render { interpolation } => self.render(interpolation),
                 }
+            }
+
+            #[cfg(feature = "lite")]
+            {
+                // tick as fast as possible
+                self.tick();
             }
         }
     }
