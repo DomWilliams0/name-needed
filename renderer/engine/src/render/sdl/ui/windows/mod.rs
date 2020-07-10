@@ -1,6 +1,6 @@
 use imgui::{ImStr, Ui};
 
-use simulation::input::{InputCommand, UiBlackboard};
+use simulation::input::{UiBlackboard, UiCommand};
 use simulation::PerfAvg;
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
@@ -20,7 +20,7 @@ pub struct UiBundle<'a> {
     pub strings: &'a PerFrameStrings,
     pub perf: &'a PerfAvg,
     pub blackboard: &'a UiBlackboard<'a>,
-    pub commands: &'a mut Vec<InputCommand>,
+    pub commands: &'a mut Vec<UiCommand>,
 }
 
 enum Value<'a> {

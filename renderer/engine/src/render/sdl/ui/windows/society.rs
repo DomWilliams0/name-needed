@@ -1,7 +1,7 @@
 use crate::render::sdl::ui::windows::{UiBundle, UiExt, Value, COLOR_BLUE, COLOR_RED};
 use crate::ui_str;
 use imgui::{im_str, TreeNode};
-use simulation::input::{InputCommand, SocietyInputCommand};
+use simulation::input::{SocietyInputCommand, UiCommand};
 
 pub struct SocietyWindow;
 
@@ -43,7 +43,7 @@ impl SocietyWindow {
                 None => ui.text_disabled("No block selection"),
                 Some(range) => {
                     if ui.button(im_str!("Break blocks"), [0.0, 0.0]) {
-                        bundle.commands.push(InputCommand::IssueSocietyCommand(
+                        bundle.commands.push(UiCommand::IssueSocietyCommand(
                             society_handle,
                             SocietyInputCommand::BreakBlocks(range),
                         ));

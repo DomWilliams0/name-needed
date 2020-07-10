@@ -1,6 +1,6 @@
 use imgui::{im_str, CollapsingHeader, ImStr, TreeNode};
 
-use simulation::input::InputCommand;
+use simulation::input::UiCommand;
 
 use crate::render::sdl::ui::windows::UiBundle;
 use crate::ui_str;
@@ -12,7 +12,7 @@ impl UiBundle<'_> {
         let mut enabled = self.blackboard.enabled_debug_renderers.contains(ident);
         if self.ui.checkbox(title, &mut enabled) {
             self.commands
-                .push(InputCommand::ToggleDebugRenderer { ident, enabled })
+                .push(UiCommand::ToggleDebugRenderer { ident, enabled })
         }
     }
 }

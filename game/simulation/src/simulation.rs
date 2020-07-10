@@ -16,8 +16,8 @@ use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
 use crate::entity_builder::EntityBuilder;
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputCommand, InputEvent, InputSystem, SelectedComponent,
-    SelectedEntity, SelectedTiles, SocietyInputCommand, UiBlackboard,
+    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedComponent, SelectedEntity,
+    SelectedTiles, SocietyInputCommand, UiBlackboard, UiCommand,
 };
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
@@ -103,7 +103,7 @@ impl<R: Renderer> Simulation<R> {
         EntityBuilder::new(&mut self.ecs_world)
     }
 
-    pub fn tick(&mut self, commands: &[InputCommand], world_viewer: &mut WorldViewer) {
+    pub fn tick(&mut self, commands: &[UiCommand], world_viewer: &mut WorldViewer) {
         let _span = Span::Tick.begin();
 
         // update tick resource
@@ -119,7 +119,7 @@ impl<R: Renderer> Simulation<R> {
         self.apply_world_updates(world_viewer);
 
         // apply player inputs
-        self.process_input_commands(commands);
+        self.process_ui_commands(commands);
 
         // needs
         HungerSystem.run_now(&self.ecs_world);
@@ -204,16 +204,16 @@ impl<R: Renderer> Simulation<R> {
         self.world_loader.apply_terrain_updates(terrain_updates);
     }
 
-    fn process_input_commands(&mut self, commands: &[InputCommand]) {
+    fn process_ui_commands(&mut self, commands: &[UiCommand]) {
         for cmd in commands {
             match *cmd {
-                InputCommand::ToggleDebugRenderer { ident, enabled } => {
+                UiCommand::ToggleDebugRenderer { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
                         warn!("failed to toggle debug renderer: {}", e);
                     }
                 }
 
-                InputCommand::FillSelectedTiles(placement, block_type) => {
+                UiCommand::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
                     if let Some((mut from, mut to)) = selection.bounds() {
                         if let BlockPlacement::Set = placement {
@@ -226,7 +226,7 @@ impl<R: Renderer> Simulation<R> {
                             .push(WorldTerrainUpdate::with_range(from, to, block_type));
                     }
                 }
-                InputCommand::IssueDivineCommand(ref divine_command) => {
+                UiCommand::IssueDivineCommand(ref divine_command) => {
                     let entity = match self
                         .ecs_world
                         .resource_mut::<SelectedEntity>()
@@ -256,7 +256,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                InputCommand::IssueSocietyCommand(society, ref command) => {
+                UiCommand::IssueSocietyCommand(society, ref command) => {
                     let society = match self.societies().society_by_handle_mut(society) {
                         Some(s) => s,
                         None => {

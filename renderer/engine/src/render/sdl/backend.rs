@@ -20,7 +20,7 @@ use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
 use sdl2::mouse::{MouseButton, MouseState};
-use simulation::input::{InputCommand, InputEvent, SelectType, WorldColumn};
+use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
@@ -229,7 +229,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
         perf: &PerfAvg,
-        commands: &mut Vec<InputCommand>,
+        commands: &mut Vec<UiCommand>,
     ) {
         // clear window
         Gl::clear();

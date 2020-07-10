@@ -3,7 +3,7 @@ use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 
 /// Command from the player through the UI
-pub enum InputCommand {
+pub enum UiCommand {
     ToggleDebugRenderer { ident: &'static str, enabled: bool },
     FillSelectedTiles(BlockPlacement, BlockType),
     IssueDivineCommand(DivineInputCommand),

@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use simulation::input::InputCommand;
+use simulation::input::UiCommand;
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, RenderComponent,
     Renderer, Simulation, TransformComponent, WorldViewer,
@@ -52,7 +52,7 @@ impl InitializedSimulationBackend for DummyBackendInit {
         _: &mut Simulation<Self::Renderer>,
         _: f64,
         _: &PerfAvg,
-        _: &mut Vec<InputCommand>,
+        _: &mut Vec<UiCommand>,
     ) {
     }
 

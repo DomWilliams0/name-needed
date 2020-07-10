@@ -9,7 +9,7 @@ use sdl2::event::Event;
 use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
-use simulation::input::{InputCommand, UiBlackboard};
+use simulation::input::{UiBlackboard, UiCommand};
 use simulation::PerfAvg;
 
 pub struct Ui {
@@ -84,7 +84,7 @@ impl Ui {
         mouse_state: &MouseState,
         perf: &PerfAvg,
         blackboard: UiBlackboard,
-        input_commands: &mut Vec<InputCommand>,
+        commands: &mut Vec<UiCommand>,
     ) {
         self.imgui_sdl2
             .prepare_frame(self.imgui.io_mut(), window, mouse_state);
@@ -95,7 +95,7 @@ impl Ui {
             strings: &self.strings_arena,
             perf,
             blackboard: &blackboard,
-            commands: input_commands,
+            commands,
         };
 
         self.state.render(bundle);

@@ -1,7 +1,7 @@
 use imgui::{im_str, CollapsingHeader, TreeNode};
 
 use common::{InnerSpace, Itertools};
-use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, InputCommand};
+use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, UiCommand};
 
 use crate::render::sdl::ui::windows::{
     UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
@@ -139,13 +139,13 @@ impl SelectionWindow {
                                     bundle.blackboard.selected_tiles.bounds_single_tile()
                                 {
                                     if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
-                                        bundle.commands.push(InputCommand::IssueDivineCommand(
+                                        bundle.commands.push(UiCommand::IssueDivineCommand(
                                             DivineInputCommand::Goto(tile),
                                         ));
                                     }
 
                                     if ui.button(im_str!("Break selected block"), [0.0, 0.0]) {
-                                        bundle.commands.push(InputCommand::IssueDivineCommand(
+                                        bundle.commands.push(UiCommand::IssueDivineCommand(
                                             DivineInputCommand::Break(tile),
                                         ));
                                     }
@@ -257,7 +257,7 @@ impl SelectionWindow {
                     if ui.button(ui_str!(in strings, "{}", bt), [0.0, 0.0]) {
                         bundle
                             .commands
-                            .push(InputCommand::FillSelectedTiles(self.block_placement, bt));
+                            .push(UiCommand::FillSelectedTiles(self.block_placement, bt));
                     }
                 };
 

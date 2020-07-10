@@ -1,6 +1,6 @@
 use world::WorldViewer;
 
-use crate::input::InputCommand;
+use crate::input::UiCommand;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation};
 use std::fmt::Debug;
@@ -23,7 +23,7 @@ pub trait InitializedSimulationBackend: Sized {
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
         perf: &PerfAvg,
-        commands: &mut Vec<InputCommand>,
+        commands: &mut Vec<UiCommand>,
     );
 
     fn world_viewer(&mut self) -> &mut WorldViewer;
