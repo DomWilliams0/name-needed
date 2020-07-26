@@ -1,4 +1,4 @@
-pub use debug::PathDebugRenderer;
+pub use debug::{NavigationAreaDebugRenderer, PathDebugRenderer};
 pub use system::{
     ArrivedAtTargetEventComponent, FollowPathComponent, PathSteeringSystem, WanderComponent,
     WanderPathAssignmentSystem,

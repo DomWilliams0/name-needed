@@ -7,7 +7,6 @@ use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
 use crate::world::{ChunkPosition, GlobalSliceIndex, SliceIndex, WorldPosition};
-use std::iter::{once, once_with};
 
 /// A point anywhere in the world
 // TODO assert fields are not NaN in points
@@ -36,11 +35,6 @@ impl WorldPoint {
             self.1.ceil() as i32,
             SliceIndex::new(self.2.ceil() as i32),
         )
-    }
-
-    pub fn floor_then_ceil(&self) -> impl Iterator<Item = WorldPosition> + '_ {
-        // TODO floor_then_ceil is terribly inefficient, try without the lazy eval
-        once(self.floor()).chain(once_with(move || self.ceil()))
     }
 
     pub fn round(&self) -> WorldPosition {
@@ -159,6 +153,14 @@ impl Add<GlobalSliceIndex> for WorldPoint {
 
     fn add(self, rhs: GlobalSliceIndex) -> Self::Output {
         Self(self.0, self.1, self.2 + rhs.slice() as f32)
+    }
+}
+
+impl Add<(f32, f32, f32)> for WorldPoint {
+    type Output = Self;
+
+    fn add(self, (x, y, z): (f32, f32, f32)) -> Self::Output {
+        Self(self.0 + x, self.1 + y, self.2 + z)
     }
 }
 

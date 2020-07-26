@@ -136,12 +136,12 @@ mod tests {
 
     use crate::block::BlockType;
     use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
-    use crate::world::helpers::world_from_chunks;
+    use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkBuilder, EdgeCost};
 
     #[test]
     fn simple_path() {
-        let world = world_from_chunks(vec![ChunkBuilder::new()
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(1, BlockType::Stone)
             .set_block((5, 5, 2), BlockType::Grass)
             .set_block((6, 5, 3), BlockType::Grass)
@@ -193,5 +193,38 @@ mod tests {
         ];
 
         assert_eq!(path.path, expected);
+    }
+
+    #[test]
+    fn no_hippity_hoppity() {
+        // regression test for a bug where an invalid path through the back of a staircase is generated.
+        // dont bang ur head with ur hoppity
+
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_slice(1, BlockType::Stone)
+            .set_block((3, 3, 2), BlockType::Stone) // step up
+            .set_block((2, 3, 3), BlockType::Stone) // step up from the step up
+            .build((0, 0))])
+        .into_inner();
+
+        let start = (2, 3, 2); // underneath the second step
+        let end = (5, 3, 2); // walk around the first step to here pls
+
+        let path = {
+            let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+            let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
+            graph
+                .find_block_path(start, end, SearchGoal::Arrive)
+                .expect("path should succeed")
+        };
+
+        // there should be no jumps in this nice easy path around the staircase
+        let not_walks = path
+            .path
+            .iter()
+            .filter(|node| node.exit_cost != EdgeCost::Walk)
+            .count();
+
+        assert_eq!(not_walks, 0);
     }
 }

@@ -30,7 +30,7 @@ pub trait Renderer {
     fn debug_add_line(&mut self, from: WorldPoint, to: WorldPoint, color: ColorRgb) {}
 
     #[allow(unused_variables)]
-    fn debug_add_tri(&mut self, points: [WorldPoint; 3], color: ColorRgb) {}
+    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: ColorRgb) {}
 
     fn debug_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
@@ -64,11 +64,18 @@ pub trait Renderer {
         let br = bl + Vector2::new(w, 0.0);
         let tl = bl + Vector2::new(0.0, h);
 
-        self.debug_add_line(bl, br, color);
-        self.debug_add_line(br, tr, color);
-        self.debug_add_line(tl, tr, color);
-        self.debug_add_line(bl, tl, color);
-
+        self.debug_add_quad([bl, br, tr, tl], color);
         // TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh
+    }
+
+    fn debug_add_square_around(&mut self, centre: WorldPoint, radius: f32, color: ColorRgb) {
+        let quad = [
+            centre + (-radius, -radius, 0.0),
+            centre + (-radius, radius, 0.0),
+            centre + (radius, radius, 0.0),
+            centre + (radius, -radius, 0.0),
+        ];
+
+        self.debug_add_quad(quad, color);
     }
 }

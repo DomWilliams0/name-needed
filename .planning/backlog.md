@@ -4,23 +4,19 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 
 
 ## Entity movement
-* explicit jumping instead of teleporting to target z position
-* avoid walls/needless collisions with danger context
 * navigation graph edges for larger step sizes
 	* can fall e.g. 2 or 3m
 	* cats can jump 2m
 	* humans can jump 1m
-* need to be able to recover if they get stuck on the edge of a ledge
-	* fixed most of the time but still possible to sometimes get fully lodged
 * lazy path evaluation (area at a time)
 * path optimisation (line of sight)
 * wandering should choose a close location instead of random in the world
+	* new SearchGoal to cut short path to N blocks
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
 * bug: area path finding seems to needlessly poke into other areas
-* gravity
 
-## UI
+## UI/input
 * graph for fps/tps history
 	* measure ticks per second in perf window
 * better tile selection
@@ -30,6 +26,13 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * better entity selection
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
+* persist ui state over restarts (open treenodes, toggled debug renderers etc)
+* interactive terminal to replace/extend dev ui
+	* custom log! handler to show warnings and errors
+	* in-game OR pop out OR out of process [ncurses] terminal console that persists over restarts
+* fast forward toggle
+	* update gameloop to allow changing TPS
+	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
 
 
 ## Entity behaviour
@@ -87,6 +90,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * config with watcher
 
 ## Rendering
+* debug renderer to show chunk boundaries
 * textures/sprites/animations
 * improved terrain colour palette
 * very simple oval shadows beneath entities to show height

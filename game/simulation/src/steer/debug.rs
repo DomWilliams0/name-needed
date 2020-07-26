@@ -1,5 +1,5 @@
 use color::ColorRgb;
-use world::{InnerWorldRef, SliceRange};
+use world::{InnerWorldRef, WorldViewer};
 
 use crate::ecs::*;
 use crate::render::DebugRenderer;
@@ -17,10 +17,11 @@ impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
         renderer: &mut R,
         _: &InnerWorldRef,
         ecs_world: &EcsWorld,
-        slices: SliceRange,
+        viewer: &WorldViewer,
     ) {
         type Query<'a> = (ReadStorage<'a, TransformComponent>,);
         let (transform,) = <Query as SystemData>::fetch(ecs_world);
+        let slices = viewer.entity_range();
 
         for (transform,) in (&transform,).join() {
             if slices.contains(transform.position.slice()) {

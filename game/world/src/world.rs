@@ -84,7 +84,7 @@ impl World {
         self.find_chunk_index(chunk_pos).is_some()
     }
 
-    pub(crate) fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
+    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
         self.find_chunk_index(chunk_pos)
             .map(|idx| &self.chunks[idx])
     }
@@ -447,35 +447,39 @@ impl World {
         }
     }
 
-    /// Returns first area that point.floor then ceil returns
     pub fn area_for_point(&self, point: WorldPoint) -> Option<(WorldPosition, WorldArea)> {
-        point
-            .floor_then_ceil()
-            .find_map(|pos| Option::<WorldArea>::from(self.area(pos)).map(|area| (pos, area)))
+        let pos = point.floor();
+        Option::<WorldArea>::from(self.area(pos)).map(|area| (pos, area))
     }
 
-    pub fn filter_blocks_in_range<'a>(
+    pub fn iterate_blocks<'a>(
         &'a self,
-        range: WorldPositionRange,
-        mut f: impl FnMut(Block, &WorldPosition) -> bool + 'a,
+        range: &WorldPositionRange,
     ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
-        // TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups
-
         let ((ax, bx), (ay, by), (az, bz)) = range.ranges();
         (az..=bz)
             .cartesian_product(ay..=by)
             .cartesian_product(ax..=bx)
             .map(move |((z, y), x)| (self.block((x, y, z)), (x, y, z).into()))
-            .filter_map(move |(block, pos)| {
-                block.and_then(|b| if f(b, &pos) { Some((b, pos)) } else { None })
-            })
+            .filter_map(move |(block, pos)| block.map(|b| (b, pos)))
+    }
+
+    pub fn filter_blocks_in_range<'a>(
+        &'a self,
+        range: &WorldPositionRange,
+        mut f: impl FnMut(Block, &WorldPosition) -> bool + 'a,
+    ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
+        // TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups
+
+        self.iterate_blocks(range)
+            .filter(move |(block, pos)| f(*block, pos))
     }
 
     /// Filters blocks in the range that are 1) pass the blocktype test, and 2) are adjacent to a walkable
     /// accessible block
     pub fn filter_reachable_blocks_in_range<'a>(
         &'a self,
-        range: WorldPositionRange,
+        range: &WorldPositionRange,
         mut f: impl FnMut(BlockType) -> bool + 'a,
     ) -> impl Iterator<Item = WorldPosition> + 'a {
         self.filter_blocks_in_range(range, move |b, pos| {
@@ -515,17 +519,29 @@ pub mod helpers {
     use std::time::Duration;
 
     use crate::loader::{
-        BlockingWorkerPool, MemoryTerrainSource, TerrainSource, WorldLoader, WorldTerrainUpdate,
+        BlockingWorkerPool, MemoryTerrainSource, TerrainSource, ThreadedWorkerPool, WorkerPool,
+        WorldLoader, WorldTerrainUpdate,
     };
     use crate::{ChunkDescriptor, WorldRef};
 
-    pub fn world_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldRef {
-        loader_from_chunks(chunks).world()
+    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef {
+        loader_from_chunks_blocking(chunks).world()
     }
 
-    pub fn loader_from_chunks(chunks: Vec<ChunkDescriptor>) -> WorldLoader<BlockingWorkerPool> {
+    pub fn loader_from_chunks_blocking(
+        chunks: Vec<ChunkDescriptor>,
+    ) -> WorldLoader<BlockingWorkerPool> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world_blocking(source)
+        load_world(source, BlockingWorkerPool::default())
+    }
+
+    pub fn loader_from_chunks_threaded(
+        threads: usize,
+        chunks: Vec<ChunkDescriptor>,
+    ) -> WorldLoader<ThreadedWorkerPool> {
+        let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
+        let pool = ThreadedWorkerPool::new(threads);
+        load_world(source, pool)
     }
 
     pub fn apply_updates(
@@ -553,13 +569,13 @@ pub mod helpers {
         Ok(())
     }
 
-    pub fn load_world_blocking(mut source: MemoryTerrainSource) -> WorldLoader<BlockingWorkerPool> {
+    fn load_world<P: WorkerPool>(mut source: MemoryTerrainSource, pool: P) -> WorldLoader<P> {
         let chunks_pos = source.all_chunks();
 
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
-        let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
+        let mut loader = WorldLoader::new(source, pool);
         loader.request_chunks(chunks_pos.iter().copied());
         for _ in chunks_pos {
             let _ = loader.block_on_next_finalization(Duration::from_secs(20));
@@ -590,13 +606,15 @@ mod tests {
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
-    use crate::world::helpers::{apply_updates, loader_from_chunks, world_from_chunks};
+    use crate::world::helpers::{
+        apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
+    };
     use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
     use std::time::Duration;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
-        let w = world_from_chunks(vec![ChunkBuilder::new()
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(1, BlockType::Grass)
             .build((0, 0))])
         .into_inner();
@@ -610,7 +628,7 @@ mod tests {
 
     #[test]
     fn accessible_block_in_column() {
-        let w = world_from_chunks(vec![ChunkBuilder::new()
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(6, BlockType::Grass) // lower slice
             .fill_slice(9, BlockType::Grass) // higher slice blocks it...
             .set_block((10, 10, 9), BlockType::Air) // ...with a hole here
@@ -665,7 +683,7 @@ mod tests {
 
     #[test]
     fn world_path_within_area() {
-        let world = world_from_chunks(vec![ChunkBuilder::new()
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(2, BlockType::Stone)
             .set_block((0, 0, 3), BlockType::Grass)
             .set_block((8, 8, 3), BlockType::Grass)
@@ -688,7 +706,7 @@ mod tests {
             .try_init();
 
         // cross chunks
-        let world = world_from_chunks(vec![
+        let world = world_from_chunks_blocking(vec![
             ChunkBuilder::new()
                 .fill_slice(4, BlockType::Grass)
                 .build((3, 5)),
@@ -742,7 +760,7 @@ mod tests {
             .filter_level(LevelFilter::Trace)
             .is_test(true)
             .try_init();
-        let world = world_from_chunks(presets::ring()).into_inner();
+        let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
         let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
         let dst = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
@@ -752,7 +770,7 @@ mod tests {
 
     #[test]
     fn world_path_adjacent_goal() {
-        let world = world_from_chunks(vec![ChunkBuilder::new()
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_range((2, 2, 2), (6, 2, 2), |_| BlockType::Stone)
             .build((0, 0))])
         .into_inner();
@@ -768,7 +786,7 @@ mod tests {
 
     #[test]
     fn find_chunk() {
-        let world = world_from_chunks(vec![
+        let world = world_from_chunks_blocking(vec![
             ChunkBuilder::new().build((0, 0)),
             ChunkBuilder::new().build((1, 0)),
             ChunkBuilder::new().build((2, 0)),
@@ -807,11 +825,17 @@ mod tests {
         ];
 
         let updates = vec![
-            WorldTerrainUpdate::with_block((1, 1, 1).into(), BlockType::Grass),
-            WorldTerrainUpdate::with_block((10, 10, 200).into(), BlockType::LightGrass),
-            WorldTerrainUpdate::with_block((CHUNK_SIZE.as_i32() - 1, 5, 5).into(), BlockType::Air),
+            WorldTerrainUpdate::new(WorldPositionRange::with_single((1, 1, 1)), BlockType::Grass),
+            WorldTerrainUpdate::new(
+                WorldPositionRange::with_single((10, 10, 200)),
+                BlockType::LightGrass,
+            ),
+            WorldTerrainUpdate::new(
+                WorldPositionRange::with_single((CHUNK_SIZE.as_i32() - 1, 5, 5)),
+                BlockType::Air,
+            ),
         ];
-        let mut loader = loader_from_chunks(chunks);
+        let mut loader = loader_from_chunks_blocking(chunks);
         let world = loader.world();
 
         {
@@ -873,7 +897,7 @@ mod tests {
             .set_block(pos, BlockType::Stone)
             .build((0, 0))];
 
-        let loader = loader_from_chunks(chunks);
+        let loader = loader_from_chunks_blocking(chunks);
         let world = loader.world();
 
         let mut w = world.borrow_mut();
@@ -917,7 +941,7 @@ mod tests {
 
     #[test]
     fn load_world_blocking() {
-        let world = world_from_chunks(vec![ChunkBuilder::new().build((0, 0))]);
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new().build((0, 0))]);
         let mut w = world.borrow_mut();
 
         assert_eq!(w.block((0, 0, 0)).unwrap().block_type(), BlockType::Air);
@@ -970,15 +994,17 @@ mod tests {
                     } else {
                         BlockType::Air
                     };
-                    if randy.gen_bool(0.2) {
-                        WorldTerrainUpdate::with_block(pos, blocktype)
+
+                    let range = if randy.gen_bool(0.2) {
+                        WorldPositionRange::with_single(pos)
                     } else {
                         let w = randy.gen_range(1, 10);
                         let h = randy.gen_range(1, 10);
                         let d = randy.gen_range(1, 10);
 
-                        WorldTerrainUpdate::with_range(pos, pos + (w, h, d), blocktype)
-                    }
+                        WorldPositionRange::with_inclusive_range(pos, pos + (w, h, d))
+                    };
+                    WorldTerrainUpdate::new(range, blocktype)
                 })
                 .collect_vec();
 
@@ -1001,13 +1027,13 @@ mod tests {
             .set_block((5, 5, 8), BlockType::Grass)
             .build((0, 0))];
 
-        let loader = loader_from_chunks(chunks);
+        let loader = loader_from_chunks_blocking(chunks);
         let world = loader.world();
         let w = world.borrow();
 
-        let range = WorldPositionRange::Range((4, 7, 4).into(), (6, 3, 9).into());
+        let range = WorldPositionRange::with_inclusive_range((4, 7, 4), (6, 3, 9));
         let filtered = w
-            .filter_blocks_in_range(range, |b, pos| {
+            .filter_blocks_in_range(&range, |b, pos| {
                 b.block_type() != BlockType::Air && pos.slice().slice() < 6
             })
             .sorted_by_key(|(_, pos)| pos.slice())
@@ -1032,13 +1058,13 @@ mod tests {
             .fill_range((0, 0, 5), (8, 8, 8), |_| BlockType::Stone) // ceiling
             .build((0, 0))];
 
-        let loader = loader_from_chunks(chunks);
+        let loader = loader_from_chunks_blocking(chunks);
         let world = loader.world();
         let w = world.borrow();
 
         let is_reachable = |xyz: (i32, i32, i32)| {
             let range = WorldPositionRange::Single(xyz.into());
-            w.filter_reachable_blocks_in_range(range, |bt| bt != BlockType::Air)
+            w.filter_reachable_blocks_in_range(&range, |bt| bt != BlockType::Air)
                 .count()
                 == 1
         };

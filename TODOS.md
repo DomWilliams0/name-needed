@@ -1,4 +1,4 @@
-# TODOs (169)
+# TODOs (170)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -59,11 +59,10 @@
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
    * `// TODO just use a dyn Job instead of redefining jobs as an identical enum?`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
-   * `// TODO can no longer select a single block, its always 2x2`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (10)
    * `// TODO this could do with a builder`
    * `pub class: ItemClass, // TODO possible for an item to have multiple classes?`
@@ -97,14 +96,19 @@
    * `// TODO compensate multipliers`
    * `let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
+ * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
+   * `// TODO only render the top area in each slice`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (3)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
    * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
    * `warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error`
-   * `// FIXME GROSS HACK`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
+ * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
+   * `// TODO vertical height too`
+ * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (1)
+   * `// TODO apply fall damage if applicable`
  * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
@@ -123,11 +127,11 @@
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
- * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (2)
-   * `// TODO struclog event`
-   * `// TODO populate danger interests from world/other entity collisions`
- * [game/world/src/block.rs](game/world/src/block.rs) (1)
+ * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
+   * `// TODO cache allocation in system`
+ * [game/world/src/block.rs](game/world/src/block.rs) (2)
    * `// TODO store sparse block data in the slab instead of inline in the block`
+   * `// TODO this should return an Option if area is uninitialized`
  * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
    * `// TODO still does a lot of unnecessary initialization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
@@ -185,7 +189,7 @@
    * `// TODO smallvecs`
    * `// TODO derive(Error) for NavigationError`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (2)
-   * `/// TODO bitset of Opacitys will be much smaller, 2 bits each`
+   * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
  * [game/world/src/viewer.rs](game/world/src/viewer.rs) (7)
    * `assert!(size > 0); // TODO Result`
@@ -214,7 +218,8 @@
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
- * [renderer/engine/src/render/sdl/render/mod.rs](renderer/engine/src/render/sdl/render/mod.rs) (1)
+ * [renderer/engine/src/render/sdl/render/mod.rs](renderer/engine/src/render/sdl/render/mod.rs) (2)
+   * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO helpers in Bundle`
@@ -236,6 +241,5 @@
    * `// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
- * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (2)
+ * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)
    * `// TODO assert fields are not NaN in points`
-   * `// TODO floor_then_ceil is terribly inefficient, try without the lazy eval`

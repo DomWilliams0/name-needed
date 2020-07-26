@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use common::debug;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
@@ -10,6 +11,7 @@ use crate::grid::{CoordType, Grid, GridImpl};
 use crate::grid_declare;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
+use crate::occlusion::OcclusionOpacity;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
@@ -19,8 +21,7 @@ grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridB
 
 #[derive(Default, Copy, Clone)]
 struct AreaDiscoveryGridBlock {
-    /// is material solid
-    solid: bool,
+    opacity: OcclusionOpacity,
 
     area: SlabAreaIndex,
 }
@@ -50,7 +51,7 @@ pub(crate) struct AreaDiscovery<'a> {
 impl Into<AreaDiscoveryGridBlock> for &Block {
     fn into(self) -> AreaDiscoveryGridBlock {
         AreaDiscoveryGridBlock {
-            solid: self.opacity().solid(),
+            opacity: self.opacity().into(),
             area: Default::default(),
         }
     }
@@ -156,20 +157,37 @@ impl<'a> AreaDiscovery<'a> {
                 self.queue.push((n, src));
             }
 
-            // check vertical neighbours for jump access only
+            // check vertical neighbours for jump access
 
             // don't queue the slab above's neighbours if we're at the top of the slab
             if current[2] < SLAB_SIZE.as_i32() - 1 {
-                // only check the above slab if its not solid and a jump is possible
-                if !self
+                // only check for jump ups if the block directly above is not solid
+                if self
                     .get_vertical_offset(current, VerticalOffset::Above)
-                    .solid
+                    .opacity
+                    .transparent()
                 {
                     let [x, y, z] = current;
                     let above = [x, y, z + 1];
 
                     for n in SlabNeighbours::new(above) {
                         self.queue.push((n, Some((current, EdgeCost::JumpUp))));
+                    }
+                }
+            }
+
+            // don't queue the slab below's neighbours if we're at the bottom of the slab
+            if current[2] > 0 {
+                for n_adjacent in SlabNeighbours::new(current) {
+                    // only check for jump downs if the block directly above that is not solid
+                    // (mirrored check for jump ups above)
+
+                    if self.grid[&n_adjacent].opacity.transparent() {
+                        let [x, y, z] = n_adjacent;
+                        let n_below = [x, y, z - 1]; // the check above ensures we stay in this slab
+
+                        self.queue
+                            .push((n_below, Some((current, EdgeCost::JumpDown))));
                     }
                 }
             }
@@ -187,20 +205,21 @@ impl<'a> AreaDiscovery<'a> {
 
             // store graph
             self.block_graphs.insert(area, graph);
+            debug!("area {:?} has {} blocks", area, count);
         }
     }
 
     fn is_walkable(&self, pos: CoordType) -> bool {
         let marker = &self.grid[&pos];
 
-        if marker.solid {
+        if marker.opacity.solid() {
             return false;
         }
 
         let below = self.get_vertical_offset(pos, VerticalOffset::Below);
 
         // below not solid either: nope
-        if !below.solid {
+        if below.opacity.transparent() {
             return false;
         }
 
@@ -225,7 +244,7 @@ impl<'a> AreaDiscovery<'a> {
                 } else {
                     // not present: this must be the top of the world
                     AreaDiscoveryGridBlock {
-                        solid: false,
+                        opacity: OcclusionOpacity::Unknown,
                         ..Default::default()
                     }
                 }
@@ -239,7 +258,7 @@ impl<'a> AreaDiscovery<'a> {
                 } else {
                     // not present: this must be the bottom of the world
                     AreaDiscoveryGridBlock {
-                        solid: false,
+                        opacity: OcclusionOpacity::Unknown,
                         ..Default::default()
                     }
                 }

@@ -685,7 +685,7 @@ mod pair_walking {
 
         if opacity.solid() {
             let mut opacities = NeighbourOpacity::default();
-            opacities[direction as usize] = opacity;
+            opacities[direction as usize] = opacity.into();
 
             // get block pos in this chunk
             let block_pos = {
@@ -784,14 +784,14 @@ mod pair_walking {
             let mut opacities = NeighbourOpacity::default();
 
             // directly across is certainly present
-            opacities[direction as usize] = upper[centre.unwrap()].opacity();
+            opacities[direction as usize] = upper[centre.unwrap()].opacity().into();
 
             if let Some(left) = left {
-                opacities[direction.next() as usize] = upper[left].opacity();
+                opacities[direction.next() as usize] = upper[left].opacity().into();
             }
 
             if let Some(right) = right {
-                opacities[direction.prev() as usize] = upper[right].opacity();
+                opacities[direction.prev() as usize] = upper[right].opacity().into();
             }
 
             // get block pos in this chunk
@@ -911,7 +911,7 @@ impl ChunkTerrain {
                 let mut blocked = NeighbourOpacity::default();
                 for (n, offset) in NeighbourOffset::offsets() {
                     if let Some(neighbour_block) = this_block.try_add(offset) {
-                        blocked[n as usize] = slice_next[neighbour_block].opacity();
+                        blocked[n as usize] = slice_next[neighbour_block].opacity().into();
                     }
                 }
 
@@ -1021,17 +1021,19 @@ mod tests {
     use matches::assert_matches;
 
     use unit::dim::CHUNK_SIZE;
-    use unit::world::{GlobalSliceIndex, SLAB_SIZE};
+    use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
     use crate::block::BlockType;
     use crate::chunk::slab::Slab;
     use crate::chunk::terrain::{BaseTerrain, ChunkTerrain};
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
-    use crate::world::helpers::world_from_chunks;
+    use crate::world::helpers::{apply_updates, world_from_chunks_blocking};
     use crate::{World, WorldRef};
 
     use super::*;
+    use crate::helpers::loader_from_chunks_blocking;
+    use crate::loader::WorldTerrainUpdate;
 
     #[test]
     fn empty() {
@@ -1469,7 +1471,7 @@ mod tests {
             .set_block((0, CHUNK_SIZE.as_i32() - 1, 1), BlockType::Stone)
             .build((0, -1));
 
-        let world = world_from_chunks(vec![a, b, c]).into_inner();
+        let world = world_from_chunks_blocking(vec![a, b, c]).into_inner();
 
         // 0,0,0 occluded by 2 chunk neighbours
         assert!(world.block((-1, 0, 1)).unwrap().opacity().solid());
@@ -1509,7 +1511,7 @@ mod tests {
                 .set_block((0, 0, 0), blockage)
                 .build((0, 0));
 
-            world_from_chunks(vec![a, b])
+            world_from_chunks_blocking(vec![a, b])
         }
 
         let world_ref = mk_chunks(false);
@@ -1567,7 +1569,7 @@ mod tests {
             .set_block((0, 0, 1), BlockType::Grass)
             .build((0, 1));
 
-        let world = world_from_chunks(vec![a, b, c]).into_inner();
+        let world = world_from_chunks_blocking(vec![a, b, c]).into_inner();
 
         // 0,0,0 occluded by corner on 2 sides
         assert!(world
@@ -1661,5 +1663,48 @@ mod tests {
         let immut = terrain.slab(SlabIndex(0)).unwrap();
         assert_eq!(old.slice(0)[(0, 0)].block_type(), BlockType::Air);
         assert_eq!(immut.slice(0)[(0, 0)].block_type(), BlockType::Stone);
+    }
+
+    #[test]
+    fn area_discovery_after_modification() {
+        // regression test for bug where area discovery was only looking for jump ups and not down
+
+        let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_range((0, 0, 0), (2, 2, 1), |_| BlockType::Stone)
+            .build((0, 0))]);
+
+        let world_ref = loader.world();
+        let assert_single_area = || {
+            let w = world_ref.borrow();
+
+            // just the one area
+            assert_eq!(
+                w.find_chunk_with_pos(ChunkPosition(0, 0))
+                    .unwrap()
+                    .areas()
+                    .count(),
+                1
+            );
+        };
+
+        assert_single_area();
+
+        // dig out a block
+        let updates = [WorldTerrainUpdate::new(
+            WorldPositionRange::with_single((0, 0, 1)),
+            BlockType::Air,
+        )];
+        apply_updates(&mut loader, &updates).expect("updates failed");
+
+        assert_single_area();
+
+        // dig out another block
+        let updates = [WorldTerrainUpdate::new(
+            WorldPositionRange::with_single((1, 1, 1)),
+            BlockType::Air,
+        )];
+        apply_updates(&mut loader, &updates).expect("updates failed");
+
+        assert_single_area();
     }
 }

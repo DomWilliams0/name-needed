@@ -23,6 +23,7 @@ specs-derive = "^0.4"
 crossbeam = "^0.7"
 ux = "^0.1"
 arraydeque = "^0.4"
+ahash = "^0.4"
 
 
 [dev-dependencies]

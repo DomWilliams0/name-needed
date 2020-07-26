@@ -135,9 +135,7 @@ impl SelectionWindow {
                                 .leaf(true)
                                 .build(ui)
                             {
-                                if let Some(tile) =
-                                    bundle.blackboard.selected_tiles.bounds_single_tile()
-                                {
+                                if let Some(tile) = bundle.blackboard.selected_tiles.single_tile() {
                                     if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
                                         bundle.commands.push(UiCommand::IssueDivineCommand(
                                             DivineInputCommand::Goto(tile),

@@ -2,6 +2,7 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::ecs::{Component, VecStorage};
+use crate::physics::Bounds;
 
 /// Position and rotation component
 #[derive(Debug, Copy, Clone, Component)]
@@ -24,6 +25,9 @@ pub struct TransformComponent {
 
     /// Current velocity
     pub velocity: Vector2,
+
+    /// Number of blocks fallen in current fall
+    pub fallen: u32,
 }
 
 impl TransformComponent {
@@ -35,6 +39,7 @@ impl TransformComponent {
             rotation: Basis2::from_angle(rad(0.0)),
             last_position: position,
             velocity: Zero::zero(),
+            fallen: 0,
         }
     }
 
@@ -54,5 +59,29 @@ impl TransformComponent {
     }
     pub const fn z(&self) -> f32 {
         self.position.2
+    }
+
+    pub fn bounds(&self) -> Bounds {
+        // allow tiny overlap
+        const MARGIN: f32 = 0.8;
+        let radius = self.bounding_radius * MARGIN;
+        Bounds::from_radius(self.position, radius, radius)
+    }
+
+    pub fn feelers_bounds(&self) -> Bounds {
+        let feelers = self.velocity + (self.velocity.normalize() * self.bounding_radius);
+        let centre = self.position + feelers;
+
+        const EXTRA: f32 = 1.25;
+        let length = self.bounding_radius * EXTRA;
+        let width = 0.1; // will be floor'd/ceil'd to 0 and 1
+
+        let (x, y) = if feelers.x > feelers.y {
+            (width, length)
+        } else {
+            (length, width)
+        };
+
+        Bounds::from_radius(centre, x, y)
     }
 }

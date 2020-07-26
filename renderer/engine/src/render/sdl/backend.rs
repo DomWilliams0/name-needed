@@ -258,7 +258,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         };
 
         let (_, mut blackboard) = simulation.render(
-            self.world_viewer.entity_range(),
+            &self.world_viewer,
             frame_target,
             &mut self.backend.renderer,
             interpolation,

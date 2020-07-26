@@ -56,7 +56,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             debug!("seeding random generator with seed {:?} from config", seed);
         }
 
-        let mut colors = ColorRgb::unique_randoms(0.65, 0.4).unwrap();
+        let mut colors = ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap();
 
         // add entities from config
         /*{

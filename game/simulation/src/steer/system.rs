@@ -5,6 +5,7 @@ use crate::movement::DesiredMovementComponent;
 use crate::steer::behaviour::SteeringResult;
 use crate::steer::SteeringBehaviour;
 use crate::TransformComponent;
+use world::WorldRef;
 
 /// Steering context
 #[derive(Default, Component)]
@@ -18,12 +19,14 @@ pub struct SteeringSystem;
 impl<'a> System<'a> for SteeringSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
+        Read<'a, WorldRef>,
         ReadStorage<'a, TransformComponent>,
         WriteStorage<'a, SteeringComponent>,
         WriteStorage<'a, DesiredMovementComponent>,
     );
 
-    fn run(&mut self, (entities, transform, mut steer, mut movement): Self::SystemData) {
+    fn run(&mut self, (entities, world_ref, transform, mut steer, mut movement): Self::SystemData) {
+        let world = world_ref.borrow();
         for (e, transform, mut steer, movement) in
             (&entities, &transform, &mut steer, &mut movement).join()
         {
@@ -44,11 +47,20 @@ impl<'a> System<'a> for SteeringSystem {
                     e,
                     steer.behaviour
                 );
-                // TODO struclog event
+
                 steer.behaviour = SteeringBehaviour::default();
             }
 
-            // TODO populate danger interests from world/other entity collisions
+            // avoid collision with world
+            let avoidance = transform.feelers_bounds();
+            // TODO cache allocation in system
+            let mut solids = Vec::new();
+            if avoidance.find_solids(&*world, &mut solids) {
+                for pos in &solids {
+                    let angle = Rad::atan2(-pos.0 as f32, pos.1 as f32);
+                    context_map.write_danger(angle, 0.05);
+                }
+            }
         }
     }
 }

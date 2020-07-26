@@ -1,9 +1,8 @@
 use std::iter::once;
-use std::mem::MaybeUninit;
 
 use common::*;
 use unit::world::{GlobalSliceIndex, WorldPoint};
-use world::{InnerWorldRef, WorldPath};
+use world::InnerWorldRef;
 use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
@@ -58,7 +57,11 @@ impl<'a> System<'a> for PathSteeringSystem {
                 // skip path finding if destination is the same
                 if Some(target) != path.path.as_ref().map(|path| path.target()) {
                     let world = (*world).borrow();
-                    let new_path = match path_find(&world, transform.position, target, goal) {
+                    let new_path = match world.find_path_with_goal(
+                        transform.position.floor(),
+                        target.floor(),
+                        goal,
+                    ) {
                         Err(e) => {
                             warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error
                             continue;
@@ -82,12 +85,6 @@ impl<'a> System<'a> for PathSteeringSystem {
             };
 
             if steer.behaviour.is_nop() {
-                // assume entity is now at the same z level as the last waypoint
-                // FIXME GROSS HACK
-                if let Some(last) = path.prev_z.take() {
-                    transform.set_height(last.slice());
-                }
-
                 // move onto next waypoint
                 match following.next_waypoint() {
                     None => {
@@ -137,7 +134,11 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                 // manually here rather than setting path.new_target and maybe waiting a few ticks
                 path_follow.path = world.choose_random_walkable_block(10).and_then(|target| {
                     let target = target.centred();
-                    match path_find(&world, transform.position, target, SearchGoal::Arrive) {
+                    match world.find_path_with_goal(
+                        transform.position.floor(),
+                        target.floor(),
+                        SearchGoal::Arrive,
+                    ) {
                         Err(NavigationError::SourceNotWalkable(_)) => {
                             warn!("{:?}: stuck in a non walkable position", e);
                             None
@@ -162,34 +163,6 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
             }
         }
     }
-}
-
-fn path_find(
-    world: &InnerWorldRef,
-    src: WorldPoint,
-    tgt: WorldPoint,
-    goal: SearchGoal,
-) -> Result<WorldPath, NavigationError> {
-    // try floor'd pos first, then ceil'd if it fails
-    let srcs = src.floor_then_ceil();
-
-    let mut last_err = MaybeUninit::uninit();
-    let mut results = srcs
-        .map(|src| world.find_path_with_goal(src, tgt.floor(), goal))
-        .skip_while(|res| {
-            if let Err(e) = res {
-                last_err = MaybeUninit::new(e.clone());
-            }
-            res.is_err()
-        });
-
-    results.next().unwrap_or_else(|| {
-        Err(
-            // Safety: if results is empty, it's because path navigation failed so last_err is
-            // definitely set
-            unsafe { last_err.assume_init() },
-        )
-    })
 }
 
 impl Default for FollowPathComponent {
@@ -226,25 +199,4 @@ impl FollowPathComponent {
             );
         }
     }
-    /*
-    pub fn new_path_to_pos(&mut self, target: WorldPosition, speed: NormalizedFloat) {
-        let mut vec = SmallVec::new();
-        vec.push(target);
-        self.update(vec, speed);
-    }
-
-    pub fn new_path_to_point(&mut self, target: WorldPoint, speed: NormalizedFloat) {
-        let mut vec = SmallVec::new();
-        vec.extend(target.floor_then_ceil());
-        self.update(vec, speed);
-    }
-
-    fn update(&mut self, target: SmallVec<[WorldPosition; 2]>, speed: NormalizedFloat) {
-        if let Some(old) = self.new_target.replace(target) {
-            warn!("follow path target was overwritten before it could be used (prev: {:?}, overwritten with: {:?})", old, target);
-        }
-
-        self.follow_speed = speed;
-    }
-    */
 }

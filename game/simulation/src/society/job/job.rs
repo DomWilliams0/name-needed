@@ -19,7 +19,7 @@ impl Job for BreakBlocksJob {
         // only queue blocks that are not air and are reachable
         out.extend(
             world
-                .filter_reachable_blocks_in_range(self.0.clone(), |bt| bt != BlockType::Air)
+                .filter_reachable_blocks_in_range(&self.0, |bt| bt != BlockType::Air)
                 .map(Task::BreakBlock),
         );
     }

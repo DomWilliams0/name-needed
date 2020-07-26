@@ -2,8 +2,9 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
+use unit::world::WorldPositionRange;
 use world::block::BlockType;
-use world::helpers::{apply_updates, loader_from_chunks, world_from_chunks};
+use world::helpers::{apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking};
 use world::loader::WorldTerrainUpdate;
 use world::{ChunkBuilder, ChunkDescriptor, DeepClone};
 
@@ -60,7 +61,7 @@ pub fn small_world(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("chunk radius", i), &i, |b, _| {
             let chunks = &chunks;
             b.iter(move || {
-                let _ = world_from_chunks(deep_clone(chunks));
+                let _ = world_from_chunks_blocking(deep_clone(chunks));
             })
         });
     }
@@ -78,18 +79,18 @@ pub fn tall_world(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("creation only", z), &z, |b, _| {
             let chunks = &chunks;
             b.iter(move || {
-                let _ = world_from_chunks(deep_clone(chunks));
+                let _ = world_from_chunks_blocking(deep_clone(chunks));
             })
         });
 
         // generate and apply a tiny 1 block change
-        let updates = vec![WorldTerrainUpdate::with_block(
-            (1, 1, 1).into(),
+        let updates = vec![WorldTerrainUpdate::new(
+            WorldPositionRange::with_single((1, 1, 1)),
             BlockType::Grass,
         )];
         group.bench_with_input(BenchmarkId::new("tiny 1 block change", z), &z, |b, _| {
             let chunks = &chunks;
-            let mut loader = loader_from_chunks(deep_clone(chunks));
+            let mut loader = loader_from_chunks_blocking(deep_clone(chunks));
             let updates = &updates;
             b.iter(move || {
                 let updates = updates.as_slice();
@@ -101,7 +102,7 @@ pub fn tall_world(c: &mut Criterion) {
 
 pub fn access_block(c: &mut Criterion) {
     const CHUNKS: i32 = 20;
-    let world = world_from_chunks(small_world_chunks(CHUNKS));
+    let world = world_from_chunks_blocking(small_world_chunks(CHUNKS));
     let w = world.borrow();
 
     let mut rng = thread_rng();

@@ -13,6 +13,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f3e0bf23f51883cce372d5d5892211236856e4bb37fb942e1eb135ee0f146e3"
 
 [[package]]
+name = "ahash"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ce6598c0a42bbb2485089f93d8dc28b31ff906ddb643c01a49fe3373d335e8e"
+dependencies = [
+ "const-random",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -266,6 +275,26 @@ dependencies = [
  "notify",
  "ron",
  "serde",
+]
+
+[[package]]
+name = "const-random"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f1af9ac737b2dd2d577701e59fd09ba34822f6f2ebdb30a7647405d9e55e16a"
+dependencies = [
+ "const-random-macro",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "const-random-macro"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25e4c606eb459dd29f7c57b2e0879f2b6f14ee130918c2b78ccb58a9624e6c7a"
+dependencies = [
+ "getrandom",
+ "proc-macro-hack",
 ]
 
 [[package]]
@@ -747,7 +776,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96282e96bfcd3da0d3aa9938bedf1e50df3269b6db08b4876d2da0bb1a0841cf"
 dependencies = [
- "ahash",
+ "ahash 0.3.5",
  "autocfg 1.0.0",
 ]
 
@@ -1439,6 +1468,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "237a5ed80e274dbc66f86bd59c1e25edc039660be53194b5fe0a482e0f2612ea"
 
 [[package]]
+name = "proc-macro-hack"
+version = "0.5.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e0456befd48169b9f13ef0f0ad46d492cf9d2dbb918bcf38e01eed4ce3ec5e4"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1882,6 +1917,7 @@ checksum = "b5752e017e03af9d735b4b069f53b7a7fd90fefafa04d8bd0c25581b0bff437f"
 name = "simulation"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.4.1",
  "ai",
  "arraydeque",
  "color",

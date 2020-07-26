@@ -128,8 +128,12 @@ impl Renderer for GlRenderer {
         });
     }
 
-    fn debug_add_tri(&mut self, _: [WorldPoint; 3], _: ColorRgb) {
-        unimplemented!()
+    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: ColorRgb) {
+        // TODO add proper support for quads and other debug shapes
+        self.debug_add_line(points[0], points[1], color);
+        self.debug_add_line(points[1], points[2], color);
+        self.debug_add_line(points[2], points[3], color);
+        self.debug_add_line(points[3], points[0], color);
     }
 
     fn debug_finish(&mut self) -> GlResult<()> {

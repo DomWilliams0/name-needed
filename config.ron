@@ -19,7 +19,7 @@ Config(
         random_count: 5,
         acceleration: 0.08,
         friction: 0.85,
-        max_speed: 0.22,
+        max_speed: 0.16,
         start_delay: 0,
         food_nutrition: 200,
         food_count: 200,

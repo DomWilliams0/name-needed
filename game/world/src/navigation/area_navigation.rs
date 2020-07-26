@@ -277,12 +277,12 @@ mod tests {
     use crate::navigation::path::AreaPathNode;
     use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::neighbour::NeighbourOffset;
-    use crate::world::helpers::world_from_chunks;
+    use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkDescriptor, EdgeCost};
 
     fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
         // gross but allows for neater tests
-        let world = world_from_chunks(chunks).into_inner();
+        let world = world_from_chunks_blocking(chunks).into_inner();
         (*world.area_graph()).clone()
     }
 
@@ -733,7 +733,7 @@ mod tests {
         // also the blocks are ridiculously high and not in slab 0
         const SLAB: SlabIndex = SlabIndex(201 / SLAB_SIZE.as_i32());
 
-        let w = world_from_chunks(vec![
+        let w = world_from_chunks_blocking(vec![
             ChunkBuilder::new()
                 .set_block((14, 2, 201), BlockType::Stone)
                 .set_block((15, 2, 201), BlockType::Stone)
@@ -772,7 +772,7 @@ mod tests {
         // also the blocks are ridiculously high and not in slab 0
         const SLAB: SlabIndex = SlabIndex(202 / SLAB_SIZE.as_i32());
 
-        let w = world_from_chunks(vec![ChunkBuilder::new()
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(201, BlockType::Grass)
             .build((0, 0))])
         .into_inner();

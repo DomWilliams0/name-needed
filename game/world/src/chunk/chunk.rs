@@ -1,5 +1,4 @@
-use std::convert::TryFrom;
-use std::ops::{Deref, DerefMut, Shl};
+use std::ops::{Deref, DerefMut};
 
 use common::*;
 
@@ -40,7 +39,7 @@ impl Chunk {
 
     pub fn id(&self) -> ChunkId {
         let ChunkPosition(x, y) = self.pos;
-        (u64::try_from(x).unwrap()).shl(32) | u64::try_from(y).unwrap()
+        (x as u64) << 32 | (y as u64)
     }
 
     pub fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> Option<BlockType> {

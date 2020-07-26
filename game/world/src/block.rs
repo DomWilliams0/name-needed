@@ -1,7 +1,7 @@
 use color::ColorRgb;
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
-use crate::occlusion::{BlockOcclusion, Opacity};
+use crate::occlusion::BlockOcclusion;
 use common::derive_more::Display;
 use common::Proportion;
 pub use enum_iterator::IntoEnumIterator;
@@ -35,6 +35,26 @@ pub enum BlockType {
     Stone,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BlockOpacity {
+    Transparent,
+    Solid,
+}
+
+impl BlockOpacity {
+    pub fn solid(self) -> bool {
+        if let Self::Solid = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn transparent(self) -> bool {
+        !self.solid()
+    }
+}
+
 impl Block {
     fn with_block_type(block_type: BlockType) -> Self {
         Self {
@@ -62,7 +82,7 @@ impl Block {
         &mut self.block_type
     }
 
-    pub fn opacity(self) -> Opacity {
+    pub fn opacity(self) -> BlockOpacity {
         self.block_type.opacity()
     }
 
@@ -70,7 +90,16 @@ impl Block {
         self.area.initialized()
     }
 
+    pub fn walkable_area(self) -> Option<SlabAreaIndex> {
+        if self.area.initialized() {
+            Some(self.area)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn area_index(self) -> SlabAreaIndex {
+        // TODO this should return an Option if area is uninitialized
         self.area
     }
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
@@ -116,11 +145,11 @@ impl BlockType {
         }
     }
 
-    pub fn opacity(self) -> Opacity {
+    pub fn opacity(self) -> BlockOpacity {
         if let BlockType::Air = self {
-            Opacity::Transparent
+            BlockOpacity::Transparent
         } else {
-            Opacity::Solid
+            BlockOpacity::Solid
         }
     }
 

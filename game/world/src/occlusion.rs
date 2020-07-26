@@ -1,6 +1,7 @@
 use common::derive_more::{Deref, DerefMut};
 use common::*;
 
+use crate::block::BlockOpacity;
 use crate::neighbour::NeighbourOffset;
 use std::ops::Add;
 
@@ -31,13 +32,13 @@ impl From<VertexOcclusion> for f32 {
     }
 }
 
-/// TODO bitset of Opacitys will be much smaller, 2 bits each
+/// TODO bitset of Opacities will be much smaller, 2 bits each
 #[derive(Deref, DerefMut, Default, Copy, Clone)]
-pub struct NeighbourOpacity([Opacity; NeighbourOffset::COUNT]);
+pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
 
 impl NeighbourOpacity {
     pub const fn default_const() -> Self {
-        Self([Opacity::Transparent; NeighbourOffset::COUNT])
+        Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
     }
 
     /// Reduce to `[0 = transparent/unknown, 1 = solid]`
@@ -57,7 +58,7 @@ impl NeighbourOpacity {
 
     #[cfg(test)]
     pub fn all_solid() -> Self {
-        Self([Opacity::Solid; NeighbourOffset::COUNT])
+        Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
     }
 }
 
@@ -77,25 +78,23 @@ impl Debug for NeighbourOpacity {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Opacity {
+pub enum OcclusionOpacity {
     /// Across a chunk boundary, treated as transparent
     Unknown,
-    Transparent,
-    Solid,
+    Known(BlockOpacity),
 }
 
-impl Default for Opacity {
+impl Default for OcclusionOpacity {
     fn default() -> Self {
-        Opacity::Unknown
+        OcclusionOpacity::Unknown
     }
 }
 
-impl Opacity {
+impl OcclusionOpacity {
     pub fn solid(self) -> bool {
-        if let Opacity::Solid = self {
-            true
-        } else {
-            false
+        match self {
+            OcclusionOpacity::Unknown => false,
+            OcclusionOpacity::Known(opacity) => opacity.solid(),
         }
     }
 
@@ -113,16 +112,22 @@ impl Opacity {
 
     fn update(self, new: Self) -> Self {
         match (self, new) {
-            (Opacity::Unknown, known) | (known, Opacity::Unknown) => known,
+            (OcclusionOpacity::Unknown, known) | (known, OcclusionOpacity::Unknown) => known,
             (_, new) => new,
         }
     }
 }
 
 /// "Is occluded"
-impl From<Opacity> for bool {
-    fn from(o: Opacity) -> Self {
+impl From<OcclusionOpacity> for bool {
+    fn from(o: OcclusionOpacity) -> Self {
         o.solid()
+    }
+}
+
+impl From<BlockOpacity> for OcclusionOpacity {
+    fn from(o: BlockOpacity) -> Self {
+        Self::Known(o)
     }
 }
 
@@ -245,12 +250,12 @@ mod tests {
     fn after_block_removed() {
         let neighbour_occluded = {
             let mut o = NeighbourOpacity::default();
-            o.0[0] = Opacity::Solid;
+            o.0[0] = OcclusionOpacity::Known(BlockOpacity::Solid);
             o
         };
         let neighbour_not_occluded = {
             let mut o = NeighbourOpacity::default();
-            o.0[0] = Opacity::Transparent;
+            o.0[0] = OcclusionOpacity::Known(BlockOpacity::Transparent);
             o
         };
 

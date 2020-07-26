@@ -6,7 +6,7 @@ use specs::RunNow;
 use common::derive_more::Deref;
 use common::*;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
-use world::{OcclusionChunkUpdate, SliceRange, WorldRef, WorldViewer};
+use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
 
 use crate::ai::{
     ActivityComponent, AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem,
@@ -26,8 +26,8 @@ use crate::item::{
 use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
-    ArrivedAtTargetEventComponent, FollowPathComponent, PathDebugRenderer, PathSteeringSystem,
-    WanderComponent, WanderPathAssignmentSystem,
+    ArrivedAtTargetEventComponent, FollowPathComponent, NavigationAreaDebugRenderer,
+    PathDebugRenderer, PathSteeringSystem, WanderComponent, WanderPathAssignmentSystem,
 };
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
@@ -38,6 +38,7 @@ use crate::society::{PlayerSociety, SocietyComponent};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 use crate::{ComponentWorld, Societies, SocietyHandle};
+use unit::world::WorldPositionRange;
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
@@ -121,6 +122,22 @@ impl<R: Renderer> Simulation<R> {
         // apply player inputs
         self.process_ui_commands(commands);
 
+        // tick game logic
+        self.tick_systems();
+
+        // we're about to go mutable, drop this fuzzy ball of unsafeness
+        let _ = self.ecs_world.remove::<EcsWorldFrameRef>();
+
+        // per tick maintenance
+        // must remove resource from world first so we can use &mut ecs_world
+        let mut updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
+        updates.execute(&mut self.ecs_world);
+        self.ecs_world.insert(updates);
+
+        self.ecs_world.maintain();
+    }
+
+    fn tick_systems(&mut self) {
         // needs
         HungerSystem.run_now(&self.ecs_world);
         EatingSystem.run_now(&self.ecs_world);
@@ -146,23 +163,13 @@ impl<R: Renderer> Simulation<R> {
         // remove completed divine commands
         DivineCommandCompletionSystem.run_now(&self.ecs_world);
 
+        // validate inventory soundness
         #[cfg(debug_assertions)]
         crate::item::validation::InventoryValidationSystem(&self.ecs_world)
             .run_now(&self.ecs_world);
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
-
-        // we're about to go mutable, drop this fuzzy ball of unsafeness
-        let _ = self.ecs_world.remove::<EcsWorldFrameRef>();
-
-        // per tick maintenance
-        // must remove resource from world first so we can use &mut ecs_world
-        let mut updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
-        updates.execute(&mut self.ecs_world);
-        self.ecs_world.insert(updates);
-
-        self.ecs_world.maintain();
     }
 
     pub fn world(&self) -> WorldRef {
@@ -222,8 +229,9 @@ impl<R: Renderer> Simulation<R> {
                             from = from.below();
                             to = to.below();
                         }
+                        let range = WorldPositionRange::with_inclusive_range(from, to);
                         self.terrain_changes
-                            .push(WorldTerrainUpdate::with_range(from, to, block_type));
+                            .push(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
                 UiCommand::IssueDivineCommand(ref divine_command) => {
@@ -281,7 +289,7 @@ impl<R: Renderer> Simulation<R> {
     // target is for this frame only
     pub fn render(
         &mut self,
-        slices: SliceRange,
+        world_viewer: &WorldViewer,
         target: R::Target,
         renderer: &mut R,
         interpolation: f64,
@@ -301,7 +309,7 @@ impl<R: Renderer> Simulation<R> {
             {
                 let mut render_system = RenderSystem {
                     renderer,
-                    slices,
+                    slices: world_viewer.entity_range(),
                     interpolation: interpolation as f32,
                 };
 
@@ -320,7 +328,7 @@ impl<R: Renderer> Simulation<R> {
 
             self.debug_renderers
                 .iter_enabled()
-                .for_each(|r| r.render(renderer, &voxel_world, ecs_world, slices));
+                .for_each(|r| r.render(renderer, &voxel_world, ecs_world, world_viewer));
 
             if let Err(e) = renderer.debug_finish() {
                 warn!("render debug_finish() failed: {:?}", e);
@@ -396,6 +404,7 @@ fn register_debug_renderers<R: Renderer>(
         PathDebugRenderer::default(),
         config::get().display.nav_paths_by_default,
     )?;
+    r.register(NavigationAreaDebugRenderer::default(), false)?;
     Ok(())
 }
 

@@ -2,7 +2,7 @@ use crate::ecs::*;
 use crate::input::{InputEvent, SelectType, WorldColumn};
 use crate::{RenderComponent, TransformComponent};
 use common::*;
-use unit::world::{WorldPosition, WorldPositionRange};
+use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
 use world::WorldRef;
 
 pub struct InputSystem<'a> {
@@ -120,12 +120,11 @@ impl<'a> System<'a> for InputSystem<'a> {
                                     y -= (dy - TILE_SELECTION_LIMIT) * mul_y;
                                 }
 
-                                // TODO can no longer select a single block, its always 2x2
                                 (WorldPosition(x, y, to.slice()), from)
                             };
 
                             debug!("selected block region {:?} -> {:?}", from, to);
-                            Some(WorldPositionRange::Range(from, to))
+                            Some(WorldPositionRange::with_exclusive_range(from, to))
                         }
                         _ => None,
                     }
@@ -163,10 +162,11 @@ impl SelectedTiles {
         self.0.as_ref().map(|range| range.bounds())
     }
 
-    pub fn bounds_single_tile(&self) -> Option<WorldPosition> {
-        self.0
-            .as_ref()
-            .filter(|range| matches!(range, WorldPositionRange::Single(_)))
-            .map(|range| range.bounds().0)
+    pub fn single_tile(&self) -> Option<WorldPosition> {
+        self.0.clone().and_then(|range| match range {
+            WorldRange::Single(pos) => Some(pos),
+            WorldRange::Range(a, b) if a == b => Some(a),
+            _ => None,
+        })
     }
 }

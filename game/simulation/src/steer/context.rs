@@ -131,6 +131,11 @@ pub struct SingleContextMap<C: ContextType> {
     phantom: PhantomData<C>,
 }
 
+enum Falloff {
+    FallOff,
+    NoFallOff,
+}
+
 impl<C: ContextType> SingleContextMap<C> {
     fn write_direct(&mut self, direction: Direction, desire: Desire) {
         let val = &mut self.values[direction as usize];
@@ -143,13 +148,16 @@ impl<C: ContextType> SingleContextMap<C> {
         self.values[direction as usize]
     }
 
-    fn write(&mut self, direction: Rad, value: f32) {
+    fn write(&mut self, direction: Rad, value: f32, do_falloff: Falloff) {
         let dir = Direction::from(direction);
         let (desire, falloff) = Desire::from_float(value);
 
-        self.values[dir.prev() as usize] = falloff;
         self.values[dir as usize] = desire;
-        self.values[dir.next() as usize] = falloff;
+
+        if let Falloff::FallOff = do_falloff {
+            self.values[dir.prev() as usize] = falloff;
+            self.values[dir.next() as usize] = falloff;
+        }
     }
 
     pub fn update_from(&mut self, _prev: Self) {
@@ -160,13 +168,13 @@ impl<C: ContextType> SingleContextMap<C> {
 
 impl SingleContextMap<Interest> {
     pub fn write_interest(&mut self, direction: Rad, value: f32) {
-        self.write(direction, value)
+        self.write(direction, value, Falloff::FallOff)
     }
 }
 
 impl SingleContextMap<Danger> {
     pub fn write_danger(&mut self, direction: Rad, value: f32) {
-        self.write(direction, value)
+        self.write(direction, value, Falloff::NoFallOff)
     }
 }
 
@@ -178,11 +186,11 @@ pub struct ContextMap {
 
 impl ContextMap {
     pub fn write_interest(&mut self, direction: Rad, value: f32) {
-        self.interest.write(direction, value);
+        self.interest.write_interest(direction, value)
     }
 
     pub fn write_danger(&mut self, direction: Rad, value: f32) {
-        self.danger.write(direction, value);
+        self.danger.write_danger(direction, value);
     }
 
     pub fn resolve(mut self) -> (Rad, f32) {
@@ -274,7 +282,7 @@ mod tests {
     #[test]
     fn falloff() {
         let mut map = SingleContextMap::<Interest>::default();
-        map.write(rad(0.0), 0.5);
+        map.write_interest(rad(0.0), 0.5);
 
         let expected_value = Desire(128);
         assert_eq!(map.read_direct(Direction::North), expected_value);

@@ -30,6 +30,7 @@ impl DebugWindow {
                     .default_open(true)
                     .build(bundle.ui) {
                     bundle.checkbox(im_str!("Navigation paths"), "navigation path");
+                    bundle.checkbox(im_str!("Navigation areas"), "navigation areas");
                     bundle.checkbox(im_str!("Steering direction"), "steering");
                 }
 

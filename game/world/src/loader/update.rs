@@ -2,7 +2,8 @@ use std::iter::once;
 
 use common::derive_more::*;
 use unit::world::{
-    ChunkPosition, RangePosition, SlabIndex, SlabPosition, WorldPosition, WorldRange,
+    ChunkPosition, RangePosition, SlabIndex, SlabPosition, WorldPosition, WorldPositionRange,
+    WorldRange,
 };
 
 use crate::block::BlockType;
@@ -58,15 +59,8 @@ impl WorldTerrainUpdate {
             .chain(range_iter.into_iter().flatten())
     }
 
-    pub fn with_block(pos: WorldPosition, block_type: BlockType) -> Self {
-        Self(GenericTerrainUpdate(WorldRange::Single(pos), block_type))
-    }
-
-    pub fn with_range(from: WorldPosition, to: WorldPosition, block_type: BlockType) -> Self {
-        Self(GenericTerrainUpdate(
-            WorldRange::Range(from, to),
-            block_type,
-        ))
+    pub fn new(range: WorldPositionRange, block_type: BlockType) -> Self {
+        Self(GenericTerrainUpdate(range, block_type))
     }
 }
 
@@ -174,7 +168,7 @@ mod split {
     mod tests {
         use common::*;
         use unit::dim::CHUNK_SIZE;
-        use unit::world::{ChunkPosition, SlabIndex, WorldRange, SLAB_SIZE};
+        use unit::world::{ChunkPosition, SlabIndex, WorldPositionRange, WorldRange, SLAB_SIZE};
 
         use crate::block::BlockType;
         use crate::loader::update::split::inter_chunk_boundaries;
@@ -210,9 +204,8 @@ mod split {
 
         #[test]
         fn within_chunk() {
-            let update = WorldTerrainUpdate::with_range(
-                (1, 1, 1).into(),
-                (3, 3, 3).into(),
+            let update = WorldTerrainUpdate::new(
+                WorldPositionRange::with_inclusive_range((1, 1, 1), (3, 3, 3)),
                 BlockType::Stone,
             );
             assert_eq!(update.into_slab_updates().count(), 1);
@@ -235,10 +228,13 @@ mod split {
             from: (i32, i32, i32),
             to: (i32, i32, i32),
         ) -> Vec<(ChunkPosition, SlabIndex, SlabTerrainUpdate)> {
-            WorldTerrainUpdate::with_range(from.into(), to.into(), BlockType::Stone)
-                .into_slab_updates()
-                .sorted_by(|(ca, sa, _), (cb, sb, _)| ca.cmp(cb).then(sa.cmp(sb)))
-                .collect_vec()
+            WorldTerrainUpdate::new(
+                WorldPositionRange::with_inclusive_range(from, to),
+                BlockType::Stone,
+            )
+            .into_slab_updates()
+            .sorted_by(|(ca, sa, _), (cb, sb, _)| ca.cmp(cb).then(sa.cmp(sb)))
+            .collect_vec()
         }
 
         #[test]

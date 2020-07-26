@@ -1,12 +1,12 @@
 use crate::ecs::EcsWorld;
-use crate::{Renderer, SliceRange};
+use crate::Renderer;
 use color::ColorRgb;
 use common::*;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::ops::DerefMut;
 use unit::world::WorldPoint;
-use world::InnerWorldRef;
+use world::{InnerWorldRef, WorldViewer};
 
 pub trait DebugRenderer<R: Renderer> {
     fn identifier(&self) -> &'static str;
@@ -15,7 +15,7 @@ pub trait DebugRenderer<R: Renderer> {
         renderer: &mut R,
         world: &InnerWorldRef,
         ecs_world: &EcsWorld,
-        slices: SliceRange,
+        viewer: &WorldViewer,
     );
 }
 
@@ -109,7 +109,7 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         "axes"
     }
 
-    fn render(&mut self, renderer: &mut R, _: &InnerWorldRef, _: &EcsWorld, _: SliceRange) {
+    fn render(&mut self, renderer: &mut R, _: &InnerWorldRef, _: &EcsWorld, _: &WorldViewer) {
         renderer.debug_add_line(
             WorldPoint(0.0, 0.0, 1.0),
             WorldPoint(1.0, 0.0, 1.0),

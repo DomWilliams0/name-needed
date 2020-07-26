@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::{BlockDurability, BlockType};
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::BlockDamageResult;
@@ -56,7 +56,10 @@ impl QueuedUpdates {
 
             if let Some(BlockDamageResult::Broken) = voxel_world.damage_block(block, damage) {
                 let terrain_updates = world.resource_mut::<TerrainUpdatesRes>();
-                terrain_updates.push(WorldTerrainUpdate::with_block(block, BlockType::Air))
+                terrain_updates.push(WorldTerrainUpdate::new(
+                    WorldPositionRange::with_single(block),
+                    BlockType::Air,
+                ))
             }
 
             Ok(())
