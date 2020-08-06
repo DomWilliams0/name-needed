@@ -48,7 +48,7 @@ impl<'a> UiBlackboard<'a> {
         debug_renderers: &'a HashSet<&'static str>,
     ) -> Self {
         let selected_entity = world.resource_mut::<SelectedEntity>().get(world).map(|e| {
-            let transform = *world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
+            let transform = world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
             let details = match world.component::<BaseItemComponent>(e) {
                 Ok(item) => EntityDetails::Item {
                     item: item.clone(),
@@ -73,7 +73,7 @@ impl<'a> UiBlackboard<'a> {
 
             SelectedEntityDetails {
                 entity: e,
-                transform,
+                transform: transform.clone(),
                 details,
             }
         });

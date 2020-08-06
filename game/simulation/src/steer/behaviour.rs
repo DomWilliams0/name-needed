@@ -110,7 +110,7 @@ impl DoASteer for Seek {
         let pos = Vector2::from(transform.position);
 
         let distance = pos.distance(tgt);
-        if distance < transform.bounding_radius + transform.velocity.magnitude() {
+        if distance < transform.bounding_radius() + transform.velocity.magnitude() {
             // we've arrived
             return SteeringResult::Finished;
         }
@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use crate::steer::context::{ContextMap, Direction};
     use crate::steer::Seek;
-    use crate::TransformComponent;
+    use crate::{PhysicalShape, TransformComponent};
     use common::NormalizedFloat;
     use matches::assert_matches;
     use std::f32::EPSILON;
@@ -148,7 +148,8 @@ mod tests {
         let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
 
         // starts at 0,0 going to 10,0
-        let mut transform = TransformComponent::new(WorldPoint::default(), 0.5, 0.0);
+        let mut transform =
+            TransformComponent::new(WorldPoint::default(), PhysicalShape::circle(0.5), 0.0);
         let mut output = InterestsContextMap::default();
 
         // first ticks takes us toward
@@ -163,7 +164,8 @@ mod tests {
     #[test]
     fn seek_arrived_already() {
         let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
-        let transform = TransformComponent::new(WorldPoint(9.8, 0.0, 0.0), 0.5, 0.0);
+        let transform =
+            TransformComponent::new(WorldPoint(9.8, 0.0, 0.0), PhysicalShape::circle(0.5), 0.0);
         let mut output = InterestsContextMap::default();
 
         // already arrived
@@ -174,7 +176,8 @@ mod tests {
     fn seek_exact_pos() {
         // we are not exactly lined up with the target, and a tiny radius
         let mut seek = Seek::with_target(WorldPoint(10.8, 0.6, 0.0), NormalizedFloat::one());
-        let transform = TransformComponent::new(WorldPoint(0.2, 0.9, 0.0), 0.2, 0.0);
+        let transform =
+            TransformComponent::new(WorldPoint(0.2, 0.9, 0.0), PhysicalShape::circle(0.2), 0.0);
         let mut output = ContextMap::default();
 
         // output should be towards the block

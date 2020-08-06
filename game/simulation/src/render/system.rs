@@ -1,31 +1,26 @@
 use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
 use crate::render::renderer::Renderer;
-use crate::render::shape::PhysicalShape;
+use crate::render::shape::RenderHexColor;
 use crate::{SliceRange, TransformComponent};
 use color::ColorRgb;
 use common::*;
+use specs::{Builder, EntityBuilder};
 
 #[derive(Debug, Clone, Component)]
 #[storage(VecStorage)]
 pub struct RenderComponent {
     /// simple color
-    color: ColorRgb,
-
-    /// simple 2D shape
-    shape: PhysicalShape,
+    pub color: ColorRgb,
 }
 
 impl RenderComponent {
-    pub fn new(color: ColorRgb, shape: PhysicalShape) -> Self {
-        Self { color, shape }
+    pub fn new(color: ColorRgb) -> Self {
+        Self { color }
     }
 
-    pub fn color(&self) -> ColorRgb {
+    pub const fn color(&self) -> ColorRgb {
         self.color
-    }
-    pub fn shape(&self) -> PhysicalShape {
-        self.shape
     }
 }
 
@@ -48,7 +43,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         for (transform, render, selected) in (&transform, &render, selected.maybe()).join() {
             if self.slices.contains(transform.slice()) {
                 // make copy to mutate for interpolation
-                let mut transform = *transform;
+                let mut transform = transform.clone();
 
                 transform.position = {
                     let last_pos: Vector3 = transform.last_position.into();
@@ -70,3 +65,22 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         }
     }
 }
+
+impl<V: Value> ComponentTemplate<V> for RenderComponent {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let color: RenderHexColor = values.get("color")?.into_type()?;
+
+        Ok(Box::new(Self {
+            color: color.into(),
+        }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+register_component_template!("render", RenderComponent);

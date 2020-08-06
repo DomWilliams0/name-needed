@@ -1,7 +1,5 @@
 use common::*;
 
-type Durability = u16;
-
 #[derive(Debug, Clone)]
 pub enum ItemConditionGrade {
     Broken,
@@ -12,45 +10,32 @@ pub enum ItemConditionGrade {
     Perfect,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ItemCondition {
-    value: Proportion<Durability>,
+    value: NormalizedFloat,
 
     /// Updated with value
     grade: ItemConditionGrade,
 }
 
 impl ItemCondition {
-    pub fn new_perfect(max: Durability) -> Self {
-        Self::new(max, max)
+    pub fn perfect() -> Self {
+        Self::new(NormalizedFloat::one())
     }
 
-    pub fn with_proportion(durability: Proportion<Durability>) -> Self {
+    pub fn new(proportion: NormalizedFloat) -> Self {
         Self {
-            value: durability,
-            grade: ItemConditionGrade::from_proportion(durability.proportion()),
+            value: proportion,
+            grade: ItemConditionGrade::from_proportion(proportion.value()),
         }
     }
 
-    pub fn new(value: Durability, max: Durability) -> Self {
-        let value = Proportion::with_value(value, max);
-        Self::with_proportion(value)
-    }
-
-    /*
-    pub fn decrement(&mut self) {
-        self.value -= 1;
-        self.grade = ItemConditionGrade::calculate(self.value, self.max)
-    }
-    */
-
     pub fn set(&mut self, proportion: NormalizedFloat) {
-        self.value.set_proportion(proportion.value());
-        self.grade = ItemConditionGrade::from_proportion(proportion.value());
+        *self = Self::new(proportion)
     }
 
     pub fn value(&self) -> NormalizedFloat {
-        NormalizedFloat::new(self.value.proportion())
+        self.value
     }
 }
 
@@ -69,6 +54,6 @@ impl ItemConditionGrade {
 
 impl Display for ItemCondition {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{} ({:?})", self.value, self.grade)
+        write!(f, "{:?} ({})", self.grade, self.value.value())
     }
 }

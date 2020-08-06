@@ -1,4 +1,7 @@
-use common::*;
+use common::{
+    derive_more::{Display, Error},
+    *,
+};
 use std::hint::unreachable_unchecked;
 
 use crate::ecs::{ComponentWorld, EcsWorld, Entity};
@@ -27,14 +30,14 @@ pub struct Contents {
     slots: Box<[ItemSlot]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ContentsGetError {
     SlotOutOfRange,
-    BadOverflowState(SlotIndex),
+    BadOverflowState(#[error(not(source))] SlotIndex),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ContentsPutError {
     SlotOutOfRange,
@@ -327,10 +330,10 @@ mod tests {
 
         // empty
         assert!(inv
-            .search(&ItemFilter::Class(ItemClass::Food), Some(&world))
+            .search(&ItemFilter::SpecificEntity(food), Some(&world))
             .is_none());
         assert!(inv
-            .search(&ItemFilter::Class(ItemClass::Weapon), Some(&world))
+            .search(&ItemFilter::SpecificEntity(weapon), Some(&world))
             .is_none());
         assert!(inv
             .search(&ItemFilter::SpecificEntity(food), Some(&world))
@@ -340,7 +343,7 @@ mod tests {
         assert_matches!(inv.put_item(food, 0, 1), Ok(()));
 
         assert_eq!(
-            inv.search(&ItemFilter::Class(ItemClass::Food), Some(&world)),
+            inv.search(&ItemFilter::SpecificEntity(food), Some(&world)),
             Some((0, food))
         );
         assert_eq!(
@@ -348,18 +351,18 @@ mod tests {
             Some((0, food))
         );
         assert!(inv
-            .search(&ItemFilter::Class(ItemClass::Weapon), Some(&world))
+            .search(&ItemFilter::SpecificEntity(weapon), Some(&world))
             .is_none());
 
         // add weapon
         assert_matches!(inv.put_item(weapon, 1, 1), Ok(()));
 
         assert_eq!(
-            inv.search(&ItemFilter::Class(ItemClass::Food), Some(&world)),
+            inv.search(&ItemFilter::SpecificEntity(food), Some(&world)),
             Some((0, food)) // still there
         );
         assert_eq!(
-            inv.search(&ItemFilter::Class(ItemClass::Weapon), Some(&world)),
+            inv.search(&ItemFilter::SpecificEntity(weapon), Some(&world)),
             Some((1, weapon))
         );
 

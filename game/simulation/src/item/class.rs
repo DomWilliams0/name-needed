@@ -1,9 +1,10 @@
-use crate::ecs::Entity;
+use crate::ecs::{EcsWorld, Entity};
 use crate::item::{BaseItemComponent, ItemSlot};
 use crate::{entity_pretty, ComponentWorld};
 use common::*;
 
 #[derive(Eq, PartialEq, Copy, Clone, Hash, Debug, Ord, PartialOrd)]
+#[deprecated(note = "Use presence of components instead i.e. EdibleItemComponent")]
 pub enum ItemClass {
     Food,
     Weapon,
@@ -11,6 +12,7 @@ pub enum ItemClass {
 
 #[derive(Eq, PartialEq, Copy, Clone, Hash, Debug, Ord, PartialOrd)]
 pub enum ItemFilter {
+    #[deprecated]
     Class(ItemClass),
     SpecificEntity(Entity),
     Predicate(fn(Entity) -> bool),

@@ -70,7 +70,7 @@ impl EventSink for JsonPipeSink {
                     let mut buffer = Vec::with_capacity(256);
                     loop {
                         match rx.recv() {
-                            Err(e) => panic!("failed to recv: {:?}", e),
+                            Err(e) => panic!("failed to recv: {}", e),
                             Ok(Message::Stop) => break,
                             Ok(msg) => serde_json::to_writer(&mut buffer, &msg)
                                 .expect("failed to serialize message"),

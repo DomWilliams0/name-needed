@@ -5,28 +5,30 @@ use crate::ecs::*;
 use crate::item::condition::ItemCondition;
 use crate::item::{ItemClass, SlotIndex};
 use crate::needs::Fuel;
+use specs::{Builder, EntityBuilder};
 
 /// Common properties across all items
-#[derive(Component, Constructor, Clone)]
+#[derive(Component, Constructor, Clone, Debug)]
 #[storage(DenseVecStorage)]
 pub struct BaseItemComponent {
-    // TODO this could do with a builder
-    pub name: &'static str,
+    pub name: String,
     pub condition: ItemCondition,
     // Kilograms
     pub mass: f32,
 
     /// Never changes
-    pub class: ItemClass, // TODO possible for an item to have multiple classes?
+    pub class: ItemClass,
 
     /// Number of base inventory slots this takes up e.g. in hand
     pub base_slots: u8,
 
     /// Number of mounted inventory slots this takes up e.g. in bag
     pub mounted_slots: u8,
+
+    pub stack_size: u16,
 }
 
-#[derive(Component, Constructor, Clone)]
+#[derive(Component, Constructor, Clone, Debug)]
 #[storage(DenseVecStorage)]
 pub struct EdibleItemComponent {
     /// All fuel available from this item - never changes, decrease base item condition instead
@@ -38,7 +40,7 @@ pub struct EdibleItemComponent {
 }
 
 // TODO use item mass to determine how far it flies? or also aerodynamic-ness
-#[derive(Component, Default)]
+#[derive(Component, Default, Debug)]
 #[storage(NullStorage)]
 pub struct ThrowableItemComponent;
 
@@ -62,3 +64,61 @@ pub struct UsingItemComponent {
 
     pub class: ItemClass,
 }
+
+impl<V: Value> ComponentTemplate<V> for BaseItemComponent {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(Self {
+            name: values.get_string("name")?,
+            condition: ItemCondition::perfect(),
+            mass: values.get_float("mass")?,
+            class: ItemClass::Food, // TODO remove ItemClass
+            base_slots: values.get_int("base_slots")?,
+            mounted_slots: values.get_int("mounted_slots")?,
+            stack_size: match values.get_string("stacking")?.as_str() {
+                "single" => 1,
+                "item_default" => 150,
+                s => {
+                    return Err(ComponentBuildError::InvalidEnumVariant(
+                        s.to_owned(),
+                        "item stacking",
+                    ))
+                }
+            },
+        }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
+    fn construct(
+        values: &mut Map<V>,
+    ) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError> {
+        Ok(Box::new(Self {
+            total_nutrition: values.get_int("total_nutrition")?,
+        }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
+    fn construct(_: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError> {
+        Ok(Box::new(Self))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(ThrowableItemComponent)
+    }
+}
+
+register_component_template!("item", BaseItemComponent);
+register_component_template!("edible", EdibleItemComponent);
+register_component_template!("throwable", ThrowableItemComponent);

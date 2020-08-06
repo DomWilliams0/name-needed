@@ -1,10 +1,14 @@
-use common::*;
+use common::{
+    derive_more::{Display, Error},
+    *,
+};
 
 use crate::ecs::*;
 use crate::item::inventory::Contents;
 use crate::item::{
     ContentsGetError, ContentsPutError, ItemFilter, ItemSlot, MountedInventoryIndex, SlotIndex,
 };
+use specs::{Builder, EntityBuilder};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SlotReference {
@@ -20,11 +24,11 @@ pub struct ItemReference(pub SlotReference, pub Entity);
 #[derive(Debug, Clone, Copy)]
 pub struct LooseItemReference(pub ItemReference);
 
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub enum InventoryError {
     SlotOutOfRange,
-    InventoryOutOfRange(MountedInventoryIndex),
+    InventoryOutOfRange(#[error(not(source))] MountedInventoryIndex),
     ContentsGet(ContentsGetError),
     ContentsPut(ContentsPutError),
     EmptySlot,
@@ -359,14 +363,6 @@ impl From<ContentsGetError> for InventoryError {
     }
 }
 
-impl Display for InventoryError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Error for InventoryError {}
-
 impl PartialEq for LooseItemReference {
     fn eq(&self, other: &Self) -> bool {
         // only compare entity
@@ -375,6 +371,29 @@ impl PartialEq for LooseItemReference {
 }
 
 impl Eq for LooseItemReference {}
+
+#[derive(Debug)]
+pub struct InventoryComponentTemplate {
+    base: usize,
+    mounted: usize,
+}
+
+impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let base = values.get_int("base_slots")?;
+        let mounted = values.get_int("mounted_slots")?;
+        Ok(Box::new(Self { base, mounted }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(InventoryComponent::new(self.base, self.mounted, None))
+    }
+}
+
+register_component_template!("inventory", InventoryComponentTemplate);
 
 #[cfg(test)]
 mod tests {
@@ -481,7 +500,7 @@ mod tests {
 
         // weapon is found in base
         assert_matches!(
-            inv.search(&ItemFilter::Class(ItemClass::Weapon), &world),
+            inv.search(&ItemFilter::SpecificEntity(weapon), &world),
             Some(ItemReference(SlotReference::Base(1), _))
         );
 

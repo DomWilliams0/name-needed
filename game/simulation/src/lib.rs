@@ -4,7 +4,7 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        BlockForAllResult, GeneratedTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
+        BlockForAllError, GeneratedTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
     },
     presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
@@ -14,17 +14,21 @@ pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
 pub use crate::transform::TransformComponent;
 pub use ecs::ComponentWorld;
-pub use item::InventoryComponent;
+pub use item::{BaseItemComponent, InventoryComponent};
+pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
-pub use society::{Societies, SocietyHandle};
+pub use society::{Societies, SocietyComponent, SocietyHandle};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
+#[cfg(test)]
+pub use simulation::register_components;
+
 mod ai;
 mod backend;
+mod definitions;
 pub mod dev;
 mod ecs;
-mod entity_builder;
 pub mod input;
 mod item;
 mod movement;

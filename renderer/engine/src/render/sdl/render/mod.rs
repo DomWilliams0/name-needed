@@ -9,6 +9,7 @@ use crate::render::sdl::gl::{
 };
 use crate::render::sdl::render::entity::EntityPipeline;
 use crate::render::sdl::render::terrain::TerrainRenderer;
+use resources::resource::Shaders;
 use unit::world::WorldPoint;
 
 mod entity;
@@ -25,15 +26,15 @@ pub struct GlRenderer {
 }
 
 impl GlRenderer {
-    pub fn new() -> GlResult<Self> {
-        let terrain = TerrainRenderer::new()?;
+    pub fn new(shaders_res: &Shaders) -> GlResult<Self> {
+        let terrain = TerrainRenderer::new(shaders_res)?;
 
         // smooth lines look nice globally
         Capability::LineSmooth.enable();
 
         // init debug lines pipeline
         let debug_pipeline = {
-            let pipeline = Pipeline::new(Program::load("debug", "rgb")?);
+            let pipeline = Pipeline::new(Program::load(shaders_res, "debug", "rgb")?);
 
             let vao = pipeline.vao.scoped_bind();
             let _vbo = pipeline.vbo.scoped_bind();
@@ -53,7 +54,7 @@ impl GlRenderer {
             frame_target: None,
             debug_shapes: Vec::new(),
             debug_pipeline,
-            entity_pipeline: EntityPipeline::new()?,
+            entity_pipeline: EntityPipeline::new(shaders_res)?,
         })
     }
     pub fn terrain(&self) -> &TerrainRenderer {
@@ -97,13 +98,14 @@ impl Renderer for GlRenderer {
         // ...plus a tiny amount to always render above the terrain, not in it
         position.2 += 0.001;
 
-        self.entity_pipeline.add_entity((position, render.clone()));
+        self.entity_pipeline
+            .add_entity((position, transform.shape, render.color()));
     }
 
     fn sim_selected(&mut self, transform: &TransformComponent) {
         // simple underline
         const PAD: f32 = 0.2;
-        let radius = transform.bounding_radius + PAD;
+        let radius = transform.bounding_radius() + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
         self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));

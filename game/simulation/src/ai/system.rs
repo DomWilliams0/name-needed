@@ -15,6 +15,7 @@ use crate::society::job::{JobList, Task};
 use crate::society::{Society, SocietyComponent};
 use crate::TransformComponent;
 use crate::{dse, Societies};
+use specs::{Builder, EntityBuilder};
 use std::iter::once;
 use world::WorldRef;
 
@@ -27,9 +28,13 @@ pub struct AiComponent {
 }
 
 impl AiComponent {
-    pub fn human() -> Self {
+    fn with_species(species: &Species) -> Self {
+        let intelligence = match species {
+            Species::Human => Intelligence::new(human_dses()),
+        };
+
         Self {
-            intelligence: Intelligence::new(human_dses()),
+            intelligence,
             // last_completed_action: None,
             current_action: None,
         }
@@ -229,3 +234,40 @@ impl Default for ActivityComponent {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum Species {
+    Human,
+}
+
+#[derive(Debug)]
+pub struct IntelligenceComponentTemplate {
+    species: Species,
+}
+
+impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let species = values.get_string("species")?;
+        let species = match species.as_str() {
+            "human" => Species::Human,
+            _ => {
+                return Err(ComponentBuildError::TemplateSpecific(format!(
+                    "unknown species {:?}",
+                    species
+                )))
+            }
+        };
+
+        Ok(Box::new(Self { species }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        let ai = AiComponent::with_species(&self.species);
+        builder.with(ai).with(ActivityComponent::default())
+    }
+}
+
+register_component_template!("intelligence", IntelligenceComponentTemplate);

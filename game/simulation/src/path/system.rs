@@ -63,7 +63,7 @@ impl<'a> System<'a> for PathSteeringSystem {
                         goal,
                     ) {
                         Err(e) => {
-                            warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error
+                            warn!("failed to find path to target {:?}: {}", target, e);
                             continue;
                         }
                         Ok(path) => path,
@@ -145,7 +145,7 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                         }
                         Err(err) => {
                             trace!(
-                                "{:?}: failed to find wander path to random position: {:?}",
+                                "{:?}: failed to find wander path to random position: {}",
                                 e,
                                 err
                             );

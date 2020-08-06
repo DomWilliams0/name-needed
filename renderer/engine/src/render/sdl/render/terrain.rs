@@ -11,6 +11,7 @@ use crate::render::sdl::gl::{
     Vao, Vbo,
 };
 use cgmath::Matrix;
+use resources::resource::Shaders;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldVertex {
@@ -39,8 +40,8 @@ pub struct TerrainRenderer {
 }
 
 impl TerrainRenderer {
-    pub fn new() -> GlResult<Self> {
-        let program = Program::load("terrain", "rgb")?;
+    pub fn new(shaders_res: &Shaders) -> GlResult<Self> {
+        let program = Program::load(shaders_res, "terrain", "rgb")?;
 
         Ok(Self {
             program,

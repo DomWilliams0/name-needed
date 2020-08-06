@@ -1,4 +1,4 @@
-# TODOs (170)
+# TODOs (169)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -14,11 +14,12 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
- * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (4)
+ * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
    * `// TODO add ItemUseType which hints at which slot to use`
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
+   * `// TODO get item name`
  * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
    * `// TODO failure/interrupt reason`
  * [game/simulation/src/ai/activity/movement.rs](game/simulation/src/ai/activity/movement.rs) (3)
@@ -49,12 +50,16 @@
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations?`
- * [game/simulation/src/backend.rs](game/simulation/src/backend.rs) (1)
-   * `type Error: Debug; // TODO Error!!`
+ * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
+   * `// TODO remove abstract definitions`
+ * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)
+   * `// TODO consider using `nested` vecs as an optimization`
+ * [game/simulation/src/definitions/mod.rs](game/simulation/src/definitions/mod.rs) (1)
+   * `// TODO include which key caused the problem`
  * [game/simulation/src/dev.rs](game/simulation/src/dev.rs) (1)
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
- * [game/simulation/src/entity_builder.rs](game/simulation/src/entity_builder.rs) (1)
-   * `// TODO add must_use to all builder patterns`
+ * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
+   * `// TODO should be a Box<dyn Error>`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
@@ -63,9 +68,7 @@
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (10)
-   * `// TODO this could do with a builder`
-   * `pub class: ItemClass, // TODO possible for an item to have multiple classes?`
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (9)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
@@ -74,6 +77,7 @@
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
    * `/// Item must be in base inventory to use TODO is this needed?`
+   * `class: ItemClass::Food, // TODO remove ItemClass`
  * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (6)
    * `dominant_base: SlotIndex, // TODO option`
    * `// TODO cache result of search until they change (specs::storage::Tracked?)`
@@ -87,7 +91,8 @@
    * `// TODO handle different item sizes`
  * [game/simulation/src/item/pickup.rs](game/simulation/src/item/pickup.rs) (1)
    * `// TODO store this in the system and reuse the allocation`
- * [game/simulation/src/needs/hunger.rs](game/simulation/src/needs/hunger.rs) (8)
+ * [game/simulation/src/needs/hunger.rs](game/simulation/src/needs/hunger.rs) (9)
+   * `// TODO newtype for Fuel`
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
    * `// TODO generic needs component with hunger/thirst/toilet/social etc`
@@ -100,9 +105,8 @@
    * `// TODO only render the top area in each slice`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
    * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
-   * `warn!("failed to find path to target {:?}: {:?}", target, e); // TODO {} for error`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
@@ -114,10 +118,10 @@
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
-   * `// TODO return Result instead of panic!, even though this only happens during game init`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `// TODO per tick alloc/reuse buf`
+   * `// TODO remove need to manually register each component type`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)
    * `// TODO reuse allocation`
  * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
@@ -185,15 +189,13 @@
    * `// TODO currently arbitrary, should depend on physical attributes`
  * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (1)
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
- * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (2)
+ * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
-   * `// TODO derive(Error) for NavigationError`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (2)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (7)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (6)
    * `assert!(size > 0); // TODO Result`
-   * `// TODO return Result from from_world`
    * `// TODO intelligently choose an initial view range`
    * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
@@ -223,12 +225,9 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO helpers in Bundle`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (1)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
- * [renderer/main/src/presets/dev.rs](renderer/main/src/presets/dev.rs) (1)
-   * `// TODO GamePreset::world() should return a Result`
- * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
-   * `panic!("failed to wait for world to load: {:?}", err); // TODO return result`
+   * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

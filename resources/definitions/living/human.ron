@@ -1,0 +1,24 @@
+[
+    (
+        uid: "core_living_human",
+        components: [
+            {"render": (
+                    color: (r: 0.2, g: 0.5, b: 0.8),
+            )},
+            {"transform": (
+                    shape: (radius: 0.4),
+                    height: 1.0,
+            )},
+            {"inventory": (
+                    base_slots: 2,
+                    mounted_slots: 2,
+            )},
+            {"movement": (
+                    max_speed: 0.16,
+                    acceleration: 0.08,
+            )},
+            {"intelligence": (species: "human")},
+            {"hunger": (max: 3000)},
+        ],
+    ),
+]

@@ -5,6 +5,7 @@ use petgraph::prelude::EdgeRef;
 use petgraph::stable_graph::StableGraph;
 use petgraph::Directed;
 
+use common::derive_more::{Display, Error};
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock};
@@ -47,9 +48,12 @@ impl Default for AreaGraph {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display, Error)]
 pub enum AreaPathError {
-    NoSuchNode(WorldArea),
+    #[display(fmt = "No such area {:?}", _0)]
+    NoSuchNode(#[error(not(source))] WorldArea),
+
+    #[display(fmt = "No path found")]
     NoPath,
 }
 

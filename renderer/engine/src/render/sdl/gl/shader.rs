@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use gl::types::*;
 
 use common::*;
@@ -7,6 +5,8 @@ use common::*;
 use crate::errchk;
 use crate::render::sdl::gl::vertex::{Bindable, ScopedBind};
 use crate::render::sdl::gl::{GlError, GlResult};
+use resources::resource::Shaders;
+use resources::{ReadResource, ResourceContainer};
 
 pub struct Shader(GLuint);
 
@@ -16,21 +16,19 @@ pub enum ShaderType {
 }
 
 impl Shader {
-    pub fn load(name: &str, shader_type: ShaderType) -> GlResult<Self> {
+    pub fn load(res: &Shaders, name: &str, shader_type: ShaderType) -> GlResult<Self> {
         let ext = match shader_type {
             ShaderType::Vertex => "glslv",
             ShaderType::Fragment => "glslf",
         };
 
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/render/sdl/shaders");
-        path.push(name);
-        path.set_extension(ext);
+        let file_name = format!("{}.{}", name, ext);
+        debug!("loading shader {:?}", file_name);
 
-        debug!(
-            "loading shader from {:?}",
-            path.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap()
-        );
-        let src = std::fs::read_to_string(path).map_err(GlError::LoadingShader)?;
+        let src = res
+            .get_file(file_name)
+            .and_then(String::read)
+            .map_err(GlError::LoadingShader)?;
 
         Self::from_source(&src, shader_type)
     }
@@ -95,9 +93,9 @@ impl Drop for Shader {
 pub struct Program(GLuint);
 
 impl Program {
-    pub fn load(vertex: &str, fragment: &str) -> GlResult<Self> {
-        let vertex = Shader::load(vertex, ShaderType::Vertex)?;
-        let fragment = Shader::load(fragment, ShaderType::Fragment)?;
+    pub fn load(res: &Shaders, vertex: &str, fragment: &str) -> GlResult<Self> {
+        let vertex = Shader::load(res, vertex, ShaderType::Vertex)?;
+        let fragment = Shader::load(res, fragment, ShaderType::Fragment)?;
 
         Self::with_shaders(&[vertex, fragment])
     }
@@ -173,7 +171,7 @@ impl ScopedBind<'_, Program> {
             };
 
             if let Err(e) = do_set() {
-                warn!("failed to set uniform {:?}: {:?}", name, e);
+                warn!("failed to set uniform {:?}: {}", name, e);
             }
         }
     }

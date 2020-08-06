@@ -1,6 +1,7 @@
+use common::derive_more::{Display, Error};
 use common::*;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
@@ -10,7 +11,25 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 
 use crate::config::Config;
 
-type ConfigResult<T> = std::result::Result<T, String>;
+#[derive(Debug, Display, Error)]
+pub enum ConfigError {
+    #[display(fmt = "Failed to read config file")]
+    Io(std::io::Error),
+
+    #[display(fmt = "Failed to parse config")]
+    Parsing(ron::de::Error),
+
+    #[display(fmt = "Failed to watch config file")]
+    Notify(notify::Error),
+
+    #[display(fmt = "Path is not a file")]
+    NotAFile,
+
+    #[display(fmt = "RawConfig path not initialized")]
+    PathNotSet,
+}
+
+type ConfigResult<T> = std::result::Result<T, ConfigError>;
 
 pub(crate) struct RawConfig {
     pub parsed: Option<Config>,
@@ -33,17 +52,13 @@ impl Default for RawConfig {
 
 impl RawConfig {
     pub fn parse_file(&mut self) -> ConfigResult<()> {
-        let path = self
-            .path
-            .as_ref()
-            .ok_or_else(|| "config path has not been set".to_string())?;
-        let bytes = std::fs::read_to_string(path.as_path())
-            .map_err(|e| format!("loading config: {}", e))?;
+        let path = self.path.as_ref().ok_or(ConfigError::PathNotSet)?;
+        let bytes = std::fs::read_to_string(path.as_path()).map_err(ConfigError::Io)?;
         self.parse_bytes(&bytes)
     }
 
     pub fn parse_bytes(&mut self, bytes: &str) -> ConfigResult<()> {
-        let parsed = ron::de::from_str(bytes).map_err(|e| format!("parsing config: {}", e))?;
+        let parsed = ron::de::from_str(bytes).map_err(ConfigError::Parsing)?;
         self.parsed = Some(parsed);
         self.load_time = Instant::now();
 
@@ -83,31 +98,25 @@ fn lock<'a>() -> MutexGuard<'a, RawConfig> {
     }
 }
 
-pub fn init<P: Into<PathBuf>>(path: P) -> ConfigResult<()> {
-    let path = path
-        .into()
-        .canonicalize()
-        .map_err(|e| format!("invalid path: {}", e))?;
+pub fn init<P: AsRef<Path>>(path: P) -> ConfigResult<()> {
+    let path = path.as_ref().canonicalize().map_err(ConfigError::Io)?;
 
     if !path.is_file() {
-        return Err("not a file".to_owned());
+        return Err(ConfigError::NotAFile);
     }
 
     let mut raw = lock();
     raw.path = Some(path.clone());
 
     // watch directory for changes
-    let watch_dir = path
-        .parent()
-        .ok_or_else(|| "invalid config file".to_owned())?;
+    let watch_dir = path.parent().expect("file should have a parent dir");
     let watch_file = path.file_name().map(|s| s.to_owned()).unwrap();
 
     let (tx, rx) = channel();
-    let mut watcher = watcher(tx, Duration::from_secs(1))
-        .map_err(|e| format!("failed to setup config watcher: {}", e))?;
+    let mut watcher = watcher(tx, Duration::from_secs(1)).map_err(ConfigError::Notify)?;
     watcher
         .watch(watch_dir, RecursiveMode::NonRecursive)
-        .map_err(|e| format!("failed to setup config watcher: {}", e))?;
+        .map_err(ConfigError::Notify)?;
     raw.watcher = Some(watcher);
 
     // start watcher thread

@@ -42,7 +42,7 @@ impl<W: ComponentWorld> Activity<W> for OneShotNopActivity {
 }
 
 #[derive(Display)]
-#[display(fmt = "Following divine command: {}", .0)]
+#[display(fmt = "Following divine command: {}", _0)]
 pub struct DivineCommandActivity<W: ComponentWorld>(Box<dyn Activity<W>>);
 
 impl<W: ComponentWorld> Activity<W> for DivineCommandActivity<W> {

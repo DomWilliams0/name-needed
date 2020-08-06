@@ -7,7 +7,9 @@ use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, ItemClass, SlotReference,
     UsingItemComponent,
 };
+use specs::{Builder, EntityBuilder};
 
+// TODO newtype for Fuel
 pub type Fuel = u16;
 
 // fuel used per tick TODO depends on time rate
@@ -18,7 +20,7 @@ const BASE_METABOLISM: f32 = 0.5;
 const BASE_EAT_RATE: Fuel = 5;
 
 // TODO generic needs component with hunger/thirst/toilet/social etc
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Debug)]
 #[storage(VecStorage)]
 pub struct HungerComponent {
     current_fuel: AccumulativeInt<Fuel>,
@@ -95,7 +97,7 @@ impl<'a> System<'a> for EatingSystem {
                     if let EatResult::Errored(item) | EatResult::Success(item) = result {
                         trace!("deleting food item {:?}", item);
                         if let Err(e) = entities.delete(item) {
-                            warn!("failed to delete item: {:?}", e);
+                            warn!("failed to delete item: {}", e);
                         }
                     }
                 }
@@ -119,7 +121,7 @@ fn do_eat(
         Ok(e) => e,
         Err(e) => {
             warn!(
-                "failed to get item in use from inventory: {:?} - {:?}",
+                "failed to get item in use from inventory: {:?} - {}",
                 slot, e
             );
             return EatResult::NoItem;
@@ -150,10 +152,9 @@ fn do_eat(
 }
 
 impl HungerComponent {
-    pub fn new(starting: NormalizedFloat, max: Fuel) -> Self {
-        let starting = starting.value() * max as f32;
+    pub fn new(max: Fuel) -> Self {
         Self {
-            current_fuel: AccumulativeInt::new(starting as Fuel),
+            current_fuel: AccumulativeInt::new(max),
             max_fuel: max,
         }
     }
@@ -166,4 +167,25 @@ impl HungerComponent {
     pub fn satiety(&self) -> (Fuel, Fuel) {
         (self.current_fuel.value(), self.max_fuel)
     }
+
+    pub fn set_satiety(&mut self, proportion: NormalizedFloat) {
+        let fuel = self.max_fuel as f64 * proportion.value() as f64;
+        self.current_fuel = AccumulativeInt::new(fuel as Fuel)
+    }
 }
+
+impl<V: Value> ComponentTemplate<V> for HungerComponent {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let max = values.get_int("max")?;
+        Ok(Box::new(Self::new(max)))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+register_component_template!("hunger", HungerComponent);

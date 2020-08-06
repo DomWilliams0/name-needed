@@ -12,50 +12,34 @@ pub type MountedInventoryIndex = usize;
 
 #[cfg(test)]
 mod test {
-    use crate::ecs::{ComponentBuilder, ComponentWorld, DummyComponentReceptacle, Entity};
-    use crate::item::*;
+    use crate::ecs::{EcsWorld, Entity};
+    use crate::{definitions, ComponentWorld};
 
-    pub fn test_dummy_items() -> (DummyComponentReceptacle, [Entity; 3]) {
-        let mut world = DummyComponentReceptacle::new();
+    pub fn test_dummy_items() -> (impl ComponentWorld, [Entity; 3]) {
+        let registry = definitions::load_from_str(
+            r#"
+[
+	(
+		uid: "test_dummy_item",
+		components: [],
+	),
+]
+        "#,
+        )
+        .expect("bad definitions");
+        let mut world = EcsWorld::test_new();
 
-        // add dummy items
-        let food = world
-            .create_entity()
-            .with_(BaseItemComponent::new(
-                "food",
-                ItemCondition::new_perfect(100),
-                1.0,
-                ItemClass::Food,
-                1,
-                1,
-            ))
-            .with_(EdibleItemComponent::new(50))
-            .build_();
+        let mut dummies = (0..3).map(|_| {
+            registry
+                .instantiate("test_dummy_item", &mut world)
+                .expect("bad definition")
+                .spawn()
+                .expect("failed to spawn item")
+        });
 
-        let weapon = world
-            .create_entity()
-            .with_(BaseItemComponent::new(
-                "weapon",
-                ItemCondition::new_perfect(100),
-                1.0,
-                ItemClass::Weapon,
-                1,
-                1,
-            ))
-            .build_();
-
-        let other_weapon = world
-            .create_entity()
-            .with_(BaseItemComponent::new(
-                "another weapon",
-                ItemCondition::new_perfect(100),
-                1.0,
-                ItemClass::Weapon,
-                1,
-                1,
-            ))
-            .build_();
-
-        (world, [food, weapon, other_weapon])
+        let a = dummies.next().expect("no entity");
+        let b = dummies.next().expect("no entity");
+        let c = dummies.next().expect("no entity");
+        (world, [a, b, c])
     }
 }

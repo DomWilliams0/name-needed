@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use common::derive_more::{Display, Error};
+use resources::resource::Resources;
 use simulation::input::UiCommand;
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, RenderComponent,
@@ -7,6 +9,9 @@ use simulation::{
 };
 
 pub struct DummyRenderer;
+
+#[derive(Debug, Display, Error)]
+pub struct DummyError;
 
 pub struct DummyBackendPersistent;
 pub struct DummyBackendInit {
@@ -16,7 +21,7 @@ pub struct DummyBackendInit {
 
 impl Renderer for DummyRenderer {
     type Target = ();
-    type Error = ();
+    type Error = DummyError;
 
     fn init(&mut self, _target: Self::Target) {}
 
@@ -66,10 +71,10 @@ impl InitializedSimulationBackend for DummyBackendInit {
 }
 
 impl PersistentSimulationBackend for DummyBackendPersistent {
-    type Error = ();
+    type Error = DummyError;
     type Initialized = DummyBackendInit;
 
-    fn new() -> Result<Self, Self::Error> {
+    fn new(_: &Resources) -> Result<Self, Self::Error> {
         Ok(Self)
     }
 

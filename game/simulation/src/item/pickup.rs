@@ -44,7 +44,7 @@ impl<'a> System<'a> for PickupItemSystem {
                 let holder_pos = Vector2::from(transform.position);
                 let item_pos = item_transform.position.into();
                 let touching_radius2 =
-                    (transform.bounding_radius + item_transform.bounding_radius).powi(2);
+                    (transform.bounding_radius() + item_transform.bounding_radius()).powi(2);
 
                 // return base item ref only if within touching distance
                 let base_item = if holder_pos.distance2(item_pos) < touching_radius2 {

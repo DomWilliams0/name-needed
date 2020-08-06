@@ -1,3 +1,4 @@
+use common::derive_more::{Display, Error};
 use common::*;
 
 use crate::mesh::BaseVertex;
@@ -12,6 +13,15 @@ pub struct WorldViewer {
     view_range: SliceRange,
     chunk_range: (ChunkPosition, ChunkPosition),
     clean_chunks: HashSet<ChunkPosition>,
+}
+
+#[derive(Debug, Clone, Display, Error)]
+pub enum WorldViewerError {
+    #[display(fmt = "No block found at 0, 0")]
+    EmptyOrigin,
+
+    #[display(fmt = "Bad viewer range: {}", _0)]
+    InvalidRange(#[error(not(source))] SliceRange),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -87,13 +97,12 @@ impl Add<i32> for SliceRange {
 }
 
 impl WorldViewer {
-    pub fn from_world(world: WorldRef) -> Self {
+    pub fn from_world(world: WorldRef) -> Result<Self, WorldViewerError> {
         let world_borrowed = world.borrow();
 
-        // TODO return Result from from_world
         let start = world_borrowed
             .find_accessible_block_in_column(0, 0)
-            .expect("there's a hole at 0,0??")
+            .ok_or(WorldViewerError::EmptyOrigin)?
             .2;
 
         let world_bounds = world_borrowed.slice_bounds().unwrap(); // world has at least 1 slice as above
@@ -106,13 +115,14 @@ impl WorldViewer {
             (start - half_range).max(world_bounds.bottom()),
             (start + half_range).min(world_bounds.top()),
         )
-        .expect("bad view range");
-        Self {
+        .ok_or_else(|| WorldViewerError::InvalidRange(world_bounds))?;
+
+        Ok(Self {
             world,
             view_range,
             chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
             clean_chunks: HashSet::with_capacity(128),
-        }
+        })
     }
 
     pub fn regenerate_dirty_chunk_meshes<F: FnMut(ChunkPosition, Vec<V>), V: BaseVertex>(

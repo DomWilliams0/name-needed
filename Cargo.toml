@@ -3,6 +3,7 @@
 members = [
 	"game/ai",
 	"game/procgen",
+	"game/resources",
 	"game/simulation",
 	"game/world",
 

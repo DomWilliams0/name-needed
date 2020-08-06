@@ -230,10 +230,7 @@ impl Display for GoPickUpItemActivity {
 impl Display for UseHeldItemActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Using held item")?;
-        if let Some(class) = self.item_class {
-            write!(f, " ({:?})", class)?;
-        }
-
+        // TODO get item name
         Ok(())
     }
 }

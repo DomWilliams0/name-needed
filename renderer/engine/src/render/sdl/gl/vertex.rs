@@ -519,7 +519,7 @@ impl<T> Drop for ScopedMapMut<T> {
         unsafe {
             gl::UnmapBuffer(self.bind.into());
             if let Err(e) = errchk!(()) {
-                warn!("glUnmapBuffer failed: {:?}", e);
+                warn!("glUnmapBuffer failed: {}", e);
             }
         }
     }

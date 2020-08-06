@@ -48,7 +48,7 @@ fn tall_world_chunks(height_radius: i32) -> Vec<ChunkDescriptor> {
         .build((0, 0))]
 }
 
-fn deep_clone(chunks: &Vec<ChunkDescriptor>) -> Vec<ChunkDescriptor> {
+fn deep_clone(chunks: &[ChunkDescriptor]) -> Vec<ChunkDescriptor> {
     chunks.iter().map(DeepClone::deep_clone).collect()
 }
 

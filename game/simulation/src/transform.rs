@@ -1,11 +1,13 @@
 use common::*;
 use unit::world::WorldPoint;
 
-use crate::ecs::{Component, VecStorage};
+use crate::ecs::*;
 use crate::physics::Bounds;
+use crate::PhysicalShape;
+use specs::{Builder, EntityBuilder};
 
 /// Position and rotation component
-#[derive(Debug, Copy, Clone, Component)]
+#[derive(Debug, Clone, Component)]
 #[storage(VecStorage)]
 pub struct TransformComponent {
     /// Position in world, center of entity in x/y and bottom of entity in z
@@ -14,8 +16,8 @@ pub struct TransformComponent {
     /// Height in z axis
     pub height: f32,
 
-    /// Bounding box radius
-    pub bounding_radius: f32,
+    /// Physical shape in x,y axes
+    pub shape: PhysicalShape,
 
     /// Used for render interpolation
     pub last_position: WorldPoint,
@@ -31,16 +33,21 @@ pub struct TransformComponent {
 }
 
 impl TransformComponent {
-    pub fn new(position: WorldPoint, bounding_radius: f32, height: f32) -> Self {
+    pub fn new(position: WorldPoint, shape: PhysicalShape, height: f32) -> Self {
         Self {
             position,
-            bounding_radius,
+            shape,
             height,
             rotation: Basis2::from_angle(rad(0.0)),
             last_position: position,
             velocity: Zero::zero(),
             fallen: 0,
         }
+    }
+
+    pub fn reset_position(&mut self, new_position: WorldPoint) {
+        self.position = new_position;
+        self.last_position = new_position;
     }
 
     pub fn set_height(&mut self, z: i32) {
@@ -61,19 +68,24 @@ impl TransformComponent {
         self.position.2
     }
 
+    pub fn bounding_radius(&self) -> f32 {
+        self.shape.radius()
+    }
+
     pub fn bounds(&self) -> Bounds {
         // allow tiny overlap
         const MARGIN: f32 = 0.8;
-        let radius = self.bounding_radius * MARGIN;
+        let radius = self.shape.radius() * MARGIN;
         Bounds::from_radius(self.position, radius, radius)
     }
 
     pub fn feelers_bounds(&self) -> Bounds {
-        let feelers = self.velocity + (self.velocity.normalize() * self.bounding_radius);
+        let bounding_radius = self.shape.radius();
+        let feelers = self.velocity + (self.velocity.normalize() * bounding_radius);
         let centre = self.position + feelers;
 
         const EXTRA: f32 = 1.25;
-        let length = self.bounding_radius * EXTRA;
+        let length = bounding_radius * EXTRA;
         let width = 0.1; // will be floor'd/ceil'd to 0 and 1
 
         let (x, y) = if feelers.x > feelers.y {
@@ -85,3 +97,22 @@ impl TransformComponent {
         Bounds::from_radius(centre, x, y)
     }
 }
+
+impl<V: Value> ComponentTemplate<V> for TransformComponent {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let shape: PhysicalShape = values.get("shape")?.into_type()?;
+        let height = values.get_float("height")?;
+
+        // position will be customized afterwards
+        Ok(Box::new(Self::new(WorldPoint::default(), shape, height)))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+register_component_template!("transform", TransformComponent);

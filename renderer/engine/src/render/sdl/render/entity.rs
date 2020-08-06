@@ -3,15 +3,17 @@ use crate::render::sdl::gl::{
     InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
 };
 use crate::render::sdl::render::FrameTarget;
+use color::ColorRgb;
 use common::*;
-use simulation::{PhysicalShape, RenderComponent};
+use resources::resource::Shaders;
+use simulation::PhysicalShape;
 use unit::view::ViewPoint;
 use unit::world::{WorldPoint, SCALE};
 
 pub(crate) struct EntityPipeline {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, RenderComponent)>,
+    entities: Vec<(WorldPoint, PhysicalShape, ColorRgb)>,
 }
 
 #[repr(C)]
@@ -27,8 +29,8 @@ const RECT_VERTEX_COUNT: usize = 6;
 type SharedAttribute = [f32; 3];
 
 impl EntityPipeline {
-    pub fn new() -> GlResult<Self> {
-        let pipeline = InstancedPipeline::new(Program::load("entity", "rgb")?);
+    pub fn new(shaders_res: &Shaders) -> GlResult<Self> {
+        let pipeline = InstancedPipeline::new(Program::load(shaders_res, "entity", "rgb")?);
         let indices = Vbo::index_buffer();
         let vao = pipeline.vao.scoped_bind();
 
@@ -114,14 +116,14 @@ impl EntityPipeline {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, RenderComponent)) {
+    pub fn add_entity(&mut self, entity: (WorldPoint, PhysicalShape, ColorRgb)) {
         self.entities.push(entity);
     }
 
     pub fn render_entities(&mut self, frame_target: &mut FrameTarget) -> GlResult<()> {
         // sort by shape
         self.entities
-            .sort_unstable_by_key(|(_, phys)| phys.shape().ord());
+            .sort_unstable_by_key(|(_, phys, _)| phys.ord());
 
         let p = self.pipeline.program.scoped_bind();
         let _vao = self.pipeline.vao.scoped_bind();
@@ -138,11 +140,11 @@ impl EntityPipeline {
         if let Some(mut mapped) = vbo.map_write_only::<EntityInstance>()? {
             // TODO cursor interface in ScopedMap
 
-            for (i, (pos, render)) in self.entities.iter().enumerate() {
+            for (i, (pos, shape, color)) in self.entities.iter().enumerate() {
                 let pos = ViewPoint::from(*pos);
-                mapped[i].color = render.color().into();
+                mapped[i].color = (*color).into();
 
-                let (scale_x, scale_y) = match render.shape() {
+                let (scale_x, scale_y) = match shape {
                     PhysicalShape::Circle { radius } => (radius, radius),
                     PhysicalShape::Rectangle { rx, ry } => (rx, ry),
                 };
@@ -164,7 +166,7 @@ impl EntityPipeline {
         for (i, grouped) in self
             .entities
             .iter()
-            .group_by(|(_, phys)| phys.shape().ord())
+            .group_by(|(_, shape, _)| shape.ord())
             .into_iter()
         {
             let (primitive, start_ptr, element_count) = render_data[i];

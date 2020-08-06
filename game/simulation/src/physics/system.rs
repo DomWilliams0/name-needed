@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::movement::DesiredMovementComponent;
+use crate::movement::{DesiredMovementComponent, MovementConfigComponent};
 use crate::TransformComponent;
 use common::*;
 use world::WorldRef;
@@ -14,18 +14,21 @@ impl<'a> System<'a> for PhysicsSystem {
         Read<'a, WorldRef>,
         Read<'a, EntitiesRes>,
         ReadStorage<'a, DesiredMovementComponent>,
+        ReadStorage<'a, MovementConfigComponent>,
         WriteStorage<'a, TransformComponent>,
     );
 
-    fn run(&mut self, (world_ref, entities, movement, mut transform): Self::SystemData) {
-        let (max_speed, mut friction) = {
-            let cfg = &config::get().simulation;
-            (cfg.max_speed, cfg.friction)
-        };
+    fn run(
+        &mut self,
+        (world_ref, entities, movement, movement_cfg, mut transform): Self::SystemData,
+    ) {
+        let mut friction = config::get().simulation.friction;
 
         let world = world_ref.borrow();
 
-        for (e, movement, transform) in (&entities, &movement, &mut transform).join() {
+        for (e, movement, cfg, transform) in
+            (&entities, &movement, &movement_cfg, &mut transform).join()
+        {
             // update last position for render interpolation
             transform.last_position = transform.position;
 
@@ -82,7 +85,7 @@ impl<'a> System<'a> for PhysicsSystem {
             }
 
             // accelerate and limit to max speed
-            velocity = truncate(velocity + acceleration, max_speed);
+            velocity = truncate(velocity + acceleration, cfg.max_speed);
 
             // apply velocity
             transform.position += velocity;

@@ -1,16 +1,18 @@
 use crate::chunk::RawChunkTerrain;
-use common::derive_more::Display;
-use std::error::Error;
+use common::derive_more::{Display, Error};
 use unit::world::ChunkPosition;
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Error)]
 pub enum TerrainSourceError {
     #[display(fmt = "There are no chunks")]
     NoChunks,
+
     #[display(fmt = "Missing mandatory (0, 0) chunk")]
     MissingCentreChunk,
+
     #[display(fmt = "Chunk {:?} already exists", "_0")]
-    Duplicate(ChunkPosition),
+    Duplicate(#[error(not(source))] ChunkPosition),
+
     #[display(fmt = "Requested chunk is out of bounds")]
     OutOfBounds,
 }
@@ -49,8 +51,6 @@ pub trait TerrainSource: Send {
         (min.0..=max.0).contains(&chunk.0) && (min.1..=max.1).contains(&chunk.1)
     }
 }
-
-impl Error for TerrainSourceError {}
 
 mod generate;
 mod memory;

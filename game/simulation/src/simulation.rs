@@ -12,9 +12,9 @@ use crate::ai::{
     ActivityComponent, AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem,
     DivineCommandComponent,
 };
+use crate::definitions;
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
-use crate::entity_builder::EntityBuilder;
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedComponent, SelectedEntity,
     SelectedTiles, SocietyInputCommand, UiBlackboard, UiCommand,
@@ -23,7 +23,9 @@ use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
     PickupItemSystem, ThrowableItemComponent, UsingItemComponent,
 };
-use crate::movement::{DesiredMovementComponent, MovementFulfilmentSystem};
+use crate::movement::{
+    DesiredMovementComponent, MovementConfigComponent, MovementFulfilmentSystem,
+};
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
     ArrivedAtTargetEventComponent, FollowPathComponent, NavigationAreaDebugRenderer,
@@ -38,6 +40,9 @@ use crate::society::{PlayerSociety, SocietyComponent};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 use crate::{ComponentWorld, Societies, SocietyHandle};
+
+use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
+use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
@@ -49,6 +54,7 @@ pub struct Tick(u32);
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
+    definitions: definitions::Registry,
 
     world_loader: ThreadedWorldLoader,
     /// Occlusion updates received from world loader
@@ -71,7 +77,13 @@ impl Default for Tick {
 
 impl<R: Renderer> Simulation<R> {
     /// world_loader should have had all chunks requested
-    pub fn new(mut world_loader: ThreadedWorldLoader) -> Self {
+    pub fn new(mut world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
+        // load entity definitions from file system
+        let definitions = {
+            let def_root = resources.definitions()?;
+            definitions::load(def_root)?
+        };
+
         let mut ecs_world = EcsWorld::new();
 
         register_components(&mut ecs_world);
@@ -83,12 +95,10 @@ impl<R: Renderer> Simulation<R> {
 
         let chunk_updates = world_loader.chunk_updates_rx().unwrap();
         let mut debug_renderers = DebugRenderers::new();
-        if let Err(e) = register_debug_renderers(&mut debug_renderers) {
-            // TODO return Result instead of panic!, even though this only happens during game init
-            panic!("failed to register debug renderers: {}", e);
-        }
+        register_debug_renderers(&mut debug_renderers)?;
 
-        Self {
+        Ok(Self {
+            definitions,
             ecs_world,
             renderer: PhantomData,
             voxel_world,
@@ -97,11 +107,15 @@ impl<R: Renderer> Simulation<R> {
             debug_renderers,
             current_tick: Tick::default(),
             terrain_changes: Vec::with_capacity(1024),
-        }
+        })
     }
 
-    pub fn add_entity(&mut self) -> EntityBuilder<EcsWorld> {
-        EntityBuilder::new(&mut self.ecs_world)
+    pub fn entity_builder(
+        &mut self,
+        definition_uid: &str,
+    ) -> Result<DefinitionBuilder<EcsWorld>, DefinitionErrorKind> {
+        self.definitions
+            .instantiate(definition_uid, &mut self.ecs_world)
     }
 
     pub fn tick(&mut self, commands: &[UiCommand], world_viewer: &mut WorldViewer) {
@@ -316,7 +330,7 @@ impl<R: Renderer> Simulation<R> {
                 render_system.run_now(&self.ecs_world);
             }
             if let Err(e) = renderer.sim_finish() {
-                warn!("render sim_finish() failed: {:?}", e);
+                warn!("render sim_finish() failed: {}", e);
             }
         }
 
@@ -331,7 +345,7 @@ impl<R: Renderer> Simulation<R> {
                 .for_each(|r| r.render(renderer, &voxel_world, ecs_world, world_viewer));
 
             if let Err(e) = renderer.debug_finish() {
-                warn!("render debug_finish() failed: {:?}", e);
+                warn!("render debug_finish() failed: {}", e);
             }
         }
 
@@ -345,10 +359,12 @@ impl<R: Renderer> Simulation<R> {
     }
 }
 
-fn register_components(_world: &mut EcsWorld) {
+#[allow(dead_code)]
+pub fn register_components(world: &mut EcsWorld) {
+    // TODO remove need to manually register each component type
     macro_rules! register {
         ($comp:ty) => {
-            _world.register::<$comp>()
+            world.register::<$comp>()
         };
     }
 
@@ -358,6 +374,7 @@ fn register_components(_world: &mut EcsWorld) {
 
     // movement
     register!(DesiredMovementComponent);
+    register!(MovementConfigComponent);
     register!(FollowPathComponent);
     register!(ArrivedAtTargetEventComponent);
     register!(SteeringComponent);

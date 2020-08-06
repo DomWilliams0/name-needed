@@ -6,6 +6,7 @@ use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
 use color::ColorRgb;
+use common::derive_more::{Display, Error};
 use common::input::{CameraDirection, Key, KeyEvent};
 use common::*;
 use simulation::{
@@ -19,6 +20,8 @@ use crate::render::sdl::render::FrameTarget;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
+use resources::resource::Resources;
+use resources::ResourceError;
 use sdl2::mouse::{MouseButton, MouseState};
 use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
 
@@ -51,18 +54,26 @@ struct GraphicsKeepAlive {
     gl: Gl,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 pub enum SdlBackendError {
-    Sdl(String),
+    #[display(fmt = "SDL error")]
+    Sdl(#[error(not(source))] String),
+
+    #[display(fmt = "Failed to create window")]
     WindowCreation(WindowBuildError),
+
+    #[display(fmt = "OpenGL error")]
     Gl(GlError),
+
+    #[display(fmt = "Failed to load resources")]
+    Resources(ResourceError),
 }
 
 impl PersistentSimulationBackend for SdlBackendPersistent {
     type Error = SdlBackendError;
     type Initialized = SdlBackendInit;
 
-    fn new() -> Result<Self, Self::Error> {
+    fn new(resources: &Resources) -> Result<Self, Self::Error> {
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
         video.gl_attr().set_context_version(3, 0);
@@ -96,7 +107,10 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         video.gl_set_swap_interval(1)?;
 
         let events = sdl.event_pump()?;
-        let renderer = GlRenderer::new()?;
+        let renderer = {
+            let shaders = resources.shaders().map_err(SdlBackendError::Resources)?;
+            GlRenderer::new(&shaders)?
+        };
         let camera = Camera::new(w as i32, h as i32);
 
         Ok(Self {

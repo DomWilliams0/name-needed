@@ -449,7 +449,7 @@ impl World {
 
     pub fn area_for_point(&self, point: WorldPoint) -> Option<(WorldPosition, WorldArea)> {
         let pos = point.floor();
-        Option::<WorldArea>::from(self.area(pos)).map(|area| (pos, area))
+        self.area(pos).ok().map(|area| (pos, area))
     }
 
     pub fn iterate_blocks<'a>(
@@ -505,9 +505,9 @@ impl World {
     }
 }
 
-impl From<AreaLookup> for Option<WorldArea> {
-    fn from(a: AreaLookup) -> Self {
-        match a {
+impl AreaLookup {
+    pub fn ok(self) -> Option<WorldArea> {
+        match self {
             AreaLookup::Area(area) => Some(area),
             _ => None,
         }
@@ -601,8 +601,7 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
     use crate::loader::{
-        BlockForAllResult, BlockingWorkerPool, GeneratedTerrainSource, WorldLoader,
-        WorldTerrainUpdate,
+        BlockingWorkerPool, GeneratedTerrainSource, WorldLoader, WorldTerrainUpdate,
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
@@ -974,10 +973,7 @@ mod tests {
         let mut loader = WorldLoader::new(source, pool);
         loader.request_all_chunks();
 
-        assert!(matches!(
-            loader.block_for_all(Duration::from_secs(60)),
-            BlockForAllResult::Success
-        ));
+        assert!(loader.block_for_all(Duration::from_secs(60)).is_ok());
 
         let world = loader.world();
 

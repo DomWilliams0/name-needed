@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use common::cgmath::num_traits::clamp;
 use common::{Rng, RngCore};
 use std::ops::Mul;
 
@@ -22,17 +23,14 @@ impl ColorRgb {
         Self { r, g, b }
     }
 
-    pub fn new_float(r: f32, g: f32, b: f32) -> Option<Self> {
-        let range = 0.0f32..=1.0;
-        if range.contains(&r) && range.contains(&g) && range.contains(&b) {
-            Some(Self::new(
-                (r * 255.0).round() as u8,
-                (g * 255.0).round() as u8,
-                (b * 255.0).round() as u8,
-            ))
-        } else {
-            None
-        }
+    /// Clamps inputs to 0-1
+    pub fn new_float(r: f32, g: f32, b: f32) -> Self {
+        let clamp = |f: f32| {
+            let val = clamp(f, 0.0, 1.0);
+            (val * 255.0).round() as u8
+        };
+
+        Self::new(clamp(r), clamp(g), clamp(b))
     }
 
     pub fn unique_randoms(
@@ -111,12 +109,19 @@ impl From<ColorRgb> for u32 {
     }
 }
 
+impl From<u32> for ColorRgb {
+    fn from(int: u32) -> Self {
+        let [r, g, b, _]: [u8; 4] = int.to_be_bytes();
+        Self::new(r, g, b)
+    }
+}
+
 impl TryFrom<&[f32]> for ColorRgb {
     type Error = ();
 
     fn try_from(slice: &[f32]) -> Result<Self, Self::Error> {
         if slice.len() == 3 {
-            Self::new_float(slice[0], slice[1], slice[2]).ok_or(())
+            Ok(Self::new_float(slice[0], slice[1], slice[2]))
         } else {
             Err(())
         }
@@ -179,7 +184,7 @@ impl From<ColorHsl> for ColorRgb {
             }
         };
 
-        Self::new_float(r, g, b).expect("hsl conversion")
+        Self::new_float(r, g, b)
     }
 }
 
@@ -217,16 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn convert_bad_values() {
-        assert_eq!(ColorRgb::try_from(&[0.0f32, 0.0, -1.0] as &[f32]), Err(()));
-        assert_eq!(ColorRgb::try_from(&[2.0f32, 0.0, 0.5] as &[f32]), Err(()));
-        assert_eq!(
-            ColorRgb::try_from(&[100.1f32, 2000.0, -0.5] as &[f32]),
-            Err(())
-        );
-    }
-
-    #[test]
     fn hsl_to_rgb() {
         // random colors from wikipedia
         assert_eq!(
@@ -235,7 +230,7 @@ mod tests {
                 s: 0.817,
                 l: 0.624
             }),
-            ColorRgb::new_float(0.931, 0.463, 0.316).unwrap()
+            ColorRgb::new_float(0.931, 0.463, 0.316)
         );
         assert_eq!(
             ColorRgb::from(ColorHsl {
@@ -243,7 +238,7 @@ mod tests {
                 s: 0.29,
                 l: 0.608
             }),
-            ColorRgb::new_float(0.495, 0.493, 0.721).unwrap()
+            ColorRgb::new_float(0.495, 0.493, 0.721)
         );
     }
 

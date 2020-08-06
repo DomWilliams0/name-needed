@@ -11,6 +11,7 @@ default-run = "main"
 engine = {path = "../engine"}
 
 simulation = {path = "../../game/simulation"}
+resources = {path = "../../game/resources"}
 
 config = {path = "../../shared/config"}
 common = { path = "../../shared/common", features = ["binary"] }

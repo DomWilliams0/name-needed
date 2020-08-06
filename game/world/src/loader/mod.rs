@@ -6,6 +6,7 @@ use crossbeam::channel::{Receiver, Sender};
 use crossbeam::crossbeam_channel::{bounded, unbounded};
 
 pub use batch::UpdateBatch;
+use common::derive_more::{Display, Error};
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
@@ -50,12 +51,16 @@ struct FinalizeBatchItem {
     consumed: Cell<bool>,
 }
 
-#[derive(Debug)]
-pub enum BlockForAllResult {
+#[derive(Debug, Display, Error)]
+pub enum BlockForAllError {
     /// Terrain source needs to have had `request_all` called to know how many to wait for
+    #[display(fmt = "`request_all` must be called first")]
     Unsupported,
-    Success,
+
+    #[display("Timed out")]
     TimedOut,
+
+    #[display(fmt = "Failed to load terrain")]
     Error(TerrainSourceError),
 }
 
@@ -235,27 +240,27 @@ impl<P: WorkerPool> WorldLoader<P> {
         self.pool.block_on_next_finalize(timeout)
     }
 
-    pub fn block_for_all(&mut self, timeout: Duration) -> BlockForAllResult {
+    pub fn block_for_all(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
         match self.all_count {
-            None => BlockForAllResult::Unsupported,
+            None => Err(BlockForAllError::Unsupported),
             Some(count) => {
                 let start_time = Instant::now();
                 for i in 0..count {
                     let elapsed = start_time.elapsed();
                     let timeout = match timeout.checked_sub(elapsed) {
-                        None => return BlockForAllResult::TimedOut,
+                        None => return Err(BlockForAllError::TimedOut),
                         Some(t) => t,
                     };
 
                     trace!("waiting for chunk {}/{} for {:?}", (i + 1), count, timeout);
                     match self.block_on_next_finalization(timeout) {
-                        None => return BlockForAllResult::TimedOut,
-                        Some(Err(e)) => return BlockForAllResult::Error(e),
+                        None => return Err(BlockForAllError::TimedOut),
+                        Some(Err(e)) => return Err(BlockForAllError::Error(e)),
                         Some(Ok(_)) => continue,
                     }
                 }
 
-                BlockForAllResult::Success
+                Ok(())
             }
         }
     }

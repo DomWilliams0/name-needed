@@ -3,7 +3,8 @@ use std::path::Path;
 
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
-use simulation::{BlockForAllResult, Renderer, Simulation, ThreadedWorldLoader};
+use resources::resource::Resources;
+use simulation::{Renderer, Simulation, ThreadedWorldLoader};
 use std::time::Duration;
 
 pub trait GamePreset<R: Renderer> {
@@ -11,25 +12,19 @@ pub trait GamePreset<R: Renderer> {
     fn config(&self) -> Option<&Path> {
         None
     }
-    fn world(&self) -> ThreadedWorldLoader;
-    fn init(&self, sim: &mut Simulation<R>);
+    fn world(&self) -> BoxedResult<ThreadedWorldLoader>;
+    fn init(&self, sim: &mut Simulation<R>) -> BoxedResult<()>;
 
-    fn load(&self) -> Simulation<R> {
-        let mut world = self.world();
+    fn load(&self, resources: Resources) -> BoxedResult<Simulation<R>> {
+        let mut world = self.world()?;
 
         debug!("waiting for world to load before initializing simulation");
         world.request_all_chunks();
-        match world.block_for_all(Duration::from_secs(30)) {
-            BlockForAllResult::Success => {}
-            err => {
-                error!("failed to wait for world to load: {:?}", err);
-                panic!("failed to wait for world to load: {:?}", err); // TODO return result
-            }
-        }
+        world.block_for_all(Duration::from_secs(30))?;
 
-        let mut sim = Simulation::new(world);
-        self.init(&mut sim);
-        sim
+        let mut sim = Simulation::new(world, resources)?;
+        self.init(&mut sim)?;
+        Ok(sim)
     }
 }
 

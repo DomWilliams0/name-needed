@@ -8,7 +8,9 @@ use sdl2::VideoSubsystem;
 
 pub use capability::{Capability, ScopedCapability};
 use color::ColorRgb;
+use common::derive_more::{Display, Error};
 use common::*;
+use resources::ResourceError;
 pub use shader::Program;
 pub use vertex::{
     AttribType, Bindable, BufferUsage, Divisor, Normalized, Primitive, ScopedBind, ScopedBindable,
@@ -24,13 +26,28 @@ pub struct Gl {
     gl_context: GLContext,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 pub enum GlError {
-    LoadingShader(std::io::Error),
-    CompilingShader(String),
+    #[display(fmt = "Failed to load shader")]
+    LoadingShader(ResourceError),
+
+    #[display(fmt = "Failed to compile shader: {}", _0)]
+    CompilingShader(#[error(not(source))] String),
+
+    #[display(fmt = "Failed to link program")]
     LinkingProgram,
-    UnknownUniform(&'static str),
-    Gl(GLenum),
+
+    #[display(fmt = "Unknown uniform {:?}", _0)]
+    UnknownUniform(#[error(not(source))] &'static str),
+
+    #[display(fmt = "GL error: {}", _0)]
+    Gl(#[error(not(source))] GLenum),
+
+    #[display(
+        fmt = "Buffer is too small, requested {} but size is {}",
+        requested_len,
+        real_len
+    )]
     BufferTooSmall {
         real_len: usize,
         requested_len: usize,

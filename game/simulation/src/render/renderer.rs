@@ -6,7 +6,7 @@ use crate::{RenderComponent, TransformComponent};
 
 pub trait Renderer {
     type Target;
-    type Error: Debug;
+    type Error: Error;
 
     /// Initialize frame rendering
     fn init(&mut self, target: Self::Target);

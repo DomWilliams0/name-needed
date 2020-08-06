@@ -14,7 +14,6 @@ color = { path = "../../shared/color" }
 procgen = { path = "../procgen", default-features = false } # no bin
 
 petgraph = "^0.5"
-float-cmp = "^0.6"
 nd_iter = "0.0.4"
 threadpool = "^1.8"
 crossbeam = "^0.7"

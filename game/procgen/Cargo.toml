@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 common = {path = "../../shared/common"}
 noise = "^0.6"
-image = {version = "^0.23", optional = true}
+image = {version = "^0.23", optional = true, default-features = false, features = ["png"]}
 
 [features]
 default = ["bin"]

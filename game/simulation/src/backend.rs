@@ -3,7 +3,8 @@ use world::WorldViewer;
 use crate::input::UiCommand;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation};
-use std::fmt::Debug;
+use common::Error;
+use resources::resource::Resources;
 
 pub enum Exit {
     Stop,
@@ -32,17 +33,18 @@ pub trait InitializedSimulationBackend: Sized {
 }
 
 pub trait PersistentSimulationBackend: Sized {
-    type Error: Debug; // TODO Error!!
+    type Error: Error;
     type Initialized: InitializedSimulationBackend<Persistent = Self>;
 
     /// One time setup
-    fn new() -> Result<Self, Self::Error>;
+    fn new(resources: &Resources) -> Result<Self, Self::Error>;
 
     fn start(self, world: WorldViewer) -> Self::Initialized;
 }
 
 pub mod state {
     use crate::{InitializedSimulationBackend, PersistentSimulationBackend};
+    use resources::resource::Resources;
     use world::WorldViewer;
 
     #[allow(clippy::manual_non_exhaustive)]
@@ -58,8 +60,10 @@ pub mod state {
     pub struct BackendState<B: PersistentSimulationBackend>(State<B>);
 
     impl<B: PersistentSimulationBackend> BackendState<B> {
-        pub fn new() -> Result<Self, <B as PersistentSimulationBackend>::Error> {
-            let backend = B::new()?;
+        pub fn new(
+            resources: &Resources,
+        ) -> Result<Self, <B as PersistentSimulationBackend>::Error> {
+            let backend = B::new(resources)?;
             Ok(Self(State::Uninit(backend)))
         }
 

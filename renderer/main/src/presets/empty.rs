@@ -1,4 +1,5 @@
 use crate::GamePreset;
+use common::BoxedResult;
 use simulation::{
     presets, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
 };
@@ -16,12 +17,13 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
         Some(Path::new("config.ron"))
     }
 
-    fn world(&self) -> ThreadedWorldLoader {
+    fn world(&self) -> BoxedResult<ThreadedWorldLoader> {
         let pool = ThreadedWorkerPool::new(1);
-        WorldLoader::new(presets::multi_chunk_wonder(), pool)
+        Ok(WorldLoader::new(presets::multi_chunk_wonder(), pool))
     }
 
-    fn init(&self, _sim: &mut Simulation<R>) {
+    fn init(&self, _sim: &mut Simulation<R>) -> BoxedResult<()> {
         // nop
+        Ok(())
     }
 }

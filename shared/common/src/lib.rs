@@ -12,6 +12,7 @@ pub use itertools::*;
 pub use log::*;
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
+pub use parse_display;
 pub use rand::prelude::*;
 pub use smallvec::*;
 pub use thiserror::{self, Error};
@@ -30,6 +31,8 @@ pub use std::{
     iter::{empty, once},
     marker::PhantomData,
 };
+
+pub type BoxedResult<T> = Result<T, Box<dyn Error>>;
 
 pub type F = f32;
 pub type Vector3 = cgmath::Vector3<F>;

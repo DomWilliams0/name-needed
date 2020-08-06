@@ -5,7 +5,9 @@ use simulation::state::BackendState;
 use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
 
 use engine::Engine;
-use std::path::PathBuf;
+use resources::resource::Resources;
+use resources::ResourceContainer;
+use std::path::Path;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -30,7 +32,7 @@ type Backend = engine::DummyBackendPersistent;
 type BackendInit = <Backend as PersistentSimulationBackend>::Initialized;
 type Renderer = <BackendInit as InitializedSimulationBackend>::Renderer;
 
-fn do_main() -> i32 {
+fn do_main() -> BoxedResult<()> {
     let args = App::new(env!("CARGO_PKG_NAME"))
         .arg(
             Arg::with_name("preset")
@@ -55,7 +57,10 @@ fn do_main() -> i32 {
         _ => unreachable!(),
     };
 
-    let root = args.value_of("dir").unwrap();
+    let root: &Path = args
+        .value_of("dir")
+        .unwrap() // default is provided
+        .as_ref();
 
     // init logger
     env_logger::Builder::from_env(env_logger::Env::default().filter_or("NN_LOG", "info"))
@@ -75,40 +80,29 @@ fn do_main() -> i32 {
     #[cfg(feature = "metrics")]
     metrics::start_serving();
 
+    // init resources root
+    let resources = Resources::new(root)?;
+
     // load config
     if let Some(config_file_name) = preset.config() {
-        let config_path = {
-            let mut path = PathBuf::new();
-            path.push(root);
-            path.push(config_file_name);
-            path
-        };
+        let config_path = resources.get_file(config_file_name)?;
 
-        info!("loading config from '{:?}'", config_path);
-        if let Err(e) = config::init(config_path) {
-            error!("failed to load config: {}", e);
-            return 1;
-        }
+        info!("loading config from {:?}", config_path);
+        config::init(config_path)?;
     }
 
     // initialize persistent backend
-    let mut backend_state = match BackendState::<Backend>::new() {
-        Err(e) => {
-            error!("failed to initialize engine: {:?}", e);
-            return 2;
-        }
-        Ok(b) => b,
-    };
+    let mut backend_state = BackendState::<Backend>::new(&resources)?;
 
     loop {
         // create simulation
         let simulation = {
             let _span = Span::Setup.begin();
-            preset.load()
+            preset.load(resources.clone())?
         };
 
         // initialize backend with simulation world
-        let world_viewer = WorldViewer::from_world(simulation.world());
+        let world_viewer = WorldViewer::from_world(simulation.world())?;
         let backend = backend_state.start(world_viewer);
 
         // create and run engine
@@ -123,12 +117,12 @@ fn do_main() -> i32 {
         }
     }
 
-    0
+    Ok(())
 }
 
 fn main() {
     #[cfg(feature = "count-allocs")]
-    let exit = {
+    let result = {
         use alloc_counter::count_alloc;
         let (counts, result) = count_alloc(|| do_main());
         // TODO more granular - n for engine setup, n for sim setup, n for each frame?
@@ -140,7 +134,27 @@ fn main() {
     };
 
     #[cfg(not(feature = "count-allocs"))]
-    let exit = do_main();
+    let result = do_main();
+
+    let exit = match result {
+        Err(e) => {
+            error!("error: {}", e);
+
+            if log_enabled!(Level::Debug) {
+                error!(" debug: {:#?}", e);
+            }
+
+            // TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)
+            let mut src = e.source();
+            while let Some(source) = src {
+                error!(" caused by: {}", source);
+                src = source.source();
+            }
+
+            1
+        }
+        Ok(()) => 0,
+    };
 
     info!("exiting cleanly with exit code {}", exit);
     std::process::exit(exit);

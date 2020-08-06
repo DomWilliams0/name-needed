@@ -107,6 +107,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * on panic in any thread, process should exit with backtrace
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
 
+## Data driven
+* explicit namespacing for entity definitions e.g. "core:food_apple"
+
 ## Entity diversity
 * animal species
 	* dogs, cats, birds, deer
@@ -127,3 +130,5 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * gradual healing and tending
 * track injury causes e.g. arrow in leg, fired by X at time Y with weapon Z
 * blood flow that can be blocked off
+* inventory system should be on top of physical body, which defines number and availability of slots
+	* e.g. parts are marked as mounting points, mounting affects the availability of other mounts (backpack (shoulder) vs briefcase (hand) vs ... skin pocket?? (wherever it is))
