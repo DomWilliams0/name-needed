@@ -221,6 +221,7 @@ impl<'a> System<'a> for AiSystem {
     }
 }
 
+#[deprecated]
 #[derive(Component)]
 #[storage(DenseVecStorage)]
 pub struct ActivityComponent {
@@ -266,7 +267,9 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         let ai = AiComponent::with_species(&self.species);
-        builder.with(ai).with(ActivityComponent::default())
+        builder
+            .with(ai)
+            .with(crate::activity::ActivityComponent::default())
     }
 }
 

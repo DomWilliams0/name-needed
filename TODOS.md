@@ -1,4 +1,4 @@
-# TODOs (175)
+# TODOs (187)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -14,6 +14,16 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
+ * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (6)
+   * `// TODO failure/interrupt reason`
+   * `// TODO display too`
+   * `// TODO for testing, eventually have a submodule per activity`
+   * `//         // TODO`
+   * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
+   * `// TODO specify entity specifically, either Self or Other(e)`
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
+   * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
+   * `// TODO use fancy bitmask magic to get both at once`
  * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
@@ -60,13 +70,16 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (6)
+ * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (7)
    * `// TODO derive perfect hash for event types`
-   * `// TODO subscribe with event handler typeid to disallow dupes`
+   * `// TODO subscribe with event handler typeid to disallow dupes?`
+   * `// TODO weak reference to subscribers`
    * `// TODO ensure handler is not already subscribed`
    * `// TODO ideally we should be able to pass a reference here rather than a rc clone`
    * `// TODO intelligently shrink subscriber lists at some point to avoid monotonic increase in mem usage`
    * `// TODO try with no subs`
+ * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (1)
+   * `// TODO event queue generic over event type`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
@@ -112,8 +125,9 @@
    * `// TODO only render the top area in each slice`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
    * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
+   * `// TODO remove this`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
@@ -124,9 +138,10 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
+   * `// TODO bring back systems`
    * `// TODO per tick alloc/reuse buf`
    * `// TODO remove need to manually register each component type`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)

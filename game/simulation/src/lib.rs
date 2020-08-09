@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, deprecated)]
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{

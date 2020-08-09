@@ -5,7 +5,7 @@ pub use input::AiInput;
 pub use system::{ActivityComponent, AiComponent, AiSystem};
 use unit::world::WorldPoint;
 
-pub use crate::ai::activity::AiAction;
+pub use crate::ai::activity::{AiAction, ItemsToPickUp};
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};

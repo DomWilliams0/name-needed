@@ -41,7 +41,9 @@ use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
+use crate::activity::{ActivityEventSystem, ActivitySystem, BlockingActivityComponent};
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
+use crate::event::{EntityEventQueue, EventsComponent};
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 
@@ -153,11 +155,13 @@ impl<R: Renderer> Simulation<R> {
 
     fn tick_systems(&mut self) {
         // needs
-        HungerSystem.run_now(&self.ecs_world);
-        EatingSystem.run_now(&self.ecs_world);
+        // TODO bring back systems
+        // HungerSystem.run_now(&self.ecs_world);
+        // EatingSystem.run_now(&self.ecs_world);
 
         // choose activity
-        AiSystem.run_now(&self.ecs_world);
+        // AiSystem.run_now(&self.ecs_world);
+        ActivitySystem.run_now(&self.ecs_world);
 
         // assign paths for wandering
         WanderPathAssignmentSystem.run_now(&self.ecs_world);
@@ -176,6 +180,9 @@ impl<R: Renderer> Simulation<R> {
 
         // remove completed divine commands
         DivineCommandCompletionSystem.run_now(&self.ecs_world);
+
+        // process entity events
+        ActivityEventSystem.run_now(&self.ecs_world);
 
         // validate inventory soundness
         #[cfg(debug_assertions)]
@@ -359,7 +366,7 @@ impl<R: Renderer> Simulation<R> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn register_components(world: &mut EcsWorld) {
     // TODO remove need to manually register each component type
     macro_rules! register {
@@ -384,7 +391,9 @@ pub fn register_components(world: &mut EcsWorld) {
     // ai
     register!(AiComponent);
     register!(HungerComponent);
-    register!(ActivityComponent);
+    // register!(ActivityComponent);
+    register!(crate::activity::ActivityComponent);
+    register!(BlockingActivityComponent);
     register!(SocietyComponent);
 
     // items
@@ -410,6 +419,7 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(TerrainUpdatesRes::default());
     world.insert(Societies::default());
     world.insert(PlayerSociety::default());
+    world.insert(EntityEventQueue::default());
 }
 
 fn register_debug_renderers<R: Renderer>(

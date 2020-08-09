@@ -1,30 +1,15 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use strum_macros::EnumDiscriminants;
-
 use common::derive_more::From;
 use common::*;
-use unit::world::WorldPoint;
 
-use crate::ecs::Entity;
+use crate::event::component::{EntityEventPayload, EntityEventType};
 
 // TODO derive perfect hash for event types
 
-#[derive(EnumDiscriminants)]
-#[strum_discriminants(name(EntityEventType), derive(Hash))]
-pub enum EntityEventPayload {
-    /// Completed path finding to target
-    Arrived(WorldPoint),
-
-    /// Item entity picked up by a holder
-    PickedUp(Entity),
-
-    #[cfg(test)]
-    Dummy,
-}
-// TODO subscribe with event handler typeid to disallow dupes
-
+// TODO subscribe with event handler typeid to disallow dupes?
+// TODO weak reference to subscribers
 pub type EventHandler = Rc<dyn EventSubscriber>;
 
 #[derive(From)]
@@ -35,6 +20,7 @@ pub struct EventDispatcher {
     all_subs: Vec<EventHandlerWrapper>,
 }
 
+#[derive(Clone)]
 pub enum EventSubscription {
     All,
     Specific(EntityEventType),
@@ -107,6 +93,12 @@ impl EventDispatcher {
     }
 }
 
+impl Default for EventDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PartialEq<EventHandler> for &EventHandlerWrapper {
     fn eq(&self, other: &EventHandler) -> bool {
         Rc::ptr_eq(&self.0, other)
@@ -132,6 +124,15 @@ impl PartialEq<EventHandlerWrapper> for EventHandlerWrapper {
 }
 
 impl Eq for EventHandlerWrapper {}
+
+impl EventSubscription {
+    pub fn matches(&self, event: &EntityEventPayload) -> bool {
+        match self {
+            EventSubscription::All => true,
+            EventSubscription::Specific(ty) => *ty == EntityEventType::from(event),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -9,16 +9,16 @@ Config(
         nav_paths_by_default: false,
     ),
     world: (
-        // source: Preset(MultiChunkWonder),
-        source: Generate (radius: 2, seed: Some(342879)),
+        source: Preset(OneChunkWonder),
+        // source: Generate (radius: 2, seed: Some(342879)),
         worker_threads: None,
         generation_height_scale: 15.0,
     ),
     simulation: (
         random_seed: Some(67853852415419),
-        random_count: 5,
+        random_count: 1,
         friction: 0.85,
         start_delay: 0,
-        food_count: 200,
+        food_count: 0,
      ),
 )

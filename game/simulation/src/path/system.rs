@@ -6,6 +6,7 @@ use world::InnerWorldRef;
 use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EventsComponent};
 use crate::path::follow::PathFollowing;
 use crate::path::WANDER_SPEED;
 use crate::steer::{SteeringBehaviour, SteeringComponent};
@@ -40,6 +41,7 @@ impl<'a> System<'a> for PathSteeringSystem {
         Read<'a, EntitiesRes>,
         Read<'a, WorldRef>,
         Read<'a, LazyUpdate>,
+        Write<'a, EntityEventQueue>,
         WriteStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
         WriteStorage<'a, SteeringComponent>,
@@ -47,7 +49,7 @@ impl<'a> System<'a> for PathSteeringSystem {
 
     fn run(
         &mut self,
-        (entities, world, lazy_update, mut transform, mut path, mut steer): Self::SystemData,
+        (entities, world, lazy_update, mut event_queue, mut transform, mut path, mut steer): Self::SystemData,
     ) {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
@@ -88,15 +90,14 @@ impl<'a> System<'a> for PathSteeringSystem {
                 // move onto next waypoint
                 match following.next_waypoint() {
                     None => {
-                        trace!(
-                            "{:?}: path finished, arrived at {}",
-                            e,
-                            path.target().unwrap(),
-                        );
+                        let target = path.target().unwrap();
+                        trace!("{:?}: path finished, arrived at {}", e, target,);
 
                         // indicate arrival to other systems
-                        lazy_update
-                            .insert(e, ArrivedAtTargetEventComponent(path.target().unwrap()));
+                        // TODO remove this
+                        lazy_update.insert(e, ArrivedAtTargetEventComponent(target));
+
+                        event_queue.post(EntityEvent(e, EntityEventPayload::Arrived(target)));
 
                         path.path = None;
                     }

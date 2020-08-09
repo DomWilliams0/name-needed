@@ -64,6 +64,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ### Performance
 * allocation reuse
 	* cap cached alloc size so memory usage doesnt only go upwards
+	* raii struct i.e. `fn start(&mut self) -> TempVec;` `TempVec::drop() {self.backing.clear()}`
 * pooled allocations
 * per-tick arena allocator
 * spatial queries for entities

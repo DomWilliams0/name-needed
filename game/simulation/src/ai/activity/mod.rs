@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 pub use action::AiAction;
 use ai::AiBox;
-pub(crate) use items::ItemsToPickUp;
+pub use items::ItemsToPickUp;
 pub use misc::NopActivity;
 
 use crate::ai::activity::items::{GoPickUpItemActivity, UseHeldItemActivity};
