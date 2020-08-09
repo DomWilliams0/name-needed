@@ -1,6 +1,4 @@
-use crate::activity::activity::{
-    Activity, ActivityContext, ActivityResult, Finish, GotoThenNop, NopActivity,
-};
+use crate::activity::activity::{Activity, ActivityContext, ActivityResult, Finish};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
@@ -8,7 +6,8 @@ use crate::queued_update::QueuedUpdates;
 use common::*;
 
 use crate::activity::EventUnblockResult;
-use unit::world::WorldPoint;
+
+use crate::activity::activities::NopActivity;
 
 pub struct ActivitySystem;
 
@@ -60,7 +59,12 @@ impl<'a> System<'a> for ActivitySystem {
             }
 
             match activity.current.on_tick(&mut ctx) {
-                ActivityResult::Blocked(subscriptions) => {
+                ActivityResult::Blocked => {
+                    assert!(
+                        !ctx.subscriptions.is_empty(),
+                        "blocking activity must subscribe to events"
+                    );
+
                     // subscribe to requested events
                     event_queue.subscribe(entity, subscriptions.drain(..));
 
@@ -126,7 +130,7 @@ impl<'a> System<'a> for ActivityEventSystem {
 impl Default for ActivityComponent {
     fn default() -> Self {
         Self {
-            current: Box::new(GotoThenNop::new(WorldPoint(8.0, 8.0, 3.0))),
+            current: Box::new(NopActivity),
             new_activity: None,
         }
     }

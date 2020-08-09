@@ -1,4 +1,4 @@
-# TODOs (187)
+# TODOs (186)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -14,14 +14,15 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
- * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (7)
-   * `// TODO failure/interrupt reason`
-   * `// TODO display too`
-   * `0.5 // TODO get from current sub activity`
-   * `// TODO for testing, eventually have a submodule per activity`
-   * `//         // TODO`
+ * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (1)
+   * `// TODO`
+ * [game/simulation/src/activity/activities/nop.rs](game/simulation/src/activity/activities/nop.rs) (2)
    * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
    * `// TODO specify entity specifically, either Self or Other(e)`
+ * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (3)
+   * `// TODO failure/interrupt reason`
+   * `// TODO can queuedupdates be removed from activity context`
+   * `0.5 // TODO get from current sub activity`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO use fancy bitmask magic to get both at once`
