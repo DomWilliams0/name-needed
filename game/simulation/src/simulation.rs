@@ -8,9 +8,9 @@ use common::*;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
 use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
 
+use crate::activity::ActivityComponent;
 use crate::ai::{
-    ActivityComponent, AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem,
-    DivineCommandComponent,
+    AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem, DivineCommandComponent,
 };
 use crate::definitions;
 use crate::dev::SimulationDevExt;
@@ -43,7 +43,7 @@ use crate::{ComponentWorld, Societies, SocietyHandle};
 
 use crate::activity::{ActivityEventSystem, ActivitySystem, BlockingActivityComponent};
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
-use crate::event::{EntityEventQueue, EventsComponent};
+use crate::event::EntityEventQueue;
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 
@@ -155,12 +155,11 @@ impl<R: Renderer> Simulation<R> {
 
     fn tick_systems(&mut self) {
         // needs
-        // TODO bring back systems
-        // HungerSystem.run_now(&self.ecs_world);
-        // EatingSystem.run_now(&self.ecs_world);
+        HungerSystem.run_now(&self.ecs_world);
+        EatingSystem.run_now(&self.ecs_world);
 
         // choose activity
-        // AiSystem.run_now(&self.ecs_world);
+        AiSystem.run_now(&self.ecs_world);
         ActivitySystem.run_now(&self.ecs_world);
 
         // assign paths for wandering
@@ -391,8 +390,7 @@ pub fn register_components(world: &mut EcsWorld) {
     // ai
     register!(AiComponent);
     register!(HungerComponent);
-    // register!(ActivityComponent);
-    register!(crate::activity::ActivityComponent);
+    register!(ActivityComponent);
     register!(BlockingActivityComponent);
     register!(SocietyComponent);
 

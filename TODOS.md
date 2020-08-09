@@ -14,9 +14,10 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
- * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (6)
+ * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (7)
    * `// TODO failure/interrupt reason`
    * `// TODO display too`
+   * `0.5 // TODO get from current sub activity`
    * `// TODO for testing, eventually have a submodule per activity`
    * `//         // TODO`
    * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
@@ -138,10 +139,9 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
-   * `// TODO bring back systems`
    * `// TODO per tick alloc/reuse buf`
    * `// TODO remove need to manually register each component type`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)

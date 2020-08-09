@@ -1,7 +1,7 @@
 use crate::activity::activity::{
     Activity, ActivityContext, ActivityResult, Finish, GotoThenNop, NopActivity,
 };
-use crate::ai::AiAction;
+use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
 use crate::queued_update::QueuedUpdates;
@@ -28,6 +28,7 @@ pub struct BlockingActivityComponent;
 impl<'a> System<'a> for ActivitySystem {
     type SystemData = (
         WriteStorage<'a, ActivityComponent>,
+        WriteStorage<'a, AiComponent>,
         ReadStorage<'a, BlockingActivityComponent>,
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
@@ -38,10 +39,10 @@ impl<'a> System<'a> for ActivitySystem {
 
     fn run(
         &mut self,
-        (mut activities, blocking, entities, world, updates, comp_updates, mut event_queue): Self::SystemData,
+        (mut activities, mut ai, blocking, entities, world, updates, comp_updates, mut event_queue): Self::SystemData,
     ) {
         let mut subscriptions = Vec::new(); // TODO reuse allocation in system
-        for (entity, activity, _) in (&entities, &mut activities, !&blocking).join() {
+        for (entity, ai, activity, _) in (&entities, &mut ai, &mut activities, !&blocking).join() {
             debug_assert!(subscriptions.is_empty());
             let mut ctx = ActivityContext::<EcsWorld> {
                 entity,
@@ -68,7 +69,7 @@ impl<'a> System<'a> for ActivitySystem {
                 }
 
                 ActivityResult::Ongoing => {
-                    // tick again next tick
+                    // go again next tick
                 }
                 ActivityResult::Finished(finish) => {
                     debug!(
@@ -76,9 +77,13 @@ impl<'a> System<'a> for ActivitySystem {
                         finish, activity.current
                     );
 
+                    // finish current and replace with nop
                     activity.current.on_finish(finish, &mut ctx);
-
                     activity.current = Box::new(NopActivity);
+
+                    // next tick ai should return a new decision rather than unchanged to avoid
+                    // infinite Nop loops
+                    ai.clear_last_action();
                 }
             }
         }

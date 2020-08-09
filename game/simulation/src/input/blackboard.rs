@@ -1,4 +1,4 @@
-use crate::ai::ActivityComponent;
+use crate::activity::ActivityComponent;
 use crate::ecs::Entity;
 use crate::input::{SelectedEntity, SelectedTiles};
 use crate::item::{BaseItemComponent, EdibleItemComponent};

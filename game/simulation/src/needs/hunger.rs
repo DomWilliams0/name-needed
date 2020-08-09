@@ -1,7 +1,7 @@
 use common::newtype::AccumulativeInt;
 use common::*;
 
-use crate::ai::ActivityComponent;
+use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, ItemClass, SlotReference,

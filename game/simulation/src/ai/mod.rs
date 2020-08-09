@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common::*;
 pub use input::AiInput;
-pub use system::{ActivityComponent, AiComponent, AiSystem};
+pub use system::{AiComponent, AiSystem};
 use unit::world::WorldPoint;
 
 pub use crate::ai::activity::{AiAction, ItemsToPickUp};

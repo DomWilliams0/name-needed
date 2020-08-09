@@ -58,6 +58,10 @@ pub trait Activity<W: ComponentWorld>: Display {
     fn on_event(&mut self, _event: &EntityEvent) -> (EventUnblockResult, EventUnsubscribeResult) {
         unreachable!()
     }
+
+    fn exertion(&self) -> f32 {
+        0.5 // TODO get from current sub activity
+    }
 }
 // TODO for testing, eventually have a submodule per activity
 #[derive(Display)]

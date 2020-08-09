@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
 
-use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish, NopActivity};
+use crate::activity::ActivityComponent;
 use crate::ai::dse::{human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
-use crate::queued_update::QueuedUpdates;
+
 use crate::simulation::Tick;
 use crate::society::job::{JobList, Task};
 use crate::society::{Society, SocietyComponent};
@@ -24,7 +24,7 @@ use world::WorldRef;
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
     // last_completed_action: Option<AiAction>,
-    current_action: Option<AiAction>,
+    // current_action: Option<AiAction>,
 }
 
 impl AiComponent {
@@ -36,7 +36,7 @@ impl AiComponent {
         Self {
             intelligence,
             // last_completed_action: None,
-            current_action: None,
+            // current_action: None,
         }
     }
 
@@ -48,6 +48,10 @@ impl AiComponent {
 
     pub fn remove_divine_command(&mut self) {
         self.intelligence.pop_smarts(&AdditionalDse::DivineCommand);
+    }
+
+    pub fn clear_last_action(&mut self) {
+        self.intelligence.clear_last_action();
     }
 
     // pub fn last_completed_action(&self) -> Option<&AiAction> {
@@ -64,7 +68,6 @@ impl<'a> System<'a> for AiSystem {
         Read<'a, EcsWorldFrameRef>,
         Read<'a, WorldRef>,
         Write<'a, Societies>,
-        Write<'a, QueuedUpdates>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
         ReadStorage<'a, InventoryComponent>,
@@ -81,7 +84,6 @@ impl<'a> System<'a> for AiSystem {
             ecs_world,
             voxel_world,
             mut societies,
-            updates,
             transform,
             hunger,
             inventory,
@@ -127,11 +129,6 @@ impl<'a> System<'a> for AiSystem {
             // Safety: can't use true lifetime on Blackboard so using 'static and transmuting until
             // we get our GATs
             let bb_ref: &mut AiBlackboard = unsafe { std::mem::transmute(&mut bb) };
-            let ctx = ActivityContext {
-                entity: e,
-                world: ecs_world,
-                updates: &updates,
-            };
 
             // collect extra actions from society job list, if any
             // TODO provide READ ONLY DSEs to ai intelligence
@@ -165,73 +162,26 @@ impl<'a> System<'a> for AiSystem {
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_task, dse)| &**dse);
-            match ai
+            if let IntelligentDecision::New { dse, action, src } = ai
                 .intelligence
                 .choose_with_stream_dses(bb_ref, streamed_dse)
             {
-                IntelligentDecision::New { dse, action, src } => {
-                    debug!("{:?}: new activity: {} (from {:?})", e, dse.name(), src);
-                    trace!("activity: {:?}", action);
+                debug!("{:?}: new activity: {} (from {:?})", e, dse.name(), src);
+                trace!("activity: {:?}", action);
 
-                    let (mut old, new) = {
-                        let new_activity = action.clone().into();
-                        let old_activity = std::mem::replace(&mut activity.current, new_activity);
-                        (old_activity, &mut activity.current)
-                    };
+                // pass on to activity system
+                activity.new_activity = Some(action);
 
-                    ai.current_action = Some(action);
-                    // ai.last_completed_action = None; // interrupted
+                if let DecisionSource::Stream(i) = src {
+                    // a society task was chosen, reserve this so others can't try to do it too
+                    let society = society
+                        .as_mut()
+                        .expect("streamed DSEs expected to come from a society only");
 
-                    old.on_finish(Finish::Interrupted, &ctx);
-                    new.on_start(&ctx);
-
-                    if let DecisionSource::Stream(i) = src {
-                        // a society task was chosen, reserve this so others can't try to do it too
-                        let society = society
-                            .as_mut()
-                            .expect("streamed DSEs expected to come from a society only");
-
-                        let task = &extra_dses[i].0;
-                        society.jobs_mut().reserve_task(e, task.clone());
-                    }
-                }
-                IntelligentDecision::Unchanged => {
-                    let result = activity.current.on_tick(&ctx);
-
-                    if let ActivityResult::Finished(finish) = result {
-                        debug!(
-                            "finished activity with finish {:?}: '{}'. reverting to nop activity",
-                            finish, activity.current
-                        );
-                        let new = AiBox::new(NopActivity);
-                        let mut old = std::mem::replace(&mut activity.current, new);
-
-                        old.on_finish(finish, &ctx);
-                        // no need to nop.on_start()
-
-                        // next tick should return IntelligentDecision::New rather than Unchanged to
-                        // avoid infinite Nop loops
-                        ai.intelligence.clear_last_action();
-
-                        // ai.last_completed_action = std::mem::take(&mut ai.current_action);
-                    }
+                    let task = &extra_dses[i].0;
+                    society.jobs_mut().reserve_task(e, task.clone());
                 }
             }
-        }
-    }
-}
-
-#[deprecated]
-#[derive(Component)]
-#[storage(DenseVecStorage)]
-pub struct ActivityComponent {
-    pub current: AiBox<dyn Activity<EcsWorld>>,
-}
-
-impl Default for ActivityComponent {
-    fn default() -> Self {
-        Self {
-            current: AiBox::new(NopActivity),
         }
     }
 }
@@ -267,9 +217,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         let ai = AiComponent::with_species(&self.species);
-        builder
-            .with(ai)
-            .with(crate::activity::ActivityComponent::default())
+        builder.with(ai).with(ActivityComponent::default())
     }
 }
 

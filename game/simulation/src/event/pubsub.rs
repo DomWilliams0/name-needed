@@ -139,6 +139,7 @@ mod tests {
     use std::cell::Cell;
 
     use super::*;
+    use unit::world::WorldPoint;
 
     #[test]
     fn pub_sub() {

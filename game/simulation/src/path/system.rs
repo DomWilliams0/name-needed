@@ -6,7 +6,7 @@ use world::InnerWorldRef;
 use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
-use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EventsComponent};
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::path::follow::PathFollowing;
 use crate::path::WANDER_SPEED;
 use crate::steer::{SteeringBehaviour, SteeringComponent};
