@@ -27,6 +27,8 @@ arraydeque = "^0.4"
 ahash = "^0.4"
 inventory = "^0.1"
 daggy = "^0.7"
+strum = "^0.19"
+strum_macros = "^0.19"
 
 ron = "^0.6"
 serde = "^1.0"

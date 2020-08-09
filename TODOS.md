@@ -1,4 +1,4 @@
-# TODOs (169)
+# TODOs (175)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -60,6 +60,13 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
+ * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (6)
+   * `// TODO derive perfect hash for event types`
+   * `// TODO subscribe with event handler typeid to disallow dupes`
+   * `// TODO ensure handler is not already subscribed`
+   * `// TODO ideally we should be able to pass a reference here rather than a rc clone`
+   * `// TODO intelligently shrink subscriber lists at some point to avoid monotonic increase in mem usage`
+   * `// TODO try with no subs`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)

@@ -24,11 +24,13 @@ pub const TICKS_PER_SECOND: usize = 20;
 #[cfg(test)]
 pub use simulation::register_components;
 
+mod activity;
 mod ai;
 mod backend;
 mod definitions;
 pub mod dev;
 mod ecs;
+mod event;
 pub mod input;
 mod item;
 mod movement;
