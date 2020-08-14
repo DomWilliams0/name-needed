@@ -20,7 +20,8 @@ pub struct EventDispatcher {
     all_subs: Vec<EventHandlerWrapper>,
 }
 
-#[derive(Clone)]
+// TODO use a bitmask for event subscription instead of a special case for all
+#[derive(Clone, Debug)]
 pub enum EventSubscription {
     All,
     Specific(EntityEventType),

@@ -1,12 +1,12 @@
 use common::*;
 
-use crate::ai::AiAction;
 use crate::ComponentWorld;
 
-use crate::activity::activities::NopActivity;
+use crate::activity::NopActivity;
 use crate::ecs::Entity;
-use crate::event::{EntityEvent, EntityEventSubscription};
+use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
 use crate::queued_update::QueuedUpdates;
+use unit::world::WorldPoint;
 
 pub enum ActivityResult {
     Ongoing,
@@ -27,11 +27,10 @@ pub enum EventUnsubscribeResult {
     StaySubscribed,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum Finish {
-    Succeeded,
-    Failed,
-    // TODO failure/interrupt reason
+    Success,
+    Failure(Box<dyn Error>),
     Interrupted,
 }
 
@@ -44,36 +43,61 @@ pub struct ActivityContext<'a, W: ComponentWorld> {
     pub subscriptions: &'a mut Vec<EntityEventSubscription>,
 }
 
-pub trait Activity<W: ComponentWorld>: Display {
-    // fn on_start(&mut self, ctx: &ActivityContext<W>);
-    fn on_finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>);
+pub struct ActivityEventContext {
+    pub subscriber: Entity,
+}
 
+pub trait Activity<W: ComponentWorld>: Display {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult;
 
-    fn on_event(&mut self, _event: &EntityEvent) -> (EventUnblockResult, EventUnsubscribeResult) {
+    #[allow(unused_variables)]
+    fn on_event(
+        &mut self,
+        event: &EntityEvent,
+        ctx: &ActivityEventContext,
+    ) -> (EventUnblockResult, EventUnsubscribeResult) {
+        // must be subscribed to an event to get here
         unreachable!()
     }
 
-    fn exertion(&self) -> f32 {
-        0.5 // TODO get from current sub activity
+    fn on_finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
+
+    // ---
+    fn current_subactivity(&self) -> &dyn SubActivity<W>;
+
+    /// Calls on_finish on both activity and sub activity
+    fn finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+        let a = self.current_subactivity().on_finish(ctx);
+        let b = self.on_finish(finish, ctx);
+
+        match (a, b) {
+            (err @ Err(_), Ok(_)) | (Ok(_), err @ Err(_)) => err,
+            (Err(a), Err(b)) => {
+                // pass through activity failure and log subactivity
+                error!("failed to finish subactivity as well as activity: {}", a);
+                Err(b)
+            }
+            _ => Ok(()), // both ok
+        }
     }
 }
 
-impl AiAction {
-    pub fn into_activity<W: ComponentWorld>(self, activity: &mut Box<dyn Activity<W>>) {
-        macro_rules! activity {
-            ($act:expr) => {
-                Box::new($act) as Box<dyn Activity<W>>
-            };
-        }
+pub trait SubActivity<W: ComponentWorld>: Display {
+    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult;
+    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
 
-        *activity = match self {
-            AiAction::Nop => activity!(NopActivity),
-            // AiAction::Goto(pos) => activity!(GotoThenNop::new(pos)),
-            // AiAction::GoPickUp(ItemsToPickUp(_, items)) => {
-            //     activity!(PickupItemsActivity::with_items(items))
-            // }
-            _ => todo!(),
-        }
+    fn exertion(&self) -> f32;
+}
+
+impl<'a, W: ComponentWorld> ActivityContext<'a, W> {
+    pub fn subscribe_to(&mut self, subject_entity: Entity, subscription: EventSubscription) {
+        self.subscriptions
+            .push(EntityEventSubscription(subject_entity, subscription));
+    }
+}
+
+impl ActivityResult {
+    pub fn errored<E: Error + 'static>(err: E) -> Self {
+        Self::Finished(Finish::Failure(Box::new(err)))
     }
 }

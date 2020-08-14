@@ -19,6 +19,6 @@ Config(
         random_count: 1,
         friction: 0.85,
         start_delay: 0,
-        food_count: 0,
+        food_count: 5,
      ),
 )

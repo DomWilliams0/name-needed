@@ -4,12 +4,12 @@ use crate::event::component::EntityEvent;
 use crate::event::EntityEventSubscription;
 use common::{Itertools, SmallVec};
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // TODO event queue generic over event type
 pub struct EntityEventQueue {
     events: Vec<EntityEvent>,
-    unsubscribers: Vec<Entity>,
+    unsubscribers: HashSet<Entity>,
 
     /// subject -> interested subscriber and his subscriptions
     subscriptions: HashMap<Entity, SmallVec<[(Entity, EntityEventSubscription); 2]>>,
@@ -20,7 +20,7 @@ impl Default for EntityEventQueue {
     fn default() -> Self {
         Self {
             events: Vec::with_capacity(512),
-            unsubscribers: Vec::with_capacity(16),
+            unsubscribers: HashSet::with_capacity(16),
             subscriptions: HashMap::with_capacity(64),
             needs_cleanup: false,
         }
@@ -50,9 +50,14 @@ impl EntityEventQueue {
                     }
                 };
             });
+
+        for (subject, sub) in self.subscriptions.iter() {
+            common::info!("SUBJECT {} => {:#?}", crate::entity_pretty!(subject), sub);
+        }
     }
 
     pub fn post(&mut self, event: EntityEvent) {
+        common::debug!("posting event: {:?}", event);
         self.events.push(event);
     }
 
@@ -65,6 +70,7 @@ impl EntityEventQueue {
 
     fn tidy_up(&mut self) {
         if std::mem::take(&mut self.needs_cleanup) {
+            // TODO only tidy up occasionally rather than every time e.g. when threshold is reached
             self.subscriptions.retain(|_, subs| !subs.is_empty());
         }
     }
@@ -73,10 +79,7 @@ impl EntityEventQueue {
         &mut self,
         mut f: impl FnMut(Entity, &EntityEvent) -> EventUnsubscribeResult,
     ) {
-        let grouped_events = self
-            .events
-            .iter()
-            .group_by(|EntityEvent(subject, _)| *subject);
+        let grouped_events = self.events.iter().group_by(|evt| evt.subject);
 
         for (subject, events) in grouped_events.into_iter() {
             // find subscribers interested in this subject entity
@@ -89,17 +92,18 @@ impl EntityEventQueue {
             };
 
             for event in events {
-                let payload = &event.1;
-
                 for subscriber in subscribers.iter().filter_map(|(subscriber, sub)| {
-                    if sub.1.matches(payload) {
+                    if sub.1.matches(&event.payload) {
                         Some(subscriber)
                     } else {
                         None
                     }
                 }) {
-                    if let EventUnsubscribeResult::UnsubscribeAll = f(*subscriber, event) {
-                        self.unsubscribers.push(*subscriber);
+                    // already subscribed, no more events pls
+                    if !self.unsubscribers.contains(subscriber) {
+                        if let EventUnsubscribeResult::UnsubscribeAll = f(*subscriber, event) {
+                            self.unsubscribers.insert(*subscriber);
+                        }
                     }
                 }
             }
@@ -118,5 +122,144 @@ impl EntityEventQueue {
 
         // cleanup from unsubscribing
         self.tidy_up()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ecs::WorldExt;
+    use crate::event::{EntityEventPayload, EntityEventType, EventSubscription};
+    use common::once;
+    use specs::Builder;
+    use unit::world::WorldPoint;
+
+    fn make_entities() -> (Entity, Entity) {
+        {
+            let mut w = crate::ecs::EcsWorld::new();
+            let a = w.create_entity().build();
+            let b = w.create_entity().build();
+            (a, b)
+        }
+    }
+
+    #[test]
+    fn subscription() {
+        let mut q = EntityEventQueue::default();
+        let (e1, e2) = make_entities();
+
+        let evt_1_arrived = EntityEvent {
+            subject: e1,
+            payload: EntityEventPayload::Arrived(WorldPoint::default()),
+        };
+
+        let evt_1_dummy = EntityEvent {
+            subject: e1,
+            payload: EntityEventPayload::Dummy,
+        };
+        let evt_2_dummy = EntityEvent {
+            subject: e2,
+            payload: EntityEventPayload::Dummy,
+        };
+
+        // no subs yet
+        q.post(evt_1_arrived.clone());
+        q.post(evt_1_dummy.clone());
+        q.handle_events(|_, _| panic!("no subs"));
+
+        // sub e2 to e1's arrival only
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Arrived),
+            )),
+        );
+
+        q.post(evt_1_arrived.clone());
+        q.post(evt_1_dummy.clone());
+        q.handle_events(|subscriber, e| {
+            assert_eq!(subscriber, e2);
+            assert_eq!(e.subject, e1);
+            assert!(matches!(e.payload, EntityEventPayload::Arrived(_)));
+            EventUnsubscribeResult::UnsubscribeAll
+        });
+
+        // subscribe to e1 all
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(e1, EventSubscription::All)),
+        );
+        q.post(evt_1_arrived.clone());
+        q.post(evt_1_dummy.clone());
+        q.post(evt_2_dummy.clone());
+        let mut arrival_done = false;
+        q.handle_events(|subscriber, e| {
+            assert_eq!(subscriber, e2);
+            assert_eq!(e.subject, e1);
+
+            match &e.payload {
+                EntityEventPayload::Arrived(_) => {
+                    assert!(!arrival_done);
+                    arrival_done = true;
+                }
+                EntityEventPayload::Dummy => {
+                    assert!(arrival_done);
+                }
+                _ => unreachable!(),
+            }
+
+            EventUnsubscribeResult::UnsubscribeAll
+        });
+    }
+
+    #[test]
+    fn repeated_subscriptions() {
+        let mut q = EntityEventQueue::default();
+        let (e1, e2) = make_entities();
+
+        let evt_1_arrived = EntityEvent {
+            subject: e1,
+            payload: EntityEventPayload::Arrived(WorldPoint::default()),
+        };
+
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Arrived),
+            )),
+        );
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Arrived),
+            )),
+        );
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Dummy),
+            )),
+        );
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(e1, EventSubscription::All)),
+        );
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(e1, EventSubscription::All)),
+        );
+
+        q.post(evt_1_arrived.clone());
+        let mut count = 0;
+        q.handle_events(|_, _| {
+            count += 1;
+            EventUnsubscribeResult::StaySubscribed
+        });
+
+        assert_eq!(count, 1);
     }
 }

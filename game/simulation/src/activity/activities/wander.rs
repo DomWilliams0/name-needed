@@ -1,0 +1,33 @@
+use crate::activity::activity::{ActivityResult, Finish, SubActivity};
+use crate::activity::subactivities::ThinkingSubActivity;
+use crate::activity::{Activity, ActivityContext};
+use crate::path::WanderComponent;
+use crate::ComponentWorld;
+use common::*;
+
+pub struct WanderActivity;
+// TODO move wander logic from wander system to wander activity
+
+impl<W: ComponentWorld> Activity<W> for WanderActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+        // add wander marker component
+        ctx.world.add_lazy(ctx.entity, WanderComponent);
+        ActivityResult::Blocked
+    }
+
+    fn on_finish(&mut self, _: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+        ctx.world.remove_lazy::<WanderComponent>(ctx.entity);
+        Ok(())
+    }
+
+    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+        // TODO wander subactivity
+        &ThinkingSubActivity
+    }
+}
+
+impl Display for WanderActivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Wandering aimlessly")
+    }
+}

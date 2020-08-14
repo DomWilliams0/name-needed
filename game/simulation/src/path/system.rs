@@ -97,7 +97,10 @@ impl<'a> System<'a> for PathSteeringSystem {
                         // TODO remove this
                         lazy_update.insert(e, ArrivedAtTargetEventComponent(target));
 
-                        event_queue.post(EntityEvent(e, EntityEventPayload::Arrived(target)));
+                        event_queue.post(EntityEvent {
+                            subject: e,
+                            payload: EntityEventPayload::Arrived(target),
+                        });
 
                         path.path = None;
                     }
@@ -178,6 +181,8 @@ impl Default for FollowPathComponent {
 }
 
 impl FollowPathComponent {
+    // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
+    // TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing
     pub fn new_path(&mut self, target: WorldPoint, goal: SearchGoal, speed: NormalizedFloat) {
         if let Some((old, _)) = self.new_target.replace((target, goal)) {
             warn!("follow path target was overwritten before it could be used (prev: {:?}, overwritten with: {:?})", old, target);

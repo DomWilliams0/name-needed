@@ -50,7 +50,7 @@ impl<'a> System<'a> for HungerSystem {
             // TODO individual metabolism rate
             // TODO compensate multipliers
             let metabolism = 1.0;
-            let fuel_used = BASE_METABOLISM * metabolism * activity.current.exertion();
+            let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
 
             debug_assert!(fuel_used.is_sign_positive());
             hunger.current_fuel -= fuel_used;

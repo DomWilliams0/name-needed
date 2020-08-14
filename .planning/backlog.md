@@ -42,6 +42,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
 * ai incentive to choose the same action as last tick
+* (sub)activities take an amount of ticks to complete
 
 ## World generation
 * biomes
@@ -107,9 +108,14 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * on panic in any thread, process should exit with backtrace
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
+* error context chaining would be useful
 
-## Data driven
+## Engine
 * explicit namespacing for entity definitions e.g. "core:food_apple"
+* structured logging with slog
+	* log to a file in /tmp too
+	* consider moving log sink/drain to another thread with async io
+	* `Entity`s can be formatted automatically by the drain, huzzah
 
 ## Entity diversity
 * animal species

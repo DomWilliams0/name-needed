@@ -1,5 +1,6 @@
 mod activities;
 mod activity;
+mod subactivities;
 mod system;
 
 pub use activities::*;
@@ -7,3 +8,31 @@ pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscri
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
 };
+
+mod action_to_activity {
+    use super::*;
+    use crate::activity::Activity;
+    use crate::ai::{AiAction, ItemsToPickUp};
+    use crate::ComponentWorld;
+
+    impl AiAction {
+        pub fn into_activity<W: ComponentWorld>(self, activity: &mut Box<dyn Activity<W>>) {
+            macro_rules! activity {
+                ($act:expr) => {
+                    Box::new($act) as Box<dyn Activity<W>>
+                };
+            }
+
+            *activity = match self {
+                AiAction::Nop => activity!(NopActivity),
+                // AiAction::Goto(pos) => activity!(GotoThenNop::new(pos)),
+                AiAction::GoPickUp(ItemsToPickUp(_, items)) => {
+                    // TODO itemfilter should specify a static string describing itself
+                    activity!(PickupItemsActivity::with_items(items, "iTeMs"))
+                }
+                AiAction::Wander => activity!(WanderActivity),
+                _ => todo!(),
+            }
+        }
+    }
+}

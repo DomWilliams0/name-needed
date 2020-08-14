@@ -24,7 +24,7 @@ pub struct ItemReference(pub SlotReference, pub Entity);
 #[derive(Debug, Clone, Copy)]
 pub struct LooseItemReference(pub ItemReference);
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, Clone)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub enum InventoryError {
     SlotOutOfRange,

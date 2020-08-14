@@ -1,4 +1,4 @@
-# TODOs (186)
+# TODOs (195)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -15,22 +15,29 @@
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
  * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (1)
-   * `// TODO`
+   * `// TODO detect other destructive events e.g. entity removal`
  * [game/simulation/src/activity/activities/nop.rs](game/simulation/src/activity/activities/nop.rs) (2)
    * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
    * `// TODO specify entity specifically, either Self or Other(e)`
- * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (3)
-   * `// TODO failure/interrupt reason`
+ * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (2)
+   * `// TODO move wander logic from wander system to wander activity`
+   * `// TODO wander subactivity`
+ * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
    * `// TODO can queuedupdates be removed from activity context`
-   * `0.5 // TODO get from current sub activity`
- * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
+ * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
+   * `// TODO itemfilter should specify a static string describing itself`
+ * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
+   * `// TODO clear path from followpath if it matches this path assignment token`
+   * `// TODO better exertion calculation for movement speed`
+ * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
+   * `// TODO pickup error should trigger event too`
+   * `// TODO exertion of picking up item depends on item weight`
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
-   * `// TODO use fancy bitmask magic to get both at once`
- * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
+ * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (4)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
    * `// TODO add ItemUseType which hints at which slot to use`
-   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
    * `// TODO get item name`
  * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
    * `// TODO failure/interrupt reason`
@@ -72,16 +79,21 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (7)
+ * [game/simulation/src/event/component.rs](game/simulation/src/event/component.rs) (2)
+   * `// TODO include path assignment token here`
+   * `// TODO Result for when path is aborted or invalided during navigation`
+ * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (8)
    * `// TODO derive perfect hash for event types`
    * `// TODO subscribe with event handler typeid to disallow dupes?`
    * `// TODO weak reference to subscribers`
+   * `// TODO use a bitmask for event subscription instead of a special case for all`
    * `// TODO ensure handler is not already subscribed`
    * `// TODO ideally we should be able to pass a reference here rather than a rc clone`
    * `// TODO intelligently shrink subscriber lists at some point to avoid monotonic increase in mem usage`
    * `// TODO try with no subs`
- * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (1)
+ * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
+   * `// TODO only tidy up occasionally rather than every time e.g. when threshold is reached`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
@@ -127,9 +139,11 @@
    * `// TODO only render the top area in each slice`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (2)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (4)
    * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
    * `// TODO remove this`
+   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
+   * `// TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)

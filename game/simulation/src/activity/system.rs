@@ -1,4 +1,6 @@
-use crate::activity::activity::{Activity, ActivityContext, ActivityResult, Finish};
+use crate::activity::activity::{
+    Activity, ActivityContext, ActivityEventContext, ActivityResult, Finish,
+};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
@@ -31,8 +33,8 @@ impl<'a> System<'a> for ActivitySystem {
         ReadStorage<'a, BlockingActivityComponent>,
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
-        Write<'a, QueuedUpdates>,
-        Write<'a, LazyUpdate>,
+        Read<'a, QueuedUpdates>,
+        Read<'a, LazyUpdate>,
         Write<'a, EntityEventQueue>,
     );
 
@@ -52,7 +54,9 @@ impl<'a> System<'a> for ActivitySystem {
 
             if let Some(new_action) = activity.new_activity.take() {
                 // interrupt current activity with new
-                activity.current.on_finish(Finish::Interrupted, &mut ctx);
+                if let Err(e) = activity.current.finish(Finish::Interrupted, &mut ctx) {
+                    error!("error interrupting activity '{}': {}", activity.current, e);
+                }
 
                 // replace current with new activity, dropping the old one
                 new_action.into_activity(&mut activity.current);
@@ -60,12 +64,8 @@ impl<'a> System<'a> for ActivitySystem {
 
             match activity.current.on_tick(&mut ctx) {
                 ActivityResult::Blocked => {
-                    assert!(
-                        !ctx.subscriptions.is_empty(),
-                        "blocking activity must subscribe to events"
-                    );
-
-                    // subscribe to requested events
+                    // subscribe to requested events if any. if no subscriptions are added, the only
+                    // way to unblock will be on activity end
                     event_queue.subscribe(entity, subscriptions.drain(..));
 
                     // mark activity as blocked
@@ -82,7 +82,9 @@ impl<'a> System<'a> for ActivitySystem {
                     );
 
                     // finish current and replace with nop
-                    activity.current.on_finish(finish, &mut ctx);
+                    if let Err(e) = activity.current.finish(finish, &mut ctx) {
+                        error!("error finishing activity '{}': {}", activity.current, e);
+                    }
                     activity.current = Box::new(NopActivity);
 
                     // next tick ai should return a new decision rather than unchanged to avoid
@@ -96,30 +98,29 @@ impl<'a> System<'a> for ActivitySystem {
 
 impl<'a> System<'a> for ActivityEventSystem {
     type SystemData = (
-        Read<'a, LazyUpdate>,
         Write<'a, EntityEventQueue>,
         WriteStorage<'a, ActivityComponent>,
-        ReadStorage<'a, BlockingActivityComponent>,
+        WriteStorage<'a, BlockingActivityComponent>,
     );
 
-    fn run(&mut self, (updates, mut events, mut activities, blocking): Self::SystemData) {
+    fn run(&mut self, (mut events, mut activities, mut blocking): Self::SystemData) {
         events.handle_events(|subscriber, event| {
-            // TODO use fancy bitmask magic to get both at once
             let activity = activities
                 .get_mut(subscriber)
                 .expect("subscriber must have activity component");
-            assert!(
-                blocking.get(subscriber).is_some(),
-                "subscriber must be in a blocked state"
-            );
 
             debug!("passing event to {:?} ({:?})", subscriber, event);
 
-            let (unblock, unsubscribe) = activity.current.on_event(event);
+            let ctx = ActivityEventContext { subscriber };
+
+            let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
 
             if let EventUnblockResult::Unblock = unblock {
-                updates.remove::<BlockingActivityComponent>(subscriber);
-                debug!("unblocking activity of {:?}", subscriber);
+                debug!(
+                    "unblocking activity of {:?} ({})",
+                    subscriber, activity.current
+                );
+                blocking.remove(subscriber);
             }
 
             unsubscribe
@@ -133,5 +134,11 @@ impl Default for ActivityComponent {
             current: Box::new(NopActivity),
             new_activity: None,
         }
+    }
+}
+
+impl ActivityComponent {
+    pub fn exertion(&self) -> f32 {
+        self.current.current_subactivity().exertion()
     }
 }

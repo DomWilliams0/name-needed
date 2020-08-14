@@ -30,14 +30,14 @@ pub struct Contents {
     slots: Box<[ItemSlot]>,
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, Clone)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ContentsGetError {
     SlotOutOfRange,
     BadOverflowState(#[error(not(source))] SlotIndex),
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, Clone)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ContentsPutError {
     SlotOutOfRange,

@@ -210,7 +210,6 @@ impl GoPickUpItemActivity {
                 .component_mut::<FollowPathComponent>(holder)
                 .map_err(|_| Box::new(PickupError::NoFollowPathComponent))?;
 
-            // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
             follow.new_path(target, SearchGoal::Arrive, NormalizedFloat::one());
 
             // attempt to pickup the item when close

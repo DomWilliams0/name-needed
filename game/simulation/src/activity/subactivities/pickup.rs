@@ -1,0 +1,57 @@
+use common::*;
+// use common::derive_more::Error;
+use crate::activity::activity::{ActivityResult, SubActivity};
+use crate::activity::ActivityContext;
+use crate::ecs::Entity;
+use crate::event::{EntityEventType, EventSubscription};
+use crate::item::PickupItemComponent;
+use crate::{BaseItemComponent, ComponentWorld, InventoryComponent, TransformComponent};
+
+#[derive(Clone, Debug)]
+pub struct PickupItemSubActivity(pub(crate) Entity);
+
+#[derive(Error, Debug)]
+pub enum PickupItemError {
+    #[error("Entity is not an item")]
+    NotAnItem,
+
+    #[error("Item has already been picked up")]
+    AlreadyPickedUp,
+
+    #[error("Picker-upper has no transform or inventory")]
+    InvalidPickerUpper,
+
+    #[error("Picker-upper is too far away from item (distance: {})", _0)]
+    TooFar(f32),
+}
+
+impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
+    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+        // picking up is done in another system, kick that off and wait on the result
+        ctx.world.add_lazy(ctx.entity, PickupItemComponent(self.0));
+
+        // TODO pickup error should trigger event too
+        ctx.subscribe_to(
+            self.0,
+            EventSubscription::Specific(EntityEventType::PickedUp),
+        );
+
+        ActivityResult::Blocked
+    }
+
+    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+        let _ = ctx.world.remove_lazy::<PickupItemComponent>(ctx.entity);
+        Ok(())
+    }
+
+    fn exertion(&self) -> f32 {
+        // TODO exertion of picking up item depends on item weight
+        0.2
+    }
+}
+
+impl Display for PickupItemSubActivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Picking up item")
+    }
+}

@@ -1,18 +1,25 @@
-use crate::activity::activity::{ActivityResult, Finish};
+use crate::activity::activity::{ActivityResult, Finish, SubActivity};
+use crate::activity::subactivities::ThinkingSubActivity;
 use crate::activity::{Activity, ActivityContext};
 use crate::ComponentWorld;
-use common::{derive_more::Display, warn};
+use common::{derive_more::Display, warn, BoxedResult};
 
 #[derive(Display)]
 #[display("Doing nothing")]
 pub struct NopActivity;
 
 impl<W: ComponentWorld> Activity<W> for NopActivity {
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) {}
-
     fn on_tick<'a>(&mut self, _: &'a mut ActivityContext<'_, W>) -> ActivityResult {
         warn!("ticking nop activity, possible infinite loop");
         ActivityResult::Ongoing
+    }
+
+    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+        Ok(())
+    }
+
+    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+        &ThinkingSubActivity
     }
 }
 
