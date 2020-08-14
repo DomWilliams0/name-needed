@@ -1,28 +1,33 @@
 use crate::activity::EventUnsubscribeResult;
 use crate::ecs::Entity;
 use crate::event::component::EntityEvent;
-use crate::event::EntityEventSubscription;
-use common::{Itertools, SmallVec};
+use crate::event::{
+    EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
+};
+use common::{num_traits::FromPrimitive, *};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+
+#[derive(Default)]
+struct BitSet(usize);
 
 // TODO event queue generic over event type
 pub struct EntityEventQueue {
     events: Vec<EntityEvent>,
-    unsubscribers: HashSet<Entity>,
+    unsubscribers: HashMap<Entity, Option<EntityEventSubscription>>,
 
     /// subject -> interested subscriber and his subscriptions
-    subscriptions: HashMap<Entity, SmallVec<[(Entity, EntityEventSubscription); 2]>>,
-    needs_cleanup: bool,
+    subscriptions: HashMap<Entity, SmallVec<[(Entity, BitSet); 2]>>,
+    needs_cleanup: u32,
 }
 
 impl Default for EntityEventQueue {
     fn default() -> Self {
         Self {
             events: Vec::with_capacity(512),
-            unsubscribers: HashSet::with_capacity(16),
+            unsubscribers: HashMap::with_capacity(64),
             subscriptions: HashMap::with_capacity(64),
-            needs_cleanup: false,
+            needs_cleanup: 0,
         }
     }
 }
@@ -37,22 +42,40 @@ impl EntityEventQueue {
             .group_by(|EntityEventSubscription(subject, _)| *subject)
             .into_iter()
             .for_each(|(subject, subscriptions)| {
-                let subscriptions = subscriptions.map(|sub| (subscriber, sub));
+                let subscriptions = subscriptions.map(|EntityEventSubscription(_, sub)| sub);
 
                 match self.subscriptions.entry(subject) {
                     Entry::Occupied(mut e) => {
                         let subs = e.get_mut();
-                        subs.extend(subscriptions);
+
+                        if let Some((_, bitset)) =
+                            subs.iter_mut().find(|(sub, _)| *sub == subscriber)
+                        {
+                            bitset.add_all(subscriptions);
+                        }
                     }
                     Entry::Vacant(e) => {
                         let subs = e.insert(SmallVec::new());
-                        subs.extend(subscriptions);
+                        let mut bitset = BitSet::default();
+                        bitset.add_all(subscriptions);
+
+                        subs.push((subscriber, bitset));
                     }
                 };
             });
 
-        for (subject, sub) in self.subscriptions.iter() {
-            common::info!("SUBJECT {} => {:#?}", crate::entity_pretty!(subject), sub);
+        // temporary logging
+        for (subject, subs) in self.subscriptions.iter() {
+            if !subs.is_empty() {
+                debug!(
+                    "subject {} has {} subscribers",
+                    crate::entity_pretty!(subject),
+                    subs.len()
+                );
+                for (subscriber, bitset) in subs {
+                    debug!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
+                }
+            }
         }
     }
 
@@ -62,16 +85,39 @@ impl EntityEventQueue {
     }
 
     pub fn unsubscribe_all(&mut self, subscriber: Entity) {
+        let mut removals = 0;
         self.subscriptions
             .values_mut()
-            .for_each(|subs| subs.retain(|(interested, _)| *interested == subscriber));
-        self.needs_cleanup = true;
+            .flat_map(|subs| subs.iter_mut())
+            .filter(|(interested, _)| *interested == subscriber)
+            .for_each(|(_, bitset)| {
+                bitset.clear();
+                removals += 1;
+            });
+
+        self.needs_cleanup += removals;
     }
 
-    fn tidy_up(&mut self) {
-        if std::mem::take(&mut self.needs_cleanup) {
-            // TODO only tidy up occasionally rather than every time e.g. when threshold is reached
-            self.subscriptions.retain(|_, subs| !subs.is_empty());
+    pub fn unsubscribe(&mut self, subscriber: Entity, unsubscription: EntityEventSubscription) {
+        let EntityEventSubscription(subject, sub) = unsubscription;
+        if let Some(subs) = self.subscriptions.get_mut(&subject) {
+            if let Some(idx) = subs.iter().position(|(e, _)| *e == subscriber) {
+                let (_, bitset) = unsafe { subs.get_unchecked_mut(idx) };
+                if bitset.remove(sub) {
+                    self.needs_cleanup += 1;
+                }
+            }
+        }
+    }
+
+    fn maintain(&mut self) {
+        // TODO track by game tick instead of just number of ops
+        if self.needs_cleanup > 500 {
+            self.needs_cleanup = 0;
+            self.subscriptions.retain(|_, subs| {
+                subs.retain(|(_, bitset)| !bitset.is_empty());
+                !subs.is_empty()
+            });
         }
     }
 
@@ -93,35 +139,132 @@ impl EntityEventQueue {
 
             for event in events {
                 for subscriber in subscribers.iter().filter_map(|(subscriber, sub)| {
-                    if sub.1.matches(&event.payload) {
+                    if sub.contains(&event.payload) {
                         Some(subscriber)
                     } else {
                         None
                     }
                 }) {
-                    // already subscribed, no more events pls
-                    if !self.unsubscribers.contains(subscriber) {
-                        if let EventUnsubscribeResult::UnsubscribeAll = f(*subscriber, event) {
-                            self.unsubscribers.insert(*subscriber);
-                        }
+                    let unsubscribed_already = self
+                        .unsubscribers
+                        .get(subscriber)
+                        .map(|unsub| match unsub {
+                            None => true, // unsub from all
+                            Some(sub) => sub.matches(event),
+                        })
+                        .unwrap_or(false);
+
+                    if unsubscribed_already {
+                        // already unsubscribed, no more events pls
+                        continue;
                     }
+
+                    let result = f(*subscriber, event);
+                    let unsubscription = match result {
+                        EventUnsubscribeResult::UnsubscribeAll => None,
+                        EventUnsubscribeResult::Unsubscribe(subs) => Some(subs),
+                        EventUnsubscribeResult::StaySubscribed => continue,
+                    };
+
+                    self.unsubscribers.insert(*subscriber, unsubscription);
                 }
             }
         }
 
         // handle unsubscriptions
         // need to swap vec out from self to be able to access self mutably
-        let unsubs = std::mem::take(&mut self.unsubscribers);
-        for unsubscriber in unsubs.iter().copied() {
-            self.unsubscribe_all(unsubscriber);
+        let mut unsubs = std::mem::take(&mut self.unsubscribers);
+        for (unsubscriber, unsubs) in unsubs.drain() {
+            match unsubs {
+                None => self.unsubscribe_all(unsubscriber),
+                Some(unsub) => self.unsubscribe(unsubscriber, unsub),
+            }
         }
         self.unsubscribers = unsubs;
-
-        self.unsubscribers.clear();
         self.events.clear();
 
-        // cleanup from unsubscribing
-        self.tidy_up()
+        self.maintain()
+    }
+}
+
+impl BitSet {
+    pub fn add(&mut self, subscription: EventSubscription) {
+        match subscription {
+            EventSubscription::Specific(evt) => self.0 |= 1 << (evt as usize),
+            EventSubscription::All => self.0 = usize::MAX,
+        }
+    }
+
+    pub fn add_all(&mut self, subscriptions: impl Iterator<Item = EventSubscription>) {
+        for sub in subscriptions {
+            let is_all = matches!(sub, EventSubscription::All);
+
+            self.add(sub);
+
+            if is_all {
+                // all further subs are a nop
+                break;
+            }
+        }
+    }
+
+    pub fn contains<E: Into<EntityEventType>>(&self, ty: E) -> bool {
+        self.contains_type(ty.into() as usize)
+    }
+
+    fn contains_type(&self, ordinal: usize) -> bool {
+        let bit = 1 << ordinal;
+        self.0 & bit != 0
+    }
+
+    pub fn clear(&mut self) {
+        self.0 = 0;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    /// Returns true if now is empty
+    pub fn remove(&mut self, unsubscription: EventSubscription) -> bool {
+        match unsubscription {
+            EventSubscription::All => {
+                self.clear();
+                true
+            }
+            EventSubscription::Specific(ty) => {
+                let bit = 1usize << ty as usize;
+                self.0 &= !bit;
+                self.is_empty()
+            }
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = EntityEventType> + '_ {
+        let bit_count = std::mem::size_of::<usize>() * 8;
+        (0..bit_count).filter_map(move |bit| {
+            if self.contains_type(bit) {
+                let ty = EntityEventType::from_usize(1 >> bit)
+                    .unwrap_or_else(|| panic!("invalid event type bit set {}", bit));
+                Some(ty)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl Debug for BitSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if self.0 == usize::MAX {
+            write!(f, "Bitset(ALL)")
+        } else {
+            write!(f, "Bitset(")?;
+            let mut list = f.debug_set();
+            list.entries(self.iter());
+            list.finish()?;
+            write!(f, ")")
+        }
     }
 }
 
@@ -193,24 +336,38 @@ mod tests {
         q.post(evt_1_arrived.clone());
         q.post(evt_1_dummy.clone());
         q.post(evt_2_dummy.clone());
-        let mut arrival_done = false;
+
+        let mut arrival = 0;
+        let mut dummy = 0;
         q.handle_events(|subscriber, e| {
             assert_eq!(subscriber, e2);
             assert_eq!(e.subject, e1);
 
             match &e.payload {
                 EntityEventPayload::Arrived(_) => {
-                    assert!(!arrival_done);
-                    arrival_done = true;
+                    arrival += 1;
                 }
                 EntityEventPayload::Dummy => {
-                    assert!(arrival_done);
+                    dummy += 1;
                 }
                 _ => unreachable!(),
             }
 
-            EventUnsubscribeResult::UnsubscribeAll
+            EventUnsubscribeResult::StaySubscribed
         });
+
+        assert_eq!(arrival, 1);
+        assert_eq!(dummy, 1);
+    }
+
+    fn count_events(q: &mut EntityEventQueue) -> usize {
+        let mut count = 0;
+        q.handle_events(|_, _| {
+            count += 1;
+            EventUnsubscribeResult::StaySubscribed
+        });
+
+        count
     }
 
     #[test]
@@ -254,12 +411,102 @@ mod tests {
         );
 
         q.post(evt_1_arrived.clone());
-        let mut count = 0;
-        q.handle_events(|_, _| {
-            count += 1;
-            EventUnsubscribeResult::StaySubscribed
-        });
+        assert_eq!(count_events(&mut q), 1);
+    }
 
-        assert_eq!(count, 1);
+    #[test]
+    fn unsubscribe() {
+        let mut q = EntityEventQueue::default();
+        let (e1, e2) = make_entities();
+
+        let count_events = |q: &mut EntityEventQueue| {
+            let evt_1_arrived = EntityEvent {
+                subject: e1,
+                payload: EntityEventPayload::Arrived(WorldPoint::default()),
+            };
+            let evt_1_dummy = EntityEvent {
+                subject: e1,
+                payload: EntityEventPayload::Dummy,
+            };
+            let evt_2_arrived = EntityEvent {
+                subject: e2,
+                payload: EntityEventPayload::Arrived(WorldPoint::default()),
+            };
+            let evt_2_dummy = EntityEvent {
+                subject: e2,
+                payload: EntityEventPayload::Dummy,
+            };
+
+            q.post(evt_1_arrived.clone());
+            q.post(evt_1_dummy.clone());
+            q.post(evt_2_arrived.clone());
+            q.post(evt_2_dummy.clone());
+
+            count_events(q)
+        };
+
+        // initially sub to all
+        q.subscribe(
+            e1,
+            once(EntityEventSubscription(e1, EventSubscription::All)),
+        );
+        q.subscribe(
+            e1,
+            once(EntityEventSubscription(e2, EventSubscription::All)),
+        );
+
+        assert_eq!(count_events(&mut q), 4);
+
+        // get rid of e1 subs manually
+        q.unsubscribe(
+            e1,
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Arrived)),
+        );
+        q.unsubscribe(
+            e1,
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+        );
+
+        // e2 has no subs, no effect
+        q.unsubscribe(
+            e2,
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+        );
+
+        // repeated unsub, no effect
+        q.unsubscribe(
+            e1,
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+        );
+        q.unsubscribe(
+            e1,
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+        );
+
+        // e2 events only
+        assert_eq!(count_events(&mut q), 2);
+
+        // resub manually
+        q.subscribe(
+            e1,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Arrived),
+            )),
+        );
+
+        // unsub from all e2
+        q.unsubscribe(e1, EntityEventSubscription(e2, EventSubscription::All));
+
+        assert_eq!(count_events(&mut q), 1);
+
+        // unsub from all
+        q.subscribe(
+            e1,
+            once(EntityEventSubscription(e2, EventSubscription::All)),
+        );
+
+        q.unsubscribe_all(e1);
+        assert_eq!(count_events(&mut q), 0);
     }
 }

@@ -9,5 +9,5 @@
 * [ ] add subactivty to activity component to calculate exertion() and display in ui
 * [ ] tests for event queue when complete
 * [ ] replace derive_more::Error with nicer thiserror
-* [ ] bitmask for event subscription, so All isn't a special case
+* [X] bitmask for event subscription, so All isn't a special case
 * [ ] assign opaque token to path assignments for future comparisons

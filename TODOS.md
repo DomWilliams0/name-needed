@@ -93,7 +93,7 @@
    * `// TODO try with no subs`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
-   * `// TODO only tidy up occasionally rather than every time e.g. when threshold is reached`
+   * `// TODO track by game tick instead of just number of ops`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)

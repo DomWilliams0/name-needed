@@ -2,6 +2,7 @@ use crate::ecs::*;
 use crate::event::pubsub::EventDispatcher;
 use crate::event::EventSubscription;
 use crate::item::PickupItemError;
+use common::{num_derive::FromPrimitive, num_traits};
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
 
@@ -12,7 +13,12 @@ pub struct EventsComponent {
 }
 
 #[derive(EnumDiscriminants, Clone, Debug)]
-#[strum_discriminants(name(EntityEventType), derive(Hash))]
+#[strum_discriminants(
+    name(EntityEventType),
+    derive(Hash, FromPrimitive),
+    num_traits = "num_traits",
+    repr(usize)
+)]
 #[non_exhaustive]
 pub enum EntityEventPayload {
     /// Completed path finding to target
@@ -36,3 +42,16 @@ pub struct EntityEvent {
 
 #[derive(Clone, Debug)]
 pub struct EntityEventSubscription(#[doc = "Subject"] pub Entity, pub EventSubscription);
+
+impl EntityEventSubscription {
+    pub fn matches(&self, event: &EntityEvent) -> bool {
+        if event.subject != self.0 {
+            return false;
+        }
+
+        match self.1 {
+            EventSubscription::All => true,
+            EventSubscription::Specific(ty) => EntityEventType::from(&event.payload) == ty,
+        }
+    }
+}

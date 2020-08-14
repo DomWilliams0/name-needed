@@ -10,6 +10,7 @@ pub use env_logger;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use log::*;
+pub use num_derive;
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
 pub use parse_display;

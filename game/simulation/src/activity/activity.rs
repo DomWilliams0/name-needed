@@ -24,6 +24,7 @@ pub enum EventUnblockResult {
 #[derive(Debug)]
 pub enum EventUnsubscribeResult {
     UnsubscribeAll,
+    Unsubscribe(EntityEventSubscription),
     StaySubscribed,
 }
 
