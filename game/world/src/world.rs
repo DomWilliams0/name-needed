@@ -429,6 +429,24 @@ impl World {
         None
     }
 
+    pub fn choose_random_accessible_block(
+        &self,
+        accessible_from: WorldPosition,
+        max_attempts: usize,
+    ) -> Option<WorldPosition> {
+        let src_area = match self.area(accessible_from) {
+            AreaLookup::Area(a) => a,
+            _ => return None,
+        };
+
+        (0..max_attempts)
+            .filter_map(|i| self.choose_random_walkable_block(max_attempts - i + 1))
+            .find(|pos| match self.area(*pos) {
+                AreaLookup::Area(area) => self.area_path_exists(src_area, area),
+                _ => false,
+            })
+    }
+
     pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {
         let block_pos = pos.into();
         let chunk_pos = ChunkPosition::from(block_pos);

@@ -1,7 +1,6 @@
 use common::derive_more::Constructor;
 use common::*;
 use unit::world::WorldPoint;
-use world::SearchGoal;
 
 use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish};
 use crate::ecs::{ComponentWorld, Entity};
@@ -210,7 +209,7 @@ impl GoPickUpItemActivity {
                 .component_mut::<FollowPathComponent>(holder)
                 .map_err(|_| Box::new(PickupError::NoFollowPathComponent))?;
 
-            follow.new_path(target, SearchGoal::Arrive, NormalizedFloat::one());
+            let _ = follow.new_path_to(target, NormalizedFloat::one());
 
             // attempt to pickup the item when close
             world.add_lazy(holder, PickupItemComponent(item));

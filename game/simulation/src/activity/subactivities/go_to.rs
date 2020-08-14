@@ -1,22 +1,33 @@
-use crate::activity::activity::{ActivityResult, Finish, SubActivity};
-use crate::activity::ActivityContext;
-use crate::event::{EntityEventType, EventSubscription};
-use crate::path::FollowPathComponent;
-use crate::ComponentWorld;
+use std::cell::Cell;
+
 use common::*;
 use unit::world::WorldPoint;
-use world::SearchGoal;
+
+use crate::activity::activity::{ActivityResult, SubActivity};
+use crate::activity::ActivityContext;
+use crate::event::{EntityEventType, EventSubscription};
+use crate::path::{FollowPathComponent, PathToken};
+use crate::ComponentWorld;
 
 /// Assigns path to navigate to given pos. Blocks on arrival event
 #[derive(Clone, Debug)]
 pub struct GoToSubActivity {
     target: WorldPoint,
     speed: NormalizedFloat,
+    token: Cell<Option<PathToken>>,
 }
 
 impl GoToSubActivity {
     pub fn new(target: WorldPoint, speed: NormalizedFloat) -> Self {
-        Self { target, speed }
+        Self {
+            target,
+            speed,
+            token: Cell::new(None),
+        }
+    }
+
+    pub fn token(&self) -> Option<PathToken> {
+        self.token.get()
     }
 }
 
@@ -31,7 +42,8 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         };
 
         // assign path
-        follow_path.new_path(self.target, SearchGoal::Arrive, self.speed);
+        let token = follow_path.new_path_to(self.target, self.speed);
+        self.token.set(Some(token));
 
         // await arrival
         ctx.subscribe_to(
@@ -43,7 +55,14 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
     }
 
     fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
-        // TODO clear path from followpath if it matches this path assignment token
+        // TODO helper on ctx to get component
+
+        if let Ok(comp) = ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {
+            let token = self.token();
+            if token.is_some() && comp.current_token() == token {
+                comp.clear_path();
+            }
+        }
         Ok(())
     }
 

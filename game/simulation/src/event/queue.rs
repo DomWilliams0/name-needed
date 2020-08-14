@@ -295,7 +295,6 @@ mod tests {
     use crate::event::{EntityEventPayload, EntityEventType, EventSubscription};
     use common::once;
     use specs::Builder;
-    use unit::world::WorldPoint;
 
     fn make_entities() -> (Entity, Entity) {
         {
@@ -311,40 +310,40 @@ mod tests {
         let mut q = EntityEventQueue::default();
         let (e1, e2) = make_entities();
 
-        let evt_1_arrived = EntityEvent {
+        let evt_1_dummy_a = EntityEvent {
             subject: e1,
-            payload: EntityEventPayload::Arrived(WorldPoint::default()),
+            payload: EntityEventPayload::DummyA,
         };
 
-        let evt_1_dummy = EntityEvent {
+        let evt_1_dummy_b = EntityEvent {
             subject: e1,
-            payload: EntityEventPayload::Dummy,
+            payload: EntityEventPayload::DummyB,
         };
-        let evt_2_dummy = EntityEvent {
+        let evt_2_dummy_b = EntityEvent {
             subject: e2,
-            payload: EntityEventPayload::Dummy,
+            payload: EntityEventPayload::DummyB,
         };
 
         // no subs yet
-        q.post(evt_1_arrived.clone());
-        q.post(evt_1_dummy.clone());
+        q.post(evt_1_dummy_a.clone());
+        q.post(evt_1_dummy_b.clone());
         q.handle_events(|_, _| panic!("no subs"));
 
-        // sub e2 to e1's arrival only
+        // sub e2 to e1's dummy A only
         q.subscribe(
             e2,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Arrived),
+                EventSubscription::Specific(EntityEventType::DummyA),
             )),
         );
 
-        q.post(evt_1_arrived.clone());
-        q.post(evt_1_dummy.clone());
+        q.post(evt_1_dummy_a.clone());
+        q.post(evt_1_dummy_b.clone());
         q.handle_events(|subscriber, e| {
             assert_eq!(subscriber, e2);
             assert_eq!(e.subject, e1);
-            assert!(matches!(e.payload, EntityEventPayload::Arrived(_)));
+            assert!(matches!(e.payload, EntityEventPayload::DummyA));
             EventUnsubscribeResult::UnsubscribeAll
         });
 
@@ -353,22 +352,22 @@ mod tests {
             e2,
             once(EntityEventSubscription(e1, EventSubscription::All)),
         );
-        q.post(evt_1_arrived.clone());
-        q.post(evt_1_dummy.clone());
-        q.post(evt_2_dummy.clone());
+        q.post(evt_1_dummy_a.clone());
+        q.post(evt_1_dummy_b.clone());
+        q.post(evt_2_dummy_b.clone());
 
-        let mut arrival = 0;
-        let mut dummy = 0;
+        let mut dummy_a = 0;
+        let mut dummy_b = 0;
         q.handle_events(|subscriber, e| {
             assert_eq!(subscriber, e2);
             assert_eq!(e.subject, e1);
 
             match &e.payload {
-                EntityEventPayload::Arrived(_) => {
-                    arrival += 1;
+                EntityEventPayload::DummyA => {
+                    dummy_a += 1;
                 }
-                EntityEventPayload::Dummy => {
-                    dummy += 1;
+                EntityEventPayload::DummyB => {
+                    dummy_b += 1;
                 }
                 _ => unreachable!(),
             }
@@ -376,8 +375,8 @@ mod tests {
             EventUnsubscribeResult::StaySubscribed
         });
 
-        assert_eq!(arrival, 1);
-        assert_eq!(dummy, 1);
+        assert_eq!(dummy_a, 1);
+        assert_eq!(dummy_b, 1);
     }
 
     fn count_events(q: &mut EntityEventQueue) -> usize {
@@ -395,30 +394,30 @@ mod tests {
         let mut q = EntityEventQueue::default();
         let (e1, e2) = make_entities();
 
-        let evt_1_arrived = EntityEvent {
+        let evt_1_dummy_a = EntityEvent {
             subject: e1,
-            payload: EntityEventPayload::Arrived(WorldPoint::default()),
+            payload: EntityEventPayload::DummyB,
         };
 
         q.subscribe(
             e2,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Arrived),
+                EventSubscription::Specific(EntityEventType::DummyA),
             )),
         );
         q.subscribe(
             e2,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Arrived),
+                EventSubscription::Specific(EntityEventType::DummyA),
             )),
         );
         q.subscribe(
             e2,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Dummy),
+                EventSubscription::Specific(EntityEventType::DummyB),
             )),
         );
         q.subscribe(
@@ -430,7 +429,7 @@ mod tests {
             once(EntityEventSubscription(e1, EventSubscription::All)),
         );
 
-        q.post(evt_1_arrived.clone());
+        q.post(evt_1_dummy_a.clone());
         assert_eq!(count_events(&mut q), 1);
     }
 
@@ -440,27 +439,27 @@ mod tests {
         let (e1, e2) = make_entities();
 
         let count_events = |q: &mut EntityEventQueue| {
-            let evt_1_arrived = EntityEvent {
+            let evt_1_dummy_a = EntityEvent {
                 subject: e1,
-                payload: EntityEventPayload::Arrived(WorldPoint::default()),
+                payload: EntityEventPayload::DummyA,
             };
-            let evt_1_dummy = EntityEvent {
+            let evt_1_dummy_b = EntityEvent {
                 subject: e1,
-                payload: EntityEventPayload::Dummy,
+                payload: EntityEventPayload::DummyB,
             };
-            let evt_2_arrived = EntityEvent {
+            let evt_2_dummy_a = EntityEvent {
                 subject: e2,
-                payload: EntityEventPayload::Arrived(WorldPoint::default()),
+                payload: EntityEventPayload::DummyA,
             };
-            let evt_2_dummy = EntityEvent {
+            let evt_2_dummy_b = EntityEvent {
                 subject: e2,
-                payload: EntityEventPayload::Dummy,
+                payload: EntityEventPayload::DummyB,
             };
 
-            q.post(evt_1_arrived.clone());
-            q.post(evt_1_dummy.clone());
-            q.post(evt_2_arrived.clone());
-            q.post(evt_2_dummy.clone());
+            q.post(evt_1_dummy_a.clone());
+            q.post(evt_1_dummy_b.clone());
+            q.post(evt_2_dummy_a.clone());
+            q.post(evt_2_dummy_b.clone());
 
             count_events(q)
         };
@@ -480,27 +479,27 @@ mod tests {
         // get rid of e1 subs manually
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Arrived)),
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyA)),
         );
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
         );
 
         // e2 has no subs, no effect
         q.unsubscribe(
             e2,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
         );
 
         // repeated unsub, no effect
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
         );
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::Dummy)),
+            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
         );
 
         // e2 events only
@@ -511,7 +510,7 @@ mod tests {
             e1,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Arrived),
+                EventSubscription::Specific(EntityEventType::DummyA),
             )),
         );
 
@@ -533,12 +532,12 @@ mod tests {
     #[test]
     fn is_subscription_actually_what_we_want() {
         let mut bitset = BitSet::default();
-        bitset.add(EventSubscription::Specific(EntityEventType::Dummy));
+        bitset.add(EventSubscription::Specific(EntityEventType::DummyB));
 
-        assert!(bitset.contains(EntityEventType::Dummy));
+        assert!(bitset.contains(EntityEventType::DummyB));
 
         let subs = bitset.iter().collect_vec();
-        assert_eq!(subs, vec![EntityEventType::Dummy]);
+        assert_eq!(subs, vec![EntityEventType::DummyB]);
     }
 
     #[test]
@@ -551,19 +550,19 @@ mod tests {
         let mut q = EntityEventQueue::default();
         let (e1, e2) = make_entities();
 
-        // both subscribe to e1 dummy event
+        // both subscribe to e1 dummy_b event
         q.subscribe(
             e1,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Dummy),
+                EventSubscription::Specific(EntityEventType::DummyB),
             )),
         );
         q.subscribe(
             e2,
             once(EntityEventSubscription(
                 e1,
-                EventSubscription::Specific(EntityEventType::Dummy),
+                EventSubscription::Specific(EntityEventType::DummyB),
             )),
         );
 
@@ -571,7 +570,7 @@ mod tests {
 
         q.post(EntityEvent {
             subject: e1,
-            payload: EntityEventPayload::Dummy,
+            payload: EntityEventPayload::DummyB,
         });
 
         let mut subs = Vec::with_capacity(2);

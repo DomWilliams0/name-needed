@@ -2,9 +2,11 @@ use crate::ecs::*;
 use crate::event::pubsub::EventDispatcher;
 use crate::event::EventSubscription;
 use crate::item::PickupItemError;
+use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
+use world::NavigationError;
 
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
@@ -21,10 +23,8 @@ pub struct EventsComponent {
 )]
 #[non_exhaustive]
 pub enum EntityEventPayload {
-    /// Completed path finding to target
-    // TODO include path assignment token here
-    // TODO Result for when path is aborted or invalided during navigation
-    Arrived(WorldPoint),
+    /// Path finding ended
+    Arrived(PathToken, Result<WorldPoint, NavigationError>),
 
     /// Item entity picked up by a holder
     /// (item, picker upper)
@@ -32,7 +32,11 @@ pub enum EntityEventPayload {
 
     #[doc(hidden)]
     #[cfg(test)]
-    Dummy,
+    DummyA,
+
+    #[doc(hidden)]
+    #[cfg(test)]
+    DummyB,
 }
 
 #[derive(Clone, Debug)]

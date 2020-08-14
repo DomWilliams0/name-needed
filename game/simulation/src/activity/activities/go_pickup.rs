@@ -9,7 +9,9 @@ use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 use crate::item::PickupItemError;
+use crate::path::FollowPathComponent;
 use crate::{ComponentWorld, TransformComponent};
+use world::NavigationError;
 
 #[derive(Debug)]
 enum PickupItemsState {
@@ -28,7 +30,7 @@ pub struct PickupItemsActivity {
 
 enum BestItem {
     Excellent {
-        index: usize,
+        // index: usize,
         item: Entity,
         pos: WorldPoint,
     },
@@ -37,7 +39,8 @@ enum BestItem {
 
 #[derive(Debug)]
 enum PickupFailure {
-    Error(PickupItemError),
+    PickupError(PickupItemError),
+    NavigationError(NavigationError),
     Other,
 }
 
@@ -81,13 +84,23 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         ctx: &ActivityEventContext,
     ) -> (EventUnblockResult, EventUnsubscribeResult) {
         match &event.payload {
-            EntityEventPayload::Arrived(_) => {
+            EntityEventPayload::Arrived(token, result) => {
                 debug_assert_eq!(event.subject, ctx.subscriber);
 
+                if let Err(e) = result {
+                    debug!("failed to navigate to item: {}", e);
+                    self.last_error = Some(PickupFailure::NavigationError(e.to_owned()));
+                    self.state = PickupItemsState::Undecided;
+                    return (
+                        EventUnblockResult::Unblock,
+                        EventUnsubscribeResult::UnsubscribeAll,
+                    );
+                }
+
                 // we have arrived at our item, change state and start the pickup in the next tick
-                match self.state {
-                    PickupItemsState::GoingTo(item, _) => {
-                        self.state = PickupItemsState::PickingUp(PickupItemSubActivity(item));
+                match &self.state {
+                    PickupItemsState::GoingTo(item, sub) if sub.token() == Some(*token) => {
+                        self.state = PickupItemsState::PickingUp(PickupItemSubActivity(*item));
 
                         // unsubscribe from our arrival but stay subscribed to item events
                         let unsubscribe = EntityEventSubscription(ctx.subscriber, EventSubscription::Specific(EntityEventType::Arrived));
@@ -120,7 +133,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
 
                         self.last_error = Some(if let Err(e) = err {
                             debug!("failed to pickup item: {}", e);
-                            PickupFailure::Error(e.to_owned())
+                            PickupFailure::PickupError(e.to_owned())
                         } else {
                             debug!("aborting item pickup");
                             PickupFailure::Other
@@ -147,7 +160,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         )
     }
 
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 
@@ -207,20 +220,17 @@ impl PickupItemsActivity {
 
                 // safety: index returned from rposition
                 let (item, pos) = unsafe { *self.items.get_unchecked(idx) };
-                BestItem::Excellent {
-                    index: idx,
-                    item,
-                    pos,
-                }
+                BestItem::Excellent { item, pos }
             }
 
             (None, Some(err)) => {
-                let err = match err {
-                    PickupFailure::Error(e) => e,
-                    PickupFailure::Other => PickupItemError::NoLongerAvailable,
+                let err: Box<dyn Error> = match err {
+                    PickupFailure::PickupError(e) => Box::new(e),
+                    PickupFailure::NavigationError(e) => Box::new(e),
+                    PickupFailure::Other => Box::new(PickupItemError::NoLongerAvailable),
                 };
 
-                BestItem::NoneLeft(Finish::Failure(Box::new(err)))
+                BestItem::NoneLeft(Finish::Failure(err))
             }
             (None, None) => BestItem::NoneLeft(Finish::Success),
         }

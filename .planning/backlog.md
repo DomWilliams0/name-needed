@@ -33,6 +33,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fast forward toggle
 	* update gameloop to allow changing TPS
 	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
+* add inventory to UI
 
 
 ## Entity behaviour

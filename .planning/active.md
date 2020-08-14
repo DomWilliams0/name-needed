@@ -2,6 +2,7 @@
 
 * [o] separate ActivitySystem from AiSystem
 * [O] refactor activities to block on specified events
+	* [ ] add back eating
 * [.] rework item pickup, remove pickup system
 * [ ] remove old unused activity system once replaced
 * [ ] remove arrivedattargeteventcomponent
@@ -10,6 +11,6 @@
 * [X] tests for event queue when complete
 * [ ] replace derive_more::Error with nicer thiserror
 * [X] bitmask for event subscription, so All isn't a special case
-* [ ] assign opaque token to path assignments for future comparisons
-* [ ] allow cancelling of path finding
+* [X] assign opaque token to path assignments for future comparisons
+* [X] allow cancelling of path finding
 * [ ] fix repetitive verbose event logging

@@ -95,6 +95,9 @@ impl<'a> System<'a> for ActivitySystem {
                     }
                     activity.current = Box::new(NopActivity);
 
+                    // ensure unblocked
+                    comp_updates.remove::<BlockingActivityComponent>(entity);
+
                     // next tick ai should return a new decision rather than unchanged to avoid
                     // infinite Nop loops
                     ai.clear_last_action();

@@ -49,7 +49,7 @@ impl<W: ComponentWorld, A: Activity<W> + GoingToActivity> Activity<W> for GotoTh
             // first time initialization: assign path target
             self.initialized = true;
             return if let Ok(c) = ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {
-                c.new_path(target, self.goal, self.speed);
+                let _ = c.new_path_with_goal(target, self.goal, self.speed);
                 ActivityResult::Ongoing
             } else {
                 on_missing_comp()

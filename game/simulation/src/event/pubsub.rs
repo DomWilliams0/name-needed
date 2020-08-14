@@ -140,7 +140,6 @@ mod tests {
     use std::cell::Cell;
 
     use super::*;
-    use unit::world::WorldPoint;
 
     #[test]
     fn pub_sub() {
@@ -150,7 +149,7 @@ mod tests {
         struct SpecificSub;
         impl EventSubscriber for SpecificSub {
             fn handle(&self, event: &EntityEventPayload) {
-                assert!(matches!(event, &EntityEventPayload::Arrived(_)));
+                assert!(matches!(event, &EntityEventPayload::DummyB));
             }
         }
 
@@ -172,11 +171,11 @@ mod tests {
         );
         dispatcher.subscribe(EventSubscription::All, any.clone());
 
-        dispatcher.publish(&EntityEventPayload::Arrived(WorldPoint::default()));
-        dispatcher.publish(&EntityEventPayload::Dummy);
+        dispatcher.publish(&EntityEventPayload::DummyB);
+        dispatcher.publish(&EntityEventPayload::DummyA);
 
         dispatcher.unsubscribe(EventSubscription::All, any.clone());
-        dispatcher.publish(&EntityEventPayload::Dummy);
+        dispatcher.publish(&EntityEventPayload::DummyA);
 
         assert_eq!(any.0.get(), 2);
     }

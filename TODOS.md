@@ -1,4 +1,4 @@
-# TODOs (194)
+# TODOs (192)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -27,7 +27,7 @@
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO itemfilter should specify a static string describing itself`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
-   * `// TODO clear path from followpath if it matches this path assignment token`
+   * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
@@ -78,9 +78,6 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/event/component.rs](game/simulation/src/event/component.rs) (2)
-   * `// TODO include path assignment token here`
-   * `// TODO Result for when path is aborted or invalided during navigation`
  * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (8)
    * `// TODO derive perfect hash for event types`
    * `// TODO subscribe with event handler typeid to disallow dupes?`
@@ -136,12 +133,13 @@
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
    * `// TODO only render the top area in each slice`
+ * [game/simulation/src/path/follow.rs](game/simulation/src/path/follow.rs) (1)
+   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (4)
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (3)
    * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
    * `// TODO remove this`
-   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
    * `// TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`

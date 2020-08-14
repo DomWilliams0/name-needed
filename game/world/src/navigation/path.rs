@@ -53,7 +53,7 @@ pub(crate) struct AreaPathNode {
     pub entry: Option<AreaNavEdge>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SearchGoal {
     /// Arrive exactly at the target
     Arrive,
