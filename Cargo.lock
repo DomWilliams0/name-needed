@@ -1236,7 +1236,6 @@ name = "metrics"
 version = "0.1.0"
 dependencies = [
  "log",
- "prometheus",
  "prometheus_exporter",
 ]
 
@@ -1632,35 +1631,28 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0575e258dab62268e7236d7307caa38848acbda7ec7ab87bd9093791e999d20"
+checksum = "dd0ced56dee39a6e960c15c74dc48849d614586db2eaada6497477af7c7811cd"
 dependencies = [
  "cfg-if",
  "fnv",
  "lazy_static",
- "protobuf",
  "spin",
  "thiserror",
 ]
 
 [[package]]
 name = "prometheus_exporter"
-version = "0.5.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "988e13ae22e7dfc6883e7dbe34c13ec70c141a822526b7b57b816dd63967b325"
+checksum = "4f36be1ddcfe923ea4c2e37e32bcab7dce61437e512925a0b5f5e7b739e9cd51"
 dependencies = [
  "crossbeam-channel 0.3.9",
  "hyper",
  "log",
  "prometheus",
 ]
-
-[[package]]
-name = "protobuf"
-version = "2.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d883f78645c21b7281d21305181aa1f4dd9e9363e7cf2566c93121552cff003e"
 
 [[package]]
 name = "quick-error"

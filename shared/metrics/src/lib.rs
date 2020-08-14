@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 pub type EntityId = u64;
 
-pub use prometheus;
+pub use prometheus_exporter::prometheus;
 
 #[macro_export]
 macro_rules! declare_entity_metric {
