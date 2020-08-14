@@ -2,11 +2,9 @@ use common::*;
 
 use crate::ComponentWorld;
 
-use crate::activity::NopActivity;
 use crate::ecs::Entity;
 use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
 use crate::queued_update::QueuedUpdates;
-use unit::world::WorldPoint;
 
 pub enum ActivityResult {
     Ongoing,

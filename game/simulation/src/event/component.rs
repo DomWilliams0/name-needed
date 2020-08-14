@@ -27,7 +27,8 @@ pub enum EntityEventPayload {
     Arrived(WorldPoint),
 
     /// Item entity picked up by a holder
-    PickedUp(Result<Entity, PickupItemError>),
+    /// (item, picker upper)
+    PickedUp(Result<(Entity, Entity), PickupItemError>),
 
     #[doc(hidden)]
     #[cfg(test)]

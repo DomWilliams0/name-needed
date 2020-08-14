@@ -1,4 +1,4 @@
-# TODOs (195)
+# TODOs (194)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -29,8 +29,7 @@
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
    * `// TODO clear path from followpath if it matches this path assignment token`
    * `// TODO better exertion calculation for movement speed`
- * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
-   * `// TODO pickup error should trigger event too`
+ * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`

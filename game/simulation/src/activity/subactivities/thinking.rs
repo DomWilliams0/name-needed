@@ -3,6 +3,7 @@ use crate::activity::ActivityContext;
 use crate::ComponentWorld;
 use common::*;
 
+/// Nop subactivity
 pub struct ThinkingSubActivity;
 
 impl<W: ComponentWorld> SubActivity<W> for ThinkingSubActivity {

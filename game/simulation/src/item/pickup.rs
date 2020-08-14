@@ -11,13 +11,13 @@ pub enum PickupItemError {
     #[error("Entity is not an item")]
     NotAnItem,
 
-    #[error("Item has already been picked up")]
-    AlreadyPickedUp,
+    #[error("Item is no longer available for picking up")]
+    NoLongerAvailable,
 
     #[error("Picker-upper has no inventory")]
     NoInventory,
 
-    #[error("Picker-upper couldn't pick up item")]
+    #[error("Picker-upper couldn't pick up item ({})", _0)]
     InventoryError(#[from] InventoryError),
 
     #[error("Picker-upper is too far away from item (distance: {})", _0)]
@@ -62,7 +62,7 @@ impl<'a> System<'a> for PickupItemSystem {
                 // entity should have a transform i.e. not be picked up
                 let item_transform = match transforms.get(item) {
                     Some(comp) => comp,
-                    None => return Err(PickupItemError::AlreadyPickedUp),
+                    None => return Err(PickupItemError::NoLongerAvailable),
                 };
 
                 // picker upper should have an inventory
@@ -102,13 +102,14 @@ impl<'a> System<'a> for PickupItemSystem {
                                 .map_err(PickupItemError::InventoryError)
                         });
 
-                    let event_payload = if result.is_ok() {
-                        let _ = world.remove_now::<TransformComponent>(item);
+                    let event_payload = match result {
+                        Ok(_) => {
+                            let _ = world.remove_now::<TransformComponent>(item);
 
-                        debug!("{:?} picked up item {:?}", holder, item);
-                        EntityEventPayload::PickedUp(Ok(item))
-                    } else {
-                        EntityEventPayload::PickedUp(Err(PickupItemError::NoInventory))
+                            debug!("{:?} picked up item {:?}", holder, item);
+                            EntityEventPayload::PickedUp(Ok((item, holder)))
+                        }
+                        Err(e) => EntityEventPayload::PickedUp(Err(e)),
                     };
 
                     // remove this component unconditionally

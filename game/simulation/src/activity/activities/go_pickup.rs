@@ -1,13 +1,15 @@
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
-use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity, ThinkingSubActivity};
-use crate::activity::{
-    Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult, NopActivity,
-};
-use crate::ecs::Entity;
-use crate::event::{EntityEvent, EntityEventPayload, EventSubscription};
-use crate::{ComponentWorld, TransformComponent};
 use common::*;
 use unit::world::WorldPoint;
+
+use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity, ThinkingSubActivity};
+use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
+use crate::ecs::Entity;
+use crate::event::{
+    EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
+};
+use crate::item::PickupItemError;
+use crate::{ComponentWorld, TransformComponent};
 
 #[derive(Debug)]
 enum PickupItemsState {
@@ -16,10 +18,27 @@ enum PickupItemsState {
     PickingUp(PickupItemSubActivity),
     Complete,
 }
+
 pub struct PickupItemsActivity {
     items: Vec<(Entity, WorldPoint)>,
     item_desc: &'static str,
     state: PickupItemsState,
+    last_error: Option<PickupFailure>,
+}
+
+enum BestItem {
+    Excellent {
+        index: usize,
+        item: Entity,
+        pos: WorldPoint,
+    },
+    NoneLeft(Finish),
+}
+
+#[derive(Debug)]
+enum PickupFailure {
+    Error(PickupItemError),
+    Other,
 }
 
 impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
@@ -28,19 +47,23 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         match &self.state {
             PickupItemsState::Undecided => {
                 // choose a new item to pickup
-                if let Some((_, (item, pos))) = self.best_item(ctx.world) {
-                    // go to the item
-                    let goto = GoToSubActivity::new(pos, NormalizedFloat::new(0.8));
-                    self.state = PickupItemsState::GoingTo(item, goto.clone());
+                match self.best_item(ctx.world) {
+                    BestItem::Excellent { item, pos, .. } => {
+                        // subscribe to anything happening to the item
+                        ctx.subscribe_to(item, EventSubscription::All);
 
-                    // subscribe to anything happening to the item too
-                    ctx.subscribe_to(item, EventSubscription::All);
+                        // go to the item and subscribe to arrival
+                        let goto = GoToSubActivity::new(pos, NormalizedFloat::new(0.8));
+                        let result = goto.init(ctx);
 
-                    goto.init(ctx)
-                } else {
-                    // no more items left, we're done
-                    debug_assert!(self.items.is_empty(), "should have exhausted all items");
-                    ActivityResult::Finished(Finish::Success)
+                        // update state
+                        self.state = PickupItemsState::GoingTo(item, goto);
+                        result
+                    }
+                    BestItem::NoneLeft(finish) => {
+                        // no more items left, we're done
+                        ActivityResult::Finished(finish)
+                    }
                 }
             }
             PickupItemsState::PickingUp(sub) => {
@@ -58,14 +81,20 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         ctx: &ActivityEventContext,
     ) -> (EventUnblockResult, EventUnsubscribeResult) {
         match &event.payload {
-            EntityEventPayload::Arrived(_) if event.subject == ctx.subscriber => {
+            EntityEventPayload::Arrived(_) => {
+                debug_assert_eq!(event.subject, ctx.subscriber);
+
                 // we have arrived at our item, change state and start the pickup in the next tick
                 match self.state {
                     PickupItemsState::GoingTo(item, _) => {
                         self.state = PickupItemsState::PickingUp(PickupItemSubActivity(item));
+
+                        // unsubscribe from our arrival but stay subscribed to item events
+                        let unsubscribe = EntityEventSubscription(ctx.subscriber, EventSubscription::Specific(EntityEventType::Arrived));
+
                         return (
                             EventUnblockResult::Unblock,
-                            EventUnsubscribeResult::UnsubscribeAll,
+                            EventUnsubscribeResult::Unsubscribe(unsubscribe),
                         );
                     }
                     ref e => unreachable!("should only receive arrival event while going to item, but is in state {:?}", e),
@@ -74,9 +103,11 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
             EntityEventPayload::PickedUp(result) => {
                 // our item has been picked up, who was it?
                 return match (&self.state, result) {
-                    (PickupItemsState::PickingUp(pickup), Ok(picked_up))
-                        if pickup.0 == *picked_up =>
+                    (PickupItemsState::PickingUp(pickup), Ok((item, picker_upper)))
+                        if *picker_upper == ctx.subscriber =>
                     {
+                        debug_assert_eq!(*item, pickup.0);
+
                         // oh hey it was us, pickup complete!
                         self.state = PickupItemsState::Complete;
                         (
@@ -84,8 +115,17 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                             EventUnsubscribeResult::UnsubscribeAll,
                         )
                     }
-                    _ => {
+                    (_, err) => {
                         // something else happened, rip to this attempt. try again next tick
+
+                        self.last_error = Some(if let Err(e) = err {
+                            debug!("failed to pickup item: {}", e);
+                            PickupFailure::Error(e.to_owned())
+                        } else {
+                            debug!("aborting item pickup");
+                            PickupFailure::Other
+                        });
+
                         // TODO detect other destructive events e.g. entity removal
                         self.state = PickupItemsState::Undecided;
                         (
@@ -126,12 +166,22 @@ impl PickupItemsActivity {
             items,
             item_desc: what,
             state: PickupItemsState::Undecided,
+            last_error: None,
         }
     }
 
-    fn best_item<W: ComponentWorld>(&mut self, world: &W) -> Option<(usize, (Entity, WorldPoint))> {
+    fn best_item<W: ComponentWorld>(&mut self, world: &W) -> BestItem {
         let voxel_ref = world.voxel_world();
         let voxel_world = voxel_ref.borrow();
+
+        let err = self.last_error.take();
+        if let Some(err) = err.as_ref() {
+            let last = self.items.pop();
+            debug!(
+                "removed last best item {:?} due to pickup failure: {:?}",
+                last, err
+            );
+        }
 
         // choose the best item that still exists
         let new_best_index = self.items.iter().rposition(|(item, known_pos)| {
@@ -150,14 +200,30 @@ impl PickupItemsActivity {
             }
         });
 
-        new_best_index.map(|idx| {
-            // any items after idx are to be discarded
-            self.items.truncate(idx + 1);
+        match (new_best_index, err) {
+            (Some(idx), _) => {
+                // any items after idx are to be discarded
+                self.items.truncate(idx + 1);
 
-            // safety: index returned from rposition
-            let item = unsafe { *self.items.get_unchecked(idx) };
-            (idx, item)
-        })
+                // safety: index returned from rposition
+                let (item, pos) = unsafe { *self.items.get_unchecked(idx) };
+                BestItem::Excellent {
+                    index: idx,
+                    item,
+                    pos,
+                }
+            }
+
+            (None, Some(err)) => {
+                let err = match err {
+                    PickupFailure::Error(e) => e,
+                    PickupFailure::Other => PickupItemError::NoLongerAvailable,
+                };
+
+                BestItem::NoneLeft(Finish::Failure(Box::new(err)))
+            }
+            (None, None) => BestItem::NoneLeft(Finish::Success),
+        }
     }
 }
 

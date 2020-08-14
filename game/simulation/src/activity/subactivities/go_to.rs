@@ -7,6 +7,7 @@ use common::*;
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
+/// Assigns path to navigate to given pos. Blocks on arrival event
 #[derive(Clone, Debug)]
 pub struct GoToSubActivity {
     target: WorldPoint,
@@ -41,7 +42,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         // TODO clear path from followpath if it matches this path assignment token
         Ok(())
     }

@@ -1,12 +1,10 @@
 use crate::activity::EventUnsubscribeResult;
 use crate::ecs::Entity;
 use crate::event::component::EntityEvent;
-use crate::event::{
-    EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
-};
+use crate::event::{EntityEventSubscription, EntityEventType, EventSubscription};
 use common::{num_traits::FromPrimitive, *};
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Default)]
 struct BitSet(usize);
@@ -47,36 +45,21 @@ impl EntityEventQueue {
                 match self.subscriptions.entry(subject) {
                     Entry::Occupied(mut e) => {
                         let subs = e.get_mut();
+                        let existing = subs.iter_mut().find(|(sub, _)| *sub == subscriber);
 
-                        if let Some((_, bitset)) =
-                            subs.iter_mut().find(|(sub, _)| *sub == subscriber)
-                        {
+                        if let Some((_, bitset)) = existing {
                             bitset.add_all(subscriptions);
+                        } else {
+                            let bitset = BitSet::with(subscriptions);
+                            subs.push((subscriber, bitset));
                         }
                     }
                     Entry::Vacant(e) => {
-                        let subs = e.insert(SmallVec::new());
-                        let mut bitset = BitSet::default();
-                        bitset.add_all(subscriptions);
-
-                        subs.push((subscriber, bitset));
+                        let bitset = BitSet::with(subscriptions);
+                        e.insert(smallvec![(subscriber, bitset)]);
                     }
                 };
             });
-
-        // temporary logging
-        for (subject, subs) in self.subscriptions.iter() {
-            if !subs.is_empty() {
-                debug!(
-                    "subject {} has {} subscribers",
-                    crate::entity_pretty!(subject),
-                    subs.len()
-                );
-                for (subscriber, bitset) in subs {
-                    debug!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
-                }
-            }
-        }
     }
 
     pub fn post(&mut self, event: EntityEvent) {
@@ -176,8 +159,21 @@ impl EntityEventQueue {
         let mut unsubs = std::mem::take(&mut self.unsubscribers);
         for (unsubscriber, unsubs) in unsubs.drain() {
             match unsubs {
-                None => self.unsubscribe_all(unsubscriber),
-                Some(unsub) => self.unsubscribe(unsubscriber, unsub),
+                None => {
+                    debug!(
+                        "unsubscribing {} from all subscriptions",
+                        crate::entity_pretty!(unsubscriber)
+                    );
+                    self.unsubscribe_all(unsubscriber)
+                }
+                Some(unsub) => {
+                    debug!(
+                        "unsubscribing {} from {:?}",
+                        crate::entity_pretty!(unsubscriber),
+                        unsub
+                    );
+                    self.unsubscribe(unsubscriber, unsub)
+                }
             }
         }
         self.unsubscribers = unsubs;
@@ -185,9 +181,33 @@ impl EntityEventQueue {
 
         self.maintain()
     }
+
+    pub fn log(&self) {
+        for (subject, subs) in self.subscriptions.iter() {
+            let count = subs.iter().filter(|(_, subs)| !subs.is_empty()).count();
+            if count > 0 {
+                debug!(
+                    "subject {} has {} subscribers",
+                    crate::entity_pretty!(subject),
+                    count,
+                );
+                for (subscriber, bitset) in subs {
+                    if !bitset.is_empty() {
+                        debug!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl BitSet {
+    pub fn with(subscriptions: impl Iterator<Item = EventSubscription>) -> Self {
+        let mut bits = Self::default();
+        bits.add_all(subscriptions);
+        bits
+    }
+
     pub fn add(&mut self, subscription: EventSubscription) {
         match subscription {
             EventSubscription::Specific(evt) => self.0 |= 1 << (evt as usize),
@@ -242,10 +262,10 @@ impl BitSet {
 
     fn iter(&self) -> impl Iterator<Item = EntityEventType> + '_ {
         let bit_count = std::mem::size_of::<usize>() * 8;
-        (0..bit_count).filter_map(move |bit| {
-            if self.contains_type(bit) {
-                let ty = EntityEventType::from_usize(1 >> bit)
-                    .unwrap_or_else(|| panic!("invalid event type bit set {}", bit));
+        (0..bit_count).filter_map(move |ord| {
+            if self.contains_type(ord) {
+                let ty = EntityEventType::from_usize(ord)
+                    .unwrap_or_else(|| panic!("invalid event type bit set {}", ord));
                 Some(ty)
             } else {
                 None
@@ -508,5 +528,58 @@ mod tests {
 
         q.unsubscribe_all(e1);
         assert_eq!(count_events(&mut q), 0);
+    }
+
+    #[test]
+    fn is_subscription_actually_what_we_want() {
+        let mut bitset = BitSet::default();
+        bitset.add(EventSubscription::Specific(EntityEventType::Dummy));
+
+        assert!(bitset.contains(EntityEventType::Dummy));
+
+        let subs = bitset.iter().collect_vec();
+        assert_eq!(subs, vec![EntityEventType::Dummy]);
+    }
+
+    #[test]
+    fn multiple_subscribers() {
+        let _ = env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+
+        let mut q = EntityEventQueue::default();
+        let (e1, e2) = make_entities();
+
+        // both subscribe to e1 dummy event
+        q.subscribe(
+            e1,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Dummy),
+            )),
+        );
+        q.subscribe(
+            e2,
+            once(EntityEventSubscription(
+                e1,
+                EventSubscription::Specific(EntityEventType::Dummy),
+            )),
+        );
+
+        q.log();
+
+        q.post(EntityEvent {
+            subject: e1,
+            payload: EntityEventPayload::Dummy,
+        });
+
+        let mut subs = Vec::with_capacity(2);
+        q.handle_events(|sub, _| {
+            subs.push(sub);
+            EventUnsubscribeResult::StaySubscribed
+        });
+
+        assert_eq!(subs.len(), 2);
     }
 }

@@ -11,3 +11,4 @@
 * [ ] replace derive_more::Error with nicer thiserror
 * [X] bitmask for event subscription, so All isn't a special case
 * [ ] assign opaque token to path assignments for future comparisons
+* [ ] allow cancelling of path finding

@@ -5,8 +5,9 @@ use crate::activity::ActivityContext;
 use crate::ecs::Entity;
 use crate::event::{EntityEventType, EventSubscription};
 use crate::item::PickupItemComponent;
-use crate::{BaseItemComponent, ComponentWorld, InventoryComponent, TransformComponent};
+use crate::ComponentWorld;
 
+/// Pick up the given item if close enough. Blocks on pick up event.
 #[derive(Clone, Debug)]
 pub struct PickupItemSubActivity(pub(crate) Entity);
 
@@ -30,7 +31,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         // picking up is done in another system, kick that off and wait on the result
         ctx.world.add_lazy(ctx.entity, PickupItemComponent(self.0));
 
-        // TODO pickup error should trigger event too
+        // subscribe to item pick up
         ctx.subscribe_to(
             self.0,
             EventSubscription::Specific(EntityEventType::PickedUp),

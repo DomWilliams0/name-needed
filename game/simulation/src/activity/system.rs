@@ -66,10 +66,18 @@ impl<'a> System<'a> for ActivitySystem {
                 ActivityResult::Blocked => {
                     // subscribe to requested events if any. if no subscriptions are added, the only
                     // way to unblock will be on activity end
+                    for sub in &subscriptions {
+                        debug!(
+                            "subscribing {} to events: {:?}",
+                            crate::entity_pretty!(entity),
+                            sub
+                        );
+                    }
                     event_queue.subscribe(entity, subscriptions.drain(..));
 
                     // mark activity as blocked
                     comp_updates.insert(entity, BlockingActivityComponent::default());
+                    debug!("blocking activity for {}", crate::entity_pretty!(entity));
                 }
 
                 ActivityResult::Ongoing => {
@@ -77,7 +85,7 @@ impl<'a> System<'a> for ActivitySystem {
                 }
                 ActivityResult::Finished(finish) => {
                     debug!(
-                        "finished activity with finish {:?}: '{}'. reverting to nop activity",
+                        "finished activity with '{:?}': '{}'. reverting to nop activity",
                         finish, activity.current
                     );
 
@@ -100,10 +108,10 @@ impl<'a> System<'a> for ActivityEventSystem {
     type SystemData = (
         Write<'a, EntityEventQueue>,
         WriteStorage<'a, ActivityComponent>,
-        WriteStorage<'a, BlockingActivityComponent>,
+        Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut events, mut activities, mut blocking): Self::SystemData) {
+    fn run(&mut self, (mut events, mut activities, updates): Self::SystemData) {
         events.handle_events(|subscriber, event| {
             let activity = activities
                 .get_mut(subscriber)
@@ -120,7 +128,7 @@ impl<'a> System<'a> for ActivityEventSystem {
                     "unblocking activity of {:?} ({})",
                     subscriber, activity.current
                 );
-                blocking.remove(subscriber);
+                updates.remove::<BlockingActivityComponent>(subscriber);
             }
 
             unsubscribe
