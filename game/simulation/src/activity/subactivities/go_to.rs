@@ -8,20 +8,27 @@ use crate::activity::ActivityContext;
 use crate::event::{EntityEventType, EventSubscription};
 use crate::path::{FollowPathComponent, PathToken};
 use crate::ComponentWorld;
+use world::SearchGoal;
 
 /// Assigns path to navigate to given pos. Blocks on arrival event
 #[derive(Clone, Debug)]
 pub struct GoToSubActivity {
     target: WorldPoint,
     speed: NormalizedFloat,
+    goal: SearchGoal,
     token: Cell<Option<PathToken>>,
 }
 
 impl GoToSubActivity {
     pub fn new(target: WorldPoint, speed: NormalizedFloat) -> Self {
+        Self::with_goal(target, speed, SearchGoal::Arrive)
+    }
+
+    pub fn with_goal(target: WorldPoint, speed: NormalizedFloat, goal: SearchGoal) -> Self {
         Self {
             target,
             speed,
+            goal,
             token: Cell::new(None),
         }
     }
@@ -42,7 +49,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         };
 
         // assign path
-        let token = follow_path.new_path_to(self.target, self.speed);
+        let token = follow_path.new_path_with_goal(self.target, self.goal, self.speed);
         self.token.set(Some(token));
 
         // await arrival

@@ -34,7 +34,7 @@ mod action_to_activity {
                 }
                 AiAction::Wander => activity!(WanderActivity),
                 AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::with_item(item)),
-                a => todo!("action {:?}", a),
+                AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
             }
         }
     }

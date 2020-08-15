@@ -33,7 +33,10 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
                     let _token =
                         path_follow.new_path_to(pos.centred(), NormalizedFloat::new(WANDER_SPEED));
                 } else {
-                    debug!("{:?}: failed to find wander path to random position", e,);
+                    warn!(
+                        "{:?}: failed to find wander path to random position from {}",
+                        e, transform.position
+                    );
                 }
             }
         }

@@ -21,3 +21,7 @@
 * [X] component world event posting helper
 * [ ] fix "unreachable" panic with many entities going for food, typical
 * [ ] unreserve interrupted society commands
+* [ ] allow ci build failures on nightly
+* [ ] bug: possible to get stuck in inaccessible position after breaking society blocks again
+	* possible SosComponent to move to an actually accessible adjacent block?
+* [ ] customisable nop activity

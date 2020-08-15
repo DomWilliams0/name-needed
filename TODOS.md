@@ -1,4 +1,4 @@
-# TODOs (199)
+# TODOs (204)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -14,6 +14,12 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
+ * [game/simulation/src/activity/activities/go_break_block.rs](game/simulation/src/activity/activities/go_break_block.rs) (5)
+   * `// TODO block breaking/world interacting should be done in a system`
+   * `// TODO get current held tool to determine how fast the block can be broken`
+   * `// TODO breaking blocks with your hand hurts!`
+   * `// TODO define proper scale/enum/consts for block and tool durability`
+   * `BreakBlockState::Breaking => &ThinkingSubActivity, // TODO customised nop activity`
  * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (1)
    * `// TODO detect other destructive events e.g. entity removal`
  * [game/simulation/src/activity/activities/go_to.rs](game/simulation/src/activity/activities/go_to.rs) (1)
