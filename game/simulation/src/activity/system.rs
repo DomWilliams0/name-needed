@@ -104,6 +104,8 @@ impl<'a> System<'a> for ActivitySystem {
                 }
             }
         }
+
+        event_queue.log();
     }
 }
 

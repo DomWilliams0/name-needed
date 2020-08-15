@@ -186,14 +186,14 @@ impl EntityEventQueue {
         for (subject, subs) in self.subscriptions.iter() {
             let count = subs.iter().filter(|(_, subs)| !subs.is_empty()).count();
             if count > 0 {
-                debug!(
+                trace!(
                     "subject {} has {} subscribers",
                     crate::entity_pretty!(subject),
                     count,
                 );
                 for (subscriber, bitset) in subs {
                     if !bitset.is_empty() {
-                        debug!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
+                        trace!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
                     }
                 }
             }
