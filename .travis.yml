@@ -20,7 +20,8 @@ env:
     SDL_DIR=SDL2-2.0.9
 os:
     - linux
-      # TODO windows and osx
+    - windows
+    # TODO try osx
 rust:
     - stable
     - nightly
@@ -29,7 +30,6 @@ jobs:
     allow_failures:
         - rust: nightly
 
-# sfml
 script: |
         export PATH=$PATH:/usr/local/lib &&
         env &&
