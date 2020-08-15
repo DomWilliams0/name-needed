@@ -24,4 +24,5 @@
 * [X] allow ci build failures on nightly
 * [ ] bug: possible to get stuck in inaccessible position after breaking society blocks again
 	* possible SosComponent to move to an actually accessible adjacent block?
-* [ ] customisable nop activity
+* [X] customisable nop activity
+* [ ] possible bug: they spend a lot of time between activities in Nop

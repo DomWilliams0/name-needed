@@ -2,13 +2,14 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
-use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity, ThinkingSubActivity};
+use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::ecs::Entity;
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 use crate::item::PickupItemError;
+use crate::nop_subactivity;
 
 use crate::{ComponentWorld, TransformComponent};
 use world::NavigationError;
@@ -171,7 +172,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         match &self.state {
             PickupItemsState::GoingTo(_, sub) => sub,
             PickupItemsState::PickingUp(sub) => sub,
-            PickupItemsState::Undecided => &ThinkingSubActivity,
+            PickupItemsState::Undecided => nop_subactivity!(),
         }
     }
 }

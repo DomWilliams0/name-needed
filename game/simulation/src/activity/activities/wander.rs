@@ -1,6 +1,6 @@
 use crate::activity::activity::{ActivityResult, Finish, SubActivity};
-use crate::activity::subactivities::ThinkingSubActivity;
 use crate::activity::{Activity, ActivityContext};
+use crate::nop_subactivity;
 use crate::path::WanderComponent;
 use crate::ComponentWorld;
 use common::*;
@@ -20,7 +20,7 @@ impl<W: ComponentWorld> Activity<W> for WanderActivity {
     }
 
     fn current_subactivity(&self) -> &dyn SubActivity<W> {
-        &ThinkingSubActivity
+        nop_subactivity!("Wandering", 0.2)
     }
 }
 

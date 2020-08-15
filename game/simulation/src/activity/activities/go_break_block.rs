@@ -1,7 +1,8 @@
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
-use crate::activity::subactivities::{GoToSubActivity, ThinkingSubActivity};
+use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
+use crate::nop_subactivity;
 use crate::ComponentWorld;
 use common::*;
 use unit::world::WorldPosition;
@@ -89,7 +90,7 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
     fn current_subactivity(&self) -> &dyn SubActivity<W> {
         match &self.state {
             BreakBlockState::Going(sub) => sub,
-            BreakBlockState::Breaking => &ThinkingSubActivity, // TODO customised nop activity
+            BreakBlockState::Breaking => nop_subactivity!("Breaking block", 1.2),
         }
     }
 }
