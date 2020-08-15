@@ -16,7 +16,7 @@
 * [X] assign opaque token to path assignments for future comparisons
 * [X] allow cancelling of path finding
 * [ ] fix repetitive verbose event logging
-* [ ] lite runner config
+* [X] lite runner config
 * [ ] definition validator separate bin
 * [X] component world event posting helper
 * [ ] fix "unreachable" panic with many entities going for food, typical

@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use common::*;
-use gameloop::{FrameAction, GameLoop};
 use simulation::input::UiCommand;
 use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
 
@@ -33,7 +32,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         }
 
         #[cfg(not(feature = "lite"))]
-        let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5)
+        let game_loop = gameloop::GameLoop::new(simulation::TICKS_PER_SECOND, 5)
             .expect("game loop initialization failed");
 
         loop {
@@ -44,8 +43,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             #[cfg(not(feature = "lite"))]
             for action in game_loop.actions() {
                 match action {
-                    FrameAction::Tick => self.tick(),
-                    FrameAction::Render { interpolation } => self.render(interpolation),
+                    gameloop::FrameAction::Tick => self.tick(),
+                    gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
                 }
             }
 

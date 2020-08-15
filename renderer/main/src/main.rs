@@ -65,7 +65,7 @@ fn do_main() -> BoxedResult<()> {
     // init logger
     env_logger::Builder::from_env(env_logger::Env::default().filter_or("NN_LOG", "info"))
         .target(env_logger::Target::Stdout)
-        .filter_module("hyper", LevelFilter::Info) // keep it down will you
+        .filter_module("hyper", LevelFilter::Info) // keep it down pls
         .filter_module("tokio_reactor", LevelFilter::Info)
         .filter_module("tokio_threadpool", LevelFilter::Info)
         .filter_module("mio", LevelFilter::Info)

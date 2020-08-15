@@ -1,6 +1,6 @@
 # TODOs (176)
  * [.travis.yml](.travis.yml) (1)
-   * `# TODO windows and osx`
+   * `# TODO try osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
    * `/// TODO pooled vec/slice rather than Vec each time`
    * `// TODO optimization: dont consider all considerations every time`

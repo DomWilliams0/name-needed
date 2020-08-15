@@ -23,7 +23,7 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
     }
 
     fn init(&self, _sim: &mut Simulation<R>) -> BoxedResult<()> {
-        // nop
+        // create no entities
         Ok(())
     }
 }

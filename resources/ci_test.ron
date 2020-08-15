@@ -1,24 +1,25 @@
 Config(
+    // irrelevant
     display: (
-        resolution: (1280, 720),
+        resolution: (0, 0),
         resizable: false,
-        camera_speed: 0.5,
+        camera_speed: 0.0,
         debug_physics: false,
         zoom: 1.0,
         initial_view_range: 5,
         nav_paths_by_default: false,
     ),
     world: (
-        // source: Preset(OneChunkWonder),
-        source: Generate (radius: 2, seed: Some(342879)),
+        // big random world
+        source: Generate (radius: 8, seed: None),
         worker_threads: None,
         generation_height_scale: 15.0,
     ),
     simulation: (
-        random_seed: Some(67853852415419),
-        random_count: 20,
+        random_seed: None,
+        random_count: 40,
         friction: 0.85,
         start_delay: 0,
-        food_count: 1,
+        food_count: 200,
      ),
 )
