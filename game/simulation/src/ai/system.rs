@@ -170,7 +170,7 @@ impl<'a> System<'a> for AiSystem {
                 trace!("activity: {:?}", action);
 
                 // pass on to activity system
-                activity.new_activity = Some(action);
+                activity.interrupt_with_new_activity(action, e, ecs_world);
 
                 if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve this so others can't try to do it too

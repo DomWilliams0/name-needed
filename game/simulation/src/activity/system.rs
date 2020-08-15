@@ -19,7 +19,7 @@ pub struct ActivityEventSystem;
 #[storage(DenseVecStorage)]
 pub struct ActivityComponent {
     pub current: Box<dyn Activity<EcsWorld>>,
-    pub new_activity: Option<AiAction>,
+    new_activity: Option<AiAction>,
 }
 
 #[derive(Component, Default)]
@@ -151,5 +151,17 @@ impl Default for ActivityComponent {
 impl ActivityComponent {
     pub fn exertion(&self) -> f32 {
         self.current.current_subactivity().exertion()
+    }
+
+    pub fn interrupt_with_new_activity(
+        &mut self,
+        action: AiAction,
+        me: Entity,
+        world: &impl ComponentWorld,
+    ) {
+        self.new_activity = Some(action);
+
+        // ensure unblocked
+        world.remove_lazy::<BlockingActivityComponent>(me);
     }
 }
