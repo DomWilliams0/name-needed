@@ -4,7 +4,7 @@ pub use component::{
     BaseItemComponent, EdibleItemComponent, ThrowableItemComponent, UsingItemComponent,
 };
 pub use condition::{ItemCondition, ItemConditionGrade};
-pub use pickup::{PickupItemComponent, PickupItemError, PickupItemSystem};
+pub use pickup::{ItemsToPickUp, PickupItemComponent, PickupItemError, PickupItemSystem};
 
 mod class;
 mod component;

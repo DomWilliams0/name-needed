@@ -28,11 +28,11 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
         // TODO add ItemUseType which hints at which slot to use
         let policy = BaseSlotPolicy::AlwaysDominant;
 
-        if !matches!(policy, BaseSlotPolicy::AlwaysDominant) {
-            if matches!(self.slot, SlotReference::Base(_)) {
-                // nothing to do, already equipped
-                return ActivityResult::Finished(Finish::Success);
-            }
+        if !matches!(policy, BaseSlotPolicy::AlwaysDominant)
+            && matches!(self.slot, SlotReference::Base(_))
+        {
+            // nothing to do, already equipped
+            return ActivityResult::Finished(Finish::Success);
         }
 
         let base_item = match ctx.world.component::<BaseItemComponent>(self.item) {
@@ -59,7 +59,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
                         .equip(slot, policy)
                         .map_err(EquipItemError::InventoryError)
                 })
-                .map(|slot| SlotReference::Base(slot));
+                .map(SlotReference::Base);
 
             world.post_event(EntityEvent {
                 subject: item,

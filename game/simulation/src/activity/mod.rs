@@ -14,7 +14,8 @@ pub use subactivities::{EquipItemError, UseHeldItemError};
 mod action_to_activity {
     use super::*;
     use crate::activity::Activity;
-    use crate::ai::{AiAction, ItemsToPickUp};
+    use crate::ai::AiAction;
+    use crate::item::ItemsToPickUp;
     use crate::ComponentWorld;
 
     impl AiAction {

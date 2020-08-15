@@ -37,7 +37,6 @@ pub struct ActivityContext<'a, W: ComponentWorld> {
     pub entity: Entity,
     /// Immutable getters only! Use lazy_updates for adding/removing components
     pub world: &'a W,
-    // TODO can queuedupdates be removed from activity context
     pub updates: &'a QueuedUpdates,
     pub subscriptions: &'a mut Vec<EntityEventSubscription>,
 }

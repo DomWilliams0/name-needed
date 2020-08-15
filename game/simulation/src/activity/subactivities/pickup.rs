@@ -11,21 +11,6 @@ use crate::ComponentWorld;
 #[derive(Clone, Debug)]
 pub struct PickupItemSubActivity(pub(crate) Entity);
 
-#[derive(Error, Debug)]
-pub enum PickupItemError {
-    #[error("Entity is not an item")]
-    NotAnItem,
-
-    #[error("Item has already been picked up")]
-    AlreadyPickedUp,
-
-    #[error("Picker-upper has no transform or inventory")]
-    InvalidPickerUpper,
-
-    #[error("Picker-upper is too far away from item (distance: {})", _0)]
-    TooFar(f32),
-}
-
 impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
     fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
         // picking up is done in another system, kick that off and wait on the result

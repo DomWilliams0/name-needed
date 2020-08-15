@@ -1,7 +1,7 @@
 use crate::activity::EventUnsubscribeResult;
 use crate::ecs::Entity;
-use crate::event::component::EntityEvent;
-use crate::event::{EntityEventSubscription, EntityEventType, EventSubscription};
+use crate::event::subscription::{EntityEvent, EventSubscription};
+use crate::event::{EntityEventSubscription, EntityEventType};
 use common::{num_traits::FromPrimitive, *};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -292,7 +292,7 @@ impl Debug for BitSet {
 mod tests {
     use super::*;
     use crate::ecs::WorldExt;
-    use crate::event::{EntityEventPayload, EntityEventType, EventSubscription};
+    use crate::event::{EntityEventPayload, EntityEventType};
     use common::once;
     use specs::Builder;
 

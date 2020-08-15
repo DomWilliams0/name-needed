@@ -1,8 +1,7 @@
 use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 
-use crate::ai::activity::AiAction;
 use crate::ai::consideration::ConstantConsideration;
-use crate::ai::AiContext;
+use crate::ai::{AiAction, AiContext};
 
 pub struct WanderDse;
 

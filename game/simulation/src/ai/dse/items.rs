@@ -1,11 +1,10 @@
 use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 
-use crate::ai::activity::{AiAction, ItemsToPickUp};
 use crate::ai::consideration::{
     FindLocalItemConsideration, HoldingItemConsideration, HungerConsideration,
 };
-use crate::ai::AiContext;
-use crate::item::{ItemClass, ItemFilter, LooseItemReference};
+use crate::ai::{AiAction, AiContext};
+use crate::item::{ItemClass, ItemFilter, ItemsToPickUp, LooseItemReference};
 use common::*;
 
 pub struct UseHeldFoodDse;

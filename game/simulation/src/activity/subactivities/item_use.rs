@@ -49,7 +49,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemUseSubActivity {
                 }
             };
 
-            let result = find_slot().and_then(|base_slot| {
+            let result = find_slot().map(|base_slot| {
                 if let Ok(Some(old)) = world.add_now(
                     holder,
                     UsingItemComponent {
@@ -60,8 +60,6 @@ impl<W: ComponentWorld> SubActivity<W> for ItemUseSubActivity {
                 ) {
                     warn!("overwriting previous item use: {:?}", old);
                 };
-
-                Ok(())
             });
 
             // only post event on error

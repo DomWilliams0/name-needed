@@ -1,13 +1,13 @@
 # Active tasks
 
 * [o] separate ActivitySystem from AiSystem
-* [O] refactor activities to block on specified events
+* [X] refactor activities to block on specified events
 	* [X] add back eating
-	* [o] divine orders
+	* [X] divine orders
 		* [X] remove divine completion system and component
 * [X] rework item pickup, remove pickup system
-* [ ] remove old unused activity system once replaced
-* [ ] remove arrivedattargeteventcomponent
+* [X] remove old unused activity system once replaced
+* [X] remove arrivedattargeteventcomponent
 * [X] allow event subscribers to subscribe to arbitrary entity events
 * [X] add subactivty to activity component to calculate exertion() and display in ui
 * [X] tests for event queue when complete

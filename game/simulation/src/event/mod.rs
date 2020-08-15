@@ -1,9 +1,7 @@
-mod component;
-mod pubsub;
 mod queue;
+mod subscription;
 
-pub use component::{
-    EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventsComponent,
-};
-pub use pubsub::{EventDispatcher, EventSubscriber, EventSubscription};
 pub use queue::EntityEventQueue;
+pub use subscription::{
+    EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
+};

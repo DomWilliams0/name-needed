@@ -1,10 +1,11 @@
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
-use crate::item::{BaseItemComponent, InventoryError};
+use crate::item::{BaseItemComponent, InventoryError, ItemFilter};
 use crate::queued_update::QueuedUpdates;
 use crate::{InventoryComponent, TransformComponent};
 use common::*;
 use std::collections::HashSet;
+use unit::world::WorldPoint;
 
 #[derive(Error, Debug, Clone)]
 pub enum PickupItemError {
@@ -23,6 +24,12 @@ pub enum PickupItemError {
     #[error("Picker-upper is too far away from item (distance: {})", _0)]
     TooFar(f32),
 }
+
+/// Newtype to compare GoPickupItem just by the filter and number of results.
+/// Items are in *reverse desirability order* - last is the most desirable, pop that
+/// and try the next last if that becomes unavailable
+#[derive(Debug, Clone)]
+pub struct ItemsToPickUp(pub ItemFilter, pub Vec<(Entity, WorldPoint)>);
 
 /// Pick up the given item entity if in range
 #[derive(Component, Debug)]
@@ -140,3 +147,11 @@ impl<'a> System<'a> for PickupItemSystem {
         }
     }
 }
+
+impl PartialEq for ItemsToPickUp {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1.len() == other.1.len()
+    }
+}
+
+impl Eq for ItemsToPickUp {}

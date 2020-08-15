@@ -5,14 +5,14 @@ pub use input::AiInput;
 pub use system::{AiComponent, AiSystem};
 use unit::world::WorldPoint;
 
-pub use crate::ai::activity::{AiAction, ItemsToPickUp};
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
+pub use action::AiAction;
 use world::WorldArea;
 
-mod activity;
+mod action;
 mod consideration;
 pub mod dse;
 mod input;

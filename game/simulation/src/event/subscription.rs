@@ -1,19 +1,11 @@
 use crate::activity::{EquipItemError, UseHeldItemError};
 use crate::ecs::*;
-use crate::event::pubsub::EventDispatcher;
-use crate::event::EventSubscription;
 use crate::item::{PickupItemError, SlotReference};
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
 use world::NavigationError;
-
-#[derive(Component, Default)]
-#[storage(DenseVecStorage)]
-pub struct EventsComponent {
-    pub dispatcher: EventDispatcher,
-}
 
 #[derive(EnumDiscriminants, Clone, Debug)]
 #[strum_discriminants(
@@ -50,6 +42,12 @@ pub enum EntityEventPayload {
 pub struct EntityEvent {
     pub subject: Entity,
     pub payload: EntityEventPayload,
+}
+
+#[derive(Clone, Debug)]
+pub enum EventSubscription {
+    All,
+    Specific(EntityEventType),
 }
 
 #[derive(Clone, Debug)]

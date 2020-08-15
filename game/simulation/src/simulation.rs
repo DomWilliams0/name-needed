@@ -26,8 +26,8 @@ use crate::movement::{
 };
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
-    ArrivedAtTargetEventComponent, FollowPathComponent, NavigationAreaDebugRenderer,
-    PathDebugRenderer, PathSteeringSystem, WanderComponent, WanderPathAssignmentSystem,
+    FollowPathComponent, NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem,
+    WanderComponent, WanderPathAssignmentSystem,
 };
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
@@ -376,7 +376,6 @@ pub fn register_components(world: &mut EcsWorld) {
     register!(DesiredMovementComponent);
     register!(MovementConfigComponent);
     register!(FollowPathComponent);
-    register!(ArrivedAtTargetEventComponent);
     register!(SteeringComponent);
     register!(DesiredMovementComponent);
     register!(WanderComponent);

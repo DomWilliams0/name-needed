@@ -1,4 +1,4 @@
-# TODOs (200)
+# TODOs (176)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -25,8 +25,6 @@
    * `// TODO reason specification should be type level and used everywhere. ties into localization`
  * [game/simulation/src/activity/activities/use_held_item.rs](game/simulation/src/activity/activities/use_held_item.rs) (1)
    * `// TODO str to describe item, and pass through to subactivities`
- * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
-   * `// TODO can queuedupdates be removed from activity context`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
    * `// TODO move subactivity errors somewhere else`
    * `// TODO itemfilter should specify a static string describing itself`
@@ -43,25 +41,8 @@
    * `// TODO exertion of picking up item depends on item weight`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
- * [game/simulation/src/ai/activity/action.rs](game/simulation/src/ai/activity/action.rs) (1)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
- * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (4)
-   * `// TODO proper exertion calculation for item use`
-   * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
-   * `// TODO add ItemUseType which hints at which slot to use`
-   * `// TODO get item name`
- * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
-   * `// TODO failure/interrupt reason`
- * [game/simulation/src/ai/activity/movement.rs](game/simulation/src/ai/activity/movement.rs) (3)
-   * `// TODO exertion depends on speed`
-   * `// TODO wander *activity* exertion should be 0, but added to the exertion of walking at X speed`
-   * `// TODO remove WANDER_SPEED constant when this is done`
- * [game/simulation/src/ai/activity/world.rs](game/simulation/src/ai/activity/world.rs) (5)
-   * `// TODO get block type we're about to break, and equip the best tool for it`
-   * `// TODO get current held tool to determine how fast the block can be broken`
-   * `// TODO breaking blocks with your hand hurts!`
-   * `// TODO define proper scale/enum/consts for block and tool durability`
-   * `// TODO exertion depends on the tool and block`
  * [game/simulation/src/ai/dse/items.rs](game/simulation/src/ai/dse/items.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
@@ -90,15 +71,6 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/event/pubsub.rs](game/simulation/src/event/pubsub.rs) (8)
-   * `// TODO derive perfect hash for event types`
-   * `// TODO subscribe with event handler typeid to disallow dupes?`
-   * `// TODO weak reference to subscribers`
-   * `// TODO use a bitmask for event subscription instead of a special case for all`
-   * `// TODO ensure handler is not already subscribed`
-   * `// TODO ideally we should be able to pass a reference here rather than a rc clone`
-   * `// TODO intelligently shrink subscriber lists at some point to avoid monotonic increase in mem usage`
-   * `// TODO try with no subs`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
@@ -149,9 +121,7 @@
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (3)
-   * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
-   * `// TODO remove this`
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
    * `// TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`

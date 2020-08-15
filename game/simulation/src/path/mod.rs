@@ -1,7 +1,5 @@
 pub use debug::{NavigationAreaDebugRenderer, PathDebugRenderer};
-pub use system::{
-    ArrivedAtTargetEventComponent, FollowPathComponent, PathSteeringSystem, PathToken,
-};
+pub use system::{FollowPathComponent, PathSteeringSystem, PathToken};
 pub use wander::{WanderComponent, WanderPathAssignmentSystem};
 
 mod debug;

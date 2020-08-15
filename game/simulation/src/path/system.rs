@@ -30,17 +30,10 @@ pub struct PathToken(u64);
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
 
-/// Event component to indicate arrival at the given target position
-/// TODO should be an enum and represent interruption too, i.e. path was invalidated
-#[derive(Component, Default)]
-#[storage(HashMapStorage)]
-pub struct ArrivedAtTargetEventComponent(pub WorldPoint);
-
 impl<'a> System<'a> for PathSteeringSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, WorldRef>,
-        Read<'a, LazyUpdate>,
         Write<'a, EntityEventQueue>,
         WriteStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
@@ -49,7 +42,7 @@ impl<'a> System<'a> for PathSteeringSystem {
 
     fn run(
         &mut self,
-        (entities, world, lazy_update, mut event_queue, mut transform, mut path, mut steer): Self::SystemData,
+        (entities, world, mut event_queue, mut transform, mut path, mut steer): Self::SystemData,
     ) {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
@@ -116,10 +109,6 @@ impl<'a> System<'a> for PathSteeringSystem {
                     None => {
                         let target = path.target().unwrap();
                         trace!("{:?}: path finished, arrived at {}", e, target);
-
-                        // indicate arrival to other systems
-                        // TODO remove this
-                        lazy_update.insert(e, ArrivedAtTargetEventComponent(target));
 
                         let token = path.current_token.take().expect("should have token");
                         event_queue.post(EntityEvent {

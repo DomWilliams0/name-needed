@@ -1,8 +1,6 @@
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::ai::activity::ItemsToPickUp;
-
-use crate::item::LooseItemReference;
+use crate::item::{ItemsToPickUp, LooseItemReference};
 
 // TODO speed should be specified as an enum for all go??? actions
 
