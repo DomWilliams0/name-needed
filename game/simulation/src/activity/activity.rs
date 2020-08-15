@@ -56,7 +56,7 @@ pub trait Activity<W: ComponentWorld>: Display {
         ctx: &ActivityEventContext,
     ) -> (EventUnblockResult, EventUnsubscribeResult) {
         // must be subscribed to an event to get here
-        unreachable!()
+        unreachable!("unexpected event {:?}", event);
     }
 
     fn on_finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;

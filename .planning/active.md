@@ -1,9 +1,10 @@
 # Active tasks
 
 * [o] separate ActivitySystem from AiSystem
-* [o] refactor activities to block on specified events
+* [O] refactor activities to block on specified events
 	* [X] add back eating
-	* [ ] divine orders
+	* [o] divine orders
+		* [X] remove divine completion system and component
 * [X] rework item pickup, remove pickup system
 * [ ] remove old unused activity system once replaced
 * [ ] remove arrivedattargeteventcomponent
@@ -19,3 +20,4 @@
 * [ ] definition validator separate bin
 * [X] component world event posting helper
 * [ ] fix "unreachable" panic with many entities going for food, typical
+* [ ] unreserve interrupted society commands

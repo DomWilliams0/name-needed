@@ -54,7 +54,7 @@ impl<W: ComponentWorld + 'static> From<AiAction> for AiBox<dyn Activity<W>> {
                 activity!(GoPickUpItemActivity::new(items))
             }
             AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::new(item)),
-            AiAction::Goto(target) => activity!(movement::goto::<W>(target)),
+            AiAction::Goto { target, .. } => activity!(movement::goto::<W>(target)),
             AiAction::GoBreakBlock(block) => activity!(BreakBlockActivity::new(block)),
         }
     }

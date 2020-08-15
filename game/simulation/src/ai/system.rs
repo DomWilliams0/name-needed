@@ -23,8 +23,7 @@ use world::WorldRef;
 #[storage(DenseVecStorage)]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
-    // last_completed_action: Option<AiAction>,
-    // current_action: Option<AiAction>,
+    current: Option<(DecisionSource<AiContext>, AiAction)>,
 }
 
 impl AiComponent {
@@ -35,8 +34,7 @@ impl AiComponent {
 
         Self {
             intelligence,
-            // last_completed_action: None,
-            // current_action: None,
+            current: None,
         }
     }
 
@@ -170,7 +168,22 @@ impl<'a> System<'a> for AiSystem {
                 trace!("activity: {:?}", action);
 
                 // pass on to activity system
-                activity.interrupt_with_new_activity(action, e, ecs_world);
+                activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
+
+                // register interruption
+                if let Some((interrupted_source, _)) = ai.current.take() {
+                    match interrupted_source {
+                        DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
+                            // divine command interrupted, assume completed
+                            debug!("removing interrupted divine command");
+                            ai.remove_divine_command();
+                        }
+                        DecisionSource::Stream(_) => {
+                            // TODO unreserve interrupted society task
+                        }
+                        _ => {}
+                    }
+                }
 
                 if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve this so others can't try to do it too
@@ -181,6 +194,8 @@ impl<'a> System<'a> for AiSystem {
                     let task = &extra_dses[i].0;
                     society.jobs_mut().reserve_task(e, task.clone());
                 }
+
+                ai.current = Some((src, action));
             }
         }
     }

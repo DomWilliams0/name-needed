@@ -10,12 +10,10 @@ use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
-pub use dev::{DivineCommandCompletionSystem, DivineCommandComponent};
 use world::WorldArea;
 
 mod activity;
 mod consideration;
-mod dev;
 pub mod dse;
 mod input;
 mod system;

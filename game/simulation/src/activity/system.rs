@@ -139,15 +139,6 @@ impl<'a> System<'a> for ActivityEventSystem {
     }
 }
 
-impl Default for ActivityComponent {
-    fn default() -> Self {
-        Self {
-            current: Box::new(NopActivity),
-            new_activity: None,
-        }
-    }
-}
-
 impl ActivityComponent {
     pub fn exertion(&self) -> f32 {
         self.current.current_subactivity().exertion()
@@ -163,5 +154,14 @@ impl ActivityComponent {
 
         // ensure unblocked
         world.remove_lazy::<BlockingActivityComponent>(me);
+    }
+}
+
+impl Default for ActivityComponent {
+    fn default() -> Self {
+        Self {
+            current: Box::new(NopActivity),
+            new_activity: None,
+        }
     }
 }

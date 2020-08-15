@@ -9,9 +9,7 @@ use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTer
 use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
 
 use crate::activity::ActivityComponent;
-use crate::ai::{
-    AiAction, AiComponent, AiSystem, DivineCommandCompletionSystem, DivineCommandComponent,
-};
+use crate::ai::{AiAction, AiComponent, AiSystem};
 use crate::definitions;
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
@@ -177,9 +175,6 @@ impl<R: Renderer> Simulation<R> {
         // pick up items
         PickupItemSystem.run_now(&self.ecs_world);
 
-        // remove completed divine commands
-        DivineCommandCompletionSystem.run_now(&self.ecs_world);
-
         // process entity events
         ActivityEventSystem.run_now(&self.ecs_world);
 
@@ -268,7 +263,10 @@ impl<R: Renderer> Simulation<R> {
                     };
 
                     let command = match divine_command {
-                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
+                        DivineInputCommand::Goto(pos) => AiAction::Goto {
+                            target: pos.centred(),
+                            reason: "I said so",
+                        },
                         DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos.below()),
                     };
 
@@ -277,10 +275,6 @@ impl<R: Renderer> Simulation<R> {
                         Ok(ai) => {
                             // add DSE
                             ai.add_divine_command(command.clone());
-
-                            // add component for tracking completion
-                            self.ecs_world
-                                .add_lazy(entity, DivineCommandComponent(command));
                         }
                     }
                 }
@@ -404,9 +398,6 @@ pub fn register_components(world: &mut EcsWorld) {
 
     // input
     register!(SelectedComponent);
-
-    // dev
-    register!(DivineCommandComponent);
 }
 
 fn register_resources(world: &mut EcsWorld) {

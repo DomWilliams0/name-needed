@@ -27,7 +27,7 @@ mod action_to_activity {
 
             *activity = match self {
                 AiAction::Nop => activity!(NopActivity),
-                // AiAction::Goto(pos) => activity!(GotoThenNop::new(pos)),
+                AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
                 AiAction::GoPickUp(ItemsToPickUp(_, items)) => {
                     // TODO itemfilter should specify a static string describing itself
                     activity!(PickupItemsActivity::with_items(items, "iTeMs"))

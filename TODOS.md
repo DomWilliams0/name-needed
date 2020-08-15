@@ -1,4 +1,4 @@
-# TODOs (197)
+# TODOs (199)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -16,13 +16,13 @@
    * `// TODO generate lower res noise and scale up`
  * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (1)
    * `// TODO detect other destructive events e.g. entity removal`
+ * [game/simulation/src/activity/activities/go_to.rs](game/simulation/src/activity/activities/go_to.rs) (1)
+   * `// TODO reason specification should be type level and used everywhere. ties into localization`
  * [game/simulation/src/activity/activities/nop.rs](game/simulation/src/activity/activities/nop.rs) (2)
    * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
    * `// TODO specify entity specifically, either Self or Other(e)`
  * [game/simulation/src/activity/activities/use_held_item.rs](game/simulation/src/activity/activities/use_held_item.rs) (1)
    * `// TODO str to describe item, and pass through to subactivities`
- * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
-   * `// TODO wander subactivity`
  * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
    * `// TODO can queuedupdates be removed from activity context`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
@@ -41,6 +41,8 @@
    * `// TODO exertion of picking up item depends on item weight`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
+ * [game/simulation/src/ai/activity/action.rs](game/simulation/src/ai/activity/action.rs) (1)
+   * `// TODO speed should be specified as an enum for all go??? actions`
  * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (4)
    * `// TODO proper exertion calculation for item use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
@@ -71,11 +73,12 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (4)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations?`
+   * `// TODO unreserve interrupted society task`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
    * `// TODO remove abstract definitions`
  * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)

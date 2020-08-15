@@ -20,7 +20,6 @@ impl<W: ComponentWorld> Activity<W> for WanderActivity {
     }
 
     fn current_subactivity(&self) -> &dyn SubActivity<W> {
-        // TODO wander subactivity
         &ThinkingSubActivity
     }
 }
