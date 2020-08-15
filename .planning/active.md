@@ -20,7 +20,7 @@
 * [ ] definition validator separate bin
 * [X] component world event posting helper
 * [ ] fix "unreachable" panic with many entities going for food, typical
-* [ ] unreserve interrupted society commands
+* [X] unreserve interrupted society commands
 * [X] allow ci build failures on nightly
 * [ ] bug: possible to get stuck in inaccessible position after breaking society blocks again
 	* possible SosComponent to move to an actually accessible adjacent block?

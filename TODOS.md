@@ -1,4 +1,4 @@
-# TODOs (201)
+# TODOs (200)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -75,12 +75,11 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (4)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations?`
-   * `// TODO unreserve interrupted society task`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
    * `// TODO remove abstract definitions`
  * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)

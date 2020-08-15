@@ -111,4 +111,12 @@ impl JobList {
             (None, _) => debug!("reserved task {:?} for {:?}", task, entity),
         };
     }
+
+    pub fn unreserve_task(&mut self, entity: Entity) {
+        if let Some(task) = self.reserved.unreserve(entity) {
+            debug!("unreserved task {:?} from {:?}", task, entity)
+        } else {
+            debug!("no task to unreserve for {:?}", entity);
+        }
+    }
 }

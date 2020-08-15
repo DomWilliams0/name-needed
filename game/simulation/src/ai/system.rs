@@ -179,7 +179,12 @@ impl<'a> System<'a> for AiSystem {
                             ai.remove_divine_command();
                         }
                         DecisionSource::Stream(_) => {
-                            // TODO unreserve interrupted society task
+                            // unreserve interrupted society task
+                            let society = society
+                                .as_mut()
+                                .expect("streamed DSEs expected to come from a society only");
+
+                            society.jobs_mut().unreserve_task(e);
                         }
                         _ => {}
                     }
