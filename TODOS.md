@@ -1,4 +1,4 @@
-# TODOs (192)
+# TODOs (197)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -19,16 +19,24 @@
  * [game/simulation/src/activity/activities/nop.rs](game/simulation/src/activity/activities/nop.rs) (2)
    * `// TODO remove path here? or is it up to the new activity to cancel path finding if it wants`
    * `// TODO specify entity specifically, either Self or Other(e)`
- * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (2)
-   * `// TODO move wander logic from wander system to wander activity`
+ * [game/simulation/src/activity/activities/use_held_item.rs](game/simulation/src/activity/activities/use_held_item.rs) (1)
+   * `// TODO str to describe item, and pass through to subactivities`
+ * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO wander subactivity`
  * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
    * `// TODO can queuedupdates be removed from activity context`
- * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
+ * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
+   * `// TODO move subactivity errors somewhere else`
    * `// TODO itemfilter should specify a static string describing itself`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
    * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
+ * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (3)
+   * `// TODO add ItemUseType which hints at which slot to use`
+   * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
+   * `// TODO inventory operations should not be immediate`
+ * [game/simulation/src/activity/subactivities/item_use.rs](game/simulation/src/activity/subactivities/item_use.rs) (1)
+   * `// TODO per-item exertion`
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)

@@ -9,7 +9,7 @@ use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 use crate::item::PickupItemError;
-use crate::path::FollowPathComponent;
+
 use crate::{ComponentWorld, TransformComponent};
 use world::NavigationError;
 
@@ -18,7 +18,6 @@ enum PickupItemsState {
     Undecided,
     GoingTo(Entity, GoToSubActivity),
     PickingUp(PickupItemSubActivity),
-    Complete,
 }
 
 pub struct PickupItemsActivity {
@@ -26,6 +25,7 @@ pub struct PickupItemsActivity {
     item_desc: &'static str,
     state: PickupItemsState,
     last_error: Option<PickupFailure>,
+    complete: bool,
 }
 
 enum BestItem {
@@ -46,6 +46,10 @@ enum PickupFailure {
 
 impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+        if self.complete {
+            return ActivityResult::Finished(Finish::Success);
+        }
+
         // try to update state
         match &self.state {
             PickupItemsState::Undecided => {
@@ -74,7 +78,6 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                 sub.init(ctx)
             }
             PickupItemsState::GoingTo(_, _) => unreachable!("should be blocked until arrival"),
-            PickupItemsState::Complete => ActivityResult::Finished(Finish::Success),
         }
     }
 
@@ -122,7 +125,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                         debug_assert_eq!(*item, pickup.0);
 
                         // oh hey it was us, pickup complete!
-                        self.state = PickupItemsState::Complete;
+                        self.complete = true;
                         (
                             EventUnblockResult::Unblock,
                             EventUnsubscribeResult::UnsubscribeAll,
@@ -160,7 +163,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         )
     }
 
-    fn on_finish(&mut self, _: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 
@@ -168,7 +171,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         match &self.state {
             PickupItemsState::GoingTo(_, sub) => sub,
             PickupItemsState::PickingUp(sub) => sub,
-            _ => &ThinkingSubActivity, // intermediate states
+            PickupItemsState::Undecided => &ThinkingSubActivity,
         }
     }
 }
@@ -180,6 +183,7 @@ impl PickupItemsActivity {
             item_desc: what,
             state: PickupItemsState::Undecided,
             last_error: None,
+            complete: false,
         }
     }
 

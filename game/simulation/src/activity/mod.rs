@@ -8,6 +8,8 @@ pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscri
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
 };
+// TODO move subactivity errors somewhere else
+pub use subactivities::{EquipItemError, UseHeldItemError};
 
 mod action_to_activity {
     use super::*;
@@ -31,7 +33,8 @@ mod action_to_activity {
                     activity!(PickupItemsActivity::with_items(items, "iTeMs"))
                 }
                 AiAction::Wander => activity!(WanderActivity),
-                _ => todo!(),
+                AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::with_item(item)),
+                a => todo!("action {:?}", a),
             }
         }
     }

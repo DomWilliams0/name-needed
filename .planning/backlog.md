@@ -44,6 +44,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		* specify wall thickness and height
 * ai incentive to choose the same action as last tick
 * (sub)activities take an amount of ticks to complete
+* be able to block subactivities for a number of ticks, show progress bar up until end tick
+* food/drink vessels and wastage
+* refactor item usage to be less generic at the system level
+	* instead of iterating over holders with (using comp, inventory comp), iterate over *items* with (being used comp, edible comp), (being used comp, other usage comp) etc
 
 ## World generation
 * biomes
@@ -103,6 +107,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fuzzing
 * stress test
 * code coverage in CI
+* smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
 
 ## Code quality
 * track down unwraps/expects and replace with results
@@ -117,6 +122,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* log to a file in /tmp too
 	* consider moving log sink/drain to another thread with async io
 	* `Entity`s can be formatted automatically by the drain, huzzah
+* detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
 
 ## Entity diversity
 * animal species

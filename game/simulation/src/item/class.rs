@@ -1,4 +1,4 @@
-use crate::ecs::{EcsWorld, Entity};
+use crate::ecs::Entity;
 use crate::item::{BaseItemComponent, ItemSlot};
 use crate::{entity_pretty, ComponentWorld};
 use common::*;

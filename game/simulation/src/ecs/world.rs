@@ -3,6 +3,7 @@ use specs::storage::InsertResult;
 
 use common::*;
 
+use crate::event::{EntityEvent, EntityEventQueue};
 use ::world::WorldRef;
 use common::struclog;
 use specs::world::EntitiesRes;
@@ -64,6 +65,11 @@ pub trait ComponentWorld {
         } else {
             ComponentGetError::NoSuchEntity(entity)
         }
+    }
+
+    fn post_event(&mut self, event: EntityEvent) {
+        let queue = self.resource_mut::<EntityEventQueue>();
+        queue.post(event)
     }
 }
 

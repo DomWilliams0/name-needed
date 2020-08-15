@@ -1,7 +1,8 @@
+use crate::activity::{EquipItemError, UseHeldItemError};
 use crate::ecs::*;
 use crate::event::pubsub::EventDispatcher;
 use crate::event::EventSubscription;
-use crate::item::PickupItemError;
+use crate::item::{PickupItemError, SlotReference};
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
 use strum_macros::EnumDiscriminants;
@@ -29,6 +30,12 @@ pub enum EntityEventPayload {
     /// Item entity picked up by a holder
     /// (item, picker upper)
     PickedUp(Result<(Entity, Entity), PickupItemError>),
+
+    /// Item entity has been used to completion
+    UsedUp(Result<(), UseHeldItemError>),
+
+    /// Item entity has been equipped in the specified base slot
+    Equipped(Result<SlotReference, EquipItemError>),
 
     #[doc(hidden)]
     #[cfg(test)]

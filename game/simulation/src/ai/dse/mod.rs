@@ -20,7 +20,7 @@ pub enum AdditionalDse {
 pub fn human_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
     vec![
         dse!(WanderDse),
-        // dse!(UseHeldFoodDse),
+        dse!(UseHeldFoodDse),
         dse!(FindLocalFoodDse),
     ]
     .into_iter()

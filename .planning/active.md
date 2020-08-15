@@ -1,9 +1,10 @@
 # Active tasks
 
 * [o] separate ActivitySystem from AiSystem
-* [O] refactor activities to block on specified events
-	* [ ] add back eating
-* [.] rework item pickup, remove pickup system
+* [o] refactor activities to block on specified events
+	* [X] add back eating
+	* [ ] divine orders
+* [X] rework item pickup, remove pickup system
 * [ ] remove old unused activity system once replaced
 * [ ] remove arrivedattargeteventcomponent
 * [X] allow event subscribers to subscribe to arbitrary entity events
@@ -14,3 +15,7 @@
 * [X] assign opaque token to path assignments for future comparisons
 * [X] allow cancelling of path finding
 * [ ] fix repetitive verbose event logging
+* [ ] lite runner config
+* [ ] definition validator separate bin
+* [X] component world event posting helper
+* [ ] fix "unreachable" panic with many entities going for food, typical

@@ -6,7 +6,6 @@ use crate::ComponentWorld;
 use common::*;
 
 pub struct WanderActivity;
-// TODO move wander logic from wander system to wander activity
 
 impl<W: ComponentWorld> Activity<W> for WanderActivity {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
