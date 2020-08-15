@@ -25,6 +25,9 @@ rust:
     - stable
     - nightly
 
+jobs:
+    allow_failures:
+        - rust: nightly
 
 # sfml
 script: |
