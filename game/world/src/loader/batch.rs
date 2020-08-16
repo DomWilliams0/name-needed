@@ -118,9 +118,9 @@ impl<U> UpdateBatcher<U> {
             .collect()
     }
 
-    pub fn pop_batch(&mut self, batch: BatchId) -> Vec<U> {
-        let (_, items) = self.batches.remove(&batch).expect("invalid batch");
-        items
+    pub fn pop_batch(&mut self, batch: BatchId) -> (UpdateBatch, Vec<U>) {
+        let (batch, items) = self.batches.remove(&batch).expect("invalid batch");
+        (batch, items)
     }
 }
 
@@ -141,6 +141,8 @@ impl Debug for UpdateBatch {
         )
     }
 }
+
+slog_kv_debug!(UpdateBatch, "batch");
 
 #[cfg(test)]
 mod tests {
@@ -197,14 +199,14 @@ mod tests {
         // only the last batch is complete
         let complete = batcher.complete_batches();
         assert_eq!(complete.to_vec(), vec![(batches_c.batch_id(), 1)]);
-        assert_eq!(batcher.pop_batch(batches_c.batch_id()), vec!["nice"]);
+        assert_eq!(batcher.pop_batch(batches_c.batch_id()).1, vec!["nice"]);
 
         // finish off first batch
         batcher.submit(batches_a.next_batch(), "up");
         let complete = batcher.complete_batches();
         assert_eq!(complete.to_vec(), vec![(batches_a.batch_id(), 3)]);
         assert_eq!(
-            batcher.pop_batch(batches_a.batch_id()),
+            batcher.pop_batch(batches_a.batch_id()).1,
             vec!["hey", "whats", "up"]
         );
 
@@ -213,7 +215,7 @@ mod tests {
         let complete = batcher.complete_batches();
         assert_eq!(complete.to_vec(), vec![(batches_b.batch_id(), 2)]);
         assert_eq!(
-            batcher.pop_batch(batches_b.batch_id()),
+            batcher.pop_batch(batches_b.batch_id()).1,
             vec!["very", "cool"]
         );
 
@@ -243,7 +245,7 @@ mod tests {
         let (batch_id, batch_len) = *complete.first().unwrap();
         assert_eq!(batch_len, 2);
 
-        let items = batcher.pop_batch(batch_id);
+        let (_, items) = batcher.pop_batch(batch_id);
         assert_eq!(items.len(), 2);
     }
 }

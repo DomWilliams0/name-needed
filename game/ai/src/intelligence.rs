@@ -49,7 +49,7 @@ impl<C: Context> Smarts<C> {
     pub fn new(dses: impl Iterator<Item = AiBox<dyn Dse<C>>>) -> Self {
         let decisions: Vec<_> = dses.map(Decision::new).collect();
         if decisions.is_empty() {
-            warn!("smarts has zero DSEs");
+            my_warn!("smarts has zero DSEs");
         }
         Self { decisions }
     }
@@ -72,8 +72,9 @@ impl<C: Context> Smarts<C> {
             // TODO add momentum to discourage changing mind so often
             let bonus = dse.weight().multiplier();
 
+            log_scope!(o!("dse" => dse.name()));
             *score = dse.score(blackboard, input_cache, bonus);
-            trace!("DSE '{}' scored {:?}", dse.name(), *score);
+            my_trace!("DSE scored {score}", score = *score);
         }
     }
 }
@@ -138,11 +139,7 @@ impl<C: Context> Intelligence<C> {
                 .unwrap() // not empty
         };
 
-        trace!(
-            "intelligence chose DSE {} (from {:?})",
-            choice.name(),
-            choice_src
-        );
+        my_trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src);
 
         let action = choice.action(blackboard);
         let last_action = self.last_action.replace(action.clone());
@@ -173,20 +170,20 @@ impl<C: Context> Intelligence<C> {
         let count = smarts.decisions.len();
         if let Some(old) = self.additional.insert(id.clone(), smarts) {
             // TODO reuse allocation
-            debug!(
-                "replaced {} additional DSEs with id {:?} with {}",
-                old.decisions.len(),
-                id,
-                count
+            my_debug!(
+                "replaced {prev_count} additional DSEs with {count}",
+                prev_count = old.decisions.len(),
+                count = count;
+                "dse_id" => ?id
             );
         }
     }
 
     pub fn pop_smarts(&mut self, id_to_remove: &C::AdditionalDseId) {
         if self.additional.remove(id_to_remove).is_none() {
-            warn!(
-                "didn't have any smarts with id {:?} to remove",
-                id_to_remove
+            my_warn!(
+                "didn't have any additional smarts to remove";
+                "dse_id" => ?id_to_remove
             );
         }
     }

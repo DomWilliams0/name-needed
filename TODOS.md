@@ -1,6 +1,8 @@
-# TODOs (176)
+# TODOs (180)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO try osx`
+ * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
+   * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
    * `/// TODO pooled vec/slice rather than Vec each time`
    * `// TODO optimization: dont consider all considerations every time`
@@ -183,7 +185,7 @@
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
    * `// TODO if this thread panics, propagate to main game thread`
-   * `// TODO detect this err condition?`
+   * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
    * `// TODO skip if slice knows it is empty`
@@ -250,6 +252,11 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/logging/src/init.rs](shared/logging/src/init.rs) (2)
+   * `// TODO configure to write to file as text`
+   * `// TODO configure to publish to elasticsearch`
+ * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
+   * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
    * `// TODO helper for this-1`
  * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)

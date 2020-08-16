@@ -51,11 +51,7 @@ impl<R: Renderer> DebugRenderers<R> {
         match self.map.entry(renderer.identifier()) {
             Entry::Occupied(_) => Err(DebugRendererError::AlreadyRegistered(renderer.identifier())),
             Entry::Vacant(e) => {
-                debug!(
-                    "registered {} debug renderer '{}'",
-                    if enabled { "enabled" } else { "disabled" },
-                    e.key()
-                );
+                my_debug!("registered debug renderer"; "renderer" => e.key(), "enabled" => enabled);
                 e.insert((enabled, Box::new(renderer)));
                 Ok(())
             }
@@ -71,11 +67,7 @@ impl<R: Renderer> DebugRenderers<R> {
             .get_mut(identifier)
             .map(|(e, _)| {
                 *e = enabled;
-                debug!(
-                    "{} debug renderer '{}'",
-                    if enabled { "enabled" } else { "disabled" },
-                    identifier
-                );
+                my_debug!("toggled debug renderer"; "renderer" => identifier, "enabled" => enabled);
             })
             .ok_or_else(|| DebugRendererError::NoSuchRenderer(identifier))
     }

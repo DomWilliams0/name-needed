@@ -137,7 +137,7 @@ mod test_utils {
     pub struct EatDse;
 
     impl Dse<TestContext> for EatDse {
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "Eat"
         }
 
@@ -157,8 +157,8 @@ mod test_utils {
     pub struct BadDse;
 
     impl Dse<TestContext> for BadDse {
-        fn name(&self) -> &str {
-            unimplemented!()
+        fn name(&self) -> &'static str {
+            "Bad"
         }
 
         fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
@@ -177,8 +177,8 @@ mod test_utils {
     pub struct EmergencyDse;
 
     impl Dse<TestContext> for EmergencyDse {
-        fn name(&self) -> &str {
-            unimplemented!()
+        fn name(&self) -> &'static str {
+            "Emergency"
         }
 
         fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {

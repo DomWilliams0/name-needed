@@ -20,11 +20,11 @@ impl GeneratedTerrainSource {
         }
 
         let seed = if let Some(seed) = seed {
-            debug!("using specified seed {} for terrain generation", seed);
+            my_debug!("using specified seed for terrain generation"; "seed" => seed);
             seed
         } else {
             let seed = thread_rng().gen();
-            debug!("using random seed {} for terrain generation", seed);
+            my_debug!("using random seed for terrain generation"; "seed" => seed);
             seed
         };
 

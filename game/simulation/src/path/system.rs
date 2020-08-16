@@ -47,12 +47,14 @@ impl<'a> System<'a> for PathSteeringSystem {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
         {
+            log_scope!(o!("system" => "path steering", E(e)));
+
             // new path request
             if let Some((req, token)) = path.pop_request() {
                 match req {
                     PathRequest::ClearCurrent => {
                         if path.target().is_some() {
-                            debug!("clearing current path by request");
+                            my_debug!("clearing current path by request");
                         }
                         path.path = None;
                     }
@@ -71,7 +73,7 @@ impl<'a> System<'a> for PathSteeringSystem {
                                 goal,
                             ) {
                                 Err(err) => {
-                                    warn!("failed to find path to target {:?}: {}", target, err);
+                                    my_warn!("failed to find path"; "target" => ?target, "error" => %err);
 
                                     event_queue.post(EntityEvent {
                                         subject: e,
@@ -84,11 +86,7 @@ impl<'a> System<'a> for PathSteeringSystem {
                             };
 
                             let new_following = PathFollowing::new(new_path, target, goal);
-                            debug!(
-                                "{:?}: following new path to {:?}",
-                                e,
-                                new_following.target()
-                            );
+                            my_debug!("following new path"; "target" => ?new_following.target());
 
                             path.path.replace(new_following);
                             path.follow_speed = speed;
@@ -108,7 +106,7 @@ impl<'a> System<'a> for PathSteeringSystem {
                 match following.next_waypoint() {
                     None => {
                         let target = path.target().unwrap();
-                        trace!("{:?}: path finished, arrived at {}", e, target);
+                        my_trace!("arrived at path target"; "target" => %target);
 
                         let token = path.current_token.take().expect("should have token");
                         event_queue.post(EntityEvent {
@@ -118,8 +116,8 @@ impl<'a> System<'a> for PathSteeringSystem {
 
                         path.path = None;
                     }
-                    Some((next_block, _cost)) => {
-                        trace!("{:?}: next waypoint: {:?}", e, next_block);
+                    Some((next_block, cost)) => {
+                        my_trace!("next waypoint"; "waypoint" => ?next_block, "cost" => ?cost);
                         steer.behaviour = SteeringBehaviour::seek(next_block, path.follow_speed);
                     }
                 }
@@ -132,7 +130,7 @@ impl FollowPathComponent {
     // TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing
     fn request_new_path(&mut self, req: PathRequest) -> PathToken {
         if let Some(old) = self.request.as_ref() {
-            warn!("follow path target was overwritten before it could be used (prev: {:?}, overwritten with: {:?})", old, req);
+            my_warn!("follow path target was overwritten before it could be used"; "previous" => ?old, "new" => ?req);
         }
 
         let token = PathToken(self.next_token);

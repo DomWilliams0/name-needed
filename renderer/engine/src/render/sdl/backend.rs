@@ -78,14 +78,14 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         let video = sdl.video()?;
         video.gl_attr().set_context_version(3, 0);
         video.gl_attr().set_depth_size(24);
-        info!(
-            "opengl {}.{}",
-            video.gl_attr().context_major_version(),
-            video.gl_attr().context_minor_version()
+        my_info!(
+            "opengl version {major}.{minor}",
+            major = video.gl_attr().context_major_version(),
+            minor = video.gl_attr().context_minor_version()
         );
 
         let (w, h) = config::get().display.resolution;
-        info!("window size is {}x{}", w, h);
+        my_info!("window size {width}x{height}", width = w, height = h);
 
         let window = {
             let mut builder = video.window("Name Needed", w, h);
@@ -131,6 +131,10 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             world_viewer: world,
         }
     }
+
+    fn name() -> &'static str {
+        "SDL2"
+    }
 }
 
 impl InitializedSimulationBackend for SdlBackendInit {
@@ -155,7 +159,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     win_event: WindowEvent::Resized(width, height),
                     ..
                 } => {
-                    debug!("resized to {}x{}", width, height);
+                    my_debug!("resized window"; "width" => width, "height" => height);
                     Gl::set_viewport(width, height);
                     self.camera.on_resize(width, height);
                 }
@@ -172,7 +176,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
                         break;
                     }
                     Some(key) => self.handle_key(KeyEvent::Down(key)),
-                    None => debug!("ignoring unknown key {:?}", key),
+                    None => my_debug!("ignoring unknown key"; "key" => %key),
                 },
                 Event::KeyUp {
                     keycode: Some(key), ..
@@ -230,9 +234,9 @@ impl InitializedSimulationBackend for SdlBackendInit {
         self.world_viewer
             .regenerate_dirty_chunk_meshes(|chunk_pos, mesh| {
                 if let Err(e) = renderer.update_chunk_mesh(chunk_pos, mesh) {
-                    error!(
-                        "failed to regenerate mesh for chunk {:?}: {:?}",
-                        chunk_pos, e
+                    my_error!(
+                        "failed to regenerate mesh for chunk";
+                        chunk_pos, "error" => %e
                     );
                 }
             });

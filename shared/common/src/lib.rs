@@ -5,11 +5,8 @@ pub use cgmath::{
     VectorSpace, Zero,
 };
 pub use derive_more;
-#[cfg(feature = "binary")]
-pub use env_logger;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;
-pub use log::*;
 pub use num_derive;
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
@@ -19,9 +16,9 @@ pub use smallvec::*;
 pub use thiserror::{self, Error};
 
 pub use lazy_static::lazy_static;
+pub use logging::{self, prelude::*, slog_kv_debug, slog_value_debug};
 pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use newtype::{NormalizedFloat, Proportion};
-pub use struclog::{self, *};
 
 // common imports that annoyingly get resolved to other pub exports of std/core
 // https://github.com/intellij-rust/intellij-rust/issues/5654

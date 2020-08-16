@@ -28,3 +28,5 @@ impl Debug for Society {
         write!(f, "Society({:?}, {} jobs)", self.name, self.jobs.count())
     }
 }
+
+slog_value_debug!(Society);

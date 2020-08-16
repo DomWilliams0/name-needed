@@ -1,4 +1,3 @@
-use log::error;
 use prometheus_exporter::PrometheusExporter;
 use std::net::SocketAddr;
 
@@ -34,11 +33,12 @@ macro_rules! entity_metric {
     };
 }
 
+// TODO return error to caller
 pub fn start_serving() {
     std::thread::spawn(|| {
         let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 9898);
         if let Err(e) = PrometheusExporter::run(&addr) {
-            error!("failed to start metrics server: {}", e);
+            eprintln!("failed to start metrics server: {}", e);
         }
     });
 }

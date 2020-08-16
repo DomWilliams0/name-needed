@@ -23,7 +23,7 @@ impl Shader {
         };
 
         let file_name = format!("{}.{}", name, ext);
-        debug!("loading shader {:?}", file_name);
+        my_debug!("loading shader from file"; "file" => &file_name);
 
         let src = res
             .get_file(file_name)
@@ -171,7 +171,7 @@ impl ScopedBind<'_, Program> {
             };
 
             if let Err(e) = do_set() {
-                warn!("failed to set uniform {:?}: {}", name, e);
+                my_warn!("failed to set uniform"; "uniform" => name, "error" => %e);
             }
         }
     }

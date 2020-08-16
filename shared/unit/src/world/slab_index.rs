@@ -1,5 +1,5 @@
 use crate::dim::SmallUnsignedConstant;
-use common::derive_more::*;
+use common::{derive_more::*, *};
 use newtype_derive::*;
 use std::ops::{Div, Mul};
 
@@ -61,3 +61,6 @@ impl From<SlabIndex> for f32 {
         slab as f32
     }
 }
+
+slog_value_debug!(SlabIndex);
+slog_kv_debug!(SlabIndex, "slab");

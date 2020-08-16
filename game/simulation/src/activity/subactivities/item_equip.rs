@@ -6,6 +6,7 @@ use crate::item::{BaseSlotPolicy, InventoryError, SlotReference};
 use crate::{BaseItemComponent, ComponentWorld, InventoryComponent};
 use common::*;
 
+#[derive(Debug)]
 pub struct ItemEquipSubActivity {
     slot: SlotReference,
     item: Entity,

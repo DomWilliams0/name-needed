@@ -29,6 +29,8 @@ impl<'a> System<'a> for PhysicsSystem {
         for (e, movement, cfg, transform) in
             (&entities, &movement, &movement_cfg, &mut transform).join()
         {
+            log_scope!(o!("system" => "physics", E(e)));
+
             // update last position for render interpolation
             transform.last_position = transform.position;
 
@@ -39,11 +41,10 @@ impl<'a> System<'a> for PhysicsSystem {
                 let resolved_bounds = bounds.resolve_vertical_collision(&*world);
                 let new_pos = resolved_bounds.into_position();
 
-                trace!(
-                    "{:?}) resolving collision at pos {} by moving to {}",
-                    e,
-                    transform.position,
-                    new_pos
+                my_trace!(
+                    "resolving collision";
+                    "from" => %transform.position,
+                    "to" => %new_pos
                 );
 
                 transform.position = new_pos;
@@ -65,7 +66,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 if fallen > 0 {
                     // TODO apply fall damage if applicable
                     if fallen > 1 {
-                        debug!("{:?} fell {} blocks", e, fallen);
+                        my_debug!("fell {fallen} blocks", fallen = fallen);
                     }
                 }
             }

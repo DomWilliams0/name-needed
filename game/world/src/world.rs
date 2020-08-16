@@ -281,7 +281,7 @@ impl World {
             for area in old_chunk.areas() {
                 if !new_areas.contains(area) {
                     // expired area
-                    trace!("removing expired world area {:?}", area);
+                    my_trace!("removing expired world area"; "area" => ?area);
                     self.area_graph.remove_node(&area);
                 } else {
                     // new area
@@ -313,10 +313,10 @@ impl World {
         if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
             let applied_count = chunk.raw_terrain_mut().apply_occlusion_updates(&updates);
             if applied_count > 0 {
-                debug!(
-                    "applied {:?}/{:?} queued occlusion updates to chunk {:?}",
-                    applied_count,
-                    updates.len(),
+                my_debug!(
+                    "applied {applied}/{total} queued occlusion updates",
+                    applied = applied_count,
+                    total = updates.len();
                     chunk_pos
                 );
 
@@ -345,18 +345,20 @@ impl World {
         // );
 
         for (slab, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
+            log_scope!(o!(chunk_pos, slab));
+
             // copy slab for modification
             let slab = match terrain.slab_mut(slab) {
                 None => {
-                    warn!("ignoring {} slab updates because the slab {:?} in chunk {:?} doesn't exist",
-                          updates.count(), slab, chunk_pos);
+                    let count = updates.count();
+                    my_warn!(
+                        "ignoring {count} slab updates because the slab doesn't exist",
+                        count = count
+                    );
                     continue;
                 }
                 Some(s) => {
-                    debug!(
-                        "apply terrain updates to chunk {:?} slab {:?}",
-                        chunk_pos, slab
-                    );
+                    my_debug!("apply terrain updates to slab");
                     s
                 }
             };
@@ -612,7 +614,7 @@ pub mod helpers {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use common::{seeded_rng, Itertools, LevelFilter, Rng};
+    use common::{seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPositionRange};
 
@@ -717,10 +719,7 @@ mod tests {
 
     #[test]
     fn world_path_cross_areas() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         // cross chunks
         let world = world_from_chunks_blocking(vec![
@@ -773,10 +772,8 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
+
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
         let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
@@ -826,10 +823,8 @@ mod tests {
 
     #[test]
     fn terrain_updates_applied() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
+
         let chunks = vec![
             ChunkBuilder::new()
                 .fill_range((0, 0, 0), (5, 5, 5), |_| BlockType::Stone)
@@ -981,11 +976,6 @@ mod tests {
         const UPDATE_SETS: usize = 100;
         const UPDATE_REPS: usize = 10;
 
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
-
         let pool = BlockingWorkerPool::default();
         let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
         let mut loader = WorldLoader::new(source, pool);
@@ -1022,12 +1012,9 @@ mod tests {
                 })
                 .collect_vec();
 
-            common::info!(
+            eprintln!(
                 "STRESSER ({}/{}) applying {} updates...\n{:#?}",
-                i,
-                UPDATE_SETS,
-                UPDATE_REPS,
-                updates
+                i, UPDATE_SETS, UPDATE_REPS, updates
             );
             apply_updates(&mut loader, updates.as_slice()).expect("updates failed");
         }

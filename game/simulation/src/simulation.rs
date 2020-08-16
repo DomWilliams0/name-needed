@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use crossbeam::crossbeam_channel::Receiver;
 use specs::RunNow;
 
-use common::derive_more::Deref;
 use common::*;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
 use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
@@ -34,7 +33,7 @@ use crate::queued_update::QueuedUpdates;
 use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
 use crate::render::{RenderComponent, RenderSystem, Renderer};
 use crate::society::job::{BreakBlocksJob, Job};
-use crate::society::{PlayerSociety, SocietyComponent};
+use crate::society::{PlayerSociety, Society, SocietyComponent};
 use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
 use crate::transform::TransformComponent;
 use crate::{ComponentWorld, Societies, SocietyHandle};
@@ -43,12 +42,17 @@ use crate::activity::{ActivityEventSystem, ActivitySystem, BlockingActivityCompo
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::event::EntityEventQueue;
 use resources::resource::Resources;
+use std::sync::atomic::{AtomicU32, Ordering};
 use unit::world::WorldPositionRange;
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
-/// Monotonically increasing tick counter
-#[derive(Copy, Clone, Eq, PartialEq, Deref)]
+/// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
+/// produced in tick()
+static mut TICK: AtomicU32 = AtomicU32::new(0);
+
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
+/// Represents a game tick
 pub struct Tick(u32);
 
 pub struct Simulation<R: Renderer> {
@@ -65,14 +69,6 @@ pub struct Simulation<R: Renderer> {
 
     renderer: PhantomData<R>,
     debug_renderers: DebugRenderers<R>,
-    current_tick: Tick,
-}
-
-/// The tick BEFORE the game starts, never produced in tick()
-impl Default for Tick {
-    fn default() -> Self {
-        Self(0)
-    }
 }
 
 impl<R: Renderer> Simulation<R> {
@@ -105,7 +101,6 @@ impl<R: Renderer> Simulation<R> {
             world_loader,
             chunk_updates,
             debug_renderers,
-            current_tick: Tick::default(),
             terrain_changes: Vec::with_capacity(1024),
         })
     }
@@ -119,11 +114,8 @@ impl<R: Renderer> Simulation<R> {
     }
 
     pub fn tick(&mut self, commands: &[UiCommand], world_viewer: &mut WorldViewer) {
-        let _span = Span::Tick.begin();
-
-        // update tick resource
-        self.current_tick.0 += 1;
-        self.ecs_world.insert(self.current_tick);
+        // update tick
+        increment_tick();
 
         // TODO sort out systems so they all have an ecs_world reference and can keep state
         // safety: only lives for the duration of this tick
@@ -231,7 +223,7 @@ impl<R: Renderer> Simulation<R> {
             match *cmd {
                 UiCommand::ToggleDebugRenderer { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
-                        warn!("failed to toggle debug renderer: {}", e);
+                        my_warn!("failed to toggle debug renderer"; "renderer" => ident, "error" => %e);
                     }
                 }
 
@@ -257,7 +249,7 @@ impl<R: Renderer> Simulation<R> {
                     {
                         Some(e) => e,
                         None => {
-                            warn!("no selected entity to issue divine command to");
+                            my_warn!("no selected entity to issue divine command to"; "command" => ?divine_command);
                             continue;
                         }
                     };
@@ -271,7 +263,7 @@ impl<R: Renderer> Simulation<R> {
                     };
 
                     match self.ecs_world.component_mut::<AiComponent>(entity) {
-                        Err(e) => warn!("can't issue divine command: {}", e),
+                        Err(e) => my_warn!("can't issue divine command"; "error" => %e),
                         Ok(ai) => {
                             // add DSE
                             ai.add_divine_command(command.clone());
@@ -282,7 +274,7 @@ impl<R: Renderer> Simulation<R> {
                     let society = match self.societies().society_by_handle_mut(society) {
                         Some(s) => s,
                         None => {
-                            warn!("unknown society with handle {:?}", society);
+                            my_warn!("invalid society while issuing command"; "society" => ?society, "command" => ?command);
                             continue;
                         }
                     };
@@ -293,7 +285,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     });
 
-                    debug!("submitting job {:?} to society {:?}", job, society);
+                    my_debug!("submitting job to society {society:?}", society = society as &Society; "job" => ?job);
                     society.jobs_mut().submit(job);
                 }
             }
@@ -309,8 +301,6 @@ impl<R: Renderer> Simulation<R> {
         interpolation: f64,
         input: &[InputEvent],
     ) -> (R::Target, UiBlackboard) {
-        let _span = Span::Render(interpolation).begin();
-
         // process input before rendering
         InputSystem { events: input }.run_now(&self.ecs_world);
 
@@ -330,7 +320,7 @@ impl<R: Renderer> Simulation<R> {
                 render_system.run_now(&self.ecs_world);
             }
             if let Err(e) = renderer.sim_finish() {
-                warn!("render sim_finish() failed: {}", e);
+                my_warn!("render sim_finish() failed"; "error" => %e);
             }
         }
 
@@ -345,7 +335,7 @@ impl<R: Renderer> Simulation<R> {
                 .for_each(|r| r.render(renderer, &voxel_world, ecs_world, world_viewer));
 
             if let Err(e) = renderer.debug_finish() {
-                warn!("render debug_finish() failed: {}", e);
+                my_warn!("render debug_finish() failed"; "error" => %e);
             }
         }
 
@@ -356,6 +346,26 @@ impl<R: Renderer> Simulation<R> {
         let blackboard = UiBlackboard::fetch(&self.ecs_world, &self.debug_renderers.summarise());
 
         (target, blackboard)
+    }
+}
+
+fn increment_tick() {
+    unsafe {
+        TICK.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+pub fn current_tick() -> u32 {
+    unsafe { TICK.load(Ordering::SeqCst) }
+}
+
+impl Tick {
+    pub fn fetch() -> Self {
+        Self(current_tick())
+    }
+
+    pub fn value(self) -> u32 {
+        self.0
     }
 }
 

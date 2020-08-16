@@ -15,6 +15,7 @@ enum BreakBlockState {
     Breaking,
 }
 
+#[derive(Debug)]
 pub struct GoBreakBlockActivity {
     block: WorldPosition,
     state: BreakBlockState,
@@ -33,10 +34,12 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
                 match world.block(self.block) {
                     None => {
                         // block no longer exists, sounds bad
+                        my_trace!("block no longer exists??");
                         ActivityResult::Finished(Finish::Interrupted)
                     }
                     Some(block) if block.block_type() == BlockType::Air => {
                         // destroyed, congratulations on your efforts
+                        my_trace!("block has been destroyed");
                         ActivityResult::Finished(Finish::Success)
                     }
                     Some(_) => {
@@ -45,6 +48,7 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
                         // TODO breaking blocks with your hand hurts!
                         // TODO define proper scale/enum/consts for block and tool durability
                         let break_rate = 6; // lets assume this is with a hand and terribly slow
+                        my_trace!("damaging block"; "damage" => break_rate);
                         ctx.updates.queue_block_damage(self.block, break_rate);
                         ActivityResult::Ongoing
                     }
@@ -66,10 +70,10 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
                 };
 
                 if let Err(e) = result {
-                    debug!("failed to navigate to block: {}", e);
+                    my_debug!("failed to navigate to block"; "error" => %e);
                     self.finished = Some(Err(Box::new(e.to_owned())));
                 } else {
-                    trace!("arrived at block, switching to breaking state");
+                    my_trace!("arrived at block, switching to breaking state");
                     self.state = BreakBlockState::Breaking;
                 }
 

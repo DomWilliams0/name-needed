@@ -33,7 +33,7 @@ pub fn recurse<R: ResourceContainer, T: ReadResource>(
         .into_iter()
         .filter_map(move |e| match e {
             Err(e) => {
-                warn!("failed to read resource file: {}", e);
+                my_warn!("failed to read resource file"; "error" => %e);
                 None
             }
             Ok(e) => {

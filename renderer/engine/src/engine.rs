@@ -27,7 +27,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         // initial sleep
         let delay = config::get().simulation.start_delay;
         if delay > 0 {
-            info!("sleeping for {}ms before starting", delay);
+            my_info!("sleeping for {delay}ms before starting", delay = delay);
             std::thread::sleep(Duration::from_millis(delay as u64));
         }
 
@@ -57,7 +57,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
     }
 
     fn tick(&mut self) {
-        trace!("tick");
+        my_trace!("tick");
         let _timer = self.perf.tick.time();
 
         let world_viewer = self.backend.world_viewer();
@@ -70,7 +70,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
     fn render(&mut self, interpolation: f64) {
         let perf = self.perf.calculate();
 
-        trace!("render (interpolation={})", interpolation);
+        my_trace!("render"; "interpolation" => interpolation);
         let _timer = self.perf.render.time();
 
         self.backend.render(

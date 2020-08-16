@@ -43,7 +43,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         let follow_path = match ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {
             Ok(comp) => comp,
             Err(e) => {
-                error!("{:?} can't follow path: {}", ctx.entity, e);
+                my_error!("can't follow path"; "error" => %e);
                 return ActivityResult::errored(e);
             }
         };

@@ -25,6 +25,7 @@ pub trait Consideration<C: Context> {
         self.consider_input(input)
     }
 
+    // TODO impl Display for considerations instead
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }

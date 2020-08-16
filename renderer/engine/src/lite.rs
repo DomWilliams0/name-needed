@@ -84,4 +84,8 @@ impl PersistentSimulationBackend for DummyBackendPersistent {
             world_viewer,
         }
     }
+
+    fn name() -> &'static str {
+        "Dummy"
+    }
 }

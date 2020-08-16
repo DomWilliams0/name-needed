@@ -58,6 +58,7 @@ impl<'a> System<'a> for PickupItemSystem {
 
         for (holder, pickup, picker_upper_transform) in (&entities, &pickup, &transforms).join() {
             let item = pickup.0;
+            log_scope!(o!("system" => "item_pickup", E(holder), "item" => E(item)));
 
             let mut do_pickup = || {
                 // entity should be an item
@@ -113,7 +114,7 @@ impl<'a> System<'a> for PickupItemSystem {
                         Ok(_) => {
                             let _ = world.remove_now::<TransformComponent>(item);
 
-                            debug!("{:?} picked up item {:?}", holder, item);
+                            my_debug!("picked up item"; E(holder), "item" => E(item));
                             EntityEventPayload::PickedUp(Ok((item, holder)))
                         }
                         Err(e) => EntityEventPayload::PickedUp(Err(e)),
@@ -137,7 +138,7 @@ impl<'a> System<'a> for PickupItemSystem {
 
             // only post event on failure - successful event will be posted in the queued update
             if let Err(err) = do_pickup() {
-                debug!("item pickup failed: {}", err);
+                my_debug!("pickup failed"; "error" => %err);
 
                 events.post(EntityEvent {
                     subject: item,

@@ -44,6 +44,9 @@ impl<'a> System<'a> for ActivitySystem {
     ) {
         let mut subscriptions = Vec::new(); // TODO reuse allocation in system
         for (entity, ai, activity, _) in (&entities, &mut ai, &mut activities, !&blocking).join() {
+            log_scope!(o!("system" => "activity", E(entity)));
+            my_debug!("current activity"; "activity" => &activity.current);
+
             debug_assert!(subscriptions.is_empty());
             let mut ctx = ActivityContext::<EcsWorld> {
                 entity,
@@ -55,7 +58,7 @@ impl<'a> System<'a> for ActivitySystem {
             if let Some(new_action) = activity.new_activity.take() {
                 // interrupt current activity with new
                 if let Err(e) = activity.current.finish(Finish::Interrupted, &mut ctx) {
-                    error!("error interrupting activity '{}': {}", activity.current, e);
+                    my_error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
                 }
 
                 // replace current with new activity, dropping the old one
@@ -66,32 +69,27 @@ impl<'a> System<'a> for ActivitySystem {
                 ActivityResult::Blocked => {
                     // subscribe to requested events if any. if no subscriptions are added, the only
                     // way to unblock will be on activity end
+                    my_debug!("subscribing to {count} events", count = subscriptions.len());
                     for sub in &subscriptions {
-                        debug!(
-                            "subscribing {} to events: {:?}",
-                            crate::entity_pretty!(entity),
-                            sub
-                        );
+                        my_trace!("subscribing to event"; "subscription" => ?sub);
                     }
                     event_queue.subscribe(entity, subscriptions.drain(..));
 
                     // mark activity as blocked
                     comp_updates.insert(entity, BlockingActivityComponent::default());
-                    debug!("blocking activity for {}", crate::entity_pretty!(entity));
+                    my_debug!("blocking activity");
                 }
 
                 ActivityResult::Ongoing => {
                     // go again next tick
+                    my_trace!("activity is ongoing")
                 }
                 ActivityResult::Finished(finish) => {
-                    debug!(
-                        "finished activity with '{:?}': '{}'. reverting to nop activity",
-                        finish, activity.current
-                    );
+                    my_debug!("finished activity, reverting to nop"; "activity" => &activity.current, "finish" => ?finish);
 
                     // finish current and replace with nop
                     if let Err(e) = activity.current.finish(finish, &mut ctx) {
-                        error!("error finishing activity '{}': {}", activity.current, e);
+                        my_error!("error finishing activity"; "activity" => &activity.current, "error" => %e);
                     }
                     activity.current = Box::new(NopActivity);
 
@@ -122,17 +120,13 @@ impl<'a> System<'a> for ActivityEventSystem {
                 .get_mut(subscriber)
                 .expect("subscriber must have activity component");
 
-            debug!("passing event to {:?} ({:?})", subscriber, event);
+            log_scope!(o!("subscriber" => E(subscriber)));
 
             let ctx = ActivityEventContext { subscriber };
-
             let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
+            my_debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
 
             if let EventUnblockResult::Unblock = unblock {
-                debug!(
-                    "unblocking activity of {:?} ({})",
-                    subscriber, activity.current
-                );
                 updates.remove::<BlockingActivityComponent>(subscriber);
             }
 

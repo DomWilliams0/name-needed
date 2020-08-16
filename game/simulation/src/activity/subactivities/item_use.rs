@@ -7,6 +7,7 @@ use crate::{BaseItemComponent, ComponentWorld, InventoryComponent};
 use common::*;
 
 /// Start using the given item, which must be equipped in the given base slot
+#[derive(Debug)]
 pub struct ItemUseSubActivity(Entity, usize);
 
 #[derive(Clone, Debug, Error)]
@@ -58,7 +59,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemUseSubActivity {
                         class,
                     },
                 ) {
-                    warn!("overwriting previous item use: {:?}", old);
+                    my_warn!("overwriting previous item use component"; "previous" => ?old);
                 };
             });
 

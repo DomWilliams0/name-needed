@@ -1,4 +1,4 @@
-use common::{bumpalo::Bump, trace};
+use common::{bumpalo::Bump, my_trace};
 
 pub struct PerFrameStrings {
     arena: Bump,
@@ -16,9 +16,9 @@ impl PerFrameStrings {
     }
 
     pub fn reset(&mut self) {
-        trace!(
-            "dropping {} bytes of per frame strings",
-            self.arena.allocated_bytes()
+        my_trace!(
+            "dropping {count} bytes of per frame strings",
+            count = self.arena.allocated_bytes()
         );
         self.arena.reset();
     }

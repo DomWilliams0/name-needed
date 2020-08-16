@@ -4,11 +4,12 @@ use crate::nop_subactivity;
 use crate::ComponentWorld;
 use common::*;
 
+#[derive(Debug)]
 pub struct NopActivity;
 
 impl<W: ComponentWorld> Activity<W> for NopActivity {
     fn on_tick<'a>(&mut self, _: &'a mut ActivityContext<'_, W>) -> ActivityResult {
-        warn!("ticking nop activity, possible infinite loop");
+        my_warn!("ticking nop activity, possible infinite loop");
         ActivityResult::Ongoing
     }
 

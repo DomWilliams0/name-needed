@@ -8,4 +8,3 @@ edition = "2018"
 
 [dependencies]
 prometheus_exporter ="^0.6"
-log = "^0.4"

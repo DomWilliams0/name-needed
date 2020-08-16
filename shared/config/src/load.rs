@@ -131,25 +131,25 @@ pub fn init<P: AsRef<Path>>(path: P) -> ConfigResult<()> {
                     Ok(e) => match e {
                         DebouncedEvent::Write(ref p) if is_config(p) => true,
                         DebouncedEvent::Remove(ref p) if is_config(p) => {
-                            warn!("config was deleted");
+                            my_warn!("config was deleted");
                             true
                         }
                         DebouncedEvent::Rename(ref a, ref b) if is_config(a) || is_config(b) => {
-                            warn!("config was renamed");
+                            my_warn!("config was renamed");
                             true
                         }
                         _ => false,
                     },
                     Err(e) => {
-                        warn!("error while watching config: {}", e);
+                        my_warn!("error while watching config"; "error" => %e);
                         continue;
                     }
                 };
 
                 if reload {
-                    info!("config was modified, reloading");
+                    my_info!("config was modified, reloading");
                     if let Err(e) = lock().parse_file() {
-                        warn!("failed to reload config: {}", e);
+                        my_warn!("failed to reload config"; "error" => %e);
                     }
                 }
             }

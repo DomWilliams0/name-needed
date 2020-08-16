@@ -76,6 +76,8 @@ impl<'a> System<'a> for EatingSystem {
         (entities, updates, mut events, mut inv, mut using, mut hunger, edible_item, mut base_item): Self::SystemData,
     ) {
         for (e, inv, using, hunger) in (&entities, &mut inv, &mut using, &mut hunger).join() {
+            log_scope!(o!("system" => "eating", E(e)));
+
             if let ItemClass::Food = using.class {
                 let val = using.left.value();
 
@@ -104,10 +106,10 @@ impl<'a> System<'a> for EatingSystem {
                     };
 
                     if let Some(item) = item {
-                        trace!("deleting food item {:?}", item);
+                        my_trace!("deleting consumed food item"; "food" => E(item));
 
                         if let Err(e) = entities.delete(item) {
-                            warn!("failed to delete item: {}", e);
+                            my_warn!("couldn't delete food item"; "food" => E(item), "error" => ?e);
                         }
 
                         let event_result = if let Some(err) = err {
@@ -142,18 +144,19 @@ fn do_eat(
     let slot = SlotReference::Base(using.base_slot);
     let item = match inv.get(slot) {
         Ok(e) => e,
-        Err(e) => {
-            warn!(
-                "failed to get item in use from inventory: {:?} - {}",
-                slot, e
+        Err(err) => {
+            my_warn!(
+                "failed to get item in use from inventory"; "slot" => ?slot, "error" => %err
             );
             return EatResult::NoItem;
         }
     };
 
+    log_scope!(o!("item" => E(item)));
+
     let (base_item, edible) = match (base_item, edible_item).join().get(item, entities) {
         None => {
-            warn!("food item missing base or edible components ({:?})", item);
+            my_warn!("food item missing base or edible components");
             return EatResult::Errored(item, UseHeldItemError::NotAnItem);
         }
         Some(tup) => tup,

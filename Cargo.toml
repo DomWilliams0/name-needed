@@ -14,12 +14,12 @@ members = [
 	"shared/common",
 	"shared/config",
 	"shared/metrics",
-	"shared/struclog",
+	"shared/logging",
 	"shared/unit",
 ]
 
 [profile.dev]
-#debug = 0 # for fasting build times
+#debug = 0 # for faster build times
 
 [profile.release]
 debug = 1 # for profiling

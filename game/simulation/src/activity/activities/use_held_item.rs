@@ -10,12 +10,14 @@ use crate::item::{ItemReference, LooseItemReference};
 use crate::ComponentWorld;
 
 // TODO str to describe item, and pass through to subactivities
+#[derive(Debug)]
 pub struct UseHeldItemActivity {
     item: Entity,
     state: UseHeldItemState,
     finished: Option<BoxedResult<()>>,
 }
 
+#[derive(Debug)]
 enum UseHeldItemState {
     Equipping(ItemEquipSubActivity),
     Using(ItemUseSubActivity),
@@ -35,7 +37,7 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
         match &mut self.state {
             UseHeldItemState::Equipping(sub) => match sub.init(ctx) {
                 ActivityResult::Finished(Finish::Success) => {
-                    trace!("item is already equipped, using immediately");
+                    my_trace!("item is already equipped, using immediately");
 
                     let sub = ItemUseSubActivity::new(self.item, sub.slot());
                     let result = sub.init(ctx);
@@ -58,7 +60,7 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
         match &event.payload {
             EntityEventPayload::Equipped(result) => match result {
                 Ok(slot) => {
-                    trace!("equipped item successfully in slot {:?}", slot);
+                    my_trace!("equipped item successfully"; "slot" => ?slot);
 
                     // upgrade state to using equipped item
                     self.state = UseHeldItemState::Using(ItemUseSubActivity::new(
@@ -72,7 +74,7 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
                 }
 
                 Err(err) => {
-                    debug!("failed to equip item: {}", err);
+                    my_debug!("failed to equip item"; "error" => %err);
                     self.finished = Some(Err(Box::new(err.to_owned())));
                     (
                         EventUnblockResult::Unblock,
@@ -82,7 +84,7 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
             },
 
             EntityEventPayload::UsedUp(result) => {
-                trace!("item is used up, finishing activity");
+                my_trace!("item is used up");
                 debug_assert!(matches!(self.state, UseHeldItemState::Using(_)));
 
                 let result = result.to_owned().map_err(|e| Box::new(e) as Box<dyn Error>);

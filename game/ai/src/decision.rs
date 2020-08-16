@@ -17,7 +17,7 @@ pub enum DecisionWeight {
 }
 
 pub trait Dse<C: Context> {
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
     /// TODO pooled vec/slice rather than Vec each time
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;
     fn weight(&self) -> DecisionWeight;
@@ -48,12 +48,8 @@ pub trait Dse<C: Context> {
                 .curve()
                 .evaluate(NormalizedFloat::new(compensated_score))
                 .value();
-            trace!(
-                "consideration '{}' raw value is {:?} and scored {:?}",
-                c.name(),
-                score,
-                evaluated_score
-            );
+
+            my_trace!("consideration scored {score}", score = evaluated_score; "consideration" => c.name(), "raw" => score);
 
             #[cfg(feature = "logging")]
             {

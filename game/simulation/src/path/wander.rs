@@ -26,16 +26,19 @@ impl<'a> System<'a> for WanderPathAssignmentSystem {
         for (e, _, transform, path_follow) in
             (&entities, &wander, &transform, &mut path_follow).join()
         {
+            log_scope!(o!("system" => "wander", E(e)));
+
             // only assign paths if not following one already
             if path_follow.target().is_none() {
                 let target = world.choose_random_accessible_block(transform.position.floor(), 20);
                 if let Some(pos) = target {
-                    let _token =
+                    let token =
                         path_follow.new_path_to(pos.centred(), NormalizedFloat::new(WANDER_SPEED));
+                    my_trace!("new wander target"; "target" => %pos, "token" => ?token);
                 } else {
-                    warn!(
-                        "{:?}: failed to find wander path to random position from {}",
-                        e, transform.position
+                    my_warn!(
+                        "failed to find wander destination, we are probably stuck";
+                        "position" => %transform.position
                     );
                 }
             }

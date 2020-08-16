@@ -5,6 +5,7 @@ use crate::path::WanderComponent;
 use crate::ComponentWorld;
 use common::*;
 
+#[derive(Debug)]
 pub struct WanderActivity;
 
 impl<W: ComponentWorld> Activity<W> for WanderActivity {

@@ -4,7 +4,7 @@ use unit::world::WorldPoint;
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
 use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-use crate::ecs::Entity;
+use crate::ecs::{Entity, E};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
@@ -21,6 +21,7 @@ enum PickupItemsState {
     PickingUp(PickupItemSubActivity),
 }
 
+#[derive(Debug)]
 pub struct PickupItemsActivity {
     items: Vec<(Entity, WorldPoint)>,
     item_desc: &'static str,
@@ -57,6 +58,8 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                 // choose a new item to pickup
                 match self.best_item(ctx.world) {
                     BestItem::Excellent { item, pos, .. } => {
+                        my_trace!("new best item chosen"; "item" => E(item), "position" => %pos);
+
                         // subscribe to anything happening to the item
                         ctx.subscribe_to(item, EventSubscription::All);
 
@@ -70,6 +73,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     }
                     BestItem::NoneLeft(finish) => {
                         // no more items left, we're done
+                        my_trace!("no more items left"; "finish" => ?finish);
                         ActivityResult::Finished(finish)
                     }
                 }
@@ -92,7 +96,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                 debug_assert_eq!(event.subject, ctx.subscriber);
 
                 if let Err(e) = result {
-                    debug!("failed to navigate to item: {}", e);
+                    my_debug!("failed to navigate to item"; "error" => %e);
                     self.last_error = Some(PickupFailure::NavigationError(e.to_owned()));
                     self.state = PickupItemsState::Undecided;
                     return (
@@ -106,28 +110,30 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     PickupItemsState::GoingTo(item, sub) => {
                         assert_eq!(sub.token(), Some(*token), "got arrival event for different token {:?} than expected {:?}", token, sub.token());
 
+                        my_trace!("arrived at item, pick up next tick");
                         self.state = PickupItemsState::PickingUp(PickupItemSubActivity(*item));
 
                         // unsubscribe from our arrival but stay subscribed to item events
                         let unsubscribe = EntityEventSubscription(ctx.subscriber, EventSubscription::Specific(EntityEventType::Arrived));
 
-                        return (
+                        (
                             EventUnblockResult::Unblock,
                             EventUnsubscribeResult::Unsubscribe(unsubscribe),
-                        );
+                        )
                     }
                     ref e => unreachable!("should only receive arrival event while going to item, but is in state {:?}", e),
                 }
             }
             EntityEventPayload::PickedUp(result) => {
                 // our item has been picked up, who was it?
-                return match (&self.state, result) {
+                match (&self.state, result) {
                     (PickupItemsState::PickingUp(pickup), Ok((item, picker_upper)))
                         if *picker_upper == ctx.subscriber =>
                     {
                         debug_assert_eq!(*item, pickup.0);
 
                         // oh hey it was us, pickup complete!
+                        my_trace!("completed pick up");
                         self.complete = true;
                         (
                             EventUnblockResult::Unblock,
@@ -136,12 +142,11 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     }
                     (_, err) => {
                         // something else happened, rip to this attempt. try again next tick
+                        my_trace!("something happened to the item before we could pick it up"; "result" => ?err);
 
                         self.last_error = Some(if let Err(e) = err {
-                            debug!("failed to pickup item: {}", e);
                             PickupFailure::PickupError(e.to_owned())
                         } else {
-                            debug!("aborting item pickup");
                             PickupFailure::Other
                         });
 
@@ -152,18 +157,10 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                             EventUnsubscribeResult::UnsubscribeAll,
                         )
                     }
-                };
+                }
             }
-            _ => {
-                // unknown event
-                debug!("ignoring event {:?}", event);
-            }
-        };
-
-        (
-            EventUnblockResult::KeepBlocking,
-            EventUnsubscribeResult::StaySubscribed,
-        )
+            e => unreachable!("unexpected event {:?}", e),
+        }
     }
 
     fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
@@ -197,10 +194,17 @@ impl PickupItemsActivity {
         let err = self.last_error.take();
         if let Some(err) = err.as_ref() {
             let last = self.items.pop();
-            debug!(
-                "removed last best item {:?} due to pickup failure: {:?}",
-                last, err
-            );
+            if let Some((last, _)) = last {
+                my_debug!(
+                    "removed last best item due to pickup failure";
+                    "item" => E(last), "error" => ?err
+                );
+            } else {
+                my_debug!(
+                    "pickup failure occurred picking up the last candidate item";
+                    "error" => ?err
+                );
+            }
         }
 
         // choose the best item that still exists

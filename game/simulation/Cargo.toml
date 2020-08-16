@@ -14,7 +14,7 @@ world = {path = "../world"}
 
 unit = {path = "../../shared/unit"}
 config = {path = "../../shared/config"}
-common = { path = "../../shared/common", features=["library"] }
+common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 ai = { path = "../ai" }
 resources = { path = "../resources" }
@@ -37,7 +37,6 @@ hex-serde = "^0.1"
 
 [dev-dependencies]
 matches = "^0.1"
-env_logger = "^0.7"
 
 [features]
 default = []

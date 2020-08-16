@@ -66,14 +66,16 @@ impl Definition {
 
                 let component_template = templates.construct(key.as_str(), &mut map)?;
 
-                // bit gross to allocate a vec here just for logging
-                let leftovers = map.keys().collect_vec();
-                if !leftovers.is_empty() {
-                    warn!(
-                        "construction of component template {:?} ignored key(s): {:?}",
-                        key, leftovers
+                for leftover in map.keys() {
+                    my_warn!(
+                        "construction of component template ignored key";
+                        "template" => &key, "ignored_key" => leftover,
                     );
                 }
+
+                // bit gross to allocate a vec here just for logging
+                let leftovers = map.keys().collect_vec();
+                if !leftovers.is_empty() {}
 
                 component_templates.push(component_template);
             }

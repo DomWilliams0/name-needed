@@ -1,5 +1,5 @@
 use crate::activity::EventUnsubscribeResult;
-use crate::ecs::Entity;
+use crate::ecs::{Entity, E};
 use crate::event::subscription::{EntityEvent, EventSubscription};
 use crate::event::{EntityEventSubscription, EntityEventType};
 use common::{num_traits::FromPrimitive, *};
@@ -63,7 +63,7 @@ impl EntityEventQueue {
     }
 
     pub fn post(&mut self, event: EntityEvent) {
-        common::debug!("posting event: {:?}", event);
+        my_debug!("posting event"; "event" => ?event);
         self.events.push(event);
     }
 
@@ -116,6 +116,10 @@ impl EntityEventQueue {
                 Some(subs) => subs,
                 None => {
                     // no subscribers
+                    let count = events.count();
+                    my_trace!("dropping {count} events because subject has no subscribers",
+                        count = count; "subject" => E(subject)
+                    );
                     continue;
                 }
             };
@@ -139,10 +143,14 @@ impl EntityEventQueue {
 
                     if unsubscribed_already {
                         // already unsubscribed, no more events pls
+                        my_trace!("already unsubscribed, skipping"; "subscriber" => E(*subscriber), "event" => ?event);
                         continue;
                     }
 
+                    my_debug!("passing event"; "subscriber" => E(*subscriber), "event" => ?event);
                     let result = f(*subscriber, event);
+                    my_trace!("result"; "result" => ?result, "subscriber" => E(*subscriber), "event" => ?event);
+
                     let unsubscription = match result {
                         EventUnsubscribeResult::UnsubscribeAll => None,
                         EventUnsubscribeResult::Unsubscribe(subs) => Some(subs),
@@ -160,17 +168,17 @@ impl EntityEventQueue {
         for (unsubscriber, unsubs) in unsubs.drain() {
             match unsubs {
                 None => {
-                    debug!(
-                        "unsubscribing {} from all subscriptions",
-                        crate::entity_pretty!(unsubscriber)
+                    my_debug!(
+                        "unsubscribing from all subscriptions";
+                        "unsubscriber" => E(unsubscriber)
                     );
                     self.unsubscribe_all(unsubscriber)
                 }
                 Some(unsub) => {
-                    debug!(
-                        "unsubscribing {} from {:?}",
-                        crate::entity_pretty!(unsubscriber),
-                        unsub
+                    my_debug!(
+                        "unsubscribing from specific subscription";
+                        "subscription" => ?unsub,
+                        "unsubscriber" => E(unsubscriber)
                     );
                     self.unsubscribe(unsubscriber, unsub)
                 }
@@ -186,14 +194,14 @@ impl EntityEventQueue {
         for (subject, subs) in self.subscriptions.iter() {
             let count = subs.iter().filter(|(_, subs)| !subs.is_empty()).count();
             if count > 0 {
-                trace!(
-                    "subject {} has {} subscribers",
-                    crate::entity_pretty!(subject),
-                    count,
+                my_trace!(
+                    "subject has {count} subscribers",
+                    count = count;
+                    "subject" => E(*subject),
                 );
                 for (subscriber, bitset) in subs {
                     if !bitset.is_empty() {
-                        trace!(" - {} -> {:?}", crate::entity_pretty!(subscriber), bitset);
+                        my_trace!("subscriptions for {subscriber}", subscriber = E(*subscriber); "subscriptions" => ?bitset);
                     }
                 }
             }
@@ -352,9 +360,9 @@ mod tests {
             e2,
             once(EntityEventSubscription(e1, EventSubscription::All)),
         );
-        q.post(evt_1_dummy_a.clone());
-        q.post(evt_1_dummy_b.clone());
-        q.post(evt_2_dummy_b.clone());
+        q.post(evt_1_dummy_a);
+        q.post(evt_1_dummy_b);
+        q.post(evt_2_dummy_b);
 
         let mut dummy_a = 0;
         let mut dummy_b = 0;
@@ -429,7 +437,7 @@ mod tests {
             once(EntityEventSubscription(e1, EventSubscription::All)),
         );
 
-        q.post(evt_1_dummy_a.clone());
+        q.post(evt_1_dummy_a);
         assert_eq!(count_events(&mut q), 1);
     }
 
@@ -456,10 +464,10 @@ mod tests {
                 payload: EntityEventPayload::DummyB,
             };
 
-            q.post(evt_1_dummy_a.clone());
-            q.post(evt_1_dummy_b.clone());
-            q.post(evt_2_dummy_a.clone());
-            q.post(evt_2_dummy_b.clone());
+            q.post(evt_1_dummy_a);
+            q.post(evt_1_dummy_b);
+            q.post(evt_2_dummy_a);
+            q.post(evt_2_dummy_b);
 
             count_events(q)
         };
@@ -542,10 +550,7 @@ mod tests {
 
     #[test]
     fn multiple_subscribers() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         let mut q = EntityEventQueue::default();
         let (e1, e2) = make_entities();

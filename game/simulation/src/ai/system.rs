@@ -61,7 +61,6 @@ pub struct AiSystem;
 
 impl<'a> System<'a> for AiSystem {
     type SystemData = (
-        Read<'a, Tick>,
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
         Read<'a, WorldRef>,
@@ -77,7 +76,6 @@ impl<'a> System<'a> for AiSystem {
     fn run(
         &mut self,
         (
-            tick,
             entities,
             ecs_world,
             voxel_world,
@@ -91,7 +89,8 @@ impl<'a> System<'a> for AiSystem {
         ): Self::SystemData,
     ) {
         // TODO only run occasionally - FIXME TERRIBLE HACK
-        if **tick % 10 != 0 {
+        let tick = Tick::fetch();
+        if tick.value() % 10 != 0 {
             return;
         }
 
@@ -111,6 +110,8 @@ impl<'a> System<'a> for AiSystem {
         )
             .join()
         {
+            log_scope!(o!("system" => "ai", E(e)));
+
             // initialize blackboard
             // TODO use arena/bump allocator and share instance between entities
             let mut bb = AiBlackboard {
@@ -136,25 +137,24 @@ impl<'a> System<'a> for AiSystem {
                 society.and_then(|society_comp| society_comp.resolve(&mut *societies));
 
             if let Some(ref mut society) = society {
-                trace!("considering tasks for society {:?}", society);
+                my_trace!("considering tasks for society"; "society" => ?society);
 
                 let jobs: &mut JobList = (*society).jobs_mut();
-                let (is_cached, tasks) = jobs.collect_cached_tasks_for(*tick, &*voxel_world, e);
+                let (is_cached, tasks) = jobs.collect_cached_tasks_for(tick, &*voxel_world, e);
 
                 debug_assert!(
                     extra_dses.is_empty(),
-                    "society tasks is the only source of extra dses"
+                    "society tasks expected to be the only source of extra dses"
                 );
                 extra_dses.extend(tasks.map(|task| {
                     let dse = (&task).into();
                     (task, dse)
                 }));
 
-                trace!(
-                    "there are {} tasks{} for {:?}",
-                    extra_dses.len(),
-                    if is_cached { " (cached)" } else { "" },
-                    e
+                my_trace!(
+                    "there are {count} tasks available",
+                    count = extra_dses.len();
+                    "cached" => is_cached,
                 );
             }
 
@@ -164,8 +164,8 @@ impl<'a> System<'a> for AiSystem {
                 .intelligence
                 .choose_with_stream_dses(bb_ref, streamed_dse)
             {
-                debug!("{:?}: new activity: {} (from {:?})", e, dse.name(), src);
-                trace!("activity: {:?}", action);
+                my_debug!("new activity"; "dse" => dse.name(), "source" => ?src);
+                my_trace!("activity action"; "action" => ?action);
 
                 // pass on to activity system
                 activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
@@ -175,7 +175,7 @@ impl<'a> System<'a> for AiSystem {
                     match interrupted_source {
                         DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
                             // divine command interrupted, assume completed
-                            debug!("removing interrupted divine command");
+                            my_debug!("removing interrupted divine command");
                             ai.remove_divine_command();
                         }
                         DecisionSource::Stream(_) => {

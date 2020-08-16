@@ -111,8 +111,8 @@ impl<P: WorkerPool> WorldLoader<P> {
             let source = self.source.clone();
             let batch = batches.next_batch();
 
-            debug!(
-                "submitting chunk {:?} request to pool in batch {:?}",
+            my_debug!(
+                "submitting batch of chunk requests to pool";
                 chunk, batch
             );
 
@@ -159,8 +159,8 @@ impl<P: WorkerPool> WorldLoader<P> {
         for (chunk, terrain) in updates {
             let batch = batches.next_batch();
 
-            debug!(
-                "submitting chunk {:?} update to pool in batch {:?}",
+            my_debug!(
+                "submitting chunk update to pool";
                 chunk, batch
             );
             self.pool.submit(
@@ -252,7 +252,7 @@ impl<P: WorkerPool> WorldLoader<P> {
                         Some(t) => t,
                     };
 
-                    trace!("waiting for chunk {}/{} for {:?}", (i + 1), count, timeout);
+                    my_trace!("waiting for chunk {index}/{total}", index = i + 1, total = count; "timeout" => ?timeout);
                     match self.block_on_next_finalization(timeout) {
                         None => return Err(BlockForAllError::TimedOut),
                         Some(Err(e)) => return Err(BlockForAllError::Error(e)),
@@ -294,29 +294,32 @@ impl ChunkFinalizer {
     fn finalize(&mut self, (chunk, terrain, batch): (ChunkPosition, ChunkTerrain, UpdateBatch)) {
         // world lock is taken and released often to prevent holding up the main thread
 
-        debug!(
-            "submitting completed chunk {:?} for finalization in batch {:?}",
-            chunk, batch
+        my_debug!(
+            "submitting completed chunk for finalization";
+            chunk, batch,
         );
+
         self.batcher
             .submit(batch, FinalizeBatchItem::initialized(chunk, terrain));
 
         // finalize completed batches only, which might not include this update.
         for (batch_id, batch_size) in self.batcher.complete_batches() {
-            debug!("finalizing {} items in batch id={}", batch_size, batch_id);
+            my_trace!("popping batch"; "id" => batch_id, "size" => batch_size);
 
             // we know that all dependent chunks (read: chunks in the same batch) are present now
-            let batch = self.batcher.pop_batch(batch_id);
-            trace!("batch: {:#?}", batch);
-            debug_assert_eq!(batch.len(), batch_size);
+            let (batch, items) = self.batcher.pop_batch(batch_id);
+            debug_assert_eq!(items.len(), batch_size);
 
+            log_scope!(o!(batch));
             for idx in 0..batch_size {
+                my_trace!("about to finalize"; "index" => idx);
+
                 // pop this chunk from the dependent list
-                let (chunk, terrain) = unsafe { batch.get_unchecked(idx) }.consume();
+                let (chunk, terrain) = unsafe { items.get_unchecked(idx) }.consume();
 
                 // finalize this chunk
-                debug!("finalizing chunk {:?}", chunk);
-                self.do_finalize(chunk, terrain, &batch);
+                my_debug!("finalizing"; chunk, "index" => idx);
+                self.do_finalize(chunk, terrain, &items);
             }
         }
     }
@@ -347,6 +350,8 @@ impl ChunkFinalizer {
                         })
                 })
             };
+
+        log_scope!(o!(chunk));
 
         for (direction, offset) in NeighbourOffset::offsets() {
             let world = self.world.borrow();
@@ -388,11 +393,10 @@ impl ChunkFinalizer {
                     .apply_occlusion_updates(&this_terrain_updates);
 
                 if applied > 0 {
-                    debug!(
-                        "applied {:?}/{:?} occlusion updates to chunk {:?}",
-                        applied,
-                        this_terrain_updates.len(),
-                        chunk
+                    my_debug!(
+                        "applied {applied}/{total_count} occlusion updates",
+                        applied=applied,
+                        total_count=this_terrain_updates.len();
                     );
                 }
 
@@ -401,10 +405,10 @@ impl ChunkFinalizer {
 
             // queue changes to existing chunks in world
             if !other_terrain_updates.is_empty() {
-                debug!(
-                    "queueing {:?} occlusion updates to apply to chunk {:?} next tick",
-                    other_terrain_updates.len(),
-                    neighbour_offset
+                my_debug!(
+                    "queueing {count} occlusion updates to apply to neighbour {neighbour:?} next tick",
+                    count = other_terrain_updates.len(),
+                    neighbour = neighbour_offset
                 );
                 self.updates
                     .send(OcclusionChunkUpdate(
@@ -430,18 +434,20 @@ impl ChunkFinalizer {
             let mut links = Vec::new(); // TODO reuse buf
             let mut ports = Vec::new(); // TODO reuse buf
             terrain.raw_terrain().cross_chunk_pairs_nav_foreach(
-                    neighbour_terrain,
-                    direction,
-                    |src_area, dst_area, edge_cost, i, z| {
-                        trace!("{:?} link from chunk {:?} area {:?} ----> chunk {:?} area {:?} ============= direction {:?} {}",
-                               edge_cost, chunk, src_area, neighbour_offset, dst_area, direction, i);
+                neighbour_terrain,
+                direction,
+                |src_area, dst_area, edge_cost, i, z| {
+                    my_trace!("adding cross-chunk link to neighbour {neighbour:?}",
+                        neighbour = neighbour_offset; "to_area" => ?dst_area,
+                        "from_area" => ?src_area, "direction" => ?direction, "xy" => i, "z" => ?z
+                    );
 
-                        let src_area = src_area.into_world_area(chunk);
-                        let dst_area = dst_area.into_world_area(neighbour_offset);
+                    let src_area = src_area.into_world_area(chunk);
+                    let dst_area = dst_area.into_world_area(neighbour_offset);
 
-                        links.push((src_area, dst_area, edge_cost, i, z));
-                    },
-                );
+                    links.push((src_area, dst_area, edge_cost, i, z));
+                },
+            );
 
             links.sort_unstable_by_key(|(_, _, _, i, _)| *i);
 
@@ -467,7 +473,7 @@ impl ChunkFinalizer {
         {
             // finally take WorldRef write lock and post new chunk
             let mut world = self.world.borrow_mut();
-            debug!("adding completed chunk {:?} to world", chunk.pos());
+            my_debug!("adding completed chunk to world");
             world.add_loaded_chunk(chunk, &area_edges);
         }
     }

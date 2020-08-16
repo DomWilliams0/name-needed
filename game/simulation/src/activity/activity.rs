@@ -45,7 +45,7 @@ pub struct ActivityEventContext {
     pub subscriber: Entity,
 }
 
-pub trait Activity<W: ComponentWorld>: Display {
+pub trait Activity<W: ComponentWorld>: Display + Debug {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult;
 
     #[allow(unused_variables)]
@@ -72,7 +72,7 @@ pub trait Activity<W: ComponentWorld>: Display {
             (err @ Err(_), Ok(_)) | (Ok(_), err @ Err(_)) => err,
             (Err(a), Err(b)) => {
                 // pass through activity failure and log subactivity
-                error!("failed to finish subactivity as well as activity: {}", a);
+                my_error!("failed to finish subactivity as well as activity"; "error" => %a);
                 Err(b)
             }
             _ => Ok(()), // both ok
@@ -97,5 +97,21 @@ impl<'a, W: ComponentWorld> ActivityContext<'a, W> {
 impl ActivityResult {
     pub fn errored<E: Error + 'static>(err: E) -> Self {
         Self::Finished(Finish::Failure(Box::new(err)))
+    }
+}
+
+// impl <A> slog::Value  for A where A: Activity<_> {
+//     fn serialize(&self, _: &Record, key: &'static str, serializer: &mut dyn Serializer) -> SlogResult<()> {
+//     }
+// }
+
+impl<W: ComponentWorld> slog::Value for dyn Activity<W> {
+    fn serialize(
+        &self,
+        _: &Record,
+        key: &'static str,
+        serializer: &mut dyn Serializer,
+    ) -> SlogResult<()> {
+        serializer.emit_arguments(key, &format_args!("{:?}", self))
     }
 }

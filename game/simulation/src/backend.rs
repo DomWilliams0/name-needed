@@ -40,6 +40,8 @@ pub trait PersistentSimulationBackend: Sized {
     fn new(resources: &Resources) -> Result<Self, Self::Error>;
 
     fn start(self, world: WorldViewer) -> Self::Initialized;
+
+    fn name() -> &'static str;
 }
 
 pub mod state {

@@ -30,18 +30,21 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             .world
             .worker_threads
             .unwrap_or_else(|| (num_cpus::get() / 2).max(1));
-        debug!("using {} threads for world loader", thread_count);
+        my_debug!(
+            "using {threads} threads for world loader",
+            threads = thread_count
+        );
         let pool = ThreadedWorkerPool::new(thread_count);
 
         let which_source = config::get().world.source.clone();
         Ok(match which_source {
             WorldSource::Preset(preset) => {
-                debug!("loading world preset '{:?}'", preset);
+                my_debug!("loading world preset"; "preset" => ?preset);
                 let source = presets::from_preset(preset);
                 WorldLoader::new(source, pool)
             }
             WorldSource::Generate { seed, radius } => {
-                debug!("generating world with radius {}", radius);
+                my_debug!("generating world with radius {radius}", radius = radius);
                 let height_scale = config::get().world.generation_height_scale;
                 let source = GeneratedTerrainSource::new(seed, radius, height_scale)?;
                 WorldLoader::new(source, pool)
@@ -52,7 +55,12 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
     fn init(&self, sim: &mut Simulation<R>) -> BoxedResult<()> {
         if let Some(seed) = config::get().simulation.random_seed {
             random::reseed(seed);
-            debug!("seeding random generator with seed {:?} from config", seed);
+            my_info!(
+                "seeding random generator with seed {seed} from config",
+                seed = seed
+            );
+        } else {
+            my_info!("using random seed")
         }
 
         let mut colors = ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap();
@@ -62,7 +70,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         let worldref = sim.world();
         let world = worldref.borrow();
         if randoms > 0 {
-            info!("adding {} random entities", randoms);
+            my_info!("adding {count} random entities", count = randoms);
 
             let society = sim
                 .societies()

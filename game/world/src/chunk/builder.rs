@@ -1,6 +1,6 @@
 use nd_iter::iter_3d;
 
-use common::warn;
+use common::*;
 use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
 
 use crate::block::Block;
@@ -54,7 +54,7 @@ impl ChunkBuilder {
             .terrain()
             .slice_mut_with_policy(slice, SlabCreationPolicy::CreateAll, do_fill)
         {
-            warn!("failed to create slice {:?} to fill", slice);
+            my_warn!("failed to create slice to fill"; "slice" => ?slice);
         }
 
         self

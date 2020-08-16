@@ -8,6 +8,7 @@ use unit::world::WorldPoint;
 use world::NavigationError;
 
 /// Simple wrapper around goto subactivity with a given reason
+#[derive(Debug)]
 pub struct GoToActivity {
     goto: GoToSubActivity,
     reason: &'static str,

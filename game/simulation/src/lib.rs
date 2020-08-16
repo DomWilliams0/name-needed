@@ -17,6 +17,7 @@ pub use ecs::ComponentWorld;
 pub use item::{BaseItemComponent, InventoryComponent};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
+pub use simulation::current_tick;
 pub use society::{Societies, SocietyComponent, SocietyHandle};
 
 pub const TICKS_PER_SECOND: usize = 20;
