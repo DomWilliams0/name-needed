@@ -20,8 +20,7 @@ env:
     SDL_DIR=SDL2-2.0.9
 os:
     - linux
-    - windows
-    # TODO try osx
+      # TODO windows and osx
 rust:
     - stable
     - nightly

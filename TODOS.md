@@ -1,6 +1,6 @@
 # TODOs (180)
  * [.travis.yml](.travis.yml) (1)
-   * `# TODO try osx`
+   * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
