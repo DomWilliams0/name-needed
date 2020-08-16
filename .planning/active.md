@@ -15,14 +15,16 @@
 * [X] bitmask for event subscription, so All isn't a special case
 * [X] assign opaque token to path assignments for future comparisons
 * [X] allow cancelling of path finding
-* [ ] fix repetitive verbose event logging
+* [X] fix repetitive verbose event logging
 * [X] lite runner config
 * [ ] definition validator separate bin
 * [X] component world event posting helper
-* [ ] fix "unreachable" panic with many entities going for food, typical
+* [X] fix "unreachable" panic with many entities going for food, typical
 * [X] unreserve interrupted society commands
 * [X] allow ci build failures on nightly
 * [ ] bug: possible to get stuck in inaccessible position after breaking society blocks again
 	* possible SosComponent to move to an actually accessible adjacent block?
 * [X] customisable nop activity
 * [ ] possible bug: they spend a lot of time between activities in Nop
+* [X] emit arrived event failure when prev target is aborted
+* [X] clear current path shouldnt assign a token

@@ -191,6 +191,7 @@ impl EntityEventQueue {
     }
 
     pub fn log(&self) {
+        my_trace!(">>> event subscribers >>>");
         for (subject, subs) in self.subscriptions.iter() {
             let count = subs.iter().filter(|(_, subs)| !subs.is_empty()).count();
             if count > 0 {
@@ -206,6 +207,7 @@ impl EntityEventQueue {
                 }
             }
         }
+        my_trace!("<<< event subscribers <<<");
     }
 }
 

@@ -108,7 +108,16 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                 // we have arrived at our item, change state and start the pickup in the next tick
                 match &self.state {
                     PickupItemsState::GoingTo(item, sub) => {
-                        assert_eq!(sub.token(), Some(*token), "got arrival event for different token {:?} than expected {:?}", token, sub.token());
+                        if sub.token() != Some(*token) {
+                            my_trace!("got arrival event for different token than expected, continuing to wait";
+                                "expected" => ?sub.token(), "actual" => ?token
+                            );
+
+                            return (
+                                EventUnblockResult::KeepBlocking,
+                                EventUnsubscribeResult::StaySubscribed
+                            );
+                        }
 
                         my_trace!("arrived at item, pick up next tick");
                         self.state = PickupItemsState::PickingUp(PickupItemSubActivity(*item));

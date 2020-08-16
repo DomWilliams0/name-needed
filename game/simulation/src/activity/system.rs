@@ -56,10 +56,15 @@ impl<'a> System<'a> for ActivitySystem {
             };
 
             if let Some(new_action) = activity.new_activity.take() {
-                // interrupt current activity with new
+                my_debug!("interrupting activity with new"; "action" => ?new_action);
+
                 if let Err(e) = activity.current.finish(Finish::Interrupted, &mut ctx) {
                     my_error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
                 }
+
+                // unsubscribe from all events from previous activity
+                event_queue.unsubscribe_all(entity);
+                comp_updates.remove::<BlockingActivityComponent>(entity);
 
                 // replace current with new activity, dropping the old one
                 new_action.into_activity(&mut activity.current);

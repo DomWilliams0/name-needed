@@ -33,6 +33,7 @@ impl GoToSubActivity {
         }
     }
 
+    // TODO remove Option, default to a null path token? or just unwrap here
     pub fn token(&self) -> Option<PathToken> {
         self.token.get()
     }
