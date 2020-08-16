@@ -1,3 +1,4 @@
+use crate::path::PathToken;
 use common::NormalizedFloat;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -10,6 +11,7 @@ pub enum PathRequest {
         target: WorldPoint,
         goal: SearchGoal,
         speed: NormalizedFloat,
+        token: PathToken,
     },
     ClearCurrent,
 }

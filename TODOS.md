@@ -30,7 +30,8 @@
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
    * `// TODO move subactivity errors somewhere else`
    * `// TODO itemfilter should specify a static string describing itself`
- * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
+ * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
+   * `// TODO remove Option, default to a null path token? or just unwrap here`
    * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
  * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (3)
@@ -123,8 +124,6 @@
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
-   * `// TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)

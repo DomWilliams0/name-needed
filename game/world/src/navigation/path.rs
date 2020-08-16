@@ -21,6 +21,9 @@ pub enum NavigationError {
 
     #[display(fmt = "Block navigation error")]
     BlockError(WorldArea, #[error(source)] BlockPathError),
+
+    #[display(fmt = "Navigation was aborted")]
+    Aborted,
 }
 
 impl From<AreaPathError> for NavigationError {

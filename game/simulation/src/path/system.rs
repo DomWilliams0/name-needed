@@ -2,7 +2,7 @@ use std::iter::once;
 
 use common::*;
 use unit::world::WorldPoint;
-use world::SearchGoal;
+use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
@@ -19,7 +19,7 @@ pub struct FollowPathComponent {
     current_token: Option<PathToken>,
 
     /// If set, will be popped in next tick and `path` updated
-    request: Option<(PathRequest, PathToken)>,
+    request: Option<PathRequest>,
     next_token: u64,
 }
 
@@ -50,48 +50,62 @@ impl<'a> System<'a> for PathSteeringSystem {
             log_scope!(o!("system" => "path steering", E(e)));
 
             // new path request
-            if let Some((req, token)) = path.pop_request() {
+            if let Some(req) = path.pop_request() {
+                my_trace!("new path request"; "rqeuest" => ?req);
+
+                // send failed arrived event for previous target
+                if let Some(current) = path.current_token {
+                    my_trace!("aborting previous path"; "token" => ?current, "target" => ?path.target());
+
+                    event_queue.post(EntityEvent {
+                        subject: e,
+                        payload: EntityEventPayload::Arrived(
+                            current,
+                            Err(NavigationError::Aborted),
+                        ),
+                    });
+                }
+
+                // clobber current path
+                path.path = None;
+                path.current_token = None;
+
                 match req {
                     PathRequest::ClearCurrent => {
-                        if path.target().is_some() {
-                            my_debug!("clearing current path by request");
-                        }
-                        path.path = None;
+                        my_debug!("clearing current path by request");
                     }
                     PathRequest::NewTarget {
                         target,
                         goal,
                         speed,
+                        token,
                     } => {
-                        // skip path finding if destination is the same
-                        let current_target = path.target();
-                        if current_target != Some(target) {
-                            let world = (*world).borrow();
-                            let new_path = match world.find_path_with_goal(
-                                transform.position.floor(),
-                                target.floor(),
-                                goal,
-                            ) {
-                                Err(err) => {
-                                    my_warn!("failed to find path"; "target" => ?target, "error" => %err);
+                        let world = (*world).borrow();
+                        let new_path = world.find_path_with_goal(
+                            transform.position.floor(),
+                            target.floor(),
+                            goal,
+                        );
 
-                                    event_queue.post(EntityEvent {
-                                        subject: e,
-                                        payload: EntityEventPayload::Arrived(token, Err(err)),
-                                    });
+                        match new_path {
+                            Err(err) => {
+                                my_warn!("failed to find path"; "target" => ?target, "error" => %err);
 
-                                    continue;
-                                }
-                                Ok(path) => path,
-                            };
+                                event_queue.post(EntityEvent {
+                                    subject: e,
+                                    payload: EntityEventPayload::Arrived(token, Err(err)),
+                                });
+                            }
+                            Ok(new_path) => {
+                                let path_len = new_path.path().len();
+                                let new_following = PathFollowing::new(new_path, target, goal);
+                                my_debug!("following new path"; "target" => ?new_following.target(), "path_nodes" => path_len);
 
-                            let new_following = PathFollowing::new(new_path, target, goal);
-                            my_debug!("following new path"; "target" => ?new_following.target());
-
-                            path.path.replace(new_following);
-                            path.follow_speed = speed;
-                            path.current_token = Some(token);
-                        }
+                                path.path = Some(new_following);
+                                path.follow_speed = speed;
+                                path.current_token = Some(token);
+                            }
+                        };
                     }
                 }
             }
@@ -127,18 +141,17 @@ impl<'a> System<'a> for PathSteeringSystem {
 }
 
 impl FollowPathComponent {
-    // TODO return a monotonic token representing this assignment, so the caller can later identify if the target is still its doing
-    fn request_new_path(&mut self, req: PathRequest) -> PathToken {
+    fn set_request(&mut self, req: PathRequest) {
         if let Some(old) = self.request.as_ref() {
-            my_warn!("follow path target was overwritten before it could be used"; "previous" => ?old, "new" => ?req);
+            if let PathRequest::NewTarget { .. } = old {
+                my_warn!("follow path target was overwritten before it could be used";
+                    "previous" => ?old, "new" => ?req
+                );
+            }
         }
 
-        let token = PathToken(self.next_token);
-        self.next_token = self.next_token.wrapping_add(1);
-
-        self.request = Some((req, token));
-        // preserve current_token until done
-        token
+        my_trace!("assigning new follow path request"; "request" => ?req);
+        self.request = Some(req);
     }
 
     pub fn new_path_to(&mut self, target: WorldPoint, speed: NormalizedFloat) -> PathToken {
@@ -151,16 +164,24 @@ impl FollowPathComponent {
         goal: SearchGoal,
         speed: NormalizedFloat,
     ) -> PathToken {
-        self.request_new_path(PathRequest::NewTarget {
+        let token = PathToken(self.next_token);
+        self.next_token = self.next_token.wrapping_add(1);
+
+        let req = PathRequest::NewTarget {
             target,
             goal,
             speed,
-        })
+            token,
+        };
+
+        self.set_request(req);
+
+        // preserve current_token until done
+        token
     }
 
     pub fn clear_path(&mut self) {
-        // ignore token
-        let _ = self.request_new_path(PathRequest::ClearCurrent);
+        self.set_request(PathRequest::ClearCurrent);
     }
 
     pub fn target(&self) -> Option<WorldPoint> {
@@ -177,7 +198,7 @@ impl FollowPathComponent {
         }
     }
 
-    pub fn pop_request(&mut self) -> Option<(PathRequest, PathToken)> {
+    fn pop_request(&mut self) -> Option<PathRequest> {
         self.request.take()
     }
 
