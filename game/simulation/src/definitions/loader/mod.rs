@@ -20,10 +20,8 @@ mod tests {
     use specs::EntityBuilder;
 
     use crate::definitions::loader::load::preprocess_from_str;
-    use crate::definitions::loader::step1_deserialization::{
-        DefinitionUid, DeserializedDefinition,
-    };
-    use crate::definitions::loader::step3_construction::{instantiate, Definition};
+    use crate::definitions::loader::step1_deserialization::DeserializedDefinition;
+    use crate::definitions::loader::step3_construction::instantiate;
     use crate::definitions::loader::template_lookup::TemplateLookup;
     use crate::definitions::DefinitionErrorKind;
     use crate::ecs::{ComponentBuildError, ComponentTemplate, ComponentTemplateEntry, Map};

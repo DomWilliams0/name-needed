@@ -9,6 +9,7 @@ pub use world::{
     presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
 
+pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
@@ -17,13 +18,12 @@ pub use ecs::ComponentWorld;
 pub use item::{BaseItemComponent, InventoryComponent};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
-pub use simulation::current_tick;
 pub use society::{Societies, SocietyComponent, SocietyHandle};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
 #[cfg(test)]
-pub use simulation::register_components;
+pub use self::simulation::register_components;
 
 mod activity;
 mod ai;
