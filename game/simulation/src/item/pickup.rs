@@ -151,7 +151,24 @@ impl<'a> System<'a> for PickupItemSystem {
 
 impl PartialEq for ItemsToPickUp {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 && self.1.len() == other.1.len()
+        if self.0 == other.0 {
+            // consider equal if the number of matching items is within a margin
+            const MARGIN: usize = 16;
+
+            let diff = {
+                let a = self.1.len();
+                let b = other.1.len();
+                if a > b {
+                    a - b
+                } else {
+                    b - a
+                }
+            };
+
+            diff <= MARGIN
+        } else {
+            false
+        }
     }
 }
 
