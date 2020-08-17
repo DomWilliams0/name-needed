@@ -14,6 +14,8 @@ pub struct Logger(Level, GlobalLoggerGuard);
 #[derive(Debug)]
 pub enum LogError {
     BadLevel(String),
+    #[cfg(feature = "elasticsearch")]
+    Elastic(Box<dyn Error>),
 }
 
 impl LoggerBuilder {
@@ -36,9 +38,14 @@ impl LoggerBuilder {
     // TODO configure to write to file as text
     // TODO configure to publish to elasticsearch
 
-    pub fn init(self, timestamp_fn: impl ThreadSafeTimestampFn) -> Result<Logger, LogError> {
+    #[cfg(not(feature = "elasticsearch"))]
+    pub fn init(
+        self,
+        timestamp_fn: impl ThreadSafeTimestampFn,
+        _tick_fn: fn() -> u32,
+    ) -> Result<Logger, LogError> {
         let decorator = slog_term::TermDecorator::new()
-            .stderr()
+            .stdout()
             .force_color()
             .build();
         let drain = slog_term::CompactFormat::new(decorator)
@@ -50,6 +57,27 @@ impl LoggerBuilder {
             .thread_name("logging".to_owned())
             .chan_size(1024)
             .build_no_guard()
+            .fuse();
+        let logger = slog::Logger::root(drain, slog::o!());
+
+        let global = slog_scope::set_global_logger(logger);
+        Ok(Logger(self.level, global))
+    }
+
+    #[cfg(feature = "elasticsearch")]
+    pub fn init(
+        self,
+        timestamp_fn: impl ThreadSafeTimestampFn,
+        nicer_tick_fn: fn() -> u32,
+    ) -> Result<Logger, LogError> {
+        use crate::elastic::ElasticDrain;
+
+        let drain = ElasticDrain::new(nicer_tick_fn).map_err(LogError::Elastic)?;
+        let drain = slog_async::Async::new(drain.fuse())
+            .thread_name("logging".to_owned())
+            .chan_size(1024)
+            .build_no_guard()
+            .filter_level(self.level)
             .fuse();
         let logger = slog::Logger::root(drain, slog::o!());
 
@@ -74,6 +102,8 @@ impl Display for LogError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             LogError::BadLevel(s) => write!(f, "Invalid level {:?}", s),
+            #[cfg(feature = "elasticsearch")]
+            LogError::Elastic(e) => write!(f, "Elasticsearch: {}", e),
         }
     }
 }

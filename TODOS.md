@@ -1,4 +1,4 @@
-# TODOs (179)
+# TODOs (180)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -250,6 +250,8 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/logging/src/elastic.rs](shared/logging/src/elastic.rs) (1)
+   * `uid: String, // TODO use uid`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (2)
    * `// TODO configure to write to file as text`
    * `// TODO configure to publish to elasticsearch`

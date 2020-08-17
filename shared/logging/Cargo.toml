@@ -13,6 +13,12 @@ slog-term = {version = "^2.5", optional = true}
 slog-async = {version = "^2.5", optional = true}
 once_cell = "^1.4"
 
+ureq = {version = "^1.4", optional = true, default-features = false}
+serde = {version = "^1.0", optional = true}
+serde_json = {version = "^1.0", optional = true, features = ["raw_value"]}
+rand = {version = "^0.7", optional = true}
+
 [features]
 default = ["binary"]
 binary = ["slog-term", "slog-async"]
+elasticsearch = ["ureq", "serde", "serde_json", "rand"]

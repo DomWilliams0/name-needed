@@ -1,6 +1,9 @@
 mod init;
 mod tests;
 
+#[cfg(feature = "elasticsearch")]
+mod elastic;
+
 pub use init::LoggerBuilder;
 pub use tests::for_tests;
 

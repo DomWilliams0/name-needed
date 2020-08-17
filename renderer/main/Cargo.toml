@@ -14,7 +14,7 @@ simulation = {path = "../../game/simulation"}
 resources = {path = "../../game/resources"}
 
 config = {path = "../../shared/config"}
-common = { path = "../../shared/common", features = ["binary"] }
+common = { path = "../../shared/common", features = ["binary", "elasticsearch"] }
 color = { path = "../../shared/color"}
 
 alloc_counter = {version = "^0.0", optional = true}

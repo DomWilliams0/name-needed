@@ -3,7 +3,8 @@ use common::*;
 use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::state::BackendState;
 use simulation::{
-    self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
+    self, current_tick, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
+    WorldViewer,
 };
 
 use engine::Engine;
@@ -118,14 +119,15 @@ fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {
 
 fn main() {
     // enable structured logging before anything else
-    let logger_guard =
-        match logging::LoggerBuilder::with_env().and_then(|builder| builder.init(log_timestamp)) {
-            Err(e) => {
-                eprintln!("failed to setup logging: {:?}", e);
-                std::process::exit(1);
-            }
-            Ok(l) => l,
-        };
+    let logger_guard = match logging::LoggerBuilder::with_env()
+        .and_then(|builder| builder.init(log_timestamp, current_tick))
+    {
+        Err(e) => {
+            eprintln!("failed to setup logging: {:?}", e);
+            std::process::exit(1);
+        }
+        Ok(l) => l,
+    };
 
     my_info!("initialized logging"; "level" => ?logger_guard.level());
 

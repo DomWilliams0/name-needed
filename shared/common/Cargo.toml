@@ -29,3 +29,4 @@ smallvec = "^1.4"
 default = ["library"]
 binary = ["logging/binary"]
 library = []
+elasticsearch = ["logging/elasticsearch"]

@@ -16,9 +16,9 @@ Config(
     ),
     simulation: (
         random_seed: Some(67853852415419),
-        random_count: 1,
+        random_count: 50,
         friction: 0.85,
         start_delay: 0,
-        food_count: 2,
+        food_count: 5,
      ),
 )
