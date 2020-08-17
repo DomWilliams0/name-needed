@@ -1,5 +1,6 @@
 use common::*;
 use unit::world::WorldPoint;
+use world::NavigationError;
 
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
 use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
@@ -9,10 +10,8 @@ use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 use crate::item::PickupItemError;
-use crate::nop_subactivity;
-
+use crate::{nop_subactivity, unexpected_event};
 use crate::{ComponentWorld, TransformComponent};
-use world::NavigationError;
 
 #[derive(Debug)]
 enum PickupItemsState {
@@ -95,19 +94,10 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
             EntityEventPayload::Arrived(token, result) => {
                 debug_assert_eq!(event.subject, ctx.subscriber);
 
-                if let Err(e) = result {
-                    my_debug!("failed to navigate to item"; "error" => %e);
-                    self.last_error = Some(PickupFailure::NavigationError(e.to_owned()));
-                    self.state = PickupItemsState::Undecided;
-                    return (
-                        EventUnblockResult::Unblock,
-                        EventUnsubscribeResult::UnsubscribeAll,
-                    );
-                }
-
                 // we have arrived at our item, change state and start the pickup in the next tick
                 match &self.state {
                     PickupItemsState::GoingTo(item, sub) => {
+                        // wrong token
                         if sub.token() != *token {
                             my_trace!("got arrival event for different token than expected, continuing to wait";
                                 "expected" => ?sub.token(), "actual" => ?token
@@ -116,6 +106,17 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                             return (
                                 EventUnblockResult::KeepBlocking,
                                 EventUnsubscribeResult::StaySubscribed
+                            );
+                        }
+
+                        // navigation error
+                        if let Err(e) = result {
+                            my_debug!("failed to navigate to item"; "error" => %e);
+                            self.last_error = Some(PickupFailure::NavigationError(e.to_owned()));
+                            self.state = PickupItemsState::Undecided;
+                            return (
+                                EventUnblockResult::Unblock,
+                                EventUnsubscribeResult::UnsubscribeAll,
                             );
                         }
 
@@ -168,7 +169,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     }
                 }
             }
-            e => unreachable!("unexpected event {:?}", e),
+            e => unexpected_event!(e),
         }
     }
 

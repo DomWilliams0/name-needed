@@ -6,8 +6,8 @@ use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubs
 use crate::ecs::Entity;
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::item::{ItemReference, LooseItemReference};
-
 use crate::ComponentWorld;
+use crate::{nop_subactivity, unexpected_event};
 
 // TODO str to describe item, and pass through to subactivities
 #[derive(Debug)]
@@ -94,7 +94,7 @@ impl<W: ComponentWorld> Activity<W> for UseHeldItemActivity {
                     EventUnsubscribeResult::UnsubscribeAll,
                 )
             }
-            _ => unreachable!(),
+            e => unexpected_event!(e),
         }
     }
 

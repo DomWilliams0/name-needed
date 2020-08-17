@@ -2,8 +2,7 @@ use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, Su
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
-use crate::nop_subactivity;
-use crate::ComponentWorld;
+use crate::{nop_subactivity, unexpected_event, ComponentWorld};
 use common::*;
 use unit::world::WorldPosition;
 use world::block::BlockType;
@@ -65,8 +64,8 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
         match &event.payload {
             EntityEventPayload::Arrived(token, result) => {
                 match &self.state {
-                    BreakBlockState::Going(sub) => assert_eq!(*token, sub.token()),
-                    s => unreachable!("arrived in unexpected state {:?}", s),
+                    BreakBlockState::Going(sub) if *token == sub.token() => {}
+                    _ => return unexpected_event!(event),
                 };
 
                 if let Err(e) = result {
@@ -83,7 +82,7 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
                 )
             }
 
-            e => unreachable!("unexpected event {:?}", e),
+            e => unexpected_event!(e),
         }
     }
 

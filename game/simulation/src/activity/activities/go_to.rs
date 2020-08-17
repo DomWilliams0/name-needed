@@ -1,11 +1,13 @@
+use common::*;
+use unit::world::WorldPoint;
+use world::NavigationError;
+
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::ComponentWorld;
-use common::*;
-use unit::world::WorldPoint;
-use world::NavigationError;
+use crate::{nop_subactivity, unexpected_event};
 
 /// Simple wrapper around goto subactivity with a given reason
 #[derive(Debug)]
@@ -33,14 +35,13 @@ impl<W: ComponentWorld> Activity<W> for GoToActivity {
         match &event.payload {
             EntityEventPayload::Arrived(token, result) if *token == self.goto.token() => {
                 self.result = Some(result.to_owned().map(|_| ()));
+                (
+                    EventUnblockResult::Unblock,
+                    EventUnsubscribeResult::UnsubscribeAll,
+                )
             }
-            _ => unreachable!("unexpected event"),
+            e => unexpected_event!(e),
         }
-
-        (
-            EventUnblockResult::Unblock,
-            EventUnsubscribeResult::UnsubscribeAll,
-        )
     }
 
     fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {

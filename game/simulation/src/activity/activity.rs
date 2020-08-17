@@ -3,7 +3,7 @@ use common::*;
 use crate::ComponentWorld;
 
 use crate::ecs::Entity;
-use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
 use crate::queued_update::QueuedUpdates;
 
 pub enum ActivityResult {
@@ -43,6 +43,19 @@ pub struct ActivityContext<'a, W: ComponentWorld> {
 
 pub struct ActivityEventContext {
     pub subscriber: Entity,
+}
+
+#[macro_export]
+macro_rules! unexpected_event {
+    ($event:expr) => {
+        {
+            my_debug!("ignoring unexpected event"; "event" => ?$event);
+            (
+                EventUnblockResult::KeepBlocking,
+                EventUnsubscribeResult::StaySubscribed,
+            )
+        }
+    };
 }
 
 pub trait Activity<W: ComponentWorld>: Display + Debug {

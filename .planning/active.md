@@ -1,6 +1,6 @@
 # Active tasks
 
-* [o] separate ActivitySystem from AiSystem
+* [X] separate ActivitySystem from AiSystem
 * [X] refactor activities to block on specified events
 	* [X] add back eating
 	* [X] divine orders
@@ -23,7 +23,7 @@
 * [X] unreserve interrupted society commands
 * [X] allow ci build failures on nightly
 * [ ] bug: possible to get stuck in inaccessible position after breaking society blocks again
-	* possible SosComponent to move to an actually accessible adjacent block?
+	* mark as in need of SoS to move to an actually accessible adjacent block?
 * [X] customisable nop activity
 * [ ] possible bug: they spend a lot of time between activities in Nop
 * [X] emit arrived event failure when prev target is aborted

@@ -51,7 +51,7 @@ impl<'a> System<'a> for PathSteeringSystem {
 
             // new path request
             if let Some(req) = path.pop_request() {
-                my_trace!("new path request"; "rqeuest" => ?req);
+                my_trace!("new path request"; "request" => ?req);
 
                 // send failed arrived event for previous target
                 if let Some(current) = path.current_token {
