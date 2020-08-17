@@ -33,9 +33,9 @@ impl GoToSubActivity {
         }
     }
 
-    // TODO remove Option, default to a null path token? or just unwrap here
-    pub fn token(&self) -> Option<PathToken> {
-        self.token.get()
+    /// Panics if called before `init` finishes successfully
+    pub fn token(&self) -> PathToken {
+        self.token.get().expect("path token not set")
     }
 }
 
@@ -66,7 +66,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         // TODO helper on ctx to get component
 
         if let Ok(comp) = ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {
-            let token = self.token();
+            let token = self.token.get();
             if token.is_some() && comp.current_token() == token {
                 comp.clear_path();
             }

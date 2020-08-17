@@ -65,7 +65,7 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
         match &event.payload {
             EntityEventPayload::Arrived(token, result) => {
                 match &self.state {
-                    BreakBlockState::Going(sub) => assert_eq!(Some(*token), sub.token()),
+                    BreakBlockState::Going(sub) => assert_eq!(*token, sub.token()),
                     s => unreachable!("arrived in unexpected state {:?}", s),
                 };
 

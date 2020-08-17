@@ -31,7 +31,7 @@ impl<W: ComponentWorld> Activity<W> for GoToActivity {
     ) -> (EventUnblockResult, EventUnsubscribeResult) {
         // arrival
         match &event.payload {
-            EntityEventPayload::Arrived(token, result) if Some(*token) == self.goto.token() => {
+            EntityEventPayload::Arrived(token, result) if *token == self.goto.token() => {
                 self.result = Some(result.to_owned().map(|_| ()));
             }
             _ => unreachable!("unexpected event"),

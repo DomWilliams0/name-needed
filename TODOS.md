@@ -1,4 +1,4 @@
-# TODOs (180)
+# TODOs (179)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -30,8 +30,7 @@
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
    * `// TODO move subactivity errors somewhere else`
    * `// TODO itemfilter should specify a static string describing itself`
- * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
-   * `// TODO remove Option, default to a null path token? or just unwrap here`
+ * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
    * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
  * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (3)
