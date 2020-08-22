@@ -1,7 +1,7 @@
 use std::time::Duration;
 
+use crate::panic;
 use common::*;
-use gameloop::{FrameAction, GameLoop};
 use simulation::input::UiCommand;
 use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
 
@@ -28,15 +28,20 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         // initial sleep
         let delay = config::get().simulation.start_delay;
         if delay > 0 {
-            info!("sleeping for {}ms before starting", delay);
+            info!("sleeping for {delay}ms before starting", delay = delay);
             std::thread::sleep(Duration::from_millis(delay as u64));
         }
 
         #[cfg(not(feature = "lite"))]
-        let game_loop = GameLoop::new(simulation::TICKS_PER_SECOND, 5)
+        let game_loop = gameloop::GameLoop::new(simulation::TICKS_PER_SECOND, 5)
             .expect("game loop initialization failed");
 
         loop {
+            if panic::has_panicked() {
+                debug!("breaking out of loop due to panics");
+                break Exit::Stop;
+            }
+
             if let Some(exit) = self.backend.consume_events() {
                 break exit;
             }
@@ -44,8 +49,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             #[cfg(not(feature = "lite"))]
             for action in game_loop.actions() {
                 match action {
-                    FrameAction::Tick => self.tick(),
-                    FrameAction::Render { interpolation } => self.render(interpolation),
+                    gameloop::FrameAction::Tick => self.tick(),
+                    gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
                 }
             }
 
@@ -71,7 +76,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
     fn render(&mut self, interpolation: f64) {
         let perf = self.perf.calculate();
 
-        trace!("render (interpolation={})", interpolation);
+        trace!("render"; "interpolation" => interpolation);
         let _timer = self.perf.render.time();
 
         self.backend.render(

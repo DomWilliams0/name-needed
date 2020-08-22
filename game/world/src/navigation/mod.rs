@@ -1,6 +1,6 @@
 pub use area_navigation::{AreaGraph, AreaNavEdge, AreaPathError};
 pub use block_navigation::{BlockGraph, BlockPathError};
-use common::Vector3;
+use common::*;
 pub use cost::EdgeCost;
 pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
@@ -26,7 +26,7 @@ pub(crate) struct ChunkArea {
 }
 
 /// An area in the world
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct WorldArea {
     pub chunk: ChunkPosition,
     pub slab: SlabIndex,
@@ -90,5 +90,14 @@ impl From<WorldArea> for Vector3 {
             y: area.chunk.1 as f32,
             z: area.slab.into(),
         }
+    }
+}
+impl Debug for WorldArea {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "WorldArea(chunk={:?}, slab={:?}, area={:?})",
+            self.chunk, self.slab, self.area
+        )
     }
 }

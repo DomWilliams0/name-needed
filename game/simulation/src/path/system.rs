@@ -1,13 +1,12 @@
 use std::iter::once;
 
 use common::*;
-use unit::world::{GlobalSliceIndex, WorldPoint};
-use world::InnerWorldRef;
+use unit::world::WorldPoint;
 use world::{NavigationError, SearchGoal};
 
 use crate::ecs::*;
-use crate::path::follow::PathFollowing;
-use crate::path::WANDER_SPEED;
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
+use crate::path::follow::{PathFollowing, PathRequest};
 use crate::steer::{SteeringBehaviour, SteeringComponent};
 use crate::{TransformComponent, WorldRef};
 
@@ -16,30 +15,26 @@ use crate::{TransformComponent, WorldRef};
 #[storage(VecStorage)]
 pub struct FollowPathComponent {
     path: Option<PathFollowing>,
-    /// If set, will be popped in next tick and `path` updated
-    new_target: Option<(WorldPoint, SearchGoal)>,
     follow_speed: NormalizedFloat,
-    prev_z: Option<GlobalSliceIndex>,
+    current_token: Option<PathToken>,
+
+    /// If set, will be popped in next tick and `path` updated
+    request: Option<PathRequest>,
+    next_token: u64,
 }
 
-#[derive(Component, Default)]
-#[storage(NullStorage)]
-pub struct WanderComponent;
+/// Entity-specific opaque unique token to differentiate path requests
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub struct PathToken(u64);
 
 /// System to assign steering behaviour from current path, if any
 pub struct PathSteeringSystem;
-
-/// Event component to indicate arrival at the given target position
-/// TODO should be an enum and represent interruption too, i.e. path was invalidated
-#[derive(Component, Default)]
-#[storage(HashMapStorage)]
-pub struct ArrivedAtTargetEventComponent(pub WorldPoint);
 
 impl<'a> System<'a> for PathSteeringSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, WorldRef>,
-        Read<'a, LazyUpdate>,
+        Write<'a, EntityEventQueue>,
         WriteStorage<'a, TransformComponent>,
         WriteStorage<'a, FollowPathComponent>,
         WriteStorage<'a, SteeringComponent>,
@@ -47,35 +42,71 @@ impl<'a> System<'a> for PathSteeringSystem {
 
     fn run(
         &mut self,
-        (entities, world, lazy_update, mut transform, mut path, mut steer): Self::SystemData,
+        (entities, world, mut event_queue, mut transform, mut path, mut steer): Self::SystemData,
     ) {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
         {
-            // new path request
-            if let Some((target, goal)) = path.new_target.take() {
-                // skip path finding if destination is the same
-                if Some(target) != path.path.as_ref().map(|path| path.target()) {
-                    let world = (*world).borrow();
-                    let new_path = match world.find_path_with_goal(
-                        transform.position.floor(),
-                        target.floor(),
-                        goal,
-                    ) {
-                        Err(e) => {
-                            warn!("failed to find path to target {:?}: {}", target, e);
-                            continue;
-                        }
-                        Ok(path) => path,
-                    };
+            log_scope!(o!("system" => "path steering", E(e)));
 
-                    let new_following = PathFollowing::new(new_path, target, goal);
-                    debug!(
-                        "{:?}: following new path to {:?}",
-                        e,
-                        new_following.target()
-                    );
-                    path.path.replace(new_following);
+            // new path request
+            if let Some(req) = path.pop_request() {
+                trace!("new path request"; "request" => ?req);
+
+                // send failed arrived event for previous target
+                if let Some(current) = path.current_token {
+                    trace!("aborting previous path"; "token" => ?current, "target" => ?path.target());
+
+                    event_queue.post(EntityEvent {
+                        subject: e,
+                        payload: EntityEventPayload::Arrived(
+                            current,
+                            Err(NavigationError::Aborted),
+                        ),
+                    });
+                }
+
+                // clobber current path
+                path.path = None;
+                path.current_token = None;
+
+                match req {
+                    PathRequest::ClearCurrent => {
+                        debug!("clearing current path by request");
+                    }
+                    PathRequest::NewTarget {
+                        target,
+                        goal,
+                        speed,
+                        token,
+                    } => {
+                        let world = (*world).borrow();
+                        let new_path = world.find_path_with_goal(
+                            transform.accessible_position(),
+                            target.floor(),
+                            goal,
+                        );
+
+                        match new_path {
+                            Err(err) => {
+                                warn!("failed to find path"; "target" => ?target, "error" => %err);
+
+                                event_queue.post(EntityEvent {
+                                    subject: e,
+                                    payload: EntityEventPayload::Arrived(token, Err(err)),
+                                });
+                            }
+                            Ok(new_path) => {
+                                let path_len = new_path.path().len();
+                                let new_following = PathFollowing::new(new_path, target, goal);
+                                debug!("following new path"; "target" => ?new_following.target(), "path_nodes" => path_len);
+
+                                path.path = Some(new_following);
+                                path.follow_speed = speed;
+                                path.current_token = Some(token);
+                            }
+                        };
+                    }
                 }
             }
 
@@ -88,22 +119,20 @@ impl<'a> System<'a> for PathSteeringSystem {
                 // move onto next waypoint
                 match following.next_waypoint() {
                     None => {
-                        trace!(
-                            "{:?}: path finished, arrived at {}",
-                            e,
-                            path.target().unwrap(),
-                        );
+                        let target = path.target().unwrap();
+                        trace!("arrived at path target"; "target" => %target);
 
-                        // indicate arrival to other systems
-                        lazy_update
-                            .insert(e, ArrivedAtTargetEventComponent(path.target().unwrap()));
+                        let token = path.current_token.take().expect("should have token");
+                        event_queue.post(EntityEvent {
+                            subject: e,
+                            payload: EntityEventPayload::Arrived(token, Ok(target)),
+                        });
 
                         path.path = None;
                     }
-                    Some((next_block, _cost)) => {
-                        trace!("{:?}: next waypoint: {:?}", e, next_block);
+                    Some((next_block, cost)) => {
+                        trace!("next waypoint"; "waypoint" => ?next_block, "cost" => ?cost);
                         steer.behaviour = SteeringBehaviour::seek(next_block, path.follow_speed);
-                        path.prev_z = Some(next_block.slice());
                     }
                 }
             }
@@ -111,79 +140,48 @@ impl<'a> System<'a> for PathSteeringSystem {
     }
 }
 
-pub struct WanderPathAssignmentSystem;
-
-impl<'a> System<'a> for WanderPathAssignmentSystem {
-    type SystemData = (
-        Read<'a, EntitiesRes>,
-        Read<'a, WorldRef>,
-        ReadStorage<'a, WanderComponent>,
-        ReadStorage<'a, TransformComponent>,
-        WriteStorage<'a, FollowPathComponent>,
-    );
-
-    fn run(&mut self, (entities, world, wander, transform, mut path_follow): Self::SystemData) {
-        let world: InnerWorldRef = (*world).borrow();
-
-        for (e, _, transform, mut path_follow) in
-            (&entities, &wander, &transform, &mut path_follow).join()
-        {
-            // only assign paths if not following one already
-            if path_follow.path.is_none() {
-                // may take a few iterations to find a valid wander target, so do the path finding
-                // manually here rather than setting path.new_target and maybe waiting a few ticks
-                path_follow.path = world.choose_random_walkable_block(10).and_then(|target| {
-                    let target = target.centred();
-                    match world.find_path_with_goal(
-                        transform.position.floor(),
-                        target.floor(),
-                        SearchGoal::Arrive,
-                    ) {
-                        Err(NavigationError::SourceNotWalkable(_)) => {
-                            warn!("{:?}: stuck in a non walkable position", e);
-                            None
-                        }
-                        Err(err) => {
-                            trace!(
-                                "{:?}: failed to find wander path to random position: {}",
-                                e,
-                                err
-                            );
-                            None
-                        }
-                        Ok(path) => {
-                            debug!("{:?} new wander path to {:?}", e, path.target());
-                            Some(PathFollowing::new(path, target, SearchGoal::Arrive))
-                        }
-                    }
-                });
-
-                // wander slowly
-                path_follow.follow_speed = NormalizedFloat::new(WANDER_SPEED);
+impl FollowPathComponent {
+    fn set_request(&mut self, req: PathRequest) {
+        if let Some(old) = self.request.as_ref() {
+            if let PathRequest::NewTarget { .. } = old {
+                warn!("follow path target was overwritten before it could be used";
+                    "previous" => ?old, "new" => ?req
+                );
             }
         }
+
+        trace!("assigning new follow path request"; "request" => ?req);
+        self.request = Some(req);
     }
-}
 
-impl Default for FollowPathComponent {
-    fn default() -> Self {
-        Self {
-            path: None,
-            new_target: None,
-            prev_z: None,
-            follow_speed: NormalizedFloat::one(),
-        }
+    pub fn new_path_to(&mut self, target: WorldPoint, speed: NormalizedFloat) -> PathToken {
+        self.new_path_with_goal(target, SearchGoal::Arrive, speed)
     }
-}
 
-impl FollowPathComponent {
-    pub fn new_path(&mut self, target: WorldPoint, goal: SearchGoal, speed: NormalizedFloat) {
-        if let Some((old, _)) = self.new_target.replace((target, goal)) {
-            warn!("follow path target was overwritten before it could be used (prev: {:?}, overwritten with: {:?})", old, target);
-        }
+    pub fn new_path_with_goal(
+        &mut self,
+        target: WorldPoint,
+        goal: SearchGoal,
+        speed: NormalizedFloat,
+    ) -> PathToken {
+        let token = PathToken(self.next_token);
+        self.next_token = self.next_token.wrapping_add(1);
 
-        self.follow_speed = speed;
-        self.prev_z = None;
+        let req = PathRequest::NewTarget {
+            target,
+            goal,
+            speed,
+            token,
+        };
+
+        self.set_request(req);
+
+        // preserve current_token until done
+        token
+    }
+
+    pub fn clear_path(&mut self) {
+        self.set_request(PathRequest::ClearCurrent);
     }
 
     pub fn target(&self) -> Option<WorldPoint> {
@@ -198,5 +196,31 @@ impl FollowPathComponent {
                     .chain(once(path.target())),
             );
         }
+    }
+
+    fn pop_request(&mut self) -> Option<PathRequest> {
+        self.request.take()
+    }
+
+    pub fn current_token(&self) -> Option<PathToken> {
+        self.current_token
+    }
+}
+
+impl Default for FollowPathComponent {
+    fn default() -> Self {
+        Self {
+            path: None,
+            request: None,
+            follow_speed: NormalizedFloat::one(),
+            next_token: 0x1000,
+            current_token: None,
+        }
+    }
+}
+
+impl Debug for PathToken {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "PathToken({:#x})", self.0)
     }
 }

@@ -38,12 +38,14 @@ impl QueuedUpdates {
     pub fn execute(&mut self, world: &mut EcsWorld) {
         let mut vec = self.updates.borrow_mut();
         if !vec.is_empty() {
-            debug!("running {} queued updates", vec.len());
+            debug!("running {count} queued updates", count = vec.len());
 
             for (name, update) in vec.drain(..) {
+                log_scope!(o!("queued_update" => name));
+
                 match update(world) {
-                    Err(e) => warn!("queued update '{}' failed: {}", name, e),
-                    Ok(_) => trace!("queued update '{}' was successful", name),
+                    Err(e) => warn!("queued update failed"; "error" => %e),
+                    Ok(_) => trace!("queued update was successful"),
                 }
             }
         }

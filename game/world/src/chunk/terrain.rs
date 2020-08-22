@@ -618,11 +618,11 @@ impl RawChunkTerrain {
                         .update_from_neighbour_opacities(new_opacities);
 
                     trace!(
-                        "new AO for block {:?}: old {:?} | new {:?} | updated {:?}",
-                        block_pos,
-                        _old_occlusion,
-                        new_opacities,
-                        block_mut.occlusion()
+                        "new AO for block";
+                        "block" => ?block_pos,
+                        "old" => ?_old_occlusion,
+                        "new" => ?new_opacities,
+                        "updated" => ?block_mut.occlusion()
                     );
                     1
                 } else {
@@ -847,17 +847,19 @@ impl ChunkTerrain {
     }
 
     fn discover_areas(&mut self, chunk_pos: ChunkPosition, request: ChunkRequest) {
-        debug!("discovering areas for chunk {:?}", chunk_pos);
+        log_scope!(o!(chunk_pos));
+        debug!("discovering areas");
 
         // TODO reuse a buffer for each slab
 
         // per slab
         for idx in self.raw_terrain.slabs.indices_increasing() {
             let idx = SlabIndex(idx);
+            log_scope!(o!(idx));
 
             if !request.is_new() && !self.raw_terrain.is_slab_exclusive(idx) {
                 // skip
-                debug!("skipping area discovery on untouched slab {:?}", idx);
+                debug!("skipping area discovery on untouched slab");
                 continue;
             }
 
@@ -870,7 +872,7 @@ impl ChunkTerrain {
 
             // flood fill and assign areas
             let area_count = discovery.flood_fill_areas();
-            debug!("chunk {:?} slab {:?}: {} areas", chunk_pos, idx, area_count);
+            debug!("discovered {count} areas", count = area_count);
 
             // collect areas and graphs
             self.areas.extend(
@@ -945,8 +947,8 @@ impl ChunkTerrain {
 
             if !request.is_new() && !this_slab.is_exclusive() {
                 trace!(
-                    "ascending_slice_pairs: skipping non exclusive slab {}",
-                    this_slab_idx
+                    "ascending_slice_pairs: skipping non exclusive slab";
+                    SlabIndex(this_slab_idx)
                 );
                 continue;
             }
@@ -1274,11 +1276,6 @@ mod tests {
 
     #[test]
     fn discovery_block_graph() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
-
         let terrain = ChunkBuilder::new()
             .fill_slice(51, BlockType::Stone)
             .set_block((2, 2, 52), BlockType::Grass)
@@ -1451,11 +1448,6 @@ mod tests {
 
     #[test]
     fn occlusion_across_chunk_sides() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
-
         let a = ChunkBuilder::new()
             .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Grass) // slab 1
             .set_block((0, 0, 0), BlockType::Grass) // slab 0
@@ -1489,11 +1481,6 @@ mod tests {
 
     #[test]
     fn lazy_occlusion_top_only() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
-
         fn mk_chunks(block_off: bool) -> WorldRef {
             let a = ChunkBuilder::new()
                 .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), BlockType::Grass)
@@ -1549,11 +1536,6 @@ mod tests {
 
     #[test]
     fn occlusion_across_chunk_corner() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
-
         let a = ChunkBuilder::new()
             // 0, 15, 0
             .set_block((0, CHUNK_SIZE.as_i32() - 1, 0), BlockType::Stone)

@@ -29,8 +29,22 @@ impl<'a> System<'a> for PhysicsSystem {
         for (e, movement, cfg, transform) in
             (&entities, &movement, &movement_cfg, &mut transform).join()
         {
+            log_scope!(o!("system" => "physics", E(e)));
+
             // update last position for render interpolation
             transform.last_position = transform.position;
+
+            // update last accessible position
+            {
+                let floor_pos = transform.position.floor();
+                if world.area(floor_pos).ok().is_some() {
+                    if let Some(old) = transform.accessible_position.replace(floor_pos) {
+                        if old != floor_pos {
+                            trace!("updating accessible position"; "position" => %floor_pos);
+                        }
+                    }
+                }
+            }
 
             let bounds = transform.bounds();
 
@@ -40,10 +54,9 @@ impl<'a> System<'a> for PhysicsSystem {
                 let new_pos = resolved_bounds.into_position();
 
                 trace!(
-                    "{:?}) resolving collision at pos {} by moving to {}",
-                    e,
-                    transform.position,
-                    new_pos
+                    "resolving collision";
+                    "from" => %transform.position,
+                    "to" => %new_pos
                 );
 
                 transform.position = new_pos;
@@ -59,13 +72,19 @@ impl<'a> System<'a> for PhysicsSystem {
                 // plop down 1 block
                 transform.position.2 -= 1.0;
                 transform.fallen += 1;
+
+                // forget about now-invalid last accessible position
+                if transform.fallen > 2 {
+                    trace!("removing last accessible position due to fall");
+                    transform.accessible_position = None;
+                }
             } else {
                 // on the ground
                 let fallen = std::mem::take(&mut transform.fallen);
                 if fallen > 0 {
                     // TODO apply fall damage if applicable
                     if fallen > 1 {
-                        debug!("{:?} fell {} blocks", e, fallen);
+                        debug!("fell {fallen} blocks", fallen = fallen);
                     }
                 }
             }

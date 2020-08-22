@@ -66,6 +66,9 @@ macro_rules! errchk {
     };
 }
 
+struct GLHex(u64);
+struct GLString<'a>(&'a CStr);
+
 extern "system" fn on_debug_message(
     source: GLenum,
     gltype: GLenum,
@@ -75,31 +78,23 @@ extern "system" fn on_debug_message(
     message: *const GLchar,
     _user_param: *mut c_void,
 ) {
-    let msg = unsafe { CStr::from_ptr(message) };
+    let msg = GLString(unsafe { CStr::from_ptr(message) });
     if gltype == gl::DEBUG_TYPE_ERROR {
-        error!("GL error: severity = {:#x}, message = {:?}", severity, msg);
+        error!("GL error"; "severity" => severity, "message" => msg);
     } else {
-        let level = match severity {
-            gl::DEBUG_SEVERITY_HIGH => Level::Error,
-            gl::DEBUG_SEVERITY_MEDIUM => Level::Info,
-            gl::DEBUG_SEVERITY_LOW => Level::Debug,
-            gl::DEBUG_SEVERITY_NOTIFICATION => {
-                if cfg!(feature = "gl-trace-log") {
-                    Level::Trace
-                } else {
-                    return;
-                }
-            }
-            _ => Level::Debug,
-        };
+        if severity == gl::DEBUG_SEVERITY_NOTIFICATION && !cfg!(feature = "gl-trace-log") {
+            // shush
+            return;
+        }
 
-        log!(
-            level,
-            "GL message: source: {:#x}, type = {:#x}, message: {:?}",
-            source,
-            gltype,
-            msg
-        );
+        let o =
+            o!("source" => GLHex(source.into()), "type" => GLHex(gltype.into()), "message" => msg);
+
+        match severity {
+            gl::DEBUG_SEVERITY_HIGH => warn!("GL message"; o),
+            gl::DEBUG_SEVERITY_MEDIUM => info!("GL message"; o),
+            _ => debug!("GL message"; o),
+        };
     }
 }
 
@@ -210,5 +205,29 @@ impl InstancedPipeline {
             shared_vbo: Vbo::array_buffer(),
             instanced_vbo: Vbo::array_buffer(),
         }
+    }
+}
+
+impl slog::Value for GLHex {
+    //noinspection DuplicatedCode
+    fn serialize(
+        &self,
+        _: &Record,
+        key: &'static str,
+        serializer: &mut dyn Serializer,
+    ) -> SlogResult<()> {
+        serializer.emit_arguments(key, &format_args!("{:#x}", self.0))
+    }
+}
+
+impl slog::Value for GLString<'_> {
+    //noinspection DuplicatedCode
+    fn serialize(
+        &self,
+        _: &Record,
+        key: &'static str,
+        serializer: &mut dyn Serializer,
+    ) -> SlogResult<()> {
+        serializer.emit_arguments(key, &format_args!("{:?}", self.0))
     }
 }

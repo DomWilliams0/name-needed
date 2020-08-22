@@ -1,4 +1,4 @@
-use crate::ai::ActivityComponent;
+use crate::activity::ActivityComponent;
 use crate::ecs::Entity;
 use crate::input::{SelectedEntity, SelectedTiles};
 use crate::item::{BaseItemComponent, EdibleItemComponent};
@@ -31,6 +31,7 @@ pub struct SelectedEntityDetails {
 pub enum EntityDetails {
     Living {
         activity: Option<String>,
+        sub_activity: Option<String>,
         hunger: Option<HungerComponent>,
         path_target: Option<WorldPoint>,
         society: Option<SocietyHandle>,
@@ -54,21 +55,23 @@ impl<'a> UiBlackboard<'a> {
                     item: item.clone(),
                     edible: world.component(e).ok().cloned(),
                 },
-                _ => EntityDetails::Living {
-                    activity: world
-                        .component::<ActivityComponent>(e)
-                        .map(|activity| format!("{}", activity.current))
-                        .ok(),
-                    hunger: world.component(e).ok().cloned(),
-                    path_target: world
-                        .component::<FollowPathComponent>(e)
-                        .ok()
-                        .and_then(|follow| follow.target()),
-                    society: world
-                        .component::<SocietyComponent>(e)
-                        .map(|s| s.handle)
-                        .ok(),
-                },
+                _ => {
+                    let activity_comp = world.component::<ActivityComponent>(e).ok();
+                    EntityDetails::Living {
+                        activity: activity_comp.map(|activity| format!("{}", activity.current)),
+                        sub_activity: activity_comp
+                            .map(|activity| format!("{}", activity.current.current_subactivity())),
+                        hunger: world.component(e).ok().cloned(),
+                        path_target: world
+                            .component::<FollowPathComponent>(e)
+                            .ok()
+                            .and_then(|follow| follow.target()),
+                        society: world
+                            .component::<SocietyComponent>(e)
+                            .map(|s| s.handle)
+                            .ok(),
+                    }
+                }
             };
 
             SelectedEntityDetails {

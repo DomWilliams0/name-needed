@@ -15,6 +15,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
 * bug: area path finding seems to needlessly poke into other areas
+	* add higher weight difference for inter-area edges
+	* an inappropriate block in an area port is chosen
+	* very indirect paths within areas too, edge costs need adjusting
+* tweak arrival threshold for path waypoints, it's a bit jerky
 
 ## UI/input
 * graph for fps/tps history
@@ -33,7 +37,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fast forward toggle
 	* update gameloop to allow changing TPS
 	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
-
+* add inventory to UI
 
 ## Entity behaviour
 * more society level jobs
@@ -42,6 +46,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
 * ai incentive to choose the same action as last tick
+* (sub)activities take an amount of ticks to complete
+* be able to block subactivities for a number of ticks, show progress bar up until end tick
+* food/drink vessels and wastage
+* refactor item usage to be less generic at the system level
+	* instead of iterating over holders with (using comp, inventory comp), iterate over *items* with (being used comp, edible comp), (being used comp, other usage comp) etc
 
 ## World generation
 * biomes
@@ -54,16 +63,19 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fluid blocks
 	* infinite sources/flows at the world edges
 * modification
-	* entities digging/building
+	* entities building/placing blocks
 	* block damage e.g. from explosion
 	* side effect of interacting with a block
 * puddles/spills/splatters on the ground
 	* picked up and spread by entities
+* blocks that technically solid but possible to pass through
+	* hedges, bushes
 
 ## Optimizations
 ### Performance
 * allocation reuse
 	* cap cached alloc size so memory usage doesnt only go upwards
+	* raii struct i.e. `fn start(&mut self) -> TempVec;` `TempVec::drop() {self.backing.clear()}`
 * pooled allocations
 * per-tick arena allocator
 * spatial queries for entities
@@ -78,6 +90,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * replace all hashmaps with faster non crypto hashes
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * unchecked_unwrap
+* inventory and physical body lookups/searches could be expensive, cache unchanged
 
 ### Memory usage
 * CoW terrain slabs
@@ -100,20 +113,26 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fuzzing
 * stress test
 * code coverage in CI
+* smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
 
 ## Code quality
 * track down unwraps/expects and replace with results
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
-* on panic in any thread, process should exit with backtrace
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
+* error context chaining would be useful
+* replace derive_more error with nicer thiserror macro
+* consider using `bugsalot` macros to replace .unwrap()/.expect() with logging and make them continuable
 
-## Data driven
+## Engine
 * explicit namespacing for entity definitions e.g. "core:food_apple"
+* detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
+* separate binary for definition file validation
 
 ## Entity diversity
 * animal species
 	* dogs, cats, birds, deer
 * individual stats for needs
+* dogs pick up sticks, move faster than humans, chase cats
 
 ## Simulation depth
 * entity interaction

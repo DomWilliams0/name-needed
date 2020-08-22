@@ -78,7 +78,7 @@ impl TerrainRenderer {
 
         // allocate mesh data
         bound_vbo.buffer_data(&new_mesh, BufferUsage::DynamicDraw)?;
-        debug!("regenerated mesh for chunk {:?}", chunk_pos);
+        debug!("regenerated mesh"; chunk_pos);
 
         Ok(())
     }
@@ -113,6 +113,6 @@ impl TerrainRenderer {
             }
         }
 
-        trace!("rendered {} visible chunks", count);
+        trace!("rendered {count} visible chunks", count = count);
     }
 }

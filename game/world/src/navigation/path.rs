@@ -21,6 +21,9 @@ pub enum NavigationError {
 
     #[display(fmt = "Block navigation error")]
     BlockError(WorldArea, #[error(source)] BlockPathError),
+
+    #[display(fmt = "Navigation was aborted")]
+    Aborted,
 }
 
 impl From<AreaPathError> for NavigationError {
@@ -53,7 +56,7 @@ pub(crate) struct AreaPathNode {
     pub entry: Option<AreaNavEdge>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SearchGoal {
     /// Arrive exactly at the target
     Arrive,

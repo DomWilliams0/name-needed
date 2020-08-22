@@ -280,10 +280,10 @@ pub(crate) fn make_collision_mesh(
                                 quad_height[v] = h;
 
                                 trace!(
-                                    "adding quad at {:?} of size {:?}x{:?}",
-                                    quad_pos,
-                                    quad_width,
-                                    quad_height
+                                    "adding quad";
+                                    "position" => ?quad_pos,
+                                    "width" => ?quad_width,
+                                    "height" => ?quad_height
                                 );
 
                                 (quad_pos, quad_width, quad_height)

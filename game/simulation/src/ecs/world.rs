@@ -3,8 +3,10 @@ use specs::storage::InsertResult;
 
 use common::*;
 
+use crate::ecs::E;
+use crate::event::{EntityEvent, EntityEventQueue};
+
 use ::world::WorldRef;
-use common::struclog;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::ops::{Deref, DerefMut};
@@ -13,11 +15,6 @@ pub type EcsWorld = World;
 
 /// World reference for the current frame only - very unsafe, don't store!
 pub struct EcsWorldFrameRef(&'static EcsWorld);
-
-#[allow(dead_code)]
-pub fn entity_id(e: Entity) -> struclog::EntityId {
-    ((e.gen().id() as u64) << 32) | e.id() as u64
-}
 
 #[macro_export]
 macro_rules! entity_pretty {
@@ -64,6 +61,11 @@ pub trait ComponentWorld {
         } else {
             ComponentGetError::NoSuchEntity(entity)
         }
+    }
+
+    fn post_event(&mut self, event: EntityEvent) {
+        let queue = self.resource_mut::<EntityEventQueue>();
+        queue.post(event)
     }
 }
 
@@ -138,7 +140,7 @@ impl ComponentWorld for EcsWorld {
     fn kill_entity(&self, entity: Entity) {
         let entities = self.read_resource::<EntitiesRes>();
         if let Err(e) = entities.delete(entity) {
-            warn!("failed to delete entity {:?}: {}", entity, e);
+            warn!("failed to delete entity"; E(entity), "error" => %e);
         }
     }
 

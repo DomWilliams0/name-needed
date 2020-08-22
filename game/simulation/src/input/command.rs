@@ -11,10 +11,12 @@ pub enum UiCommand {
 }
 
 // TODO just use a dyn Job instead of redefining jobs as an identical enum?
+#[derive(Debug)]
 pub enum SocietyInputCommand {
     BreakBlocks(WorldPositionRange),
 }
 
+#[derive(Debug)]
 pub enum DivineInputCommand {
     Goto(WorldPosition),
     Break(WorldPosition),

@@ -83,13 +83,16 @@ impl Components {
 impl ProcessedComponents {
     fn override_with(&mut self, other: &Self) {
         for (comp_name, comp_fields) in other.0.iter() {
+            log_scope!(o!("component" => comp_name.to_owned())); // dirty clone
+            debug!("overriding");
+
             if let Some(my_fields) = self.component(comp_name) {
-                debug!("combining fields for component {:?}...", comp_name);
+                debug!("combining fields");
                 my_fields.override_with(comp_fields);
             } else {
                 // add component unchanged from other
+                debug!("adding unchanged inherited component");
                 self.add_component(comp_name.to_owned(), comp_fields.to_owned());
-                debug!("adding unchanged inherited component {:?}", comp_name);
             }
         }
     }
@@ -199,11 +202,11 @@ impl ComponentFields {
         match (self, other) {
             (myself, ComponentFields::Negate) => {
                 // remove component
-                debug!("... negating");
+                debug!("negating");
                 *myself = ComponentFields::Negate;
             }
             (myself, ComponentFields::Unit) => {
-                debug!("... setting to unit");
+                debug!("setting to unit");
                 *myself = ComponentFields::Unit;
             }
             (ComponentFields::Unit, _) => {
@@ -215,9 +218,9 @@ impl ComponentFields {
                     if let Some(existing) = Self::field_mut(mine, name) {
                         // override value
                         *existing = value.clone();
-                        debug!("... overriding value for field {:?}", name);
+                        debug!("overriding value for field {field}", field = name);
                     } else {
-                        debug!("... keeping inherited field {:?}", name);
+                        debug!("keeping inherited field {field}", field = name);
                     }
                 }
             }
@@ -304,7 +307,7 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
         let mut path = Vec::with_capacity(16);
         for &node in lookup.values() {
             let this = dag.node_weight(node).unwrap();
-            debug!("applying inheritance overrides to {:?}", this.uid());
+            debug!("applying inheritance overrides"; "definition" => ?this.uid());
             path.push(this);
 
             // ascend to root, tracking path on the way
@@ -328,8 +331,7 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
             };
 
             debug!(
-                "path to root: {:?}",
-                path.iter().map(|d| d.uid()).collect_vec()
+                "path to root"; "path" => ?path.iter().map(|d| d.uid()).collect_vec(),
             );
 
             // start with a clean copy of the root node's components, and apply each override's
@@ -339,7 +341,7 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
                 .rev()
                 .skip(1) // root already cloned
                 .fold(root.processed_components().clone(), |mut acc, &def| {
-                    debug!("overriding with {:?}", def.uid());
+                    debug!("overriding with {ancestor}", ancestor = def.uid(); "definition" => ?this.uid());
                     acc.override_with(&*def.processed_components());
                     acc
                 });

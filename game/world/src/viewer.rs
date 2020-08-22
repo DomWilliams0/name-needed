@@ -137,7 +137,7 @@ impl WorldViewer {
             .for_each(|chunk| {
                 // TODO do mesh generation on a worker thread
                 let mesh = mesh::make_simple_render_mesh(chunk, range);
-                trace!("chunk mesh {:?} has {} vertices", chunk.pos(), mesh.len());
+                trace!("chunk mesh has {count} vertices", count = mesh.len(); chunk.pos());
                 f(chunk.pos(), mesh);
             });
 
@@ -159,13 +159,13 @@ impl WorldViewer {
                 self.view_range = new_range;
                 self.invalidate_meshes();
                 info!(
-                    "{} view range, new range is {}",
-                    past_participle, self.view_range
+                    "{} view range",
+                    past_participle; "range" => %self.view_range,
                 );
             } else {
                 info!(
-                    "cannot {} view range, it remains at {} (world range is {})",
-                    infinitive, self.view_range, slice_bounds
+                    "cannot {} view range",
+                    infinitive; "range" => %self.view_range, "world_range" => %slice_bounds,
                 );
             }
         }

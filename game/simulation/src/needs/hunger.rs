@@ -1,8 +1,9 @@
 use common::newtype::AccumulativeInt;
 use common::*;
 
-use crate::ai::ActivityComponent;
+use crate::activity::{ActivityComponent, UseHeldItemError};
 use crate::ecs::*;
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{
     BaseItemComponent, EdibleItemComponent, InventoryComponent, ItemClass, SlotReference,
     UsingItemComponent,
@@ -34,7 +35,7 @@ pub struct EatingSystem;
 enum EatResult {
     NoItem,
     /// Unconditionally delete item entity because something has gone wrong
-    Errored(Entity),
+    Errored(Entity, UseHeldItemError),
     /// Delete item entity if food is finished
     Success(Entity),
 }
@@ -50,7 +51,7 @@ impl<'a> System<'a> for HungerSystem {
             // TODO individual metabolism rate
             // TODO compensate multipliers
             let metabolism = 1.0;
-            let fuel_used = BASE_METABOLISM * metabolism * activity.current.exertion();
+            let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
 
             debug_assert!(fuel_used.is_sign_positive());
             hunger.current_fuel -= fuel_used;
@@ -61,6 +62,8 @@ impl<'a> System<'a> for HungerSystem {
 impl<'a> System<'a> for EatingSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
+        Read<'a, LazyUpdate>,
+        Write<'a, EntityEventQueue>,
         WriteStorage<'a, InventoryComponent>,
         WriteStorage<'a, UsingItemComponent>,
         WriteStorage<'a, HungerComponent>,
@@ -70,9 +73,11 @@ impl<'a> System<'a> for EatingSystem {
 
     fn run(
         &mut self,
-        (entities, mut inv, mut using, mut hunger, edible_item, mut base_item): Self::SystemData,
+        (entities, updates, mut events, mut inv, mut using, mut hunger, edible_item, mut base_item): Self::SystemData,
     ) {
-        for (inv, using, hunger) in (&mut inv, &mut using, &mut hunger).join() {
+        for (e, inv, using, hunger) in (&entities, &mut inv, &mut using, &mut hunger).join() {
+            log_scope!(o!("system" => "eating", E(e)));
+
             if let ItemClass::Food = using.class {
                 let val = using.left.value();
 
@@ -94,11 +99,31 @@ impl<'a> System<'a> for EatingSystem {
                     let _ = inv.remove_item(SlotReference::Base(using.base_slot));
 
                     // queue item entity for deletion
-                    if let EatResult::Errored(item) | EatResult::Success(item) = result {
-                        trace!("deleting food item {:?}", item);
+                    let (item, err) = match result {
+                        EatResult::Success(item) => (Some(item), None),
+                        EatResult::Errored(item, err) => (Some(item), Some(err)),
+                        _ => (None, None),
+                    };
+
+                    if let Some(item) = item {
+                        trace!("deleting consumed food item"; "food" => E(item));
+
                         if let Err(e) = entities.delete(item) {
-                            warn!("failed to delete item: {}", e);
+                            warn!("couldn't delete food item"; "food" => E(item), "error" => ?e);
                         }
+
+                        let event_result = if let Some(err) = err {
+                            Err(err)
+                        } else {
+                            Ok(())
+                        };
+
+                        updates.remove::<UsingItemComponent>(e);
+
+                        events.post(EntityEvent {
+                            subject: item,
+                            payload: EntityEventPayload::UsedUp(event_result),
+                        });
                     }
                 }
             }
@@ -119,19 +144,20 @@ fn do_eat(
     let slot = SlotReference::Base(using.base_slot);
     let item = match inv.get(slot) {
         Ok(e) => e,
-        Err(e) => {
+        Err(err) => {
             warn!(
-                "failed to get item in use from inventory: {:?} - {}",
-                slot, e
+                "failed to get item in use from inventory"; "slot" => ?slot, "error" => %err
             );
             return EatResult::NoItem;
         }
     };
 
+    log_scope!(o!("item" => E(item)));
+
     let (base_item, edible) = match (base_item, edible_item).join().get(item, entities) {
         None => {
-            warn!("food item missing base or edible components ({:?})", item);
-            return EatResult::Errored(item);
+            warn!("food item missing base or edible components");
+            return EatResult::Errored(item, UseHeldItemError::NotAnItem);
         }
         Some(tup) => tup,
     };

@@ -141,7 +141,7 @@ pub fn init<P: AsRef<Path>>(path: P) -> ConfigResult<()> {
                         _ => false,
                     },
                     Err(e) => {
-                        warn!("error while watching config: {}", e);
+                        warn!("error while watching config"; "error" => %e);
                         continue;
                     }
                 };
@@ -149,7 +149,7 @@ pub fn init<P: AsRef<Path>>(path: P) -> ConfigResult<()> {
                 if reload {
                     info!("config was modified, reloading");
                     if let Err(e) = lock().parse_file() {
-                        warn!("failed to reload config: {}", e);
+                        warn!("failed to reload config"; "error" => %e);
                     }
                 }
             }

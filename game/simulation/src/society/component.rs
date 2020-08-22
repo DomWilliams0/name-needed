@@ -18,7 +18,7 @@ impl SocietyComponent {
     /// Logs a warning if society is not found
     pub fn resolve<'s>(&self, societies: &'s mut Societies) -> Option<&'s mut Society> {
         societies.society_by_handle_mut(self.handle).or_else(|| {
-            warn!("bad society handle in component: {:?}", self.handle);
+            warn!("bad society handle in component"; "handle" => ?self.handle);
             None
         })
     }

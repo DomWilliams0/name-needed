@@ -4,7 +4,7 @@ use std::ptr::null;
 
 use gl::types::*;
 
-use common::warn;
+use common::*;
 
 use crate::errchk;
 use crate::render::sdl::gl::{GlError, GlResult};
@@ -519,7 +519,7 @@ impl<T> Drop for ScopedMapMut<T> {
         unsafe {
             gl::UnmapBuffer(self.bind.into());
             if let Err(e) = errchk!(()) {
-                warn!("glUnmapBuffer failed: {}", e);
+                warn!("glUnmapBuffer failed"; "error" => %e);
             }
         }
     }

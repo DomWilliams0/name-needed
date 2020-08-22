@@ -1,5 +1,8 @@
 //! Navigation inside an area
-use common::derive_more::{Display, Error};
+use common::{
+    derive_more::{Display, Error},
+    *,
+};
 
 use petgraph::graphmap::DiGraphMap;
 use petgraph::prelude::EdgeRef;
@@ -50,8 +53,6 @@ impl BlockGraph {
 
     #[cfg(test)]
     pub fn edges(&self, block: BlockPosition) -> Vec<(BlockPosition, EdgeCost)> {
-        use common::Itertools;
-
         let node = BlockNavNode(block);
         let mut edges = self
             .graph
@@ -74,7 +75,7 @@ impl BlockGraph {
 
         // same source and dest is a success, if not a pointless one
         if from == to {
-            common::warn!("pointless block path to same block {:?}", from);
+            debug!("pointless block path to same block"; "pos" => ?from);
             return Ok(BlockPath {
                 path: vec![],
                 target: to,

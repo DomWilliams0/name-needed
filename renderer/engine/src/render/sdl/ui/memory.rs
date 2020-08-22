@@ -17,8 +17,8 @@ impl PerFrameStrings {
 
     pub fn reset(&mut self) {
         trace!(
-            "dropping {} bytes of per frame strings",
-            self.arena.allocated_bytes()
+            "dropping {count} bytes of per frame strings",
+            count = self.arena.allocated_bytes()
         );
         self.arena.reset();
     }

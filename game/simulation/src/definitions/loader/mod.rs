@@ -20,17 +20,13 @@ mod tests {
     use specs::EntityBuilder;
 
     use crate::definitions::loader::load::preprocess_from_str;
-    use crate::definitions::loader::step1_deserialization::{
-        DefinitionUid, DeserializedDefinition,
-    };
-    use crate::definitions::loader::step3_construction::{instantiate, Definition};
+    use crate::definitions::loader::step1_deserialization::DeserializedDefinition;
+    use crate::definitions::loader::step3_construction::instantiate;
     use crate::definitions::loader::template_lookup::TemplateLookup;
     use crate::definitions::DefinitionErrorKind;
     use crate::ecs::{ComponentBuildError, ComponentTemplate, ComponentTemplateEntry, Map};
 
     use super::*;
-    use common::LevelFilter;
-    use env_logger;
 
     #[test]
     fn example() {
@@ -98,25 +94,25 @@ mod tests {
             }))
         }
 
-        fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        fn instantiate<'b>(&self, _: EntityBuilder<'b>) -> EntityBuilder<'b> {
             unimplemented!()
         }
     }
 
     crate::register_component_template!("TESTcomp", TestComponentTemplate);
 
-    fn get_test_template<'a>(
-        defs: &[(DefinitionUid, Definition)],
-        def_idx: usize,
-    ) -> &'a TestComponentTemplate {
-        let ptr = defs[def_idx].1.components().next().unwrap();
-        let template = &*ptr;
-        let ptr = template as *const dyn ComponentTemplate<ValueImpl> as *const u8;
-        #[allow(clippy::transmute_ptr_to_ref)]
-        unsafe {
-            std::mem::transmute(ptr)
-        }
-    }
+    // fn get_test_template<'a>(
+    //     defs: &[(DefinitionUid, Definition)],
+    //     def_idx: usize,
+    // ) -> &'a TestComponentTemplate {
+    //     let ptr = defs[def_idx].1.components().next().unwrap();
+    //     let template = &*ptr;
+    //     let ptr = template as *const dyn ComponentTemplate<ValueImpl> as *const u8;
+    //     #[allow(clippy::transmute_ptr_to_ref)]
+    //     unsafe {
+    //         std::mem::transmute(ptr)
+    //     }
+    // }
 
     #[test]
     fn circular_reference() {
@@ -162,10 +158,7 @@ mod tests {
 
     #[test]
     fn inheritance() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         let input = r#"
 [

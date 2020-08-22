@@ -7,16 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-struclog = { path = "../struclog" }
 metrics = { path = "../metrics" }
+logging = { path = "../logging" }
 
 lazy_static = "^1.4"
-log = "^0.4"
 cgmath = "^0.17"
 num-traits = "^0.2"
+num-derive = "^0.3"
 itertools = "^0.9"
 rand = "^0.7"
-env_logger = {version = "^0.7", optional = true}
 float-cmp = "^0.8"
 derive_more = "^0.99"
 parse-display = "^0.1"
@@ -27,7 +26,6 @@ smallvec = "^1.4"
 
 # TODO feature for cgmath
 [features]
-default = ["struclog/null"]
-# struclog sinks must be the same for both
-binary = ["log/release_max_level_info", "env_logger", "struclog/trace"]
-library = ["struclog/trace"]
+default = ["library"]
+binary = ["logging/binary"]
+library = []

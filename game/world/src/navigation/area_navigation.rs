@@ -22,7 +22,7 @@ type NodeIndex = petgraph::prelude::NodeIndex<u32>;
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
 pub(crate) struct AreaNavNode(pub WorldArea);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct AreaNavEdge {
     pub direction: NeighbourOffset,
@@ -196,7 +196,7 @@ impl AreaGraph {
     }
 
     pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
-        info!("edge {:?} -> {:?} | {:?}", from, to, edge);
+        info!("adding edge"; "source" => ?from, "dest" => ?to, "edge" => ?edge);
 
         let (a, b) = (self.add_node(from), self.add_node(to));
         self.graph.add_edge(a, b, edge);
@@ -268,11 +268,20 @@ impl AreaGraph {
     }
 }
 
+impl Debug for AreaNavEdge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(
+            f,
+            "AreaNavEdge(direction={:?}, {:?}, exit={}, width={})",
+            self.direction, self.cost, self.exit, self.width
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use matches::assert_matches;
 
-    use common::*;
     use unit::dim::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
@@ -303,10 +312,7 @@ mod tests {
 
     #[test]
     fn one_block_one_side_flat() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
         let chunks = vec![
             ChunkBuilder::new()
                 .set_block((15, 5, 0), BlockType::Stone)
@@ -352,10 +358,7 @@ mod tests {
 
     #[test]
     fn cross_chunk_area_linkage() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         // step up from chunk 0 (0,5,N-1) to chunk 1 (-1, 5, N) slab 1
         let graph = make_graph(vec![
@@ -379,10 +382,7 @@ mod tests {
 
     #[test]
     fn cross_chunk_area_linkage_cross_slab() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         // -1, 5, 16 -> 0, 5, 15
         let graph = make_graph(vec![
@@ -416,10 +416,7 @@ mod tests {
     }
     #[test]
     fn empty_slab_no_areas() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         let graph = make_graph(vec![ChunkBuilder::new()
             // 1 block in second slab
@@ -579,10 +576,7 @@ mod tests {
 
     #[test]
     fn area_path_ring_all_directions() {
-        let _ = env_logger::builder()
-            .filter_level(LevelFilter::Trace)
-            .is_test(true)
-            .try_init();
+        // logging::for_tests();
 
         let graph = make_graph(crate::presets::ring());
 

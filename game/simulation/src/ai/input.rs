@@ -114,7 +114,7 @@ fn search_local_area_with_cache(
         Entry::Vacant(v) => {
             let mut results = Vec::new();
             search_local_area(
-                blackboard.position,
+                blackboard.accessible_position,
                 blackboard.world,
                 blackboard.shared,
                 filter,
@@ -139,7 +139,7 @@ fn search_local_area_with_cache(
                 // TODO old results are a subset of new results, should reuse
                 results_mut.clear();
                 search_local_area(
-                    blackboard.position,
+                    blackboard.accessible_position,
                     blackboard.world,
                     blackboard.shared,
                     filter,
@@ -153,6 +153,7 @@ fn search_local_area_with_cache(
         }
     };
 
+    trace!("found {count} local items", count = search.len(); "filter" => ?filter);
     if search.is_empty() {
         0.0
     } else {
@@ -173,7 +174,7 @@ fn search_local_area_with_cache(
 }
 
 fn search_local_area(
-    self_position: WorldPoint,
+    self_position: WorldPosition,
     world: &EcsWorld,
     shared_bb: &mut SharedBlackboard,
     filter: &ItemFilter,
@@ -193,15 +194,16 @@ fn search_local_area(
     let voxel_world = voxel_world_ref.borrow();
 
     // find the area we are in
-    let self_area = match voxel_world.area_for_point(self_position) {
-        Some((_, area)) => area,
+    let self_area = match voxel_world.area(self_position).ok() {
+        Some(area) => area,
         None => {
             // we are not in a walkable area, abort
+            trace!("position is not walkable"; "position" => %self_position);
             return;
         }
     };
 
-    let self_position = Vector2::from(self_position);
+    let self_position = Vector2::from(self_position.centred());
     let results = (&entities, &transform, &item)
         .join()
         .filter(|(entity, _, item)| {
@@ -219,7 +221,7 @@ fn search_local_area(
         })
         .filter_map(|(entity, point, distance, item)| {
             // check that this item is accessible
-            let (_, item_area) = voxel_world.area_for_point(point)?;
+            let item_area = voxel_world.area(point.floor()).ok()?;
             let mut reachable;
 
             // same area, definitely accessible

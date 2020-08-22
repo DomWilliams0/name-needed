@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, deprecated)]
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
@@ -9,6 +9,7 @@ pub use world::{
     presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
 };
 
+pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
@@ -22,13 +23,15 @@ pub use society::{Societies, SocietyComponent, SocietyHandle};
 pub const TICKS_PER_SECOND: usize = 20;
 
 #[cfg(test)]
-pub use simulation::register_components;
+pub use self::simulation::register_components;
 
+mod activity;
 mod ai;
 mod backend;
 mod definitions;
 pub mod dev;
 mod ecs;
+mod event;
 pub mod input;
 mod item;
 mod movement;

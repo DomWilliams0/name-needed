@@ -2,11 +2,15 @@ use clap::{App, Arg};
 use common::*;
 use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::state::BackendState;
-use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
+use simulation::{
+    self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
+};
 
+use engine::panic::Panic;
 use engine::Engine;
 use resources::resource::Resources;
 use resources::ResourceContainer;
+use std::io::Write;
 use std::path::Path;
 
 #[cfg(feature = "count-allocs")]
@@ -62,19 +66,7 @@ fn do_main() -> BoxedResult<()> {
         .unwrap() // default is provided
         .as_ref();
 
-    // init logger
-    env_logger::Builder::from_env(env_logger::Env::default().filter_or("NN_LOG", "info"))
-        .target(env_logger::Target::Stdout)
-        .filter_module("hyper", LevelFilter::Info) // keep it down will you
-        .filter_module("tokio_reactor", LevelFilter::Info)
-        .filter_module("tokio_threadpool", LevelFilter::Info)
-        .filter_module("mio", LevelFilter::Info)
-        .init();
-
-    info!("using game preset '{}'", preset.name());
-
-    // enable structured logging
-    struclog::init();
+    info!("chosen game preset"; "preset" => ?preset.name());
 
     // start metrics server
     #[cfg(feature = "metrics")]
@@ -87,19 +79,19 @@ fn do_main() -> BoxedResult<()> {
     if let Some(config_file_name) = preset.config() {
         let config_path = resources.get_file(config_file_name)?;
 
-        info!("loading config from {:?}", config_path);
+        info!("loading config"; "path" => ?config_path);
         config::init(config_path)?;
     }
 
     // initialize persistent backend
-    let mut backend_state = BackendState::<Backend>::new(&resources)?;
+    let mut backend_state = {
+        log_scope!(o!("backend" => Backend::name()));
+        BackendState::<Backend>::new(&resources)?
+    };
 
     loop {
         // create simulation
-        let simulation = {
-            let _span = Span::Setup.begin();
-            preset.load(resources.clone())?
-        };
+        let simulation = preset.load(resources.clone())?;
 
         // initialize backend with simulation world
         let world_viewer = WorldViewer::from_world(simulation.world())?;
@@ -120,42 +112,94 @@ fn do_main() -> BoxedResult<()> {
     Ok(())
 }
 
-fn main() {
-    #[cfg(feature = "count-allocs")]
-    let result = {
-        use alloc_counter::count_alloc;
-        let (counts, result) = count_alloc(|| do_main());
-        // TODO more granular - n for engine setup, n for sim setup, n for each frame?
-        info!(
-            "{} allocations, {} reallocs, {} frees",
-            counts.0, counts.1, counts.2
-        );
-        result
-    };
+fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {
+    let tick = simulation::current_tick();
+    write!(io, "T{:06}", tick)
+}
 
-    #[cfg(not(feature = "count-allocs"))]
-    let result = do_main();
+fn main() {
+    // enable structured logging before anything else
+    let logger_guard =
+        match logging::LoggerBuilder::with_env().and_then(|builder| builder.init(log_timestamp)) {
+            Err(e) => {
+                eprintln!("failed to setup logging: {:?}", e);
+                std::process::exit(1);
+            }
+            Ok(l) => l,
+        };
+
+    info!("initialized logging"; "level" => ?logger_guard.level());
+
+    engine::panic::init_panic_detection();
+
+    let result = std::panic::catch_unwind(|| {
+        #[cfg(feature = "count-allocs")]
+        {
+            use alloc_counter::count_alloc;
+            let (counts, result) = count_alloc(|| do_main());
+            // TODO more granular - n for engine setup, n for sim setup, n for each frame?
+            info!(
+                "{allocs} allocations, {reallocs} reallocs, {frees} frees",
+                allocs = counts.0,
+                reallocs = counts.1,
+                frees = counts.2
+            );
+            result
+        }
+
+        #[cfg(not(feature = "count-allocs"))]
+        do_main()
+    });
+
+    let all_panics = engine::panic::panics().collect_vec();
 
     let exit = match result {
-        Err(e) => {
-            error!("error: {}", e);
+        _ if !all_panics.is_empty() => {
+            crit!("{count} threads panicked", count = all_panics.len());
 
-            if log_enabled!(Level::Debug) {
-                error!(" debug: {:#?}", e);
+            for Panic {
+                message,
+                thread,
+                mut backtrace,
+            } in all_panics
+            {
+                backtrace.resolve();
+
+                crit!("panic";
+                "backtrace" => ?backtrace,
+                "message" => message,
+                "thread" => thread,
+                );
+            }
+
+            1
+        }
+        Err(_) => {
+            // panics are caught by the case above
+            unreachable!()
+        }
+
+        Ok(Err(e)) => {
+            crit!("critical error"; "error" => %e);
+
+            if logger().is_enabled(MyLevel::Debug) {
+                crit!("more detail"; "error" => ?e);
             }
 
             // TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)
             let mut src = e.source();
             while let Some(source) = src {
-                error!(" caused by: {}", source);
+                crit!("reason"; "cause" => %source, "debug" => ?source);
                 src = source.source();
             }
 
             1
         }
-        Ok(()) => 0,
+        Ok(Ok(())) => 0,
     };
 
-    info!("exiting cleanly with exit code {}", exit);
+    info!("exiting cleanly"; "code"=>exit);
+
+    drop(logger_guard); // flush
     std::process::exit(exit);
 }

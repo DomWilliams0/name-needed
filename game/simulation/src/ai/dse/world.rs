@@ -8,7 +8,7 @@ use world::block::BlockType;
 pub struct BreakBlockDse(pub WorldPosition);
 
 impl Dse<AiContext> for BreakBlockDse {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Break Block"
     }
 

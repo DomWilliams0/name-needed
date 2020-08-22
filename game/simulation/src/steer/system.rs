@@ -30,6 +30,8 @@ impl<'a> System<'a> for SteeringSystem {
         for (e, transform, mut steer, movement) in
             (&entities, &transform, &mut steer, &mut movement).join()
         {
+            log_scope!(o!("system" => "steering", E(e)));
+
             // reset context map for this tick
             *movement = DesiredMovementComponent::default();
 
@@ -43,9 +45,8 @@ impl<'a> System<'a> for SteeringSystem {
 
             if let SteeringResult::Finished = result {
                 trace!(
-                    "{:?}: finished steering {:?}, reverting to default behaviour",
-                    e,
-                    steer.behaviour
+                    "finished steering, reverting to default behaviour";
+                    "finished" => ?steer.behaviour
                 );
 
                 steer.behaviour = SteeringBehaviour::default();
@@ -59,6 +60,7 @@ impl<'a> System<'a> for SteeringSystem {
                 for pos in &solids {
                     let angle = Rad::atan2(-pos.0 as f32, pos.1 as f32);
                     context_map.write_danger(angle, 0.05);
+                    trace!("registering collision danger"; "angle" => ?angle);
                 }
             }
         }

@@ -16,8 +16,20 @@ impl TaskReservations {
         (old_task, old_entity)
     }
 
-    pub fn is_reserved(&self, task: &Task) -> bool {
-        self.task_to_entity.contains_key(task)
+    // pub fn is_reserved(&self, task: &Task) -> bool {
+    //     self.task_to_entity.contains_key(task)
+    // }
+
+    pub fn unreserve(&mut self, entity: Entity) -> Option<Task> {
+        let old_task = self.entity_to_task.remove(&entity);
+        if let Some(task) = old_task.as_ref() {
+            let old_entity = self.task_to_entity.remove(task);
+            if let Some(e) = old_entity {
+                debug_assert_eq!(e, entity);
+            }
+        }
+
+        old_task
     }
 
     /// Not reserved or reserved by the given entity

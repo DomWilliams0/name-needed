@@ -1,8 +1,8 @@
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::ai::activity::ItemsToPickUp;
+use crate::item::{ItemsToPickUp, LooseItemReference};
 
-use crate::item::LooseItemReference;
+// TODO speed should be specified as an enum for all go??? actions
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum AiAction {
@@ -10,7 +10,10 @@ pub enum AiAction {
 
     Wander,
 
-    Goto(WorldPoint),
+    Goto {
+        target: WorldPoint,
+        reason: &'static str,
+    },
 
     GoPickUp(ItemsToPickUp),
 

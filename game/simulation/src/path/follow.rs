@@ -1,6 +1,20 @@
+use crate::path::PathToken;
+use common::NormalizedFloat;
+use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 use world::{EdgeCost, SearchGoal, WorldPath};
 
+#[derive(Debug)]
+pub enum PathRequest {
+    // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
+    NewTarget {
+        target: WorldPoint,
+        goal: SearchGoal,
+        speed: NormalizedFloat,
+        token: PathToken,
+    },
+    ClearCurrent,
+}
 pub struct PathFollowing {
     path: WorldPath,
     final_target: WorldPoint,

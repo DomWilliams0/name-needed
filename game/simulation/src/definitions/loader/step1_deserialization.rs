@@ -149,17 +149,17 @@ pub fn collect_raw_definitions(
 
         // deserialize
         let definition = file.and_then(|(_, mapped, path)| {
-            debug!("loading definitions from {:?}", path);
+            debug!("loading definitions"; "path" => path.display());
             DeserializedDefinition::from_ron(&*mapped, DefinitionSource::File(path))
         });
 
         match definition {
             Ok(loaded) => {
-                debug!("loaded {} definition(s)", loaded.len());
+                debug!("loaded {count}", count = loaded.len());
                 definitions.extend(loaded.into_iter());
             }
             Err(e) => {
-                debug!("failed to load definitions: {}", e);
+                debug!("failed to load definitions"; "error" => %e);
                 errors.push(e)
             }
         }

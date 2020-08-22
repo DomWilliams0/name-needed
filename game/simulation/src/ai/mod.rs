@@ -2,20 +2,18 @@ use std::collections::HashMap;
 
 use common::*;
 pub use input::AiInput;
-pub use system::{ActivityComponent, AiComponent, AiSystem};
-use unit::world::WorldPoint;
+pub use system::{AiComponent, AiSystem};
+use unit::world::{WorldPoint, WorldPosition};
 
-pub use crate::ai::activity::AiAction;
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{InventoryComponent, ItemFilter, ItemReference};
-pub use dev::{DivineCommandCompletionSystem, DivineCommandComponent};
+pub use action::AiAction;
 use world::WorldArea;
 
-mod activity;
+mod action;
 mod consideration;
-mod dev;
 pub mod dse;
 mod input;
 mod system;
@@ -33,6 +31,8 @@ impl ai::Context for AiContext {
 /// 'a: only as long as this AI tick
 pub struct AiBlackboard<'a> {
     pub entity: Entity,
+    /// For navigation
+    pub accessible_position: WorldPosition,
     pub position: WorldPoint,
     pub hunger: NormalizedFloat,
     pub inventory: Option<&'a InventoryComponent>,

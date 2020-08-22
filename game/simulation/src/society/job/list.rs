@@ -39,10 +39,10 @@ impl ActiveJobs {
             let task_count = self.active_tasks.len() - len_before;
 
             if task_count == 0 {
-                debug!("job {:?} produced no tasks, marking as finished", job);
+                debug!("job produced no tasks, marking as finished"; "job" => ?job);
                 finished.push(i);
             } else {
-                debug!("job {:?} produced {} tasks", job, task_count);
+                debug!("job produced {count} tasks", count = task_count; "job" => ?job);
             }
         }
 
@@ -95,20 +95,16 @@ impl JobList {
     }
 
     pub fn reserve_task(&mut self, entity: Entity, task: Task) {
-        match self.reserved.reserve(entity, task.clone()) {
-            (Some(t), Some(e)) if e != entity  => debug!(
-                "reserved task {:?} (previously reserved by {:?}) for {:?}, who previously reserved {:?}",
-                task, e, entity, t
-            ),
-            (Some(t), _) => debug!(
-                "reserved task {:?} for {:?}, who previously reserved {:?}",
-                task, entity, t
-            ),
-            (None, Some(e)) if e != entity => debug!(
-                "reserved task {:?} (previously reserved by {:?}) for {:?}",
-                task, e, entity
-            ),
-            (None, _) => debug!("reserved task {:?} for {:?}", task, entity),
-        };
+        let (prev_task, prev_reserver) = self.reserved.reserve(entity, task.clone());
+        debug!("reserved task, unreserving previous";
+            "task" => ?task, "prev_task" => ?prev_task,
+            "prev_reserver" => ?prev_reserver
+        );
+    }
+
+    pub fn unreserve_task(&mut self, entity: Entity) {
+        if let Some(task) = self.reserved.unreserve(entity) {
+            debug!("unreserved society task"; "task" => ?task)
+        }
     }
 }

@@ -14,7 +14,7 @@ impl TemplateLookup {
         let mut templates = HashMap::new();
 
         for entry in inventory::iter::<ComponentTemplateEntry<ValueImpl>> {
-            debug!("registering component template {:?}", entry.key);
+            debug!("registering component template {key}", key = entry.key);
             templates.insert(entry.key, entry.clone());
         }
         Self(templates)

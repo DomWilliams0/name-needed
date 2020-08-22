@@ -1,11 +1,10 @@
 use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 
-use crate::ai::activity::{AiAction, ItemsToPickUp};
 use crate::ai::consideration::{
     FindLocalItemConsideration, HoldingItemConsideration, HungerConsideration,
 };
-use crate::ai::AiContext;
-use crate::item::{ItemClass, ItemFilter, LooseItemReference};
+use crate::ai::{AiAction, AiContext};
+use crate::item::{ItemClass, ItemFilter, ItemsToPickUp, LooseItemReference};
 use common::*;
 
 pub struct UseHeldFoodDse;
@@ -15,7 +14,7 @@ const FOOD_FILTER: ItemFilter = ItemFilter::Class(ItemClass::Food);
 const FOOD_MAX_RADIUS: u32 = 20;
 
 impl Dse<AiContext> for UseHeldFoodDse {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Use Held Item - Food"
     }
 
@@ -44,7 +43,7 @@ impl Dse<AiContext> for UseHeldFoodDse {
 }
 
 impl Dse<AiContext> for FindLocalFoodDse {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Find Local Item - Food"
     }
 

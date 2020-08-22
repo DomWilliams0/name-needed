@@ -1,5 +1,5 @@
 use common::*;
-use unit::world::WorldPoint;
+use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ecs::*;
 use crate::physics::Bounds;
@@ -22,6 +22,9 @@ pub struct TransformComponent {
     /// Used for render interpolation
     pub last_position: WorldPoint,
 
+    /// Last known-accessible block position
+    pub accessible_position: Option<WorldPosition>,
+
     /// 1d rotation around z axis
     pub rotation: Basis2,
 
@@ -40,6 +43,7 @@ impl TransformComponent {
             height,
             rotation: Basis2::from_angle(rad(0.0)),
             last_position: position,
+            accessible_position: None,
             velocity: Zero::zero(),
             fallen: 0,
         }
@@ -95,6 +99,16 @@ impl TransformComponent {
         };
 
         Bounds::from_radius(centre, x, y)
+    }
+
+    pub fn accessible_position(&self) -> WorldPosition {
+        if let Some(pos) = self.accessible_position {
+            // known accessible
+            pos
+        } else {
+            // fallback to exact position
+            self.position.floor()
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use crate::definitions::{Definition, DefinitionErrorKind};
 
 use crate::definitions::loader::DefinitionUid;
 use crate::ComponentWorld;
-use common::info;
+use common::*;
 use std::collections::HashMap;
 
 pub struct Registry {
@@ -37,8 +37,8 @@ impl RegistryBuilder {
 
     pub fn build(self) -> Registry {
         info!(
-            "creating definition registry with {} entries",
-            self.map.len()
+            "creating definition registry with {count} entries",
+            count = self.map.len()
         );
         Registry { map: self.map }
     }

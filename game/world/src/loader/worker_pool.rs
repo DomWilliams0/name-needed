@@ -72,7 +72,7 @@ impl WorkerPool for ThreadedWorkerPool {
                             Err(e)
                         }
                         Err(e) => {
-                            error!("failed to load requested chunk: {}", e);
+                            error!("failed to load requested chunk"; "error" => %e);
                             Err(e)
                         }
                         Ok(result) => {
@@ -83,12 +83,12 @@ impl WorkerPool for ThreadedWorkerPool {
                     };
 
                     if let Err(e) = success_tx.send(result) {
-                        error!("failed to report finalized chunk result: {}", e);
+                        error!("failed to report finalized chunk result"; "error" => %e);
                     }
                 }
 
-                // TODO detect this err condition?
-                debug!("terrain finalizer thread exiting")
+                // TODO detect this as an error condition?
+                info!("terrain finalizer thread exiting")
             })
             .expect("finalizer thread failed to start");
     }
@@ -111,7 +111,7 @@ impl WorkerPool for ThreadedWorkerPool {
             // terrain has been processed in isolation on worker thread, now post to
             // finalization thread
             if let Err(e) = done_channel.send(result) {
-                error!("failed to send terrain result to finalizer: {}", e);
+                error!("failed to send terrain result to finalizer"; "error" => %e);
             }
         });
     }
@@ -160,7 +160,7 @@ impl WorkerPool for BlockingWorkerPool {
             .expect("expected finalized terrain by now")
         {
             Err(e) => {
-                error!("failed to load chunk: {}", e);
+                error!("failed to load chunk"; "error" => %e);
                 Err(e)
             }
             Ok(result) => {

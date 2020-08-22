@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::debug;
+use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
@@ -205,7 +205,7 @@ impl<'a> AreaDiscovery<'a> {
 
             // store graph
             self.block_graphs.insert(area, graph);
-            debug!("area {:?} has {} blocks", area, count);
+            debug!("area has {count} blocks", count = count; "area" => ?area);
         }
     }
 

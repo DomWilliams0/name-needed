@@ -51,6 +51,7 @@ impl SelectionWindow {
                     match &selection.details {
                         EntityDetails::Living {
                             activity,
+                            sub_activity,
                             hunger,
                             path_target,
                             society,
@@ -98,6 +99,19 @@ impl SelectionWindow {
                                 im_str!("Activity:"),
                                 || {
                                     if let Some(activity) = activity {
+                                        Value::Wrapped(ui_str!(in strings, "{}", activity))
+                                    } else {
+                                        Value::None("None")
+                                    }
+                                },
+                                None,
+                                COLOR_ORANGE,
+                            );
+
+                            ui.key_value(
+                                im_str!("Subactivity:"),
+                                || {
+                                    if let Some(activity) = sub_activity {
                                         Value::Wrapped(ui_str!(in strings, "{}", activity))
                                     } else {
                                         Value::None("None")

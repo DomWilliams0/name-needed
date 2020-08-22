@@ -1,6 +1,8 @@
-# TODOs (169)
+# TODOs (179)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
+ * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
+   * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
    * `/// TODO pooled vec/slice rather than Vec each time`
    * `// TODO optimization: dont consider all considerations every time`
@@ -14,24 +16,35 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
- * [game/simulation/src/ai/activity/items.rs](game/simulation/src/ai/activity/items.rs) (5)
-   * `// TODO proper exertion calculation for item use`
-   * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
-   * `// TODO add ItemUseType which hints at which slot to use`
-   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
-   * `// TODO get item name`
- * [game/simulation/src/ai/activity/mod.rs](game/simulation/src/ai/activity/mod.rs) (1)
-   * `// TODO failure/interrupt reason`
- * [game/simulation/src/ai/activity/movement.rs](game/simulation/src/ai/activity/movement.rs) (3)
-   * `// TODO exertion depends on speed`
-   * `// TODO wander *activity* exertion should be 0, but added to the exertion of walking at X speed`
-   * `// TODO remove WANDER_SPEED constant when this is done`
- * [game/simulation/src/ai/activity/world.rs](game/simulation/src/ai/activity/world.rs) (5)
-   * `// TODO get block type we're about to break, and equip the best tool for it`
+ * [game/simulation/src/activity/activities/go_break_block.rs](game/simulation/src/activity/activities/go_break_block.rs) (4)
+   * `// TODO block breaking/world interacting should be done in a system`
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
-   * `// TODO exertion depends on the tool and block`
+ * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (1)
+   * `// TODO detect other destructive events e.g. entity removal`
+ * [game/simulation/src/activity/activities/go_to.rs](game/simulation/src/activity/activities/go_to.rs) (1)
+   * `// TODO reason specification should be type level and used everywhere. ties into localization`
+ * [game/simulation/src/activity/activities/use_held_item.rs](game/simulation/src/activity/activities/use_held_item.rs) (1)
+   * `// TODO str to describe item, and pass through to subactivities`
+ * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
+   * `// TODO move subactivity errors somewhere else`
+   * `// TODO itemfilter should specify a static string describing itself`
+ * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
+   * `// TODO helper on ctx to get component`
+   * `// TODO better exertion calculation for movement speed`
+ * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (3)
+   * `// TODO add ItemUseType which hints at which slot to use`
+   * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
+   * `// TODO inventory operations should not be immediate`
+ * [game/simulation/src/activity/subactivities/item_use.rs](game/simulation/src/activity/subactivities/item_use.rs) (1)
+   * `// TODO per-item exertion`
+ * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
+   * `// TODO exertion of picking up item depends on item weight`
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
+   * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
+   * `// TODO speed should be specified as an enum for all go??? actions`
  * [game/simulation/src/ai/dse/items.rs](game/simulation/src/ai/dse/items.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
@@ -60,6 +73,9 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
+ * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
+   * `// TODO event queue generic over event type`
+   * `// TODO track by game tick instead of just number of ops`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
@@ -103,10 +119,10 @@
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
    * `// TODO only render the top area in each slice`
+ * [game/simulation/src/path/follow.rs](game/simulation/src/path/follow.rs) (1)
+   * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
- * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
-   * `/// TODO should be an enum and represent interruption too, i.e. path was invalidated`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
@@ -167,7 +183,7 @@
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
    * `// TODO if this thread panics, propagate to main game thread`
-   * `// TODO detect this err condition?`
+   * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
    * `// TODO skip if slice knows it is empty`
@@ -210,6 +226,8 @@
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
+ * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (1)
+   * `// TODO use mutex that cant be poisoned`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
    * `// TODO cascade through other handlers`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
@@ -234,6 +252,10 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
+   * `// TODO configure to write to file as text`
+ * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
+   * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
    * `// TODO helper for this-1`
  * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)

@@ -48,3 +48,6 @@ impl Sub<Self> for ChunkPosition {
         Self(self.0 - rhs.0, self.1 - rhs.1)
     }
 }
+
+slog_value_debug!(ChunkPosition);
+slog_kv_debug!(ChunkPosition, "chunk");

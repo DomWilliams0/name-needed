@@ -5,7 +5,7 @@ use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 pub struct ObeyDivineCommandDse(pub AiAction);
 
 impl Dse<AiContext> for ObeyDivineCommandDse {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "Dev - obey divine command"
     }
 

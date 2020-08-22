@@ -1,0 +1,25 @@
+Config(
+    // irrelevant
+    display: (
+        resolution: (0, 0),
+        resizable: false,
+        camera_speed: 0.0,
+        debug_physics: false,
+        zoom: 1.0,
+        initial_view_range: 5,
+        nav_paths_by_default: false,
+    ),
+    world: (
+        // big random world
+        source: Generate (radius: 8, seed: None),
+        worker_threads: None,
+        generation_height_scale: 15.0,
+    ),
+    simulation: (
+        random_seed: None,
+        random_count: 40,
+        friction: 0.85,
+        start_delay: 0,
+        food_count: 200,
+     ),
+)

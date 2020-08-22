@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
 
-use crate::ai::activity::{Activity, ActivityContext, ActivityResult, Finish, NopActivity};
+use crate::activity::ActivityComponent;
 use crate::ai::dse::{human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
-use crate::queued_update::QueuedUpdates;
+
 use crate::simulation::Tick;
 use crate::society::job::{JobList, Task};
 use crate::society::{Society, SocietyComponent};
@@ -23,8 +23,7 @@ use world::WorldRef;
 #[storage(DenseVecStorage)]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
-    // last_completed_action: Option<AiAction>,
-    current_action: Option<AiAction>,
+    current: Option<(DecisionSource<AiContext>, AiAction)>,
 }
 
 impl AiComponent {
@@ -35,8 +34,7 @@ impl AiComponent {
 
         Self {
             intelligence,
-            // last_completed_action: None,
-            current_action: None,
+            current: None,
         }
     }
 
@@ -50,6 +48,10 @@ impl AiComponent {
         self.intelligence.pop_smarts(&AdditionalDse::DivineCommand);
     }
 
+    pub fn clear_last_action(&mut self) {
+        self.intelligence.clear_last_action();
+    }
+
     // pub fn last_completed_action(&self) -> Option<&AiAction> {
     //     self.last_completed_action.as_ref()
     // }
@@ -59,12 +61,10 @@ pub struct AiSystem;
 
 impl<'a> System<'a> for AiSystem {
     type SystemData = (
-        Read<'a, Tick>,
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
         Read<'a, WorldRef>,
         Write<'a, Societies>,
-        Write<'a, QueuedUpdates>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
         ReadStorage<'a, InventoryComponent>,
@@ -76,12 +76,10 @@ impl<'a> System<'a> for AiSystem {
     fn run(
         &mut self,
         (
-            tick,
             entities,
             ecs_world,
             voxel_world,
             mut societies,
-            updates,
             transform,
             hunger,
             inventory,
@@ -91,7 +89,8 @@ impl<'a> System<'a> for AiSystem {
         ): Self::SystemData,
     ) {
         // TODO only run occasionally - FIXME TERRIBLE HACK
-        if **tick % 10 != 0 {
+        let tick = Tick::fetch();
+        if tick.value() % 10 != 0 {
             return;
         }
 
@@ -111,10 +110,13 @@ impl<'a> System<'a> for AiSystem {
         )
             .join()
         {
+            log_scope!(o!("system" => "ai", E(e)));
+
             // initialize blackboard
             // TODO use arena/bump allocator and share instance between entities
             let mut bb = AiBlackboard {
                 entity: e,
+                accessible_position: transform.accessible_position(),
                 position: transform.position,
                 hunger: hunger.hunger(),
                 inventory_search_cache: HashMap::new(),
@@ -127,11 +129,6 @@ impl<'a> System<'a> for AiSystem {
             // Safety: can't use true lifetime on Blackboard so using 'static and transmuting until
             // we get our GATs
             let bb_ref: &mut AiBlackboard = unsafe { std::mem::transmute(&mut bb) };
-            let ctx = ActivityContext {
-                entity: e,
-                world: ecs_world,
-                updates: &updates,
-            };
 
             // collect extra actions from society job list, if any
             // TODO provide READ ONLY DSEs to ai intelligence
@@ -141,14 +138,14 @@ impl<'a> System<'a> for AiSystem {
                 society.and_then(|society_comp| society_comp.resolve(&mut *societies));
 
             if let Some(ref mut society) = society {
-                trace!("considering tasks for society {:?}", society);
+                trace!("considering tasks for society"; "society" => ?society);
 
                 let jobs: &mut JobList = (*society).jobs_mut();
-                let (is_cached, tasks) = jobs.collect_cached_tasks_for(*tick, &*voxel_world, e);
+                let (is_cached, tasks) = jobs.collect_cached_tasks_for(tick, &*voxel_world, e);
 
                 debug_assert!(
                     extra_dses.is_empty(),
-                    "society tasks is the only source of extra dses"
+                    "society tasks expected to be the only source of extra dses"
                 );
                 extra_dses.extend(tasks.map(|task| {
                     let dse = (&task).into();
@@ -156,81 +153,56 @@ impl<'a> System<'a> for AiSystem {
                 }));
 
                 trace!(
-                    "there are {} tasks{} for {:?}",
-                    extra_dses.len(),
-                    if is_cached { " (cached)" } else { "" },
-                    e
+                    "there are {count} tasks available",
+                    count = extra_dses.len();
+                    "cached" => is_cached,
                 );
             }
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_task, dse)| &**dse);
-            match ai
+            if let IntelligentDecision::New { dse, action, src } = ai
                 .intelligence
                 .choose_with_stream_dses(bb_ref, streamed_dse)
             {
-                IntelligentDecision::New { dse, action, src } => {
-                    debug!("{:?}: new activity: {} (from {:?})", e, dse.name(), src);
-                    trace!("activity: {:?}", action);
+                debug!("new activity"; "dse" => dse.name(), "source" => ?src);
+                trace!("activity action"; "action" => ?action);
 
-                    let (mut old, new) = {
-                        let new_activity = action.clone().into();
-                        let old_activity = std::mem::replace(&mut activity.current, new_activity);
-                        (old_activity, &mut activity.current)
-                    };
+                // pass on to activity system
+                activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
 
-                    ai.current_action = Some(action);
-                    // ai.last_completed_action = None; // interrupted
+                // register interruption
+                if let Some((interrupted_source, _)) = ai.current.take() {
+                    match interrupted_source {
+                        DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
+                            // divine command interrupted, assume completed
+                            debug!("removing interrupted divine command");
+                            ai.remove_divine_command();
+                        }
+                        DecisionSource::Stream(_) => {
+                            // unreserve interrupted society task
+                            let society = society
+                                .as_mut()
+                                .expect("streamed DSEs expected to come from a society only");
 
-                    old.on_finish(Finish::Interrupted, &ctx);
-                    new.on_start(&ctx);
-
-                    if let DecisionSource::Stream(i) = src {
-                        // a society task was chosen, reserve this so others can't try to do it too
-                        let society = society
-                            .as_mut()
-                            .expect("streamed DSEs expected to come from a society only");
-
-                        let task = &extra_dses[i].0;
-                        society.jobs_mut().reserve_task(e, task.clone());
+                            society.jobs_mut().unreserve_task(e);
+                        }
+                        _ => {}
                     }
                 }
-                IntelligentDecision::Unchanged => {
-                    let result = activity.current.on_tick(&ctx);
 
-                    if let ActivityResult::Finished(finish) = result {
-                        debug!(
-                            "finished activity with finish {:?}: '{}'. reverting to nop activity",
-                            finish, activity.current
-                        );
-                        let new = AiBox::new(NopActivity);
-                        let mut old = std::mem::replace(&mut activity.current, new);
+                if let DecisionSource::Stream(i) = src {
+                    // a society task was chosen, reserve this so others can't try to do it too
+                    let society = society
+                        .as_mut()
+                        .expect("streamed DSEs expected to come from a society only");
 
-                        old.on_finish(finish, &ctx);
-                        // no need to nop.on_start()
-
-                        // next tick should return IntelligentDecision::New rather than Unchanged to
-                        // avoid infinite Nop loops
-                        ai.intelligence.clear_last_action();
-
-                        // ai.last_completed_action = std::mem::take(&mut ai.current_action);
-                    }
+                    let task = &extra_dses[i].0;
+                    society.jobs_mut().reserve_task(e, task.clone());
                 }
+
+                ai.current = Some((src, action));
             }
-        }
-    }
-}
-
-#[derive(Component)]
-#[storage(DenseVecStorage)]
-pub struct ActivityComponent {
-    pub current: AiBox<dyn Activity<EcsWorld>>,
-}
-
-impl Default for ActivityComponent {
-    fn default() -> Self {
-        Self {
-            current: AiBox::new(NopActivity),
         }
     }
 }

@@ -67,7 +67,7 @@ impl<'a> System<'a> for InputSystem<'a> {
 
                     // find newly selected entity
                     if let Some(to_select) = resolve_entity(pos) {
-                        debug!("selected entity {:?}", to_select);
+                        debug!("selected entity"; E(to_select));
                         let _ = selecteds.insert(to_select, SelectedComponent);
                         selected.0 = Some(to_select);
                     }
@@ -123,7 +123,7 @@ impl<'a> System<'a> for InputSystem<'a> {
                                 (WorldPosition(x, y, to.slice()), from)
                             };
 
-                            debug!("selected block region {:?} -> {:?}", from, to);
+                            debug!("selected block region"; "min" => %from, "max" => %to);
                             Some(WorldPositionRange::with_exclusive_range(from, to))
                         }
                         _ => None,
@@ -136,7 +136,7 @@ impl<'a> System<'a> for InputSystem<'a> {
 
 fn unselect_current(res: &mut Write<SelectedEntity>, comp: &mut WriteStorage<SelectedComponent>) {
     if let Some(old) = res.0.take() {
-        debug!("unselected entity {:?}", old);
+        debug!("unselected entity"; E(old));
         comp.remove(old);
     }
 }
