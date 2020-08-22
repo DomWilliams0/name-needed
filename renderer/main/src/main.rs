@@ -200,6 +200,9 @@ fn main() {
 
     info!("exiting cleanly"; "code"=>exit);
 
-    drop(logger_guard); // flush
+    // unhook custom panic handler before dropping and flushing the logger
+    let _ = std::panic::take_hook();
+    drop(logger_guard);
+
     std::process::exit(exit);
 }
