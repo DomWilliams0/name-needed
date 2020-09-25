@@ -25,3 +25,6 @@ pub fn human_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
     ]
     .into_iter()
 }
+pub fn dog_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
+    vec![dse!(WanderDse)].into_iter()
+}

@@ -110,7 +110,12 @@ impl DoASteer for Seek {
         let pos = Vector2::from(transform.position);
 
         let distance = pos.distance(tgt);
-        if distance < transform.bounding_radius() + transform.velocity.magnitude() {
+        let threshold = {
+            const MARGIN: f32 = 1.4;
+            let radius = transform.bounding_radius() + transform.velocity.magnitude();
+            radius * MARGIN
+        };
+        if distance < threshold {
             // we've arrived
             return SteeringResult::Finished;
         }

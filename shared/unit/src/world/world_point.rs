@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Sub};
 
 use common::derive_more::*;
 
@@ -172,3 +172,11 @@ impl Display for WorldPoint {
 
 /// No NaNs allowed (sorry grandma)
 impl Eq for WorldPoint {}
+
+impl Sub for WorldPoint {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0, self.1 - rhs.1, self.2 - rhs.2)
+    }
+}

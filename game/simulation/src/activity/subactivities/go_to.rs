@@ -5,7 +5,7 @@ use unit::world::WorldPoint;
 
 use crate::activity::activity::{ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
-use crate::event::{EntityEventType, EventSubscription};
+use crate::event::prelude::*;
 use crate::path::{FollowPathComponent, PathToken};
 use crate::ComponentWorld;
 use world::SearchGoal;
@@ -81,6 +81,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
 }
 
 impl Display for GoToSubActivity {
+    // TODO use movement speed enum for display e.g. wandering to, running to
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Going to {}", self.target)
     }

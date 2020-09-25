@@ -4,7 +4,7 @@ use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
 
 use crate::activity::ActivityComponent;
-use crate::ai::dse::{human_dses, AdditionalDse, ObeyDivineCommandDse};
+use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
@@ -30,6 +30,7 @@ impl AiComponent {
     fn with_species(species: &Species) -> Self {
         let intelligence = match species {
             Species::Human => Intelligence::new(human_dses()),
+            Species::Dog => Intelligence::new(dog_dses()),
         };
 
         Self {
@@ -210,6 +211,7 @@ impl<'a> System<'a> for AiSystem {
 #[derive(Debug, Clone)]
 pub enum Species {
     Human,
+    Dog,
 }
 
 #[derive(Debug)]
@@ -225,6 +227,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
         let species = values.get_string("species")?;
         let species = match species.as_str() {
             "human" => Species::Human,
+            "dog" => Species::Dog,
             _ => {
                 return Err(ComponentBuildError::TemplateSpecific(format!(
                     "unknown species {:?}",

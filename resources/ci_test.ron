@@ -17,9 +17,10 @@ Config(
     ),
     simulation: (
         random_seed: None,
-        random_count: 40,
+        human_count: 50,
+        dog_count: 10,
         friction: 0.85,
         start_delay: 0,
-        food_count: 200,
+        food_count: 400,
      ),
 )

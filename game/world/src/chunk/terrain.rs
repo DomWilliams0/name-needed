@@ -985,6 +985,7 @@ impl ChunkTerrain {
         }
     }
 
+    // TODO use an enum for the slice range rather than Options
     pub fn find_accessible_block(
         &self,
         pos: SliceBlock,

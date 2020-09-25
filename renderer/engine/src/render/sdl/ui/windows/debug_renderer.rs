@@ -32,6 +32,7 @@ impl DebugWindow {
                     bundle.checkbox(im_str!("Navigation paths"), "navigation path");
                     bundle.checkbox(im_str!("Navigation areas"), "navigation areas");
                     bundle.checkbox(im_str!("Steering direction"), "steering");
+                    bundle.checkbox(im_str!("Senses"), "senses");
                 }
 
             });

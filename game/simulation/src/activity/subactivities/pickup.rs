@@ -3,7 +3,7 @@ use common::*;
 use crate::activity::activity::{ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
 use crate::ecs::Entity;
-use crate::event::{EntityEventType, EventSubscription};
+use crate::event::prelude::*;
 use crate::item::PickupItemComponent;
 use crate::ComponentWorld;
 

@@ -153,6 +153,11 @@ impl SelectedEntity {
             nice => nice, // still alive
         }
     }
+
+    /// Entity may not be alive
+    pub fn get_unchecked(&self) -> Option<Entity> {
+        self.0
+    }
 }
 impl SelectedTiles {
     pub fn range(&self) -> Option<WorldPositionRange> {

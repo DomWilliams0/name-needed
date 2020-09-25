@@ -32,6 +32,9 @@ pub trait Renderer {
     #[allow(unused_variables)]
     fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: ColorRgb) {}
 
+    #[allow(unused_variables)]
+    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: ColorRgb) {}
+
     fn debug_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }

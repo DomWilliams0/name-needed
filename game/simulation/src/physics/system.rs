@@ -109,6 +109,12 @@ impl<'a> System<'a> for PhysicsSystem {
             // apply velocity
             transform.position += velocity;
             transform.velocity = velocity;
+
+            // face direction of travel
+            if !velocity.is_zero() {
+                // TODO lerp towards new rotation
+                transform.rotation = Basis2::from_angle(AXIS_FWD_2.angle(velocity));
+            }
         }
     }
 }

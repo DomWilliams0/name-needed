@@ -3,7 +3,9 @@ use common::*;
 use crate::ComponentWorld;
 
 use crate::ecs::Entity;
-use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
+use crate::event::{
+    EntityEvent, EntityEventSubscription, EntityTimers, EventSubscription, TimerToken,
+};
 use crate::path::FollowPathComponent;
 use crate::queued_update::QueuedUpdates;
 
@@ -111,6 +113,12 @@ impl<'a, W: ComponentWorld> ActivityContext<'a, W> {
         if let Ok(comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
             comp.clear_path();
         }
+    }
+
+    pub fn schedule_timer(&self, count: u32, subject: Entity) -> TimerToken {
+        self.world
+            .resource_mut::<EntityTimers>()
+            .schedule(count, subject)
     }
 }
 

@@ -43,7 +43,8 @@ pub enum WorldPreset {
 #[derive(Deserialize)]
 pub struct Simulation {
     pub random_seed: Option<u64>,
-    pub random_count: u32,
+    pub human_count: usize,
+    pub dog_count: usize,
     pub friction: f32,
     pub start_delay: u32,
     pub food_count: usize,

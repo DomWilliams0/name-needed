@@ -3,13 +3,14 @@ use crate::activity::activity::{
 };
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
-use crate::event::EntityEventQueue;
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EntityTimers};
 use crate::queued_update::QueuedUpdates;
 use common::*;
 
 use crate::activity::EventUnblockResult;
 
 use crate::activity::activities::NopActivity;
+use crate::simulation::Tick;
 
 pub struct ActivitySystem;
 
@@ -116,11 +117,22 @@ impl<'a> System<'a> for ActivitySystem {
 impl<'a> System<'a> for ActivityEventSystem {
     type SystemData = (
         Write<'a, EntityEventQueue>,
+        Write<'a, EntityTimers>,
         WriteStorage<'a, ActivityComponent>,
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut events, mut activities, updates): Self::SystemData) {
+    fn run(&mut self, (mut events, mut timers, mut activities, updates): Self::SystemData) {
+        // post events for elapsed timers
+        for (token, subject) in timers.maintain(Tick::fetch()) {
+            events.post(EntityEvent {
+                subject,
+                payload: EntityEventPayload::TimerElapsed(token),
+            });
+
+            trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
+        }
+
         events.handle_events(|subscriber, event| {
             let activity = activities
                 .get_mut(subscriber)

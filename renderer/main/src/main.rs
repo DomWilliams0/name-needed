@@ -6,6 +6,7 @@ use simulation::{
     self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
 };
 
+use crate::presets::ContinuousIntegrationGamePreset;
 use engine::panic::Panic;
 use engine::Engine;
 use resources::resource::Resources;
@@ -44,7 +45,7 @@ fn do_main() -> BoxedResult<()> {
                 .long("preset")
                 .help("Game preset")
                 .takes_value(true)
-                .possible_values(&["dev", "empty"]),
+                .possible_values(&["dev", "empty", "ci"]),
         )
         .arg(
             Arg::with_name("dir")
@@ -57,6 +58,7 @@ fn do_main() -> BoxedResult<()> {
 
     let preset: Box<dyn GamePreset<Renderer>> = match args.value_of("preset") {
         None | Some("dev") => Box::new(DevGamePreset::<Renderer>::default()),
+        Some("ci") => Box::new(ContinuousIntegrationGamePreset::default()),
         Some("empty") => Box::new(EmptyGamePreset::default()),
         _ => unreachable!(),
     };

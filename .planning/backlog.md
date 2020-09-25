@@ -19,6 +19,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* an inappropriate block in an area port is chosen
 	* very indirect paths within areas too, edge costs need adjusting
 * tweak arrival threshold for path waypoints, it's a bit jerky
+* bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
 
 ## UI/input
 * graph for fps/tps history
@@ -51,6 +52,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * food/drink vessels and wastage
 * refactor item usage to be less generic at the system level
 	* instead of iterating over holders with (using comp, inventory comp), iterate over *items* with (being used comp, edible comp), (being used comp, other usage comp) etc
+* consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
 
 ## World generation
 * biomes
@@ -132,7 +134,24 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * animal species
 	* dogs, cats, birds, deer
 * individual stats for needs
+* cats chase mice
+* birds/small animals swarm food crumbs left by someone eating
+
+### Dogs
 * dogs pick up sticks, move faster than humans, chase cats
+* breeds have different characteristics
+	* soft mouth vs hard mouth
+	* some more likely to pick up items
+	* some more likely to accidewntally break things in their mouth
+* can be tamed, become part of society?
+* can bond to 1 or 2 humans, follow them about, distressed when separated
+* if stressed/not fulfilled, chew and damage things
+* smell food carried by others, whine and follow them
+	* stronger smell emitted if in hand or in the open, less so if in sealed bag/container
+* people (who like dogs) see dogs and go over to pet for emotional support
+	* can also play fetch with a stick and other riveting games
+* dogs play together e.g. tag
+
 
 ## Simulation depth
 * entity interaction

@@ -1,5 +1,6 @@
 use crate::activity::{EquipItemError, UseHeldItemError};
 use crate::ecs::*;
+use crate::event::timer::TimerToken;
 use crate::item::{PickupItemError, SlotReference};
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
@@ -28,6 +29,9 @@ pub enum EntityEventPayload {
 
     /// Item entity has been equipped in the specified base slot
     Equipped(Result<SlotReference, EquipItemError>),
+
+    /// Timer elapsed
+    TimerElapsed(TimerToken),
 
     #[doc(hidden)]
     #[cfg(test)]

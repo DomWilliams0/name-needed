@@ -10,6 +10,7 @@ use crate::render::sdl::gl::{
 use crate::render::sdl::render::entity::EntityPipeline;
 use crate::render::sdl::render::terrain::TerrainRenderer;
 use resources::resource::Shaders;
+use std::f32::consts::PI;
 use unit::world::WorldPoint;
 
 mod entity;
@@ -136,6 +137,25 @@ impl Renderer for GlRenderer {
         self.debug_add_line(points[1], points[2], color);
         self.debug_add_line(points[2], points[3], color);
         self.debug_add_line(points[3], points[0], color);
+    }
+
+    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: ColorRgb) {
+        const SEGMENTS: usize = 30;
+
+        (0..SEGMENTS)
+            .map(|i| {
+                let theta = 2.0 * PI * (i as f32 / SEGMENTS as f32);
+                let x = radius * theta.cos();
+                let y = radius * theta.sin();
+                (x, y)
+            })
+            .cycle()
+            .take(SEGMENTS + 1)
+            .tuple_windows()
+            .map(|((ax, ay), (bx, by))| (centre + (ax, ay, 0.0), centre + (bx, by, 0.0)))
+            .for_each(|(from, to)| {
+                self.debug_add_line(from, to, color);
+            });
     }
 
     fn debug_finish(&mut self) -> GlResult<()> {

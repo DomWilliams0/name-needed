@@ -4,6 +4,7 @@ use unit::world::{WorldPoint, WorldPosition};
 use crate::ecs::*;
 use crate::physics::Bounds;
 use crate::PhysicalShape;
+use common::cgmath::Rotation;
 use specs::{Builder, EntityBuilder};
 
 /// Position and rotation component
@@ -54,14 +55,11 @@ impl TransformComponent {
         self.last_position = new_position;
     }
 
-    pub fn set_height(&mut self, z: i32) {
-        let z = z as f32;
-        self.position.2 = z as f32;
-    }
-
     pub const fn slice(&self) -> i32 {
+        // cant use position.slice() because not const
         self.position.2 as i32
     }
+
     pub const fn x(&self) -> f32 {
         self.position.0
     }
@@ -109,6 +107,10 @@ impl TransformComponent {
             // fallback to exact position
             self.position.floor()
         }
+    }
+
+    pub fn forwards(&self) -> Vector2 {
+        self.rotation.rotate_vector(AXIS_FWD_2)
     }
 }
 

@@ -6,7 +6,8 @@ use world::WorldRef;
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable};
-use crate::{InventoryComponent, TransformComponent};
+use crate::spatial::Spatial;
+use crate::InventoryComponent;
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
 
@@ -184,11 +185,7 @@ fn search_local_area(
     // TODO arena allocated vec return value
     // TODO clearly needs some spatial partitioning here
 
-    let (entities, transform, item): (
-        Read<EntitiesRes>,
-        ReadStorage<TransformComponent>,
-        ReadStorage<BaseItemComponent>,
-    ) = world.system_data();
+    let items = world.read_storage::<BaseItemComponent>();
 
     let voxel_world_ref = &*world.read_resource::<WorldRef>();
     let voxel_world = voxel_world_ref.borrow();
@@ -203,25 +200,18 @@ fn search_local_area(
         }
     };
 
-    let self_position = Vector2::from(self_position.centred());
-    let results = (&entities, &transform, &item)
-        .join()
-        .filter(|(entity, _, item)| {
-            // cheap filter check first
-            (*entity, *item).matches(*filter).is_some()
-        })
-        .filter_map(|(entity, transform, item)| {
-            // check distance is in range
-            let distance = self_position.distance(transform.position.into());
-            if distance <= max_radius {
-                Some((entity, transform.position, distance, item))
-            } else {
-                None
-            }
-        })
-        .filter_map(|(entity, point, distance, item)| {
-            // check that this item is accessible
-            let item_area = voxel_world.area(point.floor()).ok()?;
+    let spatial = world.resource::<Spatial>();
+    let results = spatial
+        .query_in_radius(self_position.centred(), max_radius)
+        .filter_map(|(entity, pos, dist)| {
+            let item = items.get(entity)?;
+
+            // check item filter matches
+            (entity, item).matches(*filter)?;
+
+            // check this item is accessible
+            // TODO use accessible position?
+            let item_area = voxel_world.area(pos.floor()).ok()?;
             let mut reachable;
 
             // same area, definitely accessible
@@ -242,7 +232,7 @@ fn search_local_area(
             }
 
             if reachable {
-                Some((entity, point, distance, item.condition.value()))
+                Some((entity, pos, dist, item.condition.value()))
             } else {
                 None
             }

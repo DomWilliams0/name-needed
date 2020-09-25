@@ -26,7 +26,6 @@ use crate::movement::{
 use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
 use crate::path::{
     FollowPathComponent, NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem,
-    WanderComponent, WanderPathAssignmentSystem,
 };
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
@@ -40,8 +39,11 @@ use crate::{ComponentWorld, Societies, SocietyHandle};
 
 use crate::activity::{ActivityEventSystem, ActivitySystem, BlockingActivityComponent};
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
-use crate::event::EntityEventQueue;
+use crate::event::{EntityEventQueue, EntityTimers};
+use crate::senses::{MagicalSenseComponent, SensesComponent, SensesDebugRenderer, SensesSystem};
+use crate::spatial::{Spatial, SpatialSystem};
 use resources::resource::Resources;
+use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 use unit::world::WorldPositionRange;
 
@@ -148,12 +150,12 @@ impl<R: Renderer> Simulation<R> {
         HungerSystem.run_now(&self.ecs_world);
         EatingSystem.run_now(&self.ecs_world);
 
+        // update senses
+        SensesSystem.run_now(&self.ecs_world);
+
         // choose activity
         AiSystem.run_now(&self.ecs_world);
         ActivitySystem.run_now(&self.ecs_world);
-
-        // assign paths for wandering
-        WanderPathAssignmentSystem.run_now(&self.ecs_world);
 
         // follow paths with steering
         PathSteeringSystem.run_now(&self.ecs_world);
@@ -177,6 +179,9 @@ impl<R: Renderer> Simulation<R> {
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
+
+        // update spatial
+        SpatialSystem.run_now(&self.ecs_world);
     }
 
     pub fn world(&self) -> WorldRef {
@@ -367,6 +372,19 @@ impl Tick {
     pub fn value(self) -> u32 {
         self.0
     }
+
+    #[cfg(test)]
+    pub fn with(tick: u32) -> Self {
+        Self(tick)
+    }
+}
+
+impl Add<u32> for Tick {
+    type Output = Self;
+
+    fn add(self, rhs: u32) -> Self::Output {
+        Self(self.0 + rhs)
+    }
 }
 
 #[allow(unused)]
@@ -388,7 +406,6 @@ pub fn register_components(world: &mut EcsWorld) {
     register!(FollowPathComponent);
     register!(SteeringComponent);
     register!(DesiredMovementComponent);
-    register!(WanderComponent);
 
     // ai
     register!(AiComponent);
@@ -396,6 +413,10 @@ pub fn register_components(world: &mut EcsWorld) {
     register!(ActivityComponent);
     register!(BlockingActivityComponent);
     register!(SocietyComponent);
+
+    // senses
+    register!(SensesComponent);
+    register!(MagicalSenseComponent);
 
     // items
     register!(BaseItemComponent);
@@ -410,7 +431,6 @@ pub fn register_components(world: &mut EcsWorld) {
 }
 
 fn register_resources(world: &mut EcsWorld) {
-    world.insert(Tick::default());
     world.insert(QueuedUpdates::default());
     world.insert(SelectedEntity::default());
     world.insert(SelectedTiles::default());
@@ -418,6 +438,8 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(Societies::default());
     world.insert(PlayerSociety::default());
     world.insert(EntityEventQueue::default());
+    world.insert(Spatial::default());
+    world.insert(EntityTimers::default());
 }
 
 fn register_debug_renderers<R: Renderer>(
@@ -430,6 +452,7 @@ fn register_debug_renderers<R: Renderer>(
         config::get().display.nav_paths_by_default,
     )?;
     r.register(NavigationAreaDebugRenderer::default(), false)?;
+    r.register(SensesDebugRenderer::default(), false)?;
     Ok(())
 }
 

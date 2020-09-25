@@ -1,4 +1,4 @@
-# TODOs (179)
+# TODOs (194)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -16,6 +16,8 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
    * `// TODO generate lower res noise and scale up`
+ * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
+   * `// TODO will probably need porting to a follow subactivity`
  * [game/simulation/src/activity/activities/go_break_block.rs](game/simulation/src/activity/activities/go_break_block.rs) (4)
    * `// TODO block breaking/world interacting should be done in a system`
    * `// TODO get current held tool to determine how fast the block can be broken`
@@ -27,12 +29,15 @@
    * `// TODO reason specification should be type level and used everywhere. ties into localization`
  * [game/simulation/src/activity/activities/use_held_item.rs](game/simulation/src/activity/activities/use_held_item.rs) (1)
    * `// TODO str to describe item, and pass through to subactivities`
+ * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
+   * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
    * `// TODO move subactivity errors somewhere else`
    * `// TODO itemfilter should specify a static string describing itself`
- * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (2)
+ * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
    * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
+   * `// TODO use movement speed enum for display e.g. wandering to, running to`
  * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (3)
    * `// TODO add ItemUseType which hints at which slot to use`
    * `// TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented`
@@ -50,11 +55,12 @@
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (6)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO arena allocated vec return value`
    * `// TODO clearly needs some spatial partitioning here`
+   * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
@@ -76,6 +82,9 @@
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
+ * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
+   * `// TODO sort by elapsed() bool instead`
+   * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `// TODO use ui allocation arena here too`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
@@ -127,12 +136,20 @@
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
    * `// TODO vertical height too`
- * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (1)
+ * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (2)
    * `// TODO apply fall damage if applicable`
+   * `// TODO lerp towards new rotation`
  * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
+ * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
+   * `// TODO this is really expensive`
+ * [game/simulation/src/senses/system.rs](game/simulation/src/senses/system.rs) (4)
+   * `/// TODO maybe the ecs bitmask can be reused here instead of a huge alloc per entity`
+   * `// TODO system is expensive, dont run every tick`
+   * `// TODO consider using expiry times rather than decrementing a decay counter`
+   * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
@@ -144,6 +161,8 @@
    * `// TODO HaulBlocks(block type, near position)`
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross`
+ * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
+   * `// TODO reimplement with octree`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
@@ -158,7 +177,7 @@
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (8)
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (9)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
@@ -166,6 +185,7 @@
    * `// TODO reuse a buffer for each slab`
    * `// TODO discover internal area links`
    * `// TODO transmute lifetimes instead`
+   * `// TODO use an enum for the slice range rather than Options`
    * `// TODO 1 area at z=0`
  * [game/world/src/grid.rs](game/world/src/grid.rs) (1)
    * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
@@ -226,7 +246,8 @@
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (1)
+ * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (2)
+   * `// TODO use panic.message() when it stabilises`
    * `// TODO use mutex that cant be poisoned`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
    * `// TODO cascade through other handlers`

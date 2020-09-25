@@ -82,6 +82,18 @@ impl BlockGraph {
             });
         }
 
+        fn manhattan(a: &BlockPosition, b: &BlockPosition) -> i32 {
+            let [nx, ny, nz]: [i32; 3] = (*a).into();
+            let [gx, gy, gz]: [i32; 3] = (*b).into();
+
+            // TODO use vertical distance differently?
+
+            let dx = (nx - gx).abs();
+            let dy = (ny - gy).abs();
+            let dz = (nz - gz).abs();
+            dx + dy + dz
+        }
+
         let src = BlockNavNode(from);
         let dst = BlockNavNode(to);
 
@@ -90,6 +102,9 @@ impl BlockGraph {
             SearchGoal::Adjacent => {
                 Box::new(|n: BlockNavNode| self.graph.edges(n).any(|e| e.target() == dst))
             }
+            SearchGoal::Nearby(range) => {
+                Box::new(move |n: BlockNavNode| manhattan(&n.0, &dst.0) <= range.into())
+            }
         };
 
         let path = astar(
@@ -97,27 +112,15 @@ impl BlockGraph {
             src,
             is_goal,
             |(_, _, e)| e.0.weight(),
-            |n| {
-                // manhattan distance
-                let [nx, ny, nz]: [i32; 3] = n.0.into();
-                let [gx, gy, gz]: [i32; 3] = dst.0.into();
-                // TODO use vertical distance differently?
-
-                let dx = (nx - gx).abs();
-                let dy = (ny - gy).abs();
-                let dz = (nz - gz).abs();
-                (dx + dy + dz) as f32
-            },
+            |n| manhattan(&n.0, &dst.0) as f32,
         )
         .ok_or_else(|| BlockPathError::NoPath(to, from))?;
 
         // TODO reuse vec allocation
         let mut out_path = Vec::with_capacity(path.len());
 
-        let target = path
-            .last()
-            .map(|(_, (_, target))| target.0)
-            .expect("path expected to be non-zero length");
+        let target = path.last().map(|(_, (_, target))| target).unwrap_or(&dst).0;
+
         for (_, (from, to)) in path {
             let edge = self.graph.edge_weight(from, to).unwrap();
             out_path.push(BlockPathNode {

@@ -1,7 +1,7 @@
-use arrayvec::ArrayVec;
 use backtrace::Backtrace;
 use common::*;
 
+use std::borrow::Cow;
 use std::panic::PanicInfo;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -17,7 +17,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Panic {
-    pub message: Option<String>,
+    pub message: String,
     pub thread: String,
     pub backtrace: Backtrace,
 }
@@ -55,20 +55,23 @@ fn register_panic(panic: &PanicInfo) {
         format!("{:?} ({})", t.id(), name)
     };
 
-    let message = panic.payload().downcast_ref::<&str>();
+    // TODO use panic.message() when it stabilises
+    let message = panic
+        .payload()
+        .downcast_ref::<&str>()
+        .map(|s| Cow::Borrowed(*s))
+        .unwrap_or_else(|| Cow::from(format!("{}", panic)));
 
-    error!("handling panic"; "thread" => &thread, "message" => message);
+    error!("handling panic"; "thread" => &thread, "message" => %message);
 
     let backtrace = Backtrace::new_unresolved();
-
-    let message = message.map(|s| (*s).to_owned());
 
     HAS_PANICKED.store(true, Ordering::Relaxed);
 
     // TODO use mutex that cant be poisoned
     let mut panics = PANICS.lock().unwrap(); // nested panic!?
     if let Err(e) = panics.try_push(Panic {
-        message,
+        message: message.into_owned(),
         thread,
         backtrace,
     }) {

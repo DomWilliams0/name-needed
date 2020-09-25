@@ -1,8 +1,6 @@
 use common::*;
 use std::path::Path;
 
-pub use dev::DevGamePreset;
-pub use empty::EmptyGamePreset;
 use resources::resource::Resources;
 use simulation::{Renderer, Simulation, ThreadedWorldLoader};
 use std::time::Duration;
@@ -28,5 +26,10 @@ pub trait GamePreset<R: Renderer> {
     }
 }
 
+mod ci;
 mod dev;
 mod empty;
+
+pub use ci::ContinuousIntegrationGamePreset;
+pub use dev::DevGamePreset;
+pub use empty::EmptyGamePreset;

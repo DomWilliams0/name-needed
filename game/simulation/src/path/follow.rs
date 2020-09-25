@@ -23,12 +23,15 @@ pub struct PathFollowing {
 
 impl PathFollowing {
     pub fn new(path: WorldPath, requested_target: WorldPoint, goal: SearchGoal) -> Self {
-        let final_target = if let SearchGoal::Adjacent = goal {
-            // follow to new, adjacent target instead
-            path.target().centred()
-        } else {
-            // keep precision from requested target
-            requested_target
+        let final_target = match goal {
+            SearchGoal::Arrive => {
+                // keep precision from requested target
+                requested_target
+            }
+            _ => {
+                // follow to new, adjusted target instead
+                path.target().centred()
+            }
         };
         Self {
             path,

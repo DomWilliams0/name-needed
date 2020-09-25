@@ -19,6 +19,9 @@
             )},
             {"intelligence": (species: "human")},
             {"hunger": (max: 3000)},
+            {"senses": (
+                    vision: (length: 15.0, angle: 100 /*degrees*/),
+            )}
         ],
     ),
 ]

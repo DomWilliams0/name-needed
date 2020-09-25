@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::ops::DerefMut;
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
@@ -41,6 +40,11 @@ pub enum AreaLookup {
 
     /// Block has area
     Area(WorldArea),
+}
+
+pub enum RandomWalkableBlock {
+    Global,
+    Local { from: WorldPosition, radius: u16 },
 }
 
 impl World {
@@ -155,8 +159,8 @@ impl World {
 
         let to_accessible = self.find_accessible_block_in_column_with_range(to, None);
         let (to, goal) = match goal {
-            SearchGoal::Arrive => {
-                // target block must be accessible to arrive at
+            SearchGoal::Arrive | SearchGoal::Nearby(_) => {
+                // target block must be accessible
                 to_accessible.map(|pos| (pos, goal))
             }
             SearchGoal::Adjacent => {
@@ -417,37 +421,76 @@ impl World {
         &self.area_graph
     }
 
-    pub fn choose_random_walkable_block(&self, max_attempts: usize) -> Option<WorldPosition> {
-        let mut rand = random::get();
-        for _ in 0..max_attempts {
-            let chunk = self.all_chunks().choose(rand.deref_mut()).unwrap(); // chunks wont be empty
-
-            let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-            let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-            if let Some(block_pos) = chunk.find_accessible_block(SliceBlock(x, y), None, None) {
-                return Some(block_pos.to_world_position(chunk.pos()));
-            }
-        }
-        None
-    }
-
-    pub fn choose_random_accessible_block(
+    fn choose_random_walkable_block_filtered(
         &self,
-        accessible_from: WorldPosition,
+        choice: RandomWalkableBlock,
+        mut extra_filter: impl FnMut(WorldPosition) -> bool,
         max_attempts: usize,
     ) -> Option<WorldPosition> {
-        // look at adjacent blocks as well as the starting point
-        let src_area = {
-            let mut candidates = once(accessible_from).chain(WorldNeighbours::new(accessible_from));
-            candidates.find_map(|pos| self.area(pos).ok())
-        }?;
+        let mut rand = random::get();
 
-        (0..max_attempts)
-            .filter_map(|i| self.choose_random_walkable_block(max_attempts - i + 1))
-            .find(|pos| match self.area(*pos) {
-                AreaLookup::Area(area) => self.area_path_exists(src_area, area),
-                _ => false,
-            })
+        (0..max_attempts).find_map(|_| {
+            let candidate = match choice {
+                RandomWalkableBlock::Global => {
+                    // choose from all global chunks
+                    let chunk = self.all_chunks().choose(&mut *rand).unwrap(); // never empty
+
+                    let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+                    let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+                    chunk
+                        .find_accessible_block(SliceBlock(x, y), None, None)
+                        .map(|block_pos| block_pos.to_world_position(chunk.pos()))
+                }
+
+                RandomWalkableBlock::Local { from, radius } => {
+                    let radius = radius as i32;
+                    let dx = rand.gen_range(-radius, radius);
+                    let dy = rand.gen_range(-radius, radius);
+
+                    let candidate = from + (dx, dy, 0);
+                    self.find_chunk_with_pos(candidate.into())
+                        .and_then(|chunk| {
+                            let block_pos = BlockPosition::from(candidate);
+                            chunk
+                                .find_accessible_block(block_pos.into(), None, None)
+                                .map(|block_pos| block_pos.to_world_position(chunk.pos()))
+                        })
+                }
+            };
+
+            candidate.and_then(|pos| if extra_filter(pos) { Some(pos) } else { None })
+        })
+    }
+
+    pub fn choose_random_walkable_block(&self, max_attempts: usize) -> Option<WorldPosition> {
+        self.choose_random_walkable_block_filtered(
+            RandomWalkableBlock::Global,
+            |_| true,
+            max_attempts,
+        )
+    }
+
+    pub fn choose_random_accessible_block_in_radius(
+        &self,
+        accessible_from: WorldPosition,
+        radius: u16,
+        max_attempts: usize,
+    ) -> Option<WorldPosition> {
+        let src_area = self.area(accessible_from).ok()?;
+
+        self.choose_random_walkable_block_filtered(
+            RandomWalkableBlock::Local {
+                from: accessible_from,
+                radius,
+            },
+            |pos| {
+                self.area(pos)
+                    .ok()
+                    .map(|area| self.area_path_exists(src_area, area))
+                    .unwrap_or(false)
+            },
+            max_attempts,
+        )
     }
 
     pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {

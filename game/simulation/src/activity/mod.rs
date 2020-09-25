@@ -33,9 +33,12 @@ mod action_to_activity {
                     // TODO itemfilter should specify a static string describing itself
                     activity!(PickupItemsActivity::with_items(items, "iTeMs"))
                 }
-                AiAction::Wander => activity!(WanderActivity),
+                AiAction::Wander => activity!(WanderActivity::default()),
                 AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::with_item(item)),
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
+                AiAction::Follow { target, radius } => {
+                    activity!(FollowActivity::new(target, radius))
+                }
             }
         }
     }
