@@ -207,7 +207,7 @@ fn search_local_area(
             let item = items.get(entity)?;
 
             // check item filter matches
-            (entity, item).matches(*filter)?;
+            (entity, item, Some(world)).matches(*filter)?;
 
             // check this item is accessible
             // TODO use accessible position?

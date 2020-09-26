@@ -8,8 +8,9 @@ use crate::TransformComponent;
 use world::WorldRef;
 
 /// Steering context
-#[derive(Default, Component)]
+#[derive(Default, Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("steering")]
 pub struct SteeringComponent {
     pub behaviour: SteeringBehaviour,
 }

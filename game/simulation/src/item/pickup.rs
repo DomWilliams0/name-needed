@@ -37,8 +37,9 @@ pub enum PickupItemError {
 pub struct ItemsToPickUp(pub ItemFilter, pub Vec<(Entity, WorldPoint)>);
 
 /// Pick up the given item entity if in range
-#[derive(Component, Debug)]
+#[derive(Component, EcsComponent, Debug)]
 #[storage(HashMapStorage)]
+#[name("pickup-item")]
 pub struct PickupItemComponent(pub Entity);
 
 pub struct PickupItemSystem;

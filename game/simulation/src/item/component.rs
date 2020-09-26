@@ -3,21 +3,20 @@ use common::NormalizedFloat;
 
 use crate::ecs::*;
 use crate::item::condition::ItemCondition;
-use crate::item::{ItemClass, SlotIndex};
+use crate::item::SlotIndex;
 use crate::needs::Fuel;
 use specs::{Builder, EntityBuilder};
 
 /// Common properties across all items
-#[derive(Component, Constructor, Clone, Debug)]
+#[derive(Component, EcsComponent, Constructor, Clone, Debug)]
 #[storage(DenseVecStorage)]
+#[name("item")]
 pub struct BaseItemComponent {
     pub name: String,
     pub condition: ItemCondition,
+
     // Kilograms
     pub mass: f32,
-
-    /// Never changes
-    pub class: ItemClass,
 
     /// Number of base inventory slots this takes up e.g. in hand
     pub base_slots: u8,
@@ -28,7 +27,8 @@ pub struct BaseItemComponent {
     pub stack_size: u16,
 }
 
-#[derive(Component, Constructor, Clone, Debug)]
+#[derive(Component, EcsComponent, Constructor, Clone, Debug)]
+#[name("edible")]
 #[storage(DenseVecStorage)]
 pub struct EdibleItemComponent {
     /// All fuel available from this item - never changes, decrease base item condition instead
@@ -40,8 +40,9 @@ pub struct EdibleItemComponent {
 }
 
 // TODO use item mass to determine how far it flies? or also aerodynamic-ness
-#[derive(Component, Default, Debug)]
+#[derive(Component, EcsComponent, Default, Debug)]
 #[storage(NullStorage)]
+#[name("throwable")]
 pub struct ThrowableItemComponent;
 
 // TODO drinkable
@@ -49,8 +50,9 @@ pub struct ThrowableItemComponent;
 // TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)
 
 /// Holding an item in base inventory and using it
-#[derive(Component, Debug)]
+#[derive(Component, EcsComponent, Debug)]
 #[storage(HashMapStorage)]
+#[name("using-item")]
 pub struct UsingItemComponent {
     /// Amount of item left to use, if this reaches 0 this component will be removed and the
     /// activity finished gracefully.
@@ -61,8 +63,6 @@ pub struct UsingItemComponent {
 
     /// Item must be in base inventory to use TODO is this needed?
     pub base_slot: SlotIndex,
-
-    pub class: ItemClass,
 }
 
 impl<V: Value> ComponentTemplate<V> for BaseItemComponent {
@@ -74,7 +74,6 @@ impl<V: Value> ComponentTemplate<V> for BaseItemComponent {
             name: values.get_string("name")?,
             condition: ItemCondition::perfect(),
             mass: values.get_float("mass")?,
-            class: ItemClass::Food, // TODO remove ItemClass
             base_slots: values.get_int("base_slots")?,
             mounted_slots: values.get_int("mounted_slots")?,
             stack_size: match values.get_string("stacking")?.as_str() {

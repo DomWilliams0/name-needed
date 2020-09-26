@@ -4,8 +4,9 @@ use crate::society::Society;
 use crate::Societies;
 use common::*;
 
-#[derive(Component)]
+#[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("society")]
 pub struct SocietyComponent {
     pub handle: SocietyHandle,
 }

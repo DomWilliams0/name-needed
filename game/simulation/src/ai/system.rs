@@ -19,8 +19,9 @@ use specs::{Builder, EntityBuilder};
 use std::iter::once;
 use world::WorldRef;
 
-#[derive(Component)]
+#[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("ai")]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
     current: Option<(DecisionSource<AiContext>, AiAction)>,

@@ -10,8 +10,9 @@ pub struct InputSystem<'a> {
 }
 
 /// Marker for entity selection by the player
-#[derive(Component, Default)]
+#[derive(Component, EcsComponent, Default)]
 #[storage(NullStorage)]
+#[name("selected")]
 pub struct SelectedComponent;
 
 /// Resource for selected entity - not guaranteed to be alive

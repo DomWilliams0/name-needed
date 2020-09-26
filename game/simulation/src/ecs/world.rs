@@ -3,7 +3,7 @@ use specs::storage::InsertResult;
 
 use common::*;
 
-use crate::ecs::E;
+use crate::ecs::{ComponentRegistry, SpecsWorld, E};
 use crate::event::{EntityEvent, EntityEventQueue};
 
 use ::world::WorldRef;
@@ -11,7 +11,10 @@ use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::ops::{Deref, DerefMut};
 
-pub type EcsWorld = World;
+pub struct EcsWorld {
+    world: SpecsWorld,
+    component_registry: ComponentRegistry,
+}
 
 /// World reference for the current frame only - very unsafe, don't store!
 pub struct EcsWorldFrameRef(&'static EcsWorld);
@@ -27,6 +30,7 @@ macro_rules! entity_pretty {
 pub enum ComponentGetError {
     #[error("The entity {:?} doesn't exist", _0)]
     NoSuchEntity(Entity),
+
     #[error("The entity {:?} doesn't have the given component '{}'", _0, _1)]
     NoSuchComponent(Entity, &'static str),
 }
@@ -37,6 +41,8 @@ pub trait ComponentWorld {
 
     fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError>;
     fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError>;
+    fn has_component<T: Component>(&self, entity: Entity) -> bool;
+    fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool;
 
     fn resource<T: Resource>(&self) -> &T;
     #[allow(clippy::mut_from_ref)]
@@ -69,17 +75,44 @@ pub trait ComponentWorld {
     }
 }
 
+impl Deref for EcsWorld {
+    type Target = SpecsWorld;
+
+    fn deref(&self) -> &Self::Target {
+        &self.world
+    }
+}
+
+impl DerefMut for EcsWorld {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.world
+    }
+}
+
+impl EcsWorld {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        let mut world = SpecsWorld::new();
+        let reg = ComponentRegistry::new(&mut world);
+
+        EcsWorld {
+            world,
+            component_registry: reg,
+        }
+    }
+}
+
 impl ComponentWorld for EcsWorld {
     #[cfg(test)]
     fn test_new() -> Self {
-        let mut w = Self::new();
-        crate::simulation::register_components(&mut w);
-        w.insert(WorldRef::default());
-        w
+        let mut world = Self::new();
+        world.insert(WorldRef::default());
+        world
     }
 
     fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError> {
         let storage = self.read_storage::<T>();
+
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self
         let result: Option<&T> = unsafe { std::mem::transmute(storage.get(entity)) };
@@ -92,6 +125,15 @@ impl ComponentWorld for EcsWorld {
         // lifetime from that of the storage to that of self
         let result: Option<&mut T> = unsafe { std::mem::transmute(storage.get_mut(entity)) };
         result.ok_or_else(|| self.mk_component_error::<T>(entity))
+    }
+
+    fn has_component<T: Component>(&self, entity: Entity) -> bool {
+        let storage = self.read_storage::<T>();
+        storage.contains(entity)
+    }
+
+    fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool {
+        self.component_registry.has_component(comp, self, entity)
     }
 
     fn resource<T: Resource>(&self) -> &T {
@@ -134,7 +176,7 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn create_entity(&mut self) -> EntityBuilder {
-        WorldExt::create_entity(self)
+        WorldExt::create_entity(&mut self.world)
     }
 
     fn kill_entity(&self, entity: Entity) {

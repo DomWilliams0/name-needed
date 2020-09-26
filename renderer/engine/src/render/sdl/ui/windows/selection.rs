@@ -171,12 +171,7 @@ impl SelectionWindow {
                                 None,
                                 COLOR_BLUE,
                             );
-                            ui.key_value(
-                                im_str!("Class:"),
-                                || Value::Some(ui_str!(in strings, "{:?}", item.class)),
-                                None,
-                                COLOR_BLUE,
-                            );
+                            // TODO list components on item that are relevant (i.e. not transform etc)
                             ui.key_value(
                                 im_str!("Condition:"),
                                 || Value::Some(ui_str!(in strings, "{}", item.condition)),

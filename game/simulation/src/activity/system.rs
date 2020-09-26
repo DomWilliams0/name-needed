@@ -16,15 +16,17 @@ pub struct ActivitySystem;
 
 pub struct ActivityEventSystem;
 
-#[derive(Component)]
+#[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("activity")]
 pub struct ActivityComponent {
     pub current: Box<dyn Activity<EcsWorld>>,
     new_activity: Option<AiAction>,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, EcsComponent, Default)]
 #[storage(NullStorage)]
+#[name("blocking-activity")]
 pub struct BlockingActivityComponent;
 
 impl<'a> System<'a> for ActivitySystem {

@@ -5,6 +5,7 @@ members = [
 	"game/procgen",
 	"game/resources",
 	"game/simulation",
+	"game/simulation/ecs-derive",
 	"game/world",
 
 	"renderer/engine",
@@ -19,7 +20,7 @@ members = [
 ]
 
 [profile.dev]
-#debug = 0 # for faster build times
+debug = 0 # for faster build times
 
 [profile.release]
 debug = 1 # for profiling

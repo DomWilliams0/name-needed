@@ -305,13 +305,14 @@ impl Debug for BitSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ecs::WorldExt;
+    use crate::ecs::EcsWorld;
+    use crate::ComponentWorld;
     use common::once;
     use specs::Builder;
 
     fn make_entities() -> (Entity, Entity) {
         {
-            let mut w = crate::ecs::EcsWorld::new();
+            let mut w = EcsWorld::new();
             let a = w.create_entity().build();
             let b = w.create_entity().build();
             (a, b)

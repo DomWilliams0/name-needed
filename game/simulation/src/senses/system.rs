@@ -13,8 +13,9 @@ use unit::world::WorldPoint;
 const SENSE_DECAY: u8 = 40;
 
 /// Populated by other systems with the available sense ranges
-#[derive(Component, Default)]
+#[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
+#[name("senses")]
 pub struct SensesComponent {
     pub vision: ArrayVec<[VisionCone; 1]>,
     pub hearing: ArrayVec<[HearingSphere; 1]>,
@@ -33,7 +34,8 @@ struct SensedEntity {
 
 /// Dummy magical sense provider - this will be replaced by individual body parts that provide the
 /// senses
-#[derive(Component, Debug, Clone)]
+#[derive(Component, EcsComponent, Debug, Clone)]
+#[name("magical-senses")]
 #[storage(DenseVecStorage)]
 pub struct MagicalSenseComponent {
     pub vision: VisionCone,

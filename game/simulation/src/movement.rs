@@ -8,8 +8,9 @@ use specs::{Builder, EntityBuilder};
 use std::hint::unreachable_unchecked;
 
 /// Desired movement by the brain, and practical movement to be realized by the body
-#[derive(Copy, Clone, Component)]
+#[derive(Copy, Clone, Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("desired-movement")]
 pub enum DesiredMovementComponent {
     Desired(ContextMap),
     Realized(Vector2),
@@ -61,8 +62,9 @@ impl<'a> System<'a> for MovementFulfilmentSystem {
 }
 
 /// Movement speeds
-#[derive(Clone, Component, Debug)]
+#[derive(Clone, Component, EcsComponent, Debug)]
 #[storage(DenseVecStorage)]
+#[name("movement-cfg")]
 pub struct MovementConfigComponent {
     pub max_speed: f32,
     pub acceleration: f32,

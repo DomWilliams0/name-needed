@@ -1,0 +1,7 @@
+# Active tasks
+
+* [X] collect components at compile time
+* [X] register components automatically
+* [X] add HasComponent(component name) item filter
+* [X] finally remove ItemClass
+* [~] perfect hashing

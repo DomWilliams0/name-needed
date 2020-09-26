@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity, deprecated)]
+#![allow(clippy::type_complexity)]
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
@@ -21,9 +21,6 @@ pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{Societies, SocietyComponent, SocietyHandle};
 
 pub const TICKS_PER_SECOND: usize = 20;
-
-#[cfg(test)]
-pub use self::simulation::register_components;
 
 mod activity;
 mod ai;

@@ -11,8 +11,9 @@ use crate::steer::{SteeringBehaviour, SteeringComponent};
 use crate::{TransformComponent, WorldRef};
 
 /// Holds the current path to follow
-#[derive(Component)]
+#[derive(Component, EcsComponent)]
 #[storage(VecStorage)]
+#[name("path")]
 pub struct FollowPathComponent {
     path: Option<PathFollowing>,
     follow_speed: NormalizedFloat,

@@ -1,4 +1,4 @@
-# TODOs (194)
+# TODOs (195)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -79,6 +79,8 @@
    * `// TODO always make sure that putting an item into a contents removes its transform? only do this via a system`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
+   * `// TODO perfect hashing`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
@@ -93,7 +95,7 @@
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (9)
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
@@ -102,7 +104,8 @@
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
    * `/// Item must be in base inventory to use TODO is this needed?`
-   * `class: ItemClass::Food, // TODO remove ItemClass`
+ * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
+   * `// TODO filters on item fields e.g. mass, slots, etc`
  * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (6)
    * `dominant_base: SlotIndex, // TODO option`
    * `// TODO cache result of search until they change (specs::storage::Tracked?)`
@@ -150,11 +153,10 @@
    * `// TODO system is expensive, dont run every tick`
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (3)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `// TODO per tick alloc/reuse buf`
-   * `// TODO remove need to manually register each component type`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)
    * `// TODO reuse allocation`
  * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
@@ -264,6 +266,8 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO helpers in Bundle`
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)
+   * `// TODO list components on item that are relevant (i.e. not transform etc)`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`

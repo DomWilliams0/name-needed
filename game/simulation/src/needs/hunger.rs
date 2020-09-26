@@ -5,8 +5,7 @@ use crate::activity::{ActivityComponent, UseHeldItemError};
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{
-    BaseItemComponent, EdibleItemComponent, InventoryComponent, ItemClass, SlotReference,
-    UsingItemComponent,
+    BaseItemComponent, EdibleItemComponent, InventoryComponent, SlotReference, UsingItemComponent,
 };
 use specs::{Builder, EntityBuilder};
 
@@ -21,8 +20,9 @@ const BASE_METABOLISM: f32 = 0.5;
 const BASE_EAT_RATE: Fuel = 5;
 
 // TODO generic needs component with hunger/thirst/toilet/social etc
-#[derive(Component, Clone, Debug)]
+#[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
+#[name("hunger")]
 pub struct HungerComponent {
     current_fuel: AccumulativeInt<Fuel>,
     max_fuel: Fuel,
@@ -78,53 +78,51 @@ impl<'a> System<'a> for EatingSystem {
         for (e, inv, using, hunger) in (&entities, &mut inv, &mut using, &mut hunger).join() {
             log_scope!(o!("system" => "eating", E(e)));
 
-            if let ItemClass::Food = using.class {
-                let val = using.left.value();
+            let val = using.left.value();
 
-                // food is already no more
-                if val <= 0.0 {
-                    continue;
-                }
+            // food is already no more
+            if val <= 0.0 {
+                continue;
+            }
 
-                let result = do_eat(inv, using, hunger, &edible_item, &mut base_item, &entities);
+            let result = do_eat(inv, using, hunger, &edible_item, &mut base_item, &entities);
 
-                if !matches!(result, EatResult::Success(_)) {
-                    // ensure that this disaster ends soon by killing the item now
-                    // one could say it's an ex food
-                    using.left = NormalizedFloat::zero();
-                }
+            if !matches!(result, EatResult::Success(_)) {
+                // ensure that this disaster ends soon by killing the item now
+                // one could say it's an ex food
+                using.left = NormalizedFloat::zero();
+            }
 
-                // food has ceased to be
-                if using.left.value().is_zero() {
-                    let _ = inv.remove_item(SlotReference::Base(using.base_slot));
+            // food has ceased to be
+            if using.left.value().is_zero() {
+                let _ = inv.remove_item(SlotReference::Base(using.base_slot));
 
-                    // queue item entity for deletion
-                    let (item, err) = match result {
-                        EatResult::Success(item) => (Some(item), None),
-                        EatResult::Errored(item, err) => (Some(item), Some(err)),
-                        _ => (None, None),
+                // queue item entity for deletion
+                let (item, err) = match result {
+                    EatResult::Success(item) => (Some(item), None),
+                    EatResult::Errored(item, err) => (Some(item), Some(err)),
+                    _ => (None, None),
+                };
+
+                if let Some(item) = item {
+                    trace!("deleting consumed food item"; "food" => E(item));
+
+                    if let Err(e) = entities.delete(item) {
+                        warn!("couldn't delete food item"; "food" => E(item), "error" => ?e);
+                    }
+
+                    let event_result = if let Some(err) = err {
+                        Err(err)
+                    } else {
+                        Ok(())
                     };
 
-                    if let Some(item) = item {
-                        trace!("deleting consumed food item"; "food" => E(item));
+                    updates.remove::<UsingItemComponent>(e);
 
-                        if let Err(e) = entities.delete(item) {
-                            warn!("couldn't delete food item"; "food" => E(item), "error" => ?e);
-                        }
-
-                        let event_result = if let Some(err) = err {
-                            Err(err)
-                        } else {
-                            Ok(())
-                        };
-
-                        updates.remove::<UsingItemComponent>(e);
-
-                        events.post(EntityEvent {
-                            subject: item,
-                            payload: EntityEventPayload::UsedUp(event_result),
-                        });
-                    }
+                    events.post(EntityEvent {
+                        subject: item,
+                        payload: EntityEventPayload::UsedUp(event_result),
+                    });
                 }
             }
         }

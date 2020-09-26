@@ -33,7 +33,6 @@ impl<W: ComponentWorld> SubActivity<W> for ItemUseSubActivity {
         };
 
         let condition = base_item.condition.value();
-        let class = base_item.class;
         let holder = ctx.entity;
         let item = self.0;
 
@@ -56,7 +55,6 @@ impl<W: ComponentWorld> SubActivity<W> for ItemUseSubActivity {
                     UsingItemComponent {
                         left: condition,
                         base_slot,
-                        class,
                     },
                 ) {
                     warn!("overwriting previous item use component"; "previous" => ?old);

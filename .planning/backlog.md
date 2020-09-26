@@ -90,6 +90,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
 * mesh generation on worker thread
 * replace all hashmaps with faster non crypto hashes
+* perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged

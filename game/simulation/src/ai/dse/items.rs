@@ -4,13 +4,13 @@ use crate::ai::consideration::{
     FindLocalItemConsideration, HoldingItemConsideration, HungerConsideration,
 };
 use crate::ai::{AiAction, AiContext};
-use crate::item::{ItemClass, ItemFilter, ItemsToPickUp, LooseItemReference};
+use crate::item::{ItemFilter, ItemsToPickUp, LooseItemReference};
 use common::*;
 
 pub struct UseHeldFoodDse;
 pub struct FindLocalFoodDse;
 
-const FOOD_FILTER: ItemFilter = ItemFilter::Class(ItemClass::Food);
+const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
 const FOOD_MAX_RADIUS: u32 = 20;
 
 impl Dse<AiContext> for UseHeldFoodDse {

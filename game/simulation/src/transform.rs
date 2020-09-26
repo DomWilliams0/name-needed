@@ -8,8 +8,9 @@ use common::cgmath::Rotation;
 use specs::{Builder, EntityBuilder};
 
 /// Position and rotation component
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
+#[name("transform")]
 pub struct TransformComponent {
     /// Position in world, center of entity in x/y and bottom of entity in z
     pub position: WorldPoint,

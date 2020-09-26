@@ -7,8 +7,9 @@ use color::ColorRgb;
 use common::*;
 use specs::{Builder, EntityBuilder};
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
+#[name("render")]
 pub struct RenderComponent {
     /// simple color
     pub color: ColorRgb,

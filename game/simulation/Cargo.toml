@@ -18,6 +18,7 @@ common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 ai = { path = "../ai" }
 resources = { path = "../resources" }
+ecs-derive = { path = "ecs-derive" }
 
 specs = {version = "^0.16", default-features = false} # no parallel
 specs-derive = "^0.4"

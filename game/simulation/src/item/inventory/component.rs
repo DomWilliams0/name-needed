@@ -50,8 +50,9 @@ pub enum BaseSlotPolicy {
     AnyEmptyExcept(SlotIndex),
 }
 
-#[derive(Component)]
+#[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
+#[name("inventory")]
 #[cfg_attr(test, derive(Clone))]
 pub struct InventoryComponent {
     /// Primary quick access slots e.g. in a human's hands, in a dog's mouth

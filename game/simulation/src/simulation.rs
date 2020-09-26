@@ -1,51 +1,41 @@
 use std::marker::PhantomData;
+use std::ops::Add;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crossbeam::crossbeam_channel::Receiver;
 use specs::RunNow;
 
 use common::*;
+use resources::resource::Resources;
+use unit::world::WorldPositionRange;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
 use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
 
-use crate::activity::ActivityComponent;
+use crate::activity::{ActivityEventSystem, ActivitySystem};
 use crate::ai::{AiAction, AiComponent, AiSystem};
 use crate::definitions;
+use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::dev::SimulationDevExt;
 use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
+use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedComponent, SelectedEntity,
-    SelectedTiles, SocietyInputCommand, UiBlackboard, UiCommand,
+    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
+    SocietyInputCommand, UiBlackboard, UiCommand,
 };
-use crate::item::{
-    BaseItemComponent, EdibleItemComponent, InventoryComponent, PickupItemComponent,
-    PickupItemSystem, ThrowableItemComponent, UsingItemComponent,
-};
-use crate::movement::{
-    DesiredMovementComponent, MovementConfigComponent, MovementFulfilmentSystem,
-};
-use crate::needs::{EatingSystem, HungerComponent, HungerSystem};
-use crate::path::{
-    FollowPathComponent, NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem,
-};
+use crate::item::PickupItemSystem;
+use crate::movement::MovementFulfilmentSystem;
+use crate::needs::{EatingSystem, HungerSystem};
+use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
-use crate::render::{RenderComponent, RenderSystem, Renderer};
+use crate::render::{RenderSystem, Renderer};
+use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::job::{BreakBlocksJob, Job};
-use crate::society::{PlayerSociety, Society, SocietyComponent};
-use crate::steer::{SteeringComponent, SteeringDebugRenderer, SteeringSystem};
-use crate::transform::TransformComponent;
-use crate::{ComponentWorld, Societies, SocietyHandle};
-
-use crate::activity::{ActivityEventSystem, ActivitySystem, BlockingActivityComponent};
-use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
-use crate::event::{EntityEventQueue, EntityTimers};
-use crate::senses::{MagicalSenseComponent, SensesComponent, SensesDebugRenderer, SensesSystem};
+use crate::society::{PlayerSociety, Society};
 use crate::spatial::{Spatial, SpatialSystem};
-use resources::resource::Resources;
-use std::ops::Add;
-use std::sync::atomic::{AtomicU32, Ordering};
-use unit::world::WorldPositionRange;
+use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::{ComponentWorld, Societies, SocietyHandle};
 
 pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
 
@@ -82,9 +72,8 @@ impl<R: Renderer> Simulation<R> {
             definitions::load(def_root)?
         };
 
+        // make world and register components
         let mut ecs_world = EcsWorld::new();
-
-        register_components(&mut ecs_world);
 
         // insert resources
         let voxel_world = world_loader.world();
@@ -385,49 +374,6 @@ impl Add<u32> for Tick {
     fn add(self, rhs: u32) -> Self::Output {
         Self(self.0 + rhs)
     }
-}
-
-#[allow(unused)]
-pub fn register_components(world: &mut EcsWorld) {
-    // TODO remove need to manually register each component type
-    macro_rules! register {
-        ($comp:ty) => {
-            world.register::<$comp>()
-        };
-    }
-
-    // common
-    register!(TransformComponent);
-    register!(RenderComponent);
-
-    // movement
-    register!(DesiredMovementComponent);
-    register!(MovementConfigComponent);
-    register!(FollowPathComponent);
-    register!(SteeringComponent);
-    register!(DesiredMovementComponent);
-
-    // ai
-    register!(AiComponent);
-    register!(HungerComponent);
-    register!(ActivityComponent);
-    register!(BlockingActivityComponent);
-    register!(SocietyComponent);
-
-    // senses
-    register!(SensesComponent);
-    register!(MagicalSenseComponent);
-
-    // items
-    register!(BaseItemComponent);
-    register!(EdibleItemComponent);
-    register!(ThrowableItemComponent);
-    register!(InventoryComponent);
-    register!(UsingItemComponent);
-    register!(PickupItemComponent);
-
-    // input
-    register!(SelectedComponent);
 }
 
 fn register_resources(world: &mut EcsWorld) {
