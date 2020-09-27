@@ -1,4 +1,4 @@
-# TODOs (195)
+# TODOs (196)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -248,6 +248,8 @@
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
+ * [renderer/engine/Cargo.toml](renderer/engine/Cargo.toml) (1)
+   * `# TODO add back proper crates.io imgui dependencies once they've updated to use imgui 0.5`
  * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (2)
    * `// TODO use panic.message() when it stabilises`
    * `// TODO use mutex that cant be poisoned`

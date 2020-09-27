@@ -54,7 +54,7 @@ impl UiExt for Ui<'_> {
         }
 
         self.text_colored(color, key);
-        self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 40.0);
+        self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 10.0);
         match value {
             Value::Some(val) => {
                 self.text(val);

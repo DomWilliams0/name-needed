@@ -53,6 +53,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * refactor item usage to be less generic at the system level
 	* instead of iterating over holders with (using comp, inventory comp), iterate over *items* with (being used comp, edible comp), (being used comp, other usage comp) etc
 * consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
+* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/droppinif only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
 
 ## World generation
 * biomes

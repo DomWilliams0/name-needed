@@ -1,6 +1,6 @@
 use crate::render::sdl::ui::windows::{UiBundle, UiExt, Value, COLOR_BLUE, COLOR_RED};
 use crate::ui_str;
-use imgui::{im_str, TreeNode};
+use imgui::{im_str, TabItem};
 use simulation::input::{SocietyInputCommand, UiCommand};
 
 pub struct SocietyWindow;
@@ -9,7 +9,7 @@ impl SocietyWindow {
     pub fn render(&mut self, bundle: &mut UiBundle) {
         let ui = bundle.ui;
 
-        TreeNode::new(im_str!("Society")).build(ui, || {
+        TabItem::new(im_str!("Society")).build(ui, || {
             let society_handle = match bundle.blackboard.player_society.0 {
                 None => {
                     ui.text_disabled("You don't control a society");
@@ -39,15 +39,12 @@ impl SocietyWindow {
                 },
             );
 
-            match bundle.blackboard.selected_tiles.range() {
-                None => ui.text_disabled("No block selection"),
-                Some(range) => {
-                    if ui.button(im_str!("Break blocks"), [0.0, 0.0]) {
-                        bundle.commands.push(UiCommand::IssueSocietyCommand(
-                            society_handle,
-                            SocietyInputCommand::BreakBlocks(range),
-                        ));
-                    }
+            if let Some(range) = bundle.blackboard.selected_tiles.range() {
+                if ui.button(im_str!("Break blocks"), [0.0, 0.0]) {
+                    bundle.commands.push(UiCommand::IssueSocietyCommand(
+                        society_handle,
+                        SocietyInputCommand::BreakBlocks(range),
+                    ));
                 }
             }
         });

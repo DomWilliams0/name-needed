@@ -1,6 +1,6 @@
 use crate::render::sdl::ui::windows::UiBundle;
 use crate::ui_str;
-use imgui::{im_str, Condition, Window};
+use imgui::{im_str, TreeNode};
 use simulation::TICKS_PER_SECOND;
 
 pub struct PerformanceWindow;
@@ -17,12 +17,8 @@ fn mk_stat(bundle: &UiBundle, what: &'static str, value: f64, danger_limit: f64)
 
 impl PerformanceWindow {
     pub fn render(&mut self, bundle: &UiBundle) {
-        Window::new(im_str!("Performance"))
-            .position([10.0, 10.0], Condition::Appearing)
-            .movable(false)
-            .resizable(false)
-            .always_auto_resize(true)
-            .bg_alpha(0.65)
+        TreeNode::new(im_str!("Performance"))
+            .default_open(true)
             .build(&bundle.ui, || {
                 mk_stat(
                     bundle,

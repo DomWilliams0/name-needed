@@ -101,7 +101,7 @@ impl<'a> System<'a> for InputSystem<'a> {
                                     (to.1.floor() as i32, -1)
                                 };
 
-                                let from = from.round();
+                                let mut from = from.round();
 
                                 // minimum 1 along each axis
                                 if from.0 == x {
@@ -121,7 +121,15 @@ impl<'a> System<'a> for InputSystem<'a> {
                                     y -= (dy - TILE_SELECTION_LIMIT) * mul_y;
                                 }
 
-                                (WorldPosition(x, y, to.slice()), from)
+                                // increase z of higher block by 1
+                                let z = if to.slice() > from.slice() {
+                                    to.slice() + 1
+                                } else {
+                                    from.2 += 1;
+                                    to.slice()
+                                };
+
+                                (WorldPosition(x, y, z), from)
                             };
 
                             debug!("selected block region"; "min" => %from, "max" => %to);

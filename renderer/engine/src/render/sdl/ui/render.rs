@@ -2,7 +2,7 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow, UiBundle,
 };
-use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
+use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style, TabBar};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -109,16 +109,20 @@ impl Ui {
 
 impl State {
     fn render(&mut self, mut bundle: UiBundle) {
-        self.perf.render(&bundle);
-
         imgui::Window::new(im_str!("Debug"))
             .always_auto_resize(true)
-            .position([10.0, 112.0], Condition::FirstUseEver)
+            .position([10.0, 10.0], Condition::FirstUseEver)
+            .title_bar(false)
             .always_use_window_padding(true)
             .build(bundle.ui, || {
-                self.selection.render(&mut bundle);
-                self.society.render(&mut bundle);
-                self.debug.render(&mut bundle);
+                // Perf fixed at the top
+                self.perf.render(&bundle);
+
+                TabBar::new(im_str!("Debug Tabs")).build(bundle.ui, || {
+                    self.selection.render(&mut bundle);
+                    self.society.render(&mut bundle);
+                    self.debug.render(&mut bundle);
+                });
             });
     }
 }

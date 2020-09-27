@@ -1,4 +1,4 @@
-use imgui::{im_str, CollapsingHeader, ImStr, TreeNode};
+use imgui::{im_str, ImStr, TabItem};
 
 use simulation::input::UiCommand;
 
@@ -19,21 +19,18 @@ impl UiBundle<'_> {
 
 impl DebugWindow {
     pub fn render(&mut self, bundle: &mut UiBundle) {
-        TreeNode::new(im_str!("Debug"))
-            .frame_padding(true)
+        TabItem::new(im_str!("Debug"))
             .build(bundle.ui, || {
                 let view_range = bundle.blackboard.world_view.expect("blackboard world view range not populated");
                 // TODO helpers in Bundle
                 bundle.ui.text(ui_str!(in bundle.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
 
-                if CollapsingHeader::new(im_str!("Debug renderers"))
-                    .default_open(true)
-                    .build(bundle.ui) {
+                bundle.ui.separator();
+
                     bundle.checkbox(im_str!("Navigation paths"), "navigation path");
                     bundle.checkbox(im_str!("Navigation areas"), "navigation areas");
                     bundle.checkbox(im_str!("Steering direction"), "steering");
                     bundle.checkbox(im_str!("Senses"), "senses");
-                }
 
             });
     }
