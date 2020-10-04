@@ -1,14 +1,20 @@
 use crate::ecs::*;
-use crate::InventoryComponent;
+use crate::item::Inventory2Component;
+use std::collections::HashMap;
 
-pub struct InventoryValidationSystem<'a>(pub &'a EcsWorld);
+pub struct InventoryValidationSystem;
 
-impl<'a> System<'a> for InventoryValidationSystem<'a> {
-    type SystemData = (ReadStorage<'a, InventoryComponent>,);
+impl<'a> System<'a> for InventoryValidationSystem {
+    type SystemData = (
+        Read<'a, EntitiesRes>,
+        Read<'a, EcsWorldFrameRef>,
+        ReadStorage<'a, Inventory2Component>,
+    );
 
-    fn run(&mut self, (invs,): Self::SystemData) {
-        for (inventory,) in (&invs,).join() {
-            inventory.validate(self.0);
+    fn run(&mut self, (entities, ecs_world, invs): Self::SystemData) {
+        let mut seen_items = HashMap::new();
+        for (e, inventory) in (&entities, &invs).join() {
+            inventory.validate(e, &**ecs_world, &mut seen_items);
         }
     }
 }

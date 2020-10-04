@@ -3,7 +3,9 @@ use common::*;
 use crate::ecs::*;
 use crate::movement::DesiredMovementComponent;
 use crate::steer::behaviour::SteeringResult;
+use crate::steer::context::ContextMap;
 use crate::steer::SteeringBehaviour;
+use crate::transform::PhysicalComponent;
 use crate::TransformComponent;
 use world::WorldRef;
 
@@ -22,27 +24,29 @@ impl<'a> System<'a> for SteeringSystem {
         Read<'a, EntitiesRes>,
         Read<'a, WorldRef>,
         ReadStorage<'a, TransformComponent>,
+        ReadStorage<'a, PhysicalComponent>,
         WriteStorage<'a, SteeringComponent>,
         WriteStorage<'a, DesiredMovementComponent>,
     );
 
-    fn run(&mut self, (entities, world_ref, transform, mut steer, mut movement): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, world_ref, transform, physical, mut steer, mut movement): Self::SystemData,
+    ) {
         let world = world_ref.borrow();
-        for (e, transform, mut steer, movement) in
-            (&entities, &transform, &mut steer, &mut movement).join()
+        for (e, transform, physical, mut steer, mut movement) in
+            (&entities, &transform, &physical, &mut steer, &mut movement).join()
         {
             log_scope!(o!("system" => "steering", E(e)));
 
-            // reset context map for this tick
-            *movement = DesiredMovementComponent::default();
-
-            // safety: definitely Desired from above
-            let context_map = unsafe { movement.context_map_mut_unchecked() };
+            let mut context_map = ContextMap::default();
+            let bounding_radius = physical.bounding_radius().metres();
 
             // populate steering interests from current behaviour
-            let result = steer
-                .behaviour
-                .tick(&transform, context_map.interests_mut());
+            let result =
+                steer
+                    .behaviour
+                    .tick(&transform, bounding_radius, context_map.interests_mut());
 
             if let SteeringResult::Finished = result {
                 trace!(
@@ -54,7 +58,7 @@ impl<'a> System<'a> for SteeringSystem {
             }
 
             // avoid collision with world
-            let avoidance = transform.feelers_bounds();
+            let avoidance = transform.feelers_bounds(bounding_radius);
             // TODO cache allocation in system
             let mut solids = Vec::new();
             if avoidance.find_solids(&*world, &mut solids) {
@@ -64,6 +68,8 @@ impl<'a> System<'a> for SteeringSystem {
                     trace!("registering collision danger"; "angle" => ?angle);
                 }
             }
+
+            movement.0 = context_map;
         }
     }
 }

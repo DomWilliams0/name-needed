@@ -1,3 +1,3 @@
-pub use hunger::{EatingSystem, Fuel, HungerComponent, HungerSystem};
+pub use food::{BeingEatenComponent, EatingSystem, Fuel, HungerComponent, HungerSystem};
 
-mod hunger;
+mod food;

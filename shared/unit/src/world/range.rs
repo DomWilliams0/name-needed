@@ -74,6 +74,7 @@ impl<P: RangePosition> WorldRange<P> {
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
+    #[allow(clippy::type_complexity)]
     pub fn ranges(&self) -> ((P::XY, P::XY), (P::XY, P::XY), (P::Z, P::Z)) {
         let (from, to) = match self {
             WorldRange::Single(pos) => (pos, pos),

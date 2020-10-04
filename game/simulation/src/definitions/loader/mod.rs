@@ -17,44 +17,12 @@ mod template_lookup;
 // TODO consider using `nested` vecs as an optimization
 #[cfg(test)]
 mod tests {
-    use specs::EntityBuilder;
-
     use crate::definitions::loader::load::preprocess_from_str;
     use crate::definitions::loader::step1_deserialization::DeserializedDefinition;
-    use crate::definitions::loader::step3_construction::instantiate;
-    use crate::definitions::loader::template_lookup::TemplateLookup;
     use crate::definitions::DefinitionErrorKind;
-    use crate::ecs::{ComponentBuildError, ComponentTemplate, ComponentTemplateEntry, Map};
+    use crate::ecs::*;
 
     use super::*;
-
-    #[test]
-    fn example() {
-        let input = r#"
-[
-	(
-		uid: "myuid",
-		components: [
-			 {"item": (
-			 	name: "Apple",
-			 	base_slots: 1,
-			 	mounted_slots: 1,
-			 	mass: 0.1,
-			 	stacking: "item_default",
-			 )},
-			{"throwable": ()},
-			{"edible": (total_nutrition: 80)},
-		],
-	)
-]
-        "#;
-
-        let definitions =
-            instantiate(preprocess_from_str(input).unwrap(), &TemplateLookup::init()).unwrap();
-        let (uid, d) = &definitions[0];
-        assert_eq!(uid, "myuid");
-        assert_eq!(d.components().count(), 3);
-    }
 
     #[test]
     fn duplicates() {

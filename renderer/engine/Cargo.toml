@@ -21,9 +21,8 @@ color = { path = "../../shared/color" }
 gameloop = "^0.2"
 sdl2 = { version = "^0.34", optional = true }
 gl = { version = "^0.14", optional = true }
-# TODO add back proper crates.io imgui dependencies once they've updated to use imgui 0.5
-imgui-sdl2 = { git = "https://github.com/therocode/rust-imgui-sdl2", rev = "30731a4a", optional = true }
-imgui-opengl-renderer = { git = "https://github.com/therocode/rust-imgui-opengl-renderer", rev = "1cacdeec", optional = true }
+imgui-sdl2 = { version = "^0.12", optional = true}
+imgui-opengl-renderer = { version = "^0.9", optional = true}
 imgui = { version = "^0.5", optional = true }
 
 backtrace = "^0.3"

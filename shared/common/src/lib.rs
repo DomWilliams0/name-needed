@@ -1,4 +1,5 @@
 pub use arrayvec::*;
+pub use boolinator::Boolinator;
 pub use bumpalo;
 pub use cgmath;
 pub use cgmath::{

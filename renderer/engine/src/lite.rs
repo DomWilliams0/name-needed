@@ -4,8 +4,8 @@ use common::derive_more::{Display, Error};
 use resources::resource::Resources;
 use simulation::input::UiCommand;
 use simulation::{
-    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, RenderComponent,
-    Renderer, Simulation, TransformComponent, WorldViewer,
+    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,
+    RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
 };
 
 pub struct DummyRenderer;
@@ -29,7 +29,7 @@ impl Renderer for DummyRenderer {
 
     fn sim_entity(&mut self, _transform: &TransformComponent, _render: &RenderComponent) {}
 
-    fn sim_selected(&mut self, _transform: &TransformComponent) {}
+    fn sim_selected(&mut self, _transform: &TransformComponent, _physical: &PhysicalComponent) {}
 
     fn sim_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())

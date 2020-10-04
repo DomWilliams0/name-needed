@@ -1,7 +1,6 @@
-use crate::activity::{EquipItemError, UseHeldItemError};
+use crate::activity::{EquipItemError, HaulError, PickupItemError};
 use crate::ecs::*;
 use crate::event::timer::TimerToken;
-use crate::item::{PickupItemError, SlotReference};
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
 use strum_macros::EnumDiscriminants;
@@ -24,11 +23,15 @@ pub enum EntityEventPayload {
     /// (item, picker upper)
     PickedUp(Result<(Entity, Entity), PickupItemError>),
 
-    /// Item entity has been used to completion
-    UsedUp(Result<(), UseHeldItemError>),
+    /// Food entity has been fully eaten
+    Eaten(Result<(), ()>),
 
-    /// Item entity has been equipped in the specified base slot
-    Equipped(Result<SlotReference, EquipItemError>),
+    /// Item entity (subject) has been equipped in an equip slot of this entity
+    Equipped(Result<Entity, EquipItemError>),
+
+    /// Item entity has been picked up for hauling by a hauler
+    /// (item, hauler)
+    Hauled(Result<(Entity, Entity), HaulError>),
 
     /// Timer elapsed
     TimerElapsed(TimerToken),
@@ -66,6 +69,15 @@ impl EntityEventSubscription {
         match self.1 {
             EventSubscription::All => true,
             EventSubscription::Specific(ty) => EntityEventType::from(&event.payload) == ty,
+        }
+    }
+}
+
+impl EntityEventPayload {
+    pub fn is_destructive(&self) -> bool {
+        match self {
+            Self::PickedUp(_) | Self::Eaten(_) | Self::Hauled(_) => true,
+            _ => false,
         }
     }
 }

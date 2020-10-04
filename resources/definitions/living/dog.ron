@@ -1,27 +1,25 @@
 [
-    (
-        uid: "core_living_dog",
-        components: [
-            {"render": (
-                    color: "8B4513"
-            )},
-            {"transform": (
-                    shape: (radius: 0.3),
-                    height: 0.4,
-            )},
-            {"inventory": (
-                    base_slots: 1, // mouth
-                    mounted_slots: 0,
-            )},
-            {"movement": (
-                    max_speed: 0.20,
-                    acceleration: 0.11,
-            )},
-            {"intelligence": (species: "dog")},
-            {"hunger": (max: 2000)},
-            {"senses": (
-                    vision: (length: 11.0, angle: 60 /*degrees*/),
-            )}
-        ],
-    ),
+  (
+    uid: "core_living_dog",
+    components: [
+      {"render": (
+        color: "8B4513",
+        shape: (radius: 0.3),
+      )},
+      {"physical": (
+        half_dims: [3, 3, 3],
+        volume: 400,
+      )},
+      // TODO dog mouth inventory
+      {"movement": (
+        max_speed: 0.20,
+        acceleration: 0.11,
+      )},
+      {"intelligence": (species: "dog")},
+      {"hunger": (max: 2000)},
+      {"senses": (
+        vision: (length: 11.0, angle: 60 /*degrees*/),
+      )}
+    ],
+  ),
 ]

@@ -4,16 +4,16 @@ use crate::ai::consideration::{
     FindLocalItemConsideration, HoldingItemConsideration, HungerConsideration,
 };
 use crate::ai::{AiAction, AiContext};
-use crate::item::{ItemFilter, ItemsToPickUp, LooseItemReference};
+use crate::item::{ItemFilter, ItemsToPickUp};
 use common::*;
 
-pub struct UseHeldFoodDse;
+pub struct EatHeldFoodDse;
 pub struct FindLocalFoodDse;
 
 const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
 const FOOD_MAX_RADIUS: u32 = 20;
 
-impl Dse<AiContext> for UseHeldFoodDse {
+impl Dse<AiContext> for EatHeldFoodDse {
     fn name(&self) -> &'static str {
         "Use Held Item - Food"
     }
@@ -33,12 +33,15 @@ impl Dse<AiContext> for UseHeldFoodDse {
         &self,
         blackboard: &mut <AiContext as Context>::Blackboard,
     ) -> <AiContext as Context>::Action {
-        let item = blackboard
+        let slot = blackboard
             .inventory_search_cache
             .get(&FOOD_FILTER)
             .expect("item search succeeded but missing result in cache");
 
-        AiAction::UseHeldItem(LooseItemReference(*item))
+        let inventory = blackboard.inventory.unwrap();
+        let food = slot.get(inventory);
+
+        AiAction::EatHeldItem(food)
     }
 }
 
@@ -85,6 +88,6 @@ impl Dse<AiContext> for FindLocalFoodDse {
             .map(|&(item, pos, _, _)| (item, pos))
             .collect();
 
-        AiAction::GoPickUp(ItemsToPickUp(FOOD_FILTER, desired_items))
+        AiAction::GoPickUp(ItemsToPickUp("food".into(), FOOD_FILTER, desired_items))
     }
 }

@@ -1,5 +1,7 @@
 use crate::ecs::*;
-use crate::movement::{DesiredMovementComponent, MovementConfigComponent};
+
+use crate::item::HauledItemComponent;
+use crate::transform::PhysicalComponent;
 use crate::TransformComponent;
 use common::*;
 use world::WorldRef;
@@ -9,25 +11,51 @@ const FALL_SLOWDOWN: f32 = 0.5;
 
 pub struct PhysicsSystem;
 
+#[derive(Debug, Component, EcsComponent)]
+#[storage(VecStorage)]
+#[name("physics")]
+pub struct PhysicsComponent {
+    /// Number of blocks fallen in current fall
+    pub fallen: u32,
+
+    /// Acceleration velocity to apply this frame
+    pub acceleration: Vector2,
+
+    /// Max speed limit to apply this frame
+    pub max_speed: f32,
+}
+
+impl Default for PhysicsComponent {
+    fn default() -> Self {
+        PhysicsComponent {
+            fallen: 0,
+            acceleration: Vector2::zero(),
+            max_speed: 0.0,
+        }
+    }
+}
+
 impl<'a> System<'a> for PhysicsSystem {
     type SystemData = (
         Read<'a, WorldRef>,
         Read<'a, EntitiesRes>,
-        ReadStorage<'a, DesiredMovementComponent>,
-        ReadStorage<'a, MovementConfigComponent>,
+        ReadStorage<'a, PhysicalComponent>,
         WriteStorage<'a, TransformComponent>,
+        WriteStorage<'a, PhysicsComponent>,
+        ReadStorage<'a, HauledItemComponent>,
     );
 
     fn run(
         &mut self,
-        (world_ref, entities, movement, movement_cfg, mut transform): Self::SystemData,
+        (world_ref, entities, physical, mut transform, mut physics, hauled): Self::SystemData,
     ) {
         let mut friction = config::get().simulation.friction;
 
         let world = world_ref.borrow();
 
-        for (e, movement, cfg, transform) in
-            (&entities, &movement, &movement_cfg, &mut transform).join()
+        // apply physics to NON-HAULED entities i.e. those that independently move and aren't anchored to another
+        for (e, physical, transform, physics, _) in
+            (&entities, &physical, &mut transform, &mut physics, !&hauled).join()
         {
             log_scope!(o!("system" => "physics", E(e)));
 
@@ -46,7 +74,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 }
             }
 
-            let bounds = transform.bounds();
+            let bounds = transform.bounds(physical.bounding_radius().metres());
 
             // resolve vertical collision i.e. step up
             if !bounds.check(&*world).is_all_air() {
@@ -71,16 +99,16 @@ impl<'a> System<'a> for PhysicsSystem {
 
                 // plop down 1 block
                 transform.position.2 -= 1.0;
-                transform.fallen += 1;
+                physics.fallen += 1;
 
                 // forget about now-invalid last accessible position
-                if transform.fallen > 2 {
+                if physics.fallen > 2 {
                     trace!("removing last accessible position due to fall");
                     transform.accessible_position = None;
                 }
             } else {
                 // on the ground
-                let fallen = std::mem::take(&mut transform.fallen);
+                let fallen = std::mem::take(&mut physics.fallen);
                 if fallen > 0 {
                     // TODO apply fall damage if applicable
                     if fallen > 1 {
@@ -88,11 +116,6 @@ impl<'a> System<'a> for PhysicsSystem {
                     }
                 }
             }
-
-            let acceleration = match movement {
-                DesiredMovementComponent::Realized(vel) => *vel,
-                _ => unreachable!("physics expects realized movement only"),
-            };
 
             let mut velocity = transform.velocity;
 
@@ -104,7 +127,8 @@ impl<'a> System<'a> for PhysicsSystem {
             }
 
             // accelerate and limit to max speed
-            velocity = truncate(velocity + acceleration, cfg.max_speed);
+            let acceleration = std::mem::replace(&mut physics.acceleration, Vector2::zero());
+            velocity = truncate(velocity + acceleration, physics.max_speed);
 
             // apply velocity
             transform.position += velocity;

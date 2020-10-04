@@ -190,6 +190,8 @@ impl From<ColorHsl> for ColorRgb {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::many_single_char_names)]
+
     use crate::ColorHsl;
     use crate::ColorRgb;
     use common::{random, Itertools};

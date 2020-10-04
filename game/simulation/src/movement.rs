@@ -4,33 +4,14 @@ use crate::ecs::*;
 use crate::path::FollowPathComponent;
 use crate::steer::context::ContextMap;
 use crate::steer::SteeringComponent;
-use specs::{Builder, EntityBuilder};
-use std::hint::unreachable_unchecked;
 
-/// Desired movement by the brain, and practical movement to be realized by the body
-#[derive(Copy, Clone, Component, EcsComponent)]
+use crate::physics::PhysicsComponent;
+
+/// Desired movement by the brain
+#[derive(Copy, Clone, Default, Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("desired-movement")]
-pub enum DesiredMovementComponent {
-    Desired(ContextMap),
-    Realized(Vector2),
-}
-
-impl DesiredMovementComponent {
-    pub unsafe fn context_map_mut_unchecked(&mut self) -> &mut ContextMap {
-        match self {
-            DesiredMovementComponent::Desired(map) => map,
-            _ => unreachable_unchecked(),
-        }
-    }
-}
-
-/// Desired variant
-impl Default for DesiredMovementComponent {
-    fn default() -> Self {
-        DesiredMovementComponent::Desired(ContextMap::default())
-    }
-}
+pub struct DesiredMovementComponent(pub ContextMap);
 
 /// Converts *desired* movement from context steering map to *practical* movement.
 /// this will depend on the entity's health and presence of necessary limbs -
@@ -39,24 +20,27 @@ pub struct MovementFulfilmentSystem;
 
 impl<'a> System<'a> for MovementFulfilmentSystem {
     type SystemData = (
-        WriteStorage<'a, DesiredMovementComponent>,
+        ReadStorage<'a, DesiredMovementComponent>,
         ReadStorage<'a, MovementConfigComponent>,
+        WriteStorage<'a, PhysicsComponent>,
     );
 
-    fn run(&mut self, (mut movement, config): Self::SystemData) {
-        for (movement, config) in (&mut movement, &config).join() {
-            let context_map = match movement {
-                DesiredMovementComponent::Desired(cm) => cm,
-                _ => unreachable!("movement fulfilment expects desired movement only"),
-            };
+    fn run(&mut self, (desired, config, mut physics): Self::SystemData) {
+        for (desired, config, physics) in (&desired, &config, &mut physics).join() {
+            let DesiredMovementComponent(context_map) = desired;
 
             // resolve context map to a direction
             let (angle, speed) = context_map.resolve();
             let direction = forward_angle(angle);
 
+            // TODO actually use body health to determine how much movement is allowed
+
             // scale velocity based on acceleration
             let vel = direction * (speed * config.acceleration);
-            *movement = DesiredMovementComponent::Realized(vel);
+            physics.acceleration = vel;
+
+            // TODO scale max speed based on applied effects?
+            physics.max_speed = config.max_speed;
         }
     }
 }

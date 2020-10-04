@@ -1,7 +1,7 @@
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ecs::Entity;
-use crate::item::{ItemsToPickUp, LooseItemReference};
+use crate::item::ItemsToPickUp;
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -22,14 +22,17 @@ pub enum AiAction {
     /// Go pickup the (1) best item
     GoPickUp(ItemsToPickUp),
 
-    /// Equip and use the given item
-    UseHeldItem(LooseItemReference),
+    /// Equip and eat the given entity, assuming it's already in the inventory
+    EatHeldItem(Entity),
 
     /// Go break the given block
     GoBreakBlock(WorldPosition),
 
     /// Follow the entity, keeping to the given distance
     Follow { target: Entity, radius: u8 },
+
+    /// Haul the entity to the target position
+    Haul(Entity, WorldPosition),
 }
 
 impl Default for AiAction {

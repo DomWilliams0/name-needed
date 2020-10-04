@@ -8,7 +8,7 @@ use unit::world::{WorldPoint, WorldPosition};
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ecs::{EcsWorld, Entity};
-use crate::item::{InventoryComponent, ItemFilter, ItemReference};
+use crate::item::{FoundSlot, Inventory2Component, ItemFilter};
 pub use action::AiAction;
 use world::WorldArea;
 
@@ -35,8 +35,8 @@ pub struct AiBlackboard<'a> {
     pub accessible_position: WorldPosition,
     pub position: WorldPoint,
     pub hunger: NormalizedFloat,
-    pub inventory: Option<&'a InventoryComponent>,
-    pub inventory_search_cache: HashMap<ItemFilter, ItemReference>,
+    pub inventory: Option<&'a Inventory2Component>,
+    pub inventory_search_cache: HashMap<ItemFilter, FoundSlot<'a>>,
 
     /// Value is (max distance, results), so smaller ranges can reuse results of bigger ranges
     pub local_area_search_cache: HashMap<ItemFilter, (u32, LocalAreaSearch)>,

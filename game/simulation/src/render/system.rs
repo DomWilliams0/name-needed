@@ -2,27 +2,20 @@ use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
-use crate::{SliceRange, TransformComponent};
+use crate::transform::PhysicalComponent;
+use crate::{Shape2d, SliceRange, TransformComponent};
 use color::ColorRgb;
 use common::*;
-use specs::{Builder, EntityBuilder};
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
 #[name("render")]
 pub struct RenderComponent {
-    /// simple color
+    /// Simple 2d shape
+    pub shape: Shape2d,
+
+    /// Simple color
     pub color: ColorRgb,
-}
-
-impl RenderComponent {
-    pub fn new(color: ColorRgb) -> Self {
-        Self { color }
-    }
-
-    pub const fn color(&self) -> ColorRgb {
-        self.color
-    }
 }
 
 /// Wrapper for calling generic Renderer in render system
@@ -37,11 +30,14 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         Read<'a, SelectedTiles>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
+        ReadStorage<'a, PhysicalComponent>,
         ReadStorage<'a, SelectedComponent>,
     );
 
-    fn run(&mut self, (selected_block, transform, render, selected): Self::SystemData) {
-        for (transform, render, selected) in (&transform, &render, selected.maybe()).join() {
+    fn run(&mut self, (selected_block, transform, render, physical, selected): Self::SystemData) {
+        for (transform, render, physical, selected) in
+            (&transform, &render, &physical, selected.maybe()).join()
+        {
             if self.slices.contains(transform.slice()) {
                 // make copy to mutate for interpolation
                 let mut transform = transform.clone();
@@ -55,7 +51,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 self.renderer.sim_entity(&transform, render);
 
                 if selected.is_some() {
-                    self.renderer.sim_selected(&transform);
+                    self.renderer.sim_selected(&transform, &physical);
                 }
             }
         }
@@ -73,9 +69,11 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
         Self: Sized,
     {
         let color: RenderHexColor = values.get("color")?.into_type()?;
+        let shape: Shape2d = values.get("shape")?.into_type()?;
 
         Ok(Box::new(Self {
             color: color.into(),
+            shape,
         }))
     }
 

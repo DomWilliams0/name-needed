@@ -10,7 +10,7 @@ pub enum Task {
     // TODO PlaceBlocks(block type, at position)
 }
 
-// TODO temporary box allocation is gross
+// TODO temporary box allocation is gross, use dynstack for dses
 impl From<&Task> for Box<dyn Dse<AiContext>> {
     fn from(task: &Task) -> Self {
         match task {

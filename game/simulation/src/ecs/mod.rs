@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 pub use specs::{
-    world::EntitiesRes, Component, DenseVecStorage, Entity, HashMapStorage, Join, LazyUpdate,
-    NullStorage, Read, ReadExpect, ReadStorage, System, SystemData, VecStorage, WorldExt, Write,
-    WriteExpect, WriteStorage,
+    world::EntitiesRes, Builder, Component, DenseVecStorage, Entity, EntityBuilder, HashMapStorage,
+    Join, LazyUpdate, NullStorage, Read, ReadExpect, ReadStorage, RunNow, System, SystemData,
+    VecStorage, WorldExt, Write, WriteExpect, WriteStorage,
 };
 pub use specs_derive::Component;
 

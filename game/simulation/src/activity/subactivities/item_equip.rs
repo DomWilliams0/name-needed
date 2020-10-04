@@ -1,15 +1,17 @@
-use crate::activity::activity::{ActivityResult, Finish, SubActivity};
-use crate::activity::ActivityContext;
-use crate::ecs::Entity;
-use crate::event::prelude::*;
-use crate::item::{BaseSlotPolicy, InventoryError, SlotReference};
-use crate::{BaseItemComponent, ComponentWorld, InventoryComponent};
 use common::*;
 
+use crate::activity::activity::{ActivityResult, Finish, SubActivity};
+use crate::activity::ActivityContext;
+use crate::ecs::{Entity, E};
+use crate::event::prelude::*;
+use crate::item::{FoundSlot, Inventory2Component, ItemFilter};
+use crate::ComponentWorld;
+
+/// Equip the given item, given it's already somewhere in the holder's inventory
 #[derive(Debug)]
 pub struct ItemEquipSubActivity {
-    slot: SlotReference,
-    item: Entity,
+    pub item: Entity,
+    pub extra_hands: u16,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -20,61 +22,74 @@ pub enum EquipItemError {
     #[error("Holder does not have an inventory")]
     NoInventory,
 
-    #[error("Failed to equip: {}", _0)]
-    InventoryError(#[from] InventoryError),
+    #[error("Item not found in inventory")]
+    NotInInventory,
+
+    #[error("Not enough space in inventory to equip item")]
+    NotEnoughSpace,
 }
 
 impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
     fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
-        // TODO add ItemUseType which hints at which slot to use
-        let policy = BaseSlotPolicy::AlwaysDominant;
-
-        if !matches!(policy, BaseSlotPolicy::AlwaysDominant)
-            && matches!(self.slot, SlotReference::Base(_))
-        {
-            // nothing to do, already equipped
-            return ActivityResult::Finished(Finish::Success);
-        }
-
-        let base_item = match ctx.world.component::<BaseItemComponent>(self.item) {
-            Ok(base) => base,
-            Err(_) => return ActivityResult::errored(EquipItemError::NotAnItem),
-        };
-
-        // TODO equipping will depend on the item's size in base+mounted inventories, not yet implemented
-        assert_eq!(base_item.base_slots, 1);
-        assert_eq!(base_item.mounted_slots, 1);
-
         let holder = ctx.entity;
-        let item = self.item;
-        let slot = self.slot;
+        let food = self.item;
+        let extra_hands = self.extra_hands;
+        let filter = ItemFilter::SpecificEntity(food);
 
-        // queue equip
-        ctx.updates.queue("equip item", move |world| {
-            // TODO inventory operations should not be immediate
-            let result = world
-                .component_mut::<InventoryComponent>(holder)
-                .map_err(|_| EquipItemError::NoInventory)
-                .and_then(|inventory| {
-                    inventory
-                        .equip(slot, policy)
-                        .map_err(EquipItemError::InventoryError)
-                })
-                .map(SlotReference::Base);
+        let inventory = ctx
+            .world
+            .component::<Inventory2Component>(holder)
+            .map_err(|_| EquipItemError::NoInventory);
 
-            world.post_event(EntityEvent {
-                subject: item,
-                payload: EntityEventPayload::Equipped(result.clone()),
-            });
+        // check if already equipped
+        let result = inventory.and_then(move |inv| match inv.search(&filter, ctx.world) {
+            None => Err(EquipItemError::NotInInventory),
+            Some(FoundSlot::Equipped(_)) => {
+                // already equipped
+                Ok(ActivityResult::Finished(Finish::Success))
+            }
+            Some(slot) => {
+                // in inventory but not equipped
+                debug!("found food"; "slot" => ?slot);
 
-            result?; // auto boxed
-            Ok(())
+                ctx.updates.queue("equip food", move |world| {
+                    let do_equip = || -> Result<Entity, EquipItemError> {
+                        let inventory = world
+                            .component_mut::<Inventory2Component>(holder)
+                            .map_err(|_| EquipItemError::NoInventory)?;
+
+                        // TODO inventory operations should not be immediate
+
+                        let slot = inventory
+                            .search_mut(&filter, world)
+                            .ok_or(EquipItemError::NotInInventory)?;
+
+                        if slot.equip(extra_hands) {
+                            Ok(holder)
+                        } else {
+                            Err(EquipItemError::NotEnoughSpace)
+                        }
+                    };
+
+                    let result = do_equip();
+                    world.post_event(EntityEvent {
+                        subject: food,
+                        payload: EntityEventPayload::Equipped(result),
+                    });
+
+                    Ok(())
+                });
+
+                // block on equip event
+                ctx.subscribe_to(food, EventSubscription::Specific(EntityEventType::Equipped));
+                Ok(ActivityResult::Blocked)
+            }
         });
 
-        // subscribe to finishing equipping item
-        ctx.subscribe_to(item, EventSubscription::Specific(EntityEventType::Equipped));
-
-        ActivityResult::Blocked
+        match result {
+            Ok(result) => result,
+            Err(e) => ActivityResult::errored(e),
+        }
     }
 
     fn on_finish(&self, _: &mut ActivityContext<W>) -> BoxedResult<()> {
@@ -82,22 +97,12 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
     }
 
     fn exertion(&self) -> f32 {
-        0.2
-    }
-}
-
-impl ItemEquipSubActivity {
-    pub fn new(slot: SlotReference, item: Entity) -> Self {
-        Self { slot, item }
-    }
-
-    pub fn slot(&self) -> SlotReference {
-        self.slot
+        0.1
     }
 }
 
 impl Display for ItemEquipSubActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Equipping item from inventory")
+        write!(f, "Equipping {}", E(self.item))
     }
 }

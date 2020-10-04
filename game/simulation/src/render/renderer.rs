@@ -2,6 +2,7 @@ use color::ColorRgb;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
+use crate::transform::PhysicalComponent;
 use crate::{RenderComponent, TransformComponent};
 
 pub trait Renderer {
@@ -19,7 +20,7 @@ pub trait Renderer {
 
     /// The entity with the given transform is selected, highlight it
     /// Call in addition to `sim_entity`
-    fn sim_selected(&mut self, transform: &TransformComponent);
+    fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent);
 
     /// Finish rendering simulation
     fn sim_finish(&mut self) -> Result<(), Self::Error>;

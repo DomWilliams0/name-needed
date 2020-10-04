@@ -121,6 +121,7 @@ impl WorkerPool for ThreadedWorkerPool {
 pub struct BlockingWorkerPool {
     finalizer_magic: Option<(Receiver<LoadTerrainResult>, ChunkFinalizer)>,
 
+    #[allow(clippy::type_complexity)]
     task_queue: VecDeque<(
         Box<dyn FnOnce() -> LoadTerrainResult>,
         Sender<LoadTerrainResult>,

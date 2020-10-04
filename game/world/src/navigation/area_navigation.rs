@@ -398,7 +398,7 @@ mod tests {
         ]);
 
         assert_eq!(graph.node_count(), 2); // 1 area in (0,0) and 1 in (-1,0)
-        assert_eq!(graph.edge_count(), 1 * 2); // 1 each way
+        assert_eq!(graph.edge_count(), 2); // 1 each way
 
         let a = WorldArea {
             chunk: ChunkPosition(0, 0),

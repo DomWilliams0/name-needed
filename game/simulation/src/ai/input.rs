@@ -5,9 +5,8 @@ use world::WorldRef;
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::{BaseItemComponent, ItemFilter, ItemFilterable};
+use crate::item::{BaseItemComponent, Inventory2Component, ItemFilter, ItemFilterable};
 use crate::spatial::Spatial;
-use crate::InventoryComponent;
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
 
@@ -81,9 +80,9 @@ impl ai::Input<AiContext> for AiInput {
     }
 }
 
-fn search_inventory_with_cache(
-    blackboard: &mut AiBlackboard,
-    inventory: &InventoryComponent,
+fn search_inventory_with_cache<'a>(
+    blackboard: &mut AiBlackboard<'a>,
+    inventory: &'a Inventory2Component,
     filter: &ItemFilter,
 ) -> bool {
     let cache_entry = blackboard.inventory_search_cache.entry(*filter);
@@ -183,7 +182,6 @@ fn search_local_area(
     output: &mut LocalAreaSearch,
 ) {
     // TODO arena allocated vec return value
-    // TODO clearly needs some spatial partitioning here
 
     let items = world.read_storage::<BaseItemComponent>();
 
@@ -207,7 +205,7 @@ fn search_local_area(
             let item = items.get(entity)?;
 
             // check item filter matches
-            (entity, item, Some(world)).matches(*filter)?;
+            (entity, Some(world)).matches(*filter).as_option()?;
 
             // check this item is accessible
             // TODO use accessible position?
@@ -231,11 +229,7 @@ fn search_local_area(
                     .or_insert_with(|| voxel_world.area_path_exists(self_area, item_area));
             }
 
-            if reachable {
-                Some((entity, pos, dist, item.condition.value()))
-            } else {
-                None
-            }
+            reachable.as_some((entity, pos, dist, item.condition.value()))
         });
 
     output.extend(results);

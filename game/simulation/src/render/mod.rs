@@ -5,5 +5,5 @@ mod system;
 
 pub use debug::{AxesDebugRenderer, DebugRenderer, DebugRendererError, DebugRenderers};
 pub use renderer::Renderer;
-pub use shape::PhysicalShape;
+pub use shape::Shape2d;
 pub use system::{RenderComponent, RenderSystem};

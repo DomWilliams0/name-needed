@@ -50,7 +50,7 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
 
             let mut line_from = transform.position;
             for line_to in self.waypoints.iter().copied() {
-                renderer.debug_add_line(line_from, line_to, render.color());
+                renderer.debug_add_line(line_from, line_to, render.color);
 
                 line_from = line_to;
             }

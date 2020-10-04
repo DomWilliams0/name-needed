@@ -5,15 +5,18 @@ use crate::item::{BaseItemComponent, EdibleItemComponent};
 use crate::needs::HungerComponent;
 use crate::path::FollowPathComponent;
 use crate::society::{PlayerSociety, SocietyComponent};
-use crate::{ComponentWorld, Societies, SocietyHandle, TransformComponent};
+use crate::{
+    ComponentWorld, Inventory2Component, PhysicalComponent, Societies, SocietyHandle,
+    TransformComponent,
+};
 use std::collections::HashSet;
 use unit::world::WorldPoint;
 use world::SliceRange;
 
 /// Dump of game info for the UI to render
 pub struct UiBlackboard<'a> {
-    pub selected_entity: Option<SelectedEntityDetails>,
-    pub selected_tiles: SelectedTiles,
+    pub selected_entity: Option<SelectedEntityDetails<'a>>,
+    pub selected_tiles: &'a SelectedTiles,
     pub player_society: PlayerSociety,
     pub societies: &'a Societies,
     pub enabled_debug_renderers: &'a HashSet<&'static str>,
@@ -22,28 +25,28 @@ pub struct UiBlackboard<'a> {
     pub world_view: Option<SliceRange>,
 }
 
-pub struct SelectedEntityDetails {
+pub struct SelectedEntityDetails<'a> {
     pub entity: Entity,
-    pub transform: TransformComponent,
-    pub details: EntityDetails,
+    pub transform: &'a TransformComponent,
+    pub physical: Option<&'a PhysicalComponent>,
+    pub details: EntityDetails<'a>,
 }
 
-pub enum EntityDetails {
+pub enum EntityDetails<'a> {
     Living {
-        activity: Option<String>,
-        sub_activity: Option<String>,
-        hunger: Option<HungerComponent>,
+        activity: Option<&'a ActivityComponent>,
+        hunger: Option<&'a HungerComponent>,
         path_target: Option<WorldPoint>,
         society: Option<SocietyHandle>,
+        inventory: Option<&'a Inventory2Component>,
     },
     Item {
-        item: BaseItemComponent,
-        edible: Option<EdibleItemComponent>,
+        item: &'a BaseItemComponent,
+        edible: Option<&'a EdibleItemComponent>,
     },
 }
 
 impl<'a> UiBlackboard<'a> {
-    // TODO use ui allocation arena here too
     pub fn fetch<W: ComponentWorld>(
         world: &'a W,
         debug_renderers: &'a HashSet<&'static str>,
@@ -52,31 +55,28 @@ impl<'a> UiBlackboard<'a> {
             let transform = world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
             let details = match world.component::<BaseItemComponent>(e) {
                 Ok(item) => EntityDetails::Item {
-                    item: item.clone(),
-                    edible: world.component(e).ok().cloned(),
+                    item,
+                    edible: world.component(e).ok(),
                 },
-                _ => {
-                    let activity_comp = world.component::<ActivityComponent>(e).ok();
-                    EntityDetails::Living {
-                        activity: activity_comp.map(|activity| format!("{}", activity.current)),
-                        sub_activity: activity_comp
-                            .map(|activity| format!("{}", activity.current.current_subactivity())),
-                        hunger: world.component(e).ok().cloned(),
-                        path_target: world
-                            .component::<FollowPathComponent>(e)
-                            .ok()
-                            .and_then(|follow| follow.target()),
-                        society: world
-                            .component::<SocietyComponent>(e)
-                            .map(|s| s.handle)
-                            .ok(),
-                    }
-                }
+                _ => EntityDetails::Living {
+                    activity: world.component::<ActivityComponent>(e).ok(),
+                    hunger: world.component(e).ok(),
+                    inventory: world.component(e).ok(),
+                    path_target: world
+                        .component::<FollowPathComponent>(e)
+                        .ok()
+                        .and_then(|follow| follow.target()),
+                    society: world
+                        .component::<SocietyComponent>(e)
+                        .map(|s| s.handle)
+                        .ok(),
+                },
             };
 
             SelectedEntityDetails {
                 entity: e,
-                transform: transform.clone(),
+                transform,
+                physical: world.component(e).ok(),
                 details,
             }
         });
@@ -87,7 +87,7 @@ impl<'a> UiBlackboard<'a> {
 
         Self {
             selected_entity,
-            selected_tiles: selected_tiles.clone(),
+            selected_tiles,
             player_society,
             societies,
             enabled_debug_renderers: debug_renderers,

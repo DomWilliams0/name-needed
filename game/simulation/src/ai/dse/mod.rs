@@ -1,14 +1,14 @@
 pub use self::world::BreakBlockDse;
 use ai::{AiBox, Dse};
 pub use dev::ObeyDivineCommandDse;
-pub use items::{FindLocalFoodDse, UseHeldFoodDse};
+pub use food::{EatHeldFoodDse, FindLocalFoodDse};
 pub use movement::WanderDse;
 
 use crate::ai::AiContext;
 use crate::dse;
 
 mod dev;
-mod items;
+mod food;
 mod movement;
 mod world;
 
@@ -20,11 +20,12 @@ pub enum AdditionalDse {
 pub fn human_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
     vec![
         dse!(WanderDse),
-        dse!(UseHeldFoodDse),
+        dse!(EatHeldFoodDse),
         dse!(FindLocalFoodDse),
     ]
     .into_iter()
 }
+
 pub fn dog_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
     vec![dse!(WanderDse)].into_iter()
 }

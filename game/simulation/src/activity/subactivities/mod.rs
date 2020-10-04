@@ -1,11 +1,13 @@
+pub use go_to::GoToSubActivity;
+pub use haul::{HaulError, HaulSubActivity};
+pub use item_eat::ItemEatSubActivity;
+pub use item_equip::{EquipItemError, ItemEquipSubActivity};
+pub use nop::NopSubActivity;
+pub use pickup::{PickupItemError, PickupItemSubActivity};
+
 mod go_to;
+mod haul;
+mod item_eat;
 mod item_equip;
-mod item_use;
 mod nop;
 mod pickup;
-
-pub use go_to::GoToSubActivity;
-pub use item_equip::{EquipItemError, ItemEquipSubActivity};
-pub use item_use::{ItemUseSubActivity, UseHeldItemError};
-pub use nop::NopSubActivity;
-pub use pickup::PickupItemSubActivity;

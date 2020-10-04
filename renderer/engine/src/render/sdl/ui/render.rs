@@ -28,6 +28,7 @@ pub enum EventConsumed {
 
 /// Holds window state, but there may not actually be any
 pub struct State {
+    max_window_width: f32,
     perf: PerformanceWindow,
     selection: SelectionWindow,
     society: SocietyWindow,
@@ -54,6 +55,7 @@ impl Ui {
         let imgui_sdl2 = ImguiSdl2::new(&mut imgui, window);
         let renderer = Renderer::new(&mut imgui, |s| video.gl_get_proc_address(s) as _);
         let state = State {
+            max_window_width: 0.0,
             perf: PerformanceWindow,
             selection: SelectionWindow::default(),
             society: SocietyWindow,
@@ -109,20 +111,26 @@ impl Ui {
 
 impl State {
     fn render(&mut self, mut bundle: UiBundle) {
-        imgui::Window::new(im_str!("Debug"))
-            .always_auto_resize(true)
+        let window = imgui::Window::new(im_str!("Debug"))
+            .size([self.max_window_width, 0.0], Condition::Always)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
-            .always_use_window_padding(true)
-            .build(bundle.ui, || {
-                // Perf fixed at the top
-                self.perf.render(&bundle);
+            .always_use_window_padding(true);
 
-                TabBar::new(im_str!("Debug Tabs")).build(bundle.ui, || {
-                    self.selection.render(&mut bundle);
-                    self.society.render(&mut bundle);
-                    self.debug.render(&mut bundle);
-                });
+        if let Some(token) = window.begin(bundle.ui) {
+            // Perf fixed at the top
+            self.perf.render(&bundle);
+
+            TabBar::new(im_str!("Debug Tabs")).build(bundle.ui, || {
+                self.selection.render(&mut bundle);
+                self.society.render(&mut bundle);
+                self.debug.render(&mut bundle);
             });
+
+            token.end(bundle.ui);
+
+            let window_size = bundle.ui.window_content_region_width();
+            self.max_window_width = self.max_window_width.max(window_size);
+        }
     }
 }

@@ -11,6 +11,7 @@ use crate::activity::EventUnblockResult;
 
 use crate::activity::activities::NopActivity;
 use crate::simulation::Tick;
+use crate::{Societies, SocietyComponent};
 
 pub struct ActivitySystem;
 
@@ -34,16 +35,29 @@ impl<'a> System<'a> for ActivitySystem {
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, AiComponent>,
         ReadStorage<'a, BlockingActivityComponent>,
+        WriteStorage<'a, SocietyComponent>,
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
         Read<'a, QueuedUpdates>,
         Read<'a, LazyUpdate>,
+        Write<'a, Societies>,
         Write<'a, EntityEventQueue>,
     );
 
     fn run(
         &mut self,
-        (mut activities, mut ai, blocking, entities, world, updates, comp_updates, mut event_queue): Self::SystemData,
+        (
+            mut activities,
+            mut ai,
+            blocking,
+            society,
+            entities,
+            world,
+            updates,
+            comp_updates,
+            mut societies,
+            mut event_queue,
+        ): Self::SystemData,
     ) {
         let mut subscriptions = Vec::new(); // TODO reuse allocation in system
         for (entity, ai, activity, _) in (&entities, &mut ai, &mut activities, !&blocking).join() {
@@ -99,11 +113,19 @@ impl<'a> System<'a> for ActivitySystem {
                     if let Err(e) = activity.current.finish(finish, &mut ctx) {
                         error!("error finishing activity"; "activity" => &activity.current, "error" => %e);
                     }
+
                     activity.current = Box::new(NopActivity::default());
 
                     // ensure unblocked and unsubscribed
                     event_queue.unsubscribe_all(entity);
                     comp_updates.remove::<BlockingActivityComponent>(entity);
+
+                    ai.interrupt_current_action(entity, || {
+                        society
+                            .get(entity)
+                            .and_then(|soc| societies.society_by_handle_mut(soc.handle))
+                            .expect("should have society")
+                    });
 
                     // next tick ai should return a new decision rather than unchanged to avoid
                     // infinite Nop loops

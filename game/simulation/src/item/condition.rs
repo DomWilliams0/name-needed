@@ -1,4 +1,5 @@
 use common::*;
+use std::ops::SubAssign;
 
 #[derive(Debug, Clone)]
 pub enum ItemConditionGrade {
@@ -55,5 +56,11 @@ impl ItemConditionGrade {
 impl Display for ItemCondition {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{:?} ({})", self.grade, self.value.value())
+    }
+}
+
+impl SubAssign<NormalizedFloat> for ItemCondition {
+    fn sub_assign(&mut self, rhs: NormalizedFloat) {
+        *self = Self::new(self.value - rhs)
     }
 }

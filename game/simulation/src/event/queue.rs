@@ -305,10 +305,9 @@ impl Debug for BitSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ecs::EcsWorld;
+    use crate::ecs::*;
     use crate::ComponentWorld;
     use common::once;
-    use specs::Builder;
 
     fn make_entities() -> (Entity, Entity) {
         {

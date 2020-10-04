@@ -126,6 +126,8 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
                         .map(|render| render.color = color)
                         .expect("render component");
 
+                    sim.give_bag(human);
+
                     all_humans.push(human);
                     human
                 }
@@ -159,6 +161,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
 
         // add some random food items too
         let food_count = config::get().simulation.food_count;
+        let mut all_food = Vec::new();
         for _ in 0..food_count {
             let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
             if let Some(pos) = world.choose_random_walkable_block(20) {
@@ -173,7 +176,21 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
                     .component_mut::<BaseItemComponent>(food)
                     .map(|item| item.condition.set(nutrition))
                     .expect("nutrition");
+
+                all_food.push(food);
             }
+        }
+
+        // haul a food
+        // if let Some((food, human)) = all_food.first().zip(all_humans.first()) {
+        //     let pos = (2, 2, 1);
+        //     sim.haul(*human, *food, pos.into());
+        // }
+
+        // give a free food and eat it
+        if let Some((food, human)) = all_food.first().zip(all_humans.first()) {
+            sim.put_food_in_container(*food, *human);
+            sim.eat(*human, *food);
         }
 
         Ok(())

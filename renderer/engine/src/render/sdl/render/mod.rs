@@ -1,6 +1,6 @@
 use color::ColorRgb;
 use common::*;
-use simulation::{RenderComponent, Renderer, TransformComponent};
+use simulation::{PhysicalComponent, RenderComponent, Renderer, TransformComponent};
 
 use crate::render::debug::DebugShape;
 use crate::render::sdl::gl::{
@@ -94,19 +94,21 @@ impl Renderer for GlRenderer {
         let frame_target = self.frame_target.as_ref().unwrap();
         let mut position = transform.position;
 
+        // TODO render head at head height, not the ground
+
         // tweak z position to keep normalized around 0
         position.2 -= frame_target.z_offset;
         // ...plus a tiny amount to always render above the terrain, not in it
         position.2 += 0.001;
 
         self.entity_pipeline
-            .add_entity((position, transform.shape, render.color()));
+            .add_entity((position, render.shape, render.color));
     }
 
-    fn sim_selected(&mut self, transform: &TransformComponent) {
+    fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
         // simple underline
         const PAD: f32 = 0.2;
-        let radius = transform.bounding_radius() + PAD;
+        let radius = physical.bounding_radius().metres() + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
         self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));

@@ -1,11 +1,14 @@
 use common::*;
+
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ecs::*;
-use crate::physics::Bounds;
-use crate::PhysicalShape;
+use crate::physics::{Bounds, PhysicsComponent};
+
 use common::cgmath::Rotation;
-use specs::{Builder, EntityBuilder};
+use serde::Deserialize;
+use unit::length::{Length, Length3};
+use unit::volume::Volume;
 
 /// Position and rotation component
 #[derive(Debug, Clone, Component, EcsComponent)]
@@ -14,12 +17,6 @@ use specs::{Builder, EntityBuilder};
 pub struct TransformComponent {
     /// Position in world, center of entity in x/y and bottom of entity in z
     pub position: WorldPoint,
-
-    /// Height in z axis
-    pub height: f32,
-
-    /// Physical shape in x,y axes
-    pub shape: PhysicalShape,
 
     /// Used for render interpolation
     pub last_position: WorldPoint,
@@ -32,22 +29,30 @@ pub struct TransformComponent {
 
     /// Current velocity
     pub velocity: Vector2,
+}
 
-    /// Number of blocks fallen in current fall
-    pub fallen: u32,
+/// Physical attributes of an entity
+// TODO use newtype units for ingame non-SI units
+#[derive(Component, EcsComponent, Clone, Debug)]
+#[storage(VecStorage)]
+#[name("physical")]
+pub struct PhysicalComponent {
+    pub volume: Volume,
+
+    /// Bounding dimensions around the centre
+    ///
+    /// TODO clarify in uses and definition that this isn't really half dims! ridiculous
+    pub half_dimensions: Length3,
 }
 
 impl TransformComponent {
-    pub fn new(position: WorldPoint, shape: PhysicalShape, height: f32) -> Self {
+    pub fn new(position: WorldPoint) -> Self {
         Self {
             position,
-            shape,
-            height,
             rotation: Basis2::from_angle(rad(0.0)),
             last_position: position,
             accessible_position: None,
             velocity: Zero::zero(),
-            fallen: 0,
         }
     }
 
@@ -71,19 +76,14 @@ impl TransformComponent {
         self.position.2
     }
 
-    pub fn bounding_radius(&self) -> f32 {
-        self.shape.radius()
-    }
-
-    pub fn bounds(&self) -> Bounds {
+    pub fn bounds(&self, bounding_radius: f32) -> Bounds {
         // allow tiny overlap
         const MARGIN: f32 = 0.8;
-        let radius = self.shape.radius() * MARGIN;
+        let radius = bounding_radius * MARGIN;
         Bounds::from_radius(self.position, radius, radius)
     }
 
-    pub fn feelers_bounds(&self) -> Bounds {
-        let bounding_radius = self.shape.radius();
+    pub fn feelers_bounds(&self, bounding_radius: f32) -> Bounds {
         let feelers = self.velocity + (self.velocity.normalize() * bounding_radius);
         let centre = self.position + feelers;
 
@@ -115,21 +115,54 @@ impl TransformComponent {
     }
 }
 
-impl<V: Value> ComponentTemplate<V> for TransformComponent {
+impl PhysicalComponent {
+    pub fn new(volume: Volume, half_dimensions: Length3) -> Self {
+        PhysicalComponent {
+            volume,
+            half_dimensions,
+        }
+    }
+
+    /// Max x/y dimension
+    pub fn bounding_radius(&self) -> Length {
+        self.half_dimensions.x().max(self.half_dimensions.y())
+    }
+}
+
+#[derive(Deserialize)]
+struct HalfDims {
+    x: u16,
+    y: u16,
+    z: u16,
+}
+
+#[derive(Debug)]
+pub struct PhysicalComponentTemplate {
+    half_dims: Length3,
+    volume: Volume,
+}
+impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        let shape: PhysicalShape = values.get("shape")?.into_type()?;
-        let height = values.get_float("height")?;
-
-        // position will be customized afterwards
-        Ok(Box::new(Self::new(WorldPoint::default(), shape, height)))
+        let volume = values.get_int("volume")?;
+        let half_dims: HalfDims = values.get("half_dims")?.into_type()?;
+        Ok(Box::new(Self {
+            volume: Volume::new(volume),
+            half_dims: Length3::new(half_dims.x, half_dims.y, half_dims.z),
+        }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
-        builder.with(self.clone())
+        // position will be customized afterwards
+        let pos = WorldPoint::default();
+
+        builder
+            .with(TransformComponent::new(pos))
+            .with(PhysicsComponent::default())
+            .with(PhysicalComponent::new(self.volume, self.half_dims))
     }
 }
 
-register_component_template!("transform", TransformComponent);
+register_component_template!("physical", PhysicalComponentTemplate);

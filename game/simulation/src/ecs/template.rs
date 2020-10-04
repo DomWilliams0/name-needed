@@ -1,7 +1,6 @@
 pub use crate::definitions::ValueImpl;
-use crate::ecs::{ComponentBuildError, Map, Value};
+use crate::ecs::*;
 use common::Debug;
-use specs::EntityBuilder;
 
 pub trait ComponentTemplate<V: Value>: Debug {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>

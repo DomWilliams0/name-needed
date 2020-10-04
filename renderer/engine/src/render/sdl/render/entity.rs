@@ -6,14 +6,14 @@ use crate::render::sdl::render::FrameTarget;
 use color::ColorRgb;
 use common::*;
 use resources::resource::Shaders;
-use simulation::PhysicalShape;
+use simulation::Shape2d;
 use unit::view::ViewPoint;
 use unit::world::{WorldPoint, SCALE};
 
 pub(crate) struct EntityPipeline {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, PhysicalShape, ColorRgb)>,
+    entities: Vec<(WorldPoint, Shape2d, ColorRgb)>,
 }
 
 #[repr(C)]
@@ -116,7 +116,7 @@ impl EntityPipeline {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, PhysicalShape, ColorRgb)) {
+    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb)) {
         self.entities.push(entity);
     }
 
@@ -145,8 +145,8 @@ impl EntityPipeline {
                 mapped[i].color = (*color).into();
 
                 let (scale_x, scale_y) = match shape {
-                    PhysicalShape::Circle { radius } => (radius, radius),
-                    PhysicalShape::Rectangle { rx, ry } => (rx, ry),
+                    Shape2d::Circle { radius } => (radius, radius),
+                    Shape2d::Rectangle { rx, ry } => (rx, ry),
                 };
 
                 let model = Matrix4::from_translation(pos.into())

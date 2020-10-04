@@ -126,6 +126,8 @@ impl Token for () {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::many_single_char_names)]
+
     use super::*;
 
     #[test]

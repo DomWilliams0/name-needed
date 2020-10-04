@@ -3,7 +3,6 @@ use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crossbeam::crossbeam_channel::Receiver;
-use specs::RunNow;
 
 use common::*;
 use resources::resource::Resources;
@@ -16,13 +15,13 @@ use crate::ai::{AiAction, AiComponent, AiSystem};
 use crate::definitions;
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::dev::SimulationDevExt;
-use crate::ecs::{EcsWorld, EcsWorldFrameRef, WorldExt};
+use crate::ecs::*;
 use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
     SocietyInputCommand, UiBlackboard, UiCommand,
 };
-use crate::item::PickupItemSystem;
+use crate::item::HaulSystem;
 use crate::movement::MovementFulfilmentSystem;
 use crate::needs::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
@@ -142,7 +141,7 @@ impl<R: Renderer> Simulation<R> {
         // update senses
         SensesSystem.run_now(&self.ecs_world);
 
-        // choose activity
+        // choose and tick activity
         AiSystem.run_now(&self.ecs_world);
         ActivitySystem.run_now(&self.ecs_world);
 
@@ -155,19 +154,18 @@ impl<R: Renderer> Simulation<R> {
         // attempt to fulfil desired velocity
         MovementFulfilmentSystem.run_now(&self.ecs_world);
 
-        // pick up items
-        PickupItemSystem.run_now(&self.ecs_world);
-
         // process entity events
         ActivityEventSystem.run_now(&self.ecs_world);
 
         // validate inventory soundness
         #[cfg(debug_assertions)]
-        crate::item::validation::InventoryValidationSystem(&self.ecs_world)
-            .run_now(&self.ecs_world);
+        crate::item::validation::InventoryValidationSystem.run_now(&self.ecs_world);
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
+
+        // sync hauled item positions
+        HaulSystem.run_now(&self.ecs_world);
 
         // update spatial
         SpatialSystem.run_now(&self.ecs_world);

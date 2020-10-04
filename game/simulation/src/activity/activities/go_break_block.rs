@@ -23,6 +23,10 @@ pub struct GoBreakBlockActivity {
 
 impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+        if let Some(res) = self.finished.take() {
+            return ActivityResult::from(res);
+        }
+
         match &self.state {
             BreakBlockState::Going(sub) => sub.init(ctx),
 

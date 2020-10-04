@@ -1,7 +1,7 @@
 use crate::*;
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
-use std::ops::{AddAssign, Mul, SubAssign};
+use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
 #[derive(Copy, Clone)]
 pub struct Proportion<T> {
@@ -93,6 +93,14 @@ impl From<NormalizedFloat> for f32 {
 impl SubAssign<f32> for NormalizedFloat {
     fn sub_assign(&mut self, rhs: f32) {
         *self = Self::clamped(self.0 - rhs)
+    }
+}
+
+impl Sub<NormalizedFloat> for NormalizedFloat {
+    type Output = Self;
+
+    fn sub(self, rhs: NormalizedFloat) -> Self::Output {
+        Self::clamped(self.0 - rhs.0)
     }
 }
 

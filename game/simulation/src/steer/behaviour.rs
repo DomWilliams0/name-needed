@@ -45,11 +45,16 @@ impl SteeringBehaviour {
     pub fn tick(
         &mut self,
         transform: &TransformComponent,
+        bounding_radius: f32,
         interests: &mut InterestsContextMap,
     ) -> SteeringResult {
         match self {
-            SteeringBehaviour::Stop(behaviour) => behaviour.tick(transform, interests),
-            SteeringBehaviour::Seek(behaviour) => behaviour.tick(transform, interests),
+            SteeringBehaviour::Stop(behaviour) => {
+                behaviour.tick(transform, bounding_radius, interests)
+            }
+            SteeringBehaviour::Seek(behaviour) => {
+                behaviour.tick(transform, bounding_radius, interests)
+            }
         }
     }
 
@@ -62,6 +67,7 @@ trait DoASteer {
     fn tick(
         &mut self,
         transform: &TransformComponent,
+        bounding_radius: f32,
         interests: &mut InterestsContextMap,
     ) -> SteeringResult;
 
@@ -80,6 +86,7 @@ impl DoASteer for Stop {
     fn tick(
         &mut self,
         transform: &TransformComponent,
+        _bounding_radius: f32,
         interests: &mut InterestsContextMap,
     ) -> SteeringResult {
         const STOPPED: f32 = 0.04;
@@ -103,6 +110,7 @@ impl DoASteer for Seek {
     fn tick(
         &mut self,
         transform: &TransformComponent,
+        bounding_radius: f32,
         interests: &mut InterestsContextMap,
     ) -> SteeringResult {
         // ignore z direction, assume the target is accessible and accurate.
@@ -112,7 +120,7 @@ impl DoASteer for Seek {
         let distance = pos.distance(tgt);
         let threshold = {
             const MARGIN: f32 = 1.4;
-            let radius = transform.bounding_radius() + transform.velocity.magnitude();
+            let radius = bounding_radius + transform.velocity.magnitude();
             radius * MARGIN
         };
         if distance < threshold {
@@ -142,7 +150,7 @@ mod tests {
     use super::*;
     use crate::steer::context::{ContextMap, Direction};
     use crate::steer::Seek;
-    use crate::{PhysicalShape, TransformComponent};
+    use crate::TransformComponent;
     use common::NormalizedFloat;
     use matches::assert_matches;
     use std::f32::EPSILON;
@@ -153,41 +161,47 @@ mod tests {
         let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
 
         // starts at 0,0 going to 10,0
-        let mut transform =
-            TransformComponent::new(WorldPoint::default(), PhysicalShape::circle(0.5), 0.0);
+        let mut transform = TransformComponent::new(WorldPoint::default());
         let mut output = InterestsContextMap::default();
 
         // first ticks takes us toward
-        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Ongoing);
+        assert_matches!(
+            seek.tick(&transform, 0.5, &mut output),
+            SteeringResult::Ongoing
+        );
 
         // overshoot, but not in arrival range - should still finish because the direction changed
         // we're halfway there but going fast enough to arrive next tick
         transform.position.0 = 5.0;
         transform.velocity.x = 4.8;
-        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Finished);
+        assert_matches!(
+            seek.tick(&transform, 0.5, &mut output),
+            SteeringResult::Finished
+        );
     }
     #[test]
     fn seek_arrived_already() {
         let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
-        let transform =
-            TransformComponent::new(WorldPoint(9.8, 0.0, 0.0), PhysicalShape::circle(0.5), 0.0);
+        let transform = TransformComponent::new(WorldPoint(9.8, 0.0, 0.0));
         let mut output = InterestsContextMap::default();
 
         // already arrived
-        assert_matches!(seek.tick(&transform, &mut output), SteeringResult::Finished);
+        assert_matches!(
+            seek.tick(&transform, 0.5, &mut output),
+            SteeringResult::Finished
+        );
     }
 
     #[test]
     fn seek_exact_pos() {
         // we are not exactly lined up with the target, and a tiny radius
         let mut seek = Seek::with_target(WorldPoint(10.8, 0.6, 0.0), NormalizedFloat::one());
-        let transform =
-            TransformComponent::new(WorldPoint(0.2, 0.9, 0.0), PhysicalShape::circle(0.2), 0.0);
+        let transform = TransformComponent::new(WorldPoint(0.2, 0.9, 0.0));
         let mut output = ContextMap::default();
 
         // output should be towards the block
         assert_matches!(
-            seek.tick(&transform, output.interests_mut()),
+            seek.tick(&transform, 0.2, output.interests_mut()),
             SteeringResult::Ongoing
         );
         let (dir, _) = output.resolve();

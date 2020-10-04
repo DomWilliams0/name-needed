@@ -1,13 +1,14 @@
-use imgui::{im_str, CollapsingHeader, TabItem};
+use imgui::{im_str, CollapsingHeader, TabItem, TreeNode, Ui};
 
 use common::{InnerSpace, Itertools};
 use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, UiCommand};
+use simulation::{ActivityComponent, BlockType, IntoEnumIterator, Inventory2Component};
 
+use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
 };
 use crate::ui_str;
-use simulation::{BlockType, IntoEnumIterator};
 
 pub struct SelectionWindow {
     block_placement: BlockPlacement,
@@ -50,17 +51,17 @@ impl SelectionWindow {
                         match &selection.details {
                             EntityDetails::Living {
                                 activity,
-                                sub_activity,
                                 hunger,
                                 path_target,
                                 society,
+                                inventory,
                             } => {
                                 ui.key_value(
                                     im_str!("Velocity:"),
                                     || {
                                         Value::Some(ui_str!(in strings,
-                                            "{:.2}m/s",
-                                            selection.transform.velocity.magnitude()
+                                        "{:.2}m/s",
+                                        selection.transform.velocity.magnitude()
                                         ))
                                     },
                                     None,
@@ -119,33 +120,11 @@ impl SelectionWindow {
                                     COLOR_ORANGE,
                                 );
 
+                                self.do_inventory(ui, strings, inventory);
+
                                 ui.separator();
 
-                                ui.key_value(
-                                    im_str!("Activity:"),
-                                    || {
-                                        if let Some(activity) = activity {
-                                            Value::Wrapped(ui_str!(in strings, "{}", activity))
-                                        } else {
-                                            Value::None("None")
-                                        }
-                                    },
-                                    None,
-                                    COLOR_ORANGE,
-                                );
-
-                                ui.key_value(
-                                    im_str!("Subactivity:"),
-                                    || {
-                                        if let Some(activity) = sub_activity {
-                                            Value::Wrapped(ui_str!(in strings, "{}", activity))
-                                        } else {
-                                            Value::None("None")
-                                        }
-                                    },
-                                    None,
-                                    COLOR_ORANGE,
-                                );
+                                self.do_activity(ui, strings, activity);
 
                                 if CollapsingHeader::new(im_str!("Divine control"))
                                     .leaf(true)
@@ -182,12 +161,25 @@ impl SelectionWindow {
                                     None,
                                     COLOR_BLUE,
                                 );
-                                ui.key_value(
-                                    im_str!("Mass:"),
-                                    || Value::Some(ui_str!(in strings, "{}kg", item.mass)),
-                                    None,
-                                    COLOR_BLUE,
-                                );
+                                if let Some(physical) = selection.physical {
+                                    ui.key_value(
+                                        im_str!("Volume:"),
+                                        || Value::Some(ui_str!(in strings, "{}", physical.volume)),
+                                        None,
+                                        COLOR_BLUE,
+                                    );
+
+                                    ui.key_value(
+                                        im_str!("Size:"),
+                                        || {
+                                            Value::Some(
+                                                ui_str!(in strings, "{}", physical.half_dimensions),
+                                            )
+                                        },
+                                        None,
+                                        COLOR_BLUE,
+                                    );
+                                }
 
                                 ui.key_value(
                                     im_str!("Nutrition:"),
@@ -282,6 +274,81 @@ impl SelectionWindow {
                 }
             }
         });
+    }
+
+    fn do_inventory(
+        &mut self,
+        ui: &Ui,
+        strings: &PerFrameStrings,
+        inventory: &Option<&Inventory2Component>,
+    ) {
+        if let Some(inventory) = inventory {
+            TreeNode::new(im_str!("Inventory"))
+                .default_open(false)
+                .build(ui, || {
+                    ui.text_colored(
+                        COLOR_GREEN,
+                        ui_str!(in strings, "{} hands:", inventory.equip_slots().len()),
+                    );
+
+                    for slot in inventory.equip_slots() {
+                        ui.same_line(0.0);
+                        ui.text(ui_str!(in strings, "{} ", slot));
+                    }
+
+                    ui.separator();
+                    ui.text_disabled(
+                        ui_str!(in strings, "{} containers", inventory.containers().len()),
+                    );
+
+                    for (i, container) in inventory.containers().enumerate() {
+                        TreeNode::new(ui_str!(in strings, "Container #{}", i+1))
+                            .build(ui, || {
+                                let (max_vol, max_size) = container.limits();
+                                let capacity = container.current_capacity();
+                                ui.text_colored(COLOR_GREEN, ui_str!(in strings, "Capacity {}/{}, size {}", capacity, max_vol, max_size));
+                                for entity in container.contents() {
+                                    ui.text_wrapped(ui_str!(in strings, " - {}", entity));
+                                }
+                            });
+                    }
+                });
+        }
+    }
+
+    fn do_activity(
+        &mut self,
+        ui: &Ui,
+        strings: &PerFrameStrings,
+        activity: &Option<&ActivityComponent>,
+    ) {
+        ui.key_value(
+            im_str!("Activity:"),
+            || {
+                if let Some(activity) = activity {
+                    Value::Wrapped(ui_str!(in strings, "{}", activity.current))
+                } else {
+                    Value::None("None")
+                }
+            },
+            None,
+            COLOR_ORANGE,
+        );
+
+        ui.key_value(
+            im_str!("Subactivity:"),
+            || {
+                if let Some(activity) = activity {
+                    Value::Wrapped(
+                        ui_str!(in strings, "{}", activity.current.current_subactivity()),
+                    )
+                } else {
+                    Value::None("None")
+                }
+            },
+            None,
+            COLOR_ORANGE,
+        );
     }
 }
 

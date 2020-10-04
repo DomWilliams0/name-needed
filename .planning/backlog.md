@@ -20,6 +20,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* very indirect paths within areas too, edge costs need adjusting
 * tweak arrival threshold for path waypoints, it's a bit jerky
 * bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
+* apply gravity to item entities too, for when block beneath them is mined
 
 ## UI/input
 * graph for fps/tps history
@@ -38,7 +39,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fast forward toggle
 	* update gameloop to allow changing TPS
 	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
-* add inventory to UI
+* resolve an entity to its displayable name including state in the UI layer only
+	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
 
 ## Entity behaviour
 * more society level jobs
@@ -50,10 +52,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * (sub)activities take an amount of ticks to complete
 * be able to block subactivities for a number of ticks, show progress bar up until end tick
 * food/drink vessels and wastage
-* refactor item usage to be less generic at the system level
-	* instead of iterating over holders with (using comp, inventory comp), iterate over *items* with (being used comp, edible comp), (being used comp, other usage comp) etc
 * consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
-* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/droppinif only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
+* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
+* storage containers (e.g. chest)
+	* containers can be communal and/or private
+* add "haul item" DSE (with "can haul" consideration)
+	* collect items (food/2-handed stone bricks etc) and store in communal/private chests
 
 ## World generation
 * biomes
@@ -95,6 +99,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged
+* biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage
+* dynstack for ai dses and considerations, to avoid the huge amount of boxing
+* experiment with PGO
 
 ### Memory usage
 * CoW terrain slabs
@@ -163,6 +170,15 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* toilet
 	* social
 	* sleep
+* enemies/hostiles can break blocks
+* thieves/desperate people (e.g. dying of hunger) can ignore item/container ownership and steal things
+* animals and plants provide various resources aside from meat
+	* skin/leather/bladder for waterskins, clothes, armour
+	* bones for tools
+	* tree bark as a very weak material
+	* woven plant materials
+	* milk
+	* fur
 
 ### Physical wellbeing
 * distinct body parts

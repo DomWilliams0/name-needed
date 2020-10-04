@@ -1,20 +1,75 @@
 use common::*;
+
+use crate::{ComponentWorld, PhysicalComponent, TransformComponent};
 // use common::derive_more::Error;
 use crate::activity::activity::{ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
-use crate::ecs::Entity;
+use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::PickupItemComponent;
-use crate::ComponentWorld;
+use crate::item::{HaulableItemComponent, Inventory2Component};
 
-/// Pick up the given item if close enough. Blocks on pick up event.
+/// Pick up the given item. Blocks on pick up event.
 #[derive(Clone, Debug)]
 pub struct PickupItemSubActivity(pub(crate) Entity);
 
+#[derive(Error, Debug, Clone)]
+pub enum PickupItemError {
+    #[error("Item is invalid, non-existent or already picked up")]
+    NotAvailable,
+
+    #[error("Holder has no inventory")]
+    NoInventory,
+
+    #[error("Can't free up any/enough equip slots")]
+    NoFreeHands,
+}
+
 impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
     fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
-        // picking up is done in another system, kick that off and wait on the result
-        ctx.world.add_lazy(ctx.entity, PickupItemComponent(self.0));
+        // assumes we are close enough to pick it up already
+
+        let item = self.0;
+        let holder = ctx.entity;
+
+        ctx.updates.queue("pick up item", move |world| {
+            let do_pickup = || -> Result<(Entity, Entity), PickupItemError> {
+                let mut transforms = world.write_storage::<TransformComponent>();
+                let mut inventories = world.write_storage::<Inventory2Component>();
+                let haulables = world.read_storage::<HaulableItemComponent>();
+                let physicals = world.read_storage::<PhysicalComponent>();
+
+                // get item components and ensure transform i.e. not already picked up
+                let (_, haulable, physical) = world
+                    .components(item, (&transforms, &haulables, &physicals))
+                    .ok_or(PickupItemError::NotAvailable)?;
+
+                // get holder inventory, free up enough hands and try to fill em
+                let inventory = inventories
+                    .get_mut(holder)
+                    .ok_or(PickupItemError::NoInventory)?;
+
+                inventory
+                    .insert_item(
+                        item,
+                        haulable.extra_hands,
+                        physical.volume,
+                        physical.half_dimensions,
+                    )
+                    .ok_or(PickupItemError::NoFreeHands)?;
+
+                // pickup success, remove transform from item
+                transforms.remove(item);
+                Ok((item, holder))
+            };
+
+            let result = do_pickup();
+            world.post_event(EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::PickedUp(result),
+            });
+
+            Ok(())
+        });
 
         // subscribe to item pick up
         ctx.subscribe_to(
@@ -25,8 +80,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
-        let _ = ctx.world.remove_lazy::<PickupItemComponent>(ctx.entity);
+    fn on_finish(&self, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

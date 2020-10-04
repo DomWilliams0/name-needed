@@ -43,6 +43,7 @@ pub trait ComponentWorld {
     fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError>;
     fn has_component<T: Component>(&self, entity: Entity) -> bool;
     fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool;
+    fn components<J: Join>(&self, entity: Entity, storages: J) -> Option<J::Type>;
 
     fn resource<T: Resource>(&self) -> &T;
     #[allow(clippy::mut_from_ref)]
@@ -134,6 +135,11 @@ impl ComponentWorld for EcsWorld {
 
     fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool {
         self.component_registry.has_component(comp, self, entity)
+    }
+
+    fn components<J: Join>(&self, entity: Entity, storages: J) -> Option<J::Type> {
+        let entities = self.read_resource::<EntitiesRes>();
+        storages.join().get(entity, &entities.into())
     }
 
     fn resource<T: Resource>(&self) -> &T {

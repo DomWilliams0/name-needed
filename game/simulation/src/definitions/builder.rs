@@ -1,10 +1,9 @@
 use unit::world::WorldPosition;
 
 use crate::definitions::loader::Definition;
-use crate::ecs::Entity;
+use crate::ecs::*;
 use crate::{ComponentWorld, TransformComponent};
 
-use specs::Builder;
 use world::InnerWorldRef;
 
 pub trait EntityPosition {

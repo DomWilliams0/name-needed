@@ -4,7 +4,6 @@ use crate::spatial::Spatial;
 use crate::TransformComponent;
 use common::*;
 use serde::Deserialize;
-use specs::{Builder, EntityBuilder};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use unit::world::WorldPoint;

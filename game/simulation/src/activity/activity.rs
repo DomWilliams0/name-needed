@@ -128,6 +128,17 @@ impl ActivityResult {
     }
 }
 
+impl From<BoxedResult<()>> for ActivityResult {
+    fn from(res: BoxedResult<()>) -> Self {
+        let finish = match res {
+            Ok(_) => Finish::Success,
+            Err(err) => Finish::Failure(err),
+        };
+
+        Self::Finished(finish)
+    }
+}
+
 // impl <A> slog::Value  for A where A: Activity<_> {
 //     fn serialize(&self, _: &Record, key: &'static str, serializer: &mut dyn Serializer) -> SlogResult<()> {
 //     }

@@ -1,22 +1,23 @@
+pub use activities::*;
+pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
+// TODO move subactivity errors somewhere else
+pub use subactivities::{EquipItemError, HaulError, PickupItemError};
+pub use system::{
+    ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
+};
+
 mod activities;
 mod activity;
 mod subactivities;
 mod system;
 
-pub use activities::*;
-pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-pub use system::{
-    ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
-};
-// TODO move subactivity errors somewhere else
-pub use subactivities::{EquipItemError, UseHeldItemError};
-
 mod action_to_activity {
-    use super::*;
     use crate::activity::Activity;
     use crate::ai::AiAction;
     use crate::item::ItemsToPickUp;
     use crate::ComponentWorld;
+
+    use super::*;
 
     impl AiAction {
         pub fn into_activity<W: ComponentWorld>(self, activity: &mut Box<dyn Activity<W>>) {
@@ -29,16 +30,16 @@ mod action_to_activity {
             *activity = match self {
                 AiAction::Nop => activity!(NopActivity::default()),
                 AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
-                AiAction::GoPickUp(ItemsToPickUp(_, items)) => {
-                    // TODO itemfilter should specify a static string describing itself
-                    activity!(PickupItemsActivity::with_items(items, "iTeMs"))
+                AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {
+                    activity!(PickupItemsActivity::with_items(items, desc))
                 }
                 AiAction::Wander => activity!(WanderActivity::default()),
-                AiAction::UseHeldItem(item) => activity!(UseHeldItemActivity::with_item(item)),
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
                 AiAction::Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }
+                AiAction::Haul(e, target) => activity!(HaulActivity::new(e, target)),
+                AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
             }
         }
     }

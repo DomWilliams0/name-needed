@@ -7,15 +7,14 @@ use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
 
+use crate::item::Inventory2Component;
 use crate::simulation::Tick;
 use crate::society::job::{JobList, Task};
 use crate::society::{Society, SocietyComponent};
 use crate::TransformComponent;
 use crate::{dse, Societies};
-use specs::{Builder, EntityBuilder};
 use std::iter::once;
 use world::WorldRef;
 
@@ -54,6 +53,28 @@ impl AiComponent {
         self.intelligence.clear_last_action();
     }
 
+    pub fn interrupt_current_action<'a>(
+        &mut self,
+        this_entity: Entity,
+        society_fn: impl FnOnce() -> &'a mut Society,
+    ) {
+        if let Some((interrupted_source, _)) = self.current.take() {
+            match interrupted_source {
+                DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
+                    // divine command interrupted, assume completed
+                    debug!("removing interrupted divine command");
+                    self.remove_divine_command();
+                }
+                DecisionSource::Stream(_) => {
+                    // unreserve interrupted society task
+                    let society = society_fn();
+                    society.jobs_mut().unreserve_task(this_entity);
+                }
+                _ => {}
+            }
+        }
+    }
+
     // pub fn last_completed_action(&self) -> Option<&AiAction> {
     //     self.last_completed_action.as_ref()
     // }
@@ -69,7 +90,7 @@ impl<'a> System<'a> for AiSystem {
         Write<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
-        ReadStorage<'a, InventoryComponent>,
+        ReadStorage<'a, Inventory2Component>,
         WriteStorage<'a, AiComponent>,
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, SocietyComponent>,
@@ -145,6 +166,8 @@ impl<'a> System<'a> for AiSystem {
                 let jobs: &mut JobList = (*society).jobs_mut();
                 let (is_cached, tasks) = jobs.collect_cached_tasks_for(tick, &*voxel_world, e);
 
+                // TODO fix (eventually) false assumption that all stream DSEs come from a society
+                // this will help remove the multiple silly `society.as_mut().expect()` here
                 debug_assert!(
                     extra_dses.is_empty(),
                     "society tasks expected to be the only source of extra dses"
@@ -174,24 +197,11 @@ impl<'a> System<'a> for AiSystem {
                 activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
 
                 // register interruption
-                if let Some((interrupted_source, _)) = ai.current.take() {
-                    match interrupted_source {
-                        DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
-                            // divine command interrupted, assume completed
-                            debug!("removing interrupted divine command");
-                            ai.remove_divine_command();
-                        }
-                        DecisionSource::Stream(_) => {
-                            // unreserve interrupted society task
-                            let society = society
-                                .as_mut()
-                                .expect("streamed DSEs expected to come from a society only");
-
-                            society.jobs_mut().unreserve_task(e);
-                        }
-                        _ => {}
-                    }
-                }
+                ai.interrupt_current_action(e, || {
+                    society
+                        .as_mut()
+                        .expect("streamed DSEs expected to come from a society only")
+                });
 
                 if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve this so others can't try to do it too

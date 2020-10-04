@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::module_inception)]
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
@@ -11,11 +11,12 @@ pub use world::{
 
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
-pub use crate::render::{PhysicalShape, RenderComponent, Renderer};
+pub use crate::render::{RenderComponent, Renderer, Shape2d};
 pub use crate::simulation::{Simulation, ThreadedWorldLoader};
-pub use crate::transform::TransformComponent;
+pub use crate::transform::{PhysicalComponent, TransformComponent};
+pub use activity::ActivityComponent;
 pub use ecs::ComponentWorld;
-pub use item::{BaseItemComponent, InventoryComponent};
+pub use item::{BaseItemComponent, Container, Inventory2Component};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{Societies, SocietyComponent, SocietyHandle};

@@ -4,12 +4,14 @@ use world::NavigationError;
 
 use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
 use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
-use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
+use crate::activity::{
+    Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult, PickupItemError,
+};
 use crate::ecs::{Entity, E};
 use crate::event::prelude::*;
-use crate::item::PickupItemError;
 use crate::{nop_subactivity, unexpected_event};
 use crate::{ComponentWorld, TransformComponent};
+use std::borrow::Cow;
 
 #[derive(Debug)]
 enum PickupItemsState {
@@ -21,7 +23,7 @@ enum PickupItemsState {
 #[derive(Debug)]
 pub struct PickupItemsActivity {
     items: Vec<(Entity, WorldPoint)>,
-    item_desc: &'static str,
+    item_desc: Cow<'static, str>,
     state: PickupItemsState,
     last_error: Option<PickupFailure>,
     complete: bool,
@@ -167,6 +169,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     }
                 }
             }
+            // TODO other destructive events happening to the item
             e => unexpected_event!(e),
         }
     }
@@ -186,7 +189,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
 }
 
 impl PickupItemsActivity {
-    pub fn with_items(items: Vec<(Entity, WorldPoint)>, what: &'static str) -> Self {
+    pub fn with_items(items: Vec<(Entity, WorldPoint)>, what: Cow<'static, str>) -> Self {
         Self {
             items,
             item_desc: what,
@@ -248,7 +251,7 @@ impl PickupItemsActivity {
                 let err: Box<dyn Error> = match err {
                     PickupFailure::PickupError(e) => Box::new(e),
                     PickupFailure::NavigationError(e) => Box::new(e),
-                    PickupFailure::Other => Box::new(PickupItemError::NoLongerAvailable),
+                    PickupFailure::Other => Box::new(PickupItemError::NotAvailable),
                 };
 
                 BestItem::NoneLeft(Finish::Failure(err))
