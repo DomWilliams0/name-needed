@@ -19,6 +19,16 @@ mod contents {
             fn derive_key(entity: &HeldEntity) -> Entity { entity.entity }
         }
     }
+
+    impl SortedContents {
+        pub(in crate::item::inventory2) fn inner_mut(&mut self) -> &mut Vec<HeldEntity> {
+            &mut self.inner
+        }
+
+        pub(in crate::item::inventory2) fn inner(&self) -> &[HeldEntity] {
+            &self.inner
+        }
+    }
 }
 
 pub struct Container {
@@ -96,13 +106,13 @@ impl Container {
     }
 
     pub fn remove_at_index(&mut self, idx: usize) -> HeldEntity {
-        let entity = self.contents.inner.remove(idx);
+        let entity = self.contents.inner_mut().remove(idx);
         self.current_volume -= entity.volume;
         entity
     }
 
     pub(in crate::item::inventory2) fn contents_as_slice(&self) -> &[HeldEntity] {
-        &self.contents.inner
+        self.contents.inner()
     }
 
     /// Sorted by entity
