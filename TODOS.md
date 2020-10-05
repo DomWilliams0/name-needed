@@ -120,15 +120,15 @@
    * `// TODO carry vs drag`
    * `// TODO this is awful and should be generalised to a part of the physics system e.g. relative positioned entity`
    * `// TODO position at the correct arm(s) location`
- * [game/simulation/src/item/inventory2/component.rs](game/simulation/src/item/inventory2/component.rs) (5)
+ * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (5)
    * `// TODO debug inventory validation`
    * `/// TODO it's possible some hands have been freed up while returning false anyway`
    * `// TODO loop along all held items rather than only checking the first`
    * `// TODO configurable drop equipped items to make space instead of failing`
    * `// TODO possibly add search cache keyed by entity, if there are many repeated searches for the same entity`
- * [game/simulation/src/item/inventory2/container.rs](game/simulation/src/item/inventory2/container.rs) (1)
+ * [game/simulation/src/item/inventory/container.rs](game/simulation/src/item/inventory/container.rs) (1)
    * `// TODO sort by some item type identifier so common items are grouped together`
- * [game/simulation/src/item/inventory2/equip.rs](game/simulation/src/item/inventory2/equip.rs) (1)
+ * [game/simulation/src/item/inventory/equip.rs](game/simulation/src/item/inventory/equip.rs) (1)
    * `// TODO equip slots will require a lot of integration with the body tree, so dont flesh out properly`
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`

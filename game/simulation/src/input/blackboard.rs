@@ -6,7 +6,7 @@ use crate::needs::HungerComponent;
 use crate::path::FollowPathComponent;
 use crate::society::{PlayerSociety, SocietyComponent};
 use crate::{
-    ComponentWorld, Inventory2Component, PhysicalComponent, Societies, SocietyHandle,
+    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
     TransformComponent,
 };
 use std::collections::HashSet;
@@ -38,7 +38,7 @@ pub enum EntityDetails<'a> {
         hunger: Option<&'a HungerComponent>,
         path_target: Option<WorldPoint>,
         society: Option<SocietyHandle>,
-        inventory: Option<&'a Inventory2Component>,
+        inventory: Option<&'a InventoryComponent>,
     },
     Item {
         item: &'a BaseItemComponent,

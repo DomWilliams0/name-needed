@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::item::Inventory2Component;
+use crate::item::InventoryComponent;
 use std::collections::HashMap;
 
 pub struct InventoryValidationSystem;
@@ -8,7 +8,7 @@ impl<'a> System<'a> for InventoryValidationSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
-        ReadStorage<'a, Inventory2Component>,
+        ReadStorage<'a, InventoryComponent>,
     );
 
     fn run(&mut self, (entities, ecs_world, invs): Self::SystemData) {

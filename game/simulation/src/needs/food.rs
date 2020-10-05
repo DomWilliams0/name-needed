@@ -4,7 +4,7 @@ use common::*;
 use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
-use crate::item::{EdibleItemComponent, Inventory2Component};
+use crate::item::{EdibleItemComponent, InventoryComponent};
 use crate::BaseItemComponent;
 
 // TODO newtype for Fuel
@@ -64,7 +64,7 @@ impl<'a> System<'a> for EatingSystem {
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
         Write<'a, EntityEventQueue>,
-        WriteStorage<'a, Inventory2Component>,
+        WriteStorage<'a, InventoryComponent>,
         ReadStorage<'a, BeingEatenComponent>,
         WriteStorage<'a, HungerComponent>,
         ReadStorage<'a, EdibleItemComponent>,

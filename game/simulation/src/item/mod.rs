@@ -2,14 +2,14 @@ pub use component::{BaseItemComponent, EdibleItemComponent, ThrowableItemCompone
 pub use condition::{ItemCondition, ItemConditionGrade};
 pub use filter::{ItemFilter, ItemFilterable};
 pub use haul::{HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent};
-pub use inventory2::{Container, FoundSlot, Inventory2Component};
+pub use self::inventory::{Container, FoundSlot, InventoryComponent};
 pub use pickup::ItemsToPickUp;
 
 mod component;
 mod condition;
 mod filter;
 mod haul;
-mod inventory2;
+mod inventory;
 mod pickup;
 
 #[cfg(debug_assertions)]

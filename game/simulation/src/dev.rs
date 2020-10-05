@@ -5,7 +5,7 @@ use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity, E};
 
 use crate::{
-    ComponentWorld, Container, Inventory2Component, PhysicalComponent, TransformComponent,
+    ComponentWorld, Container, InventoryComponent, PhysicalComponent, TransformComponent,
 };
 use common::*;
 use unit::length::Length3;
@@ -18,7 +18,7 @@ pub trait SimulationDevExt {
 
         let inv = self
             .world()
-            .component_mut::<Inventory2Component>(lucky_holder)
+            .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
         inv.give_container(bag);
@@ -27,7 +27,7 @@ pub trait SimulationDevExt {
     fn put_food_in_container(&mut self, food: Entity, lucky_holder: Entity) {
         let inv = self
             .world()
-            .component_mut::<Inventory2Component>(lucky_holder)
+            .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
         let bag = inv.containers_mut().next().expect("no container");

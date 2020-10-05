@@ -9,7 +9,7 @@ use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::needs::HungerComponent;
 
-use crate::item::Inventory2Component;
+use crate::item::InventoryComponent;
 use crate::simulation::Tick;
 use crate::society::job::{JobList, Task};
 use crate::society::{Society, SocietyComponent};
@@ -90,7 +90,7 @@ impl<'a> System<'a> for AiSystem {
         Write<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
-        ReadStorage<'a, Inventory2Component>,
+        ReadStorage<'a, InventoryComponent>,
         WriteStorage<'a, AiComponent>,
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, SocietyComponent>,

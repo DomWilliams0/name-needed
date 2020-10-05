@@ -5,8 +5,8 @@ use unit::length::Length3;
 use unit::volume::Volume;
 
 use crate::ecs::Entity;
-use crate::item::inventory2::container::contents::SortedContents;
-use crate::item::inventory2::HeldEntity;
+use crate::item::inventory::container::contents::SortedContents;
+use crate::item::inventory::HeldEntity;
 
 mod contents {
     #![allow(clippy::toplevel_ref_arg)]
@@ -21,11 +21,11 @@ mod contents {
     }
 
     impl SortedContents {
-        pub(in crate::item::inventory2) fn inner_mut(&mut self) -> &mut Vec<HeldEntity> {
+        pub(in crate::item::inventory) fn inner_mut(&mut self) -> &mut Vec<HeldEntity> {
             &mut self.inner
         }
 
-        pub(in crate::item::inventory2) fn inner(&self) -> &[HeldEntity] {
+        pub(in crate::item::inventory) fn inner(&self) -> &[HeldEntity] {
             &self.inner
         }
     }
@@ -111,7 +111,7 @@ impl Container {
         entity
     }
 
-    pub(in crate::item::inventory2) fn contents_as_slice(&self) -> &[HeldEntity] {
+    pub(in crate::item::inventory) fn contents_as_slice(&self) -> &[HeldEntity] {
         self.contents.inner()
     }
 

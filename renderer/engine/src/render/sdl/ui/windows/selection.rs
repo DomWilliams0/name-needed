@@ -2,7 +2,7 @@ use imgui::{im_str, CollapsingHeader, TabItem, TreeNode, Ui};
 
 use common::{InnerSpace, Itertools};
 use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, UiCommand};
-use simulation::{ActivityComponent, BlockType, IntoEnumIterator, Inventory2Component};
+use simulation::{ActivityComponent, BlockType, IntoEnumIterator, InventoryComponent};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
@@ -280,7 +280,7 @@ impl SelectionWindow {
         &mut self,
         ui: &Ui,
         strings: &PerFrameStrings,
-        inventory: &Option<&Inventory2Component>,
+        inventory: &Option<&InventoryComponent>,
     ) {
         if let Some(inventory) = inventory {
             TreeNode::new(im_str!("Inventory"))

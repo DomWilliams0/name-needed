@@ -3,7 +3,7 @@ use crate::activity::ActivityContext;
 use crate::ecs::{Entity, WorldExt, E};
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::item::{HaulType, HaulableItemComponent, HauledItemComponent};
-use crate::{ComponentWorld, Inventory2Component, PhysicalComponent};
+use crate::{ComponentWorld, InventoryComponent, PhysicalComponent};
 use common::*;
 
 /// Handles holding of an item in the hauler's hands. No moving
@@ -42,7 +42,7 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
         // TODO move this check to the DSE, doing it here only saves 1 tick
         // if let Err(e) = ctx
         //     .world
-        //     .component::<Inventory2Component>(hauler)
+        //     .component::<InventoryComponent>(hauler)
         //     .map_err(|_| HaulError::NoInventory)
         //     .and_then(|inv| {
         //         inv.has_hauling_slots(extra_hands)
@@ -86,7 +86,7 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
 
                 // get hauler inventory
                 let inventory = world
-                    .component_mut::<Inventory2Component>(hauler)
+                    .component_mut::<InventoryComponent>(hauler)
                     .map_err(|_| HaulError::NoInventory)?;
 
                 // ensure hauler has enough free hands
@@ -130,7 +130,7 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
 
             // free holder's hands
             let inventory = world
-                .component_mut::<Inventory2Component>(hauler)
+                .component_mut::<InventoryComponent>(hauler)
                 .map_err(|_| HaulError::NoInventory)?;
 
             let count = inventory.remove_item(item);

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::ecs::{Entity, E};
-use crate::item::inventory2::HeldEntity;
+use crate::item::inventory::HeldEntity;
 
 // TODO equip slots will require a lot of integration with the body tree, so dont flesh out properly
 

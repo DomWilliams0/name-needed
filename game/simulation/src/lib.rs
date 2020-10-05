@@ -16,7 +16,7 @@ pub use crate::simulation::{Simulation, ThreadedWorldLoader};
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
 pub use ecs::ComponentWorld;
-pub use item::{BaseItemComponent, Container, Inventory2Component};
+pub use item::{BaseItemComponent, Container, InventoryComponent};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{Societies, SocietyComponent, SocietyHandle};

@@ -9,7 +9,7 @@ mod component;
 mod container;
 mod equip;
 
-pub use component::{FoundSlot, Inventory2Component};
+pub use component::{FoundSlot, InventoryComponent};
 pub use container::{Container, ContainerError};
 
 #[derive(Debug, Clone)]

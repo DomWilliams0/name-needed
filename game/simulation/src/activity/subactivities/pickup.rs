@@ -6,7 +6,7 @@ use crate::activity::activity::{ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
 use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::{HaulableItemComponent, Inventory2Component};
+use crate::item::{HaulableItemComponent, InventoryComponent};
 
 /// Pick up the given item. Blocks on pick up event.
 #[derive(Clone, Debug)]
@@ -34,7 +34,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         ctx.updates.queue("pick up item", move |world| {
             let do_pickup = || -> Result<(Entity, Entity), PickupItemError> {
                 let mut transforms = world.write_storage::<TransformComponent>();
-                let mut inventories = world.write_storage::<Inventory2Component>();
+                let mut inventories = world.write_storage::<InventoryComponent>();
                 let haulables = world.read_storage::<HaulableItemComponent>();
                 let physicals = world.read_storage::<PhysicalComponent>();
 

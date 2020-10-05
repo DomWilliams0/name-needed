@@ -4,7 +4,7 @@ use crate::activity::activity::{ActivityResult, Finish, SubActivity};
 use crate::activity::ActivityContext;
 use crate::ecs::{Entity, E};
 use crate::event::prelude::*;
-use crate::item::{FoundSlot, Inventory2Component, ItemFilter};
+use crate::item::{FoundSlot, InventoryComponent, ItemFilter};
 use crate::ComponentWorld;
 
 /// Equip the given item, given it's already somewhere in the holder's inventory
@@ -38,7 +38,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
 
         let inventory = ctx
             .world
-            .component::<Inventory2Component>(holder)
+            .component::<InventoryComponent>(holder)
             .map_err(|_| EquipItemError::NoInventory);
 
         // check if already equipped
@@ -55,7 +55,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
                 ctx.updates.queue("equip food", move |world| {
                     let do_equip = || -> Result<Entity, EquipItemError> {
                         let inventory = world
-                            .component_mut::<Inventory2Component>(holder)
+                            .component_mut::<InventoryComponent>(holder)
                             .map_err(|_| EquipItemError::NoInventory)?;
 
                         // TODO inventory operations should not be immediate

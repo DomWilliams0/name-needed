@@ -5,7 +5,7 @@ use world::WorldRef;
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::{BaseItemComponent, Inventory2Component, ItemFilter, ItemFilterable};
+use crate::item::{BaseItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
 use crate::spatial::Spatial;
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
@@ -82,7 +82,7 @@ impl ai::Input<AiContext> for AiInput {
 
 fn search_inventory_with_cache<'a>(
     blackboard: &mut AiBlackboard<'a>,
-    inventory: &'a Inventory2Component,
+    inventory: &'a InventoryComponent,
     filter: &ItemFilter,
 ) -> bool {
     let cache_entry = blackboard.inventory_search_cache.entry(*filter);

@@ -8,8 +8,8 @@ use unit::length::Length3;
 use unit::volume::Volume;
 
 use crate::ecs::*;
-use crate::item::inventory2::equip::EquipSlot;
-use crate::item::inventory2::{Container, HeldEntity};
+use crate::item::inventory::equip::EquipSlot;
+use crate::item::inventory::{Container, HeldEntity};
 use crate::item::{ItemFilter, ItemFilterable};
 use crate::TransformComponent;
 
@@ -18,7 +18,7 @@ use crate::TransformComponent;
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("inventory")]
-pub struct Inventory2Component {
+pub struct InventoryComponent {
     equip_slots: Vec<EquipSlot>,
     containers: Vec<Container>,
 }
@@ -39,11 +39,11 @@ pub enum FoundSlot<'a> {
     Container(usize, usize, PhantomData<&'a ()>),
 }
 
-pub struct FoundSlotMut<'a>(&'a mut Inventory2Component, FoundSlot<'a>);
+pub struct FoundSlotMut<'a>(&'a mut InventoryComponent, FoundSlot<'a>);
 
-impl Inventory2Component {
+impl InventoryComponent {
     pub fn new(equip_slots: usize) -> Self {
-        Inventory2Component {
+        InventoryComponent {
             equip_slots: repeat_with(|| EquipSlot::Empty).take(equip_slots).collect(),
             containers: Vec::new(),
         }
@@ -367,7 +367,7 @@ impl<'a> FoundSlotMut<'a> {
 impl<'a> FoundSlot<'a> {
     /// Panics if entity not found, if for example this is not the same inventory the slot was
     /// resolved in
-    pub fn get(self, inventory: &'a Inventory2Component) -> Entity {
+    pub fn get(self, inventory: &'a InventoryComponent) -> Entity {
         let entity = match self {
             FoundSlot::Equipped(i) => inventory.equip_slots.get(i).and_then(|e| e.ok()),
             FoundSlot::Container(i, j, _) => inventory
@@ -421,7 +421,7 @@ impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
-        builder.with(Inventory2Component::new(self.equip_slots))
+        builder.with(InventoryComponent::new(self.equip_slots))
     }
 }
 
