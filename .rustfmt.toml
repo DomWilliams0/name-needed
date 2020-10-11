@@ -1,1 +1,0 @@
-#ignore = ["simulation/src/lib.rs", "physics/bulletc-sys/src/bulletc.rs"]

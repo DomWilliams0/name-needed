@@ -20,43 +20,45 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
     <img src=".screenshots/procgen-basic.png"/>
 </p>
 
-* 07 Jun 2020: <em>A debugging UI with imgui as an experiment in game <--> UI communication.</em>
-<p style="margin: auto">
-    <img src=".screenshots/debug-ui.png"/>
-</p>
+*[Continued here](PROGRESS.md)*
 
-* 31 May 2020: <em>AI utility system choosing between wandering, going to find food, and eating held food. Utility values are graphed in a Grafana dashboard - the need for hunger increases over time and is satisfied by sprinting to food and eating, look at them go!</em>
-<p style="margin: auto">
-    <img src=".screenshots/ai-wander-graph.gif"/>
-</p>
+## Building and running
 
-* 10 May 2020: <em>Random wandering with path finding, powered by context steering</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/path-follow.gif"/>
-</p>
+The engine uses SDL2 and OpenGL, and is developed primarily on Linux, although it seems to work fine on Windows too.
 
-* 26 Apr 2020: <em>Simplified 2D graphics in a 3D world without physics</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/simple-2d.gif"/>
-</p>
+If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) features of SDL2 will download and compile it for you, which requires a C compiler.
 
-* 31 Dec 2019: <em>Entities choosing random blocks and path finding to them, facing their direction of travel - low frame rate is to reduce GIF size, it's actually buttery smooth</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/movement-with-rotation.gif"/>
-</p>
+I use the latest stable Rust toolchain and the newest fanciest language features, so no promises for a Minimal Supported Rust Version.
 
-* 07 Oct 2019: <em>Multiple chunks</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/multichunk.jpg"/>
-</p>
 
-* 05 Oct 2019: <em>Half steps and navmesh edge costs - blue edges are cheap walking flat/up a half step, and red edges are more expensive jumps</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/navmesh-halfsteps.jpg"/>
-</p>
+```
+$ git clone https://github.com/DomWilliams0/name-needed
 
-* 29 Sept 2019: <em>A basic navigation mesh superimposed on an epic 3D world</em>
-<p style="margin: auto; width: 80%">
-    <img src=".screenshots/navmesh.jpg"/>
-</p>
+$ cd name-needed/
 
+$ # optionally modify game config, see below
+
+$ cargo run --release
+```
+
+### Configuration
+
+The game config can be found in `resources/config.ron`. This contains settings for the game engine, world generation and entity spawning parameters.
+
+Entity definitions live in `resources/definitions/` and define the stats and capabilities of all entities, both living and inanimate.
+
+The environment variable `NN_LOG` configures logging, set it to one of `trace`, `debug`, `info` (default), `warning`, `error`, `critical`.
+
+
+### Usage
+
+*Note: the "game" is currently very much a demo and not very playable in the slightest. Abandon all expectations!*
+
+* <kbd>Esc</kbd> to exit (most importantly)
+* <kbd>R</kbd> to restart
+* <kbd>Left-click</kbd> to select an entity and view their stats in the debug menu
+	* Command them to go to or break a selected block via `Divine control`
+* <kbd>Right-click</kbd> to drag a selection over blocks in the world
+	* Command them to collaborate to break blocks via the `Society` menu
+	* Set and place blocks via the `Selection` menu
+* Move the camera sideways with <kbd>WASD</kbd>, and vertically with the <kbd>Arrow keys</kbd>
