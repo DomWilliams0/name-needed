@@ -23,6 +23,7 @@ os:
       # TODO windows and osx
 rust:
     - stable
+    - 1.46.0
     - nightly
 
 jobs:
@@ -34,7 +35,6 @@ script: |
         env &&
         export RUST_BACKTRACE=1 &&
         export NN_LOG=debug &&
-        cargo build --verbose --workspace &&
         cargo test --verbose --workspace &&
         cargo test --verbose -- --ignored &&
         cd renderer/main && cargo run --verbose --features lite --no-default-features -- --preset ci --dir ../../
