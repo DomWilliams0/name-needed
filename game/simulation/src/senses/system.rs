@@ -92,7 +92,7 @@ impl<'a> System<'a> for SensesSystem {
 
             spatial
                 .query_in_radius(transform.position, max_radius)
-                .filter(|(entity, _, _)| *entity != e) // dont sense yourself
+                .filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list
                 .for_each(|(entity, pos, dist)| {
                     let sensed = senses.senses(transform, &pos, dist);
                     if !sensed.is_empty() {

@@ -29,7 +29,6 @@ pub struct RawChunkTerrain {
     slabs: DoubleSidedVec<Slab>,
 }
 
-// #[cfg_attr(test, derive(Clone))]
 pub struct ChunkTerrain {
     raw_terrain: RawChunkTerrain,
     areas: HashMap<WorldArea, BlockGraph>,
@@ -1437,7 +1436,7 @@ mod tests {
     }
 
     fn occlusion(
-        world: &World,
+        world: &World<()>,
         chunk: ChunkPosition,
         block: (i32, i32, i32),
     ) -> [VertexOcclusion; 4] {
@@ -1482,7 +1481,7 @@ mod tests {
 
     #[test]
     fn lazy_occlusion_top_only() {
-        fn mk_chunks(block_off: bool) -> WorldRef {
+        fn mk_chunks(block_off: bool) -> WorldRef<()> {
             let a = ChunkBuilder::new()
                 .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), BlockType::Grass)
                 .build((-1, 0));
@@ -1640,7 +1639,7 @@ mod tests {
         let old = terrain.slabs.get(0).unwrap().clone(); // reference to force a cow clone
 
         let slab = terrain.slab_mut(SlabIndex(0)).unwrap();
-        slab.set_block_type((0, 0, 0).into(), BlockType::Stone);
+        slab.slice_mut(0).set_block((0, 0), BlockType::Stone);
 
         // old reference is "dangling", pointing to old
         let immut = terrain.slab(SlabIndex(0)).unwrap();

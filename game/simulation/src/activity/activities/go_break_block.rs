@@ -1,11 +1,13 @@
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{
+    ActivityEventContext, ActivityFinish, ActivityResult, SubActivity,
+};
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::{nop_subactivity, unexpected_event, ComponentWorld};
 use common::*;
 use unit::world::WorldPosition;
-use world::block::BlockType;
+
 use world::SearchGoal;
 
 #[derive(Debug)]
@@ -38,12 +40,12 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
                     None => {
                         // block no longer exists, sounds bad
                         trace!("block no longer exists??");
-                        ActivityResult::Finished(Finish::Interrupted)
+                        ActivityResult::Finished(ActivityFinish::Interrupted)
                     }
-                    Some(block) if block.block_type() == BlockType::Air => {
+                    Some(block) if block.is_destroyed() => {
                         // destroyed, congratulations on your efforts
                         trace!("block has been destroyed");
-                        ActivityResult::Finished(Finish::Success)
+                        ActivityResult::Finished(ActivityFinish::Success)
                     }
                     Some(_) => {
                         // there remains destruction to be done
@@ -90,7 +92,11 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
         }
     }
 
-    fn on_finish(&mut self, _: Finish, ctx: &mut ActivityContext<'_, W>) -> BoxedResult<()> {
+    fn on_finish(
+        &mut self,
+        _: ActivityFinish,
+        ctx: &mut ActivityContext<'_, W>,
+    ) -> BoxedResult<()> {
         ctx.clear_path();
         Ok(())
     }

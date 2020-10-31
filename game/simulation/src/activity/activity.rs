@@ -13,7 +13,7 @@ pub enum ActivityResult {
     Ongoing,
     /// `ctx.subscriptions` expected to be populated
     Blocked,
-    Finished(Finish),
+    Finished(ActivityFinish),
 }
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ pub enum EventUnsubscribeResult {
 }
 
 #[derive(Debug)]
-pub enum Finish {
+pub enum ActivityFinish {
     Success,
     Failure(Box<dyn Error>),
     Interrupted,
@@ -74,14 +74,18 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
         unreachable!("unexpected event {:?}", event);
     }
 
-    fn on_finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
+    fn on_finish(
+        &mut self,
+        finish: ActivityFinish,
+        ctx: &mut ActivityContext<W>,
+    ) -> BoxedResult<()>;
 
     // ---
     fn current_subactivity(&self) -> &dyn SubActivity<W>;
 
     /// Calls on_finish on both activity and sub activity
-    fn finish(&mut self, finish: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
-        let a = self.current_subactivity().on_finish(ctx);
+    fn finish(&mut self, finish: ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+        let a = self.current_subactivity().on_finish(&finish, ctx);
         let b = self.on_finish(finish, ctx);
 
         match (a, b) {
@@ -98,7 +102,7 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
 
 pub trait SubActivity<W: ComponentWorld>: Display {
     fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult;
-    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
+    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
 
     fn exertion(&self) -> f32;
 }
@@ -124,15 +128,15 @@ impl<'a, W: ComponentWorld> ActivityContext<'a, W> {
 
 impl ActivityResult {
     pub fn errored<E: Error + 'static>(err: E) -> Self {
-        Self::Finished(Finish::Failure(Box::new(err)))
+        Self::Finished(ActivityFinish::Failure(Box::new(err)))
     }
 }
 
 impl From<BoxedResult<()>> for ActivityResult {
     fn from(res: BoxedResult<()>) -> Self {
         let finish = match res {
-            Ok(_) => Finish::Success,
-            Err(err) => Finish::Failure(err),
+            Ok(_) => ActivityFinish::Success,
+            Err(err) => ActivityFinish::Failure(err),
         };
 
         Self::Finished(finish)

@@ -2,13 +2,16 @@ use common::*;
 use unit::world::WorldPoint;
 use world::NavigationError;
 
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{
+    ActivityEventContext, ActivityFinish, ActivityResult, SubActivity,
+};
 use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
 use crate::activity::{
     Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult, PickupItemError,
 };
 use crate::ecs::{Entity, E};
 use crate::event::prelude::*;
+use crate::item::HauledItemComponent;
 use crate::{nop_subactivity, unexpected_event};
 use crate::{ComponentWorld, TransformComponent};
 use std::borrow::Cow;
@@ -35,7 +38,7 @@ enum BestItem {
         item: Entity,
         pos: WorldPoint,
     },
-    NoneLeft(Finish),
+    NoneLeft(ActivityFinish),
 }
 
 #[derive(Debug)]
@@ -48,7 +51,7 @@ enum PickupFailure {
 impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
         if self.complete {
-            return ActivityResult::Finished(Finish::Success);
+            return ActivityResult::Finished(ActivityFinish::Success);
         }
 
         // try to update state
@@ -137,11 +140,9 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
             EntityEventPayload::PickedUp(result) => {
                 // our item has been picked up, who was it?
                 match (&self.state, result) {
-                    (PickupItemsState::PickingUp(pickup), Ok((item, picker_upper)))
+                    (PickupItemsState::PickingUp(_), Ok(picker_upper))
                         if *picker_upper == ctx.subscriber =>
                     {
-                        debug_assert_eq!(*item, pickup.0);
-
                         // oh hey it was us, pickup complete!
                         trace!("completed pick up");
                         self.complete = true;
@@ -174,7 +175,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         }
     }
 
-    fn on_finish(&mut self, _: Finish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         ctx.clear_path();
         Ok(())
     }
@@ -221,20 +222,22 @@ impl PickupItemsActivity {
 
         // choose the best item that still exists
         let new_best_index = self.items.iter().rposition(|(item, known_pos)| {
-            match world
-                .component::<TransformComponent>(*item)
-                .ok()
-                .and_then(|transform| {
-                    // still got a transform
+            let transform = world.component::<TransformComponent>(*item).ok();
+            let being_hauled = world.has_component::<HauledItemComponent>(*item);
+
+            if !being_hauled {
+                // dont consider items being hauled currently
+
+                if let Some(transform) = transform {
                     let pos = transform.accessible_position();
-                    voxel_world.area(pos).ok().map(|a| (pos, a))
-                }) {
-                Some((current_pos, _)) if current_pos == known_pos.floor() => {
-                    // this item is good to path find to and still in the same place we expect
-                    true
+                    if pos == known_pos.floor() && voxel_world.area(pos).ok().is_some() {
+                        // this item is good to path find to and still in the same place we expect
+                        return true;
+                    }
                 }
-                _ => false, // move onto next item because this one is not accessible anymore
             }
+            // move onto next item because this one is not accessible anymore
+            false
         });
 
         match (new_best_index, err) {
@@ -254,9 +257,9 @@ impl PickupItemsActivity {
                     PickupFailure::Other => Box::new(PickupItemError::NotAvailable),
                 };
 
-                BestItem::NoneLeft(Finish::Failure(err))
+                BestItem::NoneLeft(ActivityFinish::Failure(err))
             }
-            (None, None) => BestItem::NoneLeft(Finish::Success),
+            (None, None) => BestItem::NoneLeft(ActivityFinish::Success),
         }
     }
 }

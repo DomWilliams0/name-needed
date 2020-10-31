@@ -188,7 +188,10 @@ impl EntityEventQueue {
                 }
             }
         }
-        self.unsubscribers = unsubs;
+        std::mem::swap(&mut unsubs, &mut self.unsubscribers);
+        debug_assert!(unsubs.is_empty());
+        std::mem::forget(unsubs);
+
         self.events.clear();
 
         self.maintain()
@@ -311,7 +314,7 @@ mod tests {
 
     fn make_entities() -> (Entity, Entity) {
         {
-            let mut w = EcsWorld::new();
+            let w = EcsWorld::new();
             let a = w.create_entity().build();
             let b = w.create_entity().build();
             (a, b)

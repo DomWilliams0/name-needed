@@ -39,10 +39,8 @@ pub struct TransformComponent {
 pub struct PhysicalComponent {
     pub volume: Volume,
 
-    /// Bounding dimensions around the centre
-    ///
-    /// TODO clarify in uses and definition that this isn't really half dims! ridiculous
-    pub half_dimensions: Length3,
+    /// Bounding dimensions, not positioned around centre
+    pub size: Length3,
 }
 
 impl TransformComponent {
@@ -113,24 +111,24 @@ impl TransformComponent {
     pub fn forwards(&self) -> Vector2 {
         self.rotation.rotate_vector(AXIS_FWD_2)
     }
+
+    pub fn rotate_to(&mut self, angle: Rad) {
+        self.rotation = Basis2::from_angle(angle);
+    }
 }
 
 impl PhysicalComponent {
-    pub fn new(volume: Volume, half_dimensions: Length3) -> Self {
-        PhysicalComponent {
-            volume,
-            half_dimensions,
-        }
+    pub fn new(volume: Volume, size: Length3) -> Self {
+        PhysicalComponent { volume, size }
     }
 
-    /// Max x/y dimension
-    pub fn bounding_radius(&self) -> Length {
-        self.half_dimensions.x().max(self.half_dimensions.y())
+    pub fn max_dimension(&self) -> Length {
+        self.size.x().max(self.size.y())
     }
 }
 
 #[derive(Deserialize)]
-struct HalfDims {
+struct Size {
     x: u16,
     y: u16,
     z: u16,
@@ -138,7 +136,7 @@ struct HalfDims {
 
 #[derive(Debug)]
 pub struct PhysicalComponentTemplate {
-    half_dims: Length3,
+    size: Length3,
     volume: Volume,
 }
 impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
@@ -147,10 +145,10 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
         Self: Sized,
     {
         let volume = values.get_int("volume")?;
-        let half_dims: HalfDims = values.get("half_dims")?.into_type()?;
+        let size: Size = values.get("size")?.into_type()?;
         Ok(Box::new(Self {
             volume: Volume::new(volume),
-            half_dims: Length3::new(half_dims.x, half_dims.y, half_dims.z),
+            size: Length3::new(size.x, size.y, size.z),
         }))
     }
 
@@ -161,7 +159,7 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
         builder
             .with(TransformComponent::new(pos))
             .with(PhysicsComponent::default())
-            .with(PhysicalComponent::new(self.volume, self.half_dims))
+            .with(PhysicalComponent::new(self.volume, self.size))
     }
 }
 

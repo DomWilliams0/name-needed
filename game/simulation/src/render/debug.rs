@@ -1,12 +1,11 @@
 use crate::ecs::EcsWorld;
-use crate::Renderer;
+use crate::{InnerWorldRef, Renderer, WorldViewer};
 use color::ColorRgb;
 use common::*;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::ops::DerefMut;
 use unit::world::WorldPoint;
-use world::{InnerWorldRef, WorldViewer};
 
 pub trait DebugRenderer<R: Renderer> {
     fn identifier(&self) -> &'static str;

@@ -11,7 +11,7 @@ pub struct Proportion<T> {
 
 impl<T> Proportion<T>
 where
-    T: Unsigned + Copy + AsPrimitive<f32> + NumCast + PartialOrd<T> + Saturating,
+    T: Unsigned + Copy + AsPrimitive<f32> + NumCast + PartialOrd<T> + Saturating + Debug,
 {
     pub fn with_value(value: T, max: T) -> Self {
         let value = clamp_max(value, max);
@@ -30,11 +30,19 @@ where
     }
 
     pub fn proportion(&self) -> f32 {
+        debug_assert!(
+            self.max != T::zero() || self.value != T::zero(),
+            "proportion is 0/0??"
+        );
         self.value.as_() / self.max.as_()
     }
 
     fn value_from_proportion(f: f32, max: T) -> T {
         T::from(f * max.as_()).unwrap()
+    }
+
+    pub fn value(&self) -> T {
+        self.value
     }
 }
 

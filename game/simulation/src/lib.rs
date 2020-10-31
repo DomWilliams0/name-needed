@@ -4,22 +4,30 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        BlockForAllError, GeneratedTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
+        BlockForAllError, GeneratedTerrainSource, TerrainUpdatesRes, ThreadedWorkerPool,
+        WorkerPool, WorldLoader, WorldTerrainUpdate,
     },
-    presets, BaseVertex, SliceRange, WorldRef, WorldViewer,
+    presets, BaseVertex, SliceRange,
 };
+
+// Rexports for specialised world types
+pub type WorldRef = world::WorldRef<simulation::AssociatedBlockData>;
+pub type World = world::World<simulation::AssociatedBlockData>;
+pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::AssociatedBlockData>;
+pub type WorldViewer = world::WorldViewer<simulation::AssociatedBlockData>;
 
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
-pub use crate::simulation::{Simulation, ThreadedWorldLoader};
+pub use crate::simulation::{AssociatedBlockData, Simulation, ThreadedWorldLoader};
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
-pub use ecs::ComponentWorld;
-pub use item::{BaseItemComponent, Container, InventoryComponent};
+pub use ecs::{ComponentWorld, E};
+pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
-pub use society::{Societies, SocietyComponent, SocietyHandle};
+pub use society::{job, Societies, SocietyComponent, SocietyHandle};
+pub use unit::world::WorldPositionRange;
 
 pub const TICKS_PER_SECOND: usize = 20;
 

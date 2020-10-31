@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -43,9 +44,7 @@ pub enum WorldPreset {
 #[derive(Deserialize)]
 pub struct Simulation {
     pub random_seed: Option<u64>,
-    pub human_count: usize,
-    pub dog_count: usize,
     pub friction: f32,
     pub start_delay: u32,
-    pub food_count: usize,
+    pub spawn_counts: HashMap<String, usize>,
 }

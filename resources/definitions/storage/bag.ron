@@ -1,0 +1,17 @@
+[
+  (
+    uid: "core_storage_backpack",
+    components: [
+      {"name": (
+        name: "Backpack",
+      )},
+      {"haulable": (
+        extra_hands: 0,
+      )},
+      {"container": (
+        size: (10, 10, 20),
+        volume: 100,
+      )},
+    ],
+  ),
+]

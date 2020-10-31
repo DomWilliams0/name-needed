@@ -32,7 +32,11 @@ impl QueuedUpdates {
     ) {
         // TODO pool/reuse these boxes
         let update = Box::new(update);
-        self.updates.borrow_mut().push((name, update))
+        let mut updates = self.updates.borrow_mut();
+        let old_len = updates.len();
+        updates.push((name, update));
+
+        trace!("queued update #{n} for next tick", n = old_len; "name" => name)
     }
 
     pub fn execute(&mut self, world: &mut EcsWorld) {

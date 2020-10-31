@@ -21,7 +21,10 @@ pub trait BaseVertex: Copy + Debug {
     fn new(pos: (f32, f32, f32), color: ColorRgb) -> Self;
 }
 
-pub fn make_simple_render_mesh<V: BaseVertex>(chunk: &Chunk, slice_range: SliceRange) -> Vec<V> {
+pub fn make_simple_render_mesh<V: BaseVertex, D>(
+    chunk: &Chunk<D>,
+    slice_range: SliceRange,
+) -> Vec<V> {
     let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first
 
     let shifted_slice_index = |slice_index: GlobalSliceIndex| {

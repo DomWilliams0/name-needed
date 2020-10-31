@@ -20,6 +20,7 @@ pub type SpecsWorld = specs::World;
 mod component;
 mod template;
 mod world;
+mod world_ext;
 
 pub struct E(pub Entity);
 

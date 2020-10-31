@@ -23,7 +23,6 @@ os:
       # TODO windows and osx
 rust:
     - stable
-    - 1.46.0
     - nightly
 
 jobs:

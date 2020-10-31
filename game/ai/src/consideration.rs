@@ -51,8 +51,15 @@ impl ConsiderationParameter {
 
 #[derive(Clone)]
 pub enum Curve {
+    /// x
     Identity,
+
+    /// ax + b
+    ///
+    /// (mx+c)
     Linear(f32, f32),
+
+    /// (ax^2 + bx + c)
     Quadratic(f32, f32, f32),
 
     /// d(a^(bx+c)) + e

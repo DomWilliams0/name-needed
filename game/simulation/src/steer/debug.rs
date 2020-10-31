@@ -1,9 +1,8 @@
 use color::ColorRgb;
-use world::{InnerWorldRef, WorldViewer};
 
 use crate::ecs::*;
 use crate::render::DebugRenderer;
-use crate::{Renderer, TransformComponent};
+use crate::{InnerWorldRef, Renderer, TransformComponent, WorldViewer};
 
 pub struct SteeringDebugRenderer;
 

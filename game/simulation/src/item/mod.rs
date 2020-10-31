@@ -1,12 +1,20 @@
-pub use component::{BaseItemComponent, EdibleItemComponent, ThrowableItemComponent};
+pub use self::inventory::{
+    Container, ContainerComponent, ContainerError, ContainerResolver, FoundSlot, InventoryComponent,
+};
+pub use component::{
+    ConditionComponent, EdibleItemComponent, NameComponent, ThrowableItemComponent,
+};
 pub use condition::{ItemCondition, ItemConditionGrade};
+pub use containers::ContainedInComponent;
 pub use filter::{ItemFilter, ItemFilterable};
-pub use haul::{HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent};
-pub use self::inventory::{Container, FoundSlot, InventoryComponent};
+pub use haul::{
+    EndHaulBehaviour, HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent,
+};
 pub use pickup::ItemsToPickUp;
 
 mod component;
 mod condition;
+mod containers;
 mod filter;
 mod haul;
 mod inventory;

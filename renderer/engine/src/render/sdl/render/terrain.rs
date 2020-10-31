@@ -115,4 +115,8 @@ impl TerrainRenderer {
 
         trace!("rendered {count} visible chunks", count = count);
     }
+
+    pub fn reset(&mut self) {
+        self.chunk_meshes.clear();
+    }
 }

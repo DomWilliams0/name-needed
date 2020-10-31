@@ -2,6 +2,7 @@ pub use self::world::BreakBlockDse;
 use ai::{AiBox, Dse};
 pub use dev::ObeyDivineCommandDse;
 pub use food::{EatHeldFoodDse, FindLocalFoodDse};
+pub use haul::HaulDse;
 pub use movement::WanderDse;
 
 use crate::ai::AiContext;
@@ -9,6 +10,7 @@ use crate::dse;
 
 mod dev;
 mod food;
+mod haul;
 mod movement;
 mod world;
 

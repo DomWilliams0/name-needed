@@ -1,4 +1,4 @@
-# TODOs (212)
+# TODOs (224)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -25,13 +25,15 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (7)
+ * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
-   * `// TODO pass current position of item, store in Start state`
+   * `// TODO events for items entering/exiting containers`
    * `// TODO arrival radius depends on the size of the item`
    * `// TODO could the item ever move while we're going to it? only by gravity?`
+   * `// TODO don't always drop item in centre`
+   * `// TODO explicit access side for container, e.g. front of chest`
    * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
  * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (2)
    * `// TODO detect other destructive events e.g. entity removal`
@@ -49,8 +51,8 @@
    * `// TODO better exertion calculation for movement speed`
    * `// TODO use movement speed enum for display e.g. wandering to, running to`
  * [game/simulation/src/activity/subactivities/haul.rs](game/simulation/src/activity/subactivities/haul.rs) (4)
-   * `// TODO move this check to the DSE, doing it here only saves 1 tick`
    * `// TODO apply slowness effect to holder`
+   * `// TODO subscribe to container being destroyed`
    * `// TODO remove slowness effect if any`
    * `// TODO depends on the weight of the item(s)`
  * [game/simulation/src/activity/subactivities/item_eat.rs](game/simulation/src/activity/subactivities/item_eat.rs) (1)
@@ -59,19 +61,21 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
- * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (1)
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
+   * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
+ * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (1)
+   * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO old results are a subset of new results, should reuse`
-   * `// TODO arena allocated vec return value`
    * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
@@ -82,6 +86,8 @@
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations?`
    * `// TODO fix (eventually) false assumption that all stream DSEs come from a society`
+ * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
+   * `// TODO avoid box by resolving here and storing result`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
    * `// TODO remove abstract definitions`
  * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)
@@ -98,13 +104,14 @@
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
-   * `// TODO just use a dyn Job instead of redefining jobs as an identical enum?`
+ * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
+   * `/// TODO this can probably just hold the world and have some helper functions`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
+   * `// TODO smol string`
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
@@ -113,19 +120,21 @@
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
  * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
-   * `// TODO filters on item fields e.g. mass, slots, etc`
+   * `// TODO filters on other fields e.g. mass, size, condition, etc`
  * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (5)
    * `// TODO multiple people sharing a haul`
    * `// TODO cart/wagon/vehicle`
    * `// TODO carry vs drag`
    * `// TODO this is awful and should be generalised to a part of the physics system e.g. relative positioned entity`
    * `// TODO position at the correct arm(s) location`
- * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (5)
-   * `// TODO debug inventory validation`
+ * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (7)
+   * `// TODO owner should be handled in the same way as communal i.e. mirror state elsewhere`
    * `/// TODO it's possible some hands have been freed up while returning false anyway`
    * `// TODO loop along all held items rather than only checking the first`
    * `// TODO configurable drop equipped items to make space instead of failing`
    * `// TODO possibly add search cache keyed by entity, if there are many repeated searches for the same entity`
+   * `// TODO impl this when a scenario is found to hit this code path :^)`
+   * `// TODO this is the same as is used by PhysicalComponent`
  * [game/simulation/src/item/inventory/container.rs](game/simulation/src/item/inventory/container.rs) (1)
    * `// TODO sort by some item type identifier so common items are grouped together`
  * [game/simulation/src/item/inventory/equip.rs](game/simulation/src/item/inventory/equip.rs) (1)
@@ -164,21 +173,29 @@
    * `// TODO physical shape wastes so much space`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
    * `// TODO this is really expensive`
- * [game/simulation/src/senses/system.rs](game/simulation/src/senses/system.rs) (4)
+ * [game/simulation/src/senses/system.rs](game/simulation/src/senses/system.rs) (5)
    * `/// TODO maybe the ecs bitmask can be reused here instead of a huge alloc per entity`
    * `// TODO system is expensive, dont run every tick`
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
+   * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (3)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `// TODO per tick alloc/reuse buf`
- * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (1)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
+   * `// TODO return a dyn error in result`
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
+   * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
+ * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
+   * `// TODO use dynstack instead of boxes for society jobs`
    * `// TODO reuse allocation`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
-   * `// TODO HaulBlocks(block type, near position)`
+   * `// TODO dont recalculate all unreserved tasks every tick for every entity`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (2)
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross, use dynstack for dses`
+ * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
+   * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
    * `// TODO reimplement with octree`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
@@ -186,11 +203,11 @@
    * `// TODO follow gradients and choose continuous value`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
- * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (2)
+ * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (1)
    * `// TODO use newtype units for ingame non-SI units`
-   * `/// TODO clarify in uses and definition that this isn't really half dims! ridiculous`
- * [game/world/src/block.rs](game/world/src/block.rs) (2)
+ * [game/world/src/block.rs](game/world/src/block.rs) (3)
    * `// TODO store sparse block data in the slab instead of inline in the block`
+   * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
  * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
    * `// TODO still does a lot of unnecessary initialization`

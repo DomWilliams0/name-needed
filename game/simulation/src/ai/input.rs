@@ -1,11 +1,11 @@
+use crate::{ConditionComponent, WorldRef};
 use ai::Context;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
-use world::WorldRef;
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::{BaseItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
+use crate::item::{HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
 use crate::spatial::Spatial;
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
@@ -18,6 +18,12 @@ pub enum AiInput {
     /// Switch, 1=has at least 1 matching filter, 0=none
     HasInInventory(ItemFilter),
 
+    /// Has n extra hands available for hauling the given entity. 1 if already hauling
+    HasExtraHandsForHauling(u16, Entity),
+
+    /// Switch, 0=item is unusable e.g. being hauled, 1=usable immediately
+    CanUseHeldItem(ItemFilter),
+
     // TODO HasInInventoryGraded - returns number,quality of matches
     CanFindLocally {
         filter: ItemFilter,
@@ -27,6 +33,7 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
+    /// Distance squared to given pos. Can't be WorldPoint because needs to be Hash
     MyDistance2To(WorldPosition),
 
     BlockTypeMatches(WorldPosition, BlockTypeMatch),
@@ -74,6 +81,51 @@ impl ai::Input<AiContext> for AiInput {
                     1.0
                 } else {
                     0.0
+                }
+            }
+            AiInput::HasExtraHandsForHauling(n, e) => {
+                if blackboard
+                    .world
+                    .component::<HauledItemComponent>(*e)
+                    .map(|comp| comp.hauler == blackboard.entity)
+                    .unwrap_or(false)
+                {
+                    // already being hauled by this entity
+                    return 1.0;
+                }
+
+                let can_haul = blackboard
+                    .world
+                    .component::<InventoryComponent>(blackboard.entity)
+                    .ok()
+                    .map(|inv| inv.has_hauling_slots(*n))
+                    .unwrap_or(false);
+
+                if can_haul {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            AiInput::CanUseHeldItem(filter) => {
+                match blackboard.inventory_search_cache.get(filter) {
+                    Some(found) => {
+                        // resolve found item entity
+                        let inventory = blackboard.inventory.expect("item was already found");
+                        let item = found.get(inventory, blackboard.world);
+
+                        // check if being hauled
+                        let is_hauled = blackboard.world.has_component::<HauledItemComponent>(item);
+
+                        if !is_hauled {
+                            // fully usable
+                            1.0
+                        } else {
+                            // unusable
+                            0.0
+                        }
+                    }
+                    None => 0.0,
                 }
             }
         }
@@ -173,6 +225,7 @@ fn search_local_area_with_cache(
     }
 }
 
+/// Searches for entities with a `ConditionComponent` only
 fn search_local_area(
     self_position: WorldPosition,
     world: &EcsWorld,
@@ -181,9 +234,7 @@ fn search_local_area(
     max_radius: f32,
     output: &mut LocalAreaSearch,
 ) {
-    // TODO arena allocated vec return value
-
-    let items = world.read_storage::<BaseItemComponent>();
+    let conditions = world.read_storage::<ConditionComponent>();
 
     let voxel_world_ref = &*world.read_resource::<WorldRef>();
     let voxel_world = voxel_world_ref.borrow();
@@ -202,7 +253,7 @@ fn search_local_area(
     let results = spatial
         .query_in_radius(self_position.centred(), max_radius)
         .filter_map(|(entity, pos, dist)| {
-            let item = items.get(entity)?;
+            let condition = conditions.get(entity)?;
 
             // check item filter matches
             (entity, Some(world)).matches(*filter).as_option()?;
@@ -229,7 +280,7 @@ fn search_local_area(
                     .or_insert_with(|| voxel_world.area_path_exists(self_area, item_area));
             }
 
-            reachable.as_some((entity, pos, dist, item.condition.value()))
+            reachable.as_some((entity, pos, dist, condition.0.value()))
         });
 
     output.extend(results);
@@ -255,6 +306,10 @@ impl Display for AiInput {
 
             // TODO lowercase BlockType
             AiInput::BlockTypeMatches(pos, bt_match) => write!(f, "{} at {}", bt_match, pos),
+            AiInput::HasExtraHandsForHauling(n, _) => {
+                write!(f, "Has {} extra hands for hauling", *n)
+            }
+            AiInput::CanUseHeldItem(filter) => write!(f, "Can use held item matching {}", filter),
         }
     }
 }

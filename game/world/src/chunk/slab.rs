@@ -3,9 +3,9 @@ use std::ops::Deref;
 
 use common::Itertools;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{LocalSliceIndex, SlabIndex, SlabPosition, SliceBlock, SLAB_SIZE};
+use unit::world::{LocalSliceIndex, SlabIndex, SLAB_SIZE};
 
-use crate::block::{Block, BlockType};
+use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::{
     grid::{Grid, GridImpl},
@@ -96,11 +96,6 @@ impl Slab {
         let last = above.map(|slab| SliceSource::AboveSlab(slab.slice(LocalSliceIndex::bottom())));
 
         once(first).chain(middle).chain(once(last)).tuple_windows()
-    }
-
-    pub(crate) fn set_block_type(&mut self, pos: SlabPosition, block_type: BlockType) {
-        let slice_block = SliceBlock::from(pos);
-        *self.slice_mut(pos.z())[slice_block].block_type_mut() = block_type;
     }
 }
 

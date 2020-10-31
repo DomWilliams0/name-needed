@@ -6,7 +6,9 @@ use common::*;
 use crate::ecs::{ComponentRegistry, SpecsWorld, E};
 use crate::event::{EntityEvent, EntityEventQueue};
 
-use ::world::WorldRef;
+use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
+use crate::item::{ContainerComponent, ContainerResolver};
+use crate::{definitions, WorldRef};
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::ops::{Deref, DerefMut};
@@ -35,7 +37,7 @@ pub enum ComponentGetError {
     NoSuchComponent(Entity, &'static str),
 }
 
-pub trait ComponentWorld {
+pub trait ComponentWorld: ContainerResolver + Sized {
     #[cfg(test)]
     fn test_new() -> Self;
 
@@ -57,7 +59,16 @@ pub trait ComponentWorld {
     fn remove_lazy<T: Component>(&self, entity: Entity);
 
     fn voxel_world(&self) -> WorldRef;
-    fn create_entity(&mut self) -> EntityBuilder;
+
+    fn build_entity(
+        &mut self,
+        definition_uid: &str,
+    ) -> Result<DefinitionBuilder<Self>, DefinitionErrorKind>;
+
+    /// From specs:
+    /// > You have to make sure that no component storage is borrowed during the building!
+    fn create_entity(&self) -> EntityBuilder;
+
     fn kill_entity(&self, entity: Entity);
     fn is_entity_alive(&self, entity: Entity) -> bool;
 
@@ -73,6 +84,16 @@ pub trait ComponentWorld {
     fn post_event(&mut self, event: EntityEvent) {
         let queue = self.resource_mut::<EntityEventQueue>();
         queue.post(event)
+    }
+}
+
+impl<W: ComponentWorld> ContainerResolver for W {
+    fn container(&self, e: Entity) -> Option<&ContainerComponent> {
+        self.component(e).ok()
+    }
+
+    fn container_mut(&self, e: Entity) -> Option<&mut ContainerComponent> {
+        self.component_mut(e).ok()
     }
 }
 
@@ -181,8 +202,16 @@ impl ComponentWorld for EcsWorld {
         (*self.read_resource::<WorldRef>()).clone()
     }
 
-    fn create_entity(&mut self) -> EntityBuilder {
-        WorldExt::create_entity(&mut self.world)
+    fn build_entity(
+        &mut self,
+        definition_uid: &str,
+    ) -> Result<DefinitionBuilder<Self>, DefinitionErrorKind> {
+        let definitions = self.resource::<definitions::Registry>();
+        definitions.instantiate(&*definition_uid, self)
+    }
+
+    fn create_entity(&self) -> EntityBuilder {
+        WorldExt::create_entity_unchecked(&self.world)
     }
 
     fn kill_entity(&self, entity: Entity) {

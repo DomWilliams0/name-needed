@@ -3,8 +3,8 @@ use crate::ecs::*;
 use crate::item::HauledItemComponent;
 use crate::transform::PhysicalComponent;
 use crate::TransformComponent;
+use crate::WorldRef;
 use common::*;
-use world::WorldRef;
 
 const STOP_LIMIT: f32 = 0.01;
 const FALL_SLOWDOWN: f32 = 0.5;
@@ -74,7 +74,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 }
             }
 
-            let bounds = transform.bounds(physical.bounding_radius().metres());
+            let bounds = transform.bounds(physical.max_dimension().metres() / 2.0);
 
             // resolve vertical collision i.e. step up
             if !bounds.check(&*world).is_all_air() {

@@ -305,6 +305,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
     fn end(mut self) -> Self::Persistent {
         self.sim_input_events.clear();
+        self.renderer.reset();
         self.backend
     }
 }

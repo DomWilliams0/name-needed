@@ -76,7 +76,7 @@ pub fn one_chunk_wonder() -> MemoryTerrainSource {
 
             // step up from slice 0
             for y in 2..half - 2 {
-                s.set_block((half - 1, y), BlockType::Stone)
+                s.set_block((half - 1, y), BlockType::Stone);
             }
         })
         .with_slice(2, |mut s| {
@@ -88,7 +88,7 @@ pub fn one_chunk_wonder() -> MemoryTerrainSource {
             }
 
             // step up from slice 1
-            s.set_block((half + 3, half), BlockType::Dirt)
+            s.set_block((half + 3, half), BlockType::Dirt);
         })
         .apply(|s| {
             // stairs

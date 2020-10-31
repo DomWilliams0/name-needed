@@ -38,7 +38,9 @@ mod action_to_activity {
                 AiAction::Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }
-                AiAction::Haul(e, target) => activity!(HaulActivity::new(e, target)),
+                AiAction::Haul(thing, source, target) => {
+                    activity!(HaulActivity::new(thing, source, target))
+                }
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
             }
         }

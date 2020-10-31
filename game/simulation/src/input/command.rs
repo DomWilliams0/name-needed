@@ -1,19 +1,28 @@
-use crate::SocietyHandle;
-use unit::world::{WorldPosition, WorldPositionRange};
+use unit::world::WorldPosition;
 use world::block::BlockType;
+
+use crate::ecs::Entity;
+use crate::society::job::SocietyCommand;
+use crate::SocietyHandle;
 
 /// Command from the player through the UI
 pub enum UiCommand {
-    ToggleDebugRenderer { ident: &'static str, enabled: bool },
-    FillSelectedTiles(BlockPlacement, BlockType),
-    IssueDivineCommand(DivineInputCommand),
-    IssueSocietyCommand(SocietyHandle, SocietyInputCommand),
-}
+    ToggleDebugRenderer {
+        ident: &'static str,
+        enabled: bool,
+    },
 
-// TODO just use a dyn Job instead of redefining jobs as an identical enum?
-#[derive(Debug)]
-pub enum SocietyInputCommand {
-    BreakBlocks(WorldPositionRange),
+    FillSelectedTiles(BlockPlacement, BlockType),
+
+    IssueDivineCommand(DivineInputCommand),
+
+    IssueSocietyCommand(SocietyHandle, SocietyCommand),
+
+    SetContainerOwnership {
+        container: Entity,
+        owner: Option<Option<Entity>>,
+        communal: Option<Option<SocietyHandle>>,
+    },
 }
 
 #[derive(Debug)]

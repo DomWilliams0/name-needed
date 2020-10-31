@@ -1,10 +1,12 @@
 use std::collections::HashSet;
+use std::iter::once;
 
+use common::derive_more::Constructor;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
-    WorldPosition, WorldPositionRange, WorldRange,
+    BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SlabPosition, SliceBlock,
+    SliceIndex, WorldPosition, WorldPositionRange, WorldRange,
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
@@ -16,16 +18,22 @@ use crate::navigation::{
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
-use std::iter::once;
 
-// #[cfg_attr(test, derive(Clone))]
-pub struct World {
-    chunks: Vec<Chunk>,
+/// All mutable world changes must go through `apply_terrain_updates`
+pub struct World<D> {
+    chunks: Vec<Chunk<D>>,
     area_graph: AreaGraph,
     dirty_chunks: HashSet<ChunkPosition>,
 }
 
-impl Default for World {
+#[derive(Constructor)]
+pub struct WorldChangeEvent {
+    pub pos: WorldPosition,
+    pub prev: BlockType,
+    pub new: BlockType,
+}
+
+impl<D> Default for World<D> {
     fn default() -> Self {
         Self::empty()
     }
@@ -47,8 +55,10 @@ pub enum RandomWalkableBlock {
     Local { from: WorldPosition, radius: u16 },
 }
 
-impl World {
+impl<D> World<D> {
     pub fn empty() -> Self {
+        fn nop_callback(_: WorldPosition, _: BlockType, _: BlockType) {}
+
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
@@ -56,7 +66,7 @@ impl World {
         }
     }
 
-    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk> {
+    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk<D>> {
         self.chunks.iter()
     }
 
@@ -88,12 +98,12 @@ impl World {
         self.find_chunk_index(chunk_pos).is_some()
     }
 
-    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk> {
+    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk<D>> {
         self.find_chunk_index(chunk_pos)
             .map(|idx| &self.chunks[idx])
     }
 
-    pub fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkPosition) -> Option<&mut Chunk> {
+    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkPosition) -> Option<&mut Chunk<D>> {
         self.find_chunk_index(chunk_pos)
             .map(move |idx| &mut self.chunks[idx])
     }
@@ -237,6 +247,15 @@ impl World {
         Ok(WorldPath::new(full_path, real_target))
     }
 
+    /// Cheap check if an area path exists between the areas of the 2 blocks
+    pub fn path_exists(&self, from: WorldPosition, to: WorldPosition) -> bool {
+        self.area(from)
+            .ok()
+            .and_then(|from| self.area(to).ok().map(|to| (from, to)))
+            .map(|(from, to)| self.area_path_exists(from, to))
+            .unwrap_or(false)
+    }
+
     /// Cheap check if an path exists between the 2 areas
     pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
         self.area_graph.path_exists(from, to)
@@ -263,7 +282,7 @@ impl World {
 
     pub(crate) fn add_loaded_chunk(
         &mut self,
-        chunk: Chunk,
+        chunk: Chunk<D>,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
     ) {
         let chunk_pos = chunk.pos();
@@ -273,8 +292,11 @@ impl World {
             // swap out the chunk inline, no need to push it or resort the vec
             // safety: idx returned by find_chunk_index
             let (old_chunk, new_chunk) = unsafe {
-                let old_chunk = std::mem::replace(self.chunks.get_unchecked_mut(idx), chunk);
+                let mut old_chunk = std::mem::replace(self.chunks.get_unchecked_mut(idx), chunk);
                 let new_chunk = self.chunks.get_unchecked_mut(idx);
+
+                old_chunk.swap_with(new_chunk);
+
                 (old_chunk, new_chunk)
             };
 
@@ -330,11 +352,14 @@ impl World {
         }
     }
 
+    /// Entrypoint for all world changes. Note changes are not immediate, but queued to the loader
+    /// thread pool.
     /// Panics if chunk is not found - check it exists with `world.has_chunk` first
     pub fn apply_terrain_updates(
         &self,
         chunk_pos: ChunkPosition,
         updates: impl Iterator<Item = (SlabIndex, SlabTerrainUpdate)>,
+        changes_out: &mut Vec<WorldChangeEvent>,
     ) -> RawChunkTerrain {
         let chunk = self
             .find_chunk_with_pos(chunk_pos)
@@ -348,11 +373,11 @@ impl World {
         //     "slab updates should be sorted by slab index for maximum efficiency"
         // );
 
-        for (slab, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
-            log_scope!(o!(chunk_pos, slab));
+        for (slab_idx, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
+            log_scope!(o!(chunk_pos, slab_idx));
 
             // copy slab for modification
-            let slab = match terrain.slab_mut(slab) {
+            let slab = match terrain.slab_mut(slab_idx) {
                 None => {
                     let count = updates.count();
                     warn!(
@@ -367,11 +392,16 @@ impl World {
                 }
             };
 
+            // apply changes to new slab
             for (_, update) in updates {
                 let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
+                trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
+
                 match range {
                     WorldRange::Single(pos) => {
-                        slab.set_block_type(pos, block_type);
+                        let prev_block = slab.slice_mut(pos.z()).set_block(pos, block_type);
+                        let world_pos = pos.to_world_position(chunk_pos, slab_idx);
+                        changes_out.push(WorldChangeEvent::new(world_pos, prev_block, block_type));
                     }
                     range @ WorldRange::Range(_, _) => {
                         let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
@@ -379,7 +409,12 @@ impl World {
                             let mut slice = slab.slice_mut(z);
                             for x in xa..=xb {
                                 for y in ya..=yb {
-                                    slice.set_block((x, y), block_type);
+                                    let prev_block = slice.set_block((x, y), block_type);
+                                    let world_pos = SlabPosition::new(x, y, z.into())
+                                        .to_world_position(chunk_pos, slab_idx);
+                                    changes_out.push(WorldChangeEvent::new(
+                                        world_pos, prev_block, block_type,
+                                    ));
                                 }
                             }
                         }
@@ -534,7 +569,7 @@ impl World {
             .filter(move |(block, pos)| f(*block, pos))
     }
 
-    /// Filters blocks in the range that are 1) pass the blocktype test, and 2) are adjacent to a walkable
+    /// Filters blocks in the range that 1) pass the blocktype test, and 2) are adjacent to a walkable
     /// accessible block
     pub fn filter_reachable_blocks_in_range<'a>(
         &'a self,
@@ -562,6 +597,21 @@ impl World {
         })
         .map(|(_, pos)| pos)
     }
+
+    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&D> {
+        self.find_chunk_with_pos(pos.into())
+            .and_then(|chunk| chunk.associated_block_data(pos.into()))
+    }
+
+    pub fn set_associated_block_data(&mut self, pos: WorldPosition, data: D) -> Option<D> {
+        self.find_chunk_with_pos_mut(pos.into())
+            .and_then(|chunk| chunk.set_associated_block_data(pos.into(), data))
+    }
+
+    pub fn remove_associated_block_data(&mut self, pos: WorldPosition) -> Option<D> {
+        self.find_chunk_with_pos_mut(pos.into())
+            .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
+    }
 }
 
 impl AreaLookup {
@@ -583,13 +633,13 @@ pub mod helpers {
     };
     use crate::{ChunkDescriptor, WorldRef};
 
-    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef {
+    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
         loader_from_chunks_blocking(chunks).world()
     }
 
     pub fn loader_from_chunks_blocking(
         chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<BlockingWorkerPool> {
+    ) -> WorldLoader<BlockingWorkerPool<()>, ()> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
         load_world(source, BlockingWorkerPool::default())
     }
@@ -597,19 +647,20 @@ pub mod helpers {
     pub fn loader_from_chunks_threaded(
         threads: usize,
         chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<ThreadedWorkerPool> {
+    ) -> WorldLoader<ThreadedWorkerPool, ()> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
         let pool = ThreadedWorkerPool::new(threads);
         load_world(source, pool)
     }
 
     pub fn apply_updates(
-        loader: &mut WorldLoader<BlockingWorkerPool>,
+        loader: &mut WorldLoader<BlockingWorkerPool<()>, ()>,
         updates: &[WorldTerrainUpdate],
     ) -> Result<(), String> {
         let world = loader.world();
 
-        loader.apply_terrain_updates(updates.iter().cloned());
+        let mut _updates = Vec::new();
+        loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
 
         // blocking pool doesn't use timeout
         while let Some(result) = loader.block_on_next_finalization(Duration::default()) {
@@ -628,7 +679,10 @@ pub mod helpers {
         Ok(())
     }
 
-    fn load_world<P: WorkerPool>(mut source: MemoryTerrainSource, pool: P) -> WorldLoader<P> {
+    pub(crate) fn load_world<P: WorkerPool<D>, D>(
+        mut source: MemoryTerrainSource,
+        pool: P,
+    ) -> WorldLoader<P, D> {
         let chunks_pos = source.all_chunks();
 
         // TODO build area graph in loader
@@ -653,14 +707,20 @@ pub mod helpers {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use common::{seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
-    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPositionRange};
+    use unit::world::{
+        BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition, WorldPositionRange,
+    };
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
+    use crate::helpers::load_world;
     use crate::loader::{
-        BlockingWorkerPool, GeneratedTerrainSource, WorldLoader, WorldTerrainUpdate,
+        BlockingWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, WorldLoader,
+        WorldTerrainUpdate,
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
@@ -668,7 +728,6 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
-    use std::time::Duration;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -1126,5 +1185,24 @@ mod tests {
 
         // block exposed in the ceiling can be reached from below
         assert!(is_reachable((1, 1, 5)));
+    }
+
+    #[test]
+    fn associated_block_data() {
+        let source =
+            MemoryTerrainSource::from_chunks(vec![ChunkBuilder::new().build((0, 0))].into_iter())
+                .unwrap();
+        let loader: WorldLoader<_, u32> = load_world(source, BlockingWorkerPool::default());
+        let worldref = loader.world();
+        let mut world = worldref.borrow_mut();
+
+        let pos = WorldPosition::from((0, 0, 0));
+
+        assert!(world.associated_block_data(pos).is_none());
+
+        assert!(world.set_associated_block_data(pos, 50).is_none());
+        assert_eq!(world.set_associated_block_data(pos, 100), Some(50));
+
+        assert_eq!(world.associated_block_data(pos).copied(), Some(100));
     }
 }

@@ -1,5 +1,6 @@
 use unit::world::{WorldPoint, WorldPosition};
 
+use crate::activity::HaulTarget;
 use crate::ecs::Entity;
 use crate::item::ItemsToPickUp;
 
@@ -31,8 +32,8 @@ pub enum AiAction {
     /// Follow the entity, keeping to the given distance
     Follow { target: Entity, radius: u8 },
 
-    /// Haul the entity to the target position
-    Haul(Entity, WorldPosition),
+    /// Haul the entity from the source to the destination target
+    Haul(Entity, HaulTarget, HaulTarget),
 }
 
 impl Default for AiAction {

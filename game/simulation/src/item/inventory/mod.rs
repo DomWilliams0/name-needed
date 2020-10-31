@@ -9,14 +9,14 @@ mod component;
 mod container;
 mod equip;
 
-pub use component::{FoundSlot, InventoryComponent};
+pub use component::{ContainerComponent, ContainerResolver, FoundSlot, InventoryComponent};
 pub use container::{Container, ContainerError};
 
 #[derive(Debug, Clone)]
 pub struct HeldEntity {
     pub entity: Entity,
     pub volume: Volume,
-    pub half_dims: Length3,
+    pub size: Length3,
 }
 
 impl Display for HeldEntity {

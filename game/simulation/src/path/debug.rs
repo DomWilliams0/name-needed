@@ -1,9 +1,9 @@
-use world::{BaseTerrain, InnerWorldRef, WorldViewer};
+use world::BaseTerrain;
 
 use crate::ecs::*;
 use crate::path::FollowPathComponent;
 use crate::render::DebugRenderer;
-use crate::{RenderComponent, Renderer, TransformComponent};
+use crate::{InnerWorldRef, RenderComponent, Renderer, TransformComponent, WorldViewer};
 use color::ColorRgb;
 
 use std::hash::Hasher;

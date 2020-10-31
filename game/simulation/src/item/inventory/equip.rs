@@ -20,12 +20,11 @@ impl EquipSlot {
         matches!(self, EquipSlot::Empty)
     }
 
+    /// Some(e) only for Occupied slots
     pub fn ok(&self) -> Option<Entity> {
         match self {
-            EquipSlot::Empty => None,
-            EquipSlot::Occupied(HeldEntity { entity, .. }) | EquipSlot::Overflow(entity) => {
-                Some(*entity)
-            }
+            EquipSlot::Empty | EquipSlot::Overflow(_) => None,
+            EquipSlot::Occupied(HeldEntity { entity, .. }) => Some(*entity),
         }
     }
 }

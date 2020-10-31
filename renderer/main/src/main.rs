@@ -96,7 +96,7 @@ fn do_main() -> BoxedResult<()> {
         let simulation = preset.load(resources.clone())?;
 
         // initialize backend with simulation world
-        let world_viewer = WorldViewer::from_world(simulation.world())?;
+        let world_viewer = WorldViewer::from_world(simulation.voxel_world())?;
         let backend = backend_state.start(world_viewer);
 
         // create and run engine

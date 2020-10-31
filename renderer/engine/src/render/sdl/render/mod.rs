@@ -65,6 +65,10 @@ impl GlRenderer {
     pub fn terrain_mut(&mut self) -> &mut TerrainRenderer {
         &mut self.terrain
     }
+
+    pub fn reset(&mut self) {
+        self.terrain.reset();
+    }
 }
 
 pub struct FrameTarget {
@@ -108,7 +112,7 @@ impl Renderer for GlRenderer {
     fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
         // simple underline
         const PAD: f32 = 0.2;
-        let radius = physical.bounding_radius().metres() + PAD;
+        let radius = (physical.max_dimension().metres() / 2.0) + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
         self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));

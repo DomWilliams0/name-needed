@@ -1,8 +1,13 @@
-use imgui::{im_str, CollapsingHeader, TabItem, TreeNode, Ui};
+use imgui::{im_str, CollapsingHeader, ImStr, TabItem, TreeNode, Ui};
 
 use common::{InnerSpace, Itertools};
-use simulation::input::{BlockPlacement, DivineInputCommand, EntityDetails, UiCommand};
-use simulation::{ActivityComponent, BlockType, IntoEnumIterator, InventoryComponent};
+use simulation::input::{
+    BlockPlacement, DivineInputCommand, EntityDetails, SelectedEntityDetails, UiCommand,
+};
+use simulation::{
+    ActivityComponent, BlockType, ComponentWorld, Container, IntoEnumIterator, InventoryComponent,
+    NameComponent, E,
+};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
@@ -28,6 +33,18 @@ impl SelectionWindow {
                     ui.key_value(
                         im_str!("Entity:"),
                         || Value::Some(ui_str!(in strings, "{:?}", selection.entity)),
+                        None,
+                        COLOR_GREEN,
+                    );
+                    ui.key_value(
+                        im_str!("Name:"),
+                        || {
+                            if let Some(name) = selection.name {
+                                Value::Some(ui_str!(in strings, "{}", name.0))
+                            } else {
+                                Value::None("Unnamed")
+                            }
+                        },
                         None,
                         COLOR_GREEN,
                     );
@@ -120,22 +137,19 @@ impl SelectionWindow {
                                     COLOR_ORANGE,
                                 );
 
-                                self.do_inventory(ui, strings, inventory);
+                                self.do_inventory(bundle, inventory);
 
                                 ui.separator();
 
                                 self.do_activity(ui, strings, activity);
 
-                                if CollapsingHeader::new(im_str!("Divine control"))
-                                    .leaf(true)
-                                    .build(ui)
-                                {
+                                TreeNode::new(im_str!("Divine control")).build(ui, || {
                                     if let Some(tile) =
                                         bundle.blackboard.selected_tiles.single_tile()
                                     {
                                         if ui.button(im_str!("Go to selected block"), [0.0, 0.0]) {
                                             bundle.commands.push(UiCommand::IssueDivineCommand(
-                                                DivineInputCommand::Goto(tile),
+                                                DivineInputCommand::Goto(tile.above()),
                                             ));
                                         }
 
@@ -145,22 +159,17 @@ impl SelectionWindow {
                                             ));
                                         }
                                     }
-                                }
+                                });
                             }
-                            EntityDetails::Item { item, edible } => {
-                                ui.key_value(
-                                    im_str!("Name:"),
-                                    || Value::Some(ui_str!(in strings, "{}", item.name)),
-                                    None,
-                                    COLOR_BLUE,
-                                );
+                            EntityDetails::Item { condition, edible } => {
                                 // TODO list components on item that are relevant (i.e. not transform etc)
                                 ui.key_value(
                                     im_str!("Condition:"),
-                                    || Value::Some(ui_str!(in strings, "{}", item.condition)),
+                                    || Value::Some(ui_str!(in strings, "{}", condition)),
                                     None,
                                     COLOR_BLUE,
                                 );
+
                                 if let Some(physical) = selection.physical {
                                     ui.key_value(
                                         im_str!("Volume:"),
@@ -171,11 +180,7 @@ impl SelectionWindow {
 
                                     ui.key_value(
                                         im_str!("Size:"),
-                                        || {
-                                            Value::Some(
-                                                ui_str!(in strings, "{}", physical.half_dimensions),
-                                            )
-                                        },
+                                        || Value::Some(ui_str!(in strings, "{}", physical.size)),
                                         None,
                                         COLOR_BLUE,
                                     );
@@ -273,15 +278,90 @@ impl SelectionWindow {
                     mk_button(bt);
                 }
             }
+
+            if let Some((container_entity, container_name, container)) =
+                bundle.blackboard.selected_container
+            {
+                ui.separator();
+                ui.key_value(
+                    im_str!("Container: "),
+                    || Value::Some(ui_str!(in strings, "{}", container_name)),
+                    None,
+                    COLOR_ORANGE,
+                );
+                ui.key_value(
+                    im_str!("Owner: "),
+                    || {
+                        if let Some(owner) = container.owner {
+                            Value::Some(ui_str!(in strings, "{}", E(owner)))
+                        } else {
+                            Value::None("No owner")
+                        }
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
+                ui.key_value(
+                    im_str!("Communal: "),
+                    || {
+                        if let Some(society) = container.communal() {
+                            Value::Some(ui_str!(in strings, "{:?}", society))
+                        } else {
+                            Value::None("Not communal")
+                        }
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
+                if let Some(SelectedEntityDetails {
+                    entity,
+                    details: EntityDetails::Living { society, .. },
+                    ..
+                }) = bundle.blackboard.selected_entity
+                {
+                    if ui.button(im_str!("Set owner"), [0.0, 0.0]) {
+                        bundle.commands.push(UiCommand::SetContainerOwnership {
+                            container: container_entity,
+                            owner: Some(Some(entity)),
+                            communal: None,
+                        });
+                    }
+                    if let Some(society) = society {
+                        ui.same_line(0.0);
+                        if ui.button(im_str!("Set communal"), [0.0, 0.0]) {
+                            bundle.commands.push(UiCommand::SetContainerOwnership {
+                                container: container_entity,
+                                owner: None,
+                                communal: Some(Some(society)),
+                            });
+                        }
+                    }
+                }
+
+                if ui.button(im_str!("Clear owner"), [0.0, 0.0]) {
+                    bundle.commands.push(UiCommand::SetContainerOwnership {
+                        container: container_entity,
+                        owner: Some(None),
+                        communal: None,
+                    });
+                }
+                ui.same_line(0.0);
+                if ui.button(im_str!("Clear communal"), [0.0, 0.0]) {
+                    bundle.commands.push(UiCommand::SetContainerOwnership {
+                        container: container_entity,
+                        owner: None,
+                        communal: Some(None),
+                    });
+                }
+                self.do_container(ui, strings, im_str!("Contents"), &container.container);
+            }
         });
     }
 
-    fn do_inventory(
-        &mut self,
-        ui: &Ui,
-        strings: &PerFrameStrings,
-        inventory: &Option<&InventoryComponent>,
-    ) {
+    fn do_inventory(&mut self, bundle: &UiBundle, inventory: &Option<&InventoryComponent>) {
+        let ui = bundle.ui;
+        let strings = bundle.strings;
+
         if let Some(inventory) = inventory {
             TreeNode::new(im_str!("Inventory"))
                 .default_open(false)
@@ -298,22 +378,40 @@ impl SelectionWindow {
 
                     ui.separator();
                     ui.text_disabled(
-                        ui_str!(in strings, "{} containers", inventory.containers().len()),
+                        ui_str!(in strings, "{} containers", inventory.containers_unresolved().len()),
                     );
 
-                    for (i, container) in inventory.containers().enumerate() {
-                        TreeNode::new(ui_str!(in strings, "Container #{}", i+1))
-                            .build(ui, || {
-                                let (max_vol, max_size) = container.limits();
-                                let capacity = container.current_capacity();
-                                ui.text_colored(COLOR_GREEN, ui_str!(in strings, "Capacity {}/{}, size {}", capacity, max_vol, max_size));
-                                for entity in container.contents() {
-                                    ui.text_wrapped(ui_str!(in strings, " - {}", entity));
-                                }
-                            });
+                    for (i, (e, container)) in inventory.containers(bundle.blackboard.world).enumerate() {
+                        let name = bundle.blackboard.world.component::<NameComponent>(e).map(|n| n.0.as_str()).unwrap_or("unnamed");
+                        self.do_container(
+                            ui,
+                            strings,
+                            ui_str!(in strings, "#{}: {}", i+1, name),
+                            container,
+                        );
                     }
                 });
         }
+    }
+
+    fn do_container(
+        &mut self,
+        ui: &Ui,
+        strings: &PerFrameStrings,
+        name: &ImStr,
+        container: &Container,
+    ) {
+        TreeNode::new(name).build(ui, || {
+            let (max_vol, max_size) = container.limits();
+            let capacity = container.current_capacity();
+            ui.text_colored(
+                COLOR_GREEN,
+                ui_str!(in strings, "Capacity {}/{}, size {}", capacity, max_vol, max_size),
+            );
+            for entity in container.contents() {
+                ui.text_wrapped(ui_str!(in strings, " - {}", entity));
+            }
+        });
     }
 
     fn do_activity(

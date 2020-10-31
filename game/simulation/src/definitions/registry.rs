@@ -48,8 +48,8 @@ impl Registry {
     pub fn instantiate<'s, 'w: 's, W: ComponentWorld>(
         &'s self,
         uid: &str,
-        world: &'w mut W,
-    ) -> Result<DefinitionBuilder<W>, DefinitionErrorKind> {
+        world: &'w W,
+    ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
         match self.map.get(uid) {
             Some(def) => Ok(DefinitionBuilder::new(def, world)),
             None => Err(DefinitionErrorKind::NoSuchDefinition(uid.to_owned())),

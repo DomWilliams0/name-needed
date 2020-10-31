@@ -1,4 +1,4 @@
-use crate::activity::activity::{ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::{Activity, ActivityContext};
 use crate::nop_subactivity;
 use crate::ComponentWorld;
@@ -22,7 +22,7 @@ impl<W: ComponentWorld> Activity<W> for NopActivity {
         ActivityResult::Ongoing
     }
 
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

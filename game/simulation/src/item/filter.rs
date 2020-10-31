@@ -7,7 +7,7 @@ pub enum ItemFilter {
     SpecificEntity(Entity),
     Predicate(fn(Entity) -> bool),
     HasComponent(&'static str),
-    // TODO filters on item fields e.g. mass, slots, etc
+    // TODO filters on other fields e.g. mass, size, condition, etc
 }
 
 pub trait ItemFilterable {
@@ -20,7 +20,18 @@ impl<W: ComponentWorld> ItemFilterable for (Entity, Option<&W>) {
     fn matches(self, filter: ItemFilter) -> bool {
         let (item, world) = self;
         match filter {
-            ItemFilter::SpecificEntity(e) => e == item,
+            ItemFilter::SpecificEntity(e) => {
+                let matches = e == item;
+
+                if cfg!(debug_assertions) {
+                    if let Some(world) = world {
+                        use crate::item::ContainedInComponent;
+                        assert!(world.has_component::<ContainedInComponent>(item));
+                    }
+                }
+
+                matches
+            }
             ItemFilter::Predicate(f) => f(item),
             ItemFilter::HasComponent(comp) => world.unwrap().has_component_by_name(comp, item),
         }

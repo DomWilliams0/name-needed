@@ -8,8 +8,8 @@ use std::ops::{Add, Range};
 use unit::world::{ChunkPosition, GlobalSliceIndex};
 
 #[derive(Clone)]
-pub struct WorldViewer {
-    world: WorldRef,
+pub struct WorldViewer<D> {
+    world: WorldRef<D>,
     view_range: SliceRange,
     chunk_range: (ChunkPosition, ChunkPosition),
     clean_chunks: HashSet<ChunkPosition>,
@@ -96,8 +96,8 @@ impl Add<i32> for SliceRange {
     }
 }
 
-impl WorldViewer {
-    pub fn from_world(world: WorldRef) -> Result<Self, WorldViewerError> {
+impl<D> WorldViewer<D> {
+    pub fn from_world(world: WorldRef<D>) -> Result<Self, WorldViewerError> {
         let world_borrowed = world.borrow();
 
         let start = world_borrowed
@@ -199,7 +199,7 @@ impl WorldViewer {
             .map(|(x, y)| ChunkPosition(x, y))
     }
 
-    pub fn world(&self) -> InnerWorldRef {
+    pub fn world(&self) -> InnerWorldRef<D> {
         self.world.borrow()
     }
 

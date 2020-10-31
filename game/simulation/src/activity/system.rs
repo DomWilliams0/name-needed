@@ -1,5 +1,5 @@
 use crate::activity::activity::{
-    Activity, ActivityContext, ActivityEventContext, ActivityResult, Finish,
+    Activity, ActivityContext, ActivityEventContext, ActivityFinish, ActivityResult,
 };
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
@@ -75,7 +75,10 @@ impl<'a> System<'a> for ActivitySystem {
             if let Some(new_action) = activity.new_activity.take() {
                 debug!("interrupting activity with new"; "action" => ?new_action);
 
-                if let Err(e) = activity.current.finish(Finish::Interrupted, &mut ctx) {
+                if let Err(e) = activity
+                    .current
+                    .finish(ActivityFinish::Interrupted, &mut ctx)
+                {
                     error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
                 }
 
@@ -86,6 +89,8 @@ impl<'a> System<'a> for ActivitySystem {
                 // replace current with new activity, dropping the old one
                 new_action.into_activity(&mut activity.current);
             }
+
+            // TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause
 
             match activity.current.on_tick(&mut ctx) {
                 ActivityResult::Blocked => {

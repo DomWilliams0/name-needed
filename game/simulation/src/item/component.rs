@@ -4,14 +4,18 @@ use crate::ecs::*;
 use crate::item::condition::ItemCondition;
 use crate::needs::Fuel;
 
-/// Common properties across all items
+/// An entity with a displayable name
+#[derive(Component, EcsComponent, Constructor, Clone, Debug)]
+#[storage(VecStorage)]
+#[name("name")]
+// TODO smol string
+pub struct NameComponent(pub String);
+
+/// Condition/durability of an entity, e.g. a tool or food
 #[derive(Component, EcsComponent, Constructor, Clone, Debug)]
 #[storage(DenseVecStorage)]
-#[name("item")]
-pub struct BaseItemComponent {
-    pub name: String,
-    pub condition: ItemCondition,
-}
+#[name("condition")]
+pub struct ConditionComponent(pub ItemCondition);
 
 #[derive(Component, EcsComponent, Constructor, Clone, Debug)]
 #[name("edible")]
@@ -36,15 +40,25 @@ pub struct ThrowableItemComponent;
 // TODO splatterable (after throw, if walked on)
 // TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)
 
-impl<V: Value> ComponentTemplate<V> for BaseItemComponent {
+impl<V: Value> ComponentTemplate<V> for NameComponent {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self {
-            name: values.get_string("name")?,
-            condition: ItemCondition::perfect(),
-        }))
+        Ok(Box::new(Self(values.get_string("name")?)))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+impl<V: Value> ComponentTemplate<V> for ConditionComponent {
+    fn construct(_: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(Self(ItemCondition::perfect())))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
@@ -77,6 +91,7 @@ impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
     }
 }
 
-register_component_template!("item", BaseItemComponent);
+register_component_template!("name", NameComponent);
+register_component_template!("breakable", ConditionComponent);
 register_component_template!("edible", EdibleItemComponent);
 register_component_template!("throwable", ThrowableItemComponent);

@@ -2,13 +2,10 @@
   (
     uid: "core_food_apple",
     components: [
-      {"item": (
+      {"name": (
         name: "Apple",
-        base_slots: 1,
-        mounted_slots: 1,
-        mass: 0.1,
-        stacking: "item_default",
       )},
+      {"breakable": ()},
       {"haulable": (
         extra_hands: 0,
       )},
@@ -22,7 +19,7 @@
         shape: (rx:0.2, ry:0.2),
       )},
       {"physical": (
-        half_dims: (1, 1, 1),
+        size: (1, 1, 1),
         volume: 1,
       )},
     ],

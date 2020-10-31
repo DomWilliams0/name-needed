@@ -1,10 +1,13 @@
 use common::*;
 
-use crate::activity::activity::{ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
 use crate::ecs::{Entity, E};
 use crate::event::prelude::*;
-use crate::item::{FoundSlot, InventoryComponent, ItemFilter};
+use crate::item::{
+    ContainedInComponent, EndHaulBehaviour, FoundSlot, HauledItemComponent, InventoryComponent,
+    ItemFilter,
+};
 use crate::ComponentWorld;
 
 /// Equip the given item, given it's already somewhere in the holder's inventory
@@ -32,9 +35,9 @@ pub enum EquipItemError {
 impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
     fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
         let holder = ctx.entity;
-        let food = self.item;
+        let item = self.item;
         let extra_hands = self.extra_hands;
-        let filter = ItemFilter::SpecificEntity(food);
+        let filter = ItemFilter::SpecificEntity(item);
 
         let inventory = ctx
             .world
@@ -46,14 +49,21 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
             None => Err(EquipItemError::NotInInventory),
             Some(FoundSlot::Equipped(_)) => {
                 // already equipped
-                Ok(ActivityResult::Finished(Finish::Success))
+
+                // if its currently being hauled, don't drop it
+                if let Ok(hauling) = ctx.world.component_mut::<HauledItemComponent>(self.item) {
+                    hauling.interrupt_behaviour = EndHaulBehaviour::KeepEquipped;
+                    debug!("item is currently being hauled, ensuring it is kept in inventory");
+                }
+
+                Ok(ActivityResult::Finished(ActivityFinish::Success))
             }
             Some(slot) => {
                 // in inventory but not equipped
-                debug!("found food"; "slot" => ?slot);
+                debug!("found item"; "slot" => ?slot, "item" => E(self.item));
 
-                ctx.updates.queue("equip food", move |world| {
-                    let do_equip = || -> Result<Entity, EquipItemError> {
+                ctx.updates.queue("equip item", move |world| {
+                    let mut do_equip = || -> Result<Entity, EquipItemError> {
                         let inventory = world
                             .component_mut::<InventoryComponent>(holder)
                             .map_err(|_| EquipItemError::NoInventory)?;
@@ -64,7 +74,10 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
                             .search_mut(&filter, world)
                             .ok_or(EquipItemError::NotInInventory)?;
 
-                        if slot.equip(extra_hands) {
+                        if slot.equip(extra_hands, world) {
+                            world
+                                .helpers_comps()
+                                .add_to_container(item, ContainedInComponent::InventoryOf(holder));
                             Ok(holder)
                         } else {
                             Err(EquipItemError::NotEnoughSpace)
@@ -73,7 +86,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
 
                     let result = do_equip();
                     world.post_event(EntityEvent {
-                        subject: food,
+                        subject: item,
                         payload: EntityEventPayload::Equipped(result),
                     });
 
@@ -81,7 +94,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
                 });
 
                 // block on equip event
-                ctx.subscribe_to(food, EventSubscription::Specific(EntityEventType::Equipped));
+                ctx.subscribe_to(item, EventSubscription::Specific(EntityEventType::Equipped));
                 Ok(ActivityResult::Blocked)
             }
         });
@@ -92,7 +105,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
         }
     }
 
-    fn on_finish(&self, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

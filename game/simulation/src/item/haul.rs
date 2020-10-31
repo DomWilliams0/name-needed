@@ -13,6 +13,18 @@ pub struct HauledItemComponent {
     pub hauler: Entity,
     pub haul_type: HaulType,
     first_time: bool,
+
+    /// What to do if the haul is interrupted
+    pub interrupt_behaviour: EndHaulBehaviour,
+}
+
+#[derive(Clone, Debug)]
+pub enum EndHaulBehaviour {
+    /// Drop the item on the floor
+    Drop,
+
+    /// Stop hauling but keep the thing in hands
+    KeepEquipped,
 }
 
 /// An item that is haulable
@@ -99,9 +111,17 @@ impl HauledItemComponent {
             hauler,
             haul_type: ty,
             first_time: true,
+            interrupt_behaviour: EndHaulBehaviour::default(),
         }
     }
 }
+
+impl Default for EndHaulBehaviour {
+    fn default() -> Self {
+        Self::Drop
+    }
+}
+
 impl<V: Value> ComponentTemplate<V> for HaulableItemComponent {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where

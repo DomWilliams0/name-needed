@@ -24,6 +24,7 @@ pub struct Block {
 
 pub type BlockDurability = u8;
 
+// TODO define block types in data instead of code
 /// The type of a block
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, IntoEnumIterator, Display)]
 pub enum BlockType {
@@ -33,6 +34,7 @@ pub enum BlockType {
     #[display(fmt = "Light grass")]
     LightGrass,
     Stone,
+    Chest,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -43,11 +45,7 @@ pub enum BlockOpacity {
 
 impl BlockOpacity {
     pub fn solid(self) -> bool {
-        if let Self::Solid = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Solid)
     }
 
     pub fn transparent(self) -> bool {
@@ -126,6 +124,11 @@ impl Block {
     pub(crate) fn durability_mut(&mut self) -> &mut Proportion<BlockDurability> {
         &mut self.durability
     }
+
+    /// True if air or durability == 0
+    pub fn is_destroyed(&self) -> bool {
+        self.durability.value() == 0 || self.block_type == BlockType::Air
+    }
 }
 
 impl Default for Block {
@@ -142,6 +145,7 @@ impl BlockType {
             BlockType::Grass => ColorRgb::new(49, 152, 56),
             BlockType::LightGrass => ColorRgb::new(91, 152, 51),
             BlockType::Stone => ColorRgb::new(106, 106, 117),
+            BlockType::Chest => ColorRgb::new(184, 125, 31),
         }
     }
 
@@ -158,6 +162,7 @@ impl BlockType {
             BlockType::Air => 0,
             BlockType::Dirt | BlockType::Grass | BlockType::LightGrass => 40,
             BlockType::Stone => 90,
+            BlockType::Chest => 60,
         };
 
         Proportion::with_value(max, max)

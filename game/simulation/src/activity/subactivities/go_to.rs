@@ -3,7 +3,7 @@ use std::cell::Cell;
 use common::*;
 use unit::world::WorldPoint;
 
-use crate::activity::activity::{ActivityResult, SubActivity};
+use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
 use crate::event::prelude::*;
 use crate::path::{FollowPathComponent, PathToken};
@@ -62,7 +62,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         // TODO helper on ctx to get component
 
         if let Ok(comp) = ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {

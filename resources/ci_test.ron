@@ -22,5 +22,11 @@ Config(
         friction: 0.85,
         start_delay: 0,
         food_count: 400,
+        spawn_counts: {
+            "humans": 50,
+            "dogs": 10,
+            "food": 400,
+        },
+
      ),
 )

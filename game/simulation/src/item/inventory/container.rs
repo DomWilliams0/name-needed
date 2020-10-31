@@ -42,7 +42,7 @@ pub struct Container {
     current_volume: Volume,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum ContainerError {
     #[error("Item is too big")]
     TooBig,
@@ -72,7 +72,7 @@ impl Container {
         let held = HeldEntity {
             entity,
             volume: entity_volume,
-            half_dims: entity_size,
+            size: entity_size,
         };
 
         self.add(&held)
@@ -80,7 +80,7 @@ impl Container {
 
     /// Clones on successful add and returns Ok
     pub fn add(&mut self, entity: &HeldEntity) -> Result<(), ContainerError> {
-        if !self.size_limit.fits(&entity.half_dims) {
+        if !self.size_limit.fits(&entity.size) {
             return Err(ContainerError::TooBig);
         }
 
@@ -109,6 +109,11 @@ impl Container {
         let entity = self.contents.inner_mut().remove(idx);
         self.current_volume -= entity.volume;
         entity
+    }
+
+    pub fn remove_all(&mut self) -> impl Iterator<Item = HeldEntity> + '_ {
+        self.current_volume = Volume::new(0);
+        self.contents.inner_mut().drain(..)
     }
 
     pub(in crate::item::inventory) fn contents_as_slice(&self) -> &[HeldEntity] {

@@ -1,0 +1,21 @@
+[
+  (
+    uid: "core_brick_stone",
+    components: [
+      {"name": (
+        name: "Stone brick",
+      )},
+      {"haulable": (
+        extra_hands: 1,
+      )},
+      {"render": (
+        color: "4c4c4c",
+        shape: (rx:0.4, ry:0.2),
+      )},
+      {"physical": (
+        size: (5, 3, 3),
+        volume: 25,
+      )},
+    ],
+  ),
+]

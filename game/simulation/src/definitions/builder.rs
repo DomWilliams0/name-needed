@@ -2,31 +2,35 @@ use unit::world::WorldPosition;
 
 use crate::definitions::loader::Definition;
 use crate::ecs::*;
-use crate::{ComponentWorld, TransformComponent};
-
-use world::InnerWorldRef;
+use crate::{ComponentWorld, InnerWorldRef, TransformComponent};
+use common::*;
 
 pub trait EntityPosition {
     fn resolve(&self, world: &InnerWorldRef) -> Result<WorldPosition, BuilderError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BuilderError {
+    #[error("No position specified for entity that requires a transform")]
     MissingPosition,
+
+    #[error("Column is inaccessible: {0:?}")]
     InaccessibleColumn((i32, i32)),
+
+    #[error("Position is not walkable: {0}")]
     PositionNotWalkable(WorldPosition),
 }
 
 #[must_use = "Use spawn() to create the entity"]
 pub struct DefinitionBuilder<'d, W: ComponentWorld> {
     definition: &'d Definition,
-    world: &'d mut W,
+    world: &'d W,
 
     position: Option<Box<dyn EntityPosition>>,
 }
 
 impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
-    pub fn new(definition: &'d Definition, world: &'d mut W) -> Self {
+    pub fn new(definition: &'d Definition, world: &'d W) -> Self {
         Self {
             definition,
             world,
@@ -35,6 +39,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
     }
 
     pub fn with_position<P: EntityPosition + 'static>(mut self, pos: P) -> Self {
+        // TODO avoid box by resolving here and storing result
         self.position = Some(Box::new(pos));
         self
     }

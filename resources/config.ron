@@ -15,11 +15,14 @@ Config(
         generation_height_scale: 15.0,
     ),
     simulation: (
-        random_seed: Some(67853852415421),
-        human_count: 20,
-        dog_count: 5,
+        random_seed: Some(67853852415423),
         friction: 0.85,
         start_delay: 0,
-        food_count: 100,
+        spawn_counts: {
+            "humans": 5,
+            "dogs": 3,
+            "food": 10,
+            "bricks": 20,
+        },
      ),
 )

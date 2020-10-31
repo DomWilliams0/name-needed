@@ -2,12 +2,13 @@
   (
     uid: "core_living_dog",
     components: [
+      {"name": (name: "Dog")},
       {"render": (
         color: "8B4513",
         shape: (radius: 0.3),
       )},
       {"physical": (
-        half_dims: [3, 3, 3],
+        size: [6, 6, 3],
         volume: 400,
       )},
       // TODO dog mouth inventory

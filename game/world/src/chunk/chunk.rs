@@ -10,17 +10,21 @@ use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
 use crate::chunk::BaseTerrain;
 use crate::navigation::WorldArea;
 use crate::SliceRange;
+use std::collections::HashMap;
 
 pub type ChunkId = u64;
 
-pub struct Chunk {
+pub struct Chunk<D> {
     /// Unique for each chunk
     pos: ChunkPosition,
 
     terrain: ChunkTerrain,
+
+    /// Sparse associated data with each block
+    block_data: HashMap<BlockPosition, D>,
 }
 
-impl Chunk {
+impl<D> Chunk<D> {
     pub fn empty<P: Into<ChunkPosition>>(pos: P) -> Self {
         let pos = pos.into();
         // TODO still does a lot of unnecessary initialization
@@ -30,7 +34,11 @@ impl Chunk {
 
     /// Called by ChunkBuilder when terrain has been finalized
     pub(crate) fn with_completed_terrain(pos: ChunkPosition, terrain: ChunkTerrain) -> Self {
-        Self { pos, terrain }
+        Self {
+            pos,
+            terrain,
+            block_data: HashMap::new(),
+        }
     }
 
     pub const fn pos(&self) -> ChunkPosition {
@@ -73,9 +81,25 @@ impl Chunk {
         #[allow(clippy::redundant_closure)]
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
+
+    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&D> {
+        self.block_data.get(&pos)
+    }
+
+    pub fn set_associated_block_data(&mut self, pos: BlockPosition, data: D) -> Option<D> {
+        self.block_data.insert(pos, data)
+    }
+
+    pub fn remove_associated_block_data(&mut self, pos: BlockPosition) -> Option<D> {
+        self.block_data.remove(&pos)
+    }
+
+    pub(crate) fn swap_with(&mut self, other: &mut Self) {
+        std::mem::swap(&mut self.block_data, &mut other.block_data)
+    }
 }
 
-impl Deref for Chunk {
+impl<D> Deref for Chunk<D> {
     type Target = ChunkTerrain;
 
     fn deref(&self) -> &Self::Target {
@@ -83,13 +107,13 @@ impl Deref for Chunk {
     }
 }
 
-impl DerefMut for Chunk {
+impl<D> DerefMut for Chunk<D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.terrain
     }
 }
 
-impl BaseTerrain for Chunk {
+impl<D> BaseTerrain for Chunk<D> {
     fn raw_terrain(&self) -> &RawChunkTerrain {
         self.terrain.raw_terrain()
     }
@@ -143,9 +167,9 @@ mod tests {
     #[test]
     fn chunk_id() {
         // check chunk ids are unique
-        let id1 = Chunk::empty((0, 0)).id();
-        let id2 = Chunk::empty((0, 1)).id();
-        let id3 = Chunk::empty((1, 0)).id();
+        let id1 = Chunk::<()>::empty((0, 0)).id();
+        let id2 = Chunk::<()>::empty((0, 1)).id();
+        let id3 = Chunk::<()>::empty((1, 0)).id();
         assert_ne!(id1, id2);
         assert_ne!(id2, id3);
     }
@@ -153,7 +177,7 @@ mod tests {
     #[test]
     fn blocks() {
         // check individual block collection is ordered as intended
-        let c = Chunk::empty((0, 0));
+        let c = Chunk::<()>::empty((0, 0));
         let mut blocks = Vec::new();
         c.blocks(&mut blocks);
         let mut b = blocks.into_iter();

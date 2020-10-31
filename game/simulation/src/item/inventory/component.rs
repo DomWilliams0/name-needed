@@ -8,10 +8,11 @@ use unit::length::Length3;
 use unit::volume::Volume;
 
 use crate::ecs::*;
+use crate::item::containers::ContainedInComponent;
 use crate::item::inventory::equip::EquipSlot;
 use crate::item::inventory::{Container, HeldEntity};
-use crate::item::{ItemFilter, ItemFilterable};
-use crate::TransformComponent;
+use crate::item::{HauledItemComponent, ItemFilter, ItemFilterable};
+use crate::{SocietyHandle, TransformComponent};
 
 /// Temporary dumb component to hold equip slots and containers. Will eventually be a view on top of
 /// the physical body tree
@@ -20,14 +21,35 @@ use crate::TransformComponent;
 #[name("inventory")]
 pub struct InventoryComponent {
     equip_slots: Vec<EquipSlot>,
-    containers: Vec<Container>,
+
+    /// Each entity has a ContainerComponent
+    containers: Vec<Entity>,
 }
 
-// TODO debug inventory validation
+/// Inventory of a container
+#[derive(Component, EcsComponent)]
+#[storage(DenseVecStorage)]
+#[name("container")]
+pub struct ContainerComponent {
+    pub container: Container,
+
+    /// If set, appears in the owner's private stash
+    // TODO owner should be handled in the same way as communal i.e. mirror state elsewhere
+    pub owner: Option<Entity>,
+
+    /// If set, appears in the society's stash. This field only mirrors the state in the society
+    communal: Option<SocietyHandle>,
+}
 
 #[derive(Debug)]
 pub struct InventoryComponentTemplate {
     equip_slots: usize,
+}
+
+#[derive(Debug)]
+pub struct ContainerComponentTemplate {
+    volume: Volume,
+    size: Length3,
 }
 
 pub struct EquipSlots<'a>(&'a mut [EquipSlot]);
@@ -35,11 +57,28 @@ pub struct EquipSlots<'a>(&'a mut [EquipSlot]);
 /// Slot reference with lifetime to enforce no modification while this is held.
 #[derive(Clone, Copy)]
 pub enum FoundSlot<'a> {
+    /// Slot index
     Equipped(usize),
-    Container(usize, usize, PhantomData<&'a ()>),
+    /// (container entity, index)
+    Container(Entity, usize, PhantomData<&'a ()>),
 }
 
 pub struct FoundSlotMut<'a>(&'a mut InventoryComponent, FoundSlot<'a>);
+
+pub trait ContainerResolver {
+    fn container(&self, e: Entity) -> Option<&ContainerComponent>;
+    fn container_mut(&self, e: Entity) -> Option<&mut ContainerComponent>;
+
+    fn container_unchecked(&self, e: Entity) -> &ContainerComponent {
+        self.container(e).expect("entity does not have container")
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    fn container_mut_unchecked(&self, e: Entity) -> &mut ContainerComponent {
+        self.container_mut(e)
+            .expect("entity does not have container")
+    }
+}
 
 impl InventoryComponent {
     pub fn new(equip_slots: usize) -> Self {
@@ -49,7 +88,8 @@ impl InventoryComponent {
         }
     }
 
-    pub fn give_container(&mut self, container: Container) {
+    /// Entity must have a container component
+    pub fn give_container(&mut self, container: Entity) {
         self.containers.push(container);
     }
 
@@ -67,6 +107,7 @@ impl InventoryComponent {
         self.find_hauling_slot_range(extra_hands).is_some()
     }
 
+    /// Finds range of empty slots to fit the number of extra hands
     fn find_hauling_slot_range(&self, extra_hands: u16) -> Option<Range<usize>> {
         let full_hand_count = (extra_hands + 1) as usize;
 
@@ -105,6 +146,28 @@ impl InventoryComponent {
         None
     }
 
+    /// Largest number of TOTAL hands available for hauling
+    pub fn total_hands_available(&self) -> Option<u16> {
+        let total_extra_hands = {
+            let total_hands = self.equip_slots.len();
+            if total_hands == 0 {
+                // no extra hands
+                return None;
+            } else {
+                (total_hands - 1) as u16
+            }
+        };
+
+        // this could definitely be done better
+        for extra_hands in (0..=total_extra_hands).rev() {
+            if self.has_hauling_slots(extra_hands) {
+                return Some(extra_hands + 1);
+            }
+        }
+
+        None
+    }
+
     /// Removes the given item from any equip slots, returning the count. 0 if it wasn't there
     pub fn remove_item(&mut self, item: Entity) -> usize {
         self.equip_slots
@@ -137,12 +200,28 @@ impl InventoryComponent {
         self.equip_slots.iter()
     }
 
-    pub fn containers(&self) -> impl ExactSizeIterator<Item = &Container> + '_ {
+    pub fn containers_unresolved(&self) -> impl ExactSizeIterator<Item = &Entity> + '_ {
         self.containers.iter()
     }
 
-    pub fn containers_mut(&mut self) -> impl Iterator<Item = &mut Container> + '_ {
-        self.containers.iter_mut()
+    /// Panics if any containers are missing container component
+    pub fn containers<'a>(
+        &'a self,
+        resolver: &'a impl ContainerResolver,
+    ) -> impl ExactSizeIterator<Item = (Entity, &Container)> + '_ {
+        self.containers
+            .iter()
+            .map(move |e| (*e, &resolver.container_unchecked(*e).container))
+    }
+
+    /// Panics if any containers are missing container component
+    pub fn containers_mut<'a>(
+        &'a mut self,
+        resolver: &'a impl ContainerResolver,
+    ) -> impl ExactSizeIterator<Item = (Entity, &mut Container)> + '_ {
+        self.containers
+            .iter()
+            .map(move |e| (*e, &mut resolver.container_mut_unchecked(*e).container))
     }
 
     fn get_first_held_range(&self) -> Option<(HeldEntity, Range<usize>)> {
@@ -184,13 +263,17 @@ impl InventoryComponent {
     /// Frees up enough equip slots by pushing them into containers, then fills equip slots with
     /// the given item, returning true if it worked
     ///
+    /// on_move: callback for moving item into a container (item, container)
+    ///
     /// TODO it's possible some hands have been freed up while returning false anyway
-    pub fn insert_item(
+    pub fn insert_item<R: ContainerResolver>(
         &mut self,
+        resolver: &R,
         item: Entity,
         extra_hands: u16,
         volume: Volume,
         size: Length3,
+        mut on_move: impl FnMut(Entity, Entity),
     ) -> bool {
         // fast check we have enough slots
         if !self.fits_equip_slots(extra_hands) {
@@ -210,12 +293,16 @@ impl InventoryComponent {
                 .expect("should have items remaining");
 
             // find container that can fit this item and move it
-            if self
-                .containers
-                .iter_mut()
-                .any(|container| container.add(&item_to_move).is_ok())
-            {
+            let attempt_fit = |container: &&Entity| {
+                resolver
+                    .container_mut(**container)
+                    .and_then(|comp| comp.container.add(&item_to_move).ok())
+                    .is_some()
+            };
+
+            if let Some(container) = self.containers.iter().find(attempt_fit) {
                 // excellent, we found one and moved the item into it, remove it from the equipped range
+                on_move(item_to_move.entity, *container);
                 self.empty_range(item_range);
                 continue; // try again
             } else {
@@ -235,27 +322,22 @@ impl InventoryComponent {
     pub fn search<W: ComponentWorld>(&self, filter: &ItemFilter, world: &W) -> Option<FoundSlot> {
         // TODO possibly add search cache keyed by entity, if there are many repeated searches for the same entity
 
-        self.equip_slots
-            .iter()
-            .enumerate()
-            .find_map(|(i, e)| {
-                let entity = e.ok();
-                (entity, Some(world))
-                    .matches(*filter)
-                    .as_some(FoundSlot::Equipped(i))
+        let found_in_equipped = self.equip_slots.iter().enumerate().find_map(|(i, e)| {
+            let entity = e.ok();
+            (entity, Some(world))
+                .matches(*filter)
+                .as_some(FoundSlot::Equipped(i))
+        });
+
+        found_in_equipped.or_else(|| {
+            self.containers(world).find_map(|(c, container)| {
+                container.contents().enumerate().find_map(|(i, entity)| {
+                    let filterable = (Some(entity.entity), Some(world));
+                    let matches = ItemFilterable::matches(filterable, *filter);
+                    matches.as_some(FoundSlot::Container(c, i, PhantomData))
+                })
             })
-            .or_else(|| {
-                self.containers
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, container)| {
-                        container.contents().enumerate().find_map(|(j, entity)| {
-                            (Some(entity.entity), Some(world))
-                                .matches(*filter)
-                                .as_some(FoundSlot::Container(i, j, PhantomData))
-                        })
-                    })
-            })
+        })
     }
     pub fn search_mut<W: ComponentWorld>(
         &mut self,
@@ -268,63 +350,148 @@ impl InventoryComponent {
         Some(FoundSlotMut(self, slot))
     }
 
-    fn all_items(&self) -> impl Iterator<Item = Entity> + '_ {
-        let equipped = self.equip_slots.iter().filter_map(|e| e.ok());
-        let containers = self
-            .containers()
-            .flat_map(|container| container.contents().map(|e| e.entity));
-        equipped.chain(containers)
+    fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.equip_slots.iter().filter_map(|e| e.ok())
     }
 
     /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
-    /// capacities are accurate
+    /// are valid and their capacities accurate
     /// - held_entities: item->holder
     #[cfg(debug_assertions)]
     pub fn validate(
         &self,
         holder: Entity,
         world: &impl ComponentWorld,
-        held_entities: &mut HashMap<Entity, Entity>,
+        held_entities: &mut HashMap<Entity, ContainedInComponent>,
     ) {
-        for e in self.all_items() {
+        for e in self.all_equipped_items() {
             assert!(world.is_entity_alive(e), "item {} is dead", E(e));
 
-            if let Some(other_holder) = held_entities.insert(e, holder) {
+            if let Some(other_holder) =
+                held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
+            {
                 panic!(
-                    "item {} is in the inventories of {} and {}",
+                    "item {} is in the inventory of {} and {}",
                     E(e),
                     E(holder),
-                    E(other_holder)
+                    other_holder,
                 );
             }
 
-            assert!(
-                world.component::<TransformComponent>(e).is_err(),
-                "held item {} has a transform",
-                E(e)
-            );
-        }
-
-        for container in &self.containers {
-            let real_capacity: Volume = container
-                .contents()
-                .fold(Volume::new(0), |acc, e| acc + e.volume);
+            let has_hauled = world.has_component::<HauledItemComponent>(e);
+            let has_transform = world.has_component::<TransformComponent>(e);
 
             assert_eq!(
-                real_capacity,
-                container.current_capacity(),
-                "container reports a capacity of {} when it actually is {}",
-                container.current_capacity(),
-                real_capacity
+                has_hauled,
+                has_transform,
+                "equipped item {} is invalid (being hauled = {}, has transform = {})",
+                E(e),
+                has_hauled,
+                has_transform
             );
         }
+
+        for (e, container) in self.containers(world) {
+            if let Some(other_holder) =
+                held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
+            {
+                panic!(
+                    "container {} is in the inventory of {} and {}",
+                    E(e),
+                    E(holder),
+                    other_holder,
+                );
+            }
+
+            validate_container(container, e, held_entities, world);
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+fn validate_container(
+    container: &Container,
+    container_entity: Entity,
+    held_entities: &mut HashMap<Entity, ContainedInComponent>,
+    world: &impl ComponentWorld,
+) {
+    for &HeldEntity { entity: e, .. } in container.contents() {
+        assert!(world.is_entity_alive(e), "item {} is dead", E(e));
+
+        if let Some(other_holder) =
+            held_entities.insert(e, ContainedInComponent::Container(container_entity))
+        {
+            let contained = world.component::<ContainedInComponent>(e).ok();
+            if let Some(contained) = contained {
+                // this container has already been visited in another inventory
+                let holder = contained.entity();
+                assert_eq!(
+                    holder,
+                    container_entity,
+                    "item {} found in container {} has invalid ContainedInComponent '{}'",
+                    E(e),
+                    E(container_entity),
+                    contained
+                );
+            } else {
+                panic!(
+                    "item {} is in the container {} and also {}",
+                    E(e),
+                    E(container_entity),
+                    other_holder,
+                );
+            }
+        }
+
+        assert!(
+            !world.has_component::<TransformComponent>(e),
+            "item {} in container has a transform",
+            E(e)
+        );
+
+        assert!(
+            !world.has_component::<HauledItemComponent>(e),
+            "item {} in container has a hauled component",
+            E(e)
+        );
+
+        let contained = world
+            .component::<ContainedInComponent>(e)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "item {} in container does not have a contained component",
+                    E(e)
+                )
+            });
+
+        let contained = contained.entity();
+        assert_eq!(
+            contained,
+            container_entity,
+            "item {} in container {} has a mismatching contained-in: {}",
+            E(e),
+            E(container_entity),
+            E(contained),
+        );
+
+        let real_capacity: Volume = container
+            .contents()
+            .fold(Volume::new(0), |acc, e| acc + e.volume);
+
+        assert_eq!(
+            real_capacity,
+            container.current_capacity(),
+            "container reports a capacity of {} when it actually is {}",
+            container.current_capacity(),
+            real_capacity
+        );
     }
 }
 
 impl<'a> FoundSlotMut<'a> {
     /// Remove the item represented by this FoundSlot from its container, make space in equip slots
     /// then put in equip slots. If that fails it's put back into the container and returns false
-    pub fn equip(self, extra_hands: u16) -> bool {
+    pub fn equip(self, extra_hands: u16, resolver: &impl ContainerResolver) -> bool {
         let FoundSlotMut(inv, slot) = self;
 
         match slot {
@@ -332,28 +499,48 @@ impl<'a> FoundSlotMut<'a> {
                 // already equipped
                 true
             }
-            FoundSlot::Container(container_idx, slot, _) => {
+            FoundSlot::Container(container, slot, _) => {
+                let container_idx = inv
+                    .containers
+                    .iter()
+                    .position(|e| *e == container)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "FoundSlot container is incorrect (container {})",
+                            E(container)
+                        )
+                    });
+
                 // remove from container while this slot reference is valid
-                // safety: indices from FoundSlot and inventory hasn't been mutated
+                // safety: indices from FoundSlot and .position(), and inventory hasn't been mutated
                 let removed_item = unsafe {
-                    debug_assert!(inv.containers.get(container_idx).is_some());
-                    let container = inv.containers.get_unchecked_mut(container_idx);
+                    let container = inv.containers.get_unchecked(container_idx);
+                    let container = &mut resolver.container_mut_unchecked(*container).container;
                     container.remove_at_index(slot)
                 };
 
                 // now attempt to free up equip slot
                 if inv.insert_item(
+                    resolver,
                     removed_item.entity,
                     extra_hands,
                     removed_item.volume,
-                    removed_item.half_dims,
+                    removed_item.size,
+                    |_item, _container| {
+                        // TODO impl this when a scenario is found to hit this code path :^)
+                        //  - pass through a closure from caller?
+                        todo!()
+                    },
                 ) {
                     // it worked
                     true
                 } else {
                     // failed to free up enough space, put item back into original container
                     // safety: no containers have been added/removed since
-                    let container = unsafe { inv.containers.get_unchecked_mut(container_idx) };
+                    let container = unsafe {
+                        let container = inv.containers.get_unchecked(container_idx);
+                        &mut resolver.container_mut_unchecked(*container).container
+                    };
 
                     let added = container.add(&removed_item);
                     debug_assert!(added.is_ok());
@@ -367,13 +554,17 @@ impl<'a> FoundSlotMut<'a> {
 impl<'a> FoundSlot<'a> {
     /// Panics if entity not found, if for example this is not the same inventory the slot was
     /// resolved in
-    pub fn get(self, inventory: &'a InventoryComponent) -> Entity {
+    pub fn get(
+        self,
+        inventory: &'a InventoryComponent,
+        resolver: &impl ContainerResolver,
+    ) -> Entity {
         let entity = match self {
             FoundSlot::Equipped(i) => inventory.equip_slots.get(i).and_then(|e| e.ok()),
-            FoundSlot::Container(i, j, _) => inventory
-                .containers
-                .get(i)
-                .and_then(|c| c.contents_as_slice().get(j))
+            FoundSlot::Container(c, i, _) => inventory
+                .containers(resolver)
+                .find(|(e, _)| *e == c)
+                .and_then(|(_, c)| c.contents_as_slice().get(i))
                 .map(|e| e.entity),
         };
 
@@ -382,7 +573,7 @@ impl<'a> FoundSlot<'a> {
 }
 
 impl<'a> EquipSlots<'a> {
-    pub fn fill(&mut self, entity: Entity, volume: Volume, half_dims: Length3) {
+    pub fn fill(&mut self, entity: Entity, volume: Volume, size: Length3) {
         let mut slots = self.0.iter_mut();
 
         if let Some(e) = slots.next() {
@@ -390,7 +581,7 @@ impl<'a> EquipSlots<'a> {
             *e = EquipSlot::Occupied(HeldEntity {
                 entity,
                 volume,
-                half_dims,
+                size,
             });
         }
         slots.for_each(|e| {
@@ -405,9 +596,36 @@ impl Debug for FoundSlot<'_> {
         match self {
             FoundSlot::Equipped(i) => write!(f, "Equipped({})", i),
             FoundSlot::Container(container, slot, _) => {
-                write!(f, "Container({}:{})", container, slot)
+                write!(f, "Container({}:{})", E(*container), slot)
             }
         }
+    }
+}
+
+impl ContainerComponent {
+    /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
+    /// are valid and their capacities accurate
+    /// - held_entities: item->holder
+    #[cfg(debug_assertions)]
+    pub fn validate(
+        &self,
+        container: Entity,
+        world: &impl ComponentWorld,
+        held_entities: &mut HashMap<Entity, ContainedInComponent>,
+    ) {
+        validate_container(&self.container, container, held_entities, world);
+    }
+
+    pub fn communal(&self) -> Option<SocietyHandle> {
+        self.communal
+    }
+
+    /// Must be kept in sync with society
+    pub(in crate::item) fn make_communal(
+        &mut self,
+        society: Option<SocietyHandle>,
+    ) -> Option<SocietyHandle> {
+        std::mem::replace(&mut self.communal, society)
     }
 }
 
@@ -425,4 +643,36 @@ impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
     }
 }
 
+// TODO this is the same as is used by PhysicalComponent
+#[derive(serde::Deserialize)]
+struct SizeLimit {
+    x: u16,
+    y: u16,
+    z: u16,
+}
+
+impl<V: Value> ComponentTemplate<V> for ContainerComponentTemplate {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let volume: u16 = values.get_int("volume")?;
+        let size: SizeLimit = values.get("size")?.into_type()?;
+
+        Ok(Box::new(ContainerComponentTemplate {
+            volume: Volume::new(volume),
+            size: Length3::new(size.x, size.y, size.z),
+        }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(ContainerComponent {
+            container: Container::new(self.volume, self.size),
+            owner: None,
+            communal: None,
+        })
+    }
+}
+
 register_component_template!("inventory", InventoryComponentTemplate);
+register_component_template!("container", ContainerComponentTemplate);

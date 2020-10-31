@@ -67,8 +67,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         let _timer = self.perf.tick.time();
 
         let world_viewer = self.backend.world_viewer();
-        self.simulation.tick(&self.sim_ui_commands, world_viewer);
-        self.sim_ui_commands.clear();
+        self.simulation
+            .tick(self.sim_ui_commands.drain(..), world_viewer);
 
         self.backend.tick();
     }

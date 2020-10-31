@@ -3,11 +3,10 @@ use crate::input::SelectedEntity;
 use crate::render::DebugRenderer;
 
 use crate::senses::SensesComponent;
-use crate::{Renderer, TransformComponent};
+use crate::{InnerWorldRef, Renderer, TransformComponent, WorldViewer};
 use color::ColorRgb;
 use common::cgmath::Rotation;
 use common::*;
-use world::{InnerWorldRef, WorldViewer};
 
 const COLOR_VISION: ColorRgb = ColorRgb::new(70, 200, 100);
 const COLOR_HEARING: ColorRgb = ColorRgb::new(180, 200, 80);

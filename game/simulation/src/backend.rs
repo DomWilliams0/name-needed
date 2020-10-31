@@ -1,8 +1,6 @@
-use world::WorldViewer;
-
 use crate::input::UiCommand;
 use crate::perf::PerfAvg;
-use crate::{Renderer, Simulation};
+use crate::{Renderer, Simulation, WorldViewer};
 use common::Error;
 use resources::resource::Resources;
 
@@ -45,9 +43,8 @@ pub trait PersistentSimulationBackend: Sized {
 }
 
 pub mod state {
-    use crate::{InitializedSimulationBackend, PersistentSimulationBackend};
+    use crate::{InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
     use resources::resource::Resources;
-    use world::WorldViewer;
 
     #[allow(clippy::manual_non_exhaustive)]
     enum State<B: PersistentSimulationBackend> {

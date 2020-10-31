@@ -2,7 +2,9 @@ use common::*;
 use unit::world::WorldPoint;
 use world::NavigationError;
 
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{
+    ActivityEventContext, ActivityFinish, ActivityResult, SubActivity,
+};
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
@@ -20,8 +22,8 @@ pub struct GoToActivity {
 impl<W: ComponentWorld> Activity<W> for GoToActivity {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<W>) -> ActivityResult {
         match self.result.take() {
-            Some(Ok(_)) => ActivityResult::Finished(Finish::Success),
-            Some(Err(e)) => ActivityResult::Finished(Finish::Failure(Box::new(e))),
+            Some(Ok(_)) => ActivityResult::Finished(ActivityFinish::Success),
+            Some(Err(e)) => ActivityResult::Finished(ActivityFinish::Failure(Box::new(e))),
             None => self.goto.init(ctx),
         }
     }
@@ -44,7 +46,7 @@ impl<W: ComponentWorld> Activity<W> for GoToActivity {
         }
     }
 
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

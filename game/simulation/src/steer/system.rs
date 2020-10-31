@@ -6,8 +6,7 @@ use crate::steer::behaviour::SteeringResult;
 use crate::steer::context::ContextMap;
 use crate::steer::SteeringBehaviour;
 use crate::transform::PhysicalComponent;
-use crate::TransformComponent;
-use world::WorldRef;
+use crate::{TransformComponent, WorldRef};
 
 /// Steering context
 #[derive(Default, Component, EcsComponent)]
@@ -40,7 +39,7 @@ impl<'a> System<'a> for SteeringSystem {
             log_scope!(o!("system" => "steering", E(e)));
 
             let mut context_map = ContextMap::default();
-            let bounding_radius = physical.bounding_radius().metres();
+            let bounding_radius = physical.max_dimension().metres() / 2.0;
 
             // populate steering interests from current behaviour
             let result =

@@ -2,7 +2,9 @@ use common::*;
 
 use world::SearchGoal;
 
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{
+    ActivityEventContext, ActivityFinish, ActivityResult, SubActivity,
+};
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::ecs::{Entity, E};
@@ -130,7 +132,7 @@ impl<W: ComponentWorld> Activity<W> for FollowActivity {
         }
     }
 
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

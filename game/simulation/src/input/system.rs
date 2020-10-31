@@ -1,9 +1,10 @@
-use crate::ecs::*;
-use crate::input::{InputEvent, SelectType, WorldColumn};
-use crate::{RenderComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
-use world::WorldRef;
+
+use crate::ecs::*;
+use crate::input::{InputEvent, SelectType, WorldColumn};
+use crate::WorldRef;
+use crate::{RenderComponent, TransformComponent};
 
 pub struct InputSystem<'a> {
     pub events: &'a [InputEvent],
@@ -23,7 +24,7 @@ pub struct SelectedEntity(Option<Entity>);
 #[derive(Default, Clone)]
 pub struct SelectedTiles(Option<WorldPositionRange>);
 
-const TILE_SELECTION_LIMIT: i32 = 64;
+const TILE_SELECTION_LIMIT: f32 = 50.0;
 
 impl<'a> System<'a> for InputSystem<'a> {
     type SystemData = (
@@ -85,58 +86,43 @@ impl<'a> System<'a> for InputSystem<'a> {
 
                 InputEvent::Select(SelectType::Right, from, to) => {
                     // select tiles
-                    selected_block.0 = match (resolve_walkable_pos(from), resolve_walkable_pos(to))
-                    {
-                        (Some(from), Some(to)) => {
-                            let (to, from) = {
-                                // round away from first point
-                                let (mut x, mul_x) = if to.0 > from.0 {
-                                    (to.0.ceil() as i32, 1)
-                                } else {
-                                    (to.0.floor() as i32, -1)
-                                };
-                                let (mut y, mul_y) = if to.1 > from.1 {
-                                    (to.1.ceil() as i32, 1)
-                                } else {
-                                    (to.1.floor() as i32, -1)
-                                };
+                    let w = (*world).borrow();
 
-                                let mut from = from.round();
+                    // limit selection size by moving the second point placed. this isn't totally
+                    // accurate and may allow selections of 1 block bigger, but meh who cares
+                    let to = {
+                        let dx = (from.x - to.x).abs();
+                        let dy = (from.y - to.y).abs();
 
-                                // minimum 1 along each axis
-                                if from.0 == x {
-                                    x += mul_x;
-                                }
-                                if from.1 == y {
-                                    y += mul_y;
-                                }
+                        let x_overlap = TILE_SELECTION_LIMIT - dx;
+                        let y_overlap = TILE_SELECTION_LIMIT - dy;
 
-                                // maximum along each axis
-                                let dx = (from.0 - x).abs();
-                                let dy = (from.1 - y).abs();
-                                if dx > TILE_SELECTION_LIMIT {
-                                    x -= (dx - TILE_SELECTION_LIMIT) * mul_x;
-                                }
-                                if dy > TILE_SELECTION_LIMIT {
-                                    y -= (dy - TILE_SELECTION_LIMIT) * mul_y;
-                                }
-
-                                // increase z of higher block by 1
-                                let z = if to.slice() > from.slice() {
-                                    to.slice() + 1
-                                } else {
-                                    from.2 += 1;
-                                    to.slice()
-                                };
-
-                                (WorldPosition(x, y, z), from)
-                            };
-
-                            debug!("selected block region"; "min" => %from, "max" => %to);
-                            Some(WorldPositionRange::with_exclusive_range(from, to))
+                        let mut to = *to;
+                        if x_overlap < 0.0 {
+                            let mul = if from.x > to.x { 1.0 } else { -1.0 };
+                            to.x -= mul * x_overlap;
                         }
-                        _ => None,
-                    }
+
+                        if y_overlap < 0.0 {
+                            let mul = if from.y > to.y { 1.0 } else { -1.0 };
+                            to.y -= mul * y_overlap;
+                        }
+
+                        to
+                    };
+
+                    selected_block.0 = from.find_min_max_walkable(&to, &w).map(|(min, max)| {
+                        let mut a = min.floor();
+                        let mut b = max.floor();
+
+                        // these blocks are walkable air blocks, move them down 1 to select the
+                        // actual block beneath
+                        a.2 -= 1;
+                        b.2 -= 1;
+
+                        debug!("selecting tiles"; "min" => %a, "max" => %b);
+                        WorldPositionRange::with_inclusive_range(a, b)
+                    });
                 }
             }
         }

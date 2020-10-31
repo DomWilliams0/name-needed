@@ -1,5 +1,7 @@
 use unit::world::{WorldPoint, WorldPosition};
-use world::{InnerWorldRef, SliceRange};
+use world::SliceRange;
+
+use crate::InnerWorldRef;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldColumn {
@@ -23,6 +25,30 @@ pub enum SelectType {
 }
 
 impl WorldColumn {
+    pub fn find_min_max_walkable(
+        &self,
+        other: &Self,
+        world: &InnerWorldRef,
+    ) -> Option<(WorldPoint, WorldPoint)> {
+        let range = self.slice_range;
+        debug_assert_eq!(range, other.slice_range);
+
+        let min = WorldColumn {
+            x: self.x.min(other.x),
+            y: self.y.min(other.y),
+            slice_range: range,
+        };
+
+        let max = WorldColumn {
+            x: self.x.max(other.x),
+            y: self.y.max(other.y),
+            slice_range: range,
+        };
+
+        min.find_highest_walkable(world)
+            .zip(max.find_highest_walkable(world))
+    }
+
     pub fn find_highest_walkable(&self, world: &InnerWorldRef) -> Option<WorldPoint> {
         let block = WorldPosition(
             self.x.floor() as i32,

@@ -20,6 +20,7 @@ use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
+use crate::world::WorldChangeEvent;
 use crate::{InnerWorldRef, OcclusionChunkUpdate, WorldRef};
 use std::cell::{Cell, RefCell};
 use std::ops::DerefMut;
@@ -29,18 +30,18 @@ mod terrain_source;
 mod update;
 mod worker_pool;
 
-pub struct WorldLoader<P: WorkerPool> {
+pub struct WorldLoader<P: WorkerPool<D>, D> {
     source: Arc<Mutex<dyn TerrainSource>>,
     pool: P,
     finalization_channel: Sender<LoadTerrainResult>,
     chunk_updates_rx: Option<Receiver<OcclusionChunkUpdate>>,
-    world: WorldRef,
+    world: WorldRef<D>,
     all_count: Option<usize>,
     batch_ids: UpdateBatchUniqueId,
 }
 
-struct ChunkFinalizer {
-    world: WorldRef,
+struct ChunkFinalizer<D> {
+    world: WorldRef<D>,
     updates: Sender<OcclusionChunkUpdate>,
     batcher: UpdateBatcher<FinalizeBatchItem>,
 }
@@ -70,7 +71,7 @@ pub enum ChunkRequest {
     UpdateExisting,
 }
 
-impl<P: WorkerPool> WorldLoader<P> {
+impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
         let (finalize_tx, finalize_rx) = bounded(16);
         let (chunk_updates_tx, chunk_updates_rx) = unbounded();
@@ -89,7 +90,7 @@ impl<P: WorkerPool> WorldLoader<P> {
         }
     }
 
-    pub fn world(&self) -> WorldRef {
+    pub fn world(&self) -> WorldRef<D> {
         self.world.clone()
     }
 
@@ -188,6 +189,7 @@ impl<P: WorkerPool> WorldLoader<P> {
     pub fn apply_terrain_updates(
         &mut self,
         terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
+        changes_out: &mut Vec<WorldChangeEvent>,
     ) {
         let world_ref = self.world.clone();
         let world = world_ref.borrow();
@@ -223,7 +225,7 @@ impl<P: WorkerPool> WorldLoader<P> {
             // apply updates to world but don't submit them to the loader yet
             .map(|(chunk, updates)| {
                 let updates = updates.map(|(_, slab, update)| (slab, update));
-                let new_terrain = world.apply_terrain_updates(chunk, updates);
+                let new_terrain = world.apply_terrain_updates(chunk, updates, changes_out);
                 (chunk, new_terrain)
             });
 
@@ -282,8 +284,8 @@ impl ChunkRequest {
     }
 }
 
-impl ChunkFinalizer {
-    fn new(world: WorldRef, updates: Sender<OcclusionChunkUpdate>) -> Self {
+impl<D> ChunkFinalizer<D> {
+    fn new(world: WorldRef<D>, updates: Sender<OcclusionChunkUpdate>) -> Self {
         Self {
             world,
             updates,
@@ -331,7 +333,7 @@ impl ChunkFinalizer {
         dependents: &'dependents [FinalizeBatchItem],
     ) {
         let lookup_neighbour =
-            |chunk_pos, world: &InnerWorldRef| -> Option<&'dependents RawChunkTerrain> {
+            |chunk_pos, world: &InnerWorldRef<D>| -> Option<&'dependents RawChunkTerrain> {
                 // check finalize queue in case this chunk is dependent on the one being processed currently
                 let dependent = dependents.iter().find_map(|item| item.get(chunk_pos));
 
@@ -552,7 +554,7 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
-        let mut loader = WorldLoader::new(source, BlockingWorkerPool::default());
+        let mut loader = WorldLoader::<_, ()>::new(source, BlockingWorkerPool::default());
         loader.request_chunks(once(ChunkPosition(0, 0)));
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15));

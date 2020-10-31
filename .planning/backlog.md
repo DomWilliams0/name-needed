@@ -12,6 +12,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * path optimisation (line of sight)
 * wandering should choose a close location instead of random in the world
 	* new SearchGoal to cut short path to N blocks
+	* wander should not take them up into stupid places like atop chests
+		* consider different edge costs for climbing ontop of stupid things, not considered for wandering/walking
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
 * bug: area path finding seems to needlessly poke into other areas
@@ -44,7 +46,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 
 ## Entity behaviour
 * more society level jobs
-	* pick up/haul an item
 	* place blocks, destroying what's currently there (DAG for dependencies)
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
@@ -54,15 +55,15 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * food/drink vessels and wastage
 * consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
 * if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
-* storage containers (e.g. chest)
-	* containers can be communal and/or private
-* add "haul item" DSE (with "can haul" consideration)
-	* collect items (food/2-handed stone bricks etc) and store in communal/private chests
+* if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
+* bug: society job is not notified if a subtask fails, causing it to be infinitely attempted
+	* e.g. haul things into a container but it's full
+	* a set of completed tasks should be maintained per job
 
 ## World generation
 * biomes
 * features e.g. trees, hills
-	* trees are entities, not blocks
+	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
 	* magma very low down, or it just gets too hot
 
@@ -102,6 +103,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage
 * dynstack for ai dses and considerations, to avoid the huge amount of boxing
 * experiment with PGO
+* consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
+* physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed
 
 ### Memory usage
 * CoW terrain slabs

@@ -1,10 +1,12 @@
-use crate::activity::activity::{ActivityResult, SubActivity};
+use common::*;
+
+use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
+
 use crate::ecs::{Entity, WorldExt, E};
 use crate::event::{EntityEvent, EntityEventPayload};
-use crate::item::{HaulType, HaulableItemComponent, HauledItemComponent};
-use crate::{ComponentWorld, InventoryComponent, PhysicalComponent};
-use common::*;
+use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
+use crate::{ComponentWorld, InventoryComponent, PhysicalComponent, TransformComponent};
 
 /// Handles holding of an item in the hauler's hands. No moving
 #[derive(Debug)]
@@ -25,6 +27,15 @@ pub enum HaulError {
 
     #[error("Item is not alive, haulable or physical")]
     BadItem,
+
+    #[error("Invalid container entity for haul target")]
+    BadContainer,
+
+    #[error("Hauler doesn't have a transform")]
+    BadHauler,
+
+    #[error("Container operation failed: {0}")]
+    Container(#[from] ContainerError),
 }
 
 impl HaulSubActivity {
@@ -38,23 +49,8 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
         let hauler = ctx.entity;
         let item = self.thing;
 
-        // validate inventory space now
-        // TODO move this check to the DSE, doing it here only saves 1 tick
-        // if let Err(e) = ctx
-        //     .world
-        //     .component::<InventoryComponent>(hauler)
-        //     .map_err(|_| HaulError::NoInventory)
-        //     .and_then(|inv| {
-        //         inv.has_hauling_slots(extra_hands)
-        //             .ok_or(HaulError::NotEnoughFreeHands)
-        //     })
-        // {
-        //     debug!("not enough hands");
-        //     return ActivityResult::errored(e);
-        // }
-
         ctx.updates.queue("haul item", move |world| {
-            let mut do_haul = || -> Result<(Entity, Entity), HaulError> {
+            let mut do_haul = || -> Result<Entity, HaulError> {
                 // check item is alive first, to ensure .insert() succeeds below
                 if !world.is_entity_alive(item) {
                     return Err(HaulError::BadItem);
@@ -65,11 +61,9 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
                     let haulables = world.read_storage::<HaulableItemComponent>();
                     let physicals = world.read_storage::<PhysicalComponent>();
                     match world.components(item, (&haulables, &physicals)) {
-                        Some((haulable, physical)) => (
-                            haulable.extra_hands,
-                            physical.volume,
-                            physical.half_dimensions,
-                        ),
+                        Some((haulable, physical)) => {
+                            (haulable.extra_hands, physical.volume, physical.size)
+                        }
                         None => {
                             warn!("item is not haulable"; "item" => E(item));
                             return Err(HaulError::BadItem);
@@ -94,18 +88,47 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
                     .get_hauling_slots(extra_hands)
                     .ok_or(HaulError::NotEnoughFreeHands)?;
 
+                // get hauler position if needed
+                let hauler_pos = {
+                    let transforms = world.read_storage::<TransformComponent>();
+                    if transforms.get(item).is_some() {
+                        // not needed, item already has a transform
+                        None
+                    } else {
+                        let transform = transforms.get(hauler).ok_or(HaulError::BadHauler)?;
+                        Some(transform.position)
+                    }
+                };
+
+                // ensure hauler is close enough to haulee
+                if cfg!(debug_assertions) {
+                    let transforms = world.read_storage::<TransformComponent>();
+                    let hauler_pos = transforms.get(hauler).unwrap().position;
+                    let haulee_pos = transforms.get(item).unwrap().position;
+
+                    assert!(
+                        hauler_pos.is_almost(&haulee_pos, 3.0),
+                        "{} is trying to haul {} but they are too far apart (hauler at {}, item at {}, distance is {:?}",
+                        E(hauler),
+                        E(item),
+                        hauler_pos,
+                        haulee_pos,
+                        hauler_pos.distance2(haulee_pos).sqrt()
+                    );
+                }
+
                 // everything has been checked, no more errors past this point
 
                 // fill equip slots
                 slots.fill(item, volume, size);
 
-                // add haul component to item
+                // add components
                 world
-                    .add_now(item, HauledItemComponent::new(hauler, HaulType::CarryAlone))
-                    .expect("item was asserted to be alive");
+                    .helpers_comps()
+                    .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
 
                 // TODO apply slowness effect to holder
-                Ok((item, hauler))
+                Ok(hauler)
             };
 
             let result = do_haul();
@@ -117,28 +140,43 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
             Ok(())
         });
 
+        // TODO subscribe to container being destroyed
+
         // nothing else to do here, goto sub activity will handle the actual movement
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    /// Only fails if holder has no inventory component
+    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         let hauler = ctx.entity;
         let item = self.thing;
+        let interrupted = matches!(finish, ActivityFinish::Interrupted);
+
         ctx.updates.queue("stop hauling item", move |world| {
-            // remove haul component from item
-            let _ = world.remove_now::<HauledItemComponent>(item);
+            // remove components from item
+            let behaviour = world.helpers_comps().end_haul(item, interrupted);
 
-            // free holder's hands
-            let inventory = world
-                .component_mut::<InventoryComponent>(hauler)
-                .map_err(|_| HaulError::NoInventory)?;
+            let count = match behaviour {
+                EndHaulBehaviour::Drop => {
+                    // free holder's hands
+                    let inventory = world
+                        .component_mut::<InventoryComponent>(hauler)
+                        .map_err(|_| HaulError::NoInventory)?;
 
-            let count = inventory.remove_item(item);
+                    inventory.remove_item(item)
+                }
+                EndHaulBehaviour::KeepEquipped => {
+                    // dont remove from inventory
+                    0
+                }
+            };
+
             debug!(
                 "{hauler} stopped hauling {item}, removed from {slots} slots",
                 hauler = E(hauler),
                 item = E(item),
-                slots = count
+                slots = count;
+                "behaviour" => ?behaviour,
             );
 
             // TODO remove slowness effect if any

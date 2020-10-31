@@ -13,8 +13,8 @@ pub struct BlockPosition(BlockCoord, BlockCoord, GlobalSliceIndex);
 
 impl BlockPosition {
     pub fn new(x: BlockCoord, y: BlockCoord, z: GlobalSliceIndex) -> Self {
-        assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
-        assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
+        debug_assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
+        debug_assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
         Self(x, y, z)
     }
 

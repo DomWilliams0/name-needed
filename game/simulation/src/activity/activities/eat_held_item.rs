@@ -1,6 +1,8 @@
 use common::*;
 
-use crate::activity::activity::{ActivityEventContext, ActivityResult, Finish, SubActivity};
+use crate::activity::activity::{
+    ActivityEventContext, ActivityFinish, ActivityResult, SubActivity,
+};
 use crate::activity::subactivities::{ItemEatSubActivity, ItemEquipSubActivity};
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::ecs::{Entity, E};
@@ -40,6 +42,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
 
         match &mut self.state {
             EatHeldItemState::Init => {
+                // ensure enough hands to eat it
                 let extra_hands = match ctx.world.component::<EdibleItemComponent>(self.item) {
                     Ok(comp) => comp.extra_hands,
                     Err(_) => return ActivityResult::errored(EatHeldItemError::NotEdible),
@@ -50,7 +53,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
                     extra_hands,
                 };
                 match sub.init(ctx) {
-                    ActivityResult::Finished(Finish::Success) => {
+                    ActivityResult::Finished(ActivityFinish::Success) => {
                         trace!("item is already equipped, using immediately");
 
                         let sub = ItemEatSubActivity(self.item);
@@ -112,7 +115,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
         }
     }
 
-    fn on_finish(&mut self, _: Finish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

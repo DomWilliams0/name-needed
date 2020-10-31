@@ -14,10 +14,10 @@ use std::collections::VecDeque;
 
 pub type LoadTerrainResult = Result<(ChunkPosition, ChunkTerrain, UpdateBatch), TerrainSourceError>;
 
-pub trait WorkerPool {
+pub trait WorkerPool<D> {
     fn start_finalizer(
         &mut self,
-        world: WorldRef,
+        world: WorldRef<D>,
         finalize_rx: Receiver<LoadTerrainResult>,
         chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     );
@@ -51,10 +51,10 @@ impl ThreadedWorkerPool {
     }
 }
 
-impl WorkerPool for ThreadedWorkerPool {
+impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
     fn start_finalizer(
         &mut self,
-        world: WorldRef,
+        world: WorldRef<D>,
         finalize_rx: Receiver<LoadTerrainResult>,
         chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     ) {
@@ -118,8 +118,8 @@ impl WorkerPool for ThreadedWorkerPool {
 }
 
 #[derive(Default)]
-pub struct BlockingWorkerPool {
-    finalizer_magic: Option<(Receiver<LoadTerrainResult>, ChunkFinalizer)>,
+pub struct BlockingWorkerPool<D> {
+    finalizer_magic: Option<(Receiver<LoadTerrainResult>, ChunkFinalizer<D>)>,
 
     #[allow(clippy::type_complexity)]
     task_queue: VecDeque<(
@@ -128,10 +128,10 @@ pub struct BlockingWorkerPool {
     )>,
 }
 
-impl WorkerPool for BlockingWorkerPool {
+impl<D> WorkerPool<D> for BlockingWorkerPool<D> {
     fn start_finalizer(
         &mut self,
-        world: WorldRef,
+        world: WorldRef<D>,
         finalize_rx: Receiver<LoadTerrainResult>,
         chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     ) {

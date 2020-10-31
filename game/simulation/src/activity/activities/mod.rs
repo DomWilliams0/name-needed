@@ -1,7 +1,7 @@
 pub use eat_held_item::EatHeldItemActivity;
 pub use follow::FollowActivity;
 pub use go_break_block::GoBreakBlockActivity;
-pub use go_haul::HaulActivity;
+pub use go_haul::{HaulActivity, HaulTarget};
 pub use go_pickup::PickupItemsActivity;
 pub use go_to::GoToActivity;
 pub use nop::NopActivity;

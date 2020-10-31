@@ -91,13 +91,17 @@ impl<'a> SliceMut<'a> {
         Self::new(slice)
     }
 
-    pub fn set_block<P, B>(&mut self, pos: P, block: B)
+    pub(crate) fn set_block<P, B>(&mut self, pos: P, block: B) -> BlockType
     where
         P: Into<SliceBlock>,
         B: Into<Block>,
     {
         let index = flatten_coords(pos.into());
-        self.slice[index] = block.into();
+        let b = &mut self.slice[index];
+
+        let prev = b.block_type();
+        *b = block.into();
+        prev
     }
 
     pub fn fill<B>(&mut self, block: B)

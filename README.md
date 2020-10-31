@@ -26,10 +26,9 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 The engine uses SDL2 and OpenGL, and is developed primarily on Linux, although it seems to work fine on Windows too.
 
-If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) features of SDL2 will download and compile it for you, which requires a C compiler.
+If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) feature of SDL can download and compile it for you (requires a C compiler).
 
 I use the latest stable Rust toolchain and the newest fanciest language features, so no promises for a Minimal Supported Rust Version.
-
 
 ```
 $ git clone https://github.com/DomWilliams0/name-needed
@@ -38,7 +37,7 @@ $ cd name-needed/
 
 $ # optionally modify game config, see below
 
-$ cargo run --release
+$ cargo run
 ```
 
 ### Configuration
@@ -58,6 +57,7 @@ The environment variable `NN_LOG` configures logging, set it to one of `trace`, 
 * <kbd>R</kbd> to restart
 * <kbd>Left-click</kbd> to select an entity and view their stats in the debug menu
 	* Command them to go to or break a selected block via `Divine control`
+	* Select an item and order it to be hauled to the tile selection in the `Society` menu
 * <kbd>Right-click</kbd> to drag a selection over blocks in the world
 	* Command them to collaborate to break blocks via the `Society` menu
 	* Set and place blocks via the `Selection` menu

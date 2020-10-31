@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -7,21 +6,20 @@ use crossbeam::crossbeam_channel::Receiver;
 use common::*;
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
+use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
-use world::{OcclusionChunkUpdate, WorldRef, WorldViewer};
+use world::{OcclusionChunkUpdate, WorldChangeEvent};
 
 use crate::activity::{ActivityEventSystem, ActivitySystem};
 use crate::ai::{AiAction, AiComponent, AiSystem};
-use crate::definitions;
-use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
-use crate::dev::SimulationDevExt;
+
 use crate::ecs::*;
 use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    SocietyInputCommand, UiBlackboard, UiCommand,
+    UiBlackboard, UiCommand,
 };
-use crate::item::HaulSystem;
+use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
 use crate::needs::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
@@ -30,13 +28,19 @@ use crate::queued_update::QueuedUpdates;
 use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
-use crate::society::job::{BreakBlocksJob, Job};
-use crate::society::{PlayerSociety, Society};
+
+use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::{definitions, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
-pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool>;
+#[derive(Debug)]
+pub enum AssociatedBlockData {
+    Container(Entity),
+}
+
+pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool, AssociatedBlockData>;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
@@ -49,16 +53,18 @@ pub struct Tick(u32);
 pub struct Simulation<R: Renderer> {
     ecs_world: EcsWorld,
     voxel_world: WorldRef,
-    definitions: definitions::Registry,
 
     world_loader: ThreadedWorldLoader,
+
     /// Occlusion updates received from world loader
     chunk_updates: Receiver<OcclusionChunkUpdate>,
 
     /// Terrain updates, queued and applied per tick
     terrain_changes: Vec<WorldTerrainUpdate>,
 
-    renderer: PhantomData<R>,
+    /// World change events populated during terrain updates, consumed every tick
+    change_events: Vec<WorldChangeEvent>,
+
     debug_renderers: DebugRenderers<R>,
 }
 
@@ -71,12 +77,12 @@ impl<R: Renderer> Simulation<R> {
             definitions::load(def_root)?
         };
 
-        // make world and register components
-        let mut ecs_world = EcsWorld::new();
-
-        // insert resources
         let voxel_world = world_loader.world();
+
+        // make ecs world and insert resources
+        let mut ecs_world = EcsWorld::new();
         ecs_world.insert(voxel_world.clone());
+        ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
         let chunk_updates = world_loader.chunk_updates_rx().unwrap();
@@ -84,26 +90,21 @@ impl<R: Renderer> Simulation<R> {
         register_debug_renderers(&mut debug_renderers)?;
 
         Ok(Self {
-            definitions,
             ecs_world,
-            renderer: PhantomData,
             voxel_world,
             world_loader,
             chunk_updates,
             debug_renderers,
             terrain_changes: Vec::with_capacity(1024),
+            change_events: Vec::with_capacity(1024),
         })
     }
 
-    pub fn entity_builder(
+    pub fn tick(
         &mut self,
-        definition_uid: &str,
-    ) -> Result<DefinitionBuilder<EcsWorld>, DefinitionErrorKind> {
-        self.definitions
-            .instantiate(definition_uid, &mut self.ecs_world)
-    }
-
-    pub fn tick(&mut self, commands: &[UiCommand], world_viewer: &mut WorldViewer) {
+        commands: impl Iterator<Item = UiCommand>,
+        world_viewer: &mut WorldViewer,
+    ) {
         // update tick
         increment_tick();
 
@@ -134,6 +135,10 @@ impl<R: Renderer> Simulation<R> {
     }
 
     fn tick_systems(&mut self) {
+        // validate inventory soundness
+        #[cfg(debug_assertions)]
+        crate::item::validation::InventoryValidationSystem.run_now(&self.ecs_world);
+
         // needs
         HungerSystem.run_now(&self.ecs_world);
         EatingSystem.run_now(&self.ecs_world);
@@ -157,10 +162,6 @@ impl<R: Renderer> Simulation<R> {
         // process entity events
         ActivityEventSystem.run_now(&self.ecs_world);
 
-        // validate inventory soundness
-        #[cfg(debug_assertions)]
-        crate::item::validation::InventoryValidationSystem.run_now(&self.ecs_world);
-
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
 
@@ -171,8 +172,16 @@ impl<R: Renderer> Simulation<R> {
         SpatialSystem.run_now(&self.ecs_world);
     }
 
-    pub fn world(&self) -> WorldRef {
+    pub fn voxel_world(&self) -> WorldRef {
         self.voxel_world.clone()
+    }
+
+    pub fn world_mut(&mut self) -> &mut EcsWorld {
+        &mut self.ecs_world
+    }
+
+    pub fn world(&self) -> &EcsWorld {
+        &self.ecs_world
     }
 
     pub fn societies(&mut self) -> &mut Societies {
@@ -200,19 +209,29 @@ impl<R: Renderer> Simulation<R> {
 
         // terrain changes
         // TODO per tick alloc/reuse buf
-        let terrain_updates = self.terrain_changes.drain(..).chain(
-            self.ecs_world
-                .resource_mut::<TerrainUpdatesRes>()
-                .0
-                .drain(..),
-        );
+        let terrain_updates = self
+            .terrain_changes
+            .drain(..)
+            .chain(self.ecs_world.resource_mut::<TerrainUpdatesRes>().drain(..));
 
-        self.world_loader.apply_terrain_updates(terrain_updates);
+        self.world_loader
+            .apply_terrain_updates(terrain_updates, &mut self.change_events);
+
+        // consume change events
+        let mut events = std::mem::take(&mut self.change_events);
+        events
+            .drain(..)
+            .filter(|e| e.new != e.prev)
+            .for_each(|e| self.on_world_change(e));
+
+        // swap storage back and forget empty vec
+        let empty = std::mem::replace(&mut self.change_events, events);
+        std::mem::forget(empty);
     }
 
-    fn process_ui_commands(&mut self, commands: &[UiCommand]) {
+    fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) {
         for cmd in commands {
-            match *cmd {
+            match cmd {
                 UiCommand::ToggleDebugRenderer { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
                         warn!("failed to toggle debug renderer"; "renderer" => ident, "error" => %e);
@@ -222,13 +241,14 @@ impl<R: Renderer> Simulation<R> {
                 UiCommand::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
                     if let Some((mut from, mut to)) = selection.bounds() {
-                        if let BlockPlacement::Set = placement {
-                            // move the range down 1 block to set those blocks instead of the air
-                            // blocks above
-                            from = from.below();
-                            to = to.below();
+                        if let BlockPlacement::PlaceAbove = placement {
+                            // move the range up 1 block
+                            from = from.above();
+                            to = to.above();
                         }
                         let range = WorldPositionRange::with_inclusive_range(from, to);
+                        debug!("filling in block range"; "range" => ?range, "block_type" => ?block_type);
+
                         self.terrain_changes
                             .push(WorldTerrainUpdate::new(range, block_type));
                     }
@@ -251,7 +271,7 @@ impl<R: Renderer> Simulation<R> {
                             target: pos.centred(),
                             reason: "I said so",
                         },
-                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos.below()),
+                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(*pos),
                     };
 
                     match self.ecs_world.component_mut::<AiComponent>(entity) {
@@ -262,23 +282,56 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiCommand::IssueSocietyCommand(society, ref command) => {
-                    let society = match self.societies().society_by_handle_mut(society) {
-                        Some(s) => s,
-                        None => {
-                            warn!("invalid society while issuing command"; "society" => ?society, "command" => ?command);
+                UiCommand::IssueSocietyCommand(society, command) => {
+                    let job = match command.into_job(&self.ecs_world) {
+                        Ok(job) => job,
+                        Err(cmd) => {
+                            warn!("failed to issue society command"; "command" => ?cmd);
                             continue;
                         }
                     };
 
-                    let job: Box<dyn Job> = Box::new(match command {
-                        SocietyInputCommand::BreakBlocks(range) => {
-                            BreakBlocksJob::new(range.clone().below())
+                    let society = match self.societies().society_by_handle_mut(society) {
+                        Some(s) => s,
+                        None => {
+                            warn!("invalid society while issuing job"; "society" => ?society, "job" => ?job);
+                            continue;
                         }
-                    });
+                    };
 
-                    debug!("submitting job to society {society:?}", society = society as &Society; "job" => ?job);
+                    debug!("submitting job to society"; "society" => ?society, "job" => %job);
                     society.jobs_mut().submit(job);
+                }
+                UiCommand::SetContainerOwnership {
+                    container,
+                    owner,
+                    communal,
+                } => {
+                    match self
+                        .ecs_world
+                        .component_mut::<ContainerComponent>(container)
+                    {
+                        Err(e) => {
+                            warn!("invalid container entity"; "entity" => E(container), "error" => %e);
+                            continue;
+                        }
+                        Ok(c) => {
+                            if let Some(owner) = owner {
+                                c.owner = owner;
+                                info!("set container owner"; "container" => E(container), "owner" => owner.map(E))
+                            }
+
+                            if let Some(communal) = communal {
+                                if let Err(e) = self
+                                    .ecs_world
+                                    .helpers_containers()
+                                    .set_container_communal(container, communal)
+                                {
+                                    warn!("failed to set container society"; "container" => E(container), "society" => ?communal, "error" => %e);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -339,6 +392,32 @@ impl<R: Renderer> Simulation<R> {
 
         (target, blackboard)
     }
+
+    fn on_world_change(&mut self, WorldChangeEvent { pos, prev, new }: WorldChangeEvent) {
+        debug_assert_ne!(prev, new);
+
+        match (prev, new) {
+            (_, BlockType::Chest) => {
+                // new chest placed
+                if let Err(err) = self
+                    .ecs_world
+                    .helpers_containers()
+                    .create_container(pos, "core_storage_chest")
+                {
+                    error!("failed to create container entity"; "error" => %err);
+                }
+            }
+
+            (BlockType::Chest, _) => {
+                // chest destroyed
+                if let Err(err) = self.ecs_world.helpers_containers().destroy_container(pos) {
+                    error!("failed to destroy container"; "error" => %err);
+                }
+            }
+
+            _ => {}
+        }
+    }
 }
 
 fn increment_tick() {
@@ -398,14 +477,4 @@ fn register_debug_renderers<R: Renderer>(
     r.register(NavigationAreaDebugRenderer::default(), false)?;
     r.register(SensesDebugRenderer::default(), false)?;
     Ok(())
-}
-
-impl<R: Renderer> SimulationDevExt for Simulation<R> {
-    fn world(&self) -> &EcsWorld {
-        &self.ecs_world
-    }
-
-    fn world_mut(&mut self) -> &mut EcsWorld {
-        &mut self.ecs_world
-    }
 }

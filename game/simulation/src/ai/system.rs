@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::iter::once;
 
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
@@ -7,16 +8,14 @@ use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::needs::HungerComponent;
-
 use crate::item::InventoryComponent;
+use crate::needs::HungerComponent;
 use crate::simulation::Tick;
-use crate::society::job::{JobList, Task};
+use crate::society::job::Task;
 use crate::society::{Society, SocietyComponent};
 use crate::TransformComponent;
+
 use crate::{dse, Societies};
-use std::iter::once;
-use world::WorldRef;
 
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
@@ -86,7 +85,6 @@ impl<'a> System<'a> for AiSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
-        Read<'a, WorldRef>,
         Write<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,
@@ -101,7 +99,6 @@ impl<'a> System<'a> for AiSystem {
         (
             entities,
             ecs_world,
-            voxel_world,
             mut societies,
             transform,
             hunger,
@@ -118,12 +115,13 @@ impl<'a> System<'a> for AiSystem {
         }
 
         let ecs_world: &EcsWorld = &*ecs_world;
+        let societies: &mut Societies = &mut *societies;
 
         let mut shared_bb = SharedBlackboard {
             area_link_cache: HashMap::new(),
         };
 
-        for (e, transform, hunger, ai, activity, society) in (
+        for (e, transform, hunger, ai, activity, society_opt) in (
             &entities,
             &transform,
             &hunger,
@@ -157,24 +155,26 @@ impl<'a> System<'a> for AiSystem {
             // TODO provide READ ONLY DSEs to ai intelligence
             // TODO use dynstack to avoid so many small temporary allocations?
             let mut extra_dses = Vec::<(Task, Box<dyn Dse<AiContext>>)>::new();
-            let mut society: Option<&mut Society> =
-                society.and_then(|society_comp| society_comp.resolve(&mut *societies));
+            let society = society_opt.and_then(|comp| comp.resolve(societies));
 
-            if let Some(ref mut society) = society {
+            if let Some(society) = society {
                 trace!("considering tasks for society"; "society" => ?society);
 
-                let jobs: &mut JobList = (*society).jobs_mut();
-                let (is_cached, tasks) = jobs.collect_cached_tasks_for(tick, &*voxel_world, e);
+                let mut jobs = society.jobs_mut();
+                let (is_cached, tasks) = jobs.collect_cached_tasks_for(tick, ecs_world, society, e);
 
                 // TODO fix (eventually) false assumption that all stream DSEs come from a society
-                // this will help remove the multiple silly `society.as_mut().expect()` here
+                //  - this will help remove the multiple silly `society.as_mut().expect()` here
                 debug_assert!(
                     extra_dses.is_empty(),
                     "society tasks expected to be the only source of extra dses"
                 );
-                extra_dses.extend(tasks.map(|task| {
-                    let dse = (&task).into();
-                    (task, dse)
+                extra_dses.extend(tasks.filter_map(|task| match task.as_dse(ecs_world) {
+                    Some(dse) => Some((task, dse)),
+                    None => {
+                        warn!("task failed to conversion to DSE"; "task" => ?task);
+                        None
+                    }
                 }));
 
                 trace!(
@@ -197,6 +197,7 @@ impl<'a> System<'a> for AiSystem {
                 activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
 
                 // register interruption
+                let mut society = society_opt.and_then(|comp| comp.resolve(societies));
                 ai.interrupt_current_action(e, || {
                     society
                         .as_mut()
@@ -205,9 +206,8 @@ impl<'a> System<'a> for AiSystem {
 
                 if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve this so others can't try to do it too
-                    let society = society
-                        .as_mut()
-                        .expect("streamed DSEs expected to come from a society only");
+                    let society =
+                        society.expect("streamed DSEs expected to come from a society only");
 
                     let task = &extra_dses[i].0;
                     society.jobs_mut().reserve_task(e, task.clone());

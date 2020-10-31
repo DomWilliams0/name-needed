@@ -5,7 +5,7 @@ use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
-use crate::BaseItemComponent;
+use crate::ConditionComponent;
 
 // TODO newtype for Fuel
 pub type Fuel = u16;
@@ -68,7 +68,7 @@ impl<'a> System<'a> for EatingSystem {
         ReadStorage<'a, BeingEatenComponent>,
         WriteStorage<'a, HungerComponent>,
         ReadStorage<'a, EdibleItemComponent>,
-        WriteStorage<'a, BaseItemComponent>,
+        WriteStorage<'a, ConditionComponent>,
     );
 
     fn run(
@@ -81,11 +81,11 @@ impl<'a> System<'a> for EatingSystem {
             eating,
             mut hunger,
             edible_item,
-            mut base_item,
+            mut condition,
         ): Self::SystemData,
     ) {
-        for (item, being_eaten, edible, base_item) in
-            (&entities, &eating, &edible_item, &mut base_item).join()
+        for (item, being_eaten, edible, condition) in
+            (&entities, &eating, &edible_item, &mut condition).join()
         {
             log_scope!(o!("system" => "being-eating", E(item)));
 
@@ -109,16 +109,16 @@ impl<'a> System<'a> for EatingSystem {
 
                 // do the eat
                 eater_hunger.current_fuel.add(fuel_to_consume);
-                base_item.condition -= proportion_to_eat;
+                condition.0 -= proportion_to_eat;
 
                 trace!("{eater} is eating", eater = E(being_eaten.eater);
                     "new_hunger" => ?eater_hunger.current_fuel,
-                    "new_food_condition" => ?base_item.condition
+                    "new_food_condition" => ?condition.0,
                 );
 
                 // TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2
 
-                if base_item.condition.value().value() <= 0.0 {
+                if condition.0.value().value() <= 0.0 {
                     debug!("food has been consumed");
 
                     // remove from eater's inventory
@@ -143,61 +143,7 @@ impl<'a> System<'a> for EatingSystem {
                     payload: EntityEventPayload::Eaten(result),
                 });
             }
-
-            // let condition = item.condition.value();
         }
-        /*        for (e, inv, using, hunger) in (&entities, &mut inv, &mut using, &mut hunger).join() {
-                    log_scope!(o!("system" => "eating", E(e)));
-
-                    let val = using.left.value();
-
-                    // food is already no more
-                    if val <= 0.0 {
-                        continue;
-                    }
-
-                    let result = do_eat(inv, using, hunger, &edible_item, &mut base_item, &entities);
-
-                    if !matches!(result, EatResult::Success(_)) {
-                        // ensure that this disaster ends soon by killing the item now
-                        // one could say it's an ex food
-                        using.left = NormalizedFloat::zero();
-                    }
-
-                    // food has ceased to be
-                    if using.left.value().is_zero() {
-                        let _ = inv.remove_item(SlotReference::Base(using.base_slot));
-
-                        // queue item entity for deletion
-                        let (item, err) = match result {
-                            EatResult::Success(item) => (Some(item), None),
-                            EatResult::Errored(item, err) => (Some(item), Some(err)),
-                            _ => (None, None),
-                        };
-
-                        if let Some(item) = item {
-                            trace!("deleting consumed food item"; "food" => E(item));
-
-                            if let Err(e) = entities.delete(item) {
-                                warn!("couldn't delete food item"; "food" => E(item), "error" => ?e);
-                            }
-
-                            let event_result = if let Some(err) = err {
-                                Err(err)
-                            } else {
-                                Ok(())
-                            };
-
-                            updates.remove::<UsingItemComponent>(e);
-
-                            events.post(EntityEvent {
-                                subject: item,
-                                payload: EntityEventPayload::UsedUp(event_result),
-                            });
-                        }
-                    }
-                }
-        */
     }
 }
 

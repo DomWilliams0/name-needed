@@ -1,7 +1,8 @@
 use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
 
 use crate::ai::consideration::{
-    FindLocalItemConsideration, HoldingItemConsideration, HungerConsideration,
+    CanUseHeldItemConsideration, FindLocalItemConsideration, HoldingItemConsideration,
+    HungerConsideration,
 };
 use crate::ai::{AiAction, AiContext};
 use crate::item::{ItemFilter, ItemsToPickUp};
@@ -22,6 +23,7 @@ impl Dse<AiContext> for EatHeldFoodDse {
         vec![
             AiBox::new(HungerConsideration),
             AiBox::new(HoldingItemConsideration(FOOD_FILTER)),
+            AiBox::new(CanUseHeldItemConsideration(FOOD_FILTER)),
         ]
     }
 
@@ -39,7 +41,7 @@ impl Dse<AiContext> for EatHeldFoodDse {
             .expect("item search succeeded but missing result in cache");
 
         let inventory = blackboard.inventory.unwrap();
-        let food = slot.get(inventory);
+        let food = slot.get(inventory, blackboard.world);
 
         AiAction::EatHeldItem(food)
     }
@@ -63,7 +65,7 @@ impl Dse<AiContext> for FindLocalFoodDse {
     }
 
     fn weight(&self) -> DecisionWeight {
-        DecisionWeight::BasicNeeds
+        DecisionWeight::Normal
     }
 
     fn action(

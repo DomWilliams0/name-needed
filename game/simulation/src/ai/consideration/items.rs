@@ -1,6 +1,7 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
 
 use crate::ai::{AiContext, AiInput};
+use crate::ecs::Entity;
 use crate::item::ItemFilter;
 use common::*;
 
@@ -13,6 +14,7 @@ declare_entity_metric!(
     "radius"
 );
 
+/// Switch, 1 if holding an item matching the filter, otherwise 0
 pub struct HoldingItemConsideration(pub ItemFilter);
 
 pub struct FindLocalItemConsideration {
@@ -23,6 +25,15 @@ pub struct FindLocalItemConsideration {
     ///  but 1.0 would map that to the full 1.0
     pub normalize_range: f32,
 }
+
+/// 1 if this entity has this number of extra hands available for hauling, or is already hauling
+/// the given entity, else 0
+// TODO also count currently occupied hands as "available", could drop current item to haul this
+pub struct HasExtraHandsForHaulingConsideration(pub u16, pub Entity);
+
+/// Same as `HoldingItemConsideration` but reduced if the item cannot be used immediately e.g. is
+/// being hauled
+pub struct CanUseHeldItemConsideration(pub ItemFilter);
 
 impl Consideration<AiContext> for HoldingItemConsideration {
     fn curve(&self) -> Curve {
@@ -74,5 +85,33 @@ impl Consideration<AiContext> for FindLocalItemConsideration {
             &format!("{}", self.filter),
             &format!("{}", self.max_radius)
         );
+    }
+}
+
+impl Consideration<AiContext> for HasExtraHandsForHaulingConsideration {
+    fn curve(&self) -> Curve {
+        Curve::Identity
+    }
+
+    fn input(&self) -> <AiContext as Context>::Input {
+        AiInput::HasExtraHandsForHauling(self.0, self.1)
+    }
+
+    fn parameter(&self) -> ConsiderationParameter {
+        ConsiderationParameter::Nop
+    }
+}
+
+impl Consideration<AiContext> for CanUseHeldItemConsideration {
+    fn curve(&self) -> Curve {
+        Curve::Linear(1.0, 0.3)
+    }
+
+    fn input(&self) -> <AiContext as Context>::Input {
+        AiInput::CanUseHeldItem(self.0)
+    }
+
+    fn parameter(&self) -> ConsiderationParameter {
+        ConsiderationParameter::Nop
     }
 }

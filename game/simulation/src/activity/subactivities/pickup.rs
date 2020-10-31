@@ -2,11 +2,11 @@ use common::*;
 
 use crate::{ComponentWorld, PhysicalComponent, TransformComponent};
 // use common::derive_more::Error;
-use crate::activity::activity::{ActivityResult, SubActivity};
+use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
 use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::{HaulableItemComponent, InventoryComponent};
+use crate::item::{ContainedInComponent, HaulableItemComponent, InventoryComponent};
 
 /// Pick up the given item. Blocks on pick up event.
 #[derive(Clone, Debug)]
@@ -32,34 +32,51 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         let holder = ctx.entity;
 
         ctx.updates.queue("pick up item", move |world| {
-            let do_pickup = || -> Result<(Entity, Entity), PickupItemError> {
-                let mut transforms = world.write_storage::<TransformComponent>();
-                let mut inventories = world.write_storage::<InventoryComponent>();
-                let haulables = world.read_storage::<HaulableItemComponent>();
-                let physicals = world.read_storage::<PhysicalComponent>();
+            let mut do_pickup = || -> Result<Entity, PickupItemError> {
+                let mut shifted_items = Vec::new();
+                {
+                    let mut inventories = world.write_storage::<InventoryComponent>();
+                    let transforms = world.read_storage::<TransformComponent>();
+                    let haulables = world.read_storage::<HaulableItemComponent>();
+                    let physicals = world.read_storage::<PhysicalComponent>();
 
-                // get item components and ensure transform i.e. not already picked up
-                let (_, haulable, physical) = world
-                    .components(item, (&transforms, &haulables, &physicals))
-                    .ok_or(PickupItemError::NotAvailable)?;
+                    // get item components and ensure transform i.e. not already picked up
+                    let (_, haulable, physical) = world
+                        .components(item, (&transforms, &haulables, &physicals))
+                        .ok_or(PickupItemError::NotAvailable)?;
 
-                // get holder inventory, free up enough hands and try to fill em
-                let inventory = inventories
-                    .get_mut(holder)
-                    .ok_or(PickupItemError::NoInventory)?;
+                    // get holder inventory, free up enough hands and try to fill em
+                    let inventory = inventories
+                        .get_mut(holder)
+                        .ok_or(PickupItemError::NoInventory)?;
 
-                inventory
-                    .insert_item(
-                        item,
-                        haulable.extra_hands,
-                        physical.volume,
-                        physical.half_dimensions,
-                    )
-                    .ok_or(PickupItemError::NoFreeHands)?;
+                    inventory
+                        .insert_item(
+                            world,
+                            item,
+                            haulable.extra_hands,
+                            physical.volume,
+                            physical.size,
+                            |item, container| {
+                                // cant mutate world in this callback
+                                shifted_items.push((item, container));
+                            },
+                        )
+                        .ok_or(PickupItemError::NoFreeHands)?;
+                }
 
-                // pickup success, remove transform from item
-                transforms.remove(item);
-                Ok((item, holder))
+                // update items that have been shifted into containers
+                for (item, container) in shifted_items {
+                    world
+                        .helpers_comps()
+                        .add_to_container(item, ContainedInComponent::Container(container));
+                }
+
+                // pickup success
+                world
+                    .helpers_comps()
+                    .add_to_container(item, ContainedInComponent::InventoryOf(holder));
+                Ok(holder)
             };
 
             let result = do_pickup();
@@ -80,7 +97,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 
