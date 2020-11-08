@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use common::derive_more::{Display, Error};
+use common::*;
 use resources::resource::Resources;
 use simulation::input::UiCommand;
 use simulation::{
@@ -10,7 +10,8 @@ use simulation::{
 
 pub struct DummyRenderer;
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
+#[error("Big dummy")]
 pub struct DummyError;
 
 pub struct DummyBackendPersistent;
@@ -42,11 +43,9 @@ impl InitializedSimulationBackend for DummyBackendInit {
     type Renderer = DummyRenderer;
     type Persistent = DummyBackendPersistent;
 
-    fn consume_events(&mut self) -> Option<Exit> {
+    fn consume_events(&mut self, commands: &mut Vec<UiCommand>) {
         if Instant::now() > self.end_time {
-            Some(Exit::Stop)
-        } else {
-            None
+            commands.push(UiCommand::ExitGame(Exit::Stop));
         }
     }
 

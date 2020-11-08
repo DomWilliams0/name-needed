@@ -1,4 +1,3 @@
-use common::derive_more::{Display, Error};
 use common::*;
 
 use crate::mesh::BaseVertex;
@@ -15,13 +14,13 @@ pub struct WorldViewer<D> {
     clean_chunks: HashSet<ChunkPosition>,
 }
 
-#[derive(Debug, Clone, Display, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum WorldViewerError {
-    #[display(fmt = "No block found at 0, 0")]
+    #[error("No block found at (0, 0)")]
     EmptyOrigin,
 
-    #[display(fmt = "Bad viewer range: {}", _0)]
-    InvalidRange(#[error(not(source))] SliceRange),
+    #[error("Bad viewer range: {0}")]
+    InvalidRange(SliceRange),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -32,7 +32,7 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
-use crate::{definitions, WorldRef, WorldViewer};
+use crate::{definitions, Exit, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
 #[derive(Debug)]
@@ -104,7 +104,7 @@ impl<R: Renderer> Simulation<R> {
         &mut self,
         commands: impl Iterator<Item = UiCommand>,
         world_viewer: &mut WorldViewer,
-    ) {
+    ) -> Option<Exit> {
         // update tick
         increment_tick();
 
@@ -117,7 +117,7 @@ impl<R: Renderer> Simulation<R> {
         self.apply_world_updates(world_viewer);
 
         // apply player inputs
-        self.process_ui_commands(commands);
+        let exit = self.process_ui_commands(commands);
 
         // tick game logic
         self.tick_systems();
@@ -132,6 +132,8 @@ impl<R: Renderer> Simulation<R> {
         self.ecs_world.insert(updates);
 
         self.ecs_world.maintain();
+
+        exit
     }
 
     fn tick_systems(&mut self) {
@@ -229,7 +231,8 @@ impl<R: Renderer> Simulation<R> {
         std::mem::forget(empty);
     }
 
-    fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) {
+    fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
+        let mut exit = None;
         for cmd in commands {
             match cmd {
                 UiCommand::ToggleDebugRenderer { ident, enabled } => {
@@ -333,8 +336,11 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
+                UiCommand::ExitGame(ex) => exit = Some(ex),
             }
         }
+
+        exit
     }
 
     // target is for this frame only

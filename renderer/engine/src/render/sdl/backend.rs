@@ -6,8 +6,7 @@ use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
 use color::ColorRgb;
-use common::derive_more::{Display, Error};
-use common::input::{CameraDirection, Key, KeyEvent};
+use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, Simulation,
@@ -24,6 +23,7 @@ use resources::resource::Resources;
 use resources::ResourceError;
 use sdl2::mouse::{MouseButton, MouseState};
 use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
+use std::hint::unreachable_unchecked;
 
 pub struct SdlBackendPersistent {
     camera: Camera,
@@ -54,19 +54,19 @@ struct GraphicsKeepAlive {
     gl: Gl,
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum SdlBackendError {
-    #[display(fmt = "SDL error")]
-    Sdl(#[error(not(source))] String),
+    #[error("SDL error: {0}")]
+    Sdl(String),
 
-    #[display(fmt = "Failed to create window")]
-    WindowCreation(WindowBuildError),
+    #[error("Failed to create window: {0}")]
+    WindowCreation(#[from] WindowBuildError),
 
-    #[display(fmt = "OpenGL error")]
-    Gl(GlError),
+    #[error("OpenGL error: {0}")]
+    Gl(#[from] GlError),
 
-    #[display(fmt = "Failed to load resources")]
-    Resources(ResourceError),
+    #[error("Failed to load resources: {0}")]
+    Resources(#[from] ResourceError),
 }
 
 impl PersistentSimulationBackend for SdlBackendPersistent {
@@ -74,8 +74,8 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
     type Initialized = SdlBackendInit;
 
     fn new(resources: &Resources) -> Result<Self, Self::Error> {
-        let sdl = sdl2::init()?;
-        let video = sdl.video()?;
+        let sdl = sdl2::init().map_err(SdlBackendError::Sdl)?;
+        let video = sdl.video().map_err(SdlBackendError::Sdl)?;
         video.gl_attr().set_context_version(3, 0);
         video.gl_attr().set_depth_size(24);
         info!(
@@ -98,15 +98,17 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             builder.build()?
         };
 
-        let gl = Gl::new(&window, &video)?;
+        let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
         Gl::set_clear_color(ColorRgb::new(17, 17, 20));
 
         let ui = Ui::new(&window, &video);
 
         // enable vsync
-        video.gl_set_swap_interval(1)?;
+        video
+            .gl_set_swap_interval(1)
+            .map_err(SdlBackendError::Sdl)?;
 
-        let events = sdl.event_pump()?;
+        let events = sdl.event_pump().map_err(SdlBackendError::Sdl)?;
         let renderer = {
             let shaders = resources.shaders().map_err(SdlBackendError::Resources)?;
             GlRenderer::new(&shaders)?
@@ -141,10 +143,16 @@ impl InitializedSimulationBackend for SdlBackendInit {
     type Renderer = GlRenderer;
     type Persistent = SdlBackendPersistent;
 
-    fn consume_events(&mut self) -> Option<Exit> {
-        let mut exit = None;
+    fn consume_events(&mut self, commands: &mut Vec<UiCommand>) {
+        // take event pump out of self, to be replaced at the end of the tick
+        let mut events = match self.sdl_events.take() {
+            Some(e) => e,
+            _ => {
+                debug_assert!(false, "bad event pump state");
+                unsafe { unreachable_unchecked() }
+            }
+        };
 
-        let mut events = self.sdl_events.take().unwrap(); // replaced at the end
         for event in events.poll_iter() {
             if let EventConsumed::Consumed = self.ui.handle_event(&event) {
                 continue;
@@ -152,7 +160,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             match event {
                 Event::Quit { .. } => {
-                    exit = Some(Exit::Stop);
+                    commands.push(UiCommand::ExitGame(Exit::Stop));
                     break;
                 }
                 Event::Window {
@@ -165,24 +173,25 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 }
 
                 Event::KeyDown {
-                    keycode: Some(key), ..
+                    keycode: Some(key),
+                    keymod,
+                    ..
                 } => match map_sdl_keycode(key) {
-                    Some(Key::Exit) => {
-                        exit = Some(Exit::Stop);
-                        break;
+                    Some(action) => {
+                        let ui_command = self.handle_key(action, keymod, true);
+                        commands.extend(ui_command.into_iter());
                     }
-                    Some(Key::Restart) => {
-                        exit = Some(Exit::Restart);
-                        break;
-                    }
-                    Some(key) => self.handle_key(KeyEvent::Down(key)),
+
                     None => debug!("ignoring unknown key"; "key" => %key),
                 },
                 Event::KeyUp {
-                    keycode: Some(key), ..
+                    keycode: Some(key),
+                    keymod,
+                    ..
                 } => {
-                    if let Some(key) = map_sdl_keycode(key) {
-                        self.handle_key(KeyEvent::Up(key))
+                    if let Some(action) = map_sdl_keycode(key) {
+                        let ui_command = self.handle_key(action, keymod, false);
+                        commands.extend(ui_command.into_iter());
                     }
                 }
 
@@ -221,9 +230,9 @@ impl InitializedSimulationBackend for SdlBackendInit {
         }
 
         // put back event pump like we never took it
-        self.sdl_events = Some(events);
-
-        exit
+        let none = std::mem::replace(&mut self.sdl_events, Some(events));
+        debug_assert!(none.is_none());
+        std::mem::forget(none);
     }
 
     fn tick(&mut self) {
@@ -327,36 +336,59 @@ impl DerefMut for SdlBackendInit {
 }
 
 impl SdlBackendInit {
-    fn handle_key(&mut self, event: KeyEvent) {
-        match event {
-            KeyEvent::Down(Key::SliceDown) | KeyEvent::Down(Key::SliceUp) => {
-                let delta = if let KeyEvent::Down(Key::SliceDown) = event {
-                    -1
-                } else {
-                    1
-                };
-                let modifiers = self.modifier_state();
+    fn handle_key(
+        &mut self,
+        action: KeyAction,
+        modifiers: Mod,
+        is_down: bool,
+    ) -> Option<UiCommand> {
+        use RendererKey::*;
 
-                if modifiers & (Mod::LCTRLMOD | Mod::RCTRLMOD) != Mod::NOMOD {
-                    // stretch world viewer
-                    self.world_viewer.stretch_by(delta);
-                } else if modifiers & (Mod::LSHIFTMOD | Mod::RSHIFTMOD) != Mod::NOMOD {
-                    // move by larger amount
-                    self.world_viewer.move_by_multiple(delta);
+        match action {
+            KeyAction::Renderer(key) => {
+                match (is_down, key) {
+                    (true, SliceDown) | (true, SliceUp) => {
+                        let delta = if let SliceDown = key { -1 } else { 1 };
+
+                        if modifiers & (Mod::LCTRLMOD | Mod::RCTRLMOD) != Mod::NOMOD {
+                            // stretch world viewer
+                            self.world_viewer.stretch_by(delta);
+                        } else if modifiers & (Mod::LSHIFTMOD | Mod::RSHIFTMOD) != Mod::NOMOD {
+                            // move by larger amount
+                            self.world_viewer.move_by_multiple(delta);
+                        } else {
+                            // move by 1 slice
+                            self.world_viewer.move_by(delta);
+                        }
+                    }
+
+                    (_, Camera(direction)) => {
+                        self.camera.handle_move(direction, is_down);
+                    }
+                    _ => {
+                        if is_down {
+                            warn!("unhandled key down: {:?}", key);
+                        }
+                    }
+                };
+
+                // no ui command to return
+                None
+            }
+            KeyAction::Game(key) => {
+                if is_down {
+                    let cmd = match key {
+                        GameKey::Exit => UiCommand::ExitGame(Exit::Stop),
+                        GameKey::Restart => UiCommand::ExitGame(Exit::Restart),
+                    };
+
+                    Some(cmd)
                 } else {
-                    // move by 1 slice
-                    self.world_viewer.move_by(delta);
+                    // ignore key ups
+                    None
                 }
             }
-            other => {
-                let _handled = self.camera.handle_key(other);
-                // TODO cascade through other handlers
-            }
         }
-    }
-
-    fn modifier_state(&self) -> Mod {
-        self.keep_alive.sdl.keyboard().mod_state()
     }
 
     fn parse_mouse_event(
@@ -398,35 +430,22 @@ impl SdlBackendPersistent {
 //            - impl<T, U> std::convert::TryInto<U> for T
 //              where U: std::convert::TryFrom<T>;
 //    = note: upstream crates may add a new impl of trait `std::convert::From<sdl2::keyboard::keycode::Keycode>` for type `common::input::Key` in future versions
-fn map_sdl_keycode(keycode: Keycode) -> Option<Key> {
-    match keycode {
-        Keycode::Escape => Some(Key::Exit),
-        Keycode::R => Some(Key::Restart),
-        Keycode::Up => Some(Key::SliceUp),
-        Keycode::Down => Some(Key::SliceDown),
-        Keycode::Y => Some(Key::ToggleWireframe),
-        Keycode::W => Some(Key::Camera(CameraDirection::Up)),
-        Keycode::A => Some(Key::Camera(CameraDirection::Left)),
-        Keycode::S => Some(Key::Camera(CameraDirection::Down)),
-        Keycode::D => Some(Key::Camera(CameraDirection::Right)),
-        _ => None,
-    }
-}
+fn map_sdl_keycode(keycode: Keycode) -> Option<KeyAction> {
+    use Keycode::*;
+    use RendererKey::*;
 
-impl From<String> for SdlBackendError {
-    fn from(s: String) -> Self {
-        SdlBackendError::Sdl(s)
-    }
-}
+    Some(match keycode {
+        Escape => KeyAction::Game(GameKey::Exit),
+        R => KeyAction::Game(GameKey::Restart),
 
-impl From<WindowBuildError> for SdlBackendError {
-    fn from(e: WindowBuildError) -> Self {
-        SdlBackendError::WindowCreation(e)
-    }
-}
+        Up => KeyAction::Renderer(SliceUp),
+        Down => KeyAction::Renderer(SliceDown),
 
-impl From<GlError> for SdlBackendError {
-    fn from(e: GlError) -> Self {
-        SdlBackendError::Gl(e)
-    }
+        W => KeyAction::Renderer(Camera(CameraDirection::Up)),
+        A => KeyAction::Renderer(Camera(CameraDirection::Left)),
+        S => KeyAction::Renderer(Camera(CameraDirection::Down)),
+        D => KeyAction::Renderer(Camera(CameraDirection::Right)),
+
+        _ => return None,
+    })
 }

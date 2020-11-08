@@ -36,8 +36,8 @@ pub struct WanderActivity {
 
 #[derive(Debug, Error)]
 pub enum WanderError {
-    #[error("Wanderer has no transform: _0")]
-    MissingTransform(ComponentGetError),
+    #[error("Wanderer has no transform: {0}")]
+    MissingTransform(#[from] ComponentGetError),
 
     #[error("Can't find an accessible wander destination, possibly stuck")]
     Inaccessible,

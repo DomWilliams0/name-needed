@@ -11,54 +11,51 @@ pub use loader::load_from_str;
 
 use crate::definitions::loader::DefinitionSource;
 use crate::ecs::ComponentBuildError;
-use common::{
-    derive_more::{Display, Error},
-    *,
-};
+use common::*;
 
-#[derive(Debug, Display, Error)]
-#[display(fmt = "Error loading definition {:?}: {}", "_0", "_1")]
+#[derive(Debug, Error)]
+#[error("Error loading definition {0:?}: {1}")]
 pub struct DefinitionError(pub DefinitionSource, pub DefinitionErrorKind);
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum DefinitionErrorKind {
-    #[display(fmt = "Failed to read definition file: {}", _0)]
-    Resource(resources::ResourceErrorKind),
+    #[error("Failed to read definition file: {0}")]
+    Resource(#[from] resources::ResourceErrorKind),
 
-    #[display(fmt = "Bad format: {}", _0)]
-    Format(ron::Error),
+    #[error("Bad format: {0}")]
+    Format(#[from] ron::Error),
 
-    #[display(fmt = "UID {:?} already registered", _0)]
-    AlreadyRegistered(#[error(not(source))] String),
+    #[error("UID {0:?} already registered")]
+    AlreadyRegistered(String),
 
-    #[display(fmt = "No such definition with UID {:?}", _0)]
-    NoSuchDefinition(#[error(not(source))] String),
+    #[error("No such definition with UID {0:?}")]
+    NoSuchDefinition(String),
 
-    #[display(fmt = "Invalid UID {:?}", _0)]
-    InvalidUid(#[error(not(source))] String),
+    #[error("Invalid UID {0:?}")]
+    InvalidUid(String),
 
-    #[display(fmt = "No such component type {:?}", _0)]
-    NoSuchComponent(#[error(not(source))] String),
+    #[error("No such component type {0:?}")]
+    NoSuchComponent(String),
 
     // TODO include which key caused the problem
-    #[display(fmt = "Failed to build component: {}", _0)]
-    ComponentBuild(ComponentBuildError),
+    #[error("Failed to build component: {0}")]
+    ComponentBuild(#[from] ComponentBuildError),
 
-    #[display(fmt = "Invalid parent {:?}", _0)]
-    InvalidParent(#[error(not(source))] String),
+    #[error("Invalid parent {0:?}")]
+    InvalidParent(String),
 
-    #[display(fmt = "Parent relation {}->{} would cause a cycle", _0, _1)]
+    #[error("Parent relation {0}->{1} would cause a cycle")]
     CyclicParentRelation(String, String),
 
-    #[display(fmt = "Duplicate uid {:?}", _0)]
-    DuplicateUid(#[error(not(source))] String),
+    #[error("Duplicate uid {0:?}")]
+    DuplicateUid(String),
 
-    #[display(fmt = "Duplicate component with type {:?}", _0)]
-    DuplicateComponent(#[error(not(source))] String),
+    #[error("Duplicate component with type {0:?}")]
+    DuplicateComponent(String),
 }
 
 #[derive(Debug, Error)]
-pub struct DefinitionErrors(#[error(not(source))] pub Vec<DefinitionError>);
+pub struct DefinitionErrors(pub Vec<DefinitionError>);
 
 impl Display for DefinitionErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -69,11 +66,5 @@ impl Display for DefinitionErrors {
         }
 
         write!(f, "]")
-    }
-}
-
-impl From<ComponentBuildError> for DefinitionErrorKind {
-    fn from(e: ComponentBuildError) -> Self {
-        Self::ComponentBuild(e)
     }
 }

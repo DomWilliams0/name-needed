@@ -1,35 +1,29 @@
-use common::derive_more::{Display, Error};
+use common::*;
 use unit::world::{BlockPosition, WorldPosition};
 
 use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, WorldArea};
 
 // TODO smallvecs
 
-#[derive(Debug, Clone, Display, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum NavigationError {
-    #[display(fmt = "Source block {} is not walkable", _0)]
-    SourceNotWalkable(#[error(not(source))] WorldPosition),
+    #[error("Source block {0} is not walkable")]
+    SourceNotWalkable(WorldPosition),
 
-    #[display(fmt = "Target block {} is not walkable", _0)]
-    TargetNotWalkable(#[error(not(source))] WorldPosition),
+    #[error("Target block {0} is not walkable")]
+    TargetNotWalkable(WorldPosition),
 
-    #[display(fmt = "No such area {:?}", _0)]
-    NoSuchArea(#[error(not(source))] WorldArea),
+    #[error("No such area {0:?}")]
+    NoSuchArea(WorldArea),
 
-    #[display(fmt = "Area navigation error")]
-    AreaError(AreaPathError),
+    #[error("Area navigation error: {0}")]
+    AreaError(#[from] AreaPathError),
 
-    #[display(fmt = "Block navigation error")]
-    BlockError(WorldArea, #[error(source)] BlockPathError),
+    #[error("Block navigation error in area {0:?}: {1}")]
+    BlockError(WorldArea, #[source] BlockPathError),
 
-    #[display(fmt = "Navigation was aborted")]
+    #[error("Navigation was aborted")]
     Aborted,
-}
-
-impl From<AreaPathError> for NavigationError {
-    fn from(e: AreaPathError) -> Self {
-        NavigationError::AreaError(e)
-    }
 }
 
 #[derive(Debug)]

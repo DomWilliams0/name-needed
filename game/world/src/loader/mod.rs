@@ -6,7 +6,6 @@ use crossbeam::channel::{Receiver, Sender};
 use crossbeam::crossbeam_channel::{bounded, unbounded};
 
 pub use batch::UpdateBatch;
-use common::derive_more::{Display, Error};
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
@@ -30,6 +29,8 @@ mod terrain_source;
 mod update;
 mod worker_pool;
 
+const FAILURE_THRESHOLD: usize = 20;
+
 pub struct WorldLoader<P: WorkerPool<D>, D> {
     source: Arc<Mutex<dyn TerrainSource>>,
     pool: P,
@@ -44,6 +45,7 @@ struct ChunkFinalizer<D> {
     world: WorldRef<D>,
     updates: Sender<OcclusionChunkUpdate>,
     batcher: UpdateBatcher<FinalizeBatchItem>,
+    failures: usize,
 }
 
 struct FinalizeBatchItem {
@@ -52,17 +54,17 @@ struct FinalizeBatchItem {
     consumed: Cell<bool>,
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum BlockForAllError {
     /// Terrain source needs to have had `request_all` called to know how many to wait for
-    #[display(fmt = "`request_all` must be called first")]
+    #[error("`request_all` must be called first")]
     Unsupported,
 
-    #[display("Timed out")]
+    #[error("Timed out")]
     TimedOut,
 
-    #[display(fmt = "Failed to load terrain")]
-    Error(TerrainSourceError),
+    #[error("Failed to load terrain: {0}")]
+    Error(#[from] TerrainSourceError),
 }
 
 #[derive(Copy, Clone)]
@@ -290,6 +292,7 @@ impl<D> ChunkFinalizer<D> {
             world,
             updates,
             batcher: UpdateBatcher::default(),
+            failures: 0,
         }
     }
 
@@ -412,12 +415,25 @@ impl<D> ChunkFinalizer<D> {
                     count = other_terrain_updates.len(),
                     neighbour = neighbour_offset
                 );
-                self.updates
-                    .send(OcclusionChunkUpdate(
-                        neighbour_offset,
-                        other_terrain_updates,
-                    ))
-                    .unwrap();
+                let send_result = self.updates.send(OcclusionChunkUpdate(
+                    neighbour_offset,
+                    other_terrain_updates,
+                ));
+
+                if let Err(err) = send_result {
+                    self.failures += 1;
+                    warn!(
+                        "failed to send chunk update, this is error {errors}/{threshold}",
+                        errors = self.failures,
+                        threshold = FAILURE_THRESHOLD;
+                        "error" => %err,
+                    );
+
+                    if self.failures >= FAILURE_THRESHOLD {
+                        crit!("error threshold reached, panicking");
+                        panic!("chunk finalization error threshold passed: {}", err)
+                    }
+                }
             }
         }
 

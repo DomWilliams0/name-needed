@@ -4,6 +4,7 @@ use crate::{Renderer, Simulation, WorldViewer};
 use common::Error;
 use resources::resource::Resources;
 
+#[derive(Debug)]
 pub enum Exit {
     Stop,
     Restart,
@@ -13,7 +14,7 @@ pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
 
-    fn consume_events(&mut self) -> Option<Exit>;
+    fn consume_events(&mut self, commands: &mut Vec<UiCommand>);
 
     fn tick(&mut self);
 

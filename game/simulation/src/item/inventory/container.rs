@@ -4,7 +4,7 @@ use common::*;
 use unit::length::Length3;
 use unit::volume::Volume;
 
-use crate::ecs::Entity;
+use crate::ecs::{Entity, E};
 use crate::item::inventory::container::contents::SortedContents;
 use crate::item::inventory::HeldEntity;
 
@@ -50,7 +50,7 @@ pub enum ContainerError {
     #[error("Container is full")]
     Full,
 
-    #[error("Container does not contain {0:?}")]
+    #[error("Container does not contain {}", E(*.0))]
     NotFound(Entity),
 }
 

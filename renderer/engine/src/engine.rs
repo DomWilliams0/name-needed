@@ -36,20 +36,23 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         let game_loop = gameloop::GameLoop::new(simulation::TICKS_PER_SECOND, 5)
             .expect("game loop initialization failed");
 
+        let mut exit = None;
+
         loop {
+            #[cold]
             if panic::has_panicked() {
                 debug!("breaking out of loop due to panics");
                 break Exit::Stop;
             }
 
-            if let Some(exit) = self.backend.consume_events() {
-                break exit;
-            }
+            self.backend.consume_events(&mut self.sim_ui_commands);
 
             #[cfg(not(feature = "lite"))]
             for action in game_loop.actions() {
                 match action {
-                    gameloop::FrameAction::Tick => self.tick(),
+                    gameloop::FrameAction::Tick => {
+                        exit = self.tick();
+                    }
                     gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
                 }
             }
@@ -57,20 +60,29 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             #[cfg(feature = "lite")]
             {
                 // tick as fast as possible
-                self.tick();
+                exit = self.tick();
+            }
+
+            #[cold]
+            if let Some(exit) = exit {
+                info!("exiting game"; "reason" => ?exit);
+                break exit;
             }
         }
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self) -> Option<Exit> {
         trace!("tick");
         let _timer = self.perf.tick.time();
 
         let world_viewer = self.backend.world_viewer();
-        self.simulation
-            .tick(self.sim_ui_commands.drain(..), world_viewer);
+
+        let commands = self.sim_ui_commands.drain(..);
+        let exit = self.simulation.tick(commands, world_viewer);
 
         self.backend.tick();
+
+        exit
     }
 
     fn render(&mut self, interpolation: f64) {

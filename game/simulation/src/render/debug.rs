@@ -27,7 +27,7 @@ pub struct DebugRenderers<R: Renderer> {
 pub enum DebugRendererError {
     #[error("'{0}' already registered")]
     AlreadyRegistered(&'static str),
-    #[error("no such renderer '{0}'")]
+    #[error("No such renderer '{0}'")]
     NoSuchRenderer(&'static str),
 }
 

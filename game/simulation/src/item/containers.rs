@@ -16,7 +16,7 @@ pub enum ContainerError {
     #[error("Definition does not include entity container component")]
     BadDefinition,
 
-    #[error("Builder error: {0:?}")]
+    #[error("Builder error: {0}")]
     Builder(#[from] BuilderError),
 
     #[error("Container block lacks associated container entity")]

@@ -1,5 +1,4 @@
-#[derive(Copy, Clone)]
-#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
 pub enum CameraDirection {
     Up,
     Left,
@@ -7,66 +6,44 @@ pub enum CameraDirection {
     Down,
 }
 
-impl CameraDirection {
-    pub const fn values() -> [CameraDirection; 4] {
-        [
-            CameraDirection::Up,
-            CameraDirection::Left,
-            CameraDirection::Right,
-            CameraDirection::Down,
-        ]
-    }
-
-    pub fn delta(self) -> (i8, i8) {
-        match self {
-            CameraDirection::Up => (0, 1),
-            CameraDirection::Left => (-1, 0),
-            CameraDirection::Right => (1, 0),
-            CameraDirection::Down => (0, -1),
-        }
-    }
+#[derive(Copy, Clone)]
+pub enum ChangeSliceDirection {
+    Up,
+    Down,
 }
 
-#[derive(Copy, Clone)]
-pub enum Key {
-    Exit,
-    Restart,
+#[derive(Copy, Clone, Debug)]
+pub enum RendererKey {
     SliceUp,
     SliceDown,
-    ToggleWireframe,
     Camera(CameraDirection),
 }
 
-#[derive(Copy, Clone)]
-pub enum KeyEvent {
-    Down(Key),
-    Up(Key),
+#[derive(Copy, Clone, Debug)]
+pub enum GameKey {
+    Exit,
+    Restart,
 }
 
-impl KeyEvent {
-    pub fn is_down(self) -> bool {
-        match self {
-            KeyEvent::Down(_) => true,
-            KeyEvent::Up(_) => false,
-        }
-    }
-
-    pub fn key(self) -> Key {
-        match self {
-            KeyEvent::Down(k) => k,
-            KeyEvent::Up(k) => k,
-        }
-    }
-
-    pub fn parse_camera_event(self) -> Option<(CameraDirection, bool)> {
-        match self.key() {
-            Key::Camera(dir) => Some((dir, self.is_down())),
-            _ => None,
-        }
-    }
+pub enum KeyAction {
+    /// Renderer action e.g. move camera
+    Renderer(RendererKey),
+    Game(GameKey),
 }
 
-pub enum EventHandled {
-    Handled,
-    NotHandled,
+impl CameraDirection {
+    pub const fn values() -> [CameraDirection; 4] {
+        use CameraDirection::*;
+        [Up, Left, Right, Down]
+    }
+
+    pub fn delta(self) -> (i8, i8) {
+        use CameraDirection::*;
+        match self {
+            Up => (0, 1),
+            Left => (-1, 0),
+            Right => (1, 0),
+            Down => (0, -1),
+        }
+    }
 }

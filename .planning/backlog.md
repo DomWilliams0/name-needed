@@ -134,7 +134,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
 * error context chaining would be useful
-* replace derive_more error with nicer thiserror macro
 * consider using `bugsalot` macros to replace .unwrap()/.expect() with logging and make them continuable
 
 ## Engine

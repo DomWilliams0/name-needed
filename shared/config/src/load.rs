@@ -1,4 +1,3 @@
-use common::derive_more::{Display, Error};
 use common::*;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -11,21 +10,21 @@ use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher
 
 use crate::config::Config;
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum ConfigError {
-    #[display(fmt = "Failed to read config file")]
-    Io(std::io::Error),
+    #[error("Failed to read config file: {0}")]
+    Io(#[from] std::io::Error),
 
-    #[display(fmt = "Failed to parse config")]
-    Parsing(ron::de::Error),
+    #[error("Failed to parse config: {0}")]
+    Parsing(#[from] ron::de::Error),
 
-    #[display(fmt = "Failed to watch config file")]
-    Notify(notify::Error),
+    #[error("Failed to watch config file: {0}")]
+    Notify(#[from] notify::Error),
 
-    #[display(fmt = "Path is not a file")]
+    #[error("Path is not a file")]
     NotAFile,
 
-    #[display(fmt = "RawConfig path not initialized")]
+    #[error("RawConfig path not initialized")]
     PathNotSet,
 }
 

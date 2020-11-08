@@ -1,6 +1,6 @@
 use cgmath::ortho;
 
-use common::input::{CameraDirection, EventHandled, KeyEvent};
+use common::input::CameraDirection;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::view::ViewPoint;
@@ -55,14 +55,9 @@ impl Camera {
         self.last_extrapolated_pos = self.pos;
     }
 
-    pub fn handle_key(&mut self, event: KeyEvent) -> EventHandled {
+    pub fn handle_move(&mut self, direction: CameraDirection, is_down: bool) {
         // TODO zoom
-        if let Some((dir, down)) = event.parse_camera_event() {
-            self.input[dir as usize] = down;
-            EventHandled::Handled
-        } else {
-            EventHandled::NotHandled
-        }
+        self.input[direction as usize] = is_down;
     }
 
     pub fn tick(&mut self) -> (ChunkPosition, ChunkPosition) {

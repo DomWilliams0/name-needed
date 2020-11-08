@@ -1,8 +1,5 @@
 //! Navigation inside an area
-use common::{
-    derive_more::{Display, Error},
-    *,
-};
+use common::*;
 
 use petgraph::graphmap::DiGraphMap;
 use petgraph::prelude::EdgeRef;
@@ -26,9 +23,9 @@ pub struct BlockGraph {
     graph: BlockNavGraph,
 }
 
-#[derive(Debug, Clone, Display, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum BlockPathError {
-    #[display(fmt = "No path found from {} to {}", _0, _1)]
+    #[error("No path found from {0} to {1}")]
     NoPath(BlockPosition, BlockPosition),
 }
 

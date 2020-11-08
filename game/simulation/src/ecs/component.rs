@@ -1,33 +1,33 @@
-use common::derive_more::{Display, Error, IntoIterator};
+use common::derive_more::IntoIterator;
 use common::*;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum ComponentBuildError {
-    #[display(fmt = "Component is not buildable")]
+    #[error("Component is not buildable")]
     NotImplemented,
 
-    #[display(fmt = "Failed to deserialize ron: {}", _0)]
-    Deserialize(ron::Error),
+    #[error("Failed to deserialize ron: {0}")]
+    Deserialize(#[from] ron::Error),
 
-    #[display(fmt = "Key {:?} not found", _0)]
-    KeyNotFound(#[error(not(source))] String),
+    #[error("Key {0:?} not found")]
+    KeyNotFound(String),
 
-    #[display(fmt = "Failed to convert i64 {} into type {:?}", _1, _0)]
+    #[error("Failed to convert i64 {1} into type {0:?}")]
     InvalidIntValue(String, i64),
 
-    #[display(fmt = "Failed to convert f64 {} into type {:?}", _1, _0)]
+    #[error("Failed to convert f64 {1} into type {0:?}")]
     InvalidFloatValue(String, f64),
 
-    #[display(fmt = "Bad enum variant {:?} for enum {:?}", _0, _1)]
+    #[error("Bad enum variant {0:?} for enum {1:?}")]
     InvalidEnumVariant(String, &'static str),
 
     // TODO should be a Box<dyn Error>
-    #[display(fmt = "Template error: {}", _0)]
-    TemplateSpecific(#[error(not(source))] String),
+    #[error("Template error: {0}")]
+    TemplateSpecific(String),
 }
 
 #[derive(Debug, IntoIterator)]

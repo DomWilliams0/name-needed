@@ -1,4 +1,4 @@
-# TODOs (224)
+# TODOs (223)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -287,8 +287,6 @@
  * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (2)
    * `// TODO use panic.message() when it stabilises`
    * `// TODO use mutex that cant be poisoned`
- * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
-   * `// TODO cascade through other handlers`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`

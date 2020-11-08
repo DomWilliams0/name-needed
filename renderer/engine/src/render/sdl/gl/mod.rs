@@ -8,7 +8,6 @@ use sdl2::VideoSubsystem;
 
 pub use capability::{Capability, ScopedCapability};
 use color::ColorRgb;
-use common::derive_more::{Display, Error};
 use common::*;
 use resources::ResourceError;
 pub use shader::Program;
@@ -26,28 +25,24 @@ pub struct Gl {
     gl_context: GLContext,
 }
 
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum GlError {
-    #[display(fmt = "Failed to load shader")]
-    LoadingShader(ResourceError),
+    #[error("Failed to load shader: {0}")]
+    LoadingShader(#[from] ResourceError),
 
-    #[display(fmt = "Failed to compile shader: {}", _0)]
-    CompilingShader(#[error(not(source))] String),
+    #[error("Failed to compile shader: {0}")]
+    CompilingShader(String),
 
-    #[display(fmt = "Failed to link program")]
+    #[error("Failed to link program")]
     LinkingProgram,
 
-    #[display(fmt = "Unknown uniform {:?}", _0)]
-    UnknownUniform(#[error(not(source))] &'static str),
+    #[error("Unknown uniform {0:?}")]
+    UnknownUniform(&'static str),
 
-    #[display(fmt = "GL error: {}", _0)]
-    Gl(#[error(not(source))] GLenum),
+    #[error("GL error: {0}")]
+    Gl(GLenum),
 
-    #[display(
-        fmt = "Buffer is too small, requested {} but size is {}",
-        requested_len,
-        real_len
-    )]
+    #[error("Buffer is too small, requested {requested_len} but size is {real_len}")]
     BufferTooSmall {
         real_len: usize,
         requested_len: usize,

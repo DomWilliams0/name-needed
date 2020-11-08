@@ -30,10 +30,10 @@ macro_rules! entity_pretty {
 
 #[derive(Debug, Error)]
 pub enum ComponentGetError {
-    #[error("The entity {:?} doesn't exist", _0)]
+    #[error("The entity {} doesn't exist", E(*.0))]
     NoSuchEntity(Entity),
 
-    #[error("The entity {:?} doesn't have the given component '{}'", _0, _1)]
+    #[error("The entity {} doesn't have the given component '{1}'", E(*.0))]
     NoSuchComponent(Entity, &'static str),
 }
 
