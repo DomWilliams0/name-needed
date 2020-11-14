@@ -1,3 +1,4 @@
+use crate::scenarios::Scenario;
 use crate::GamePreset;
 use common::BoxedResult;
 use simulation::{
@@ -22,7 +23,7 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
         Ok(WorldLoader::new(presets::multi_chunk_wonder(), pool))
     }
 
-    fn init(&self, _sim: &mut Simulation<R>) -> BoxedResult<()> {
+    fn init(&self, _: &mut Simulation<R>, _: Scenario) -> BoxedResult<()> {
         // create no entities
         Ok(())
     }

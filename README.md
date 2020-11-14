@@ -48,6 +48,8 @@ Entity definitions live in `resources/definitions/` and define the stats and cap
 
 The environment variable `NN_LOG` configures logging, set it to one of `trace`, `debug`, `info` (default), `warning`, `error`, `critical`.
 
+The `--scenario` parameter chooses a specific situation to spawn entities in, for example people hauling things to a chest or wandering around and picking up food. Provide an invalid scenario to list all available ones (sorry, what an awful interface).
+
 
 ### Usage
 

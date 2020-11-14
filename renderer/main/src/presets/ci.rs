@@ -1,9 +1,8 @@
-use crate::presets::DevGamePreset;
+use crate::presets::{world_from_source, DevGamePreset};
+use crate::scenarios::Scenario;
 use crate::GamePreset;
 use common::BoxedResult;
-use simulation::{
-    presets, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
-};
+use simulation::{Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader};
 use std::path::Path;
 
 #[derive(Default)]
@@ -20,11 +19,12 @@ impl<R: Renderer> GamePreset<R> for ContinuousIntegrationGamePreset {
 
     fn world(&self) -> BoxedResult<ThreadedWorldLoader> {
         let pool = ThreadedWorkerPool::new(2);
-        Ok(WorldLoader::new(presets::multi_chunk_wonder(), pool))
+        let which_source = config::get().world.source.clone();
+        world_from_source(which_source, pool).map_err(Into::into)
     }
 
-    fn init(&self, sim: &mut Simulation<R>) -> BoxedResult<()> {
+    fn init(&self, sim: &mut Simulation<R>, scenario: Scenario) -> BoxedResult<()> {
         // piggyback off dev preset
-        DevGamePreset::default().init(sim)
+        DevGamePreset::default().init(sim, scenario)
     }
 }

@@ -11,8 +11,10 @@ use crate::ecs::{EcsWorld, Entity, E};
 use crate::item::{ContainedInComponent, ContainerComponent};
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
+use crate::society::job::HaulJob;
 use crate::{
-    ComponentWorld, InventoryComponent, PhysicalComponent, SocietyHandle, TransformComponent,
+    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
+    TransformComponent,
 };
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
@@ -168,46 +170,92 @@ impl EcsExtDev<'_> {
             });
     }
 
-    pub fn haul_to_container(
+    pub fn do_with_placed_container(
+        &mut self,
+        wat: &'static str,
+        container_pos: WorldPosition,
+        mut f: impl FnMut(&mut EcsWorld, Entity) + 'static,
+    ) {
+        self.resource::<QueuedUpdates>().queue(wat, move |world| {
+            let w = world.voxel_world();
+            let w = w.borrow();
+            if let Some(AssociatedBlockData::Container(container)) =
+                w.associated_block_data(container_pos)
+            {
+                f(world, *container);
+            } else {
+                panic!("no container");
+            }
+
+            Ok(())
+        });
+    }
+
+    pub fn haul_to_container_via_divine(
         &mut self,
         hauler: Entity,
         haulee: Entity,
         container_pos: WorldPosition,
     ) {
-        self.resource::<QueuedUpdates>()
-            .queue("force haul to container", move |world| {
-                let w = world.voxel_world();
-                let w = w.borrow();
-                if let Some(AssociatedBlockData::Container(container)) =
-                    w.associated_block_data(container_pos)
-                {
-                    let food_pos = world
-                        .component::<TransformComponent>(haulee)
-                        .unwrap()
-                        .accessible_position();
+        self.do_with_placed_container(
+            "force haul to container",
+            container_pos,
+            move |world, container| {
+                let food_pos = world
+                    .component::<TransformComponent>(haulee)
+                    .unwrap()
+                    .accessible_position();
 
-                    let ai = world
-                        .component_mut::<AiComponent>(hauler)
-                        .expect("no activity");
+                let ai = world
+                    .component_mut::<AiComponent>(hauler)
+                    .expect("no activity");
 
-                    let from = HaulTarget::Position(food_pos);
-                    let to = HaulTarget::Container(*container);
+                let from = HaulTarget::Position(food_pos);
+                let to = HaulTarget::Container(container);
 
-                    info!(
-                        "forcing {hauler} to haul {haulee}",
-                        hauler = E(hauler),
-                        haulee = E(haulee);
-                        "source" => %from,
-                        "target" => %to,
-                    );
+                info!(
+                    "forcing {hauler} to haul {haulee}",
+                    hauler = E(hauler),
+                    haulee = E(haulee);
+                    "source" => %from,
+                    "target" => %to,
+                );
 
-                    ai.add_divine_command(AiAction::Haul(haulee, from, to));
-                } else {
-                    panic!("no container");
-                }
+                ai.add_divine_command(AiAction::Haul(haulee, from, to));
+            },
+        );
+    }
 
-                Ok(())
-            });
+    pub fn haul_to_container_via_society(
+        &mut self,
+        society: SocietyHandle,
+        haulee: Entity,
+        container_pos: WorldPosition,
+    ) {
+        self.do_with_placed_container(
+            "queue society haul to container job",
+            container_pos,
+            move |world, container| {
+                let job = Box::new(
+                    HaulJob::with_target_container(haulee, container, world)
+                        .expect("cant create job"),
+                );
+
+                world
+                    .resource_mut::<Societies>()
+                    .society_by_handle_mut(society)
+                    .expect("bad society")
+                    .jobs_mut()
+                    .submit(job);
+
+                info!(
+                    "adding society job to haul item to container";
+                    "society" => ?society,
+                    "haulee" => E(haulee),
+                    "container" => %container_pos,
+                );
+            },
+        );
     }
 
     pub fn eat(&mut self, eater: Entity, food: Entity) {

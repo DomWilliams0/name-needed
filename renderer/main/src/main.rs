@@ -1,4 +1,3 @@
-use clap::{App, Arg};
 use common::*;
 use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::state::BackendState;
@@ -7,12 +6,13 @@ use simulation::{
 };
 
 use crate::presets::ContinuousIntegrationGamePreset;
+
 use engine::panic::Panic;
 use engine::Engine;
 use resources::resource::Resources;
 use resources::ResourceContainer;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -27,6 +27,7 @@ mod count_allocs {
 }
 
 mod presets;
+mod scenarios;
 
 #[cfg(feature = "use-sdl")]
 type Backend = engine::SdlBackendPersistent;
@@ -37,45 +38,73 @@ type Backend = engine::DummyBackendPersistent;
 type BackendInit = <Backend as PersistentSimulationBackend>::Initialized;
 type Renderer = <BackendInit as InitializedSimulationBackend>::Renderer;
 
-fn do_main() -> BoxedResult<()> {
-    let args = App::new(env!("CARGO_PKG_NAME"))
-        .arg(
-            Arg::with_name("preset")
-                .short("p")
-                .long("preset")
-                .help("Game preset")
-                .takes_value(true)
-                .possible_values(&["dev", "empty", "ci"]),
-        )
-        .arg(
-            Arg::with_name("dir")
-                .short("d")
-                .long("dir")
-                .help("Directory to look for game files in")
-                .default_value("."),
-        )
-        .get_matches();
+/// 🎵 Nice game without a name 🎵
+#[derive(argh::FromArgs)]
+struct Args {
+    /// game preset
+    #[argh(option)]
+    preset: Option<String>,
 
-    let preset: Box<dyn GamePreset<Renderer>> = match args.value_of("preset") {
+    /// directory containing game files
+    #[argh(option, default = "PathBuf::from(\".\")")]
+    directory: PathBuf,
+
+    /// scenario to load
+    #[argh(option)]
+    scenario: Option<String>,
+}
+
+#[derive(Debug, Error)]
+enum StartError {
+    #[error("No such scenario '{0}'")]
+    NoSuchScenario(String),
+
+    #[error("No such preset '{0}'")]
+    NoSuchPreset(String),
+}
+
+fn do_main() -> BoxedResult<()> {
+    let args = argh::from_env::<Args>();
+
+    let preset: Box<dyn GamePreset<Renderer>> = match args.preset.as_deref() {
         None | Some("dev") => Box::new(DevGamePreset::<Renderer>::default()),
         Some("ci") => Box::new(ContinuousIntegrationGamePreset::default()),
         Some("empty") => Box::new(EmptyGamePreset::default()),
-        _ => unreachable!(),
+        Some(other) => return Err(StartError::NoSuchPreset(other.to_owned()).into()),
     };
 
-    let root: &Path = args
-        .value_of("dir")
-        .unwrap() // default is provided
-        .as_ref();
-
     info!("chosen game preset"; "preset" => ?preset.name());
+
+    let scenario = {
+        let name = args.scenario.as_deref();
+        let resolved = scenarios::resolve(name);
+        match resolved {
+            Some((name, s)) => {
+                info!(
+                    "resolved scenario '{scenario} to {function:#x}'",
+                    scenario = name,
+                    function = s as usize
+                );
+                s
+            }
+            None => {
+                let name = name.unwrap(); // would have panicked already if bad default
+                error!("failed to resolve scenario"; "name" => ?name);
+
+                let possibilities = scenarios::all_names().collect_vec();
+                info!("available scenarios: {:?}", possibilities);
+
+                return Err(StartError::NoSuchScenario(name.to_owned()).into());
+            }
+        }
+    };
 
     // start metrics server
     #[cfg(feature = "metrics")]
     metrics::start_serving();
 
     // init resources root
-    let resources = Resources::new(root)?;
+    let resources = Resources::new(args.directory)?;
 
     // load config
     if let Some(config_file_name) = preset.config() {
@@ -93,7 +122,7 @@ fn do_main() -> BoxedResult<()> {
 
     loop {
         // create simulation
-        let simulation = preset.load(resources.clone())?;
+        let simulation = preset.load(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
         let world_viewer = WorldViewer::from_world(simulation.voxel_world())?;

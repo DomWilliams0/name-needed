@@ -18,9 +18,9 @@ common = { path = "../../shared/common", features = ["binary"] }
 color = { path = "../../shared/color"}
 
 alloc_counter = {version = "^0.0", optional = true}
-num_cpus = "1.13"
-
-clap = "^2.33"
+num_cpus = "^1.13"
+inventory = "^0.1"
+argh = "^0.1"
 
 [features]
 default = ["use-sdl"]

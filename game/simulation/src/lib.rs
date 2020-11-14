@@ -22,12 +22,13 @@ pub use crate::render::{RenderComponent, Renderer, Shape2d};
 pub use crate::simulation::{AssociatedBlockData, Simulation, ThreadedWorldLoader};
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
-pub use ecs::{ComponentWorld, E};
+pub use definitions::EntityPosition;
+pub use ecs::{ComponentWorld, EcsWorld, Entity, E};
 pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent};
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{job, Societies, SocietyComponent, SocietyHandle};
-pub use unit::world::WorldPositionRange;
+pub use unit::world::{WorldPosition, WorldPositionRange};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
