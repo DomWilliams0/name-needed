@@ -66,6 +66,14 @@ pub struct UniqueRandomColors {
     l: f32,
 }
 
+impl UniqueRandomColors {
+    /// Iterator.next but can't fail
+    pub fn next_please(&mut self) -> ColorRgb {
+        // iterator is infinite
+        self.next().unwrap()
+    }
+}
+
 impl Iterator for UniqueRandomColors {
     type Item = ColorRgb;
 

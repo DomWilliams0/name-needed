@@ -5,7 +5,7 @@ use common::*;
 use crate::presets::world_from_source;
 use crate::scenarios::Scenario;
 use crate::GamePreset;
-use simulation::{Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader};
+use simulation::{Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader};
 
 pub struct DevGamePreset<R: Renderer> {
     _phantom: PhantomData<R>,
@@ -47,6 +47,13 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             "seeding random generator with seed {seed}",
             seed = seed; "source" => source
         );
+
+        // create society for player to control
+        let player_society = sim
+            .societies()
+            .new_society("Top Geezers".to_owned())
+            .unwrap();
+        *sim.player_society() = Some(player_society);
 
         // defer to scenario for all entity spawning
         scenario(sim.world_mut());

@@ -1,6 +1,6 @@
 use crate::scenarios::helpers::spawn_entities_randomly;
 use common::*;
-use simulation::{ComponentWorld, ConditionComponent, EcsWorld, Societies};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety};
 
 pub type Scenario = fn(&mut EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -56,7 +56,10 @@ fn following_dogs(ecs: &mut EcsWorld) {
     let mut colors = helpers::entity_colours();
 
     let all_humans = spawn_entities_randomly(&world, humans, |pos| {
-        helpers::new_entity("core_living_human", ecs, pos, colors.next(), None, None)
+        helpers::new_entity("core_living_human", ecs, pos)
+            .with_color(colors.next_please())
+            .with_player_society()
+            .thanks()
     });
 
     spawn_entities_randomly(&world, dogs, |pos| {
@@ -65,7 +68,7 @@ fn following_dogs(ecs: &mut EcsWorld) {
             .choose(&mut *rand_althor)
             .expect("no humans to follow");
 
-        let dog = helpers::new_entity("core_living_dog", ecs, pos, None, None, None);
+        let dog = helpers::new_entity("core_living_dog", ecs, pos).thanks();
         ecs.helpers_dev().follow(dog, *human);
 
         dog
@@ -84,24 +87,18 @@ fn wander_and_eat(ecs: &mut EcsWorld) {
 
     spawn_entities_randomly(&world, humans, |pos| {
         let satiety = NormalizedFloat::new(random::get().gen_range(0.4, 0.5));
-        helpers::new_entity(
-            "core_living_human",
-            ecs,
-            pos,
-            colors.next(),
-            None,
-            Some(satiety),
-        )
+        helpers::new_entity("core_living_human", ecs, pos)
+            .with_color(colors.next_please())
+            .with_player_society()
+            .with_satiety(satiety)
+            .thanks()
     });
 
     spawn_entities_randomly(&world, food, |pos| {
-        let food = helpers::new_entity("core_food_apple", ecs, pos, None, None, None);
-
         let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
-
-        ecs.component_mut::<ConditionComponent>(food)
-            .map(|condition| condition.0.set(nutrition))
-            .expect("nutrition");
+        let food = helpers::new_entity("core_food_apple", ecs, pos)
+            .with_nutrition(nutrition)
+            .thanks();
 
         food
     });
@@ -117,28 +114,24 @@ fn haul_to_container(ecs: &mut EcsWorld) {
     let bricks = helpers::get_config_count("bricks");
 
     let society = ecs
-        .resource_mut::<Societies>()
-        .new_society("haulers".to_owned())
-        .unwrap();
+        .resource_mut::<PlayerSociety>()
+        .0
+        .expect("no player society");
 
     // our lovely haulers
     spawn_entities_randomly(&world, humans, |pos| {
-        helpers::new_entity(
-            "core_living_human",
-            ecs,
-            pos,
-            colors.next(),
-            Some(society),
-            None,
-        )
+        helpers::new_entity("core_living_human", ecs, pos)
+            .with_color(colors.next_please())
+            .with_player_society()
+            .thanks()
     });
 
     let food = spawn_entities_randomly(&world, food, |pos| {
-        helpers::new_entity("core_food_apple", ecs, pos, None, None, None)
+        helpers::new_entity("core_food_apple", ecs, pos).thanks()
     });
 
     let bricks = spawn_entities_randomly(&world, bricks, |pos| {
-        helpers::new_entity("core_brick_stone", ecs, pos, None, None, None)
+        helpers::new_entity("core_brick_stone", ecs, pos).thanks()
     });
 
     let chest_pos = helpers::create_chest(ecs, &world, None);
@@ -149,12 +142,12 @@ fn haul_to_container(ecs: &mut EcsWorld) {
 }
 
 mod helpers {
-    use color::ColorRgb;
+    use color::{ColorRgb, UniqueRandomColors};
     use common::{random, NormalizedFloat};
     use simulation::{
-        BlockType, ComponentWorld, EcsWorld, Entity, EntityPosition, HungerComponent,
-        InnerWorldRef, RenderComponent, SocietyComponent, SocietyHandle, TerrainUpdatesRes,
-        WorldPosition, WorldPositionRange, WorldTerrainUpdate,
+        BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityPosition,
+        HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent, SocietyComponent,
+        SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange, WorldTerrainUpdate,
     };
 
     pub fn get_config_count(wat: &str) -> usize {
@@ -162,43 +155,87 @@ mod helpers {
         counts.get(wat).copied().unwrap_or(0)
     }
 
-    pub fn entity_colours() -> impl Iterator<Item = ColorRgb> {
+    pub fn entity_colours() -> UniqueRandomColors {
         ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap()
     }
 
-    pub fn new_entity(
-        definition: &str,
-        ecs: &mut EcsWorld,
-        pos: impl EntityPosition + 'static,
-        color: Option<ColorRgb>,
-        society: Option<SocietyHandle>,
-        satiety: Option<NormalizedFloat>,
-    ) -> Entity {
-        let entity = ecs
-            .build_entity(definition)
-            .expect("no definition")
-            .with_position(pos)
-            .spawn()
-            .expect("failed to create entity");
+    pub struct EntityBuilder<'a>(&'a mut EcsWorld, Entity);
 
-        if let Some(color) = color {
-            ecs.component_mut::<RenderComponent>(entity)
+    impl<'a> EntityBuilder<'a> {
+        fn new(
+            definition: &str,
+            pos: impl EntityPosition + 'static,
+            world: &'a mut EcsWorld,
+        ) -> Self {
+            let entity = world
+                .build_entity(definition)
+                .expect("no definition")
+                .with_position(pos)
+                .spawn()
+                .expect("failed to create entity");
+
+            Self(world, entity)
+        }
+
+        pub fn with_color(self, color: ColorRgb) -> Self {
+            self.0
+                .component_mut::<RenderComponent>(self.1)
                 .map(|render| render.color = color)
                 .expect("render component");
+
+            self
         }
 
-        if let Some(society) = society {
-            ecs.add_now(entity, SocietyComponent::new(society))
+        pub fn with_society(self, society: SocietyHandle) -> Self {
+            self.0
+                .add_now(self.1, SocietyComponent::new(society))
                 .expect("society component");
+
+            self
         }
 
-        if let Some(satiety) = satiety {
-            ecs.component_mut::<HungerComponent>(entity)
+        pub fn with_player_society(self) -> Self {
+            let player_society = self
+                .0
+                .resource::<PlayerSociety>()
+                .0
+                .expect("no player society");
+            self.with_society(player_society)
+        }
+
+        pub fn with_satiety(self, satiety: NormalizedFloat) -> Self {
+            self.0
+                .component_mut::<HungerComponent>(self.1)
                 .map(|hunger| hunger.set_satiety(satiety))
                 .expect("hunger component");
+
+            self
         }
 
-        entity
+        pub fn with_condition(self, condition: NormalizedFloat) -> Self {
+            self.0
+                .component_mut::<ConditionComponent>(self.1)
+                .map(|comp| comp.0.set(condition))
+                .expect("condition component");
+
+            self
+        }
+
+        pub fn with_nutrition(self, nutrition: NormalizedFloat) -> Self {
+            self.with_condition(nutrition)
+        }
+
+        pub fn thanks(self) -> Entity {
+            self.1
+        }
+    }
+
+    pub fn new_entity<'a>(
+        definition: &str,
+        ecs: &'a mut EcsWorld,
+        pos: impl EntityPosition + 'static,
+    ) -> EntityBuilder<'a> {
+        EntityBuilder::new(definition, pos, ecs)
     }
 
     pub fn random_walkable_pos(world: &InnerWorldRef) -> WorldPosition {
