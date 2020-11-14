@@ -225,8 +225,6 @@
    * `// TODO transmute lifetimes instead`
    * `// TODO use an enum for the slice range rather than Options`
    * `// TODO 1 area at z=0`
- * [game/world/src/grid.rs](game/world/src/grid.rs) (1)
-   * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
  * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
    * `// TODO cache full finalized chunks`
    * `// TODO sort out the lifetimes instead of cheating and using transmute`
@@ -314,6 +312,8 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (1)
+   * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)

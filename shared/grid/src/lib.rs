@@ -1,4 +1,4 @@
-use common::derive_more::*;
+use derive_more::*;
 use std::convert::TryFrom;
 use std::ops::Range;
 
@@ -144,8 +144,6 @@ impl<I: GridImpl> Grid<I> {
         self.0
     }
 }
-
-// ---
 
 #[cfg(test)]
 mod tests {
