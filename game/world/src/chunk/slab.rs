@@ -7,10 +7,7 @@ use unit::world::{LocalSliceIndex, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut};
-use crate::{
-    grid::{Grid, GridImpl},
-    grid_declare,
-};
+use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
 grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,

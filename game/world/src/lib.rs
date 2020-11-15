@@ -15,7 +15,6 @@ pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 
 pub mod block;
 mod chunk;
-mod grid;
 pub mod loader;
 mod mesh;
 mod navigation;
