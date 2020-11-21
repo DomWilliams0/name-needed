@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::fs::File;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
 
 use serde::Deserialize;
@@ -39,7 +39,7 @@ pub struct DeserializedDefinition {
 }
 #[derive(Debug, Clone)]
 pub enum DefinitionSource {
-    File(Rc<PathBuf>),
+    File(Rc<Path>),
     Memory,
 }
 
@@ -138,11 +138,11 @@ pub fn collect_raw_definitions(
     let mut errors = Vec::new();
 
     // collect unprocessed definitions
-    for file in resources::recurse::<_, (File, resources::Mmap, Rc<PathBuf>)>(&resources, "ron") {
+    for file in resources::recurse::<_, (File, resources::Mmap, Rc<Path>)>(&resources, "ron") {
         // handle resource error
         let file = file.map_err(|ResourceError(path, e)| {
             DefinitionError(
-                DefinitionSource::File(Rc::new(path)),
+                DefinitionSource::File(path.into()),
                 DefinitionErrorKind::Resource(e),
             )
         });

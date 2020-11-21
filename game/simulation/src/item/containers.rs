@@ -124,7 +124,7 @@ impl EcsExtContainers<'_> {
                 let society = self
                     .resource_mut::<Societies>()
                     .society_by_handle_mut(society)
-                    .ok_or_else(|| ContainerError::BadSociety(society))?;
+                    .ok_or(ContainerError::BadSociety(society))?;
 
                 // update container first
                 let prev_communal = container.make_communal(new_society);
@@ -141,7 +141,7 @@ impl EcsExtContainers<'_> {
                 let society = self
                     .resource_mut::<Societies>()
                     .society_by_handle_mut(prev)
-                    .ok_or_else(|| ContainerError::BadSociety(prev))?;
+                    .ok_or(ContainerError::BadSociety(prev))?;
 
                 // remove from society
                 let result = society.remove_communal_container(container_entity, self.0);

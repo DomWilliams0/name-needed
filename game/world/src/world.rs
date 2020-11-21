@@ -123,10 +123,9 @@ impl<D> World<D> {
         let from = from.into();
         let to = to.into();
 
-        let from_area =
-            resolve_area(from).ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+        let from_area = resolve_area(from).ok_or(NavigationError::SourceNotWalkable(from))?;
 
-        let to_area = resolve_area(to).ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
+        let to_area = resolve_area(to).ok_or(NavigationError::TargetNotWalkable(to))?;
 
         Ok(self.area_graph.find_area_path(from_area, to_area)?)
     }
@@ -141,7 +140,7 @@ impl<D> World<D> {
         let block_graph = self
             .find_chunk_with_pos(area.chunk)
             .and_then(|c| c.block_graph_for_area(area))
-            .ok_or_else(|| NavigationError::NoSuchArea(area))?;
+            .ok_or(NavigationError::NoSuchArea(area))?;
 
         block_graph
             .find_block_path(from, to, target)
@@ -165,7 +164,7 @@ impl<D> World<D> {
     ) -> Result<WorldPath, NavigationError> {
         let from = self
             .find_accessible_block_in_column_with_range(from, None)
-            .ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+            .ok_or(NavigationError::SourceNotWalkable(from))?;
 
         let to_accessible = self.find_accessible_block_in_column_with_range(to, None);
         let (to, goal) = match goal {
@@ -192,7 +191,7 @@ impl<D> World<D> {
                 }
             }
         }
-        .ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
+        .ok_or(NavigationError::TargetNotWalkable(to))?;
 
         // same blocks
         if from == to {

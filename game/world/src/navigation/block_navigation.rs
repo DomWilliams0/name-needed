@@ -111,7 +111,7 @@ impl BlockGraph {
             |(_, _, e)| e.0.weight(),
             |n| manhattan(&n.0, &dst.0) as f32,
         )
-        .ok_or_else(|| BlockPathError::NoPath(to, from))?;
+        .ok_or(BlockPathError::NoPath(to, from))?;
 
         // TODO reuse vec allocation
         let mut out_path = Vec::with_capacity(path.len());

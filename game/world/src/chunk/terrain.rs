@@ -491,10 +491,7 @@ impl RawChunkTerrain {
 
             let mut coord_range = [(0, 0); CHUNK_SIZE.as_usize()];
             pair_walking::calculate_boundary_slice_block_offsets(offset, &mut coord_range);
-            let x_coord_changes = match offset {
-                NeighbourOffset::North | NeighbourOffset::South => true,
-                _ => false,
-            };
+            let x_coord_changes = offset.is_vertical();
 
             // iterate the boundary slices of this slab
             for ((slice_idx, slice), (ur_slice_below, ur_slice, ur_slice_above)) in my_slab

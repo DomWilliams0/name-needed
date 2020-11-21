@@ -39,7 +39,6 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         let mut exit = None;
 
         loop {
-            #[cold]
             if panic::has_panicked() {
                 debug!("breaking out of loop due to panics");
                 break Exit::Stop;
@@ -63,7 +62,6 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                 exit = self.tick();
             }
 
-            #[cold]
             if let Some(exit) = exit {
                 info!("exiting game"; "reason" => ?exit);
                 break exit;

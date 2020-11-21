@@ -238,7 +238,7 @@ impl AreaGraph {
         self.node_lookup
             .get(&area)
             .copied()
-            .ok_or_else(|| AreaPathError::NoSuchNode(area))
+            .ok_or(AreaPathError::NoSuchNode(area))
     }
 
     #[cfg(test)]

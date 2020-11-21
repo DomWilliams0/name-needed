@@ -58,12 +58,12 @@ impl ReadResource for PathBuf {
     }
 }
 
-impl ReadResource for (File, Mmap, Rc<PathBuf>) {
+impl ReadResource for (File, Mmap, Rc<Path>) {
     fn read(path: PathBuf) -> Result<Self, ResourceError> {
         let file = File::open(&path);
         file.and_then(|f| {
             let mapped = unsafe { Mmap::map(&f) };
-            mapped.map(|m| (f, m, Rc::new(path.clone()))) // keep file alive
+            mapped.map(|m| (f, m, path.clone().into())) // keep file alive
         })
         .map_err(|e| ResourceError(path, ResourceErrorKind::Io(e)))
     }

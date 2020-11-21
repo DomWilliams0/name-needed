@@ -68,7 +68,7 @@ impl<R: Renderer> DebugRenderers<R> {
                 *e = enabled;
                 debug!("toggled debug renderer"; "renderer" => identifier, "enabled" => enabled);
             })
-            .ok_or_else(|| DebugRendererError::NoSuchRenderer(identifier))
+            .ok_or(DebugRendererError::NoSuchRenderer(identifier))
     }
 
     pub fn iter_enabled(&mut self) -> impl Iterator<Item = &mut dyn DebugRenderer<R>> {

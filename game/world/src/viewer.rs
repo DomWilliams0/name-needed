@@ -114,7 +114,7 @@ impl<D> WorldViewer<D> {
             (start - half_range).max(world_bounds.bottom()),
             (start + half_range).min(world_bounds.top()),
         )
-        .ok_or_else(|| WorldViewerError::InvalidRange(world_bounds))?;
+        .ok_or(WorldViewerError::InvalidRange(world_bounds))?;
 
         Ok(Self {
             world,

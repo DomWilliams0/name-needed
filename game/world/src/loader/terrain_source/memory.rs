@@ -78,11 +78,7 @@ impl TerrainSource for MemoryTerrainSource {
         self.chunk_map
             .get_mut(&chunk)
             .ok_or(TerrainSourceError::OutOfBounds)
-            .and_then(|terrain| {
-                terrain
-                    .take()
-                    .ok_or_else(|| TerrainSourceError::Duplicate(chunk))
-            })
+            .and_then(|terrain| terrain.take().ok_or(TerrainSourceError::Duplicate(chunk)))
     }
 }
 

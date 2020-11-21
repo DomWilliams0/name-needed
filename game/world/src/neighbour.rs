@@ -166,21 +166,18 @@ impl NeighbourOffset {
     }
 
     pub fn is_aligned(self) -> bool {
-        match self {
+        matches!(
+            self,
             NeighbourOffset::South
-            | NeighbourOffset::East
-            | NeighbourOffset::North
-            | NeighbourOffset::West => true,
-            _ => false,
-        }
+                | NeighbourOffset::East
+                | NeighbourOffset::North
+                | NeighbourOffset::West
+        )
     }
 
     pub fn is_vertical(self) -> bool {
         debug_assert!(self.is_aligned());
-        match self {
-            NeighbourOffset::North | NeighbourOffset::South => true,
-            _ => false,
-        }
+        matches!(self, NeighbourOffset::North | NeighbourOffset::South)
     }
 
     pub fn between_aligned(from: ChunkPosition, to: ChunkPosition) -> Self {
