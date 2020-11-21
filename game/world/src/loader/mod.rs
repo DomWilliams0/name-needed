@@ -111,6 +111,8 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
         let mut batches = UpdateBatch::builder(&mut self.batch_ids, chunks.len());
 
         for chunk in chunks {
+            let chunk: ChunkPosition = chunk; // fix ide inference
+
             let source = self.source.clone();
             let batch = batches.next_batch();
 

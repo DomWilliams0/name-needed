@@ -179,6 +179,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
                 let result = haul.on_finish(&ActivityFinish::Success, ctx);
 
                 // then place the haulee in the world
+                // TODO this should be in the/a subactivity
                 let item = self.thing;
                 match self.target {
                     HaulTarget::Position(pos) => {

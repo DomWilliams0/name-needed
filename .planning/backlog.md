@@ -66,6 +66,13 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
 	* magma very low down, or it just gets too hot
+* finite pregenerated world in xy (planet), infinite in z
+* unique species and settlements with societies to discover in different environments
+	* underground species with no eyes, cave houses
+	* underwater people
+	* mud crabs with human arms
+* generate and load world in SLABS, not full chunks
+	* config option to generate new land for camera, otherwise society member must be there
 
 ## Voxel world mechanics
 * fluid blocks

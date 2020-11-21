@@ -25,7 +25,8 @@ pub trait TerrainSource: Send {
     /// Bounding box, not necessarily full
     fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition);
 
-    fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross
+    // TODO pass closure instead of returning new vec
+    fn all_chunks(&mut self) -> Vec<ChunkPosition>;
 
     fn preprocess(
         &self,

@@ -105,6 +105,7 @@ impl<U> UpdateBatcher<U> {
     }
 
     /// (batch id, batch length)
+    // TODO why not return iterator?
     pub fn complete_batches(&self) -> SmallVec<[(BatchId, usize); 8]> {
         self.batches
             .values()

@@ -1,4 +1,4 @@
-# TODOs (224)
+# TODOs (225)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -25,13 +25,14 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
+ * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (10)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
    * `// TODO events for items entering/exiting containers`
    * `// TODO arrival radius depends on the size of the item`
    * `// TODO could the item ever move while we're going to it? only by gravity?`
+   * `// TODO this should be in the/a subactivity`
    * `// TODO don't always drop item in centre`
    * `// TODO explicit access side for container, e.g. front of chest`
    * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
