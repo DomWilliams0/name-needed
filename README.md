@@ -10,14 +10,15 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 * * *
 
 ## Progress log
+
+* 21 Nov 2020: <em>Containers and the hauling of items.</em>
+<p style="margin: auto">
+    <img src=".screenshots/hauling-containers.gif"/>
+</p>
+
 * 22 Aug 2020: <em>World modification and collective society task queue with a bunch of internal restructuring, including data driven entity definitions, structured logging and event-based AI.</em>
 <p style="margin: auto">
     <img src=".screenshots/world-modification.gif"/>
-</p>
-
-* 14 Jun 2020: <em>Basic, boring procedural terrain generation.</em>
-<p style="margin: auto">
-    <img src=".screenshots/procgen-basic.png"/>
 </p>
 
 *[Continued here](PROGRESS.md)*
