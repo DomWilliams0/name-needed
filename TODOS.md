@@ -1,4 +1,4 @@
-# TODOs (223)
+# TODOs (224)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -225,6 +225,8 @@
    * `// TODO transmute lifetimes instead`
    * `// TODO use an enum for the slice range rather than Options`
    * `// TODO 1 area at z=0`
+ * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
+   * `// TODO why not return iterator?`
  * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
    * `// TODO cache full finalized chunks`
    * `// TODO sort out the lifetimes instead of cheating and using transmute`
@@ -234,7 +236,7 @@
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
  * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
-   * `fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross`
+   * `// TODO pass closure instead of returning new vec`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
