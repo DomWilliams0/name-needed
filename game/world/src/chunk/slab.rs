@@ -98,8 +98,11 @@ impl Slab {
 
 impl DeepClone for Slab {
     fn deep_clone(&self) -> Self {
-        let grid: SlabGridImpl = (*self.0).clone();
-        Self(Arc::from(grid))
+        // don't go via the stack to avoid overflow
+        let mut new_copy = SlabGridImpl::default_boxed();
+        new_copy.array.copy_from_slice(&self.array);
+
+        Self(Arc::from(new_copy))
     }
 }
 
