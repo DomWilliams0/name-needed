@@ -59,7 +59,6 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
         chunk_updates_tx: Sender<OcclusionChunkUpdate>,
     ) {
         let success_tx = self.success_tx.clone();
-        // TODO if this thread panics, propagate to main game thread
         std::thread::Builder::new()
             .name("wrld-finalize".to_owned())
             .spawn(move || {
@@ -67,12 +66,12 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
 
                 while let Ok(result) = finalize_rx.recv() {
                     let result = match result {
-                        Err(e @ TerrainSourceError::OutOfBounds) => {
-                            debug!("requested out of bounds chunk, no problem");
+                        Err(e @ TerrainSourceError::OutOfBounds(_)) => {
+                            debug!("requested out of bounds slab, no problem");
                             Err(e)
                         }
                         Err(e) => {
-                            error!("failed to load requested chunk"; "error" => %e);
+                            error!("failed to load requested slab"; "error" => %e);
                             Err(e)
                         }
                         Ok(result) => {

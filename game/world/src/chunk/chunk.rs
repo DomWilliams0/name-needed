@@ -2,15 +2,20 @@ use std::ops::{Deref, DerefMut};
 
 use common::*;
 
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
+    SLAB_SIZE,
+};
 
 use crate::block::BlockType;
-use crate::chunk::slice::Slice;
+use crate::chunk::slab::SlabTerrain;
+use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
 use crate::chunk::BaseTerrain;
 use crate::navigation::WorldArea;
 use crate::SliceRange;
 use std::collections::HashMap;
+use std::sync::{Condvar, Mutex, RwLock};
 
 pub type ChunkId = u64;
 
@@ -22,14 +27,35 @@ pub struct Chunk<D> {
 
     /// Sparse associated data with each block
     block_data: HashMap<BlockPosition, D>,
+
+    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
+    slab_wait: Mutex<()>,
+    slab_wait_cvar: Condvar,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum SlabLoadingStatus {
+    /// Not available
+    Unloaded,
+
+    /// Has been requested
+    Requested,
+
+    /// Is in progress
+    // TODO box these? this variant is 6K
+    InProgress {
+        /// Slab's top slice
+        top: SliceOwned,
+
+        /// Slab's bottom slice
+        bottom: SliceOwned,
+    },
+    Done,
 }
 
 impl<D> Chunk<D> {
     pub fn empty<P: Into<ChunkLocation>>(pos: P) -> Self {
-        let pos = pos.into();
-        // TODO still does a lot of unnecessary initialization
-        let terrain = ChunkTerrain::from_new_raw_terrain(RawChunkTerrain::default(), pos);
-        Self::with_completed_terrain(pos, terrain)
+        Self::with_completed_terrain(pos.into(), ChunkTerrain::empty())
     }
 
     /// Called by ChunkBuilder when terrain has been finalized
@@ -38,6 +64,9 @@ impl<D> Chunk<D> {
             pos,
             terrain,
             block_data: HashMap::new(),
+            slab_progress: RwLock::new(HashMap::new()),
+            slab_wait: Mutex::new(()),
+            slab_wait_cvar: Condvar::new(),
         }
     }
 
@@ -94,8 +123,118 @@ impl<D> Chunk<D> {
         self.block_data.remove(&pos)
     }
 
+    /// Swap all chunk metadata with the other
     pub(crate) fn swap_with(&mut self, other: &mut Self) {
         std::mem::swap(&mut self.block_data, &mut other.block_data)
+    }
+
+    pub(crate) fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
+        let notify = matches!(state, SlabLoadingStatus::InProgress {..} | SlabLoadingStatus::Done);
+        debug!("updating slab progress"; slab, "state" => ?state);
+
+        let mut map = self.slab_progress.write().unwrap();
+        map.insert(slab, state);
+
+        if notify {
+            self.slab_wait_cvar.notify_all();
+        }
+    }
+
+    /// (slice above, slice below)
+    pub(crate) fn wait_for_neighbouring_slabs(
+        &self,
+        slab: SlabIndex,
+    ) -> (Option<SliceOwned>, Option<SliceOwned>) {
+        // slice below is mandatory as it's used for navigation. wait for it if it's in progress
+        let slice_below = self.wait_for_slab(slab - 1, true);
+
+        // slice above is optional, only used to calculate occlusion which can be updated later
+        let slice_above = {
+            let above = slab + 1;
+            let progress = self.slab_progress(above);
+            self.get_slab_slice(progress, above, false)
+        };
+
+        (slice_above, slice_below)
+    }
+
+    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
+        let guard = self.slab_progress.read().unwrap();
+        guard
+            .get(&slab)
+            .unwrap_or(&SlabLoadingStatus::Unloaded)
+            .clone()
+    }
+
+    fn get_slab_slice(
+        &self,
+        state: SlabLoadingStatus,
+        slab: SlabIndex,
+        top_slice: bool,
+    ) -> Option<SliceOwned> {
+        match state {
+            SlabLoadingStatus::InProgress { top, bottom } => {
+                Some(if top_slice { top } else { bottom })
+            }
+            SlabLoadingStatus::Done => {
+                let slice = if top_slice {
+                    LocalSliceIndex::top()
+                } else {
+                    LocalSliceIndex::bottom()
+                };
+                let global_slice = slice.to_global(slab);
+                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
+                    panic!(
+                        "slab {:?} is apparently loaded but could not be found",
+                        slab
+                    )
+                });
+                Some(slice.to_owned())
+            }
+            _ => None,
+        }
+    }
+
+    fn wait_for_slab(&self, slab: SlabIndex, top_slice: bool) -> Option<SliceOwned> {
+        let mut ret = None;
+
+        let guard = self.slab_wait.lock().unwrap();
+        let _guard = self
+            .slab_wait_cvar
+            .wait_while(guard, |_| {
+                let state = self.slab_progress(slab);
+
+                match state {
+                    SlabLoadingStatus::Requested => {
+                        // keep waiting
+                        true
+                    }
+                    SlabLoadingStatus::Unloaded => {
+                        // nothing to wait for
+                        debug!("slab of interest is unloaded"; slab);
+                        false
+                    }
+
+                    _ => {
+                        // it's available
+                        debug!("slab of interest is available"; slab, "state" => ?state);
+                        ret = self.get_slab_slice(state, slab, top_slice);
+                        false
+                    }
+                }
+            })
+            .unwrap();
+
+        ret
+    }
+}
+
+impl SlabLoadingStatus {
+    pub fn in_progress(terrain: &SlabTerrain) -> Self {
+        let top = terrain.owned_slice(LocalSliceIndex::top());
+        let bottom = terrain.owned_slice(LocalSliceIndex::bottom());
+
+        Self::InProgress { top, bottom }
     }
 }
 

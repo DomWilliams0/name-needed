@@ -206,6 +206,12 @@ impl RawChunkTerrain {
         self.slabs.len()
     }
 
+    /// Inclusive
+    pub fn slab_range(&self) -> (SlabIndex, SlabIndex) {
+        let (a, b) = self.slabs.index_range();
+        (SlabIndex(a), SlabIndex(b))
+    }
+
     /// Returns the range of slices in this terrain rounded to the nearest slab
     pub fn slice_bounds_as_slabs(&self) -> SliceRange {
         let mut slabs = self.slabs.indices_increasing();
@@ -822,6 +828,7 @@ impl Default for RawChunkTerrain {
 }
 
 impl ChunkTerrain {
+    #[deprecated]
     pub fn from_raw_terrain(
         raw_terrain: RawChunkTerrain,
         chunk_pos: ChunkLocation,
@@ -843,6 +850,13 @@ impl ChunkTerrain {
         terrain.init_occlusion(request);
 
         terrain
+    }
+
+    pub fn empty() -> Self {
+        ChunkTerrain {
+            raw_terrain: RawChunkTerrain::default(),
+            areas: HashMap::with_capacity(32),
+        }
     }
 
     pub fn from_new_raw_terrain(raw_terrain: RawChunkTerrain, chunk_pos: ChunkLocation) -> Self {
@@ -962,7 +976,8 @@ impl ChunkTerrain {
             for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
                 let this_slice_mut: SliceMut = this_slab.slice_mut(this_slice_idx);
 
-                // Safety: slices don't overlap and this_slice_idx != next_slice_idx
+                // transmute lifetime to allow a mut and immut reference
+                // safety: slices don't overlap and this_slice_idx != next_slice_idx
                 let this_slice_mut: SliceMut = unsafe { std::mem::transmute(this_slice_mut) };
                 let next_slice = this_slab.slice(next_slice_idx);
 
@@ -973,7 +988,7 @@ impl ChunkTerrain {
             if let Some(next_slab_idx) = next_slab_idx {
                 let this_slab_top_slice = this_slab.slice_mut(LocalSliceIndex::top());
 
-                // Safety: mutable and immutable slices don't overlap
+                // safety: mutable and immutable slices don't overlap
                 let this_slab_top_slice: SliceMut =
                     unsafe { std::mem::transmute(this_slab_top_slice) };
 
@@ -1452,6 +1467,8 @@ mod tests {
 
     #[test]
     fn occlusion_across_chunk_sides() {
+        logging::for_tests();
+
         let a = ChunkBuilder::new()
             .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Grass) // slab 1
             .set_block((0, 0, 0), BlockType::Grass) // slab 0

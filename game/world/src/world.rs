@@ -88,23 +88,23 @@ impl<D> World<D> {
         }
     }
 
-    fn find_chunk_index(&self, chunk_pos: ChunkLocation) -> Option<usize> {
-        self.chunks
-            .binary_search_by_key(&chunk_pos, |c| c.pos())
-            .ok()
+    fn find_chunk_index(&self, chunk_pos: ChunkLocation) -> Result<usize, usize> {
+        self.chunks.binary_search_by_key(&chunk_pos, |c| c.pos())
     }
 
     pub fn has_chunk(&self, chunk_pos: ChunkLocation) -> bool {
-        self.find_chunk_index(chunk_pos).is_some()
+        self.find_chunk_index(chunk_pos).is_ok()
     }
 
     pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<D>> {
         self.find_chunk_index(chunk_pos)
+            .ok()
             .map(|idx| &self.chunks[idx])
     }
 
     fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkLocation) -> Option<&mut Chunk<D>> {
         self.find_chunk_index(chunk_pos)
+            .ok()
             .map(move |idx| &mut self.chunks[idx])
     }
 
@@ -279,49 +279,66 @@ impl<D> World<D> {
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
+    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &Chunk<D> {
+        let idx = match self.find_chunk_index(chunk) {
+            Ok(idx) => idx,
+            Err(idx) => {
+                debug!("adding empty chunk"; chunk);
+                self.chunks.insert(idx, Chunk::empty(chunk));
+                idx
+            }
+        };
+
+        // safety: index returned above
+        unsafe { self.chunks.get_unchecked(idx) }
+    }
+
     pub(crate) fn add_loaded_chunk(
         &mut self,
         chunk: Chunk<D>,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
     ) {
         let chunk_pos = chunk.pos();
-        if let Some(idx) = self.find_chunk_index(chunk_pos) {
-            // chunk already exists
+        match self.find_chunk_index(chunk_pos) {
+            Ok(idx) => {
+                // chunk already exists
 
-            // swap out the chunk inline, no need to push it or resort the vec
-            // safety: idx returned by find_chunk_index
-            let (old_chunk, new_chunk) = unsafe {
-                let mut old_chunk = std::mem::replace(self.chunks.get_unchecked_mut(idx), chunk);
-                let new_chunk = self.chunks.get_unchecked_mut(idx);
+                // swap out the chunk inline, no need to push it or resort the vec
+                // safety: idx returned by find_chunk_index
+                let (old_chunk, new_chunk) = unsafe {
+                    let mut old_chunk =
+                        std::mem::replace(self.chunks.get_unchecked_mut(idx), chunk);
+                    let new_chunk = self.chunks.get_unchecked_mut(idx);
 
-                old_chunk.swap_with(new_chunk);
+                    old_chunk.swap_with(new_chunk);
 
-                (old_chunk, new_chunk)
-            };
+                    (old_chunk, new_chunk)
+                };
 
-            // remove old area nodes that aren't in the new chunk
-            // TODO reuse hashset allocation
-            let new_areas: HashSet<WorldArea> = new_chunk.areas().copied().collect();
+                // remove old area nodes that aren't in the new chunk
+                // TODO reuse hashset allocation
+                let new_areas: HashSet<WorldArea> = new_chunk.areas().copied().collect();
 
-            for area in old_chunk.areas() {
-                if !new_areas.contains(area) {
-                    // expired area
-                    trace!("removing expired world area"; "area" => ?area);
-                    self.area_graph.remove_node(&area);
-                } else {
-                    // new area
-                    self.area_graph.add_node(*area);
+                for area in old_chunk.areas() {
+                    if !new_areas.contains(area) {
+                        // expired area
+                        trace!("removing expired world area"; "area" => ?area);
+                        self.area_graph.remove_node(&area);
+                    } else {
+                        // new area
+                        self.area_graph.add_node(*area);
+                    }
                 }
             }
-        } else {
-            // chunk is new, just add all areas as fresh
-            for area in chunk.areas() {
-                self.area_graph.add_node(*area);
-            }
+            Err(idx) => {
+                // chunk is new, just add all areas as fresh
+                for area in chunk.areas() {
+                    self.area_graph.add_node(*area);
+                }
 
-            // add chunk to vec, maintaining sorted order
-            self.chunks.push(chunk);
-            self.chunks.sort_unstable_by_key(|c| c.pos());
+                // add chunk to vec, maintaining sorted order
+                self.chunks.insert(idx, chunk);
+            }
         }
 
         // update area edges
@@ -635,6 +652,7 @@ pub mod helpers {
     };
     use crate::{ChunkDescriptor, WorldRef};
     use common::Itertools;
+    use unit::world::ChunkLocation;
 
     pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
         loader_from_chunks_blocking(chunks).world()
@@ -642,9 +660,9 @@ pub mod helpers {
 
     pub fn loader_from_chunks_blocking(
         chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<BlockingWorkerPool<()>, ()> {
+    ) -> WorldLoader<ThreadedWorkerPool, ()> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world(source, BlockingWorkerPool::default())
+        load_world(source, ThreadedWorkerPool::new(1))
     }
 
     pub fn loader_from_chunks_threaded(
@@ -657,7 +675,7 @@ pub mod helpers {
     }
 
     pub fn apply_updates(
-        loader: &mut WorldLoader<BlockingWorkerPool<()>, ()>,
+        loader: &mut WorldLoader<impl WorkerPool<()>, ()>,
         updates: &[WorldTerrainUpdate],
     ) -> Result<(), String> {
         let world = loader.world();
@@ -682,17 +700,17 @@ pub mod helpers {
         Ok(())
     }
 
-    pub(crate) fn load_world<P: WorkerPool<D>, D>(
+    pub(crate) fn load_world<P: WorkerPool<D>, D: 'static>(
         mut source: MemoryTerrainSource,
         pool: P,
     ) -> WorldLoader<P, D> {
-        let chunks_pos = source.all_chunks().collect_vec();
-
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
+        let slabs_to_load = source.all_slabs().collect_vec();
+
         let mut loader = WorldLoader::new(source, pool);
-        loader.request_chunks(chunks_pos.into_iter());
+        loader.request_slabs(slabs_to_load.into_iter());
         loader
             .block_for_last_batch(Duration::from_secs(20))
             .unwrap();
@@ -712,7 +730,7 @@ pub mod helpers {
 mod tests {
     use std::time::Duration;
 
-    use common::{seeded_rng, Itertools, Rng};
+    use common::{logging, seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition, WorldPositionRange,
@@ -873,7 +891,7 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        // logging::for_tests();
+        logging::for_tests();
 
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
@@ -1088,7 +1106,8 @@ mod tests {
                 .map(|(x, y)| ChunkLocation(x, y))
         };
         let count = all_chunks.clone().count();
-        loader.request_chunks_with_length(all_chunks, count);
+        todo!();
+        // loader.request_chunks_with_length(all_chunks, count);
 
         assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
 

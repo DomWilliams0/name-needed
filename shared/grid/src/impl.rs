@@ -2,6 +2,7 @@ use derive_more::*;
 use std::convert::TryFrom;
 use std::ops::Range;
 
+// TODO allow smaller datatypes for dims
 pub type CoordType = [i32; 3];
 
 pub trait GridImpl {

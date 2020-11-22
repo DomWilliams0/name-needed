@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::ChunkLocation;
+use unit::world::{ChunkLocation, SlabLocation};
 
+use crate::chunk::slab::SlabTerrain;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
 
 /// Used for testing
 #[derive(Clone)]
 pub struct MemoryTerrainSource {
-    /// Terrain is `take`n on load
-    chunk_map: HashMap<ChunkLocation, Option<RawChunkTerrain>>,
+    /// Each slab is removed from terrain as it's loaded
+    chunk_map: HashMap<ChunkLocation, RawChunkTerrain>,
     bounds: (ChunkLocation, ChunkLocation),
 }
 
@@ -24,7 +25,7 @@ impl MemoryTerrainSource {
         for it in chunks {
             let (chunk, terrain) = it.into();
             let chunk = chunk.into();
-            if chunk_map.insert(chunk, Some(terrain)).is_some() {
+            if chunk_map.insert(chunk, terrain).is_some() {
                 return Err(TerrainSourceError::Duplicate(chunk));
             }
         }
@@ -52,8 +53,11 @@ impl MemoryTerrainSource {
         Ok(Self { chunk_map, bounds })
     }
 
-    pub fn all_chunks(&mut self) -> impl ExactSizeIterator<Item = ChunkLocation> + '_ {
-        self.chunk_map.keys().copied()
+    pub fn all_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.chunk_map.iter().flat_map(|(chunk, terrain)| {
+            let (min, max) = terrain.slab_range();
+            (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
+        })
     }
 }
 
@@ -64,22 +68,43 @@ impl TerrainSource for MemoryTerrainSource {
 
     fn preprocess(
         &self,
-        _: ChunkLocation,
+        _slab: SlabLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
         // nothing to do
         Box::new(|| Ok(Box::new(())))
     }
 
-    fn load_chunk(
+    fn load_slab(
         &mut self,
-        chunk: ChunkLocation,
+        slab: SlabLocation,
         _: Box<dyn PreprocessedTerrain>,
-    ) -> Result<RawChunkTerrain, TerrainSourceError> {
-        self.chunk_map
-            .get_mut(&chunk)
-            .ok_or(TerrainSourceError::OutOfBounds)
-            .and_then(|terrain| terrain.take().ok_or(TerrainSourceError::Duplicate(chunk)))
+    ) -> Result<SlabTerrain, TerrainSourceError> {
+        let terrain = self
+            .chunk_map
+            .get(&slab.chunk)
+            .and_then(|terrain| terrain.copy_slab(slab.slab))
+            .ok_or(TerrainSourceError::OutOfBounds(slab))?;
+
+        Ok(SlabTerrain::from_slab(terrain, slab))
     }
+
+    /*    fn preprocess(
+            &self,
+            _: ChunkLocation,
+        ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
+        }
+
+        fn load_chunk(
+            &mut self,
+            chunk: ChunkLocation,
+            _: Box<dyn PreprocessedTerrain>,
+        ) -> Result<RawChunkTerrain, TerrainSourceError> {
+            self.chunk_map
+                .get_mut(&chunk)
+                .ok_or(TerrainSourceError::OutOfBounds)
+                .and_then(|terrain| terrain.take().ok_or(TerrainSourceError::Duplicate(chunk)))
+        }
+    */
 }
 
 impl PreprocessedTerrain for () {

@@ -93,10 +93,7 @@ impl Default for OcclusionOpacity {
 
 impl OcclusionOpacity {
     pub fn solid(self) -> bool {
-        match self {
-            OcclusionOpacity::Unknown => false,
-            OcclusionOpacity::Known(opacity) => opacity.solid(),
-        }
+        matches!(self, OcclusionOpacity::Known(BlockOpacity::Solid))
     }
 
     pub fn transparent(self) -> bool {

@@ -9,5 +9,11 @@ pub struct SlabLocation {
     pub slab: SlabIndex,
 }
 
+impl Display for SlabLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[slab {} in chunk {:?}]", self.slab.as_i32(), self.chunk)
+    }
+}
+
 slog_value_debug!(SlabLocation);
 slog_kv_debug!(SlabLocation, "slab");

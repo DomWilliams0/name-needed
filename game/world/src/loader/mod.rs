@@ -9,11 +9,13 @@ pub use batch::UpdateBatch;
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::ChunkLocation;
+use unit::world::{ChunkLocation, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
-use crate::chunk::{BaseTerrain, Chunk, ChunkTerrain, RawChunkTerrain, WhichChunk};
+use crate::chunk::{
+    BaseTerrain, Chunk, ChunkTerrain, RawChunkTerrain, SlabLoadingStatus, WhichChunk,
+};
 use crate::loader::batch::{UpdateBatchUniqueId, UpdateBatcher};
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
@@ -74,7 +76,7 @@ pub enum ChunkRequest {
     UpdateExisting,
 }
 
-impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
+impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
         let (finalize_tx, finalize_rx) = bounded(16);
         let (chunk_updates_tx, chunk_updates_rx) = unbounded();
@@ -97,67 +99,95 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
         self.world.clone()
     }
 
-    /// Requests chunks as a single batch
-    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item = ChunkLocation>) {
-        let count = chunks.len();
-        self.request_chunks_with_length(chunks, count)
+    /// Requests slabs as a single batch
+    pub fn request_slabs(&mut self, slabs: impl ExactSizeIterator<Item = SlabLocation>) {
+        let count = slabs.len();
+        self.request_slabs_with_count(slabs, count)
     }
 
-    pub fn request_chunks_with_length(
+    pub fn request_slabs_with_count(
         &mut self,
-        chunks: impl Iterator<Item = ChunkLocation>,
+        slabs: impl Iterator<Item = SlabLocation>,
         count: usize,
     ) {
-        // TODO cache full finalized chunks
-
         let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
-
+        let mut world_mut = self.world.borrow_mut();
         let mut real_count = 0;
-        for chunk in chunks {
-            let chunk: ChunkLocation = chunk; // fix ide inference
+
+        // hold source lock as a barrier for this batch, until all slabs have been registered
+        // with the chunk so they know if their neighbours are being loaded
+        let _guard = self.source.lock().unwrap();
+
+        for slab in slabs {
+            let chunk = world_mut.ensure_chunk(slab.chunk);
+            chunk.update_slab_status(slab.slab, SlabLoadingStatus::Requested);
 
             let source = self.source.clone();
             let batch = batches.next_batch();
 
             debug!(
-                "submitting batch of chunk requests to pool";
-                chunk, batch
+                "submitting slab to pool as part of batch";
+                slab, batch
             );
 
             // load raw terrain and do as much processing in isolation as possible on a worker thread
+            let world = self.world();
             self.pool.submit(
                 move || {
                     // briefly hold the source lock to get a preprocess closure to run
                     let preprocess_work = {
                         let terrain_source = source.lock().unwrap();
 
-                        // fail fast if bad chunk position
-                        if !terrain_source.is_in_bounds(chunk) {
-                            return Err(TerrainSourceError::OutOfBounds);
+                        // fail fast if bad slab position
+                        if !terrain_source.is_in_bounds(slab) {
+                            return Err(TerrainSourceError::OutOfBounds(slab));
                         }
 
-                        terrain_source.preprocess(chunk)
+                        terrain_source.preprocess(slab)
                     };
 
                     // run preprocessing work concurrently
                     let preprocess_result = preprocess_work()?;
 
-                    // take the source lock again to convert preprocessing output into raw terrain.
+                    // take the source lock again to convert preprocessing output into raw terrain
                     // e.g. reading from a file cannot be done in parallel
                     let terrain = {
                         let mut terrain_source = source.lock().unwrap();
-                        terrain_source.load_chunk(chunk, preprocess_result)?
+                        terrain_source.load_slab(slab, preprocess_result)?
                     };
 
-                    // concurrently process raw terrain into chunk terrain
-                    let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk, ChunkRequest::New);
-                    Ok((chunk, terrain, batch))
+                    // slab terrain is now fixed, copy the top and bottom slices into chunk so
+                    // neighbouring slabs can access it
+                    info!("nice {}", slab);
+                    let world = world.borrow();
+                    let chunk = world.find_chunk_with_pos(slab.chunk).unwrap();
+                    chunk.update_slab_status(slab.slab, SlabLoadingStatus::in_progress(&terrain));
+
+                    // wait for above+below slabs to be loaded if they're in progress, then
+                    // concurrently process raw terrain in context of own chunk
+                    let (above, below) = chunk.wait_for_neighbouring_slabs(slab.slab);
+                    let terrain = terrain.into_real_slab(
+                        above.as_ref().map(|s| s.into()), // gross
+                        below.as_ref().map(|s| s.into()),
+                    );
+
+                    // TODO take mut lock and put slab into its chunk now? or do that with another mutex in chunk?
+                    // TODO wat to return?
+
+                    // let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk, ChunkRequest::New);
+                    // Ok((chunk, terrain, batch))
+                    todo!()
                 },
                 self.finalization_channel.clone(),
             );
 
             real_count += 1;
         }
+
+        // unblock workers
+        drop(_guard);
+
+        debug!("slab batch of size {size} submitted", size = count);
 
         assert_eq!(
             real_count, count,
@@ -589,7 +619,8 @@ mod tests {
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
         let mut loader = WorldLoader::<_, ()>::new(source, BlockingWorkerPool::default());
-        loader.request_chunks(once(ChunkLocation(0, 0)));
+        // loader.request_chunks(once(ChunkLocation(0, 0)));
+        todo!();
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
         assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));

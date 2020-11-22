@@ -3,10 +3,10 @@ use std::ops::Deref;
 
 use common::Itertools;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{LocalSliceIndex, SlabIndex, SLAB_SIZE};
+use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slice::{Slice, SliceMut};
+use crate::chunk::slice::{Slice, SliceMut, SliceOwned};
 use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
@@ -16,10 +16,13 @@ grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
     SLAB_SIZE.as_usize()
 );
 
-/// CoW
+/// CoW, fully occlusion'ed, ready for use in game world
 #[derive(Clone)]
 #[repr(transparent)]
-pub(crate) struct Slab(Arc<SlabGridImpl>);
+pub struct Slab(Arc<SlabGridImpl>);
+
+/// Raw terrain, just block data
+pub struct SlabTerrain(SlabLocation, Arc<SlabGridImpl>);
 
 pub trait DeepClone {
     fn deep_clone(&self) -> Self;
@@ -111,6 +114,42 @@ impl Deref for Slab {
 
     fn deref(&self) -> &Self::Target {
         self.0.deref()
+    }
+}
+
+impl SlabTerrain {
+    fn empty(loc: SlabLocation) -> Self {
+        SlabTerrain(loc, Arc::from(SlabGridImpl::default_boxed()))
+    }
+
+    /// Discover navigability and occlusion
+    pub fn into_real_slab(self, above: Option<Slice>, below: Option<Slice>) -> Slab {
+        // TODO
+        todo!(
+            "real slab above {:?} below {:?}",
+            above.is_some(),
+            below.is_some()
+        );
+
+        Slab(self.1)
+    }
+
+    fn discover_areas(&mut self) {
+        // only needs top slice of below slab
+        // creates blockgraphs for each chunkarea in this slab, does not protrude into other slabs
+    }
+    fn init_occlusion(&mut self) {
+        // TODO only needs bottom slice of next slab up, slab below doesnt matter
+    }
+
+    pub fn from_slab(slab: Slab, loc: SlabLocation) -> Self {
+        SlabTerrain(loc, slab.0)
+    }
+
+    pub fn owned_slice(&self, index: impl Into<LocalSliceIndex>) -> SliceOwned {
+        let index = index.into();
+        let (from, to) = self.1.slice_range(index.slice());
+        Slice::new(&self.1.array()[from..to]).to_owned()
     }
 }
 

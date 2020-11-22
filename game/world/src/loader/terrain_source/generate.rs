@@ -1,11 +1,10 @@
-use crate::block::BlockType;
-use crate::chunk::ChunkBuilder;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSourceError};
 use crate::loader::TerrainSource;
 use common::*;
-use unit::dim::CHUNK_SIZE;
-use unit::world::ChunkLocation;
+
+use crate::chunk::slab::SlabTerrain;
+use unit::world::{ChunkLocation, SlabLocation};
 
 pub struct GeneratedTerrainSource {
     bounds: (ChunkLocation, ChunkLocation),
@@ -50,6 +49,21 @@ impl TerrainSource for GeneratedTerrainSource {
 
     fn preprocess(
         &self,
+        slab: SlabLocation,
+    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
+        unimplemented!()
+    }
+
+    fn load_slab(
+        &mut self,
+        slab: SlabLocation,
+        preprocess_result: Box<dyn PreprocessedTerrain>,
+    ) -> Result<SlabTerrain, TerrainSourceError> {
+        unimplemented!()
+    }
+    /*
+    fn preprocess(
+        &self,
         chunk: ChunkLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
         let seed = self.seed;
@@ -90,7 +104,7 @@ impl TerrainSource for GeneratedTerrainSource {
         preprocessed: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError> {
         Ok(preprocessed.into_raw_terrain())
-    }
+    }*/
 }
 
 impl PreprocessedTerrain for RawChunkTerrain {

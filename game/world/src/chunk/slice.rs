@@ -4,6 +4,8 @@ use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::{Block, BlockType};
+use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
 const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
     [Block::air(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
@@ -15,6 +17,12 @@ pub struct Slice<'a> {
 
 pub struct SliceMut<'a> {
     slice: &'a mut [Block],
+}
+
+// TODO can this just hold opacity to reduce size?
+#[derive(Clone)]
+pub struct SliceOwned {
+    slice: [Block; DUMMY_SLICE_BLOCKS.len()],
 }
 
 impl<'a> Slice<'a> {
@@ -67,6 +75,11 @@ impl<'a> Slice<'a> {
         debug_assert!(idx < self.slice.len());
         unsafe { self.slice.get_unchecked(idx) }
     }
+
+    pub fn to_owned(&self) -> SliceOwned {
+        let slice = self.slice.try_into().expect("slice is the wrong length");
+        SliceOwned { slice }
+    }
 }
 
 impl<'a> Deref for Slice<'a> {
@@ -74,6 +87,26 @@ impl<'a> Deref for Slice<'a> {
 
     fn deref(&self) -> &Self::Target {
         self.slice
+    }
+}
+
+impl SliceOwned {
+    pub fn borrow(&self) -> Slice {
+        Slice { slice: &self.slice }
+    }
+}
+
+impl<'a> From<&'a SliceOwned> for Slice<'a> {
+    fn from(slice: &'a SliceOwned) -> Self {
+        Slice {
+            slice: &slice.slice,
+        }
+    }
+}
+
+impl Debug for SliceOwned {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SliceOwned({} blocks)", self.slice.len())
     }
 }
 

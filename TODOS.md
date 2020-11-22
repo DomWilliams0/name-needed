@@ -1,4 +1,4 @@
-# TODOs (240)
+# TODOs (246)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -212,10 +212,14 @@
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
  * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
-   * `// TODO still does a lot of unnecessary initialization`
+   * `// TODO box these? this variant is 6K`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (2)
+   * `// TODO`
+   * `// TODO only needs bottom slice of next slab up, slab below doesnt matter`
+ * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
+   * `// TODO can this just hold opacity to reduce size?`
    * `// TODO make not pub`
  * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (11)
    * `// TODO "cheap" - it clones 2 vecs of arcs!`
@@ -231,10 +235,11 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (13)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (14)
    * `// TODO slabs not chunks`
    * `// TODO slabs not chunks`
-   * `// TODO cache full finalized chunks`
+   * `// TODO take mut lock and put slab into its chunk now? or do that with another mutex in chunk?`
+   * `// TODO wat to return?`
    * `// TODO reuse vec alloc`
    * `// TODO filter out unloaded slabs too`
    * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
@@ -247,8 +252,7 @@
    * `let mut ports = Vec::new(); // TODO reuse buf`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
- * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
-   * `// TODO if this thread panics, propagate to main game thread`
+ * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (1)
    * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
@@ -269,8 +273,10 @@
    * `// TODO reuse vec allocation`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
- * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (1)
+ * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (3)
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
+   * `// TODO remove above`
+   * `// TODO add constructor for existing fully initialized slab but missing bottom slice, flood fill`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
@@ -330,7 +336,8 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (1)
+ * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (2)
+   * `// TODO allow smaller datatypes for dims`
    * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`

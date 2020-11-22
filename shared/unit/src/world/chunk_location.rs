@@ -2,13 +2,22 @@ use common::derive_more::{From, Into};
 use common::*;
 
 use crate::dim::CHUNK_SIZE;
-use crate::world::WorldPosition;
+use crate::world::{SlabIndex, SlabLocation, WorldPosition};
 use std::convert::From;
 use std::ops::{Add, Sub};
 
 /// Location of a chunk in the world
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]
 pub struct ChunkLocation(pub i32, pub i32);
+
+impl ChunkLocation {
+    pub fn get_slab(&self, slab: impl Into<SlabIndex>) -> SlabLocation {
+        SlabLocation {
+            chunk: *self,
+            slab: slab.into(),
+        }
+    }
+}
 
 impl From<WorldPosition> for ChunkLocation {
     fn from(wp: WorldPosition) -> Self {

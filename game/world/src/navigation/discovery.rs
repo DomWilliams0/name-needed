@@ -44,6 +44,7 @@ pub(crate) struct AreaDiscovery<'a> {
     slab_index: SlabIndex,
 
     below_top_slice: Option<Slice<'a>>,
+    // TODO remove above
     above_bot_slice: Option<Slice<'a>>,
 }
 
@@ -87,6 +88,9 @@ impl<'a> AreaDiscovery<'a> {
             above_bot_slice,
         }
     }
+
+    // TODO add constructor for existing fully initialized slab but missing bottom slice, flood fill
+    //  that only
 
     /// Flood fills from every block, increment area index after each flood fill
     /// Returns area count
@@ -226,6 +230,7 @@ impl<'a> AreaDiscovery<'a> {
         true
     }
 
+    /// Can check below into slab below, but not above into slab above
     fn get_vertical_offset(
         &self,
         block: CoordType,
@@ -235,19 +240,8 @@ impl<'a> AreaDiscovery<'a> {
         const TOP: i32 = SLAB_SIZE.as_i32() - 1;
 
         match z {
-            // top of the slab: check slab above
-            TOP if offset == VerticalOffset::Above => {
-                if let Some(above_slice) = &self.above_bot_slice {
-                    // it is present
-                    (&above_slice[(x as BlockCoord, y as BlockCoord)]).into()
-                } else {
-                    // not present: this must be the top of the world
-                    AreaDiscoveryGridBlock {
-                        opacity: OcclusionOpacity::Unknown,
-                        ..Default::default()
-                    }
-                }
-            }
+            // top of the slab: never check the slab above
+            TOP if offset == VerticalOffset::Above => unreachable!(),
 
             // bottom of the slab: check slab below
             0 if offset == VerticalOffset::Below => {

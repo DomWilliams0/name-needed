@@ -148,6 +148,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * explicit namespacing for entity definitions e.g. "core:food_apple"
 * detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
 * separate binary for definition file validation
+* instead of sleeping to wait for world to load, check if panicked every second
+* consider replacing 1:1 world threadpool with async threadpool
+* replace std mutexes with parkinglot
 
 ## Entity diversity
 * animal species

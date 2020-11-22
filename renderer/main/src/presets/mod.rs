@@ -23,6 +23,7 @@ pub trait GamePreset<R: Renderer> {
         // debug!("waiting for world to load before initializing simulation");
         // world.request_all_chunks();
         // world.block_for_all(Duration::from_secs(30))?;
+        todo!("load world");
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;
@@ -39,7 +40,7 @@ pub use ci::ContinuousIntegrationGamePreset;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
 
-fn world_from_source<D, P: WorkerPool<D>>(
+fn world_from_source<D: 'static, P: WorkerPool<D>>(
     source: config::WorldSource,
     pool: P,
 ) -> Result<WorldLoader<P, D>, &'static str> {
