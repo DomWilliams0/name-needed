@@ -240,19 +240,20 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (12)
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (7)
    * `// TODO slabs not chunks`
-   * `// TODO slabs not chunks`
-   * `// TODO reuse vec alloc`
-   * `// TODO filter out unloaded slabs too`
-   * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
-   * `// TODO repeated filter check not needed?`
    * `// TODO sort out the lifetimes instead of cheating and using transmute`
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
+   * `// TODO slabs not chunks`
+   * `// TODO reuse vec alloc`
+   * `// TODO filter out unloaded slabs too`
+   * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
+   * `// TODO repeated filter check not needed?`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (1)

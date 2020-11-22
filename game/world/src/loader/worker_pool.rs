@@ -8,9 +8,10 @@ use unit::world::ChunkLocation;
 
 use crate::chunk::ChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::loader::{ChunkFinalizer, UpdateBatch};
+use crate::loader::{UpdateBatch};
 use crate::{OcclusionChunkUpdate, WorldRef};
 use std::collections::VecDeque;
+use crate::loader::finalizer::ChunkFinalizer;
 
 pub type LoadTerrainResult = Result<(ChunkLocation, ChunkTerrain, UpdateBatch), TerrainSourceError>;
 

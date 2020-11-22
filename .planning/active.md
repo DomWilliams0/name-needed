@@ -15,4 +15,4 @@
 * [ ] add test for single slab navigability > load slab below > is navigation as expected between the 2
 * [ ] dont require doublesizedvec to have no holes
 	* the impl can have no holes and store options instead or something
-* [ ] split up loader/mod.rs into a few separate modules
+* [o] split up loader/mod.rs into a few separate modules
