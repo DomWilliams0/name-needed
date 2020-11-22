@@ -50,3 +50,34 @@ macro_rules! slog_kv_debug {
         }
     };
 }
+
+#[macro_export]
+macro_rules! slog_value_display {
+    ($ty:ident) => {
+        impl $crate::prelude::slog::Value for $ty {
+            fn serialize(
+                &self,
+                _: &$crate::prelude::slog::Record,
+                key: $crate::prelude::slog::Key,
+                serializer: &mut dyn $crate::prelude::slog::Serializer,
+            ) -> $crate::prelude::slog::Result<()> {
+                serializer.emit_arguments(key, &format_args!("{}", self))
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! slog_kv_display {
+    ($ty:ident, $key:expr) => {
+        impl $crate::prelude::slog::KV for $ty {
+            fn serialize(
+                &self,
+                _: &$crate::prelude::slog::Record,
+                serializer: &mut dyn $crate::prelude::slog::Serializer,
+            ) -> $crate::prelude::slog::Result<()> {
+                serializer.emit_arguments($key, &format_args!("{}", self))
+            }
+        }
+    };
+}

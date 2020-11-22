@@ -15,5 +15,5 @@ impl Display for SlabLocation {
     }
 }
 
-slog_value_debug!(SlabLocation);
-slog_kv_debug!(SlabLocation, "slab");
+slog_value_display!(SlabLocation);
+slog_kv_display!(SlabLocation, "slab");

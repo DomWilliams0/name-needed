@@ -1,4 +1,4 @@
-# TODOs (246)
+# TODOs (247)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -215,8 +215,13 @@
    * `// TODO box these? this variant is 6K`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (2)
-   * `// TODO`
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (7)
+   * `// TODO these methods are copied from Slab`
+   * `// TODO occlusion`
+   * `// TODO skip if not exclusive?`
+   * `// TODO exclusive helper on this struct too`
+   * `// TODO what do with blockgraphs?`
+   * `// TODO discover internal area links`
    * `// TODO only needs bottom slice of next slab up, slab below doesnt matter`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO can this just hold opacity to reduce size?`
@@ -235,11 +240,9 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (14)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (12)
    * `// TODO slabs not chunks`
    * `// TODO slabs not chunks`
-   * `// TODO take mut lock and put slab into its chunk now? or do that with another mutex in chunk?`
-   * `// TODO wat to return?`
    * `// TODO reuse vec alloc`
    * `// TODO filter out unloaded slabs too`
    * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
@@ -273,10 +276,8 @@
    * `// TODO reuse vec allocation`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
- * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (3)
+ * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (1)
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
-   * `// TODO remove above`
-   * `// TODO add constructor for existing fully initialized slab but missing bottom slice, flood fill`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)

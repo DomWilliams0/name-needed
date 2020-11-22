@@ -1,12 +1,13 @@
 use std::iter::once;
 use std::ops::Deref;
 
-use common::Itertools;
+use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SLAB_SIZE};
 
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut, SliceOwned};
+use crate::navigation::discovery::AreaDiscovery;
 use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
@@ -122,22 +123,60 @@ impl SlabTerrain {
         SlabTerrain(loc, Arc::from(SlabGridImpl::default_boxed()))
     }
 
+    // TODO these methods are copied from Slab
+    fn expect_mut(&mut self) -> &mut SlabGridImpl {
+        Arc::get_mut(&mut self.1).expect("expected to be the only slab reference")
+    }
+
+    fn is_exclusive(&self) -> bool {
+        Arc::strong_count(&self.1) == 1
+    }
+
     /// Discover navigability and occlusion
-    pub fn into_real_slab(self, above: Option<Slice>, below: Option<Slice>) -> Slab {
-        // TODO
-        todo!(
-            "real slab above {:?} below {:?}",
-            above.is_some(),
-            below.is_some()
-        );
+    pub fn into_real_slab(mut self, above: Option<Slice>, below: Option<Slice>) -> Slab {
+        // for panic only
+        let has_above = above.is_some();
+        let has_below = below.is_some();
+
+        log_scope!(o!(self.0));
+
+        // flood fill to discover navigability
+        self.discover_areas(below);
+
+        // TODO occlusion
+
+        todo!("real slab above {:?} below {:?}", has_above, has_below,);
 
         Slab(self.1)
     }
 
-    fn discover_areas(&mut self) {
-        // only needs top slice of below slab
-        // creates blockgraphs for each chunkarea in this slab, does not protrude into other slabs
+    fn discover_areas(&mut self, slice_below: Option<Slice>) {
+        // TODO skip if not exclusive?
+        // TODO exclusive helper on this struct too
+        assert!(self.is_exclusive(), "not exclusive?");
+
+        // collect slab into local grid
+        let mut discovery = AreaDiscovery::from_slab(&self.1, self.0.slab, slice_below);
+
+        // flood fill and assign areas
+        let area_count = discovery.flood_fill_areas();
+        debug!("discovered {count} areas", count = area_count);
+
+        // collect areas and graphs
+        let slab_areas = discovery
+            .areas_with_graph()
+            .map(|(chunk_area, block_graph)| {
+                (chunk_area.into_world_area(self.0.chunk), block_graph)
+            })
+            .collect_vec();
+        // TODO what do with blockgraphs?
+
+        // TODO discover internal area links
+
+        // apply areas to blocks
+        discovery.apply(self.expect_mut());
     }
+
     fn init_occlusion(&mut self) {
         // TODO only needs bottom slice of next slab up, slab below doesnt matter
     }

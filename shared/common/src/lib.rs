@@ -18,7 +18,9 @@ pub use smallvec::*;
 pub use thiserror::{self, Error};
 
 pub use lazy_static::lazy_static;
-pub use logging::{self, prelude::*, slog_kv_debug, slog_value_debug};
+pub use logging::{
+    self, prelude::*, slog_kv_debug, slog_kv_display, slog_value_debug, slog_value_display,
+};
 pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use newtype::{NormalizedFloat, Proportion};
 

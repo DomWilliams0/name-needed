@@ -5,12 +5,13 @@ use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slab::Slab;
+use crate::chunk::slab::{Slab, SlabGridImpl};
 use crate::chunk::slice::Slice;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
 use grid::{grid_declare, CoordType, Grid, GridImpl};
+use std::ops::Deref;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
@@ -44,8 +45,6 @@ pub(crate) struct AreaDiscovery<'a> {
     slab_index: SlabIndex,
 
     below_top_slice: Option<Slice<'a>>,
-    // TODO remove above
-    above_bot_slice: Option<Slice<'a>>,
 }
 
 impl Into<AreaDiscoveryGridBlock> for &Block {
@@ -65,10 +64,9 @@ enum VerticalOffset {
 
 impl<'a> AreaDiscovery<'a> {
     pub fn from_slab(
-        slab: &Slab,
+        slab: &impl Deref<Target = SlabGridImpl>,
         slab_index: SlabIndex,
         below_top_slice: Option<Slice<'a>>,
-        above_bot_slice: Option<Slice<'a>>,
     ) -> Self {
         let mut grid = AreaDiscoveryGrid::default();
 
@@ -85,12 +83,8 @@ impl<'a> AreaDiscovery<'a> {
             block_graphs: HashMap::new(),
             slab_index,
             below_top_slice,
-            above_bot_slice,
         }
     }
-
-    // TODO add constructor for existing fully initialized slab but missing bottom slice, flood fill
-    //  that only
 
     /// Flood fills from every block, increment area index after each flood fill
     /// Returns area count
@@ -275,9 +269,9 @@ impl<'a> AreaDiscovery<'a> {
         block_graphs.into_iter()
     }
 
-    pub fn apply(self, slab: &mut Slab) {
+    /// Assign areas to the blocks in the slab
+    pub fn apply(self, slab: &mut SlabGridImpl) {
         for i in slab.indices() {
-            let slab = slab.expect_mut();
             *slab[i].area_mut() = self.grid[i].area;
         }
     }

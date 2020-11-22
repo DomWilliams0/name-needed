@@ -863,6 +863,7 @@ impl ChunkTerrain {
         Self::from_raw_terrain(raw_terrain, chunk_pos, ChunkRequest::New)
     }
 
+    #[deprecated]
     fn discover_areas(&mut self, chunk_pos: ChunkLocation, request: ChunkRequest) {
         log_scope!(o!(chunk_pos));
         debug!("discovering areas");
@@ -885,7 +886,7 @@ impl ChunkTerrain {
             let slab = slab.unwrap();
 
             // collect slab into local grid
-            let mut discovery = AreaDiscovery::from_slab(slab, idx, slice_below, slice_above);
+            let mut discovery: AreaDiscovery = todo!();
 
             // flood fill and assign areas
             let area_count = discovery.flood_fill_areas();
@@ -1153,8 +1154,7 @@ mod tests {
         slab.slice_mut(LocalSliceIndex::new(0))
             .fill(BlockType::Stone);
 
-        let area_count =
-            AreaDiscovery::from_slab(&slab, SlabIndex(0), None, None).flood_fill_areas();
+        let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
         assert_eq!(area_count, 1);
 
         // slab with 2 unconnected floors should have 2
@@ -1164,8 +1164,7 @@ mod tests {
         slab.slice_mut(LocalSliceIndex::new(5))
             .fill(BlockType::Stone);
 
-        let area_count =
-            AreaDiscovery::from_slab(&slab, SlabIndex(0), None, None).flood_fill_areas();
+        let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
         assert_eq!(area_count, 2);
     }
 

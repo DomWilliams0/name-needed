@@ -24,6 +24,7 @@ use crate::neighbour::NeighbourOffset;
 use crate::world::WorldChangeEvent;
 use crate::{InnerWorldRef, OcclusionChunkUpdate, WorldRef};
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::ops::DerefMut;
 
 mod batch;
@@ -158,7 +159,6 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
 
                     // slab terrain is now fixed, copy the top and bottom slices into chunk so
                     // neighbouring slabs can access it
-                    info!("nice {}", slab);
                     let world = world.borrow();
                     let chunk = world.find_chunk_with_pos(slab.chunk).unwrap();
                     chunk.update_slab_status(slab.slab, SlabLoadingStatus::in_progress(&terrain));
@@ -170,9 +170,6 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                         above.as_ref().map(|s| s.into()), // gross
                         below.as_ref().map(|s| s.into()),
                     );
-
-                    // TODO take mut lock and put slab into its chunk now? or do that with another mutex in chunk?
-                    // TODO wat to return?
 
                     // let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk, ChunkRequest::New);
                     // Ok((chunk, terrain, batch))
