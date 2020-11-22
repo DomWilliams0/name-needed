@@ -48,13 +48,6 @@ impl TerrainSource for GeneratedTerrainSource {
         &self.bounds
     }
 
-    fn all_chunks(&mut self) -> Vec<ChunkLocation> {
-        let radius = (self.bounds.1).0 as u16;
-        spiral::ChebyshevIterator::new(0, 0, radius)
-            .map(|(x, y)| ChunkLocation(x, y))
-            .collect()
-    }
-
     fn preprocess(
         &self,
         chunk: ChunkLocation,

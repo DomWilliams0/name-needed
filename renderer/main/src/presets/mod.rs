@@ -19,9 +19,10 @@ pub trait GamePreset<R: Renderer> {
     fn load(&self, resources: Resources, scenario: Scenario) -> BoxedResult<Simulation<R>> {
         let mut world = self.world()?;
 
-        debug!("waiting for world to load before initializing simulation");
-        world.request_all_chunks();
-        world.block_for_all(Duration::from_secs(30))?;
+        // TODO load initial slab range
+        // debug!("waiting for world to load before initializing simulation");
+        // world.request_all_chunks();
+        // world.block_for_all(Duration::from_secs(30))?;
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;

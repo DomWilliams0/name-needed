@@ -1,4 +1,4 @@
-# TODOs (238)
+# TODOs (240)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -231,7 +231,9 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (11)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (13)
+   * `// TODO slabs not chunks`
+   * `// TODO slabs not chunks`
    * `// TODO cache full finalized chunks`
    * `// TODO reuse vec alloc`
    * `// TODO filter out unloaded slabs too`
@@ -243,8 +245,6 @@
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
- * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
-   * `// TODO pass closure instead of returning new vec`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
@@ -320,6 +320,8 @@
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
+ * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
+   * `// TODO load initial slab range`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

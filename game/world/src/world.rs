@@ -430,7 +430,7 @@ impl<D> World<D> {
     }
 
     /// Drains all dirty chunks
-    pub fn dirty_chunks(&mut self) -> impl Iterator<Item =ChunkLocation> + '_ {
+    pub fn dirty_chunks(&mut self) -> impl Iterator<Item = ChunkLocation> + '_ {
         self.dirty_chunks.drain()
     }
 
@@ -634,6 +634,7 @@ pub mod helpers {
         WorldLoader, WorldTerrainUpdate,
     };
     use crate::{ChunkDescriptor, WorldRef};
+    use common::Itertools;
 
     pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
         loader_from_chunks_blocking(chunks).world()
@@ -685,16 +686,16 @@ pub mod helpers {
         mut source: MemoryTerrainSource,
         pool: P,
     ) -> WorldLoader<P, D> {
-        let chunks_pos = source.all_chunks();
+        let chunks_pos = source.all_chunks().collect_vec();
 
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
         let mut loader = WorldLoader::new(source, pool);
-        loader.request_chunks(chunks_pos.iter().copied());
-        for _ in chunks_pos {
-            let _ = loader.block_on_next_finalization(Duration::from_secs(20));
-        }
+        loader.request_chunks(chunks_pos.into_iter());
+        loader
+            .block_for_last_batch(Duration::from_secs(20))
+            .unwrap();
 
         // apply all chunk updates
         let updates = loader.chunk_updates_rx_clone().unwrap();
@@ -721,8 +722,8 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::helpers::load_world;
     use crate::loader::{
-        BlockingWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, WorldLoader,
-        WorldTerrainUpdate,
+        BlockingWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, TerrainSource,
+        WorldLoader, WorldTerrainUpdate,
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
@@ -1078,10 +1079,18 @@ mod tests {
 
         let pool = BlockingWorkerPool::default();
         let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
+        let (min, max) = *source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
-        loader.request_all_chunks();
 
-        assert!(loader.block_for_all(Duration::from_secs(60)).is_ok());
+        let all_chunks = {
+            (min.0..=max.0)
+                .cartesian_product(min.1..=max.1)
+                .map(|(x, y)| ChunkLocation(x, y))
+        };
+        let count = all_chunks.clone().count();
+        loader.request_chunks_with_length(all_chunks, count);
+
+        assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
 
         let world = loader.world();
 

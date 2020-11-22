@@ -37,7 +37,7 @@ pub struct WorldLoader<P: WorkerPool<D>, D> {
     finalization_channel: Sender<LoadTerrainResult>,
     chunk_updates_rx: Option<Receiver<OcclusionChunkUpdate>>,
     world: WorldRef<D>,
-    all_count: Option<usize>,
+    last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
 }
 
@@ -49,6 +49,7 @@ struct ChunkFinalizer<D> {
 }
 
 struct FinalizeBatchItem {
+    // TODO slabs not chunks
     chunk: ChunkLocation,
     terrain: RefCell<MaybeUninit<ChunkTerrain>>,
     consumed: Cell<bool>,
@@ -56,9 +57,8 @@ struct FinalizeBatchItem {
 
 #[derive(Debug, Error)]
 pub enum BlockForAllError {
-    /// Terrain source needs to have had `request_all` called to know how many to wait for
-    #[error("`request_all` must be called first")]
-    Unsupported,
+    #[error("A batch of chunks must be requested first")]
+    NoBatch,
 
     #[error("Timed out")]
     TimedOut,
@@ -68,6 +68,7 @@ pub enum BlockForAllError {
 }
 
 #[derive(Copy, Clone)]
+// TODO slabs not chunks
 pub enum ChunkRequest {
     New,
     UpdateExisting,
@@ -87,7 +88,7 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
             finalization_channel: finalize_tx,
             chunk_updates_rx: Some(chunk_updates_rx),
             world,
-            all_count: None,
+            last_batch_size: 0,
             batch_ids: UpdateBatchUniqueId::default(),
         }
     }
@@ -96,20 +97,22 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
         self.world.clone()
     }
 
-    pub fn request_all_chunks(&mut self) {
-        let chunks = self.source.lock().unwrap().all_chunks();
+    /// Requests chunks as a single batch
+    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item = ChunkLocation>) {
         let count = chunks.len();
-        self.request_chunks(chunks.into_iter());
-
-        self.all_count = Some(count);
+        self.request_chunks_with_length(chunks, count)
     }
 
-    /// Requests chunks as a single batch
-    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item =ChunkLocation>) {
+    pub fn request_chunks_with_length(
+        &mut self,
+        chunks: impl Iterator<Item = ChunkLocation>,
+        count: usize,
+    ) {
         // TODO cache full finalized chunks
 
-        let mut batches = UpdateBatch::builder(&mut self.batch_ids, chunks.len());
+        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
 
+        let mut real_count = 0;
         for chunk in chunks {
             let chunk: ChunkLocation = chunk; // fix ide inference
 
@@ -152,7 +155,17 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
                 },
                 self.finalization_channel.clone(),
             );
+
+            real_count += 1;
         }
+
+        assert_eq!(
+            real_count, count,
+            "expected batch of {} but actually got {}",
+            count, real_count
+        );
+
+        self.last_batch_size = count;
     }
 
     fn update_chunks_with_len(
@@ -250,10 +263,10 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
         self.pool.block_on_next_finalize(timeout)
     }
 
-    pub fn block_for_all(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
-        match self.all_count {
-            None => Err(BlockForAllError::Unsupported),
-            Some(count) => {
+    pub fn block_for_last_batch(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
+        match self.last_batch_size {
+            0 => Err(BlockForAllError::NoBatch),
+            count => {
                 let start_time = Instant::now();
                 for i in 0..count {
                     let elapsed = start_time.elapsed();

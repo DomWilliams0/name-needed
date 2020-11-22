@@ -51,15 +51,15 @@ impl MemoryTerrainSource {
 
         Ok(Self { chunk_map, bounds })
     }
+
+    pub fn all_chunks(&mut self) -> impl ExactSizeIterator<Item = ChunkLocation> + '_ {
+        self.chunk_map.keys().copied()
+    }
 }
 
 impl TerrainSource for MemoryTerrainSource {
     fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation) {
         &self.bounds
-    }
-
-    fn all_chunks(&mut self) -> Vec<ChunkLocation> {
-        self.chunk_map.keys().copied().collect_vec()
     }
 
     fn preprocess(

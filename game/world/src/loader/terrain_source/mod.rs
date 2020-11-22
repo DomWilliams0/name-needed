@@ -22,11 +22,8 @@ pub trait PreprocessedTerrain: Send {
 }
 
 pub trait TerrainSource: Send {
-    /// Bounding box, not necessarily full
+    /// Bounding box, inclusive
     fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation);
-
-    // TODO pass closure instead of returning new vec
-    fn all_chunks(&mut self) -> Vec<ChunkLocation>;
 
     fn preprocess(
         &self,
@@ -38,14 +35,6 @@ pub trait TerrainSource: Send {
         chunk: ChunkLocation,
         preprocess_result: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError>;
-
-    /*
-    fn unload_chunk(
-        &mut self,
-        chunk: ChunkPosition,
-        terrain: RawChunkTerrain,
-    ) -> Result<(), TerrainSourceError>;
-    */
 
     fn is_in_bounds(&self, chunk: ChunkLocation) -> bool {
         let (min, max) = self.world_bounds();

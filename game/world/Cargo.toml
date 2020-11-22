@@ -18,7 +18,6 @@ petgraph = "^0.5"
 nd_iter = "0.0.4"
 threadpool = "^1.8"
 crossbeam = "^0.7"
-spiral = "^0.1"
 enum-iterator = "^0.6"
 
 [dev-dependencies]

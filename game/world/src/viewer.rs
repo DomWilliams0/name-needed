@@ -194,7 +194,7 @@ impl<D> WorldViewer<D> {
         self.move_by(delta * size as i32);
     }
 
-    pub fn visible_chunks(&self) -> impl Iterator<Item =ChunkLocation> {
+    pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkLocation> {
         let (min, max) = self.chunk_range;
         let xrange = min.0 - 1..=max.0 + 1; // +1 for little buffer
         let yrange = min.1 - 1..=max.1 + 1;
