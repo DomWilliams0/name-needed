@@ -9,7 +9,7 @@ pub use batch::UpdateBatch;
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::ChunkPosition;
+use unit::world::ChunkLocation;
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
@@ -49,7 +49,7 @@ struct ChunkFinalizer<D> {
 }
 
 struct FinalizeBatchItem {
-    chunk: ChunkPosition,
+    chunk: ChunkLocation,
     terrain: RefCell<MaybeUninit<ChunkTerrain>>,
     consumed: Cell<bool>,
 }
@@ -105,13 +105,13 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
     }
 
     /// Requests chunks as a single batch
-    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item = ChunkPosition>) {
+    pub fn request_chunks(&mut self, chunks: impl ExactSizeIterator<Item =ChunkLocation>) {
         // TODO cache full finalized chunks
 
         let mut batches = UpdateBatch::builder(&mut self.batch_ids, chunks.len());
 
         for chunk in chunks {
-            let chunk: ChunkPosition = chunk; // fix ide inference
+            let chunk: ChunkLocation = chunk; // fix ide inference
 
             let source = self.source.clone();
             let batch = batches.next_batch();
@@ -157,7 +157,7 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
 
     fn update_chunks_with_len(
         &mut self,
-        updates: impl Iterator<Item = (ChunkPosition, RawChunkTerrain)>,
+        updates: impl Iterator<Item = (ChunkLocation, RawChunkTerrain)>,
         count: usize,
     ) {
         let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
@@ -246,7 +246,7 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
     pub fn block_on_next_finalization(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkPosition, TerrainSourceError>> {
+    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
         self.pool.block_on_next_finalize(timeout)
     }
 
@@ -302,7 +302,7 @@ impl<D> ChunkFinalizer<D> {
         }
     }
 
-    fn finalize(&mut self, (chunk, terrain, batch): (ChunkPosition, ChunkTerrain, UpdateBatch)) {
+    fn finalize(&mut self, (chunk, terrain, batch): (ChunkLocation, ChunkTerrain, UpdateBatch)) {
         // world lock is taken and released often to prevent holding up the main thread
 
         debug!(
@@ -337,7 +337,7 @@ impl<D> ChunkFinalizer<D> {
 
     fn do_finalize<'func, 'dependents: 'func>(
         &'func mut self,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
         mut terrain: ChunkTerrain,
         dependents: &'dependents [FinalizeBatchItem],
     ) {
@@ -503,7 +503,7 @@ impl<D> ChunkFinalizer<D> {
 }
 
 impl FinalizeBatchItem {
-    fn initialized(chunk: ChunkPosition, terrain: ChunkTerrain) -> Self {
+    fn initialized(chunk: ChunkLocation, terrain: ChunkTerrain) -> Self {
         Self {
             chunk,
             terrain: RefCell::new(MaybeUninit::new(terrain)),
@@ -511,7 +511,7 @@ impl FinalizeBatchItem {
         }
     }
 
-    fn consume(&self) -> (ChunkPosition, ChunkTerrain) {
+    fn consume(&self) -> (ChunkLocation, ChunkTerrain) {
         let was_consumed = self.consumed.replace(true);
         assert!(!was_consumed, "chunk has already been consumed");
 
@@ -524,7 +524,7 @@ impl FinalizeBatchItem {
         (self.chunk, terrain)
     }
 
-    fn get(&self, chunk_pos: ChunkPosition) -> Option<&RawChunkTerrain> {
+    fn get(&self, chunk_pos: ChunkLocation) -> Option<&RawChunkTerrain> {
         if self.consumed.get() || self.chunk != chunk_pos {
             None
         } else {
@@ -554,7 +554,7 @@ mod tests {
     use matches::assert_matches;
 
     use unit::dim::CHUNK_SIZE;
-    use unit::world::ChunkPosition;
+    use unit::world::ChunkLocation;
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -576,10 +576,10 @@ mod tests {
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
         let mut loader = WorldLoader::<_, ()>::new(source, BlockingWorkerPool::default());
-        loader.request_chunks(once(ChunkPosition(0, 0)));
+        loader.request_chunks(once(ChunkLocation(0, 0)));
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
-        assert_matches!(finalized, Some(Ok(ChunkPosition(0, 0))));
+        assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);
     }

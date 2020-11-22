@@ -7,7 +7,7 @@ use petgraph::Directed;
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock};
+use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 
 use crate::navigation::astar::astar;
 use crate::navigation::path::AreaPathNode;
@@ -164,8 +164,8 @@ impl AreaGraph {
             |edge| edge.weight().cost.weight(), // TODO could prefer wider ports
             |n| {
                 // manhattan distance * chunk size, underestimates
-                let ChunkPosition(nx, ny) = &self.graph[n].0.chunk;
-                let ChunkPosition(gx, gy) = goal.chunk;
+                let ChunkLocation(nx, ny) = &self.graph[n].0.chunk;
+                let ChunkLocation(gx, gy) = goal.chunk;
 
                 let dx = (nx - gx).abs() * CHUNK_SIZE.as_i32();
                 let dy = (ny - gy).abs() * CHUNK_SIZE.as_i32();
@@ -282,7 +282,7 @@ mod tests {
     use matches::assert_matches;
 
     use unit::dim::CHUNK_SIZE;
-    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
+    use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -400,12 +400,12 @@ mod tests {
         assert_eq!(graph.edge_count(), 2); // 1 each way
 
         let a = WorldArea {
-            chunk: ChunkPosition(0, 0),
+            chunk: ChunkLocation(0, 0),
             slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
         let b = WorldArea {
-            chunk: ChunkPosition(-1, 0),
+            chunk: ChunkLocation(-1, 0),
             slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
@@ -454,8 +454,8 @@ mod tests {
                 .graph
                 .edge_indices()
                 .map(|e| (graph.graph[e], graph.graph.edge_endpoints(e).unwrap()))
-                .filter(|(_, (a, b))| graph.graph[*a].0.chunk == ChunkPosition(0, 0)
-                    || graph.graph[*b].0.chunk == ChunkPosition(0, 0))
+                .filter(|(_, (a, b))| graph.graph[*a].0.chunk == ChunkLocation(0, 0)
+                    || graph.graph[*b].0.chunk == ChunkLocation(0, 0))
                 .count(),
             4 * 2
         );

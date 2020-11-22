@@ -14,7 +14,7 @@ fn map_range(from_range: (f64, f64), to_range: (f64, f64), s: f64) -> f64 {
 }
 
 pub fn generate_chunk(
-    chunk_position: (i32, i32),
+    chunk_location: (i32, i32),
     chunk_size: usize,
     seed: u64,
     noise_scale: f64,
@@ -36,8 +36,8 @@ pub fn generate_chunk(
     (0..chunk_size)
         .cartesian_product(0..chunk_size)
         .for_each(|(y, x)| {
-            let nx = ((chunk_position.0 * chunk_size) + x) as f64;
-            let ny = ((chunk_position.1 * chunk_size) + y) as f64;
+            let nx = ((chunk_location.0 * chunk_size) + x) as f64;
+            let ny = ((chunk_location.1 * chunk_size) + y) as f64;
             let val = noise.get([nx / noise_scale, ny / noise_scale, 0.4]);
 
             let height = map_range((-1.0, 1.0), (0.0, 1.0), val);

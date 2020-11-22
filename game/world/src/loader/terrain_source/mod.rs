@@ -1,6 +1,6 @@
 use crate::chunk::RawChunkTerrain;
 use common::*;
-use unit::world::ChunkPosition;
+use unit::world::ChunkLocation;
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -11,7 +11,7 @@ pub enum TerrainSourceError {
     MissingCentreChunk,
 
     #[error("Chunk {0:?} already exists")]
-    Duplicate(ChunkPosition),
+    Duplicate(ChunkLocation),
 
     #[error("Requested chunk is out of bounds")]
     OutOfBounds,
@@ -23,19 +23,19 @@ pub trait PreprocessedTerrain: Send {
 
 pub trait TerrainSource: Send {
     /// Bounding box, not necessarily full
-    fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition);
+    fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation);
 
     // TODO pass closure instead of returning new vec
-    fn all_chunks(&mut self) -> Vec<ChunkPosition>;
+    fn all_chunks(&mut self) -> Vec<ChunkLocation>;
 
     fn preprocess(
         &self,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>>;
 
     fn load_chunk(
         &mut self,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
         preprocess_result: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError>;
 
@@ -47,7 +47,7 @@ pub trait TerrainSource: Send {
     ) -> Result<(), TerrainSourceError>;
     */
 
-    fn is_in_bounds(&self, chunk: ChunkPosition) -> bool {
+    fn is_in_bounds(&self, chunk: ChunkLocation) -> bool {
         let (min, max) = self.world_bounds();
         (min.0..=max.0).contains(&chunk.0) && (min.1..=max.1).contains(&chunk.1)
     }
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn invalid() {
-        let no_chunks: Vec<(ChunkPosition, RawChunkTerrain)> = vec![];
+        let no_chunks: Vec<(ChunkLocation, RawChunkTerrain)> = vec![];
         let empty = MemoryTerrainSource::from_chunks(no_chunks.into_iter());
         assert_matches!(empty.err().unwrap(), TerrainSourceError::NoChunks);
 
@@ -84,19 +84,19 @@ mod tests {
             MemoryTerrainSource::from_chunks(once(((0, 0), RawChunkTerrain::default()))).unwrap();
         assert_eq!(
             *just_one.world_bounds(),
-            (ChunkPosition(0, 0), ChunkPosition(0, 0))
+            (ChunkLocation(0, 0), ChunkLocation(0, 0))
         );
 
         // cheap check to tests bounds
-        assert!(!just_one.is_in_bounds(ChunkPosition(1, 1)));
+        assert!(!just_one.is_in_bounds(ChunkLocation(1, 1)));
 
         // make sure impl fails too
         assert!(just_one
-            .load_chunk(ChunkPosition(0, 0), Box::new(()))
+            .load_chunk(ChunkLocation(0, 0), Box::new(()))
             .is_ok());
         assert_matches!(
             just_one
-                .load_chunk(ChunkPosition(1, 1), Box::new(()))
+                .load_chunk(ChunkLocation(1, 1), Box::new(()))
                 .err()
                 .unwrap(),
             TerrainSourceError::OutOfBounds
@@ -115,7 +115,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             *sparse.world_bounds(),
-            (ChunkPosition(-8, -4), ChunkPosition(2, 6))
+            (ChunkLocation(-8, -4), ChunkLocation(2, 6))
         );
     }
 }

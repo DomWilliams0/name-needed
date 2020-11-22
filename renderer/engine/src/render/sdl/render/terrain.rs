@@ -4,7 +4,7 @@ use color::ColorRgb;
 use common::*;
 use simulation::{BaseVertex, WorldViewer};
 use unit::view::ViewPoint;
-use unit::world::{ChunkPosition, WorldPoint};
+use unit::world::{ChunkLocation, WorldPoint};
 
 use crate::render::sdl::gl::{
     AttribType, BufferUsage, Capability, GlResult, Normalized, Primitive, Program, ScopedBindable,
@@ -31,12 +31,12 @@ impl BaseVertex for WorldVertex {
 pub struct ChunkMesh {
     vao: Vao,
     vbo: Vbo,
-    chunk_pos: ChunkPosition,
+    chunk_pos: ChunkLocation,
 }
 
 pub struct TerrainRenderer {
     program: Program,
-    chunk_meshes: HashMap<ChunkPosition, ChunkMesh>,
+    chunk_meshes: HashMap<ChunkLocation, ChunkMesh>,
 }
 
 impl TerrainRenderer {
@@ -51,7 +51,7 @@ impl TerrainRenderer {
 
     pub fn update_chunk_mesh(
         &mut self,
-        chunk_pos: ChunkPosition,
+        chunk_pos: ChunkLocation,
         new_mesh: Vec<WorldVertex>,
     ) -> GlResult<()> {
         let mesh = self

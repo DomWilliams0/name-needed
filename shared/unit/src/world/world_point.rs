@@ -6,7 +6,7 @@ use common::derive_more::*;
 use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
 use crate::dim::CHUNK_SIZE;
-use crate::world::{ChunkPosition, GlobalSliceIndex, SliceIndex, WorldPosition};
+use crate::world::{ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPosition};
 
 /// A point anywhere in the world
 // TODO assert fields are not NaN in points
@@ -102,8 +102,8 @@ impl AddAssign<Vector2> for WorldPoint {
     }
 }
 
-impl From<ChunkPosition> for WorldPoint {
-    fn from(p: ChunkPosition) -> Self {
+impl From<ChunkLocation> for WorldPoint {
+    fn from(p: ChunkLocation) -> Self {
         Self(
             (p.0 * CHUNK_SIZE.as_i32()) as f32,
             (p.1 * CHUNK_SIZE.as_i32()) as f32,

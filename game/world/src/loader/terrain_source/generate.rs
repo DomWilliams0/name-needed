@@ -5,10 +5,10 @@ use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSourceError};
 use crate::loader::TerrainSource;
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::ChunkPosition;
+use unit::world::ChunkLocation;
 
 pub struct GeneratedTerrainSource {
-    bounds: (ChunkPosition, ChunkPosition),
+    bounds: (ChunkLocation, ChunkLocation),
     seed: u64,
     height_scale: f64,
 }
@@ -31,8 +31,8 @@ impl GeneratedTerrainSource {
         // radius is excluding 0,0
         let radius = radius as i32;
         let bounds = (
-            ChunkPosition(-radius, -radius),
-            ChunkPosition(radius, radius),
+            ChunkLocation(-radius, -radius),
+            ChunkLocation(radius, radius),
         );
 
         Ok(Self {
@@ -44,20 +44,20 @@ impl GeneratedTerrainSource {
 }
 
 impl TerrainSource for GeneratedTerrainSource {
-    fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition) {
+    fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation) {
         &self.bounds
     }
 
-    fn all_chunks(&mut self) -> Vec<ChunkPosition> {
+    fn all_chunks(&mut self) -> Vec<ChunkLocation> {
         let radius = (self.bounds.1).0 as u16;
         spiral::ChebyshevIterator::new(0, 0, radius)
-            .map(|(x, y)| ChunkPosition(x, y))
+            .map(|(x, y)| ChunkLocation(x, y))
             .collect()
     }
 
     fn preprocess(
         &self,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
         let seed = self.seed;
         let height_scale = self.height_scale;
@@ -93,7 +93,7 @@ impl TerrainSource for GeneratedTerrainSource {
 
     fn load_chunk(
         &mut self,
-        _: ChunkPosition,
+        _: ChunkLocation,
         preprocessed: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError> {
         Ok(preprocessed.into_raw_terrain())

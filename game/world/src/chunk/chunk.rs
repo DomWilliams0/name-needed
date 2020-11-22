@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use common::*;
 
-use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition};
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition};
 
 use crate::block::BlockType;
 use crate::chunk::slice::Slice;
@@ -16,7 +16,7 @@ pub type ChunkId = u64;
 
 pub struct Chunk<D> {
     /// Unique for each chunk
-    pos: ChunkPosition,
+    pos: ChunkLocation,
 
     terrain: ChunkTerrain,
 
@@ -25,7 +25,7 @@ pub struct Chunk<D> {
 }
 
 impl<D> Chunk<D> {
-    pub fn empty<P: Into<ChunkPosition>>(pos: P) -> Self {
+    pub fn empty<P: Into<ChunkLocation>>(pos: P) -> Self {
         let pos = pos.into();
         // TODO still does a lot of unnecessary initialization
         let terrain = ChunkTerrain::from_new_raw_terrain(RawChunkTerrain::default(), pos);
@@ -33,7 +33,7 @@ impl<D> Chunk<D> {
     }
 
     /// Called by ChunkBuilder when terrain has been finalized
-    pub(crate) fn with_completed_terrain(pos: ChunkPosition, terrain: ChunkTerrain) -> Self {
+    pub(crate) fn with_completed_terrain(pos: ChunkLocation, terrain: ChunkTerrain) -> Self {
         Self {
             pos,
             terrain,
@@ -41,12 +41,12 @@ impl<D> Chunk<D> {
         }
     }
 
-    pub const fn pos(&self) -> ChunkPosition {
+    pub const fn pos(&self) -> ChunkLocation {
         self.pos
     }
 
     pub fn id(&self) -> ChunkId {
-        let ChunkPosition(x, y) = self.pos;
+        let ChunkLocation(x, y) = self.pos;
         (x as u64) << 32 | (y as u64)
     }
 

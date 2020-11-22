@@ -4,7 +4,7 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use threadpool::ThreadPool;
 
 use common::*;
-use unit::world::ChunkPosition;
+use unit::world::ChunkLocation;
 
 use crate::chunk::ChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
@@ -12,7 +12,7 @@ use crate::loader::{ChunkFinalizer, UpdateBatch};
 use crate::{OcclusionChunkUpdate, WorldRef};
 use std::collections::VecDeque;
 
-pub type LoadTerrainResult = Result<(ChunkPosition, ChunkTerrain, UpdateBatch), TerrainSourceError>;
+pub type LoadTerrainResult = Result<(ChunkLocation, ChunkTerrain, UpdateBatch), TerrainSourceError>;
 
 pub trait WorkerPool<D> {
     fn start_finalizer(
@@ -25,7 +25,7 @@ pub trait WorkerPool<D> {
     fn block_on_next_finalize(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkPosition, TerrainSourceError>>;
+    ) -> Option<Result<ChunkLocation, TerrainSourceError>>;
 
     fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
         &mut self,
@@ -36,8 +36,8 @@ pub trait WorkerPool<D> {
 
 pub struct ThreadedWorkerPool {
     pool: ThreadPool,
-    success_rx: Receiver<Result<ChunkPosition, TerrainSourceError>>,
-    success_tx: Sender<Result<ChunkPosition, TerrainSourceError>>,
+    success_rx: Receiver<Result<ChunkLocation, TerrainSourceError>>,
+    success_tx: Sender<Result<ChunkLocation, TerrainSourceError>>,
 }
 
 impl ThreadedWorkerPool {
@@ -96,7 +96,7 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
     fn block_on_next_finalize(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkPosition, TerrainSourceError>> {
+    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
         self.success_rx.recv_timeout(timeout).ok()
     }
 
@@ -141,7 +141,7 @@ impl<D> WorkerPool<D> for BlockingWorkerPool<D> {
     fn block_on_next_finalize(
         &mut self,
         _: Duration,
-    ) -> Option<Result<ChunkPosition, TerrainSourceError>> {
+    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
         // time to actually do the work
         let (task, done_channel) = self.task_queue.pop_front()?;
 

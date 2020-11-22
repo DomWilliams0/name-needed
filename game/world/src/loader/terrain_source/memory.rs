@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::ChunkPosition;
+use unit::world::ChunkLocation;
 
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
@@ -10,12 +10,12 @@ use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainS
 #[derive(Clone)]
 pub struct MemoryTerrainSource {
     /// Terrain is `take`n on load
-    chunk_map: HashMap<ChunkPosition, Option<RawChunkTerrain>>,
-    bounds: (ChunkPosition, ChunkPosition),
+    chunk_map: HashMap<ChunkLocation, Option<RawChunkTerrain>>,
+    bounds: (ChunkLocation, ChunkLocation),
 }
 
 impl MemoryTerrainSource {
-    pub fn from_chunks<P: Into<ChunkPosition>, C: Into<(P, RawChunkTerrain)>>(
+    pub fn from_chunks<P: Into<ChunkLocation>, C: Into<(P, RawChunkTerrain)>>(
         chunks: impl Iterator<Item = C>,
     ) -> Result<Self, TerrainSourceError> {
         let size = chunks.size_hint().1.unwrap_or(8);
@@ -33,7 +33,7 @@ impl MemoryTerrainSource {
             return Err(TerrainSourceError::NoChunks);
         }
 
-        if !chunk_map.contains_key(&ChunkPosition(0, 0)) {
+        if !chunk_map.contains_key(&ChunkLocation(0, 0)) {
             return Err(TerrainSourceError::MissingCentreChunk);
         }
 
@@ -43,10 +43,10 @@ impl MemoryTerrainSource {
             chunk_map.keys().map(|c| c.1).minmax(),
         ) {
             (MinMaxResult::MinMax(min_x, max_x), MinMaxResult::MinMax(min_y, max_y)) => {
-                (ChunkPosition(min_x, min_y), ChunkPosition(max_x, max_y))
+                (ChunkLocation(min_x, min_y), ChunkLocation(max_x, max_y))
             }
             // must have single chunk
-            _ => (ChunkPosition(0, 0), ChunkPosition(0, 0)),
+            _ => (ChunkLocation(0, 0), ChunkLocation(0, 0)),
         };
 
         Ok(Self { chunk_map, bounds })
@@ -54,17 +54,17 @@ impl MemoryTerrainSource {
 }
 
 impl TerrainSource for MemoryTerrainSource {
-    fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition) {
+    fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation) {
         &self.bounds
     }
 
-    fn all_chunks(&mut self) -> Vec<ChunkPosition> {
+    fn all_chunks(&mut self) -> Vec<ChunkLocation> {
         self.chunk_map.keys().copied().collect_vec()
     }
 
     fn preprocess(
         &self,
-        _: ChunkPosition,
+        _: ChunkLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
         // nothing to do
         Box::new(|| Ok(Box::new(())))
@@ -72,7 +72,7 @@ impl TerrainSource for MemoryTerrainSource {
 
     fn load_chunk(
         &mut self,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
         _: Box<dyn PreprocessedTerrain>,
     ) -> Result<RawChunkTerrain, TerrainSourceError> {
         self.chunk_map

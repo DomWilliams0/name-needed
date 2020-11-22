@@ -4,7 +4,7 @@ use common::input::CameraDirection;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::view::ViewPoint;
-use unit::world::{ChunkPosition, WorldPoint, WorldPosition, SCALE};
+use unit::world::{ChunkLocation, WorldPoint, WorldPosition, SCALE};
 
 pub struct Camera {
     /// Camera pos in metres
@@ -60,7 +60,7 @@ impl Camera {
         self.input[direction as usize] = is_down;
     }
 
-    pub fn tick(&mut self) -> (ChunkPosition, ChunkPosition) {
+    pub fn tick(&mut self) -> (ChunkLocation, ChunkLocation) {
         let (dx, dy) = CameraDirection::values()
             .iter()
             .zip(&self.input)

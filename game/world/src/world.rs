@@ -5,7 +5,7 @@ use common::derive_more::Constructor;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SlabPosition, SliceBlock,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabPosition, SliceBlock,
     SliceIndex, WorldPosition, WorldPositionRange, WorldRange,
 };
 
@@ -23,7 +23,7 @@ use crate::{OcclusionChunkUpdate, SliceRange};
 pub struct World<D> {
     chunks: Vec<Chunk<D>>,
     area_graph: AreaGraph,
-    dirty_chunks: HashSet<ChunkPosition>,
+    dirty_chunks: HashSet<ChunkLocation>,
 }
 
 #[derive(Constructor)]
@@ -88,22 +88,22 @@ impl<D> World<D> {
         }
     }
 
-    fn find_chunk_index(&self, chunk_pos: ChunkPosition) -> Option<usize> {
+    fn find_chunk_index(&self, chunk_pos: ChunkLocation) -> Option<usize> {
         self.chunks
             .binary_search_by_key(&chunk_pos, |c| c.pos())
             .ok()
     }
 
-    pub fn has_chunk(&self, chunk_pos: ChunkPosition) -> bool {
+    pub fn has_chunk(&self, chunk_pos: ChunkLocation) -> bool {
         self.find_chunk_index(chunk_pos).is_some()
     }
 
-    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk<D>> {
+    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<D>> {
         self.find_chunk_index(chunk_pos)
             .map(|idx| &self.chunks[idx])
     }
 
-    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkPosition) -> Option<&mut Chunk<D>> {
+    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkLocation) -> Option<&mut Chunk<D>> {
         self.find_chunk_index(chunk_pos)
             .map(move |idx| &mut self.chunks[idx])
     }
@@ -115,7 +115,7 @@ impl<D> World<D> {
     ) -> Result<AreaPath, NavigationError> {
         // resolve areas
         let resolve_area = |pos: WorldPosition| {
-            let chunk_pos: ChunkPosition = pos.into();
+            let chunk_pos: ChunkLocation = pos.into();
             self.find_chunk_with_pos(chunk_pos)
                 .and_then(|c| c.area_for_block(pos))
         };
@@ -272,7 +272,7 @@ impl<D> World<D> {
         pos: WorldPosition,
         z_min: Option<GlobalSliceIndex>,
     ) -> Option<WorldPosition> {
-        let chunk_pos = ChunkPosition::from(pos);
+        let chunk_pos = ChunkLocation::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
             .and_then(|c| c.find_accessible_block(slice_block, Some(pos.2), z_min))
@@ -356,7 +356,7 @@ impl<D> World<D> {
     /// Panics if chunk is not found - check it exists with `world.has_chunk` first
     pub fn apply_terrain_updates(
         &self,
-        chunk_pos: ChunkPosition,
+        chunk_pos: ChunkLocation,
         updates: impl Iterator<Item = (SlabIndex, SlabTerrainUpdate)>,
         changes_out: &mut Vec<WorldChangeEvent>,
     ) -> RawChunkTerrain {
@@ -430,13 +430,13 @@ impl<D> World<D> {
     }
 
     /// Drains all dirty chunks
-    pub fn dirty_chunks(&mut self) -> impl Iterator<Item = ChunkPosition> + '_ {
+    pub fn dirty_chunks(&mut self) -> impl Iterator<Item =ChunkLocation> + '_ {
         self.dirty_chunks.drain()
     }
 
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
         let pos = pos.into();
-        self.find_chunk_with_pos(ChunkPosition::from(pos))
+        self.find_chunk_with_pos(ChunkLocation::from(pos))
             .and_then(|chunk| chunk.get_block(pos))
     }
 
@@ -445,7 +445,7 @@ impl<D> World<D> {
         pos: WorldPosition,
         damage: BlockDurability,
     ) -> Option<BlockDamageResult> {
-        self.find_chunk_with_pos_mut(ChunkPosition::from(pos))
+        self.find_chunk_with_pos_mut(ChunkLocation::from(pos))
             .and_then(|chunk| {
                 chunk
                     .raw_terrain_mut()
@@ -532,7 +532,7 @@ impl<D> World<D> {
 
     pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {
         let block_pos = pos.into();
-        let chunk_pos = ChunkPosition::from(block_pos);
+        let chunk_pos = ChunkLocation::from(block_pos);
         let block = self
             .find_chunk_with_pos(chunk_pos)
             .and_then(|chunk| chunk.get_block(block_pos));
@@ -714,7 +714,7 @@ mod tests {
     use common::{seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
-        BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition, WorldPositionRange,
+        BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition, WorldPositionRange,
     };
 
     use crate::block::BlockType;
@@ -918,7 +918,7 @@ mod tests {
             );
         }
 
-        assert!(world.find_chunk_with_pos(ChunkPosition(10, 10)).is_none());
+        assert!(world.find_chunk_with_pos(ChunkLocation(10, 10)).is_none());
     }
 
     #[test]
@@ -1026,7 +1026,7 @@ mod tests {
             .clone();
 
         w.apply_occlusion_update(OcclusionChunkUpdate(
-            ChunkPosition(0, 0),
+            ChunkLocation(0, 0),
             vec![(pos.into(), NeighbourOpacity::all_solid())],
         ));
 
@@ -1058,7 +1058,7 @@ mod tests {
 
         assert_eq!(w.block((0, 0, 0)).unwrap().block_type(), BlockType::Air);
 
-        *w.find_chunk_with_pos_mut(ChunkPosition(0, 0))
+        *w.find_chunk_with_pos_mut(ChunkLocation(0, 0))
             .unwrap()
             .slice_mut(0)
             .unwrap()[(0, 0)]

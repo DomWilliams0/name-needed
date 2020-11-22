@@ -5,7 +5,7 @@ pub use cost::EdgeCost;
 pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
 };
-use unit::world::{ChunkPosition, SlabIndex};
+use unit::world::{ChunkLocation, SlabIndex};
 
 mod area_navigation;
 mod astar;
@@ -28,7 +28,7 @@ pub(crate) struct ChunkArea {
 /// An area in the world
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct WorldArea {
-    pub chunk: ChunkPosition,
+    pub chunk: ChunkLocation,
     pub slab: SlabIndex,
     pub area: SlabAreaIndex,
 }
@@ -36,13 +36,13 @@ pub struct WorldArea {
 impl WorldArea {
     /// Helper for less verbose tests
     #[cfg(test)]
-    pub fn new<C: Into<ChunkPosition>>(chunk: C) -> Self {
+    pub fn new<C: Into<ChunkLocation>>(chunk: C) -> Self {
         Self::new_with_slab(chunk, SlabIndex(0))
     }
 
     /// Helper for less verbose tests
     #[cfg(test)]
-    pub fn new_with_slab<C: Into<ChunkPosition>>(chunk: C, slab: SlabIndex) -> Self {
+    pub fn new_with_slab<C: Into<ChunkLocation>>(chunk: C, slab: SlabIndex) -> Self {
         Self {
             chunk: chunk.into(),
             slab,
@@ -73,7 +73,7 @@ impl SlabAreaIndex {
 }
 
 impl ChunkArea {
-    pub fn into_world_area(self, chunk_pos: ChunkPosition) -> WorldArea {
+    pub fn into_world_area(self, chunk_pos: ChunkLocation) -> WorldArea {
         WorldArea {
             chunk: chunk_pos,
             slab: self.slab,

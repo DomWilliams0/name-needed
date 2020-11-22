@@ -135,7 +135,7 @@ impl BlockGraph {
 
 #[cfg(test)]
 mod tests {
-    use unit::world::ChunkPosition;
+    use unit::world::ChunkLocation;
 
     use crate::block::BlockType;
     use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
@@ -150,7 +150,7 @@ mod tests {
             .set_block((6, 5, 3), BlockType::Grass)
             .build((0, 0))])
         .into_inner();
-        let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+        let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
         let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
 
         let path = graph
@@ -214,7 +214,7 @@ mod tests {
         let end = (5, 3, 2); // walk around the first step to here pls
 
         let path = {
-            let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+            let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
             let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
             graph
                 .find_block_path(start, end, SearchGoal::Arrive)

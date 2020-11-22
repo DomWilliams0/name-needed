@@ -222,27 +222,27 @@ impl PartialEq<NeighbourOpacity> for BlockOcclusion {
 mod tests {
     use matches::assert_matches;
 
-    use unit::world::ChunkPosition;
+    use unit::world::ChunkLocation;
 
     use super::*;
 
     #[test]
     fn offset_between_aligned_chunks() {
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(5, 5), ChunkPosition(5, 6)),
+            NeighbourOffset::between_aligned(ChunkLocation(5, 5), ChunkLocation(5, 6)),
             NeighbourOffset::North
         );
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(5, 5), ChunkPosition(5, 1)),
+            NeighbourOffset::between_aligned(ChunkLocation(5, 5), ChunkLocation(5, 1)),
             NeighbourOffset::South
         );
 
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(-2, 5), ChunkPosition(-3, 5)),
+            NeighbourOffset::between_aligned(ChunkLocation(-2, 5), ChunkLocation(-3, 5)),
             NeighbourOffset::West
         );
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(-2, 5), ChunkPosition(33, 5)),
+            NeighbourOffset::between_aligned(ChunkLocation(-2, 5), ChunkLocation(33, 5)),
             NeighbourOffset::East
         );
     }

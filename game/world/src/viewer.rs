@@ -4,14 +4,14 @@ use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldRef};
 use std::collections::HashSet;
 use std::ops::{Add, Range};
-use unit::world::{ChunkPosition, GlobalSliceIndex};
+use unit::world::{ChunkLocation, GlobalSliceIndex};
 
 #[derive(Clone)]
 pub struct WorldViewer<D> {
     world: WorldRef<D>,
     view_range: SliceRange,
-    chunk_range: (ChunkPosition, ChunkPosition),
-    clean_chunks: HashSet<ChunkPosition>,
+    chunk_range: (ChunkLocation, ChunkLocation),
+    clean_chunks: HashSet<ChunkLocation>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -125,12 +125,12 @@ impl<D> WorldViewer<D> {
             world,
             view_range,
             // TODO dont default to -1,-1 -> 1,1 in chunk range, depends on view radius and start chunk
-            chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
+            chunk_range: (ChunkLocation(-1, -1), ChunkLocation(1, 1)),
             clean_chunks: HashSet::with_capacity(128),
         })
     }
 
-    pub fn regenerate_dirty_chunk_meshes<F: FnMut(ChunkPosition, Vec<V>), V: BaseVertex>(
+    pub fn regenerate_dirty_chunk_meshes<F: FnMut(ChunkLocation, Vec<V>), V: BaseVertex>(
         &mut self,
         mut f: F,
     ) {
@@ -194,14 +194,14 @@ impl<D> WorldViewer<D> {
         self.move_by(delta * size as i32);
     }
 
-    pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkPosition> {
+    pub fn visible_chunks(&self) -> impl Iterator<Item =ChunkLocation> {
         let (min, max) = self.chunk_range;
         let xrange = min.0 - 1..=max.0 + 1; // +1 for little buffer
         let yrange = min.1 - 1..=max.1 + 1;
 
         xrange
             .cartesian_product(yrange)
-            .map(|(x, y)| ChunkPosition(x, y))
+            .map(|(x, y)| ChunkLocation(x, y))
     }
 
     pub fn world(&self) -> InnerWorldRef<D> {
@@ -220,15 +220,15 @@ impl<D> WorldViewer<D> {
         self.view_range + 1
     }
 
-    pub fn set_chunk_bounds(&mut self, range: (ChunkPosition, ChunkPosition)) {
+    pub fn set_chunk_bounds(&mut self, range: (ChunkLocation, ChunkLocation)) {
         self.chunk_range = range;
     }
 
-    fn is_chunk_dirty(&self, chunk: &ChunkPosition) -> bool {
+    fn is_chunk_dirty(&self, chunk: &ChunkLocation) -> bool {
         !self.clean_chunks.contains(chunk)
     }
 
-    pub fn mark_dirty(&mut self, chunk: ChunkPosition) {
+    pub fn mark_dirty(&mut self, chunk: ChunkLocation) {
         self.clean_chunks.remove(&chunk);
     }
 }

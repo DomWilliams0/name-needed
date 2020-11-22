@@ -7,7 +7,7 @@ use common::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
     SliceBlock, SLAB_SIZE,
 };
 
@@ -132,7 +132,7 @@ pub trait BaseTerrain {
 }
 
 pub struct OcclusionChunkUpdate(
-    pub ChunkPosition,
+    pub ChunkLocation,
     pub Vec<(BlockPosition, NeighbourOpacity)>,
 );
 
@@ -824,7 +824,7 @@ impl Default for RawChunkTerrain {
 impl ChunkTerrain {
     pub fn from_raw_terrain(
         raw_terrain: RawChunkTerrain,
-        chunk_pos: ChunkPosition,
+        chunk_pos: ChunkLocation,
         request: ChunkRequest,
     ) -> Self {
         let mut terrain = Self {
@@ -845,11 +845,11 @@ impl ChunkTerrain {
         terrain
     }
 
-    pub fn from_new_raw_terrain(raw_terrain: RawChunkTerrain, chunk_pos: ChunkPosition) -> Self {
+    pub fn from_new_raw_terrain(raw_terrain: RawChunkTerrain, chunk_pos: ChunkLocation) -> Self {
         Self::from_raw_terrain(raw_terrain, chunk_pos, ChunkRequest::New)
     }
 
-    fn discover_areas(&mut self, chunk_pos: ChunkPosition, request: ChunkRequest) {
+    fn discover_areas(&mut self, chunk_pos: ChunkLocation, request: ChunkRequest) {
         log_scope!(o!(chunk_pos));
         debug!("discovering areas");
 
@@ -1441,7 +1441,7 @@ mod tests {
 
     fn occlusion(
         world: &World<()>,
-        chunk: ChunkPosition,
+        chunk: ChunkLocation,
         block: (i32, i32, i32),
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
@@ -1473,7 +1473,7 @@ mod tests {
         assert!(world.block((-1, 0, 1)).unwrap().opacity().solid());
         assert!(world.block((0, -1, 1)).unwrap().opacity().solid());
         assert_matches!(
-            occlusion(&world, ChunkPosition(0, 0), (0, 0, 0)),
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, 0)),
             [
                 VertexOcclusion::Full,
                 VertexOcclusion::Mildly,
@@ -1513,7 +1513,7 @@ mod tests {
         assert!(world.block((-1, 0, 0)).unwrap().opacity().solid());
         assert!(world.block((0, 0, 0)).unwrap().opacity().transparent());
         assert_matches!(
-            occlusion(&world, ChunkPosition(0, 0), (0, 0, -1)),
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly,
@@ -1528,7 +1528,7 @@ mod tests {
 
         assert!(world.block((0, 0, 0)).unwrap().opacity().solid());
         assert_matches!(
-            occlusion(&world, ChunkPosition(0, 0), (0, 0, -1)),
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,
@@ -1574,7 +1574,7 @@ mod tests {
             .opacity()
             .solid());
         assert_matches!(
-            occlusion(&world, ChunkPosition(0, 0), (0, CHUNK_SIZE.as_i32() - 1, 0)),
+            occlusion(&world, ChunkLocation(0, 0), (0, CHUNK_SIZE.as_i32() - 1, 0)),
             [
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,
@@ -1665,7 +1665,7 @@ mod tests {
 
             // just the one area
             assert_eq!(
-                w.find_chunk_with_pos(ChunkPosition(0, 0))
+                w.find_chunk_with_pos(ChunkLocation(0, 0))
                     .unwrap()
                     .areas()
                     .count(),
