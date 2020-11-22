@@ -36,10 +36,12 @@ impl Spatial {
             self.entities.push((e, transform.position));
         }
 
-        debug!(
-            "updated spatial index with {count} entities",
-            count = self.entities.len()
-        );
+        if !self.entities.is_empty() {
+            debug!(
+                "updated spatial index with {count} entities",
+                count = self.entities.len()
+            );
+        }
     }
 
     // The sort is a massive hotspot in profiling, keeping this not-inlined helps this terrible

@@ -38,6 +38,7 @@ pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
 
 impl NeighbourOpacity {
     pub const fn default_const() -> Self {
+        // TODO this is different to the actual Default!
         Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
     }
 

@@ -365,6 +365,7 @@ impl<D> World<D> {
             .expect("chunk expected to be loaded");
 
         // shallow clone terrain, no terrain is copied yet
+        // TODO dont clone terrain
         let mut terrain = chunk.raw_terrain().clone();
 
         // debug_assert!(
@@ -396,6 +397,7 @@ impl<D> World<D> {
                 let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
                 trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
 
+                // TODO consider resizing/populating changes_out initially with empty events for performance
                 match range {
                     WorldRange::Single(pos) => {
                         let prev_block = slab.slice_mut(pos.z()).set_block(pos, block_type);
@@ -406,6 +408,7 @@ impl<D> World<D> {
                         let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
                         for z in za..=zb {
                             let mut slice = slab.slice_mut(z);
+                            // TODO reserve space in changes_out first
                             for x in xa..=xb {
                                 for y in ya..=yb {
                                     let prev_block = slice.set_block((x, y), block_type);

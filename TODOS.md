@@ -1,4 +1,4 @@
-# TODOs (225)
+# TODOs (238)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -166,7 +166,8 @@
  * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (2)
    * `// TODO apply fall damage if applicable`
    * `// TODO lerp towards new rotation`
- * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
+ * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (2)
+   * `// TODO use dynstack for updates to avoid a separate box per entry`
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
@@ -216,9 +217,11 @@
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (9)
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (11)
+   * `// TODO "cheap" - it clones 2 vecs of arcs!`
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
+   * `// TODO this is sometimes a false positive, triggering unnecessary copies`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO shared cow instance for empty slab`
    * `// TODO reuse a buffer for each slab`
@@ -228,8 +231,12 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (11)
    * `// TODO cache full finalized chunks`
+   * `// TODO reuse vec alloc`
+   * `// TODO filter out unloaded slabs too`
+   * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
+   * `// TODO repeated filter check not needed?`
    * `// TODO sort out the lifetimes instead of cheating and using transmute`
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
@@ -266,20 +273,26 @@
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
- * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (2)
+ * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
+   * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (6)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (8)
    * `assert!(size > 0); // TODO Result`
+   * `// TODO determine viewer start pos from world/randomly e.g. ground level`
    * `// TODO intelligently choose an initial view range`
+   * `// TODO dont default to -1,-1 -> 1,1 in chunk range, depends on view radius and start chunk`
    * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (6)
+ * [game/world/src/world.rs](game/world/src/world.rs) (9)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO reuse hashset allocation`
+   * `// TODO dont clone terrain`
+   * `// TODO consider resizing/populating changes_out initially with empty events for performance`
+   * `// TODO reserve space in changes_out first`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`

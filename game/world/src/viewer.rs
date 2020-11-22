@@ -16,8 +16,8 @@ pub struct WorldViewer<D> {
 
 #[derive(Debug, Clone, Error)]
 pub enum WorldViewerError {
-    #[error("No block found at (0, 0)")]
-    EmptyOrigin,
+    #[error("Failed to position viewer, no block found at ({0}, {1})")]
+    InvalidStartColumn(i32, i32),
 
     #[error("Bad viewer range: {0}")]
     InvalidRange(SliceRange),
@@ -96,12 +96,17 @@ impl Add<i32> for SliceRange {
 }
 
 impl<D> WorldViewer<D> {
-    pub fn from_world(world: WorldRef<D>) -> Result<Self, WorldViewerError> {
+    pub fn with_world(world: WorldRef<D>) -> Result<Self, WorldViewerError> {
         let world_borrowed = world.borrow();
 
+        // TODO determine viewer start pos from world/randomly e.g. ground level
+        let start_pos = (0, 0);
         let start = world_borrowed
-            .find_accessible_block_in_column(0, 0)
-            .ok_or(WorldViewerError::EmptyOrigin)?
+            .find_accessible_block_in_column(start_pos.0, start_pos.1)
+            .ok_or(WorldViewerError::InvalidStartColumn(
+                start_pos.0,
+                start_pos.1,
+            ))?
             .2;
 
         let world_bounds = world_borrowed.slice_bounds().unwrap(); // world has at least 1 slice as above
@@ -119,6 +124,7 @@ impl<D> WorldViewer<D> {
         Ok(Self {
             world,
             view_range,
+            // TODO dont default to -1,-1 -> 1,1 in chunk range, depends on view radius and start chunk
             chunk_range: (ChunkPosition(-1, -1), ChunkPosition(1, 1)),
             clean_chunks: HashSet::with_capacity(128),
         })

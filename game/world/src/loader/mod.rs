@@ -195,11 +195,12 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
         terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
         changes_out: &mut Vec<WorldChangeEvent>,
     ) {
-        let world_ref = self.world.clone();
-        let world = world_ref.borrow();
+        let world = self.world.clone();
+        let world = world.borrow();
 
         let (slab_updates, chunk_count) = {
             // translate world -> slab updates
+            // TODO reuse vec alloc
             let mut slab_updates = terrain_updates
                 .flat_map(|world_update| world_update.into_slab_updates())
                 .collect_vec();
@@ -210,9 +211,11 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
             });
 
             // filter out unloaded chunks
+            // TODO filter out unloaded slabs too
+            // TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably
             slab_updates.retain(|(chunk, _, _)| world.has_chunk(*chunk));
 
-            // count chunk count for batch size
+            // count chunk count for batch size. no allocations in dedup because vec is sorted
             let chunk_count = slab_updates
                 .iter()
                 .dedup_by(|(chunk_a, _, _), (chunk_b, _, _)| chunk_a == chunk_b)
@@ -225,8 +228,9 @@ impl<P: WorkerPool<D>, D> WorldLoader<P, D> {
 
         let chunk_updates = grouped_chunk_updates
             .into_iter()
+            // TODO repeated filter check not needed?
             .filter(|(chunk, _)| world.has_chunk(*chunk))
-            // apply updates to world but don't submit them to the loader yet
+            // apply updates to world in closure, don't submit them to the loader right now
             .map(|(chunk, updates)| {
                 let updates = updates.map(|(_, slab, update)| (slab, update));
                 let new_terrain = world.apply_terrain_updates(chunk, updates, changes_out);
@@ -309,7 +313,7 @@ impl<D> ChunkFinalizer<D> {
         self.batcher
             .submit(batch, FinalizeBatchItem::initialized(chunk, terrain));
 
-        // finalize completed batches only, which might not include this update.
+        // finalize completed batches only, which might not include this update
         for (batch_id, batch_size) in self.batcher.complete_batches() {
             trace!("popping batch"; "id" => batch_id, "size" => batch_size);
 
@@ -379,7 +383,6 @@ impl<D> ChunkFinalizer<D> {
                 direction,
                 |which, block_pos, opacity| {
                     // TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead
-                    //
                     match which {
                         WhichChunk::ThisChunk => {
                             // update opacity now for this chunk being loaded

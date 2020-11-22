@@ -73,6 +73,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* mud crabs with human arms
 * generate and load world in SLABS, not full chunks
 	* config option to generate new land for camera, otherwise society member must be there
+* bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
 
 ## Voxel world mechanics
 * fluid blocks

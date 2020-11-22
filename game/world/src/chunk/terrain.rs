@@ -24,11 +24,13 @@ use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
 use crate::{EdgeCost, SliceRange};
 
 /// Terrain only. Cloning is cheap Arc copies, unless `deep_clone` is used
+// TODO "cheap" - it clones 2 vecs of arcs!
 #[derive(Clone)]
 pub struct RawChunkTerrain {
     slabs: DoubleSidedVec<Slab>,
 }
 
+/// Processed terrain populated with navigation graph and occlusion
 pub struct ChunkTerrain {
     raw_terrain: RawChunkTerrain,
     areas: HashMap<WorldArea, BlockGraph>,
@@ -189,6 +191,10 @@ impl RawChunkTerrain {
     /// Cow-copies the slab if not already the exclusive holder
     pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab> {
         self.slabs.get_mut(index).map(|s| s.cow_clone())
+    }
+
+    pub(crate) fn copy_slab(&self, index: SlabIndex) -> Option<Slab> {
+        self.slabs.get(index).map(|s| s.deep_clone())
     }
 
     /// Creates slabs up to and including target
@@ -603,6 +609,7 @@ impl RawChunkTerrain {
 
                 if *slice[block_pos].occlusion() != new_opacities {
                     // opacities have changed, promote slice to mutable, possibly triggering a slab copy
+                    // TODO this is sometimes a false positive, triggering unnecessary copies
                     let block_mut =
                         &mut raw_terrain.slice_mut_unchecked_with_cow(block_pos.z())[block_pos];
 
