@@ -6,7 +6,7 @@ use crate::world::WorldPosition;
 use std::convert::From;
 use std::ops::{Add, Sub};
 
-/// A chunk in the world
+/// Location of a chunk in the world
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]
 pub struct ChunkLocation(pub i32, pub i32);
 

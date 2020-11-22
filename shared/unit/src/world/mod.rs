@@ -1,8 +1,9 @@
 pub use block_position::*;
-pub use chunk_point::*;
 pub use chunk_location::*;
+pub use chunk_point::*;
 pub use range::*;
 pub use slab_index::*;
+pub use slab_location::*;
 pub use slab_position::*;
 pub use slice_block::*;
 pub use slice_index::*;
@@ -10,10 +11,11 @@ pub use world_point::*;
 pub use world_position::*;
 
 mod block_position;
-mod chunk_point;
 mod chunk_location;
+mod chunk_point;
 mod range;
 mod slab_index;
+mod slab_location;
 mod slab_position;
 mod slice_block;
 mod slice_index;
