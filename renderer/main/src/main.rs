@@ -183,7 +183,7 @@ fn main() {
         do_main()
     });
 
-    let all_panics = engine::panic::panics().collect_vec();
+    let all_panics = engine::panic::panics();
 
     let exit = match result {
         _ if !all_panics.is_empty() => {

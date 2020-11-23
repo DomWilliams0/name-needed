@@ -1,14 +1,14 @@
 use backtrace::Backtrace;
 use common::*;
 
+use parking_lot::Mutex;
 use std::borrow::Cow;
 use std::panic::PanicInfo;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
 
 lazy_static! {
     static ref HAS_PANICKED: AtomicBool = AtomicBool::default();
-    static ref PANICS: Mutex<ArrayVec<[Panic; 16]>> = Mutex::new(ArrayVec::new());
+    static ref PANICS: Mutex<Vec<Panic>> = Mutex::new(Vec::new());
 }
 
 // thread_local! {
@@ -34,10 +34,9 @@ pub fn init_panic_detection() {
     info!("initialized panic handler");
 }
 
-pub fn panics() -> impl Iterator<Item = Panic> {
-    let mut panics = PANICS.lock().unwrap();
-    let stolen = std::mem::take(&mut *panics);
-    stolen.into_iter()
+pub fn panics() -> Vec<Panic> {
+    let mut panics = PANICS.lock();
+    std::mem::take(&mut *panics)
 }
 
 pub fn has_panicked() -> bool {
@@ -68,13 +67,10 @@ fn register_panic(panic: &PanicInfo) {
 
     HAS_PANICKED.store(true, Ordering::Relaxed);
 
-    // TODO use mutex that cant be poisoned
-    let mut panics = PANICS.lock().unwrap(); // nested panic!?
-    if let Err(e) = panics.try_push(Panic {
+    let mut panics = PANICS.lock();
+    panics.push(Panic {
         message: message.into_owned(),
         thread,
         backtrace,
-    }) {
-        error!("too many concurrent panics"; "count" => panics.len(), "error" => %e);
-    }
+    });
 }
