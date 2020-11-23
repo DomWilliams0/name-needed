@@ -8,7 +8,7 @@ pub(crate) use pair_walking::WhichChunk;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SliceBlock, SLAB_SIZE,
+    SLAB_SIZE,
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
@@ -31,6 +31,7 @@ pub struct RawChunkTerrain {
 }
 
 /// Processed terrain populated with navigation graph and occlusion
+#[deprecated(note = "terrain = RawChunkTerrain, everything else = Chunk")]
 pub struct ChunkTerrain {
     raw_terrain: RawChunkTerrain,
     areas: HashMap<WorldArea, BlockGraph>,
@@ -136,16 +137,6 @@ pub struct OcclusionChunkUpdate(
     pub Vec<(BlockPosition, NeighbourOpacity)>,
 );
 
-impl BaseTerrain for RawChunkTerrain {
-    fn raw_terrain(&self) -> &RawChunkTerrain {
-        self
-    }
-
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
-        self
-    }
-}
-
 #[derive(Copy, Clone)]
 pub enum SlabCreationPolicy {
     /// Don't add missing slabs
@@ -158,6 +149,16 @@ pub enum SlabCreationPolicy {
 pub enum BlockDamageResult {
     Broken,
     Unbroken,
+}
+
+impl BaseTerrain for RawChunkTerrain {
+    fn raw_terrain(&self) -> &RawChunkTerrain {
+        self
+    }
+
+    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
+        self
+    }
 }
 
 impl RawChunkTerrain {
@@ -173,6 +174,12 @@ impl RawChunkTerrain {
             .iter_increasing()
             .zip(self.slabs.indices_increasing())
             .map(|(ptr, idx)| (ptr, SlabIndex(idx)))
+    }
+
+    pub fn replace_slab(&mut self, index: SlabIndex, new_slab: Slab) -> Option<Slab> {
+        self.slabs
+            .get_mut(index)
+            .map(|old| std::mem::replace(old, new_slab))
     }
 
     fn add_slab(&mut self, slab: Slab, index: impl Into<SlabIndex>) {
@@ -907,14 +914,6 @@ impl ChunkTerrain {
         }
     }
 
-    pub(crate) fn areas(&self) -> impl Iterator<Item = &WorldArea> {
-        self.areas.keys()
-    }
-
-    pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
-        self.areas.get(&area)
-    }
-
     fn init_occlusion(&mut self, request: ChunkRequest) {
         self.ascending_slice_pairs_foreach(request, |mut slice_this, slice_next| {
             for (i, b) in slice_this
@@ -1002,23 +1001,6 @@ impl ChunkTerrain {
                 f(this_slab_top_slice, next_slab_bottom_slice);
             }
         }
-    }
-
-    // TODO use an enum for the slice range rather than Options
-    pub fn find_accessible_block(
-        &self,
-        pos: SliceBlock,
-        start_from: Option<GlobalSliceIndex>,
-        end_at: Option<GlobalSliceIndex>,
-    ) -> Option<BlockPosition> {
-        let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
-        let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
-        self.raw_terrain()
-            .slices_from_top_offset()
-            .skip_while(|(s, _)| *s > start_from)
-            .take_while(|(s, _)| *s >= end_at)
-            .find(|(_, slice)| slice[pos].walkable())
-            .map(|(z, _)| pos.to_block_position(z))
     }
 }
 
@@ -1301,42 +1283,44 @@ mod tests {
 
         let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
 
-        let graph = terrain
-            .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
-            .unwrap();
+        /*        let graph = terrain
+                    .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
+                    .unwrap();
 
-        // 4 flat connections
-        assert_eq!(
-            graph.edges((5, 5, 52).into()),
-            vec![
-                ((4, 5, 52).into(), EdgeCost::Walk),
-                ((5, 4, 52).into(), EdgeCost::Walk),
-                ((5, 6, 52).into(), EdgeCost::Walk),
-                ((6, 5, 52).into(), EdgeCost::Walk),
-            ]
-        );
+                // 4 flat connections
+                assert_eq!(
+                    graph.edges((5, 5, 52).into()),
+                    vec![
+                        ((4, 5, 52).into(), EdgeCost::Walk),
+                        ((5, 4, 52).into(), EdgeCost::Walk),
+                        ((5, 6, 52).into(), EdgeCost::Walk),
+                        ((6, 5, 52).into(), EdgeCost::Walk),
+                    ]
+                );
 
-        // step up on 1 side
-        assert_eq!(
-            graph.edges((2, 3, 52).into()),
-            vec![
-                ((1, 3, 52).into(), EdgeCost::Walk),
-                ((2, 2, 53).into(), EdgeCost::JumpUp),
-                ((2, 4, 52).into(), EdgeCost::Walk),
-                ((3, 3, 52).into(), EdgeCost::Walk),
-            ]
-        );
+                // step up on 1 side
+                assert_eq!(
+                    graph.edges((2, 3, 52).into()),
+                    vec![
+                        ((1, 3, 52).into(), EdgeCost::Walk),
+                        ((2, 2, 53).into(), EdgeCost::JumpUp),
+                        ((2, 4, 52).into(), EdgeCost::Walk),
+                        ((3, 3, 52).into(), EdgeCost::Walk),
+                    ]
+                );
 
-        // step down on all sides
-        assert_eq!(
-            graph.edges((2, 2, 53).into()),
-            vec![
-                ((1, 2, 52).into(), EdgeCost::JumpDown),
-                ((2, 1, 52).into(), EdgeCost::JumpDown),
-                ((2, 3, 52).into(), EdgeCost::JumpDown),
-                ((3, 2, 52).into(), EdgeCost::JumpDown),
-            ]
-        );
+                // step down on all sides
+                assert_eq!(
+                    graph.edges((2, 2, 53).into()),
+                    vec![
+                        ((1, 2, 52).into(), EdgeCost::JumpDown),
+                        ((2, 1, 52).into(), EdgeCost::JumpDown),
+                        ((2, 3, 52).into(), EdgeCost::JumpDown),
+                        ((3, 2, 52).into(), EdgeCost::JumpDown),
+                    ]
+                );
+        */
+        todo!()
     }
 
     #[test]

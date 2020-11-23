@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -14,7 +12,8 @@ use unit::world::{ChunkLocation, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
-use crate::chunk::{Chunk, ChunkTerrain, RawChunkTerrain, SlabLoadingStatus, WhichChunk};
+use crate::chunk::slab::{Slab, SlabInternalNavigability};
+use crate::chunk::{ChunkTerrain, RawChunkTerrain, SlabLoadingStatus, WhichChunk};
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
@@ -35,6 +34,13 @@ pub struct WorldLoader<P: WorkerPool<D>, D> {
     world: WorldRef<D>,
     last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
+}
+
+pub struct LoadedSlab {
+    pub(crate) slab: SlabLocation,
+    pub(crate) terrain: Slab,
+    pub(crate) navigation: SlabInternalNavigability,
+    pub(crate) batch: UpdateBatch,
 }
 
 #[derive(Debug, Error)]
@@ -100,7 +106,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
 
         for slab in slabs {
             let chunk = world_mut.ensure_chunk(slab.chunk);
-            chunk.update_slab_status(slab.slab, SlabLoadingStatus::Requested);
+            chunk.mark_slab_requested(slab.slab);
 
             let source = self.source.clone();
             let batch = batches.next_batch();
@@ -140,19 +146,23 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                     // neighbouring slabs can access it
                     let world = world.borrow();
                     let chunk = world.find_chunk_with_pos(slab.chunk).unwrap();
-                    chunk.update_slab_status(slab.slab, SlabLoadingStatus::in_progress(&terrain));
+                    chunk.mark_slab_in_progress(slab.slab, &terrain);
 
                     // wait for above+below slabs to be loaded if they're in progress, then
                     // concurrently process raw terrain in context of own chunk
                     let (above, below) = chunk.wait_for_neighbouring_slabs(slab.slab);
-                    let terrain = terrain.into_real_slab(
+                    let (terrain, navigation) = terrain.into_real_slab(
                         above.as_ref().map(|s| s.into()), // gross
                         below.as_ref().map(|s| s.into()),
                     );
 
-                    // let terrain = ChunkTerrain::from_raw_terrain(terrain, chunk, ChunkRequest::New);
-                    // Ok((chunk, terrain, batch))
-                    todo!()
+                    // submit slab for finalization
+                    Ok(LoadedSlab {
+                        slab,
+                        terrain,
+                        navigation,
+                        batch,
+                    })
                 },
                 self.finalization_channel.clone(),
             );
@@ -195,7 +205,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                         chunk,
                         ChunkRequest::UpdateExisting,
                     );
-                    Ok((chunk, terrain, batch))
+                    todo!()
+                    // Ok((chunk, terrain, batch))
                 },
                 self.finalization_channel.clone(),
             );
@@ -265,7 +276,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     pub fn block_on_next_finalization(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
+    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
         self.pool.block_on_next_finalize(timeout)
     }
 
@@ -313,13 +324,10 @@ impl ChunkRequest {
 
 #[cfg(test)]
 mod tests {
-    use std::iter::once;
+
     use std::time::Duration;
 
-    use matches::assert_matches;
-
     use unit::dim::CHUNK_SIZE;
-    use unit::world::ChunkLocation;
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -345,7 +353,8 @@ mod tests {
         todo!();
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
-        assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));
+        // assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));
+        todo!();
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);
     }

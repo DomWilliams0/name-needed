@@ -82,6 +82,15 @@ impl ChunkArea {
     }
 }
 
+impl From<WorldArea> for ChunkArea {
+    fn from(area: WorldArea) -> Self {
+        ChunkArea {
+            slab: area.slab,
+            area: area.area,
+        }
+    }
+}
+
 impl From<WorldArea> for Vector3 {
     fn from(area: WorldArea) -> Self {
         // is this good for estimating node cost?

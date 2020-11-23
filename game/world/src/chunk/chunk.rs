@@ -1,18 +1,16 @@
-use std::ops::{Deref, DerefMut};
-
 use common::*;
 
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, WorldPosition,
-    SLAB_SIZE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
+    WorldPosition,
 };
 
 use crate::block::BlockType;
 use crate::chunk::slab::SlabTerrain;
 use crate::chunk::slice::{Slice, SliceOwned};
-use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
+use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
-use crate::navigation::WorldArea;
+use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
 use crate::SliceRange;
 use std::collections::HashMap;
 use std::sync::{Condvar, Mutex, RwLock};
@@ -23,10 +21,13 @@ pub struct Chunk<D> {
     /// Unique for each chunk
     pos: ChunkLocation,
 
-    terrain: ChunkTerrain,
+    terrain: RawChunkTerrain,
 
     /// Sparse associated data with each block
     block_data: HashMap<BlockPosition, D>,
+
+    /// Navigation lookup
+    areas: HashMap<ChunkArea, BlockGraph>,
 
     slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
     slab_wait: Mutex<()>,
@@ -50,20 +51,18 @@ pub(crate) enum SlabLoadingStatus {
         /// Slab's bottom slice
         bottom: SliceOwned,
     },
+
+    /// Finished and present in chunk.terrain
     Done,
 }
 
 impl<D> Chunk<D> {
-    pub fn empty<P: Into<ChunkLocation>>(pos: P) -> Self {
-        Self::with_completed_terrain(pos.into(), ChunkTerrain::empty())
-    }
-
-    /// Called by ChunkBuilder when terrain has been finalized
-    pub(crate) fn with_completed_terrain(pos: ChunkLocation, terrain: ChunkTerrain) -> Self {
+    pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
         Self {
-            pos,
-            terrain,
+            pos: pos.into(),
+            terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
+            areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_wait: Mutex::new(()),
             slab_wait_cvar: Condvar::new(),
@@ -95,6 +94,39 @@ impl<D> Chunk<D> {
         })
     }
 
+    pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> {
+        self.areas.keys()
+    }
+
+    pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
+        self.areas.get(&area.into())
+    }
+
+    pub(crate) fn update_block_graphs(
+        &mut self,
+        slab_nav: impl Iterator<Item = (ChunkArea, BlockGraph)>,
+    ) {
+        for (area, graph) in slab_nav {
+            let (new_edges, new_nodes) = graph.len();
+            match self.areas.insert(area, graph) {
+                None => {
+                    debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
+                }
+                Some(prev) => {
+                    let (prev_edges, prev_nodes) = prev.len();
+                    debug!(
+                        "replaced {prev_edges} edges and {prev_nodes} nodes with {new_edges} \
+                        edges and {new_nodes} nodes",
+                        prev_edges = prev_edges,
+                        prev_nodes = prev_nodes,
+                        new_edges = new_edges,
+                        new_nodes = new_nodes
+                    );
+                }
+            }
+        }
+    }
+
     pub fn slice_range(
         &self,
         range: SliceRange,
@@ -109,6 +141,23 @@ impl<D> Chunk<D> {
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice {
         #[allow(clippy::redundant_closure)]
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
+    }
+
+    // TODO use an enum for the slice range rather than Options
+    pub fn find_accessible_block(
+        &self,
+        pos: SliceBlock,
+        start_from: Option<GlobalSliceIndex>,
+        end_at: Option<GlobalSliceIndex>,
+    ) -> Option<BlockPosition> {
+        let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
+        let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
+        self.terrain
+            .slices_from_top_offset()
+            .skip_while(|(s, _)| *s > start_from)
+            .take_while(|(s, _)| *s >= end_at)
+            .find(|(_, slice)| slice[pos].walkable())
+            .map(|(z, _)| pos.to_block_position(z))
     }
 
     pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&D> {
@@ -128,7 +177,23 @@ impl<D> Chunk<D> {
         std::mem::swap(&mut self.block_data, &mut other.block_data)
     }
 
-    pub(crate) fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
+    pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::Requested);
+    }
+
+    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &SlabTerrain) {
+        let top = terrain.owned_slice(LocalSliceIndex::top());
+        let bottom = terrain.owned_slice(LocalSliceIndex::bottom());
+
+        self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
+    }
+
+    // TODO mark complete after finalization
+    pub(crate) fn mark_slab_complete(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::Done);
+    }
+
+    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
         let notify = matches!(state, SlabLoadingStatus::InProgress {..} | SlabLoadingStatus::Done);
         debug!("updating slab progress"; slab, "state" => ?state);
 
@@ -229,36 +294,13 @@ impl<D> Chunk<D> {
     }
 }
 
-impl SlabLoadingStatus {
-    pub fn in_progress(terrain: &SlabTerrain) -> Self {
-        let top = terrain.owned_slice(LocalSliceIndex::top());
-        let bottom = terrain.owned_slice(LocalSliceIndex::bottom());
-
-        Self::InProgress { top, bottom }
-    }
-}
-
-impl<D> Deref for Chunk<D> {
-    type Target = ChunkTerrain;
-
-    fn deref(&self) -> &Self::Target {
-        &self.terrain
-    }
-}
-
-impl<D> DerefMut for Chunk<D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.terrain
-    }
-}
-
 impl<D> BaseTerrain for Chunk<D> {
     fn raw_terrain(&self) -> &RawChunkTerrain {
-        self.terrain.raw_terrain()
+        &self.terrain
     }
 
     fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
-        self.terrain.raw_terrain_mut()
+        &mut self.terrain
     }
 }
 

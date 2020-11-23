@@ -29,8 +29,12 @@ impl<D> WorldRef<D> {
 
     #[cfg(test)]
     pub fn into_inner(self) -> World<D> {
-        let mutex =
-            Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("exclusive world reference needed"));
+        let mutex = Arc::try_unwrap(self.0).unwrap_or_else(|arc| {
+            panic!(
+                "exclusive world reference needed but there are {}",
+                Arc::strong_count(&arc)
+            )
+        });
         mutex.into_inner().expect("world lock is poisoned")
     }
 }

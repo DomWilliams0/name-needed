@@ -1,4 +1,4 @@
-# TODOs (247)
+# TODOs (256)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -211,22 +211,23 @@
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
- * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
+ * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (3)
    * `// TODO box these? this variant is 6K`
+   * `// TODO use an enum for the slice range rather than Options`
+   * `// TODO mark complete after finalization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (7)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (6)
    * `// TODO these methods are copied from Slab`
    * `// TODO occlusion`
    * `// TODO skip if not exclusive?`
    * `// TODO exclusive helper on this struct too`
-   * `// TODO what do with blockgraphs?`
    * `// TODO discover internal area links`
    * `// TODO only needs bottom slice of next slab up, slab below doesnt matter`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO can this just hold opacity to reduce size?`
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (11)
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (10)
    * `// TODO "cheap" - it clones 2 vecs of arcs!`
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
@@ -236,18 +237,25 @@
    * `// TODO reuse a buffer for each slab`
    * `// TODO discover internal area links`
    * `// TODO transmute lifetimes instead`
-   * `// TODO use an enum for the slice range rather than Options`
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (7)
-   * `// TODO slabs not chunks`
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (15)
+   * `// TODO finalize chunks? or finalize slabs?`
+   * `// TODO logging`
+   * `// TODO occlusion`
+   * `let mut area_edges = Vec::new(); // TODO reuse buf`
+   * `let mut links = Vec::new(); // TODO reuse buf`
+   * `let mut ports = Vec::new(); // TODO reuse buf`
+   * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
    * `// TODO sort out the lifetimes instead of cheating and using transmute`
+   * `// TODO limit checks to range around the actual changes`
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
+   * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
  * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
    * `// TODO slabs not chunks`
    * `// TODO reuse vec alloc`
@@ -294,10 +302,11 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (9)
+ * [game/world/src/world.rs](game/world/src/world.rs) (10)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
-   * `// TODO reuse hashset allocation`
+   * `// TODO trim stale areas that no longer exist?`
+   * `// TODO mark chunk as dirty`
    * `// TODO dont clone terrain`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`
    * `// TODO reserve space in changes_out first`

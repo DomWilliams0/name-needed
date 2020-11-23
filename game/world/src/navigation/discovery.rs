@@ -5,7 +5,7 @@ use unit::dim::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slab::{Slab, SlabGridImpl};
+use crate::chunk::slab::SlabGridImpl;
 use crate::chunk::slice::Slice;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;

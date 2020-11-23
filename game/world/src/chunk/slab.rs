@@ -8,6 +8,7 @@ use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SLAB_SIZE};
 use crate::block::Block;
 use crate::chunk::slice::{Slice, SliceMut, SliceOwned};
 use crate::navigation::discovery::AreaDiscovery;
+use crate::navigation::{BlockGraph, ChunkArea};
 use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
@@ -24,6 +25,8 @@ pub struct Slab(Arc<SlabGridImpl>);
 
 /// Raw terrain, just block data
 pub struct SlabTerrain(SlabLocation, Arc<SlabGridImpl>);
+
+pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
 
 pub trait DeepClone {
     fn deep_clone(&self) -> Self;
@@ -118,6 +121,15 @@ impl Deref for Slab {
     }
 }
 
+impl IntoIterator for SlabInternalNavigability {
+    type Item = (ChunkArea, BlockGraph);
+    type IntoIter = std::vec::IntoIter<(ChunkArea, BlockGraph)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl SlabTerrain {
     fn empty(loc: SlabLocation) -> Self {
         SlabTerrain(loc, Arc::from(SlabGridImpl::default_boxed()))
@@ -133,7 +145,11 @@ impl SlabTerrain {
     }
 
     /// Discover navigability and occlusion
-    pub fn into_real_slab(mut self, above: Option<Slice>, below: Option<Slice>) -> Slab {
+    pub(crate) fn into_real_slab(
+        mut self,
+        above: Option<Slice>,
+        below: Option<Slice>,
+    ) -> (Slab, SlabInternalNavigability) {
         // for panic only
         let has_above = above.is_some();
         let has_below = below.is_some();
@@ -141,16 +157,16 @@ impl SlabTerrain {
         log_scope!(o!(self.0));
 
         // flood fill to discover navigability
-        self.discover_areas(below);
+        let navigation = self.discover_areas(below);
 
         // TODO occlusion
 
-        todo!("real slab above {:?} below {:?}", has_above, has_below,);
+        // todo!("real slab above {:?} below {:?}", has_above, has_below,);
 
-        Slab(self.1)
+        (Slab(self.1), navigation)
     }
 
-    fn discover_areas(&mut self, slice_below: Option<Slice>) {
+    fn discover_areas(&mut self, slice_below: Option<Slice>) -> SlabInternalNavigability {
         // TODO skip if not exclusive?
         // TODO exclusive helper on this struct too
         assert!(self.is_exclusive(), "not exclusive?");
@@ -165,16 +181,14 @@ impl SlabTerrain {
         // collect areas and graphs
         let slab_areas = discovery
             .areas_with_graph()
-            .map(|(chunk_area, block_graph)| {
-                (chunk_area.into_world_area(self.0.chunk), block_graph)
-            })
             .collect_vec();
-        // TODO what do with blockgraphs?
 
         // TODO discover internal area links
 
         // apply areas to blocks
         discovery.apply(self.expect_mut());
+
+        SlabInternalNavigability(slab_areas)
     }
 
     fn init_occlusion(&mut self) {

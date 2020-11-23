@@ -131,6 +131,13 @@ impl BlockGraph {
             target,
         })
     }
+
+    /// (edges, nodes)
+    pub fn len(&self) -> (usize, usize) {
+        let edges = self.graph.edge_count();
+        let nodes = self.graph.node_count();
+        (edges, nodes)
+    }
 }
 
 #[cfg(test)]

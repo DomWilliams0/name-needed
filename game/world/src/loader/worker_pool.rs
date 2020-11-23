@@ -4,16 +4,15 @@ use crossbeam::channel::{unbounded, Receiver, Sender};
 use threadpool::ThreadPool;
 
 use common::*;
-use unit::world::ChunkLocation;
+use unit::world::SlabLocation;
 
-use crate::chunk::ChunkTerrain;
+use crate::loader::finalizer::ChunkFinalizer;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::loader::{UpdateBatch};
+use crate::loader::LoadedSlab;
 use crate::{OcclusionChunkUpdate, WorldRef};
 use std::collections::VecDeque;
-use crate::loader::finalizer::ChunkFinalizer;
 
-pub type LoadTerrainResult = Result<(ChunkLocation, ChunkTerrain, UpdateBatch), TerrainSourceError>;
+pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
 
 pub trait WorkerPool<D> {
     fn start_finalizer(
@@ -26,7 +25,7 @@ pub trait WorkerPool<D> {
     fn block_on_next_finalize(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkLocation, TerrainSourceError>>;
+    ) -> Option<Result<SlabLocation, TerrainSourceError>>;
 
     fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
         &mut self,
@@ -37,8 +36,8 @@ pub trait WorkerPool<D> {
 
 pub struct ThreadedWorkerPool {
     pool: ThreadPool,
-    success_rx: Receiver<Result<ChunkLocation, TerrainSourceError>>,
-    success_tx: Sender<Result<ChunkLocation, TerrainSourceError>>,
+    success_rx: Receiver<Result<SlabLocation, TerrainSourceError>>,
+    success_tx: Sender<Result<SlabLocation, TerrainSourceError>>,
 }
 
 impl ThreadedWorkerPool {
@@ -76,9 +75,9 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
                             Err(e)
                         }
                         Ok(result) => {
-                            let chunk = result.0;
+                            let slab = result.slab;
                             finalizer.finalize(result);
-                            Ok(chunk)
+                            Ok(slab)
                         }
                     };
 
@@ -96,7 +95,7 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
     fn block_on_next_finalize(
         &mut self,
         timeout: Duration,
-    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
+    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
         self.success_rx.recv_timeout(timeout).ok()
     }
 
@@ -141,7 +140,7 @@ impl<D> WorkerPool<D> for BlockingWorkerPool<D> {
     fn block_on_next_finalize(
         &mut self,
         _: Duration,
-    ) -> Option<Result<ChunkLocation, TerrainSourceError>> {
+    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
         // time to actually do the work
         let (task, done_channel) = self.task_queue.pop_front()?;
 
@@ -165,7 +164,7 @@ impl<D> WorkerPool<D> for BlockingWorkerPool<D> {
                 Err(e)
             }
             Ok(result) => {
-                let chunk = result.0;
+                let chunk = result.slab;
 
                 // finalize on "finalizer thread"
                 finalizer.finalize(result);
