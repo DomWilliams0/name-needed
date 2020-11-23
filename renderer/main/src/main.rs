@@ -230,8 +230,6 @@ fn main() {
         Ok(Ok(())) => 0,
     };
 
-    info!("exiting cleanly"; "code"=>exit);
-
     // unhook custom panic handler before dropping and flushing the logger
     let _ = std::panic::take_hook();
     if exit != 0 {
@@ -244,5 +242,6 @@ fn main() {
     }
     drop(logger_guard);
 
+    info!("exiting cleanly"; "code" => exit);
     std::process::exit(exit);
 }
