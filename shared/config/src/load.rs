@@ -1,8 +1,8 @@
 use common::*;
+use parking_lot::{Mutex, MutexGuard};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
-use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -86,14 +86,14 @@ fn lock<'a>() -> MutexGuard<'a, RawConfig> {
         // try a few times then panic instead of blocking
         for _ in 0..3 {
             match CONFIG.try_lock() {
-                Ok(guard) => return guard,
-                Err(_) => continue,
+                Some(guard) => return guard,
+                None => continue,
             }
         }
 
         panic!("config lock is already held")
     } else {
-        CONFIG.lock().unwrap()
+        CONFIG.lock()
     }
 }
 

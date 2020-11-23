@@ -1,6 +1,7 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use common::parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::World;
+use std::sync::Arc;
 
 /// Reference counted reference to the world
 pub struct WorldRef<D>(Arc<RwLock<World<D>>>);
@@ -20,11 +21,11 @@ impl<D> WorldRef<D> {
     // TODO don't unwrap()
 
     pub fn borrow(&self) -> InnerWorldRef<'_, D> {
-        (*self.0).read().unwrap()
+        (*self.0).read()
     }
 
     pub fn borrow_mut(&self) -> InnerWorldRefMut<'_, D> {
-        (*self.0).write().unwrap()
+        (*self.0).write()
     }
 
     #[cfg(test)]
@@ -35,7 +36,7 @@ impl<D> WorldRef<D> {
                 Arc::strong_count(&arc)
             )
         });
-        mutex.into_inner().expect("world lock is poisoned")
+        mutex.into_inner()
     }
 }
 

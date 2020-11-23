@@ -150,7 +150,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * separate binary for definition file validation
 * instead of sleeping to wait for world to load, check if panicked every second
 * consider replacing 1:1 world threadpool with async threadpool
-* replace std mutexes with parkinglot
 
 ## Entity diversity
 * animal species
