@@ -11,6 +11,8 @@ before_cache:
 branches:
     only:
         - /.*/
+    except:
+        - feature/better-procgen # huge breaking refactors
 
 install:
     - if [[ "$TRAVIS_BRANCH" = "develop" && -f .planning/active.md ]]; then echo "develop should not have an active.md"; exit 1; fi
