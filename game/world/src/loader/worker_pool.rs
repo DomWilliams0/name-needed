@@ -66,10 +66,6 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
 
                 while let Ok(result) = finalize_rx.recv() {
                     let result = match result {
-                        Err(e @ TerrainSourceError::OutOfBounds(_)) => {
-                            debug!("requested out of bounds slab, no problem");
-                            Err(e)
-                        }
                         Err(e) => {
                             error!("failed to load requested slab"; "error" => %e);
                             Err(e)
@@ -82,7 +78,8 @@ impl<D: 'static> WorkerPool<D> for ThreadedWorkerPool {
                     };
 
                     if let Err(e) = success_tx.send(result) {
-                        error!("failed to report finalized chunk result"; "error" => %e);
+                        error!("failed to report finalized terrain result"; "error" => %e);
+                        trace!("lost result"; "result" => ?e.0);
                     }
                 }
 

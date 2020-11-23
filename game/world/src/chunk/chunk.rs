@@ -12,8 +12,8 @@ use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
 use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
 use crate::SliceRange;
+use parking_lot::{Condvar, Mutex, RwLock};
 use std::collections::HashMap;
-use std::sync::{Condvar, Mutex, RwLock};
 
 pub type ChunkId = u64;
 
@@ -194,15 +194,12 @@ impl<D> Chunk<D> {
     }
 
     fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
-        let notify = matches!(state, SlabLoadingStatus::InProgress {..} | SlabLoadingStatus::Done);
-        debug!("updating slab progress"; slab, "state" => ?state);
+        trace!("updating slab progress"; slab, "state" => ?state);
 
-        let mut map = self.slab_progress.write().unwrap();
+        let mut map = self.slab_progress.write();
         map.insert(slab, state);
 
-        if notify {
-            self.slab_wait_cvar.notify_all();
-        }
+        self.slab_wait_cvar.notify_all();
     }
 
     /// (slice above, slice below)
@@ -224,7 +221,7 @@ impl<D> Chunk<D> {
     }
 
     fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
-        let guard = self.slab_progress.read().unwrap();
+        let guard = self.slab_progress.read();
         guard
             .get(&slab)
             .unwrap_or(&SlabLoadingStatus::Unloaded)
@@ -263,32 +260,35 @@ impl<D> Chunk<D> {
     fn wait_for_slab(&self, slab: SlabIndex, top_slice: bool) -> Option<SliceOwned> {
         let mut ret = None;
 
-        let guard = self.slab_wait.lock().unwrap();
-        let _guard = self
-            .slab_wait_cvar
-            .wait_while(guard, |_| {
-                let state = self.slab_progress(slab);
+        let mut should_keep_waiting = || {
+            let state = self.slab_progress(slab);
 
-                match state {
-                    SlabLoadingStatus::Requested => {
-                        // keep waiting
-                        true
-                    }
-                    SlabLoadingStatus::Unloaded => {
-                        // nothing to wait for
-                        debug!("slab of interest is unloaded"; slab);
-                        false
-                    }
-
-                    _ => {
-                        // it's available
-                        debug!("slab of interest is available"; slab, "state" => ?state);
-                        ret = self.get_slab_slice(state, slab, top_slice);
-                        false
-                    }
+            match state {
+                SlabLoadingStatus::Requested => {
+                    // keep waiting
+                    trace!("waiting for other slab"; "index" => ?slab);
+                    true
                 }
-            })
-            .unwrap();
+                SlabLoadingStatus::Unloaded => {
+                    // nothing to wait for
+                    debug!("slab of interest is unloaded"; slab);
+                    false
+                }
+
+                _ => {
+                    // it's available
+                    debug!("slab of interest is available"; slab, "state" => ?state);
+                    ret = self.get_slab_slice(state, slab, top_slice);
+                    false
+                }
+            }
+        };
+
+        let mut guard = self.slab_wait.lock();
+
+        while should_keep_waiting() {
+            self.slab_wait_cvar.wait(&mut guard);
+        }
 
         ret
     }

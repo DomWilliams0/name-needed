@@ -25,6 +25,7 @@ bumpalo = {version = "^3.4", features = ["collections"]}
 smallvec = "^1.4"
 arrayvec = "^0.5"
 boolinator = "^2.4"
+parking_lot = "^0.11"
 
 # TODO feature for cgmath
 [features]

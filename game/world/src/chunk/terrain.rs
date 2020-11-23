@@ -841,6 +841,7 @@ impl ChunkTerrain {
         chunk_pos: ChunkLocation,
         request: ChunkRequest,
     ) -> Self {
+        unreachable!();
         let mut terrain = Self {
             raw_terrain,
             areas: HashMap::with_capacity(32),

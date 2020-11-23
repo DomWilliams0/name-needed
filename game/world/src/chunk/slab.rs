@@ -131,7 +131,7 @@ impl IntoIterator for SlabInternalNavigability {
 }
 
 impl SlabTerrain {
-    fn empty(loc: SlabLocation) -> Self {
+    pub(crate) fn empty(loc: SlabLocation) -> Self {
         SlabTerrain(loc, Arc::from(SlabGridImpl::default_boxed()))
     }
 
@@ -179,9 +179,7 @@ impl SlabTerrain {
         debug!("discovered {count} areas", count = area_count);
 
         // collect areas and graphs
-        let slab_areas = discovery
-            .areas_with_graph()
-            .collect_vec();
+        let slab_areas = discovery.areas_with_graph().collect_vec();
 
         // TODO discover internal area links
 
@@ -193,6 +191,7 @@ impl SlabTerrain {
 
     fn init_occlusion(&mut self) {
         // TODO only needs bottom slice of next slab up, slab below doesnt matter
+        // TODO ascending pairs? can we avoid checking whole chunk?
     }
 
     pub fn from_slab(slab: Slab, loc: SlabLocation) -> Self {

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 use crossbeam::channel::{Receiver, Sender};
@@ -12,13 +12,14 @@ use unit::world::{ChunkLocation, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
 
-use crate::chunk::slab::{Slab, SlabInternalNavigability};
+use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabTerrain};
 use crate::chunk::{ChunkTerrain, RawChunkTerrain, SlabLoadingStatus, WhichChunk};
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldRef};
+use std::sync::Arc;
 
 mod batch;
 mod finalizer;
@@ -27,6 +28,7 @@ mod update;
 mod worker_pool;
 
 pub struct WorldLoader<P: WorkerPool<D>, D> {
+    // TODO use rwlock so preprocessing can start concurrently
     source: Arc<Mutex<dyn TerrainSource>>,
     pool: P,
     finalization_channel: Sender<LoadTerrainResult>,
@@ -91,6 +93,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         self.request_slabs_with_count(slabs, count)
     }
 
+    // TODO more efficient version that takes chunk+multiple slabs
     pub fn request_slabs_with_count(
         &mut self,
         slabs: impl Iterator<Item = SlabLocation>,
@@ -102,7 +105,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
 
         // hold source lock as a barrier for this batch, until all slabs have been registered
         // with the chunk so they know if their neighbours are being loaded
-        let _guard = self.source.lock().unwrap();
+        let _guard = self.source.lock();
 
         for slab in slabs {
             let chunk = world_mut.ensure_chunk(slab.chunk);
@@ -120,26 +123,37 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
             let world = self.world();
             self.pool.submit(
                 move || {
-                    // briefly hold the source lock to get a preprocess closure to run
-                    let preprocess_work = {
-                        let terrain_source = source.lock().unwrap();
+                    // wrapped in closure for common error handling case
+                    let get_terrain = || -> Result<SlabTerrain, TerrainSourceError> {
+                        // briefly hold the source lock to get a preprocess closure to run
+                        let preprocess_work = {
+                            let terrain_source = source.lock();
+                            terrain_source.preprocess(slab)
+                        };
 
-                        // fail fast if bad slab position
-                        if !terrain_source.is_in_bounds(slab) {
-                            return Err(TerrainSourceError::OutOfBounds(slab));
-                        }
+                        // run preprocessing work concurrently
+                        let preprocess_result = preprocess_work()?;
 
-                        terrain_source.preprocess(slab)
+                        // take the source lock again to convert preprocessing output into raw terrain
+                        // e.g. reading from a file cannot be done in parallel
+                        let terrain = {
+                            let mut terrain_source = source.lock();
+                            terrain_source.load_slab(slab, preprocess_result)?
+                        };
+
+                        Ok(terrain)
                     };
 
-                    // run preprocessing work concurrently
-                    let preprocess_result = preprocess_work()?;
-
-                    // take the source lock again to convert preprocessing output into raw terrain
-                    // e.g. reading from a file cannot be done in parallel
-                    let terrain = {
-                        let mut terrain_source = source.lock().unwrap();
-                        terrain_source.load_slab(slab, preprocess_result)?
+                    let terrain = match get_terrain() {
+                        Ok(terrain) => terrain,
+                        Err(TerrainSourceError::OutOfBounds(slab)) => {
+                            // soft error, we're at the world edge. treat as all air instead of
+                            // crashing and burning
+                            debug!("slab is out of bounds, swapping in an empty one"; slab);
+                            // TODO CoW empty slab
+                            SlabTerrain::empty(slab)
+                        }
+                        Err(err) => return Err(err),
                     };
 
                     // slab terrain is now fixed, copy the top and bottom slices into chunk so
@@ -151,6 +165,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                     // wait for above+below slabs to be loaded if they're in progress, then
                     // concurrently process raw terrain in context of own chunk
                     let (above, below) = chunk.wait_for_neighbouring_slabs(slab.slab);
+                    // TODO detect when slab is all air and avoid expensive processing
                     let (terrain, navigation) = terrain.into_real_slab(
                         above.as_ref().map(|s| s.into()), // gross
                         below.as_ref().map(|s| s.into()),
@@ -277,7 +292,21 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         &mut self,
         timeout: Duration,
     ) -> Option<Result<SlabLocation, TerrainSourceError>> {
-        self.pool.block_on_next_finalize(timeout)
+        let end_time = Instant::now() + timeout;
+        loop {
+            let this_timeout = {
+                let now = Instant::now();
+                if now >= end_time {
+                    break None; // finished
+                }
+                let left = end_time - now;
+                left.min(Duration::from_secs(1))
+            };
+
+            if let ret @ Some(_) = self.pool.block_on_next_finalize(this_timeout) {
+                break ret;
+            }
+        }
     }
 
     pub fn block_for_last_batch(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
@@ -292,7 +321,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                         Some(t) => t,
                     };
 
-                    trace!("waiting for chunk {index}/{total}", index = i + 1, total = count; "timeout" => ?timeout);
+                    trace!("waiting for slab {index}/{total}", index = i + 1, total = count; "timeout" => ?timeout);
                     match self.block_on_next_finalization(timeout) {
                         None => return Err(BlockForAllError::TimedOut),
                         Some(Err(e)) => return Err(BlockForAllError::Error(e)),

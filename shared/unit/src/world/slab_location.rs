@@ -9,6 +9,15 @@ pub struct SlabLocation {
     pub slab: SlabIndex,
 }
 
+impl SlabLocation {
+    pub fn new<S: Into<SlabIndex>, C: Into<ChunkLocation>>(slab: S, chunk: C) -> Self {
+        SlabLocation {
+            chunk: chunk.into(),
+            slab: slab.into(),
+        }
+    }
+}
+
 impl Display for SlabLocation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[slab {} in chunk {:?}]", self.slab.as_i32(), self.chunk)

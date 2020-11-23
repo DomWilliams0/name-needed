@@ -1,4 +1,4 @@
-# TODOs (258)
+# TODOs (260)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -257,10 +257,12 @@
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
    * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (9)
    * `// TODO use rwlock so preprocessing can start concurrently`
    * `// TODO slabs not chunks`
    * `// TODO more efficient version that takes chunk+multiple slabs`
+   * `// TODO CoW empty slab`
+   * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO reuse vec alloc`
    * `// TODO filter out unloaded slabs too`
    * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`

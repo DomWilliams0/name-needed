@@ -28,7 +28,7 @@ pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent}
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
-pub use unit::world::{WorldPosition, WorldPositionRange};
+pub use unit::world::{SlabLocation, WorldPosition, WorldPositionRange};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
