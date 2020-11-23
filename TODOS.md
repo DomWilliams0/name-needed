@@ -1,4 +1,4 @@
-# TODOs (257)
+# TODOs (258)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -257,8 +257,10 @@
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
    * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
+   * `// TODO use rwlock so preprocessing can start concurrently`
    * `// TODO slabs not chunks`
+   * `// TODO more efficient version that takes chunk+multiple slabs`
    * `// TODO reuse vec alloc`
    * `// TODO filter out unloaded slabs too`
    * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
@@ -316,9 +318,8 @@
    * `// TODO build area graph in loader`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (2)
+ * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (1)
    * `// TODO use panic.message() when it stabilises`
-   * `// TODO use mutex that cant be poisoned`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`

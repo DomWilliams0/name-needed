@@ -13,6 +13,7 @@ use resources::resource::Resources;
 use resources::ResourceContainer;
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -233,6 +234,14 @@ fn main() {
 
     // unhook custom panic handler before dropping and flushing the logger
     let _ = std::panic::take_hook();
+    if exit != 0 {
+        const SECONDS: u64 = 2;
+        info!(
+            "waiting {seconds} seconds to allow other threads to finish logging",
+            seconds = SECONDS
+        );
+        std::thread::sleep(Duration::from_secs(SECONDS));
+    }
     drop(logger_guard);
 
     std::process::exit(exit);
