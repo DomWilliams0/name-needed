@@ -5,7 +5,7 @@ use common::*;
 use crate::presets::world_from_source;
 use crate::scenarios::Scenario;
 use crate::GamePreset;
-use simulation::{Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader};
+use simulation::{AsyncWorkerPool, Renderer, Simulation, ThreadedWorldLoader};
 
 pub struct DevGamePreset<R: Renderer> {
     _phantom: PhantomData<R>,
@@ -29,7 +29,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
             "using {threads} threads for world loader",
             threads = thread_count
         );
-        let pool = ThreadedWorkerPool::new(thread_count);
+        let pool = AsyncWorkerPool::new(thread_count)?;
 
         let which_source = config::get().world.source.clone();
         world_from_source(which_source, pool).map_err(Into::into)

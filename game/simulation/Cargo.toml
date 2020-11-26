@@ -22,7 +22,6 @@ ecs-derive = { path = "ecs-derive" }
 
 specs = {version = "^0.16", default-features = false} # no parallel
 specs-derive = "^0.4"
-crossbeam = "^0.7"
 ux = "^0.1"
 arraydeque = "^0.4"
 ahash = "^0.4"

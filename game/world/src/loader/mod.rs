@@ -1,8 +1,7 @@
 use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
-use crossbeam::channel::{Receiver, Sender};
-use crossbeam::crossbeam_channel::{bounded, unbounded};
+use futures::channel::mpsc as async_channel;
 
 pub use batch::UpdateBatch;
 use common::*;
@@ -10,15 +9,16 @@ pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::{ChunkLocation, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
-pub use worker_pool::{BlockingWorkerPool, ThreadedWorkerPool, WorkerPool};
+pub use worker_pool::{AsyncWorkerPool, WorkerPool};
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabTerrain};
-use crate::chunk::{ChunkTerrain, RawChunkTerrain, SlabLoadingStatus, WhichChunk};
+use crate::chunk::{ChunkTerrain, RawChunkTerrain};
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldRef};
+
 use std::sync::Arc;
 
 mod batch;
@@ -31,8 +31,8 @@ pub struct WorldLoader<P: WorkerPool<D>, D> {
     // TODO use rwlock so preprocessing can start concurrently
     source: Arc<Mutex<dyn TerrainSource>>,
     pool: P,
-    finalization_channel: Sender<LoadTerrainResult>,
-    chunk_updates_rx: Option<Receiver<OcclusionChunkUpdate>>,
+    finalization_channel: async_channel::Sender<LoadTerrainResult>,
+    chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
     world: WorldRef<D>,
     last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
@@ -66,8 +66,8 @@ pub enum ChunkRequest {
 
 impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
-        let (finalize_tx, finalize_rx) = bounded(16);
-        let (chunk_updates_tx, chunk_updates_rx) = unbounded();
+        let (finalize_tx, finalize_rx) = async_channel::channel(16);
+        let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
 
         let world = WorldRef::default();
         pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
@@ -76,7 +76,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
             source: Arc::new(Mutex::new(source)),
             pool,
             finalization_channel: finalize_tx,
-            chunk_updates_rx: Some(chunk_updates_rx),
+            chunk_updates_rx,
             world,
             last_batch_size: 0,
             batch_ids: UpdateBatchUniqueId::default(),
@@ -334,14 +334,10 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         }
     }
 
-    /// Takes `Receiver` out of loader
-    pub fn chunk_updates_rx(&mut self) -> Option<Receiver<OcclusionChunkUpdate>> {
-        self.chunk_updates_rx.take()
-    }
-
-    /// Borrows a clone of `Receiver`, leaving it in the loader
-    pub fn chunk_updates_rx_clone(&mut self) -> Option<Receiver<OcclusionChunkUpdate>> {
-        self.chunk_updates_rx.clone()
+    pub fn iter_occlusion_updates(&mut self, mut f: impl FnMut(OcclusionChunkUpdate)) {
+        while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
+            f(update)
+        }
     }
 }
 
@@ -361,8 +357,7 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
     use crate::loader::terrain_source::MemoryTerrainSource;
-    use crate::loader::worker_pool::BlockingWorkerPool;
-    use crate::loader::WorldLoader;
+    use crate::loader::{AsyncWorkerPool, WorldLoader};
 
     #[test]
     fn thread_flow() {
@@ -377,7 +372,8 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
-        let mut loader = WorldLoader::<_, ()>::new(source, BlockingWorkerPool::default());
+        let mut loader =
+            WorldLoader::<_, ()>::new(source, AsyncWorkerPool::new_blocking().unwrap());
         // loader.request_chunks(once(ChunkLocation(0, 0)));
         todo!();
 

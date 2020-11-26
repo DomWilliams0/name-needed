@@ -1,14 +1,12 @@
 use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crossbeam::crossbeam_channel::Receiver;
-
 use common::*;
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
-use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
-use world::{OcclusionChunkUpdate, WorldChangeEvent};
+use world::loader::{AsyncWorkerPool, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate};
+use world::WorldChangeEvent;
 
 use crate::activity::{ActivityEventSystem, ActivitySystem};
 use crate::ai::{AiAction, AiComponent, AiSystem};
@@ -40,7 +38,7 @@ pub enum AssociatedBlockData {
     Container(Entity),
 }
 
-pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool, AssociatedBlockData>;
+pub type ThreadedWorldLoader = WorldLoader<AsyncWorkerPool, AssociatedBlockData>;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
@@ -55,9 +53,6 @@ pub struct Simulation<R: Renderer> {
     voxel_world: WorldRef,
 
     world_loader: ThreadedWorldLoader,
-
-    /// Occlusion updates received from world loader
-    chunk_updates: Receiver<OcclusionChunkUpdate>,
 
     /// Terrain updates, queued and applied per tick
     terrain_changes: Vec<WorldTerrainUpdate>,
@@ -85,7 +80,6 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
-        let chunk_updates = world_loader.chunk_updates_rx().unwrap();
         let mut debug_renderers = DebugRenderers::new();
         register_debug_renderers(&mut debug_renderers)?;
 
@@ -93,7 +87,6 @@ impl<R: Renderer> Simulation<R> {
             ecs_world,
             voxel_world,
             world_loader,
-            chunk_updates,
             debug_renderers,
             terrain_changes: Vec::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
@@ -199,9 +192,8 @@ impl<R: Renderer> Simulation<R> {
             let mut world = self.voxel_world.borrow_mut();
 
             // occlusion updates
-            while let Ok(update) = self.chunk_updates.try_recv() {
-                world.apply_occlusion_update(update);
-            }
+            self.world_loader
+                .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
             // mark modified chunks as dirty in world viewer
             world

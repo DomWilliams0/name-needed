@@ -240,8 +240,8 @@ fn main() {
         );
         std::thread::sleep(Duration::from_secs(SECONDS));
     }
+    info!("exiting cleanly"; "code" => exit);
     drop(logger_guard);
 
-    info!("exiting cleanly"; "code" => exit);
     std::process::exit(exit);
 }

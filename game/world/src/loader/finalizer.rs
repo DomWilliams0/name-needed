@@ -7,7 +7,7 @@ use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
 use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldRef};
 use common::*;
-use crossbeam::channel::Sender;
+use futures::channel::mpsc as async_channel;
 use std::cell::{Cell, RefCell};
 use std::mem::MaybeUninit;
 use std::ops::DerefMut;
@@ -17,7 +17,7 @@ const SEND_FAILURE_THRESHOLD: usize = 20;
 
 pub struct ChunkFinalizer<D> {
     world: WorldRef<D>,
-    updates: Sender<OcclusionChunkUpdate>,
+    updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     batcher: UpdateBatcher<LoadedSlab>,
     send_failures: usize,
 }
@@ -29,7 +29,10 @@ struct FinalizeBatchItem {
 }
 
 impl<D> ChunkFinalizer<D> {
-    pub fn new(world: WorldRef<D>, updates: Sender<OcclusionChunkUpdate>) -> Self {
+    pub fn new(
+        world: WorldRef<D>,
+        updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
+    ) -> Self {
         Self {
             world,
             updates,

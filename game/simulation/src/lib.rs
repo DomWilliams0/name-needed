@@ -4,8 +4,8 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        BlockForAllError, GeneratedTerrainSource, TerrainUpdatesRes, ThreadedWorkerPool,
-        WorkerPool, WorldLoader, WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, TerrainUpdatesRes, WorkerPool,
+        WorldLoader, WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };

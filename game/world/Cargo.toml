@@ -17,8 +17,9 @@ procgen = { path = "../procgen", default-features = false } # no bin
 petgraph = "^0.5"
 nd_iter = "0.0.4"
 threadpool = "^1.8"
-crossbeam = "^0.7"
 enum-iterator = "^0.6"
+futures = { version = "^0.3", default-features = false, features = ["std"] }
+tokio = { version = "^0.3", default-features = false, features = ["time", "rt", "rt-multi-thread"]}
 
 [dev-dependencies]
 matches = "^0.1"

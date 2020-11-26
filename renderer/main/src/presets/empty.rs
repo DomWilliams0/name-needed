@@ -2,7 +2,7 @@ use crate::scenarios::Scenario;
 use crate::GamePreset;
 use common::BoxedResult;
 use simulation::{
-    presets, Renderer, Simulation, ThreadedWorkerPool, ThreadedWorldLoader, WorldLoader,
+    presets, AsyncWorkerPool, Renderer, Simulation, ThreadedWorldLoader, WorldLoader,
 };
 use std::path::Path;
 
@@ -19,7 +19,7 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
     }
 
     fn world(&self) -> BoxedResult<ThreadedWorldLoader> {
-        let pool = ThreadedWorkerPool::new(1);
+        let pool = AsyncWorkerPool::new(1)?;
         Ok(WorldLoader::new(presets::multi_chunk_wonder(), pool))
     }
 

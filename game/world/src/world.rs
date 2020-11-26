@@ -632,8 +632,7 @@ pub mod helpers {
     use std::time::Duration;
 
     use crate::loader::{
-        BlockingWorkerPool, MemoryTerrainSource, ThreadedWorkerPool, WorkerPool, WorldLoader,
-        WorldTerrainUpdate,
+        AsyncWorkerPool, MemoryTerrainSource, WorkerPool, WorldLoader, WorldTerrainUpdate,
     };
     use crate::{ChunkDescriptor, WorldRef};
     use common::Itertools;
@@ -646,16 +645,7 @@ pub mod helpers {
         chunks: Vec<ChunkDescriptor>,
     ) -> WorldLoader<impl WorkerPool<()>, ()> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world(source, BlockingWorkerPool::default())
-    }
-
-    pub fn loader_from_chunks_threaded(
-        threads: usize,
-        chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<ThreadedWorkerPool, ()> {
-        let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        let pool = ThreadedWorkerPool::new(threads);
-        load_world(source, pool)
+        load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
     pub fn apply_updates(
@@ -667,19 +657,15 @@ pub mod helpers {
         let mut _updates = Vec::new();
         loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
 
-        // blocking pool doesn't use timeout
-        while let Some(result) = loader.block_on_next_finalization(Duration::default()) {
-            if let Err(e) = result {
-                return Err(format!("error applying updates: {}", e));
-            }
-        }
+        loader
+            .block_for_last_batch(Duration::from_secs(20))
+            .unwrap();
 
-        // apply all occlusion updates
-        let occlusion_updates = loader.chunk_updates_rx_clone().unwrap();
-        let mut w = world.borrow_mut();
-        while let Ok(update) = occlusion_updates.try_recv() {
-            w.apply_occlusion_update(update);
-        }
+        // apply occlusion updates
+        let mut world = world.borrow_mut();
+        loader.iter_occlusion_updates(|update| {
+            world.apply_occlusion_update(update);
+        });
 
         Ok(())
     }
@@ -699,11 +685,12 @@ pub mod helpers {
             .block_for_last_batch(Duration::from_secs(20))
             .unwrap();
 
-        // apply all chunk updates
-        let updates = loader.chunk_updates_rx_clone().unwrap();
-        while let Ok(update) = updates.try_recv() {
-            loader.world().borrow_mut().apply_occlusion_update(update);
-        }
+        // apply occlusion updates
+        let world = loader.world();
+        let mut world = world.borrow_mut();
+        loader.iter_occlusion_updates(|update| {
+            world.apply_occlusion_update(update);
+        });
 
         loader
     }
@@ -724,8 +711,8 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::helpers::load_world;
     use crate::loader::{
-        BlockingWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, TerrainSource,
-        WorldLoader, WorldTerrainUpdate,
+        AsyncWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, TerrainSource, WorldLoader,
+        WorldTerrainUpdate,
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
@@ -1079,7 +1066,7 @@ mod tests {
         const UPDATE_SETS: usize = 100;
         const UPDATE_REPS: usize = 10;
 
-        let pool = BlockingWorkerPool::default();
+        let pool = AsyncWorkerPool::new_blocking().unwrap();
         let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
         let (min, max) = *source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
@@ -1206,7 +1193,8 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![ChunkBuilder::new().build((0, 0))].into_iter())
                 .unwrap();
-        let loader: WorldLoader<_, u32> = load_world(source, BlockingWorkerPool::default());
+        let loader: WorldLoader<_, u32> =
+            load_world(source, AsyncWorkerPool::new_blocking().unwrap());
         let worldref = loader.world();
         let mut world = worldref.borrow_mut();
 
