@@ -60,8 +60,13 @@ impl<D> ChunkFinalizer<D> {
             let (batch, mut items) = self.batcher.pop_batch(batch_id);
             debug_assert_eq!(items.len(), batch_size);
 
-            // sort and group slabs by chunk
-            items.sort_unstable_by_key(|item| item.slab.chunk);
+            // sort and group slabs by chunk then slab
+            items.sort_unstable_by(|a, b| {
+                a.slab
+                    .chunk
+                    .cmp(&b.slab.chunk)
+                    .then_with(|| a.slab.slab.cmp(&b.slab.slab))
+            });
 
             log_scope!(o!(batch));
 

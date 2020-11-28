@@ -182,8 +182,8 @@ impl<D> Chunk<D> {
     }
 
     pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &SlabTerrain) {
-        let top = terrain.owned_slice(LocalSliceIndex::top());
-        let bottom = terrain.owned_slice(LocalSliceIndex::bottom());
+        let top = terrain.slice_owned(LocalSliceIndex::top());
+        let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
 
         self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
     }

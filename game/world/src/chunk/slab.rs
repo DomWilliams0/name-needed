@@ -6,9 +6,11 @@ use unit::dim::CHUNK_SIZE;
 use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slice::{Slice, SliceMut, SliceOwned};
+use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
+use crate::neighbour::NeighbourOffset;
+use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
 use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
@@ -159,7 +161,8 @@ impl SlabTerrain {
         // flood fill to discover navigability
         let navigation = self.discover_areas(below);
 
-        // TODO occlusion
+        // occlusion
+        self.init_occlusion(above);
 
         // todo!("real slab above {:?} below {:?}", has_above, has_below,);
 
@@ -189,19 +192,78 @@ impl SlabTerrain {
         SlabInternalNavigability(slab_areas)
     }
 
-    fn init_occlusion(&mut self) {
-        // TODO only needs bottom slice of next slab up, slab below doesnt matter
-        // TODO ascending pairs? can we avoid checking whole chunk?
+    fn init_occlusion(&mut self, slice_above: Option<Slice>) {
+        self.ascending_slice_pairs(slice_above, |mut slice_this, slice_next| {
+            slice_this
+                .iter_mut()
+                .enumerate()
+                .filter(|(i, b)| {
+                    // this block should be solid...
+                    b.opacity().solid() &&
+                        // ... and the one above it should not be
+                        (*slice_next)[*i].opacity().transparent()
+                })
+                .for_each(|(i, b)| {
+                    let this_block = unflatten_index(i);
+
+                    // collect blocked state of each neighbour on the top face
+                    let mut blocked = NeighbourOpacity::default();
+                    for (n, offset) in NeighbourOffset::offsets() {
+                        if let Some(neighbour_block) = this_block.try_add(offset) {
+                            blocked[n as usize] = slice_next[neighbour_block].opacity().into();
+                        }
+                    }
+
+                    *b.occlusion_mut() = BlockOcclusion::from_neighbour_opacities(blocked);
+                });
+        });
+    }
+
+    fn ascending_slice_pairs(
+        &mut self,
+        next_slab_up_bottom_slice: Option<Slice>,
+        mut f: impl FnMut(SliceMut, Slice),
+    ) {
+        for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
+            let this_slice_mut: SliceMut = self.slice_mut(this_slice_idx);
+
+            // transmute lifetime to allow a mut and immut reference
+            // safety: slices don't overlap and this_slice_idx != next_slice_idx
+            let this_slice_mut: SliceMut = unsafe { std::mem::transmute(this_slice_mut) };
+            let next_slice: Slice = self.slice(next_slice_idx);
+
+            f(this_slice_mut, next_slice);
+        }
+
+        // top slice of this slab and bottom of next
+        if let Some(next_slab_bottom_slice) = next_slab_up_bottom_slice {
+            let this_slab_top_slice = self.slice_mut(LocalSliceIndex::top());
+
+            // safety: mutable and immutable slices don't overlap
+            let this_slab_top_slice: SliceMut = unsafe { std::mem::transmute(this_slab_top_slice) };
+
+            f(this_slab_top_slice, next_slab_bottom_slice);
+        }
     }
 
     pub fn from_slab(slab: Slab, loc: SlabLocation) -> Self {
         SlabTerrain(loc, slab.0)
     }
 
-    pub fn owned_slice(&self, index: impl Into<LocalSliceIndex>) -> SliceOwned {
+    pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
         let index = index.into();
         let (from, to) = self.1.slice_range(index.slice());
-        Slice::new(&self.1.array()[from..to]).to_owned()
+        Slice::new(&self.1.array()[from..to])
+    }
+
+    pub fn slice_owned<S: Into<LocalSliceIndex>>(&self, index: S) -> SliceOwned {
+        self.slice(index).to_owned()
+    }
+
+    pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
+        let index = index.into();
+        let (from, to) = self.1.slice_range(index.slice());
+        SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 }
 
