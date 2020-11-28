@@ -660,6 +660,15 @@ pub mod helpers {
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
+    fn timeout() -> Duration {
+        let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(5);
+
+        Duration::from_secs(seconds)
+    }
+
     pub fn apply_updates(
         loader: &mut WorldLoader<impl WorkerPool<()>, ()>,
         updates: &[WorldTerrainUpdate],
@@ -669,9 +678,7 @@ pub mod helpers {
         let mut _updates = Vec::new();
         loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
 
-        loader
-            .block_for_last_batch(Duration::from_secs(20))
-            .unwrap();
+        loader.block_for_last_batch(timeout()).unwrap();
 
         // apply occlusion updates
         let mut world = world.borrow_mut();
@@ -693,9 +700,7 @@ pub mod helpers {
 
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs(slabs_to_load.into_iter());
-        loader
-            .block_for_last_batch(Duration::from_secs(20))
-            .unwrap();
+        loader.block_for_last_batch(timeout()).unwrap();
 
         // apply occlusion updates
         let world = loader.world();
