@@ -222,13 +222,7 @@ impl AreaGraph {
 
     pub(crate) fn remove_node(&mut self, area: &WorldArea) {
         if let Some(node) = self.node_lookup.remove(area) {
-            // invalidate edges first
-            let edges: Vec<_> = self.graph.edges(node).map(|e| e.id()).collect();
-            for edge in edges {
-                self.graph.remove_edge(edge);
-            }
-
-            // invalidate node
+            // invalidate node, which removes all its edges too
             let old = self.graph.remove_node(node);
             debug_assert!(old.is_some(), "node was not in both lookup and graph")
         }
