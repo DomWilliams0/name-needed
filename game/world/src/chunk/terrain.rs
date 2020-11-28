@@ -176,10 +176,14 @@ impl RawChunkTerrain {
             .map(|(ptr, idx)| (ptr, SlabIndex(idx)))
     }
 
+    /// Adds slab, returning old if it exists
     pub fn replace_slab(&mut self, index: SlabIndex, new_slab: Slab) -> Option<Slab> {
-        self.slabs
-            .get_mut(index)
-            .map(|old| std::mem::replace(old, new_slab))
+        if let Some(old) = self.slabs.get_mut(index) {
+            Some(std::mem::replace(old, new_slab))
+        } else {
+            self.slabs.add(new_slab, index);
+            None
+        }
     }
 
     fn add_slab(&mut self, slab: Slab, index: impl Into<SlabIndex>) {
