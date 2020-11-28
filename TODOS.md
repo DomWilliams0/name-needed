@@ -1,4 +1,4 @@
-# TODOs (250)
+# TODOs (251)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -258,8 +258,9 @@
    * `// TODO repeated filter check not needed?`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
- * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
+ * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (3)
    * `// TODO could remove WorkerPool trait now, there's only 1 impl`
+   * `// TODO separate OS thread for finalizer?`
    * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`

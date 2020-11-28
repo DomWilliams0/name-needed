@@ -84,20 +84,15 @@ mod tests {
         // cheap check to tests bounds
         assert!(!just_one.is_in_bounds(ChunkLocation(1, 1).get_slab(0)));
 
-        todo!();
-
         // make sure impl fails too
-        /*        assert!(just_one
-                    .load_chunk(ChunkLocation(0, 0), Box::new(()))
-                    .is_ok());
-                assert_matches!(
-                    just_one
-                        .load_chunk(ChunkLocation(1, 1), Box::new(()))
-                        .err()
-                        .unwrap(),
-                    TerrainSourceError::OutOfBounds
-                );
-        */
+        assert!(just_one
+            .load_slab(SlabLocation::new(0, (0, 0)), Box::new(()))
+            .is_ok());
+
+        assert!(matches!(
+            just_one.load_slab(SlabLocation::new(0, (1, 1)), Box::new(())),
+            Err(TerrainSourceError::OutOfBounds(_))
+        ));
         let sparse = MemoryTerrainSource::from_chunks(
             vec![
                 ((0, 0), RawChunkTerrain::default()),

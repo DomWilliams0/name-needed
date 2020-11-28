@@ -152,6 +152,12 @@ impl DeepClone for ChunkDescriptor {
     }
 }
 
+impl DeepClone for ChunkBuilder {
+    fn deep_clone(&self) -> Self {
+        ChunkBuilder(self.0.as_ref().map(|t| t.deep_clone()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use unit::world::GlobalSliceIndex;

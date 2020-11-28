@@ -643,11 +643,21 @@ impl AreaLookup {
 pub mod helpers {
     use std::time::Duration;
 
+    use crate::chunk::RawChunkTerrain;
     use crate::loader::{
         AsyncWorkerPool, MemoryTerrainSource, WorkerPool, WorldLoader, WorldTerrainUpdate,
     };
-    use crate::{ChunkDescriptor, WorldRef};
+    use crate::{BaseTerrain, Chunk, ChunkBuilder, ChunkDescriptor, WorldRef};
     use common::Itertools;
+    use unit::world::ChunkLocation;
+
+    pub fn load_single_chunk(chunk: ChunkBuilder) -> Chunk<()> {
+        let pos = ChunkLocation(0, 0);
+        let world = world_from_chunks_blocking(vec![chunk.build(pos)]);
+        let mut world = world.borrow_mut();
+        let chunk = world.find_chunk_with_pos_mut(pos).unwrap();
+        std::mem::replace(chunk, Chunk::empty(pos))
+    }
 
     pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
         loader_from_chunks_blocking(chunks).world()
@@ -724,7 +734,8 @@ mod tests {
     use common::{logging, seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
-        BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition, WorldPositionRange,
+        BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
+        WorldPositionRange, SLAB_SIZE,
     };
 
     use crate::block::BlockType;
@@ -739,7 +750,7 @@ mod tests {
     use crate::world::helpers::{
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
-    use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
+    use crate::{all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -1080,25 +1091,24 @@ mod tests {
     #[ignore]
     #[test]
     fn random_terrain_updates_stresser() {
-        const CHUNK_RADIUS: u32 = 8;
+        const CHUNK_RADIUS: i32 = 8;
         const TERRAIN_HEIGHT: f64 = 400.0;
 
         const UPDATE_SETS: usize = 100;
         const UPDATE_REPS: usize = 10;
 
-        let pool = AsyncWorkerPool::new_blocking().unwrap();
-        let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
+        let pool = AsyncWorkerPool::new(4).unwrap();
+        let source =
+            GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
         let (min, max) = *source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
 
-        let all_chunks = {
-            (min.0..=max.0)
-                .cartesian_product(min.1..=max.1)
-                .map(|(x, y)| ChunkLocation(x, y))
-        };
-        let count = all_chunks.clone().count();
-        todo!();
-        // loader.request_chunks_with_length(all_chunks, count);
+        let max_slab = (TERRAIN_HEIGHT as f32 / SLAB_SIZE.as_f32()).ceil() as i32 + 1;
+        let (all_slabs, count) = all_slabs_in_range(
+            SlabLocation::new(-max_slab, min),
+            SlabLocation::new(max_slab, max),
+        );
+        loader.request_slabs_with_count(all_slabs, count);
 
         assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
 

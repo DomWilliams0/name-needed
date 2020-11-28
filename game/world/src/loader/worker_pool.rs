@@ -80,6 +80,7 @@ impl<D: 'static> WorkerPool<D> for AsyncWorkerPool {
         chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     ) {
         let mut success_tx = self.success_tx.clone();
+        // TODO separate OS thread for finalizer?
         self.pool.spawn(async move {
             let mut finalizer = ChunkFinalizer::new(world, chunk_updates_tx);
 

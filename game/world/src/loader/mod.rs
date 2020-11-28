@@ -432,6 +432,7 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldLoader};
+    use unit::world::{ChunkLocation, SlabLocation};
 
     #[test]
     fn thread_flow() {
@@ -448,12 +449,10 @@ mod tests {
 
         let mut loader =
             WorldLoader::<_, ()>::new(source, AsyncWorkerPool::new_blocking().unwrap());
-        // loader.request_chunks(once(ChunkLocation(0, 0)));
-        todo!();
+        loader.request_slabs(vec![SlabLocation::new(1, (0, 0))].into_iter());
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15), &|| false);
-        // assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));
-        todo!();
+        assert_eq!(finalized.unwrap().unwrap(), SlabLocation::new(1, (0, 0)));
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);
     }

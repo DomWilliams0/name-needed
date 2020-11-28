@@ -3,8 +3,8 @@ use std::path::Path;
 
 use resources::resource::Resources;
 use simulation::{
-    presets, GeneratedTerrainSource, Renderer, Simulation, SlabLocation, ThreadedWorldLoader,
-    WorkerPool, WorldLoader,
+    all_slabs_in_range, presets, GeneratedTerrainSource, Renderer, Simulation, SlabLocation,
+    ThreadedWorldLoader, WorkerPool, WorldLoader,
 };
 use std::time::Duration;
 
@@ -21,25 +21,10 @@ pub trait GamePreset<R: Renderer> {
 
         // TODO load initial slab range
         debug!("waiting for world to load before initializing simulation");
-        let (slabs_to_request, slab_count) = {
-            let chunk_range = ((-1, -1), (1, 1));
-            let slab_range = (-1, 1);
-
-            let chunks = ((chunk_range.0).0..=(chunk_range.1).0)
-                .cartesian_product((chunk_range.0).1..=(chunk_range.1).1);
-            let all_slabs = chunks
-                .flat_map(move |chunk| {
-                    let slabs = slab_range.0..=slab_range.1;
-                    slabs.zip(repeat(chunk))
-                })
-                .map(|(slab, chunk)| SlabLocation::new(slab, chunk));
-
-            let slab_count = slab_range.1 - slab_range.0 + 1;
-            let chunk_count = ((chunk_range.1).0 - (chunk_range.0).0 + 1)
-                * ((chunk_range.1).1 - (chunk_range.0).1 + 1);
-
-            (all_slabs, slab_count as usize * chunk_count as usize)
-        };
+        let (slabs_to_request, slab_count) = all_slabs_in_range(
+            SlabLocation::new(-1, (-1, -1)),
+            SlabLocation::new(1, (1, 1)),
+        );
 
         world.request_slabs_with_count(slabs_to_request, slab_count);
         world.block_for_last_batch_with_bail(Duration::from_secs(30), panic::has_panicked)?;
@@ -59,7 +44,6 @@ pub use ci::ContinuousIntegrationGamePreset;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
 use engine::panic;
-use std::iter::repeat;
 
 fn world_from_source<D: 'static, P: WorkerPool<D>>(
     source: config::WorldSource,

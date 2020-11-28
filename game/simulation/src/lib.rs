@@ -2,6 +2,7 @@
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
+    all_slabs_in_range,
     block::{BlockType, IntoEnumIterator},
     loader::{
         AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, TerrainUpdatesRes, WorkerPool,

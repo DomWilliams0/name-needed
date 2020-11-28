@@ -4,8 +4,8 @@
 pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{
-    BaseTerrain, BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone,
-    OcclusionChunkUpdate,
+    all_slabs_in_range, BaseTerrain, BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor,
+    DeepClone, OcclusionChunkUpdate,
 };
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};

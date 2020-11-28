@@ -923,6 +923,7 @@ impl ChunkTerrain {
         }
     }
 
+    #[deprecated]
     fn init_occlusion(&mut self, request: ChunkRequest) {
         self.ascending_slice_pairs_foreach(request, |mut slice_this, slice_next| {
             for (i, b) in slice_this
@@ -1041,7 +1042,7 @@ mod tests {
     use crate::chunk::terrain::{BaseTerrain, ChunkTerrain};
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
-    use crate::world::helpers::{apply_updates, world_from_chunks_blocking};
+    use crate::world::helpers::{apply_updates, load_single_chunk, world_from_chunks_blocking};
     use crate::{World, WorldRef};
 
     use super::*;
@@ -1159,59 +1160,55 @@ mod tests {
         assert_eq!(area_count, 2);
     }
 
+    //noinspection DuplicatedCode
     #[test]
     fn slab_areas_jump() {
         // terrain with accessible jumps should still be 1 area
 
-        let mut terrain = RawChunkTerrain::default();
-        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll); // solid walkable
+        let mut terrain = ChunkBuilder::default().set_block((2, 2, 2), BlockType::Stone); // solid walkable
 
         // full jump staircase next to it
-        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((4, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((5, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        terrain = terrain
+            .set_block((3, 2, 3), BlockType::Stone)
+            .set_block((4, 2, 4), BlockType::Stone)
+            .set_block((5, 2, 4), BlockType::Stone);
 
         // 1 area still
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
-        assert_eq!(terrain.areas.len(), 1);
+        let chunk = load_single_chunk(terrain);
+        assert_eq!(chunk.areas().count(), 1);
 
         // too big jump out of reach is still unreachable
-        let mut terrain = RawChunkTerrain::default();
-        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((4, 2, 7), BlockType::Stone, SlabCreationPolicy::CreateAll);
+        let terrain = ChunkBuilder::default()
+            .set_block((2, 2, 2), BlockType::Stone)
+            .set_block((3, 2, 3), BlockType::Stone)
+            .set_block((4, 2, 7), BlockType::Stone);
 
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
-        assert_eq!(terrain.areas.len(), 2);
+        let chunk = load_single_chunk(terrain);
+        assert_eq!(chunk.areas().count(), 2);
 
         // if above is blocked, can't jump
-        let mut terrain = RawChunkTerrain::default();
-        terrain.set_block((2, 2, 2), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((3, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll);
-        terrain.set_block((2, 2, 4), BlockType::Stone, SlabCreationPolicy::CreateAll); // blocks jump!
+        let terrain = ChunkBuilder::default()
+            .set_block((2, 2, 2), BlockType::Stone)
+            .set_block((3, 2, 3), BlockType::Stone)
+            .set_block((2, 2, 4), BlockType::Stone); // blocks jump!
 
         // so 2 areas expected
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
-        assert_eq!(terrain.areas.len(), 2);
+        let chunk = load_single_chunk(terrain);
+        assert_eq!(chunk.areas().count(), 2);
     }
 
     #[test]
     fn cross_slab_walkability() {
         // a slab whose top layer is solid should mean the slab above's z=0 is walkable
 
-        let mut terrain = RawChunkTerrain::default();
-        terrain.add_empty_slab(1); // add upper slab
+        let terrain = ChunkBuilder::default()
+            .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Air) // add upper slab
+            .fill_slice(SLAB_SIZE.as_i32() - 1, BlockType::Stone); // fill top layer of first slab
 
-        // fill top layer of first slab
-        terrain
-            .slice_mut(SLAB_SIZE.as_i32() - 1)
-            .unwrap()
-            .fill(BlockType::Stone);
-
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
+        let terrain = load_single_chunk(terrain);
 
         // TODO 1 area at z=0
-        assert_eq!(terrain.areas.len(), 1);
+        assert_eq!(terrain.areas().count(), 1);
     }
 
     #[test]
@@ -1276,60 +1273,57 @@ mod tests {
         let terrain = ChunkBuilder::new()
             .set_block((2, 2, 2), BlockType::Stone)
             // technically a vertical neighbour but the jump is too high
-            .set_block((3, 2, 4), BlockType::Stone)
-            .into_inner();
+            .set_block((3, 2, 4), BlockType::Stone);
 
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
-        assert_eq!(terrain.areas.len(), 2); // 2 disconnected areas
+        let chunk = load_single_chunk(terrain);
+        assert_eq!(chunk.areas().count(), 2); // 2 disconnected areas
     }
 
+    //noinspection DuplicatedCode
     #[test]
     fn discovery_block_graph() {
         let terrain = ChunkBuilder::new()
             .fill_slice(51, BlockType::Stone)
-            .set_block((2, 2, 52), BlockType::Grass)
-            .into_inner();
+            .set_block((2, 2, 52), BlockType::Grass);
 
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
+        let chunk = load_single_chunk(terrain);
 
-        /*        let graph = terrain
-                    .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
-                    .unwrap();
+        let graph = chunk
+            .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
+            .unwrap();
 
-                // 4 flat connections
-                assert_eq!(
-                    graph.edges((5, 5, 52).into()),
-                    vec![
-                        ((4, 5, 52).into(), EdgeCost::Walk),
-                        ((5, 4, 52).into(), EdgeCost::Walk),
-                        ((5, 6, 52).into(), EdgeCost::Walk),
-                        ((6, 5, 52).into(), EdgeCost::Walk),
-                    ]
-                );
+        // 4 flat connections
+        assert_eq!(
+            graph.edges((5, 5, 52).into()),
+            vec![
+                ((4, 5, 52).into(), EdgeCost::Walk),
+                ((5, 4, 52).into(), EdgeCost::Walk),
+                ((5, 6, 52).into(), EdgeCost::Walk),
+                ((6, 5, 52).into(), EdgeCost::Walk),
+            ]
+        );
 
-                // step up on 1 side
-                assert_eq!(
-                    graph.edges((2, 3, 52).into()),
-                    vec![
-                        ((1, 3, 52).into(), EdgeCost::Walk),
-                        ((2, 2, 53).into(), EdgeCost::JumpUp),
-                        ((2, 4, 52).into(), EdgeCost::Walk),
-                        ((3, 3, 52).into(), EdgeCost::Walk),
-                    ]
-                );
+        // step up on 1 side
+        assert_eq!(
+            graph.edges((2, 3, 52).into()),
+            vec![
+                ((1, 3, 52).into(), EdgeCost::Walk),
+                ((2, 2, 53).into(), EdgeCost::JumpUp),
+                ((2, 4, 52).into(), EdgeCost::Walk),
+                ((3, 3, 52).into(), EdgeCost::Walk),
+            ]
+        );
 
-                // step down on all sides
-                assert_eq!(
-                    graph.edges((2, 2, 53).into()),
-                    vec![
-                        ((1, 2, 52).into(), EdgeCost::JumpDown),
-                        ((2, 1, 52).into(), EdgeCost::JumpDown),
-                        ((2, 3, 52).into(), EdgeCost::JumpDown),
-                        ((3, 2, 52).into(), EdgeCost::JumpDown),
-                    ]
-                );
-        */
-        todo!()
+        // step down on all sides
+        assert_eq!(
+            graph.edges((2, 2, 53).into()),
+            vec![
+                ((1, 2, 52).into(), EdgeCost::JumpDown),
+                ((2, 1, 52).into(), EdgeCost::JumpDown),
+                ((2, 3, 52).into(), EdgeCost::JumpDown),
+                ((3, 2, 52).into(), EdgeCost::JumpDown),
+            ]
+        );
     }
 
     #[test]
@@ -1369,13 +1363,14 @@ mod tests {
     #[test]
     fn occlusion_in_slab() {
         // no occlusion because the block directly above 2,2,2 is solid
-        let mut terrain = RawChunkTerrain::default();
-        assert!(terrain.set_block((2, 2, 2), BlockType::Dirt, SlabCreationPolicy::CreateAll));
-        assert!(terrain.set_block((2, 2, 3), BlockType::Stone, SlabCreationPolicy::CreateAll));
-        assert!(terrain.set_block((2, 3, 3), BlockType::Dirt, SlabCreationPolicy::CreateAll));
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
+        let mut terrain = ChunkBuilder::default()
+            .set_block((2, 2, 2), BlockType::Dirt)
+            .set_block((2, 2, 3), BlockType::Stone)
+            .set_block((2, 3, 3), BlockType::Dirt);
 
-        let (occlusion, _) = terrain
+        let chunk = load_single_chunk(terrain.deep_clone());
+
+        let (occlusion, _) = chunk
             .get_block((2, 2, 2))
             .unwrap()
             .occlusion()
@@ -1392,11 +1387,10 @@ mod tests {
         );
 
         // occlusion will be populated if block directly above it is air
-        let mut terrain: RawChunkTerrain = terrain.into();
-        assert!(terrain.set_block((2, 2, 3), BlockType::Air, SlabCreationPolicy::CreateAll));
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
+        terrain = terrain.set_block((2, 2, 3), BlockType::Air);
+        let chunk = load_single_chunk(terrain);
 
-        let (occlusion, _) = terrain
+        let (occlusion, _) = chunk
             .get_block((2, 2, 2))
             .unwrap()
             .occlusion()
@@ -1415,19 +1409,14 @@ mod tests {
 
     #[test]
     fn occlusion_across_slab() {
-        let mut terrain = RawChunkTerrain::default();
-        assert!(terrain.set_block(
-            (2, 2, SLAB_SIZE.as_i32() - 1),
-            BlockType::Dirt,
-            SlabCreationPolicy::CreateAll,
-        ));
-        assert!(terrain.set_block(
-            (2, 3, SLAB_SIZE.as_i32()),
-            BlockType::Dirt,
-            SlabCreationPolicy::CreateAll,
-        )); // next slab up
+        let terrain = ChunkBuilder::default()
+            .set_block((2, 2, SLAB_SIZE.as_i32() - 1), BlockType::Dirt)
+            .set_block(
+                (2, 3, SLAB_SIZE.as_i32()), // next slab up
+                BlockType::Dirt,
+            );
 
-        let terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
+        let terrain = load_single_chunk(terrain);
 
         let (occlusion, _) = terrain
             .get_block((2, 2, SLAB_SIZE.as_i32() - 1))
@@ -1591,59 +1580,6 @@ mod tests {
                 VertexOcclusion::Mostly,
             ]
         );
-    }
-
-    #[test]
-    fn ascending_slice_pairs() {
-        let mut terrain = RawChunkTerrain::default();
-
-        // this pattern should repeat across slices across slabs
-        const PATTERN: [BlockType; 4] = [
-            BlockType::Air,
-            BlockType::Dirt,
-            BlockType::Stone,
-            BlockType::Grass,
-        ];
-
-        // crosses 3 slabs
-        for (bt, z) in PATTERN
-            .iter()
-            .cycle()
-            .zip(-SLAB_SIZE.as_i32()..(SLAB_SIZE.as_i32() * 2) - 1)
-        {
-            terrain.set_block((0, 0, z), *bt, SlabCreationPolicy::CreateAll);
-        }
-
-        let mut count = 0;
-        let mut expected = PATTERN.iter().cycle().copied().peekable();
-
-        let mut terrain = ChunkTerrain::from_new_raw_terrain(terrain, (0, 0).into());
-        assert_eq!(terrain.raw_terrain().slab_count(), 3 + 1); // 3 + 1 empty at the top
-
-        const EXPECTED_COUNT: i32 = (SLAB_SIZE.as_i32() * 4) - 1;
-        const PATTERN_SLICE_LIMIT: i32 = (SLAB_SIZE.as_i32() * 3) - 1;
-
-        terrain.ascending_slice_pairs_foreach(ChunkRequest::New, |a, b| {
-            count += 1;
-
-            let expected_next = if count > PATTERN_SLICE_LIMIT {
-                BlockType::Air // empty slab at the top is all air
-            } else {
-                expected.next().unwrap()
-            };
-
-            assert_eq!(dbg!(a[(0, 0)].block_type()), expected_next);
-
-            let expected_next = if count >= PATTERN_SLICE_LIMIT {
-                BlockType::Air // top of highest slab with nothing above it
-            } else {
-                *expected.peek().unwrap()
-            };
-
-            assert_eq!(dbg!(b[(0, 0)].block_type()), expected_next);
-        });
-
-        assert_eq!(count, EXPECTED_COUNT);
     }
 
     #[test]
