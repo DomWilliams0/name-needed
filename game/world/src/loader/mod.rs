@@ -117,6 +117,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         // first iterate slabs to register them all with their chunk, so they know if their
         // neighbours have been requested/are being loaded too
         for (chunk, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
+            log_scope!(o!(chunk));
+
             let chunk = world_mut.ensure_chunk(chunk);
 
             // track the highest slab
@@ -156,6 +158,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         };
 
         for (slab, request) in all_slabs {
+            log_scope!(o!(slab));
+
             let chunk = world_mut.ensure_chunk(slab.chunk);
             chunk.mark_slab_requested(slab.slab);
 

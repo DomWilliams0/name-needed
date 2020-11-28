@@ -212,9 +212,11 @@ impl RawChunkTerrain {
         self.slabs.get(index).map(|s| s.deep_clone())
     }
 
-    /// Creates slabs up to and including target
-    fn create_slabs_until(&mut self, target: SlabIndex) {
-        self.slabs.fill_until(target, |_| Slab::empty())
+    /// Fills in gaps in slabs up to the inclusive target with empty slab. Nop if zero
+    pub(crate) fn create_slabs_until(&mut self, target: SlabIndex) {
+        if target != SlabIndex(0) {
+            self.slabs.fill_until(target, |_| Slab::empty())
+        }
     }
 
     pub fn slab_count(&self) -> usize {
@@ -248,6 +250,20 @@ impl RawChunkTerrain {
                 .rev()
                 .map(move |(z, slice)| (z.to_global(idx), slice))
         })
+    }
+
+    pub fn slab_boundary_slices(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice, Slice)> {
+        self.slabs
+            .indices_increasing()
+            .zip(self.slabs.iter_increasing())
+            .tuple_windows()
+            .map(|((lower_idx, lower), (upper_idx, upper))| {
+                let lower_idx = LocalSliceIndex::top().to_global(SlabIndex(lower_idx));
+                let lower_hi = lower.slice(LocalSliceIndex::top());
+                let upper_lo = upper.slice(LocalSliceIndex::bottom());
+
+                (lower_idx, lower_hi, upper_lo)
+            })
     }
 
     /// If slab doesn't exist, does nothing and returns false

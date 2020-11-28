@@ -424,11 +424,15 @@ impl<D> World<D> {
     pub(crate) fn populate_chunk_with_slabs(
         &mut self,
         chunk_loc: ChunkLocation,
+        (min_slab, max_slab): (SlabIndex, SlabIndex),
         slabs: impl Iterator<Item = LoadedSlab>,
     ) {
         let chunk = self
             .find_chunk_with_pos_mut(chunk_loc)
             .expect("no such chunk");
+
+        chunk.raw_terrain_mut().create_slabs_until(min_slab);
+        chunk.raw_terrain_mut().create_slabs_until(max_slab);
 
         for slab in slabs {
             debug_assert_eq!(slab.slab.chunk, chunk_loc);

@@ -10,10 +10,12 @@ use common::*;
 use futures::channel::mpsc as async_channel;
 use std::cell::{Cell, RefCell};
 
+use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
+use crate::occlusion::NeighbourOpacity;
 use std::mem::MaybeUninit;
 use std::ops::DerefMut;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
 
@@ -66,8 +68,20 @@ impl<D> ChunkFinalizer<D> {
                 a.slab
                     .chunk
                     .cmp(&b.slab.chunk)
+                    .then_with(|| a.slab.slab.is_negative().cmp(&b.slab.slab.is_negative()))
                     .then_with(|| a.slab.slab.cmp(&b.slab.slab))
             });
+
+            // find min and max slabs in the whole set. this assumes the batch is a cuboid!
+            let (min, max) = if let Some((min, max)) = items
+                .iter()
+                .minmax_by_key(|slab| slab.slab.slab)
+                .into_option()
+            {
+                (min.slab.slab, max.slab.slab)
+            } else {
+                (SlabIndex(0), SlabIndex(0))
+            };
 
             log_scope!(o!(batch));
 
@@ -82,7 +96,7 @@ impl<D> ChunkFinalizer<D> {
                 log_scope!(o!(chunk));
                 debug!("populating chunk with slabs");
                 let mut world = self.world.borrow_mut();
-                world.populate_chunk_with_slabs(chunk, slabs);
+                world.populate_chunk_with_slabs(chunk, (min, max), slabs);
                 chunks.push(chunk);
             }
 
@@ -173,6 +187,7 @@ impl<D> ChunkFinalizer<D> {
     }
     fn finalize_occlusion(&mut self, chunk: ChunkLocation) {
         // TODO limit checks to range around the actual changes
+        // propagate across chunk boundaries
         for (direction, offset) in NeighbourOffset::offsets() {
             let world = self.world.borrow();
 
@@ -208,43 +223,69 @@ impl<D> ChunkFinalizer<D> {
             );
 
             // queue occlusion updates for next tick
-            macro_rules! queue_updates {
-                ($updates:expr, $chunk:expr) => {
-                let updates = $updates;
-                let chunk = $chunk;
-
-                if !updates.is_empty() {
-                    debug!(
-                        "queueing {count} occlusion updates to apply to {chunk:?} next tick",
-                        count = updates.len(),
-                        chunk = chunk,
-                    );
-                    let send_result = self.updates.unbounded_send(OcclusionChunkUpdate(
-                        chunk,
-                        updates,
-                    ));
-
-                    if let Err(err) = send_result {
-                        self.send_failures += 1;
-                        warn!(
-                        "failed to send chunk update, this is error {errors}/{threshold}",
-                        errors = self.send_failures,
-                        threshold = SEND_FAILURE_THRESHOLD;
-                        "error" => %err,
-                    );
-
-                        if self.send_failures >= SEND_FAILURE_THRESHOLD {
-                            crit!("error threshold reached, panicking");
-                            panic!("chunk finalization error threshold passed: {}", err)
-                        }
-                    }
-                }
-
-                };
+            // TODO prevent mesh being rendered if there are queued occlusion changes?
+            drop(world);
+            if !this_terrain_updates.is_empty() {
+                self.send_update(OcclusionChunkUpdate(chunk, this_terrain_updates));
             }
+            if !other_terrain_updates.is_empty() {
+                self.send_update(OcclusionChunkUpdate(neighbour, other_terrain_updates));
+            }
+        }
 
-            queue_updates!(this_terrain_updates, chunk);
-            queue_updates!(other_terrain_updates, neighbour);
+        // propagate across slab boundaries within chunk
+        {
+            let world = self.world.borrow();
+            let this_terrain = world.find_chunk_with_pos(chunk).unwrap(); // should be present
+
+            let chunk_updates = this_terrain
+                .raw_terrain()
+                .slab_boundary_slices()
+                .flat_map(|(lower_slice_idx, lower, upper)| {
+                    lower.into_iter().enumerate().filter_map(move |(i, b)| {
+                        let this_block = b.opacity();
+                        let block_above = (*upper)[i].opacity();
+
+                        // this block should be solid and the one above it should not be
+                        if this_block.solid() && block_above.transparent() {
+                            let this_block = unflatten_index(i);
+
+                            let block_pos = this_block.to_block_position(lower_slice_idx);
+                            let opacity = NeighbourOpacity::with_slice_above(this_block, upper);
+                            Some((block_pos, opacity))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect_vec();
+
+            drop(world);
+            self.send_update(OcclusionChunkUpdate(chunk, chunk_updates));
+        }
+    }
+
+    fn send_update(&mut self, update: OcclusionChunkUpdate) {
+        debug!(
+            "queueing {count} occlusion updates to apply to {chunk:?} next tick",
+            count = update.1.len(),
+            chunk = update.0,
+        );
+        let send_result = self.updates.unbounded_send(update);
+
+        if let Err(err) = send_result {
+            self.send_failures += 1;
+            warn!(
+                "failed to send chunk update, this is error {errors}/{threshold}",
+                errors = self.send_failures,
+                threshold = SEND_FAILURE_THRESHOLD;
+                "error" => %err,
+            );
+
+            if self.send_failures >= SEND_FAILURE_THRESHOLD {
+                crit!("error threshold reached, panicking");
+                panic!("chunk finalization error threshold passed: {}", err)
+            }
         }
     }
 }

@@ -2,8 +2,10 @@ use common::derive_more::{Deref, DerefMut};
 use common::*;
 
 use crate::block::BlockOpacity;
+use crate::chunk::slice::{unflatten_index, Slice};
 use crate::neighbour::NeighbourOffset;
 use std::ops::Add;
+use unit::world::SliceBlock;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {
@@ -60,6 +62,18 @@ impl NeighbourOpacity {
     #[cfg(test)]
     pub fn all_solid() -> Self {
         Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
+    }
+
+    pub fn with_slice_above(this_block: SliceBlock, slice_above: Slice) -> NeighbourOpacity {
+        // collect blocked state of each neighbour on the top face
+        let mut opacity = NeighbourOpacity::default();
+        for (n, offset) in NeighbourOffset::offsets() {
+            if let Some(neighbour_block) = this_block.try_add(offset) {
+                opacity[n as usize] = slice_above[neighbour_block].opacity().into();
+            }
+        }
+
+        opacity
     }
 }
 

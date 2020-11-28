@@ -10,7 +10,7 @@ use std::fmt::{Debug, Formatter};
 const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
     [Block::air(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Slice<'a> {
     slice: &'a [Block],
 }
@@ -80,6 +80,10 @@ impl<'a> Slice<'a> {
         let slice = self.slice.try_into().expect("slice is the wrong length");
         SliceOwned { slice }
     }
+
+    pub fn into_iter(self) -> impl Iterator<Item = &'a Block> {
+        self.slice.iter()
+    }
 }
 
 impl<'a> Deref for Slice<'a> {
@@ -101,6 +105,12 @@ impl<'a> From<&'a SliceOwned> for Slice<'a> {
         Slice {
             slice: &slice.slice,
         }
+    }
+}
+
+impl<'a> From<SliceMut<'a>> for Slice<'a> {
+    fn from(slice: SliceMut<'a>) -> Self {
+        Slice { slice: slice.slice }
     }
 }
 

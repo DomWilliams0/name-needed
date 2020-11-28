@@ -152,10 +152,6 @@ impl SlabTerrain {
         above: Option<Slice>,
         below: Option<Slice>,
     ) -> (Slab, SlabInternalNavigability) {
-        // for panic only
-        let has_above = above.is_some();
-        let has_below = below.is_some();
-
         log_scope!(o!(self.0));
 
         // flood fill to discover navigability
@@ -194,28 +190,21 @@ impl SlabTerrain {
 
     fn init_occlusion(&mut self, slice_above: Option<Slice>) {
         self.ascending_slice_pairs(slice_above, |mut slice_this, slice_next| {
-            slice_this
-                .iter_mut()
-                .enumerate()
-                .filter(|(i, b)| {
-                    // this block should be solid...
-                    b.opacity().solid() &&
-                        // ... and the one above it should not be
-                        (*slice_next)[*i].opacity().transparent()
-                })
-                .for_each(|(i, b)| {
+            slice_this.iter_mut().enumerate().for_each(|(i, b)| {
+                let this_block = b.opacity();
+                let block_above = (*slice_next)[i].opacity();
+
+                // this block should be solid and the one above it should not be
+                let opacity = if this_block.solid() && block_above.transparent() {
                     let this_block = unflatten_index(i);
 
-                    // collect blocked state of each neighbour on the top face
-                    let mut blocked = NeighbourOpacity::default();
-                    for (n, offset) in NeighbourOffset::offsets() {
-                        if let Some(neighbour_block) = this_block.try_add(offset) {
-                            blocked[n as usize] = slice_next[neighbour_block].opacity().into();
-                        }
-                    }
+                    NeighbourOpacity::with_slice_above(this_block, slice_next)
+                } else {
+                    NeighbourOpacity::default()
+                };
 
-                    *b.occlusion_mut() = BlockOcclusion::from_neighbour_opacities(blocked);
-                });
+                *b.occlusion_mut() = BlockOcclusion::from_neighbour_opacities(opacity);
+            });
         });
     }
 
