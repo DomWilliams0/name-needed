@@ -451,7 +451,7 @@ mod tests {
         // loader.request_chunks(once(ChunkLocation(0, 0)));
         todo!();
 
-        let finalized = loader.block_on_next_finalization(Duration::from_secs(15));
+        let finalized = loader.block_on_next_finalization(Duration::from_secs(15), &|| false);
         // assert_matches!(finalized, Some(Ok(ChunkLocation(0, 0))));
         todo!();
 

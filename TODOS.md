@@ -1,4 +1,4 @@
-# TODOs (257)
+# TODOs (250)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -238,21 +238,14 @@
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`
- * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (14)
-   * `// TODO logging`
-   * `// TODO occlusion`
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (7)
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
    * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
-   * `// TODO sort out the lifetimes instead of cheating and using transmute`
    * `// TODO limit checks to range around the actual changes`
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
-   * `let mut area_edges = Vec::new(); // TODO reuse buf`
-   * `let mut links = Vec::new(); // TODO reuse buf`
-   * `let mut ports = Vec::new(); // TODO reuse buf`
-   * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
  * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (9)
    * `// TODO use rwlock so preprocessing can start concurrently`
    * `// TODO slabs not chunks`
