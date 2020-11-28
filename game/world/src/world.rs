@@ -14,8 +14,8 @@ use crate::block::{Block, BlockDurability, BlockType};
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, RawChunkTerrain};
 use crate::loader::{GenericTerrainUpdate, LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
-    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
-    WorldPathNode,
+    AreaGraph, AreaNavEdge, AreaPath, BlockPath, ChunkArea, NavigationError, SearchGoal, WorldArea,
+    WorldPath, WorldPathNode,
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
@@ -299,14 +299,26 @@ impl<D> World<D> {
         chunk_loc: ChunkLocation,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
     ) {
-        let chunk = self.find_chunk_with_pos(chunk_loc).expect("no such chunk");
+        // add all areas even if they currently have no edges
+        {
+            // safety: area graph is totally separate from chunk lookup
+            let naughty_area_graph: &mut AreaGraph =
+                unsafe { std::mem::transmute(&mut self.area_graph) };
 
-        // update area edges
+            let chunk = self.find_chunk_with_pos(chunk_loc).expect("no such chunk");
+
+            for area in chunk.areas() {
+                debug!("{:?} has area {:?}", chunk_loc, area);
+                naughty_area_graph.add_node(area.into_world_area(chunk_loc));
+            }
+        }
+
+        // update area nodes and edges
         for &(src, dst, edge) in area_nav {
             self.area_graph.add_edge(src, dst, edge);
         }
 
-        // TODO trim stale areas that no longer exist?
+        // TODO trim stale areas and edges that no longer exist?
 
         // TODO mark chunk as dirty
         // self.dirty_chunks.insert(chunk_pos);

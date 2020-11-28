@@ -416,6 +416,7 @@ mod tests {
             .set_block((2, 2, SLAB_SIZE.as_i32()), BlockType::Stone)
             .build((0, 0))]);
 
+        // BUG: area is not created because no neighbouring chunks found
         assert_eq!(graph.node_count(), 1); // just one area in slab idx 1
     }
 

@@ -310,7 +310,7 @@
  * [game/world/src/world.rs](game/world/src/world.rs) (10)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
-   * `// TODO trim stale areas that no longer exist?`
+   * `// TODO trim stale areas and edges that no longer exist?`
    * `// TODO mark chunk as dirty`
    * `// TODO dont clone terrain`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`

@@ -51,8 +51,6 @@ impl<D> ChunkFinalizer<D> {
 
         self.batcher.submit(slab.batch, slab);
 
-        // TODO finalize chunks? or finalize slabs?
-
         // finalize completed batches only, which might not include this update
         for (batch_id, batch_size) in self.batcher.complete_batches() {
             trace!("popping batch"; "id" => batch_id, "size" => batch_size);
@@ -108,12 +106,11 @@ impl<D> ChunkFinalizer<D> {
 
         // let chunk = Chunk::with_completed_terrain(chunk, terrain);
         {
-            // finally take WorldRef write lock and post new chunk
+            // finally take WorldRef write lock and update chunk
             let mut world = self.world.borrow_mut();
             debug!("adding completed chunk to world");
             debug!("{} edges", area_edges.len());
             world.finalize_chunk(chunk, &area_edges);
-            // world.add_loaded_chunk(chunk, &area_edges);
         }
     }
 
