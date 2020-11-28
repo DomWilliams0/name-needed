@@ -67,12 +67,13 @@ impl<T> DoubleSidedVec<T> {
 
         if idx != expected_idx {
             panic!(
-                "no gaps allowed, next {} index must be {}",
+                "no gaps allowed, next {} index must be {} but got {}",
                 if index.is_positive() {
                     "positive"
                 } else {
                     "negative"
                 },
+                expected_idx,
                 index
             )
         }

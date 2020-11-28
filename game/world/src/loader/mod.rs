@@ -7,7 +7,7 @@ pub use batch::UpdateBatch;
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{AsyncWorkerPool, WorkerPool};
 
@@ -19,6 +19,7 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldRef};
 
+use std::iter::repeat;
 use std::sync::Arc;
 
 mod batch;
@@ -88,28 +89,78 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     }
 
     /// Requests slabs as a single batch
-    pub fn request_slabs(&mut self, slabs: impl ExactSizeIterator<Item = SlabLocation>) {
+    pub fn request_slabs(&mut self, slabs: impl ExactSizeIterator<Item = SlabLocation> + Clone) {
         let count = slabs.len();
         self.request_slabs_with_count(slabs, count)
     }
 
     // TODO more efficient version that takes chunk+multiple slabs
+    /// Must be sorted by chunk then by ascending slab
     pub fn request_slabs_with_count(
         &mut self,
-        slabs: impl Iterator<Item = SlabLocation>,
+        slabs: impl Iterator<Item = SlabLocation> + Clone,
         count: usize,
     ) {
-        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
         let mut world_mut = self.world.borrow_mut();
+
+        // check order of slabs is as expected
+        if cfg!(debug_assertions) {
+            let sorted = slabs
+                .clone()
+                .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
+
+            assert_equal(slabs.clone(), sorted);
+        }
+
+        let mut extra_slabs = SmallVec::<[SlabLocation; 16]>::new();
+
+        // first iterate slabs to register them all with their chunk, so they know if their
+        // neighbours have been requested/are being loaded too
+        for (chunk, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
+            let chunk = world_mut.ensure_chunk(chunk);
+
+            // track the highest slab
+            let mut highest = SlabIndex::MIN;
+
+            for slab in slabs {
+                chunk.mark_slab_requested(slab.slab);
+
+                debug_assert!(slab.slab > highest, "slabs should be in ascending order");
+                highest = slab.slab;
+            }
+
+            // should have seen some slabs
+            assert_ne!(highest, SlabIndex::MIN);
+
+            // request the slab above the highest as all-air, so navigation discovery works
+            // properly
+            let empty = highest + 1;
+            extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
+            chunk.mark_slab_requested(empty);
+        }
+
+        let count = count + extra_slabs.len();
+        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
         let mut real_count = 0;
 
-        // hold source lock as a barrier for this batch, until all slabs have been registered
-        // with the chunk so they know if their neighbours are being loaded
-        let _guard = self.source.lock();
+        #[derive(Copy, Clone)]
+        enum SlabRequest {
+            Real,
+            AirOnly,
+        }
 
-        for slab in slabs {
+        let all_slabs = {
+            let real_slabs = slabs.zip(repeat(SlabRequest::Real));
+            let air_slabs = extra_slabs.into_iter().zip(repeat(SlabRequest::AirOnly));
+            real_slabs.chain(air_slabs)
+        };
+
+        for (slab, request) in all_slabs {
             let chunk = world_mut.ensure_chunk(slab.chunk);
             chunk.mark_slab_requested(slab.slab);
+
+            // ensure there is a slab above this one for navigation discovery to work properly
+            // chunk.ensure_slab_above(slab.slab);
 
             let source = self.source.clone();
             let batch = batches.next_batch();
@@ -125,6 +176,11 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                 move || {
                     // wrapped in closure for common error handling case
                     let get_terrain = || -> Result<SlabTerrain, TerrainSourceError> {
+                        if matches!(request, SlabRequest::AirOnly) {
+                            // bit of a hack to force an all air slab
+                            return Err(TerrainSourceError::OutOfBounds(slab));
+                        }
+
                         // briefly hold the source lock to get a preprocess closure to run
                         let preprocess_work = {
                             let terrain_source = source.lock();
@@ -147,9 +203,17 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                     let terrain = match get_terrain() {
                         Ok(terrain) => terrain,
                         Err(TerrainSourceError::OutOfBounds(slab)) => {
-                            // soft error, we're at the world edge. treat as all air instead of
-                            // crashing and burning
-                            debug!("slab is out of bounds, swapping in an empty one"; slab);
+                            match request {
+                                SlabRequest::AirOnly => {
+                                    debug!("adding air only slab to the top of the chunk"; slab)
+                                }
+                                SlabRequest::Real => {
+                                    // soft error, we're at the world edge. treat as all air instead of
+                                    // crashing and burning
+                                    debug!("slab is out of bounds, swapping in an empty one"; slab);
+                                }
+                            }
+
                             // TODO CoW empty slab
                             SlabTerrain::empty(slab)
                         }
@@ -184,9 +248,6 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
 
             real_count += 1;
         }
-
-        // unblock workers
-        drop(_guard);
 
         debug!("slab batch of size {size} submitted", size = count);
 

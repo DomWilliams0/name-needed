@@ -280,7 +280,7 @@ impl<D> World<D> {
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
-    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &Chunk<D> {
+    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<D> {
         let idx = match self.find_chunk_index(chunk) {
             Ok(idx) => idx,
             Err(idx) => {
@@ -291,7 +291,7 @@ impl<D> World<D> {
         };
 
         // safety: index returned above
-        unsafe { self.chunks.get_unchecked(idx) }
+        unsafe { self.chunks.get_unchecked_mut(idx) }
     }
 
     pub(crate) fn finalize_chunk(
@@ -696,7 +696,10 @@ pub mod helpers {
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
-        let slabs_to_load = source.all_slabs().collect_vec();
+        let slabs_to_load = source
+            .all_slabs()
+            .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)))
+            .collect_vec();
 
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs(slabs_to_load.into_iter());

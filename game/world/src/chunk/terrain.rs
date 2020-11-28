@@ -190,6 +190,10 @@ impl RawChunkTerrain {
         self.slabs.add(slab, index.into());
     }
 
+    pub(crate) fn add_empty_slab(&mut self, slab: impl Into<SlabIndex>) {
+        self.slabs.add(Slab::empty(), slab.into());
+    }
+
     pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab> {
         self.slabs.get(index)
     }
@@ -832,7 +836,7 @@ impl Default for RawChunkTerrain {
             slabs: DoubleSidedVec::with_capacity(8),
         };
 
-        terrain.add_slab(Slab::empty(), 0);
+        terrain.add_empty_slab(0);
 
         terrain
     }
@@ -1054,18 +1058,18 @@ mod tests {
     #[should_panic]
     fn no_dupes() {
         let mut terrain = RawChunkTerrain::default();
-        terrain.add_slab(Slab::empty(), 0);
+        terrain.add_empty_slab(0);
     }
 
     #[test]
     fn slabs() {
         let mut terrain = RawChunkTerrain::default();
 
-        terrain.add_slab(Slab::empty(), 1);
-        terrain.add_slab(Slab::empty(), 2);
+        terrain.add_empty_slab(1);
+        terrain.add_empty_slab(2);
 
-        terrain.add_slab(Slab::empty(), -1);
-        terrain.add_slab(Slab::empty(), -2);
+        terrain.add_empty_slab(-1);
+        terrain.add_empty_slab(-2);
 
         let slabs: Vec<i32> = terrain
             .slabs_from_top()
@@ -1106,7 +1110,7 @@ mod tests {
         assert!(terrain.slice(SLAB_SIZE.as_i32()).is_none());
         assert!(terrain.slice(-1).is_none());
 
-        terrain.add_slab(Slab::empty(), -1);
+        terrain.add_empty_slab(-1);
         *terrain.slice_mut(-1).unwrap()[(3, 3)].block_type_mut() = BlockType::Grass;
         assert_eq!(
             terrain.slice(-1).unwrap()[(3, 3)].block_type(),
@@ -1196,7 +1200,7 @@ mod tests {
         // a slab whose top layer is solid should mean the slab above's z=0 is walkable
 
         let mut terrain = RawChunkTerrain::default();
-        terrain.add_slab(Slab::empty(), 1); // add upper slab
+        terrain.add_empty_slab(1); // add upper slab
 
         // fill top layer of first slab
         terrain
@@ -1455,7 +1459,7 @@ mod tests {
 
     #[test]
     fn occlusion_across_chunk_sides() {
-        logging::for_tests();
+        // logging::for_tests();
 
         let a = ChunkBuilder::new()
             .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Grass) // slab 1
