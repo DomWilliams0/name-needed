@@ -1,4 +1,4 @@
-# TODOs (260)
+# TODOs (257)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -217,14 +217,11 @@
    * `// TODO mark complete after finalization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (7)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (4)
    * `// TODO these methods are copied from Slab`
-   * `// TODO occlusion`
    * `// TODO skip if not exclusive?`
    * `// TODO exclusive helper on this struct too`
    * `// TODO discover internal area links`
-   * `// TODO only needs bottom slice of next slab up, slab below doesnt matter`
-   * `// TODO ascending pairs? can we avoid checking whole chunk?`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO can this just hold opacity to reduce size?`
    * `// TODO make not pub`

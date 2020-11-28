@@ -352,9 +352,14 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     pub fn block_on_next_finalization(
         &mut self,
         timeout: Duration,
+        bail: &impl Fn() -> bool,
     ) -> Option<Result<SlabLocation, TerrainSourceError>> {
         let end_time = Instant::now() + timeout;
         loop {
+            if bail() {
+                break Some(Err(TerrainSourceError::Bailed));
+            }
+
             let this_timeout = {
                 let now = Instant::now();
                 if now >= end_time {
@@ -371,6 +376,14 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     }
 
     pub fn block_for_last_batch(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
+        self.block_for_last_batch_with_bail(timeout, || false)
+    }
+
+    pub fn block_for_last_batch_with_bail(
+        &mut self,
+        timeout: Duration,
+        bail: impl Fn() -> bool,
+    ) -> Result<(), BlockForAllError> {
         match self.last_batch_size {
             0 => Err(BlockForAllError::NoBatch),
             count => {
@@ -383,7 +396,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                     };
 
                     trace!("waiting for slab {index}/{total}", index = i + 1, total = count; "timeout" => ?timeout);
-                    match self.block_on_next_finalization(timeout) {
+                    match self.block_on_next_finalization(timeout, &bail) {
                         None => return Err(BlockForAllError::TimedOut),
                         Some(Err(e)) => return Err(BlockForAllError::Error(e)),
                         Some(Ok(_)) => continue,

@@ -15,6 +15,9 @@ pub enum TerrainSourceError {
 
     #[error("Requested slab {0} is out of bounds")]
     OutOfBounds(SlabLocation),
+
+    #[error("Received signal to bail")]
+    Bailed,
 }
 
 pub trait PreprocessedTerrain: Send {

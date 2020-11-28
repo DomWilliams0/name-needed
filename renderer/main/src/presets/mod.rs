@@ -42,7 +42,7 @@ pub trait GamePreset<R: Renderer> {
         };
 
         world.request_slabs_with_count(slabs_to_request, slab_count);
-        world.block_for_last_batch(Duration::from_secs(30))?;
+        world.block_for_last_batch_with_bail(Duration::from_secs(30), panic::has_panicked)?;
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;
@@ -58,6 +58,7 @@ use crate::scenarios::Scenario;
 pub use ci::ContinuousIntegrationGamePreset;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
+use engine::panic;
 use std::iter::repeat;
 
 fn world_from_source<D: 'static, P: WorkerPool<D>>(
