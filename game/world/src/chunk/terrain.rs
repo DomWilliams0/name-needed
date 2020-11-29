@@ -186,10 +186,6 @@ impl RawChunkTerrain {
         }
     }
 
-    fn add_slab(&mut self, slab: Slab, index: impl Into<SlabIndex>) {
-        self.slabs.add(slab, index.into());
-    }
-
     pub(crate) fn add_empty_slab(&mut self, slab: impl Into<SlabIndex>) {
         self.slabs.add(Slab::empty(), slab.into());
     }
@@ -252,7 +248,7 @@ impl RawChunkTerrain {
             .indices_increasing()
             .zip(self.slabs.iter_increasing())
             .tuple_windows()
-            .map(|((lower_idx, lower), (upper_idx, upper))| {
+            .map(|((lower_idx, lower), (_, upper))| {
                 let lower_idx = LocalSliceIndex::top().to_global(SlabIndex(lower_idx));
                 let lower_hi = lower.slice(LocalSliceIndex::top());
                 let upper_lo = upper.slice(LocalSliceIndex::bottom());
@@ -319,7 +315,7 @@ impl RawChunkTerrain {
         f(block);
     }
 
-    pub fn apply_block_damage(
+    pub(crate) fn apply_block_damage(
         &mut self,
         pos: BlockPosition,
         damage: BlockDurability,

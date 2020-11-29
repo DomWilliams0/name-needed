@@ -114,6 +114,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * experiment with PGO
 * consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
 * physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed
+* when submitting slab changes to the worker pool, cancel any other tasks queued for the same slab as they're now outdated
 
 ### Memory usage
 * CoW terrain slabs

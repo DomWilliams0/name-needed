@@ -172,11 +172,6 @@ impl<D> Chunk<D> {
         self.block_data.remove(&pos)
     }
 
-    /// Swap all chunk metadata with the other
-    pub(crate) fn swap_with(&mut self, other: &mut Self) {
-        std::mem::swap(&mut self.block_data, &mut other.block_data)
-    }
-
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
     }

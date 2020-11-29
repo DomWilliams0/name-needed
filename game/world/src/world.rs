@@ -5,22 +5,23 @@ use common::derive_more::Constructor;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabPosition, SliceBlock,
-    SliceIndex, WorldPosition, WorldPositionRange, WorldRange,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceBlock,
+    SliceIndex, WorldPosition, WorldPositionRange,
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
 
-use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, RawChunkTerrain};
-use crate::loader::{GenericTerrainUpdate, LoadedSlab, SlabTerrainUpdate};
+use crate::chunk::slab::{Slab, SlabInternalNavigability};
+use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
+use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
-    AreaGraph, AreaNavEdge, AreaPath, BlockPath, ChunkArea, NavigationError, SearchGoal, WorldArea,
-    WorldPath, WorldPathNode,
+    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
+    WorldPathNode,
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
 
-/// All mutable world changes must go through `apply_terrain_updates`
+/// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<D> {
     chunks: Vec<Chunk<D>>,
     area_graph: AreaGraph,
@@ -58,8 +59,6 @@ pub enum RandomWalkableBlock {
 
 impl<D> World<D> {
     pub fn empty() -> Self {
-        fn nop_callback(_: WorldPosition, _: BlockType, _: BlockType) {}
-
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
@@ -93,8 +92,10 @@ impl<D> World<D> {
         self.chunks.binary_search_by_key(&chunk_pos, |c| c.pos())
     }
 
-    pub fn has_chunk(&self, chunk_pos: ChunkLocation) -> bool {
-        self.find_chunk_index(chunk_pos).is_ok()
+    pub fn has_slab(&self, slab_pos: SlabLocation) -> bool {
+        self.find_chunk_with_pos(slab_pos.chunk)
+            .map(|chunk| chunk.raw_terrain().slab(slab_pos.slab).is_some())
+            .unwrap_or_default()
     }
 
     pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<D>> {
@@ -107,6 +108,56 @@ impl<D> World<D> {
         self.find_chunk_index(chunk_pos)
             .ok()
             .map(move |idx| &mut self.chunks[idx])
+    }
+
+    /// For use during terrain finalization in the loader.
+    /// The given slab terrain is now fixed, it will be processed to discover areas/occlusion.
+    /// Run this on a worker thread!
+    /// Returns None if the chunk was not found
+    pub(crate) fn process_given_slab_terrain(
+        &self,
+        slab: SlabLocation,
+        terrain: &mut Slab,
+    ) -> Option<SlabInternalNavigability> {
+        let chunk = self.find_chunk_with_pos(slab.chunk)?;
+        Some(Self::process_slab_terrain_common(slab.slab, chunk, terrain))
+    }
+
+    /// For use during terrain finalization in the loader.
+    /// The slab terrain is now fixed after being modified in place, it will be processed to
+    /// discover areas/occlusion. Run this on a worker thread!
+    /// Returns None if the slab was not found
+    pub(crate) fn process_inline_slab_terrain(
+        &mut self,
+        slab: SlabLocation,
+    ) -> Option<SlabInternalNavigability> {
+        let chunk = self.find_chunk_with_pos_mut(slab.chunk)?;
+        let terrain = chunk.raw_terrain_mut().slab_mut(slab.slab)?;
+
+        // safety: i solemnly swear that all callees know that `terrain` is from `chunk` and do no
+        // naughtiness. both are local to this function and so the screwed up lifetimes are contained.
+        let terrain: &mut Slab = unsafe { std::mem::transmute(terrain) };
+        Some(Self::process_slab_terrain_common(slab.slab, chunk, terrain))
+    }
+
+    fn process_slab_terrain_common(
+        slab: SlabIndex,
+        chunk: &Chunk<D>,
+        terrain: &mut Slab,
+    ) -> SlabInternalNavigability {
+        // copy the top and bottom slices into chunk so neighbouring slabs can access it
+        chunk.mark_slab_in_progress(slab, terrain);
+
+        // wait for above+below slabs to be loaded if they're in progress, then
+        // process raw terrain in context of own chunk (blocking this current thread)
+        let (above, below) = chunk.wait_for_neighbouring_slabs(slab);
+        // TODO detect when slab is all air and avoid expensive processing
+
+        terrain.process_terrain(
+            slab,
+            above.as_ref().map(|s| s.into()), // gross
+            below.as_ref().map(|s| s.into()),
+        )
     }
 
     pub(crate) fn find_area_path<F: Into<WorldPosition>, T: Into<WorldPosition>>(
@@ -342,82 +393,56 @@ impl<D> World<D> {
         }
     }
 
-    /// Entrypoint for all world changes. Note changes are not immediate, but queued to the loader
-    /// thread pool.
-    /// Panics if chunk is not found - check it exists with `world.has_chunk` first
-    pub fn apply_terrain_updates(
-        &self,
-        chunk_pos: ChunkLocation,
-        updates: impl Iterator<Item = (SlabIndex, SlabTerrainUpdate)>,
+    pub(crate) fn apply_terrain_updates_in_place(
+        &mut self,
+        updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate>)>,
         changes_out: &mut Vec<WorldChangeEvent>,
-    ) -> RawChunkTerrain {
-        let chunk = self
-            .find_chunk_with_pos(chunk_pos)
-            .expect("chunk expected to be loaded");
+        mut per_slab: impl FnMut(SlabLocation),
+    ) {
+        let mut last_chunk_idx = None;
 
-        // shallow clone terrain, no terrain is copied yet
-        // TODO dont clone terrain
-        let mut terrain = chunk.raw_terrain().clone();
-
-        // debug_assert!(
-        //     IsSorted::is_sorted_by_key(&mut updates.clone(), |(slab, _)| *slab),
-        //     "slab updates should be sorted by slab index for maximum efficiency"
-        // );
-
-        for (slab_idx, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
-            log_scope!(o!(chunk_pos, slab_idx));
-
-            // copy slab for modification
-            let slab = match terrain.slab_mut(slab_idx) {
-                None => {
-                    let count = updates.count();
-                    warn!(
-                        "ignoring {count} slab updates because the slab doesn't exist",
-                        count = count
-                    );
-                    continue;
+        for (slab_loc, slab_updates) in updates {
+            // fetch chunk, reusing the last one if it's the same, as it should be in this sorted iterator
+            let chunk: &mut Chunk<D> = match last_chunk_idx.take() {
+                Some((last_loc, idx)) if last_loc == slab_loc.chunk => {
+                    // nice, reuse index of chunk without lookup
+                    // safety: index returned by last loop iteration and no chunks added since
+                    unsafe { self.chunks.get_unchecked_mut(idx) }
                 }
-                Some(s) => {
-                    debug!("apply terrain updates to slab");
-                    s
-                }
-            };
+                _ => {
+                    // new chunk
+                    match self.find_chunk_index(slab_loc.chunk) {
+                        Ok(idx) => {
+                            last_chunk_idx = Some((slab_loc.chunk, idx));
 
-            // apply changes to new slab
-            for (_, update) in updates {
-                let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
-                trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
-
-                // TODO consider resizing/populating changes_out initially with empty events for performance
-                match range {
-                    WorldRange::Single(pos) => {
-                        let prev_block = slab.slice_mut(pos.z()).set_block(pos, block_type);
-                        let world_pos = pos.to_world_position(chunk_pos, slab_idx);
-                        changes_out.push(WorldChangeEvent::new(world_pos, prev_block, block_type));
-                    }
-                    range @ WorldRange::Range(_, _) => {
-                        let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
-                        for z in za..=zb {
-                            let mut slice = slab.slice_mut(z);
-                            // TODO reserve space in changes_out first
-                            for x in xa..=xb {
-                                for y in ya..=yb {
-                                    let prev_block = slice.set_block((x, y), block_type);
-                                    let world_pos = SlabPosition::new(x, y, z.into())
-                                        .to_world_position(chunk_pos, slab_idx);
-                                    changes_out.push(WorldChangeEvent::new(
-                                        world_pos, prev_block, block_type,
-                                    ));
-                                }
-                            }
+                            // safety: index returned by find_chunk_index
+                            unsafe { self.chunks.get_unchecked_mut(idx) }
+                        }
+                        Err(_) => {
+                            let count = slab_updates.count();
+                            debug!("skipping {count} terrain updates for chunk because it's not loaded", count = count; slab_loc.chunk);
+                            continue;
                         }
                     }
                 }
-            }
-        }
+            };
 
-        // to be submitted to world loader
-        terrain
+            let slab = match chunk.raw_terrain_mut().slab_mut(slab_loc.slab) {
+                Some(slab) => slab,
+                None => {
+                    let count = slab_updates.count();
+                    debug!("skipping {count} terrain updates for slab because it's not loaded", count = count; slab_loc);
+                    continue;
+                }
+            };
+
+            let prev_len = changes_out.len();
+            slab.apply_terrain_updates(slab_loc, slab_updates, changes_out);
+            let count = changes_out.len() - prev_len;
+            debug!("applied {count} terrain updates to slab", count = count; slab_loc);
+
+            per_slab(slab_loc);
+        }
     }
 
     /// Panics if chunk doesn't exist
@@ -434,13 +459,15 @@ impl<D> World<D> {
         chunk.raw_terrain_mut().create_slabs_until(min_slab);
         chunk.raw_terrain_mut().create_slabs_until(max_slab);
 
-        for slab in slabs {
+        for mut slab in slabs {
             debug_assert_eq!(slab.slab.chunk, chunk_loc);
 
-            // update slab terrain
-            chunk
-                .raw_terrain_mut()
-                .replace_slab(slab.slab.slab /* lmao */, slab.terrain);
+            // update slab terrain if necessary
+            if let Some(terrain) = slab.terrain.take() {
+                chunk
+                    .raw_terrain_mut()
+                    .replace_slab(slab.slab.slab /* lmao */, terrain);
+            }
 
             // update chunk area navigation
             chunk.update_block_graphs(slab.navigation.into_iter());
@@ -458,6 +485,7 @@ impl<D> World<D> {
             .and_then(|chunk| chunk.get_block(pos))
     }
 
+    /// Mutates terrain silently to the loader, ensure the loader knows about this
     pub fn damage_block(
         &mut self,
         pos: WorldPosition,
@@ -647,11 +675,10 @@ impl AreaLookup {
 pub mod helpers {
     use std::time::Duration;
 
-    use crate::chunk::RawChunkTerrain;
     use crate::loader::{
         AsyncWorkerPool, MemoryTerrainSource, WorkerPool, WorldLoader, WorldTerrainUpdate,
     };
-    use crate::{BaseTerrain, Chunk, ChunkBuilder, ChunkDescriptor, WorldRef};
+    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldRef};
     use common::Itertools;
     use unit::world::ChunkLocation;
 
@@ -746,15 +773,16 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::helpers::load_world;
     use crate::loader::{
-        AsyncWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, TerrainSource, WorldLoader,
-        WorldTerrainUpdate,
+        AsyncWorkerPool, MemoryTerrainSource, TerrainSource, WorldLoader, WorldTerrainUpdate,
     };
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
+    use crate::presets::from_preset;
     use crate::world::helpers::{
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::{all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
+    use config::WorldPreset;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -844,8 +872,6 @@ mod tests {
 
     #[test]
     fn world_path_cross_areas() {
-        logging::for_tests();
-
         // cross chunks
         let world = world_from_chunks_blocking(vec![
             ChunkBuilder::new()
@@ -897,8 +923,6 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        logging::for_tests();
-
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
         let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
@@ -1046,7 +1070,7 @@ mod tests {
         // hold a reference to slab to trigger CoW
         let slab = w.chunks[0]
             .raw_terrain()
-            .slab_ptr(GlobalSliceIndex::new(pos.2).slab_index())
+            .slab(GlobalSliceIndex::new(pos.2).slab_index())
             .unwrap()
             .clone();
 
@@ -1102,8 +1126,10 @@ mod tests {
         const UPDATE_REPS: usize = 10;
 
         let pool = AsyncWorkerPool::new(4).unwrap();
-        let source =
-            GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
+        // TODO make stresser use generated terrain again
+        // let source =
+        //     GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
+        let source = from_preset(WorldPreset::MultiChunkWonder);
         let (min, max) = *source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
 

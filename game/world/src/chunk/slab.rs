@@ -3,14 +3,15 @@ use std::ops::Deref;
 
 use common::*;
 use unit::dim::CHUNK_SIZE;
-use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SLAB_SIZE};
+use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, WorldRange, SLAB_SIZE};
 
 use crate::block::Block;
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
+use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
-use crate::neighbour::NeighbourOffset;
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
+use crate::WorldChangeEvent;
 use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
@@ -225,6 +226,45 @@ impl Slab {
 
     pub fn slice_owned<S: Into<LocalSliceIndex>>(&self, index: S) -> SliceOwned {
         self.slice(index).to_owned()
+    }
+
+    pub(crate) fn apply_terrain_updates(
+        &mut self,
+        this_slab: SlabLocation,
+        updates: impl Iterator<Item = SlabTerrainUpdate>,
+        changes_out: &mut Vec<WorldChangeEvent>,
+    ) {
+        for update in updates {
+            let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
+            trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
+
+            // TODO consider resizing/populating changes_out initially with empty events for performance
+            match range {
+                WorldRange::Single(pos) => {
+                    let prev_block = self.slice_mut(pos.z()).set_block(pos, block_type);
+                    let world_pos = pos.to_world_position(this_slab);
+                    let event = WorldChangeEvent::new(world_pos, prev_block, block_type);
+                    changes_out.push(event);
+                }
+                range @ WorldRange::Range(_, _) => {
+                    let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
+                    for z in za..=zb {
+                        let mut slice = self.slice_mut(z);
+                        // TODO reserve space in changes_out first
+                        for x in xa..=xb {
+                            for y in ya..=yb {
+                                let prev_block = slice.set_block((x, y), block_type);
+                                let world_pos =
+                                    SlabPosition::new(x, y, z.into()).to_world_position(this_slab);
+                                let event =
+                                    WorldChangeEvent::new(world_pos, prev_block, block_type);
+                                changes_out.push(event);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -217,10 +217,12 @@
    * `// TODO mark complete after finalization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (3)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
    * `// TODO skip if not exclusive?`
    * `// TODO exclusive helper on this struct too`
    * `// TODO discover internal area links`
+   * `// TODO consider resizing/populating changes_out initially with empty events for performance`
+   * `// TODO reserve space in changes_out first`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO can this just hold opacity to reduce size?`
    * `// TODO make not pub`
@@ -246,14 +248,12 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
    * `// TODO use rwlock so preprocessing can start concurrently`
    * `// TODO slabs not chunks`
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
-   * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO reuse vec alloc`
-   * `// TODO this queries a chunk repeatedly for every slab, only do this once per chunk preferably`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (3)
@@ -297,15 +297,15 @@
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
  * [game/world/src/world.rs](game/world/src/world.rs) (9)
+   * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO trim stale areas and edges that no longer exist?`
    * `// TODO mark chunk as dirty`
-   * `//     // TODO consider resizing/populating changes_out initially with empty events for performance`
-   * `//                 // TODO reserve space in changes_out first`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
+   * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
  * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (1)

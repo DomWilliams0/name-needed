@@ -2,7 +2,7 @@ use std::iter::once;
 
 use common::derive_more::*;
 use unit::world::{
-    ChunkLocation, RangePosition, SlabIndex, SlabPosition, WorldPosition, WorldPositionRange,
+    ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition, WorldPositionRange,
     WorldRange,
 };
 
@@ -28,9 +28,7 @@ pub struct GenericTerrainUpdate<P: RangePosition>(pub WorldRange<P>, pub BlockTy
 pub struct TerrainUpdatesRes(Vec<WorldTerrainUpdate>);
 
 impl WorldTerrainUpdate {
-    pub fn into_slab_updates(
-        self,
-    ) -> impl Iterator<Item = (ChunkLocation, SlabIndex, SlabTerrainUpdate)> {
+    pub fn into_slab_updates(self) -> impl Iterator<Item = (SlabLocation, SlabTerrainUpdate)> {
         let mut block_iter = None;
         let mut range_iter = None;
 
@@ -41,9 +39,8 @@ impl WorldTerrainUpdate {
                 let chunk = ChunkLocation::from(pos);
                 let block = SlabPosition::from(pos);
                 let slab = pos.slice().slab_index();
-                let result: (_, _, SlabTerrainUpdate) = (
-                    chunk,
-                    slab,
+                let result: (_, SlabTerrainUpdate) = (
+                    SlabLocation::new(slab, chunk),
                     GenericTerrainUpdate(WorldRange::Single(block), block_type),
                 );
                 block_iter = Some(once(result));
@@ -70,8 +67,8 @@ mod split {
     use common::*;
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
-        ChunkLocation, GlobalSliceIndex, SlabIndex, WorldPosition, WorldPositionRange, WorldRange,
-        SLAB_SIZE,
+        ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
+        WorldRange, SLAB_SIZE,
     };
 
     use crate::block::BlockType;
@@ -80,7 +77,7 @@ mod split {
     pub fn split_range_across_slabs(
         range: WorldPositionRange,
         bt: BlockType,
-    ) -> impl Iterator<Item = (ChunkLocation, SlabIndex, SlabTerrainUpdate)> {
+    ) -> impl Iterator<Item = (SlabLocation, SlabTerrainUpdate)> {
         let ((ax, bx), (ay, by), (az, bz)) = range.ranges();
 
         // discover chunk/slab boundaries, skipping the first if its a duplicate (i.e. the point is already
@@ -112,7 +109,7 @@ mod split {
             let slab = GlobalSliceIndex::new(z1.as_from()).slab_index();
             let update =
                 GenericTerrainUpdate(WorldRange::Range(corner_bl.into(), corner_tr.into()), bt);
-            (chunk, slab, update)
+            (SlabLocation::new(slab, chunk), update)
         })
     }
 
@@ -233,7 +230,8 @@ mod split {
                 BlockType::Stone,
             )
             .into_slab_updates()
-            .sorted_by(|(ca, sa, _), (cb, sb, _)| ca.cmp(cb).then(sa.cmp(sb)))
+            .sorted_by(|(a, _), (b, _)| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)))
+            .map(|(loc, update)| (loc.chunk, loc.slab, update))
             .collect_vec()
         }
 

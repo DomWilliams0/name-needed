@@ -7,12 +7,12 @@ pub use batch::UpdateBatch;
 use common::*;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+use unit::world::{SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{AsyncWorkerPool, WorkerPool};
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability};
-use crate::chunk::{ChunkTerrain, RawChunkTerrain};
+
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
@@ -41,7 +41,8 @@ pub struct WorldLoader<P: WorkerPool<D>, D> {
 
 pub struct LoadedSlab {
     pub(crate) slab: SlabLocation,
-    pub(crate) terrain: Slab,
+    /// If None the terrain has already been updated
+    pub(crate) terrain: Option<Slab>,
     pub(crate) navigation: SlabInternalNavigability,
     pub(crate) batch: UpdateBatch,
 }
@@ -221,26 +222,16 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                         Err(err) => return Err(err),
                     };
 
-                    // slab terrain is now fixed, copy the top and bottom slices into chunk so
-                    // neighbouring slabs can access it
+                    // slab terrain is now fixed, process it concurrently on worker thread
                     let world = world.borrow();
-                    let chunk = world.find_chunk_with_pos(slab.chunk).unwrap();
-                    chunk.mark_slab_in_progress(slab.slab, &terrain);
-
-                    // wait for above+below slabs to be loaded if they're in progress, then
-                    // concurrently process raw terrain in context of own chunk
-                    let (above, below) = chunk.wait_for_neighbouring_slabs(slab.slab);
-                    // TODO detect when slab is all air and avoid expensive processing
-                    let navigation = terrain.process_terrain(
-                        slab.slab,
-                        above.as_ref().map(|s| s.into()), // gross
-                        below.as_ref().map(|s| s.into()),
-                    );
+                    let navigation = world
+                        .process_given_slab_terrain(slab, &mut terrain)
+                        .expect("chunk should be present");
 
                     // submit slab for finalization
                     Ok(LoadedSlab {
                         slab,
-                        terrain,
+                        terrain: Some(terrain),
                         navigation,
                         batch,
                     })
@@ -262,29 +253,92 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         self.last_batch_size = count;
     }
 
-    fn update_chunks_with_len(
+    /// Note changes are made immediately to the terrain but are not immediate to the player,
+    /// because navigation/occlusion/finalization is queued to the loader thread pool.
+    // noinspection RsUnresolvedReference - itertools' GroupBy confuses CLion
+    pub fn apply_terrain_updates(
         &mut self,
-        updates: impl Iterator<Item = (ChunkLocation, RawChunkTerrain)>,
-        count: usize,
+        terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
+        changes_out: &mut Vec<WorldChangeEvent>,
     ) {
-        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
-        for (chunk, terrain) in updates {
-            let batch = batches.next_batch();
+        let world_ref = self.world.clone();
 
-            debug!(
-                "submitting chunk update to pool";
-                chunk, batch
-            );
+        let (slab_updates, upper_slab_limit) = {
+            // translate world -> slab updates
+            // TODO reuse vec alloc
+            let mut slab_updates = terrain_updates
+                .flat_map(|world_update| world_update.into_slab_updates())
+                .collect_vec();
+
+            // sort then group by chunk and slab, so each slab is touched only once
+            slab_updates.sort_unstable_by(|(a, _), (b, _)| {
+                a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab))
+            });
+
+            // count slabs for vec allocation, upper limit because some might be filtered out.
+            // no allocations in dedup because vec is sorted
+            let upper_slab_limit = slab_updates
+                .iter()
+                .dedup_by(|(a, _), (b, _)| a == b)
+                .count();
+
+            (slab_updates, upper_slab_limit)
+        };
+
+        if upper_slab_limit == 0 {
+            // nothing to do
+            return;
+        }
+
+        // group per slab to each slab is fetched and modified only once
+        let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
+        let grouped_updates = grouped_updates
+            .into_iter()
+            .map(|(slab, updates)| (slab, updates.map(|(_, update)| update)));
+
+        // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
+        // navigation or rendering), world queries in the next game tick will be current with the
+        // changes applied now.
+        let mut slab_locs = Vec::with_capacity(upper_slab_limit);
+        let mut world = world_ref.borrow_mut();
+        world.apply_terrain_updates_in_place(
+            grouped_updates.into_iter(),
+            changes_out,
+            |slab_loc| slab_locs.push(slab_loc),
+        );
+
+        let real_slab_count = slab_locs.len();
+        debug!(
+            "applied terrain updates to {count} slabs",
+            count = real_slab_count
+        );
+        debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
+
+        // submit slabs for finalization
+        let mut batches = UpdateBatch::builder(&mut self.batch_ids, real_slab_count);
+
+        for slab_loc in slab_locs.into_iter() {
+            debug!("submitting slab for finalization"; slab_loc);
+
+            let batch = batches.next_batch();
+            let world_ref = world_ref.clone();
             self.pool.submit(
                 move || {
-                    // concurrently process raw terrain into chunk terrain
-                    let terrain = ChunkTerrain::from_raw_terrain(
-                        terrain,
-                        chunk,
-                        ChunkRequest::UpdateExisting,
-                    );
-                    todo!()
-                    // Ok((chunk, terrain, batch))
+                    // need mutable world ref here to access the slab terrain mutably as we don't
+                    // have it in scope here
+                    let mut world = world_ref.borrow_mut();
+                    let navigation = world
+                        .process_inline_slab_terrain(slab_loc)
+                        .expect("slab should be present");
+                    drop(world);
+
+                    // submit for finalization
+                    Ok(LoadedSlab {
+                        slab: slab_loc,
+                        terrain: None, // owned by the world
+                        navigation,
+                        batch,
+                    })
                 },
                 self.finalization_channel.clone(),
             );
@@ -296,59 +350,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                 n, m
             );
         }
-    }
 
-    pub fn apply_terrain_updates(
-        &mut self,
-        terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
-        changes_out: &mut Vec<WorldChangeEvent>,
-    ) {
-        let world = self.world.clone();
-        let world = world.borrow();
-
-        let (slab_updates, chunk_count) = {
-            // translate world -> slab updates
-            // TODO reuse vec alloc
-            let mut slab_updates = terrain_updates
-                .flat_map(|world_update| world_update.into_slab_updates())
-                .collect_vec();
-
-            // sort then group by chunk and slab, so each slab is touched only once
-            slab_updates.sort_unstable_by(|(chunk_a, slab_a, _), (chunk_b, slab_b, _)| {
-                chunk_a.cmp(chunk_b).then(slab_a.cmp(slab_b))
-            });
-
-            // filter out unloaded chunks
-            // TODO filter out unloaded slabs too
-            // TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably
-            slab_updates.retain(|(chunk, _, _)| world.has_chunk(*chunk));
-
-            // count chunk count for batch size. no allocations in dedup because vec is sorted
-            let chunk_count = slab_updates
-                .iter()
-                .dedup_by(|(chunk_a, _, _), (chunk_b, _, _)| chunk_a == chunk_b)
-                .count();
-
-            (slab_updates, chunk_count)
-        };
-
-        let grouped_chunk_updates = slab_updates.into_iter().group_by(|(chunk, _, _)| *chunk);
-
-        let chunk_updates = grouped_chunk_updates
-            .into_iter()
-            // TODO repeated filter check not needed?
-            .filter(|(chunk, _)| world.has_chunk(*chunk))
-            // apply updates to world in closure, don't submit them to the loader right now
-            .map(|(chunk, updates)| {
-                let updates = updates.map(|(_, slab, update)| (slab, update));
-                let new_terrain = world.apply_terrain_updates(chunk, updates, changes_out);
-                (chunk, new_terrain)
-            });
-
-        // submit all new terrain as a single batch
-        if chunk_count > 0 {
-            self.update_chunks_with_len(chunk_updates, chunk_count);
-        }
+        self.last_batch_size = real_slab_count;
     }
 
     pub fn block_on_next_finalization(
@@ -434,7 +437,7 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldLoader};
-    use unit::world::{ChunkLocation, SlabLocation};
+    use unit::world::SlabLocation;
 
     #[test]
     fn thread_flow() {

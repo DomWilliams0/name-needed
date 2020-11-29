@@ -26,12 +26,6 @@ pub struct ChunkFinalizer<D> {
     send_failures: usize,
 }
 
-struct FinalizeBatchItem {
-    slab: SlabLocation,
-    terrain: RefCell<MaybeUninit<Slab>>,
-    consumed: Cell<bool>,
-}
-
 impl<D> ChunkFinalizer<D> {
     pub fn new(
         world: WorldRef<D>,
@@ -287,49 +281,5 @@ impl<D> ChunkFinalizer<D> {
                 panic!("chunk finalization error threshold passed: {}", err)
             }
         }
-    }
-}
-
-impl FinalizeBatchItem {
-    fn initialized(slab: SlabLocation, terrain: Slab) -> Self {
-        Self {
-            slab,
-            terrain: RefCell::new(MaybeUninit::new(terrain)),
-            consumed: Cell::new(false),
-        }
-    }
-
-    fn consume(&self) -> (SlabLocation, Slab) {
-        let was_consumed = self.consumed.replace(true);
-        assert!(!was_consumed, "slab has already been consumed");
-
-        // steal terrain
-        let terrain = unsafe {
-            let mut t = self.terrain.borrow_mut();
-            std::mem::replace(t.deref_mut(), MaybeUninit::uninit()).assume_init()
-        };
-
-        (self.slab, terrain)
-    }
-
-    fn get(&self, slab_pos: SlabLocation) -> Option<&Slab> {
-        if self.consumed.get() || self.slab != slab_pos {
-            None
-        } else {
-            let terrain_ref = self.terrain.borrow();
-            let slab = unsafe { &*terrain_ref.as_ptr() };
-            Some(slab)
-        }
-    }
-}
-
-impl Debug for FinalizeBatchItem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(
-            f,
-            "FinalizeBatchItem(slab={}, consumed={:?})",
-            self.slab,
-            self.consumed.get()
-        )
     }
 }
