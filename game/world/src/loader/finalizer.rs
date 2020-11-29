@@ -1,5 +1,3 @@
-use crate::chunk::slab::Slab;
-
 use crate::loader::batch::UpdateBatcher;
 
 use crate::loader::LoadedSlab;
@@ -13,20 +11,18 @@ use std::cell::{Cell, RefCell};
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
 use crate::occlusion::NeighbourOpacity;
-use std::mem::MaybeUninit;
-use std::ops::DerefMut;
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
 
-pub struct ChunkFinalizer<D> {
+pub struct SlabFinalizer<D> {
     world: WorldRef<D>,
     updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     batcher: UpdateBatcher<LoadedSlab>,
     send_failures: usize,
 }
 
-impl<D> ChunkFinalizer<D> {
+impl<D> SlabFinalizer<D> {
     pub fn new(
         world: WorldRef<D>,
         updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,

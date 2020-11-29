@@ -3,7 +3,7 @@ use std::time::Duration;
 use common::*;
 use unit::world::SlabLocation;
 
-use crate::loader::finalizer::ChunkFinalizer;
+use crate::loader::finalizer::SlabFinalizer;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::LoadedSlab;
 use crate::{OcclusionChunkUpdate, WorldRef};
@@ -82,7 +82,7 @@ impl<D: 'static> WorkerPool<D> for AsyncWorkerPool {
         let mut success_tx = self.success_tx.clone();
         // TODO separate OS thread for finalizer?
         self.pool.spawn(async move {
-            let mut finalizer = ChunkFinalizer::new(world, chunk_updates_tx);
+            let mut finalizer = SlabFinalizer::new(world, chunk_updates_tx);
 
             while let Some(result) = finalize_rx.next().await {
                 let result = match result {
