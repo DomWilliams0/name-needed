@@ -71,6 +71,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* underground species with no eyes, cave houses
 	* underwater people
 	* mud crabs with human arms
+	* savage cavemen who sneak around in darkness, break bones then drag them back to the cave
 * generate and load world in SLABS, not full chunks
 	* config option to generate new land for camera, otherwise society member must be there
 * bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison

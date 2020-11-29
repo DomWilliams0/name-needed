@@ -3,7 +3,7 @@ use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSourceError};
 use crate::loader::TerrainSource;
 use common::*;
 
-use crate::chunk::slab::SlabTerrain;
+use crate::chunk::slab::Slab;
 use unit::world::{ChunkLocation, SlabLocation};
 
 pub struct GeneratedTerrainSource {
@@ -58,7 +58,7 @@ impl TerrainSource for GeneratedTerrainSource {
         &mut self,
         slab: SlabLocation,
         preprocess_result: Box<dyn PreprocessedTerrain>,
-    ) -> Result<SlabTerrain, TerrainSourceError> {
+    ) -> Result<Slab, TerrainSourceError> {
         unimplemented!()
     }
     /*

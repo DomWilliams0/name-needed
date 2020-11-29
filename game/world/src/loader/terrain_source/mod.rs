@@ -37,7 +37,7 @@ pub trait TerrainSource: Send {
         &mut self,
         slab: SlabLocation,
         preprocess_result: Box<dyn PreprocessedTerrain>,
-    ) -> Result<SlabTerrain, TerrainSourceError>;
+    ) -> Result<Slab, TerrainSourceError>;
 
     /// Checks chunk bounds only, assume infinite depth
     fn is_in_bounds(&self, slab: SlabLocation) -> bool {
@@ -48,7 +48,7 @@ pub trait TerrainSource: Send {
 
 mod generate;
 mod memory;
-use crate::chunk::slab::SlabTerrain;
+use crate::chunk::slab::Slab;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 

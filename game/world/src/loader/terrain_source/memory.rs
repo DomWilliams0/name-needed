@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common::*;
 use unit::world::{ChunkLocation, SlabLocation};
 
-use crate::chunk::slab::SlabTerrain;
+use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
 
@@ -78,14 +78,14 @@ impl TerrainSource for MemoryTerrainSource {
         &mut self,
         slab: SlabLocation,
         _: Box<dyn PreprocessedTerrain>,
-    ) -> Result<SlabTerrain, TerrainSourceError> {
-        let terrain = self
+    ) -> Result<Slab, TerrainSourceError> {
+        let slab = self
             .chunk_map
             .get(&slab.chunk)
             .and_then(|terrain| terrain.copy_slab(slab.slab))
             .ok_or(TerrainSourceError::OutOfBounds(slab))?;
 
-        Ok(SlabTerrain::from_slab(terrain, slab))
+        Ok(slab)
     }
 
     /*    fn preprocess(

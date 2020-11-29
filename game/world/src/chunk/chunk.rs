@@ -6,7 +6,7 @@ use unit::world::{
 };
 
 use crate::block::BlockType;
-use crate::chunk::slab::SlabTerrain;
+use crate::chunk::slab::Slab;
 use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
@@ -181,7 +181,7 @@ impl<D> Chunk<D> {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
     }
 
-    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &SlabTerrain) {
+    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
         let top = terrain.slice_owned(LocalSliceIndex::top());
         let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
 

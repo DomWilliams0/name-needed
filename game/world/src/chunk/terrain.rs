@@ -198,11 +198,6 @@ impl RawChunkTerrain {
         self.slabs.get(index)
     }
 
-    #[cfg(test)]
-    pub(crate) fn slab_ptr(&self, index: SlabIndex) -> Option<&Slab> {
-        self.slabs.get(index)
-    }
-
     /// Cow-copies the slab if not already the exclusive holder
     pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab> {
         self.slabs.get_mut(index).map(|s| s.cow_clone())

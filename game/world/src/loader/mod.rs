@@ -11,7 +11,7 @@ use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{AsyncWorkerPool, WorkerPool};
 
-use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabTerrain};
+use crate::chunk::slab::{Slab, SlabInternalNavigability};
 use crate::chunk::{ChunkTerrain, RawChunkTerrain};
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
@@ -88,14 +88,14 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         self.world.clone()
     }
 
-    /// Requests slabs as a single batch
+    /// Requests slabs as a single batch. Must be sorted as per [self.request_slabs_with_count]
     pub fn request_slabs(&mut self, slabs: impl ExactSizeIterator<Item = SlabLocation> + Clone) {
         let count = slabs.len();
         self.request_slabs_with_count(slabs, count)
     }
 
-    // TODO more efficient version that takes chunk+multiple slabs
-    /// Must be sorted by chunk then by ascending slab
+    // TODO add more efficient version that takes chunk+multiple slabs
+    /// Must be sorted by chunk then by ascending slab (debug asserted)
     pub fn request_slabs_with_count(
         &mut self,
         slabs: impl Iterator<Item = SlabLocation> + Clone,
@@ -163,9 +163,6 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
             let chunk = world_mut.ensure_chunk(slab.chunk);
             chunk.mark_slab_requested(slab.slab);
 
-            // ensure there is a slab above this one for navigation discovery to work properly
-            // chunk.ensure_slab_above(slab.slab);
-
             let source = self.source.clone();
             let batch = batches.next_batch();
 
@@ -179,7 +176,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
             self.pool.submit(
                 move || {
                     // wrapped in closure for common error handling case
-                    let get_terrain = || -> Result<SlabTerrain, TerrainSourceError> {
+                    let get_terrain = || -> Result<Slab, TerrainSourceError> {
                         if matches!(request, SlabRequest::AirOnly) {
                             // bit of a hack to force an all air slab
                             return Err(TerrainSourceError::OutOfBounds(slab));
@@ -204,7 +201,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                         Ok(terrain)
                     };
 
-                    let terrain = match get_terrain() {
+                    let mut terrain = match get_terrain() {
                         Ok(terrain) => terrain,
                         Err(TerrainSourceError::OutOfBounds(slab)) => {
                             match request {
@@ -218,8 +215,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                                 }
                             }
 
-                            // TODO CoW empty slab
-                            SlabTerrain::empty(slab)
+                            // TODO shared instance of CoW for empty slab
+                            Slab::empty()
                         }
                         Err(err) => return Err(err),
                     };
@@ -234,7 +231,8 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                     // concurrently process raw terrain in context of own chunk
                     let (above, below) = chunk.wait_for_neighbouring_slabs(slab.slab);
                     // TODO detect when slab is all air and avoid expensive processing
-                    let (terrain, navigation) = terrain.into_real_slab(
+                    let navigation = terrain.process_terrain(
+                        slab.slab,
                         above.as_ref().map(|s| s.into()), // gross
                         below.as_ref().map(|s| s.into()),
                     );

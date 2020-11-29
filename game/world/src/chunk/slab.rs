@@ -20,13 +20,10 @@ grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
     SLAB_SIZE.as_usize()
 );
 
-/// CoW, fully occlusion'ed, ready for use in game world
+/// CoW slab terrain
 #[derive(Clone)]
 #[repr(transparent)]
 pub struct Slab(Arc<SlabGridImpl>);
-
-/// Raw terrain, just block data
-pub struct SlabTerrain(SlabLocation, Arc<SlabGridImpl>);
 
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
 
@@ -132,46 +129,37 @@ impl IntoIterator for SlabInternalNavigability {
     }
 }
 
-impl SlabTerrain {
-    pub(crate) fn empty(loc: SlabLocation) -> Self {
-        SlabTerrain(loc, Arc::from(SlabGridImpl::default_boxed()))
-    }
-
-    // TODO these methods are copied from Slab
-    fn expect_mut(&mut self) -> &mut SlabGridImpl {
-        Arc::get_mut(&mut self.1).expect("expected to be the only slab reference")
-    }
-
-    fn is_exclusive(&self) -> bool {
-        Arc::strong_count(&self.1) == 1
-    }
-
+/// Initialization functions
+impl Slab {
     /// Discover navigability and occlusion
-    pub(crate) fn into_real_slab(
-        mut self,
+    pub(crate) fn process_terrain(
+        &mut self,
+        index: SlabIndex,
         above: Option<Slice>,
         below: Option<Slice>,
-    ) -> (Slab, SlabInternalNavigability) {
-        log_scope!(o!(self.0));
+    ) -> SlabInternalNavigability {
+        log_scope!(o!(index));
 
         // flood fill to discover navigability
-        let navigation = self.discover_areas(below);
+        let navigation = self.discover_areas(index, below);
 
         // occlusion
         self.init_occlusion(above);
 
-        // todo!("real slab above {:?} below {:?}", has_above, has_below,);
-
-        (Slab(self.1), navigation)
+        navigation
     }
 
-    fn discover_areas(&mut self, slice_below: Option<Slice>) -> SlabInternalNavigability {
+    fn discover_areas(
+        &mut self,
+        this_slab: SlabIndex,
+        slice_below: Option<Slice>,
+    ) -> SlabInternalNavigability {
         // TODO skip if not exclusive?
         // TODO exclusive helper on this struct too
         assert!(self.is_exclusive(), "not exclusive?");
 
         // collect slab into local grid
-        let mut discovery = AreaDiscovery::from_slab(&self.1, self.0.slab, slice_below);
+        let mut discovery = AreaDiscovery::from_slab(&self.0, this_slab, slice_below);
 
         // flood fill and assign areas
         let area_count = discovery.flood_fill_areas();
@@ -235,24 +223,8 @@ impl SlabTerrain {
         }
     }
 
-    pub fn from_slab(slab: Slab, loc: SlabLocation) -> Self {
-        SlabTerrain(loc, slab.0)
-    }
-
-    pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
-        let index = index.into();
-        let (from, to) = self.1.slice_range(index.slice());
-        Slice::new(&self.1.array()[from..to])
-    }
-
     pub fn slice_owned<S: Into<LocalSliceIndex>>(&self, index: S) -> SliceOwned {
         self.slice(index).to_owned()
-    }
-
-    pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
-        let index = index.into();
-        let (from, to) = self.1.slice_range(index.slice());
-        SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 }
 

@@ -1,4 +1,4 @@
-# TODOs (252)
+# TODOs (248)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -217,8 +217,7 @@
    * `// TODO mark complete after finalization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (4)
-   * `// TODO these methods are copied from Slab`
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (3)
    * `// TODO skip if not exclusive?`
    * `// TODO exclusive helper on this struct too`
    * `// TODO discover internal area links`
@@ -247,16 +246,14 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (9)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
    * `// TODO use rwlock so preprocessing can start concurrently`
    * `// TODO slabs not chunks`
-   * `// TODO more efficient version that takes chunk+multiple slabs`
-   * `// TODO CoW empty slab`
+   * `// TODO add more efficient version that takes chunk+multiple slabs`
+   * `// TODO shared instance of CoW for empty slab`
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO reuse vec alloc`
-   * `// TODO filter out unloaded slabs too`
-   * `// TODO this query a chunk repeatedly for every slab, only do this once per chunk preferably`
-   * `// TODO repeated filter check not needed?`
+   * `// TODO this queries a chunk repeatedly for every slab, only do this once per chunk preferably`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (3)
@@ -299,14 +296,13 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (10)
+ * [game/world/src/world.rs](game/world/src/world.rs) (9)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO trim stale areas and edges that no longer exist?`
    * `// TODO mark chunk as dirty`
-   * `// TODO dont clone terrain`
-   * `// TODO consider resizing/populating changes_out initially with empty events for performance`
-   * `// TODO reserve space in changes_out first`
+   * `//     // TODO consider resizing/populating changes_out initially with empty events for performance`
+   * `//                 // TODO reserve space in changes_out first`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
