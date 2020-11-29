@@ -24,7 +24,7 @@ pub trait PreprocessedTerrain: Send {
     fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain;
 }
 
-pub trait TerrainSource: Send {
+pub trait TerrainSource: Send + Sync {
     /// Bounding box, inclusive
     fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation);
 

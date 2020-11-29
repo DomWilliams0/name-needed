@@ -1,4 +1,4 @@
-# TODOs (241)
+# TODOs (240)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -241,8 +241,7 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (5)
-   * `// TODO use rwlock so preprocessing can start concurrently`
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (4)
    * `// TODO slabs not chunks`
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`

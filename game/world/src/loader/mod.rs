@@ -1,4 +1,3 @@
-use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 use futures::channel::mpsc as async_channel;
@@ -19,6 +18,7 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldRef};
 
+use common::parking_lot::RwLock;
 use std::iter::repeat;
 use std::sync::Arc;
 
@@ -29,8 +29,7 @@ mod update;
 mod worker_pool;
 
 pub struct WorldLoader<P: WorkerPool<D>, D> {
-    // TODO use rwlock so preprocessing can start concurrently
-    source: Arc<Mutex<dyn TerrainSource>>,
+    source: Arc<RwLock<dyn TerrainSource>>,
     pool: P,
     finalization_channel: async_channel::Sender<LoadTerrainResult>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
@@ -75,7 +74,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
 
         Self {
-            source: Arc::new(Mutex::new(source)),
+            source: Arc::new(RwLock::new(source)),
             pool,
             finalization_channel: finalize_tx,
             chunk_updates_rx,
@@ -183,19 +182,20 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                             return Err(TerrainSourceError::OutOfBounds(slab));
                         }
 
-                        // briefly hold the source lock to get a preprocess closure to run
+                        // briefly hold the source lock to get a preprocess closure to run.
+                        // only read lock so all workers can do this concurrently
                         let preprocess_work = {
-                            let terrain_source = source.lock();
+                            let terrain_source = source.read();
                             terrain_source.preprocess(slab)
                         };
 
                         // run preprocessing work concurrently
                         let preprocess_result = preprocess_work()?;
 
-                        // take the source lock again to convert preprocessing output into raw terrain
+                        // take the source write lock to convert preprocessing output into raw terrain
                         // e.g. reading from a file cannot be done in parallel
                         let terrain = {
-                            let mut terrain_source = source.lock();
+                            let mut terrain_source = source.write();
                             terrain_source.load_slab(slab, preprocess_result)?
                         };
 
