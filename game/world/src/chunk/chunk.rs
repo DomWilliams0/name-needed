@@ -1,8 +1,8 @@
 use common::*;
 
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
-    WorldPosition,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, WorldPosition,
 };
 
 use crate::block::BlockType;
@@ -43,18 +43,19 @@ pub(crate) enum SlabLoadingStatus {
     Requested,
 
     /// Is in progress
-    // TODO box these? this variant is 6K
     InProgress {
         /// Slab's top slice
-        top: SliceOwned,
+        top: Box<SliceOwned>,
 
         /// Slab's bottom slice
-        bottom: SliceOwned,
+        bottom: Box<SliceOwned>,
     },
 
     /// Finished and present in chunk.terrain
     Done,
 }
+
+pub(crate) struct MarkSlabsComplete<'a, D>(&'a Chunk<D>, ArrayVec<[SlabIndex; 8]>);
 
 impl<D> Chunk<D> {
     pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
@@ -177,23 +178,46 @@ impl<D> Chunk<D> {
     }
 
     pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
-        let top = terrain.slice_owned(LocalSliceIndex::top());
-        let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
+        let top = Box::new(terrain.slice_owned(LocalSliceIndex::top()));
+        let bottom = Box::new(terrain.slice_owned(LocalSliceIndex::bottom()));
 
         self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
     }
 
-    // TODO mark complete after finalization
-    pub(crate) fn mark_slab_complete(&self, slab: SlabIndex) {
-        self.update_slab_status(slab, SlabLoadingStatus::Done);
+    pub(crate) fn begin_marking_slabs_complete(&self) -> MarkSlabsComplete<D> {
+        MarkSlabsComplete(self, ArrayVec::new())
+        // self.update_slab_status(slab, SlabLoadingStatus::Done);
     }
 
     fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
-        trace!("updating slab progress"; slab, "state" => ?state);
+        self.update_slabs_status(once(slab), state)
+    }
 
+    fn update_slabs_status(
+        &self,
+        mut slabs: impl Iterator<Item = SlabIndex>,
+        state: SlabLoadingStatus,
+    ) {
         let mut map = self.slab_progress.write();
-        map.insert(slab, state);
 
+        let mut do_update = |slab, state| {
+            trace!("updating slab progress"; slab, "state" => ?state);
+            map.insert(slab, state);
+        };
+
+        let first = slabs.next();
+
+        // clone for all except first
+        for slab in slabs {
+            do_update(slab, state.clone());
+        }
+
+        // use original for last
+        if let Some(slab) = first {
+            do_update(slab, state);
+        }
+
+        // notify once for all
         self.slab_wait_cvar.notify_all();
     }
 
@@ -231,7 +255,8 @@ impl<D> Chunk<D> {
     ) -> Option<SliceOwned> {
         match state {
             SlabLoadingStatus::InProgress { top, bottom } => {
-                Some(if top_slice { top } else { bottom })
+                let boxed = if top_slice { top } else { bottom };
+                Some(*boxed)
             }
             SlabLoadingStatus::Done => {
                 let slice = if top_slice {
@@ -286,6 +311,27 @@ impl<D> Chunk<D> {
         }
 
         ret
+    }
+}
+
+impl<D> MarkSlabsComplete<'_, D> {
+    fn flush(&mut self) {
+        let slabs = self.1.iter().copied();
+        self.0.update_slabs_status(slabs, SlabLoadingStatus::Done);
+        self.1.clear();
+    }
+    pub fn mark_slab_complete(&mut self, slab: SlabIndex) {
+        if self.1.is_full() {
+            self.flush();
+        }
+
+        self.1.push(slab);
+    }
+}
+
+impl<D> Drop for MarkSlabsComplete<'_, D> {
+    fn drop(&mut self) {
+        self.flush();
     }
 }
 

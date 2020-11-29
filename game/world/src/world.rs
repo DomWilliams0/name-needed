@@ -12,7 +12,7 @@ use unit::world::{
 use crate::block::{Block, BlockDurability, BlockType};
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability};
-use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
+use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, MarkSlabsComplete};
 use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
@@ -459,6 +459,11 @@ impl<D> World<D> {
         chunk.raw_terrain_mut().create_slabs_until(min_slab);
         chunk.raw_terrain_mut().create_slabs_until(max_slab);
 
+        // safety: mutable chunk reference is stored in `completion` and is only used to update
+        // slab progress. chunk reference is always valid
+        let mut completion: MarkSlabsComplete<D> =
+            unsafe { std::mem::transmute(chunk.begin_marking_slabs_complete()) };
+
         for mut slab in slabs {
             debug_assert_eq!(slab.slab.chunk, chunk_loc);
 
@@ -471,6 +476,8 @@ impl<D> World<D> {
 
             // update chunk area navigation
             chunk.update_block_graphs(slab.navigation.into_iter());
+
+            completion.mark_slab_complete(slab.slab.slab);
         }
     }
 

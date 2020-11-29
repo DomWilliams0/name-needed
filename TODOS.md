@@ -1,4 +1,4 @@
-# TODOs (248)
+# TODOs (246)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -211,10 +211,8 @@
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
- * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (3)
-   * `// TODO box these? this variant is 6K`
+ * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
    * `// TODO use an enum for the slice range rather than Options`
-   * `// TODO mark complete after finalization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
