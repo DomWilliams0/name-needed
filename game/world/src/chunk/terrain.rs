@@ -324,6 +324,15 @@ impl RawChunkTerrain {
         }
     }
 
+    fn limited_slab_indices(&self, limit: (SlabIndex, SlabIndex)) -> (SlabIndex, SlabIndex) {
+        let (actual_min, actual_max) = self.slabs.index_range();
+        let (req_min, req_max) = limit;
+
+        let min = req_min.as_i32().max(actual_min);
+        let max = req_max.as_i32().min(actual_max);
+        (SlabIndex(min), SlabIndex(max))
+    }
+
     /// offset: self->other
     pub(crate) fn cross_chunk_pairs_foreach<
         F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity),
@@ -331,6 +340,7 @@ impl RawChunkTerrain {
         &'_ self,
         other: &'_ Self,
         offset: NeighbourOffset,
+        slab_range: (SlabIndex, SlabIndex),
         mut f: F,
     ) {
         let offset_opposite = offset.opposite();
@@ -342,12 +352,8 @@ impl RawChunkTerrain {
         };
 
         // find slab range
-        fn range_to_slab_indices(slabs: &DoubleSidedVec<Slab>) -> (SlabIndex, SlabIndex) {
-            let (min, max) = slabs.index_range();
-            (SlabIndex(min), SlabIndex(max))
-        }
-        let (my_min, my_max) = range_to_slab_indices(&self.slabs);
-        let (ur_min, ur_max) = range_to_slab_indices(&other.slabs);
+        let (my_min, my_max) = self.limited_slab_indices(slab_range);
+        let (ur_min, ur_max) = other.limited_slab_indices(slab_range);
 
         // one chunk starts lower than the other
         if my_min != ur_min {
@@ -495,9 +501,11 @@ impl RawChunkTerrain {
         &'_ self,
         other: &'_ Self,
         offset: NeighbourOffset,
+        slab_range: (SlabIndex, SlabIndex),
         mut f: F,
     ) {
-        for slab_idx in self.slabs.indices_increasing() {
+        let (SlabIndex(start), SlabIndex(end)) = self.limited_slab_indices(slab_range);
+        for slab_idx in start..=end {
             let my_slab = self.slabs.get(slab_idx).unwrap();
 
             // get loaded adjacent neighbour slab
@@ -1405,5 +1413,57 @@ mod tests {
         apply_updates(&mut loader, &updates).expect("updates failed");
 
         assert_single_area();
+    }
+
+    #[test]
+    fn stale_areas_removed_after_modification() {
+        let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_range((0, 0, 0), (5, 0, 0), |_| BlockType::Stone) // 5x1x1 ground
+            .fill_range((3, 0, 0), (3, 0, 5), |_| BlockType::Stone) // 1x1xz wall cutting it in half
+            .build((0, 0))]);
+
+        let world_ref = loader.world();
+
+        let get_areas = || {
+            let w = world_ref.borrow();
+            w.find_chunk_with_pos(ChunkLocation(0, 0))
+                .unwrap()
+                .areas()
+                .copied()
+                .collect_vec()
+        };
+
+        // 3 areas initially, 1 on either side of the wall and 1 atop
+        assert_eq!(get_areas().len(), 3);
+
+        // remove some of the wall to combine the 2 areas
+        let updates = [WorldTerrainUpdate::new(
+            WorldPositionRange::with_inclusive_range((3, 0, 1), (3, 0, 2)),
+            BlockType::Air,
+        )];
+        apply_updates(&mut loader, &updates).expect("updates failed");
+
+        // now only 2 areas, the ground and atop the wall
+        assert_eq!(get_areas().len(), 2);
+
+        // remove the wall completely
+        let updates = [WorldTerrainUpdate::new(
+            WorldPositionRange::with_inclusive_range((3, 0, 1), (3, 0, 10)),
+            BlockType::Air,
+        )];
+        apply_updates(&mut loader, &updates).expect("updates failed");
+
+        // now only 1 area, the ground
+        assert_eq!(get_areas().len(), 1);
+
+        // remove the ground too
+        let updates = [WorldTerrainUpdate::new(
+            WorldPositionRange::with_inclusive_range((0, 0, 0), (5, 5, 5)),
+            BlockType::Air,
+        )];
+        apply_updates(&mut loader, &updates).expect("updates failed");
+
+        // now the chunk is empty
+        assert_eq!(get_areas().len(), 0);
     }
 }

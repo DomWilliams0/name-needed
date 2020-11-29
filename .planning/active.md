@@ -20,3 +20,4 @@
 * [ ] investigate flashing shadows when a lot of terrain updates happen
 	* probably because occlusion changes are queued for next tick
 	* doesnt happen in release mode
+* [ ] debug world loading takes way longer now

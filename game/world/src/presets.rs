@@ -17,6 +17,7 @@ pub fn from_preset(preset: WorldPreset) -> MemoryTerrainSource {
         WorldPreset::OneBlockWonder => one_block_wonder(),
         WorldPreset::FlatLands => flat_lands(),
         WorldPreset::Bottleneck => bottleneck(),
+        WorldPreset::Stairs => stairs(),
     }
 }
 
@@ -168,6 +169,37 @@ pub fn bottleneck() -> MemoryTerrainSource {
     });
 
     MemoryTerrainSource::from_chunks(chunks).expect("hardcoded world preset is wrong??!!1!")
+}
+
+/// Lots of slabs
+pub fn stairs() -> MemoryTerrainSource {
+    let mut chunk = ChunkBuilder::new();
+
+    const HEIGHT: i32 = 500;
+
+    // 3x3 spiral
+    const COORDS: [(i32, i32); 8] = [
+        (0, 0),
+        (1, 0),
+        (2, 0),
+        (2, 1),
+        (2, 2),
+        (1, 2),
+        (0, 2),
+        (0, 1),
+    ];
+
+    for ((x, y), z) in COORDS.iter().copied().cycle().zip(-HEIGHT..=HEIGHT) {
+        let bt = if z % 2 == 0 {
+            BlockType::Grass
+        } else {
+            BlockType::Stone
+        };
+        chunk = chunk.set_block((x, y, z), bt);
+    }
+
+    MemoryTerrainSource::from_chunks(once(chunk.build((0, 0))))
+        .expect("hardcoded world preset is wrong??!!1!")
 }
 
 #[cfg(test)]

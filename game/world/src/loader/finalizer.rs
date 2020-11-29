@@ -62,15 +62,12 @@ impl<D> SlabFinalizer<D> {
             });
 
             // find min and max slabs in the whole set. this assumes the batch is a cuboid!
-            let (min, max) = if let Some((min, max)) = items
+            let slab_range = items
                 .iter()
                 .minmax_by_key(|slab| slab.slab.slab)
                 .into_option()
-            {
-                (min.slab.slab, max.slab.slab)
-            } else {
-                (SlabIndex(0), SlabIndex(0))
-            };
+                .map(|(min, max)| (min.slab.slab, max.slab.slab))
+                .unwrap(); // batch can't be empty
 
             log_scope!(o!(batch));
 
@@ -85,40 +82,47 @@ impl<D> SlabFinalizer<D> {
                 log_scope!(o!(chunk));
                 debug!("populating chunk with slabs");
                 let mut world = self.world.borrow_mut();
-                world.populate_chunk_with_slabs(chunk, (min, max), slabs);
+                world.populate_chunk_with_slabs(chunk, slab_range, slabs);
                 chunks.push(chunk);
             }
 
             // finalize one chunk at a time
-            for chunk in chunks.iter() {
-                debug!("finalizing"; chunk);
-                self.finalize_chunk(*chunk);
+            for chunk in chunks.into_iter() {
+                log_scope!(o!(chunk));
+                self.finalize_chunk_between_slabs(chunk, slab_range);
             }
         }
     }
 
-    fn finalize_chunk(&mut self, chunk: ChunkLocation) {
-        log_scope!(o!(chunk));
+    /// Lower and upper slab range is inclusive
+    fn finalize_chunk_between_slabs(
+        &mut self,
+        chunk: ChunkLocation,
+        slab_range: (SlabIndex, SlabIndex),
+    ) {
+        debug!("finalizing slab range in chunk"; "lower" => slab_range.0, "upper" => slab_range.1);
 
         // navigation
-        let area_edges = self.finalize_chunk_navigation(chunk);
+        let area_edges = self.finalize_chunk_navigation(chunk, slab_range);
 
         // occlusion
-        self.finalize_occlusion(chunk);
+        self.finalize_occlusion(chunk, slab_range);
 
-        // let chunk = Chunk::with_completed_terrain(chunk, terrain);
         {
             // finally take WorldRef write lock and update chunk
             let mut world = self.world.borrow_mut();
-            debug!("adding completed chunk to world");
-            debug!("{} edges", area_edges.len());
-            world.finalize_chunk(chunk, &area_edges);
+            debug!(
+                "adding completed chunk to world with {area_edges} area edges",
+                area_edges = area_edges.len()
+            );
+            world.finalize_chunk(chunk, &area_edges, slab_range);
         }
     }
 
     fn finalize_chunk_navigation(
         &mut self,
         chunk: ChunkLocation,
+        slab_range: (SlabIndex, SlabIndex),
     ) -> Vec<(WorldArea, WorldArea, AreaNavEdge)> {
         let mut area_edges = Vec::new(); // TODO reuse buf
 
@@ -139,6 +143,7 @@ impl<D> SlabFinalizer<D> {
             this_terrain.raw_terrain().cross_chunk_pairs_nav_foreach(
                 neighbour_terrain,
                 direction,
+                slab_range,
                 |src_area, dst_area, edge_cost, i, z| {
                     trace!("adding cross-chunk link to neighbour {neighbour:?}",
                         neighbour = neighbour; "to_area" => ?dst_area,
@@ -174,8 +179,9 @@ impl<D> SlabFinalizer<D> {
 
         area_edges
     }
-    fn finalize_occlusion(&mut self, chunk: ChunkLocation) {
-        // TODO limit checks to range around the actual changes
+    fn finalize_occlusion(&mut self, chunk: ChunkLocation, slab_range: (SlabIndex, SlabIndex)) {
+        // TODO only propagate across chunk boundaries if the changes were near to a boundary?
+
         // propagate across chunk boundaries
         for (direction, offset) in NeighbourOffset::offsets() {
             let world = self.world.borrow();
@@ -196,6 +202,7 @@ impl<D> SlabFinalizer<D> {
             this_terrain.raw_terrain().cross_chunk_pairs_foreach(
                 neighbour_terrain.raw_terrain(),
                 direction,
+                slab_range,
                 |which, block_pos, opacity| {
                     // TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead
                     match which {
@@ -211,15 +218,12 @@ impl<D> SlabFinalizer<D> {
                 },
             );
 
+            drop(world);
+
             // queue occlusion updates for next tick
             // TODO prevent mesh being rendered if there are queued occlusion changes?
-            drop(world);
-            if !this_terrain_updates.is_empty() {
-                self.send_update(OcclusionChunkUpdate(chunk, this_terrain_updates));
-            }
-            if !other_terrain_updates.is_empty() {
-                self.send_update(OcclusionChunkUpdate(neighbour, other_terrain_updates));
-            }
+            self.send_update(OcclusionChunkUpdate(chunk, this_terrain_updates));
+            self.send_update(OcclusionChunkUpdate(neighbour, other_terrain_updates));
         }
 
         // propagate across slab boundaries within chunk
@@ -255,6 +259,10 @@ impl<D> SlabFinalizer<D> {
     }
 
     fn send_update(&mut self, update: OcclusionChunkUpdate) {
+        if update.1.is_empty() {
+            return;
+        }
+
         debug!(
             "queueing {count} occlusion updates to apply to {chunk:?} next tick",
             count = update.1.len(),

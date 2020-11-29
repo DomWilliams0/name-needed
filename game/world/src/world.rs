@@ -349,6 +349,7 @@ impl<D> World<D> {
         &mut self,
         chunk_loc: ChunkLocation,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
+        slab_range: (SlabIndex, SlabIndex),
     ) {
         // add all areas even if they currently have no edges
         {
@@ -358,18 +359,29 @@ impl<D> World<D> {
 
             let chunk = self.find_chunk_with_pos(chunk_loc).expect("no such chunk");
 
+            // remove all previous areas and edges for the slab range in this chunk
+            let removed = naughty_area_graph.retain(|area| {
+                !(area.chunk == chunk_loc
+                    && (area.slab >= slab_range.0 && area.slab <= slab_range.1))
+            });
+
             for area in chunk.areas() {
-                debug!("{:?} has area {:?}", chunk_loc, area);
+                trace!("has area {:?}", area);
                 naughty_area_graph.add_node(area.into_world_area(chunk_loc));
             }
+
+            let added = chunk.area_count();
+            debug!(
+                "removed {removed} areas and added {added}",
+                removed = removed,
+                added = added
+            );
         }
 
         // update area nodes and edges
         for &(src, dst, edge) in area_nav {
             self.area_graph.add_edge(src, dst, edge);
         }
-
-        // TODO trim stale areas and edges that no longer exist?
 
         // mark chunk as dirty
         self.dirty_chunks.insert(chunk_loc);
@@ -449,15 +461,20 @@ impl<D> World<D> {
     pub(crate) fn populate_chunk_with_slabs(
         &mut self,
         chunk_loc: ChunkLocation,
-        (min_slab, max_slab): (SlabIndex, SlabIndex),
+        slab_range: (SlabIndex, SlabIndex),
         slabs: impl Iterator<Item = LoadedSlab>,
     ) {
         let chunk = self
             .find_chunk_with_pos_mut(chunk_loc)
             .expect("no such chunk");
 
-        chunk.raw_terrain_mut().create_slabs_until(min_slab);
-        chunk.raw_terrain_mut().create_slabs_until(max_slab);
+        // create missing chunks
+        let terrain = chunk.raw_terrain_mut();
+        terrain.create_slabs_until(slab_range.0);
+        terrain.create_slabs_until(slab_range.1);
+
+        // remove all areas in the slab range, because we're about to add the new ones
+        chunk.remove_block_graphs(slab_range);
 
         // safety: mutable chunk reference is stored in `completion` and is only used to update
         // slab progress. chunk reference is always valid

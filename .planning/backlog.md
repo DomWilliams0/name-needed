@@ -119,6 +119,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ### Memory usage
 * CoW terrain slabs
 * store sparse block metadata in the containing slab instead of in each block
+* LEAK: opengl sub buffers are being leaked, ~3MB per restart
 
 ## Crate release
 * voxel world

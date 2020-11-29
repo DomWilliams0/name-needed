@@ -122,6 +122,7 @@ impl<T> DoubleSidedVec<T> {
         (lowest..highest).rev()
     }
 
+    /// Inclusive range
     fn range(&self) -> (i32, i32) {
         let lowest = -(self.negative.len() as i32);
         let highest = self.positive.len() as i32;
@@ -129,6 +130,7 @@ impl<T> DoubleSidedVec<T> {
         (lowest, highest)
     }
 
+    /// Exclusive range
     pub fn index_range(&self) -> (i32, i32) {
         let (lowest, highest) = self.range();
         (lowest, highest - 1)

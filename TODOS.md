@@ -1,4 +1,4 @@
-# TODOs (236)
+# TODOs (235)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -234,7 +234,7 @@
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
    * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
-   * `// TODO limit checks to range around the actual changes`
+   * `// TODO only propagate across chunk boundaries if the changes were near to a boundary?`
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
@@ -284,11 +284,10 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (8)
+ * [game/world/src/world.rs](game/world/src/world.rs) (7)
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
-   * `// TODO trim stale areas and edges that no longer exist?`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`

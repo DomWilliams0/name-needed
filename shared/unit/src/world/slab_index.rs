@@ -26,7 +26,8 @@ pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
 pub struct SlabIndex(pub i32);
 
 impl SlabIndex {
-    pub const MIN: SlabIndex = SlabIndex(i32::min_value());
+    pub const MIN: SlabIndex = SlabIndex(i32::MIN);
+    pub const MAX: SlabIndex = SlabIndex(i32::MAX);
 
     pub const fn as_i32(self) -> i32 {
         self.0

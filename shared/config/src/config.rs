@@ -39,6 +39,7 @@ pub enum WorldPreset {
     OneBlockWonder,
     FlatLands,
     Bottleneck,
+    Stairs,
 }
 
 #[derive(Deserialize)]

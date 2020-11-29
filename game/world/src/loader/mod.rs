@@ -382,7 +382,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         timeout: Duration,
         bail: impl Fn() -> bool,
     ) -> Result<(), BlockForAllError> {
-        match self.last_batch_size {
+        match std::mem::take(&mut self.last_batch_size) {
             0 => Err(BlockForAllError::NoBatch),
             count => {
                 let start_time = Instant::now();

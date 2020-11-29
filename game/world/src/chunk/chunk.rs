@@ -99,6 +99,18 @@ impl<D> Chunk<D> {
         self.areas.keys()
     }
 
+    pub(crate) fn area_count(&self) -> usize {
+        self.areas.len()
+    }
+
+    pub(crate) fn remove_block_graphs(&mut self, (min, max): (SlabIndex, SlabIndex)) {
+        let n = self.areas.len();
+        self.areas
+            .retain(|area, _| !(area.slab >= min && area.slab <= max));
+        let m = self.areas.len();
+        debug!("removed {removed} nodes in slab range", removed=n-m; "lower"=>min, "upper"=>max);
+    }
+
     pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
         self.areas.get(&area.into())
     }
@@ -109,22 +121,8 @@ impl<D> Chunk<D> {
     ) {
         for (area, graph) in slab_nav {
             let (new_edges, new_nodes) = graph.len();
-            match self.areas.insert(area, graph) {
-                None => {
-                    debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
-                }
-                Some(prev) => {
-                    let (prev_edges, prev_nodes) = prev.len();
-                    debug!(
-                        "replaced {prev_edges} edges and {prev_nodes} nodes with {new_edges} \
-                        edges and {new_nodes} nodes",
-                        prev_edges = prev_edges,
-                        prev_nodes = prev_nodes,
-                        new_edges = new_edges,
-                        new_nodes = new_nodes
-                    );
-                }
-            }
+            self.areas.insert(area, graph);
+            debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
         }
     }
 
