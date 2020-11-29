@@ -8,7 +8,6 @@ use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
 
 /// Used for testing
-#[derive(Clone)]
 pub struct MemoryTerrainSource {
     /// Each slab is removed from terrain as it's loaded
     chunk_map: HashMap<ChunkLocation, RawChunkTerrain>,

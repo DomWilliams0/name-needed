@@ -1,8 +1,8 @@
 use common::*;
 
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
-    SliceBlock, WorldPosition,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
+    WorldPosition,
 };
 
 use crate::block::BlockType;

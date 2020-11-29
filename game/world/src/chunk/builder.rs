@@ -131,7 +131,6 @@ impl Default for ChunkBuilder {
     }
 }
 
-#[derive(Clone)]
 pub struct ChunkDescriptor {
     pub terrain: RawChunkTerrain,
     pub chunk_pos: ChunkLocation,

@@ -769,7 +769,7 @@ pub mod helpers {
 mod tests {
     use std::time::Duration;
 
-    use common::{logging, seeded_rng, Itertools, Rng};
+    use common::{seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,

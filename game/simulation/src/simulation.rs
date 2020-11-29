@@ -65,7 +65,7 @@ pub struct Simulation<R: Renderer> {
 
 impl<R: Renderer> Simulation<R> {
     /// world_loader should have had all chunks requested
-    pub fn new(mut world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
+    pub fn new(world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
         // load entity definitions from file system
         let definitions = {
             let def_root = resources.definitions()?;

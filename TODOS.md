@@ -1,4 +1,4 @@
-# TODOs (246)
+# TODOs (241)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -224,16 +224,11 @@
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO can this just hold opacity to reduce size?`
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (10)
-   * `// TODO "cheap" - it clones 2 vecs of arcs!`
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (5)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
    * `// TODO this is sometimes a false positive, triggering unnecessary copies`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
-   * `// TODO shared cow instance for empty slab`
-   * `// TODO reuse a buffer for each slab`
-   * `// TODO discover internal area links`
-   * `// TODO transmute lifetimes instead`
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
    * `// TODO why not return iterator?`

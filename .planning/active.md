@@ -17,3 +17,6 @@
 * [ ] dont require doublesizedvec to have no holes
 	* the impl can have no holes and store options instead or something
 * [o] split up loader/mod.rs into a few separate modules
+* [ ] investigate flashing shadows when a lot of terrain updates happen
+	* probably because occlusion changes are queued for next tick
+	* doesnt happen in release mode

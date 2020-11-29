@@ -6,7 +6,6 @@ use crate::neighbour::NeighbourOffset;
 use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldRef};
 use common::*;
 use futures::channel::mpsc as async_channel;
-use std::cell::{Cell, RefCell};
 
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
