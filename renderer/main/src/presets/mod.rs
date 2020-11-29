@@ -19,7 +19,7 @@ pub trait GamePreset<R: Renderer> {
     fn load(&self, resources: Resources, scenario: Scenario) -> BoxedResult<Simulation<R>> {
         let mut world = self.world()?;
 
-        // TODO load initial slab range
+        // TODO get initial slab range to request from engine
         debug!("waiting for world to load before initializing simulation");
         let (slabs_to_request, slab_count) = all_slabs_in_range(
             SlabLocation::new(-1, (-1, -1)),

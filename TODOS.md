@@ -1,4 +1,4 @@
-# TODOs (240)
+# TODOs (236)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -215,14 +215,13 @@
    * `// TODO use an enum for the slice range rather than Options`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
-   * `// TODO skip if not exclusive?`
-   * `// TODO exclusive helper on this struct too`
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (4)
+   * `// TODO if exclusive we're in deep water with CoW`
    * `// TODO discover internal area links`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`
    * `// TODO reserve space in changes_out first`
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
-   * `// TODO can this just hold opacity to reduce size?`
+   * `// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity`
    * `// TODO make not pub`
  * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (5)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
@@ -230,8 +229,6 @@
    * `// TODO this is sometimes a false positive, triggering unnecessary copies`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
- * [game/world/src/loader/batch.rs](game/world/src/loader/batch.rs) (1)
-   * `// TODO why not return iterator?`
  * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (8)
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
@@ -241,8 +238,7 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (4)
-   * `// TODO slabs not chunks`
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (3)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
@@ -250,7 +246,7 @@
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (3)
    * `// TODO could remove WorkerPool trait now, there's only 1 impl`
-   * `// TODO separate OS thread for finalizer?`
+   * `// TODO prioritize finalizer task - separate OS thread or runtime?`
    * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
@@ -288,12 +284,11 @@
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
- * [game/world/src/world.rs](game/world/src/world.rs) (9)
+ * [game/world/src/world.rs](game/world/src/world.rs) (8)
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO trim stale areas and edges that no longer exist?`
-   * `// TODO mark chunk as dirty`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
@@ -322,7 +317,7 @@
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
-   * `// TODO load initial slab range`
+   * `// TODO get initial slab range to request from engine`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

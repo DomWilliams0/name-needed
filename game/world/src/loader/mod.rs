@@ -58,13 +58,6 @@ pub enum BlockForAllError {
     Error(#[from] TerrainSourceError),
 }
 
-#[derive(Copy, Clone)]
-// TODO slabs not chunks
-pub enum ChunkRequest {
-    New,
-    UpdateExisting,
-}
-
 impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
@@ -417,12 +410,6 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
             f(update)
         }
-    }
-}
-
-impl ChunkRequest {
-    pub fn is_new(self) -> bool {
-        matches!(self, ChunkRequest::New)
     }
 }
 

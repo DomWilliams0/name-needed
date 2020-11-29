@@ -155,8 +155,7 @@ impl Slab {
         this_slab: SlabIndex,
         slice_below: Option<Slice>,
     ) -> SlabInternalNavigability {
-        // TODO skip if not exclusive?
-        // TODO exclusive helper on this struct too
+        // TODO if exclusive we're in deep water with CoW
         assert!(self.is_exclusive(), "not exclusive?");
 
         // collect slab into local grid

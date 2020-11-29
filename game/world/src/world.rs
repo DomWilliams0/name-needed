@@ -371,8 +371,8 @@ impl<D> World<D> {
 
         // TODO trim stale areas and edges that no longer exist?
 
-        // TODO mark chunk as dirty
-        // self.dirty_chunks.insert(chunk_pos);
+        // mark chunk as dirty
+        self.dirty_chunks.insert(chunk_loc);
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {

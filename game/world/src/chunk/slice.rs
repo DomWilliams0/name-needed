@@ -7,8 +7,8 @@ use crate::block::{Block, BlockType};
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 
-const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
-    [Block::air(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
+const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
+const DUMMY_SLICE_BLOCKS: [Block; SLICE_SIZE] = [Block::air(); SLICE_SIZE];
 
 #[derive(Clone, Copy)]
 pub struct Slice<'a> {
@@ -19,10 +19,11 @@ pub struct SliceMut<'a> {
     slice: &'a mut [Block],
 }
 
-// TODO can this just hold opacity to reduce size?
+// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity
+
 #[derive(Clone)]
 pub struct SliceOwned {
-    slice: [Block; DUMMY_SLICE_BLOCKS.len()],
+    slice: [Block; SLICE_SIZE],
 }
 
 impl<'a> Slice<'a> {
