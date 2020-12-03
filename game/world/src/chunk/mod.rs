@@ -35,7 +35,7 @@ pub fn all_slabs_in_range(
         chunk: ChunkLocation(max_chunk_x, max_chunk_y),
     } = to;
 
-    assert!(min_slab < max_slab && min_chunk_x < max_chunk_x && min_chunk_y < max_chunk_y);
+    assert!(min_slab <= max_slab && min_chunk_x <= max_chunk_x && min_chunk_y <= max_chunk_y);
 
     let chunks = (min_chunk_x..=max_chunk_x).cartesian_product(min_chunk_y..=max_chunk_y);
     let all_slabs = chunks

@@ -1,4 +1,4 @@
-# TODOs (235)
+# TODOs (237)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -181,9 +181,10 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (3)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
+   * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
    * `// TODO per tick alloc/reuse buf`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
@@ -275,15 +276,16 @@
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (8)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (9)
    * `assert!(size > 0); // TODO Result`
    * `// TODO determine viewer start pos from world/randomly e.g. ground level`
    * `// TODO intelligently choose an initial view range`
-   * `// TODO dont default to -1,-1 -> 1,1 in chunk range, depends on view radius and start chunk`
+   * `// TODO receive initial chunk+slab range from engine`
    * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
+   * `// TODO submit only the new chunks in range`
  * [game/world/src/world.rs](game/world/src/world.rs) (7)
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO optimize path with raytracing (#50)`

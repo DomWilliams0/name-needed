@@ -1,10 +1,10 @@
 use common::*;
 
 use crate::mesh::BaseVertex;
-use crate::{mesh, InnerWorldRef, WorldRef};
+use crate::{all_slabs_in_range, mesh, InnerWorldRef, WorldRef};
 use std::collections::HashSet;
 use std::ops::{Add, Range};
-use unit::world::{ChunkLocation, GlobalSliceIndex};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation};
 
 #[derive(Clone)]
 pub struct WorldViewer<D> {
@@ -12,6 +12,7 @@ pub struct WorldViewer<D> {
     view_range: SliceRange,
     chunk_range: (ChunkLocation, ChunkLocation),
     clean_chunks: HashSet<ChunkLocation>,
+    requested_slabs: Vec<SlabLocation>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -25,6 +26,8 @@ pub enum WorldViewerError {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SliceRange(GlobalSliceIndex, GlobalSliceIndex);
+
+pub struct RequestedSlabs<'a>(&'a mut Vec<SlabLocation>);
 
 impl SliceRange {
     fn new(top: GlobalSliceIndex, size: i32) -> Self {
@@ -124,9 +127,10 @@ impl<D> WorldViewer<D> {
         Ok(Self {
             world,
             view_range,
-            // TODO dont default to -1,-1 -> 1,1 in chunk range, depends on view radius and start chunk
+            // TODO receive initial chunk+slab range from engine
             chunk_range: (ChunkLocation(-1, -1), ChunkLocation(1, 1)),
             clean_chunks: HashSet::with_capacity(128),
+            requested_slabs: Vec::with_capacity(128),
         })
     }
 
@@ -221,7 +225,23 @@ impl<D> WorldViewer<D> {
     }
 
     pub fn set_chunk_bounds(&mut self, range: (ChunkLocation, ChunkLocation)) {
+        let prev_range = self.chunk_range;
+
+        debug_assert!(range.0 <= range.1);
         self.chunk_range = range;
+
+        if prev_range != range {
+            // new chunks are visible and should be loaded
+            // TODO submit only the new chunks in range
+            let (from_chunk, to_chunk) = range;
+            let slice_range = self.terrain_range();
+            let from = SlabLocation::new(slice_range.bottom().slab_index(), from_chunk);
+            let to = SlabLocation::new(slice_range.top().slab_index(), to_chunk);
+
+            let (slab_range, slab_count) = all_slabs_in_range(from, to);
+            self.requested_slabs.extend(slab_range);
+            trace!("camera movement requested loading of {count} slabs", count = slab_count; "from" => from, "to" => to);
+        }
     }
 
     fn is_chunk_dirty(&self, chunk: &ChunkLocation) -> bool {
@@ -230,5 +250,48 @@ impl<D> WorldViewer<D> {
 
     pub fn mark_dirty(&mut self, chunk: ChunkLocation) {
         self.clean_chunks.remove(&chunk);
+    }
+
+    /// Returns deduped and sorted by chunk+slab, inner vec is cleared on ret value drop
+    pub fn requested_slabs(
+        &mut self,
+        extras: impl Iterator<Item = SlabLocation>,
+    ) -> RequestedSlabs {
+        // include extra requested slabs
+        self.requested_slabs.extend(extras);
+
+        let len_before = self.requested_slabs.len();
+
+        // sort by chunk and slab and remove duplicates
+        self.requested_slabs
+            .sort_unstable_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
+        self.requested_slabs.dedup();
+
+        // filter down any already loaded slabs
+        let world = self.world.borrow();
+        world.retain_unloaded_slabs(&mut self.requested_slabs);
+        drop(world);
+
+        if len_before > 0 {
+            debug!(
+                "filtered {unfiltered} slab requests down to {filtered}",
+                unfiltered = len_before,
+                filtered = self.requested_slabs.len()
+            );
+        }
+
+        RequestedSlabs(&mut self.requested_slabs)
+    }
+}
+
+impl Drop for RequestedSlabs<'_> {
+    fn drop(&mut self) {
+        self.0.clear();
+    }
+}
+
+impl AsRef<[SlabLocation]> for RequestedSlabs<'_> {
+    fn as_ref(&self) -> &[SlabLocation] {
+        &self.0
     }
 }

@@ -188,20 +188,26 @@ impl<R: Renderer> Simulation<R> {
     }
 
     fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
-        {
-            let mut world = self.voxel_world.borrow_mut();
+        // request new slabs
+        let discovered = empty(); // TODO include slabs discovered by members of player's society
+        let requested_slabs = world_viewer.requested_slabs(discovered);
+        let actual_requested_slabs = requested_slabs.as_ref().iter().copied();
+        self.world_loader.request_slabs(actual_requested_slabs);
+        drop(requested_slabs);
 
-            // occlusion updates
-            self.world_loader
-                .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
+        let mut world = self.voxel_world.borrow_mut();
 
-            // mark modified chunks as dirty in world viewer
-            world
-                .dirty_chunks()
-                .for_each(|c| world_viewer.mark_dirty(c));
-        }
+        // apply occlusion updates
+        self.world_loader
+            .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
-        // terrain changes
+        // mark modified chunks as dirty in world viewer
+        world
+            .dirty_chunks()
+            .for_each(|c| world_viewer.mark_dirty(c));
+        drop(world);
+
+        // apply terrain changes
         // TODO per tick alloc/reuse buf
         let terrain_updates = self
             .terrain_changes
@@ -220,6 +226,7 @@ impl<R: Renderer> Simulation<R> {
 
         // swap storage back and forget empty vec
         let empty = std::mem::replace(&mut self.change_events, events);
+        debug_assert!(empty.is_empty());
         std::mem::forget(empty);
     }
 

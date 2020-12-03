@@ -57,6 +57,16 @@ pub enum RandomWalkableBlock {
     Local { from: WorldPosition, radius: u16 },
 }
 
+struct ContiguousChunkIteratorMut<'a, D> {
+    world: &'a mut World<D>,
+    last_chunk: Option<(ChunkLocation, usize)>,
+}
+
+struct ContiguousChunkIterator<'a, D> {
+    world: &'a World<D>,
+    last_chunk: Option<(ChunkLocation, usize)>,
+}
+
 impl<D> World<D> {
     pub fn empty() -> Self {
         Self {
@@ -411,31 +421,16 @@ impl<D> World<D> {
         changes_out: &mut Vec<WorldChangeEvent>,
         mut per_slab: impl FnMut(SlabLocation),
     ) {
-        let mut last_chunk_idx = None;
+        let mut contiguous_chunks = ContiguousChunkIteratorMut::new(self);
 
         for (slab_loc, slab_updates) in updates {
             // fetch chunk, reusing the last one if it's the same, as it should be in this sorted iterator
-            let chunk: &mut Chunk<D> = match last_chunk_idx.take() {
-                Some((last_loc, idx)) if last_loc == slab_loc.chunk => {
-                    // nice, reuse index of chunk without lookup
-                    // safety: index returned by last loop iteration and no chunks added since
-                    unsafe { self.chunks.get_unchecked_mut(idx) }
-                }
-                _ => {
-                    // new chunk
-                    match self.find_chunk_index(slab_loc.chunk) {
-                        Ok(idx) => {
-                            last_chunk_idx = Some((slab_loc.chunk, idx));
-
-                            // safety: index returned by find_chunk_index
-                            unsafe { self.chunks.get_unchecked_mut(idx) }
-                        }
-                        Err(_) => {
-                            let count = slab_updates.count();
-                            debug!("skipping {count} terrain updates for chunk because it's not loaded", count = count; slab_loc.chunk);
-                            continue;
-                        }
-                    }
+            let chunk = match contiguous_chunks.next(slab_loc.chunk) {
+                Some(chunk) => chunk,
+                None => {
+                    let count = slab_updates.count();
+                    debug!("skipping {count} terrain updates for chunk because it's not loaded", count = count; slab_loc.chunk);
+                    continue;
                 }
             };
 
@@ -683,6 +678,91 @@ impl<D> World<D> {
     pub fn remove_associated_block_data(&mut self, pos: WorldPosition) -> Option<D> {
         self.find_chunk_with_pos_mut(pos.into())
             .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
+    }
+
+    /// More efficient when sorted by slab
+    pub fn retain_unloaded_slabs(&self, slabs: &mut Vec<SlabLocation>) {
+        let mut contiguous_chunks = ContiguousChunkIterator::new(self);
+
+        slabs.retain(|slab| {
+            match contiguous_chunks.next(slab.chunk) {
+                Some(chunk) => !chunk.is_slab_loaded_or_loading(slab.slab),
+                None => {
+                    // chunk is unloaded so its slabs are too
+                    true
+                }
+            }
+        });
+    }
+}
+
+impl<'a, D> ContiguousChunkIteratorMut<'a, D> {
+    pub fn new(world: &'a mut World<D>) -> Self {
+        ContiguousChunkIteratorMut {
+            world,
+            last_chunk: None,
+        }
+    }
+
+    // Identical to ContiguousChunkIterator just different enough with mut to require too
+    // much effort to reduce duplication :( lmao even this comment is the same
+    // noinspection DuplicatedCode
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&mut Chunk<D>> {
+        match self.last_chunk.take() {
+            Some((last_loc, idx)) if last_loc == chunk => {
+                // nice, reuse index of chunk without lookup
+                // safety: index returned by last call and no chunks added since because this holds
+                // a world reference
+                Some(unsafe { self.world.chunks.get_unchecked_mut(idx) })
+            }
+            _ => {
+                // new chunk
+                match self.world.find_chunk_index(chunk) {
+                    Ok(idx) => {
+                        self.last_chunk = Some((chunk, idx));
+
+                        // safety: index returned by find_chunk_index
+                        Some(unsafe { self.world.chunks.get_unchecked_mut(idx) })
+                    }
+                    Err(_) => None,
+                }
+            }
+        }
+    }
+}
+
+impl<'a, D> ContiguousChunkIterator<'a, D> {
+    pub fn new(world: &'a World<D>) -> Self {
+        ContiguousChunkIterator {
+            world,
+            last_chunk: None,
+        }
+    }
+
+    // Identical to ContiguousChunkIteratorMut but just different enough with mut to require too
+    // much effort to reduce duplication :( lmao even this comment is the same
+    // noinspection DuplicatedCode
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&Chunk<D>> {
+        match self.last_chunk.take() {
+            Some((last_loc, idx)) if last_loc == chunk => {
+                // nice, reuse index of chunk without lookup
+                // safety: index returned by last call and no chunks added since because this holds
+                // a world reference
+                Some(unsafe { self.world.chunks.get_unchecked(idx) })
+            }
+            _ => {
+                // new chunk
+                match self.world.find_chunk_index(chunk) {
+                    Ok(idx) => {
+                        self.last_chunk = Some((chunk, idx));
+
+                        // safety: index returned by find_chunk_index
+                        Some(unsafe { self.world.chunks.get_unchecked(idx) })
+                    }
+                    Err(_) => None,
+                }
+            }
+        }
     }
 }
 

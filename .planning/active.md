@@ -1,6 +1,11 @@
 # Active tasks
 
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
+* [.] dynamic chunk loading
+	* [X] load slabs as camera pans
+	* [ ] load slabs as camera moves up and down
+	* [ ] config opt to disable discovery by camera, only by society entities
+	* [ ] restrict camera at world edge?
 * [ ] return full slab from procgen
 * [o] block modification should be localised to the slabs
 * [ ] dont mark chunk as dirty, but chunk+slab range

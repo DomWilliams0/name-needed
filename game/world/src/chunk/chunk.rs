@@ -310,6 +310,11 @@ impl<D> Chunk<D> {
 
         ret
     }
+
+    /// Returns true if slab has been requested
+    pub fn is_slab_loaded_or_loading(&self, slab: SlabIndex) -> bool {
+        !matches!(self.slab_progress(slab), SlabLoadingStatus::Unloaded)
+    }
 }
 
 impl<D> MarkSlabsComplete<'_, D> {

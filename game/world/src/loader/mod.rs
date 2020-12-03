@@ -88,12 +88,19 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
     }
 
     // TODO add more efficient version that takes chunk+multiple slabs
-    /// Must be sorted by chunk then by ascending slab (debug asserted)
+    /// Must be sorted by chunk then by ascending slab (debug asserted). All slabs are loaded from
+    /// scratch, it's the caller's responsibility to ensure slabs that are already loaded are not
+    /// passed in here
     pub fn request_slabs_with_count(
         &mut self,
         slabs: impl Iterator<Item = SlabLocation> + Clone,
         count: usize,
     ) {
+        // bomb out early if nothing to do
+        if count == 0 {
+            return;
+        }
+
         let mut world_mut = self.world.borrow_mut();
 
         // check order of slabs is as expected
