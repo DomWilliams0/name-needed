@@ -1,4 +1,4 @@
-# TODOs (237)
+# TODOs (238)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -276,7 +276,7 @@
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (9)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (10)
    * `assert!(size > 0); // TODO Result`
    * `// TODO determine viewer start pos from world/randomly e.g. ground level`
    * `// TODO intelligently choose an initial view range`
@@ -284,6 +284,7 @@
    * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO cache world slice_bounds()`
+   * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
  * [game/world/src/world.rs](game/world/src/world.rs) (7)

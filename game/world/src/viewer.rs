@@ -3,7 +3,7 @@ use common::*;
 use crate::mesh::BaseVertex;
 use crate::{all_slabs_in_range, mesh, InnerWorldRef, WorldRef};
 use std::collections::HashSet;
-use std::ops::{Add, Range};
+use std::ops::{Add, RangeInclusive};
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation};
 
 #[derive(Clone)]
@@ -75,8 +75,9 @@ impl SliceRange {
         self.1
     }
 
-    pub fn as_range(self) -> Range<i32> {
-        self.0.slice()..self.1.slice()
+    #[inline]
+    pub fn as_range(self) -> RangeInclusive<i32> {
+        self.0.slice()..=self.1.slice()
     }
 
     pub fn size(self) -> u32 {
