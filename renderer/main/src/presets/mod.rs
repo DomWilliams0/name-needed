@@ -20,10 +20,11 @@ pub trait GamePreset<R: Renderer> {
         let mut world = self.world()?;
 
         // TODO get initial slab range to request from engine
+        let ((min_x, min_y, min_z), (max_x, max_y, max_z)) = config::get().world.initial_slab_range;
         debug!("waiting for world to load before initializing simulation");
         let (slabs_to_request, slab_count) = all_slabs_in_range(
-            SlabLocation::new(-1, (-1, -1)),
-            SlabLocation::new(1, (1, 1)),
+            SlabLocation::new(min_z, (min_x, min_y)),
+            SlabLocation::new(max_z, (max_x, max_y)),
         );
 
         world.request_slabs_with_count(slabs_to_request, slab_count);

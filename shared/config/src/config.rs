@@ -24,6 +24,7 @@ pub struct World {
     pub source: WorldSource,
     pub worker_threads: Option<usize>,
     pub generation_height_scale: f64,
+    pub initial_slab_range: ((i32, i32, i32), (i32, i32, i32)),
 }
 
 #[derive(Deserialize, Clone)]

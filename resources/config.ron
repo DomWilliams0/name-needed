@@ -13,6 +13,7 @@ Config(
         // source: Generate (radius: 2, seed: Some(342882)),
         worker_threads: None,
         generation_height_scale: 15.0,
+        initial_slab_range: ((-1, -1, -1), (1, 1, 1))
     ),
     simulation: (
         random_seed: Some(67853852415423),
