@@ -17,7 +17,7 @@ pub(crate) mod slab;
 pub(crate) mod slice;
 mod terrain;
 
-/// Inclusive range
+/// Inclusive range. Is sorted by chunk then slab
 pub fn all_slabs_in_range(
     from: SlabLocation,
     to: SlabLocation,

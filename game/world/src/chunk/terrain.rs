@@ -579,13 +579,14 @@ impl RawChunkTerrain {
         }
     }
 
-    pub fn apply_occlusion_updates(
-        &mut self,
-        updates: &[(BlockPosition, NeighbourOpacity)],
-    ) -> usize {
+    /// Returns iter of slabs affected, probably duplicated but in order
+    pub fn apply_occlusion_updates<'a>(
+        &'a mut self,
+        updates: &'a [(BlockPosition, NeighbourOpacity)],
+    ) -> impl Iterator<Item = SlabIndex> + 'a {
         updates
             .iter()
-            .map(|&(block_pos, new_opacities)| {
+            .filter_map(move |&(block_pos, new_opacities)| {
                 let raw_terrain = self.raw_terrain_mut();
 
                 // obtain immutable slice for checking, to avoid unnecessary CoW slab copying
@@ -611,12 +612,13 @@ impl RawChunkTerrain {
                         "new" => ?new_opacities,
                         "updated" => ?block_mut.occlusion()
                     );
-                    1
+
+                    let slab = block_pos.z().slab_index();
+                    Some(slab)
                 } else {
-                    0
+                    None
                 }
             })
-            .sum()
     }
 
     // TODO set_block trait to reuse in ChunkBuilder (#46)

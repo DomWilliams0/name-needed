@@ -201,10 +201,8 @@ impl<R: Renderer> Simulation<R> {
         self.world_loader
             .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
-        // mark modified chunks as dirty in world viewer
-        world
-            .dirty_chunks()
-            .for_each(|c| world_viewer.mark_dirty(c));
+        // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
+        world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
         drop(world);
 
         // apply terrain changes

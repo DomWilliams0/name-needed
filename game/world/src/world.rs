@@ -25,7 +25,7 @@ use crate::{OcclusionChunkUpdate, SliceRange};
 pub struct World<D> {
     chunks: Vec<Chunk<D>>,
     area_graph: AreaGraph,
-    dirty_chunks: HashSet<ChunkLocation>,
+    dirty_slabs: HashSet<SlabLocation>,
 }
 
 #[derive(Constructor)]
@@ -74,7 +74,7 @@ impl<D> World<D> {
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
-            dirty_chunks: HashSet::with_capacity(32),
+            dirty_slabs: HashSet::with_capacity(32),
         }
     }
 
@@ -390,24 +390,36 @@ impl<D> World<D> {
             self.area_graph.add_edge(src, dst, edge);
         }
 
-        // mark chunk as dirty
-        self.dirty_chunks.insert(chunk_loc);
+        // mark slabs dirty
+        let slabs = slab_range.0.as_i32()..=slab_range.1.as_i32();
+        self.dirty_slabs
+            .extend(slabs.map(|s| SlabLocation::new(s, chunk_loc)));
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
         let OcclusionChunkUpdate(chunk_pos, updates) = update;
+        let len_before = self.dirty_slabs.len();
+
+        // safety: dirty_slabs is not referenced anywhere else through &mut self
+        let dirty_slabs: &mut HashSet<_> = unsafe { std::mem::transmute(&mut self.dirty_slabs) };
+
         if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
-            let applied_count = chunk.raw_terrain_mut().apply_occlusion_updates(&updates);
+            let mut applied_count = 0usize;
+            for affected_slab in chunk.raw_terrain_mut().apply_occlusion_updates(&updates) {
+                applied_count += 1;
+
+                let slab_loc = SlabLocation::new(affected_slab, chunk_pos);
+                dirty_slabs.insert(slab_loc);
+            }
+
             if applied_count > 0 {
                 debug!(
-                    "applied {applied}/{total} queued occlusion updates",
+                    "applied {applied}/{total} queued occlusion updates across {slabs} slabs",
                     applied = applied_count,
-                    total = updates.len();
+                    total = updates.len(),
+                    slabs = self.dirty_slabs.len() - len_before;
                     chunk_pos
                 );
-
-                // mark chunk as dirty
-                self.dirty_chunks.insert(chunk_pos);
             }
         }
     }
@@ -490,9 +502,9 @@ impl<D> World<D> {
         }
     }
 
-    /// Drains all dirty chunks
-    pub fn dirty_chunks(&mut self) -> impl Iterator<Item = ChunkLocation> + '_ {
-        self.dirty_chunks.drain()
+    /// Drains all dirty slabs
+    pub fn dirty_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.dirty_slabs.drain()
     }
 
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {

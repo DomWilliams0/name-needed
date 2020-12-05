@@ -281,7 +281,7 @@
    * `// TODO determine viewer start pos from world/randomly e.g. ground level`
    * `// TODO intelligently choose an initial view range`
    * `// TODO receive initial chunk+slab range from engine`
-   * `// TODO do mesh generation on a worker thread`
+   * `// TODO do mesh generation on a worker thread? or just do this bit in a parallel iter`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO limit to loaded slab bounds if camera is not discovering`
    * `// TODO only request slabs that are newly visible`

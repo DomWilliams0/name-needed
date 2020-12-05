@@ -10,7 +10,7 @@
 	* [ ] restrict camera at world edge?
 * [ ] return full slab from procgen
 * [o] block modification should be localised to the slabs
-* [ ] dont mark chunk as dirty, but chunk+slab range
+* [X] mark slabs as dirty instead of chunks in viewer
 * terrain should be generated at the slab level
 	* [X] pass slab range along with chunk pos to load
 	* [o] load result should only hold slabs, chunk container should be lightweight

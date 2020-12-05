@@ -11,7 +11,7 @@ pub struct WorldViewer<D> {
     world: WorldRef<D>,
     view_range: SliceRange,
     chunk_range: (ChunkLocation, ChunkLocation),
-    clean_chunks: HashSet<ChunkLocation>,
+    clean_slabs: HashSet<SlabLocation>,
     requested_slabs: Vec<SlabLocation>,
 }
 
@@ -130,7 +130,7 @@ impl<D> WorldViewer<D> {
             view_range,
             // TODO receive initial chunk+slab range from engine
             chunk_range: (ChunkLocation(-1, -1), ChunkLocation(1, 1)),
-            clean_chunks: HashSet::with_capacity(128),
+            clean_slabs: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
         })
     }
@@ -141,24 +141,27 @@ impl<D> WorldViewer<D> {
     ) {
         let range = self.terrain_range();
         let world = self.world.borrow();
-        self.visible_chunks()
-            .filter(|c| self.is_chunk_dirty(c))
-            .filter_map(|c| world.find_chunk_with_pos(c))
-            .for_each(|chunk| {
-                // TODO do mesh generation on a worker thread
-                let mesh = mesh::make_simple_render_mesh(chunk, range);
-                trace!("chunk mesh has {count} vertices", count = mesh.len(); chunk.pos());
-                f(chunk.pos(), mesh);
-            });
+
+        for dirty_chunk in self
+            .visible_slabs(range)
+            .filter_map(|slab| self.is_slab_dirty(&slab).as_some(slab.chunk))
+            .dedup()
+            .filter_map(|chunk| world.find_chunk_with_pos(chunk))
+        {
+            // TODO do mesh generation on a worker thread? or just do this bit in a parallel iter
+            let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
+            trace!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
+            f(dirty_chunk.pos(), mesh);
+        }
 
         drop(world);
 
-        self.clean_chunks.extend(self.visible_chunks());
+        self.clean_slabs.extend(self.visible_slabs(range));
     }
 
     fn invalidate_meshes(&mut self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        self.clean_chunks.clear();
+        self.clean_slabs.clear();
     }
 
     fn update_range(&mut self, new_range: SliceRange, wat: &str) {
@@ -205,12 +208,22 @@ impl<D> WorldViewer<D> {
 
     pub fn visible_chunks(&self) -> impl Iterator<Item = ChunkLocation> {
         let (min, max) = self.chunk_range;
-        let xrange = min.0 - 1..=max.0 + 1; // +1 for little buffer
-        let yrange = min.1 - 1..=max.1 + 1;
+        let xrange = min.0 - 1..=max.0;
+        let yrange = min.1 - 1..=max.1;
 
         xrange
             .cartesian_product(yrange)
             .map(|(x, y)| ChunkLocation(x, y))
+    }
+
+    pub fn visible_slabs(&self, range: SliceRange) -> impl Iterator<Item = SlabLocation> {
+        let (bottom_slab, top_slab) = (range.bottom().slab_index(), range.top().slab_index());
+        let (bottom_chunk, top_chunk) = self.chunk_range;
+
+        let from = SlabLocation::new(bottom_slab, bottom_chunk);
+        let to = SlabLocation::new(top_slab, top_chunk);
+        let (slabs, _) = all_slabs_in_range(from, to);
+        slabs
     }
 
     pub fn world(&self) -> InnerWorldRef<D> {
@@ -249,12 +262,12 @@ impl<D> WorldViewer<D> {
         }
     }
 
-    fn is_chunk_dirty(&self, chunk: &ChunkLocation) -> bool {
-        !self.clean_chunks.contains(chunk)
+    fn is_slab_dirty(&self, slab: &SlabLocation) -> bool {
+        !self.clean_slabs.contains(slab)
     }
 
-    pub fn mark_dirty(&mut self, chunk: ChunkLocation) {
-        self.clean_chunks.remove(&chunk);
+    pub fn mark_dirty(&mut self, slab: SlabLocation) {
+        self.clean_slabs.remove(&slab);
     }
 
     /// Returns deduped and sorted by chunk+slab, inner vec is cleared on ret value drop
