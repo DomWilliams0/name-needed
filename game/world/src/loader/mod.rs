@@ -8,7 +8,7 @@ pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::{SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
-pub use worker_pool::{AsyncWorkerPool, WorkerPool};
+pub use worker_pool::AsyncWorkerPool;
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
 
@@ -28,9 +28,9 @@ mod terrain_source;
 mod update;
 mod worker_pool;
 
-pub struct WorldLoader<P: WorkerPool<D>, D> {
+pub struct WorldLoader<D> {
     source: Arc<RwLock<dyn TerrainSource>>,
-    pool: P,
+    pool: AsyncWorkerPool,
     finalization_channel: async_channel::Sender<LoadTerrainResult>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
     world: WorldRef<D>,
@@ -58,8 +58,8 @@ pub enum BlockForAllError {
     Error(#[from] TerrainSourceError),
 }
 
-impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
-    pub fn new<S: TerrainSource + 'static>(source: S, mut pool: P) -> Self {
+impl<D: 'static> WorldLoader<D> {
+    pub fn new<S: TerrainSource + 'static>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
         let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
 
@@ -438,8 +438,7 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
-        let mut loader =
-            WorldLoader::<_, ()>::new(source, AsyncWorkerPool::new_blocking().unwrap());
+        let mut loader = WorldLoader::<()>::new(source, AsyncWorkerPool::new_blocking().unwrap());
         loader.request_slabs(vec![SlabLocation::new(1, (0, 0))].into_iter());
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15), &|| false);

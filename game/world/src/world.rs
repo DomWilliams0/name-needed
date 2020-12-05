@@ -804,9 +804,7 @@ impl AreaLookup {
 pub mod helpers {
     use std::time::Duration;
 
-    use crate::loader::{
-        AsyncWorkerPool, MemoryTerrainSource, WorkerPool, WorldLoader, WorldTerrainUpdate,
-    };
+    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldRef};
     use common::Itertools;
     use unit::world::ChunkLocation;
@@ -823,9 +821,7 @@ pub mod helpers {
         loader_from_chunks_blocking(chunks).world()
     }
 
-    pub fn loader_from_chunks_blocking(
-        chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<impl WorkerPool<()>, ()> {
+    pub fn loader_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldLoader<()> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
@@ -840,7 +836,7 @@ pub mod helpers {
     }
 
     pub fn apply_updates(
-        loader: &mut WorldLoader<impl WorkerPool<()>, ()>,
+        loader: &mut WorldLoader<()>,
         updates: &[WorldTerrainUpdate],
     ) -> Result<(), String> {
         let world = loader.world();
@@ -859,10 +855,10 @@ pub mod helpers {
         Ok(())
     }
 
-    pub(crate) fn load_world<P: WorkerPool<D>, D: 'static>(
+    pub(crate) fn load_world<D: 'static>(
         mut source: MemoryTerrainSource,
-        pool: P,
-    ) -> WorldLoader<P, D> {
+        pool: AsyncWorkerPool,
+    ) -> WorldLoader<D> {
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
@@ -1383,8 +1379,7 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![ChunkBuilder::new().build((0, 0))].into_iter())
                 .unwrap();
-        let loader: WorldLoader<_, u32> =
-            load_world(source, AsyncWorkerPool::new_blocking().unwrap());
+        let loader: WorldLoader<u32> = load_world(source, AsyncWorkerPool::new_blocking().unwrap());
         let worldref = loader.world();
         let mut world = worldref.borrow_mut();
 

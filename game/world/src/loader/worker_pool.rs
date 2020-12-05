@@ -14,27 +14,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
 
-// TODO could remove WorkerPool trait now, there's only 1 impl
-pub trait WorkerPool<D> {
-    fn start_finalizer(
-        &mut self,
-        world: WorldRef<D>,
-        finalize_rx: async_channel::Receiver<LoadTerrainResult>,
-        chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
-    );
-
-    fn block_on_next_finalize(
-        &mut self,
-        timeout: Duration,
-    ) -> Option<Result<SlabLocation, TerrainSourceError>>;
-
-    fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
-        &mut self,
-        task: T,
-        done_channel: async_channel::Sender<LoadTerrainResult>,
-    );
-}
-
 pub struct AsyncWorkerPool {
     pool: tokio::runtime::Runtime,
     success_rx: async_channel::UnboundedReceiver<Result<SlabLocation, TerrainSourceError>>,
@@ -70,10 +49,8 @@ impl AsyncWorkerPool {
             success_tx,
         })
     }
-}
 
-impl<D: 'static> WorkerPool<D> for AsyncWorkerPool {
-    fn start_finalizer(
+    pub fn start_finalizer<D: 'static>(
         &mut self,
         world: WorldRef<D>,
         mut finalize_rx: async_channel::Receiver<LoadTerrainResult>,
@@ -108,7 +85,7 @@ impl<D: 'static> WorkerPool<D> for AsyncWorkerPool {
         });
     }
 
-    fn block_on_next_finalize(
+    pub fn block_on_next_finalize(
         &mut self,
         timeout: Duration,
     ) -> Option<Result<SlabLocation, TerrainSourceError>> {
@@ -122,7 +99,7 @@ impl<D: 'static> WorkerPool<D> for AsyncWorkerPool {
         })
     }
 
-    fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
+    pub fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
         &mut self,
         task: T,
         mut done_channel: async_channel::Sender<LoadTerrainResult>,

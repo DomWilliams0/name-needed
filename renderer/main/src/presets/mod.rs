@@ -3,8 +3,8 @@ use std::path::Path;
 
 use resources::resource::Resources;
 use simulation::{
-    all_slabs_in_range, presets, GeneratedTerrainSource, Renderer, Simulation, SlabLocation,
-    ThreadedWorldLoader, WorkerPool, WorldLoader,
+    all_slabs_in_range, presets, AsyncWorkerPool, GeneratedTerrainSource, Renderer, Simulation,
+    SlabLocation, ThreadedWorldLoader, WorldLoader,
 };
 use std::time::Duration;
 
@@ -46,10 +46,10 @@ pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
 use engine::panic;
 
-fn world_from_source<D: 'static, P: WorkerPool<D>>(
+fn world_from_source<D: 'static>(
     source: config::WorldSource,
-    pool: P,
-) -> Result<WorldLoader<P, D>, &'static str> {
+    pool: AsyncWorkerPool,
+) -> Result<WorldLoader<D>, &'static str> {
     Ok(match source {
         config::WorldSource::Preset(preset) => {
             debug!("loading world preset"; "preset" => ?preset);

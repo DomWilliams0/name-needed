@@ -5,7 +5,7 @@ use common::*;
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
-use world::loader::{AsyncWorkerPool, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate};
+use world::loader::{TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
 use crate::activity::{ActivityEventSystem, ActivitySystem};
@@ -38,7 +38,7 @@ pub enum AssociatedBlockData {
     Container(Entity),
 }
 
-pub type ThreadedWorldLoader = WorldLoader<AsyncWorkerPool, AssociatedBlockData>;
+pub type ThreadedWorldLoader = WorldLoader<AssociatedBlockData>;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
