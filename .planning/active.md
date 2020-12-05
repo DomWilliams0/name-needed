@@ -1,10 +1,12 @@
 # Active tasks
 
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
-* [.] dynamic chunk loading
+* [o] dynamic chunk loading
 	* [X] load slabs as camera pans
-	* [ ] load slabs as camera moves up and down
+	* [X] load slabs as camera moves up and down
 	* [ ] config opt to disable discovery by camera, only by society entities
+	* [ ] all-air placeholder slabs should not be marked as fully loaded
+	* [ ] bug: all air placeholders clobber existing terrain!
 	* [ ] restrict camera at world edge?
 * [ ] return full slab from procgen
 * [o] block modification should be localised to the slabs

@@ -5,8 +5,8 @@ use common::derive_more::Constructor;
 use common::*;
 use unit::dim::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceBlock,
-    SliceIndex, WorldPosition, WorldPositionRange,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
@@ -83,21 +83,16 @@ impl<D> World<D> {
     }
 
     pub fn slice_bounds(&self) -> Option<SliceRange> {
-        let min = self
-            .chunks
-            .iter()
-            .map(|c| c.slice_bounds_as_slabs().bottom())
-            .min();
-        let max = self
-            .chunks
-            .iter()
-            .map(|c| c.slice_bounds_as_slabs().top())
-            .max();
+        let slab_ranges = self.chunks.iter().map(|c| c.raw_terrain().slab_range());
 
-        match (min, max) {
-            (Some(min), Some(max)) => Some(SliceRange::from_bounds_unchecked(min, max)),
-            _ => None,
-        }
+        let min = slab_ranges.clone().map(|(bottom, _)| bottom).min();
+        let max = slab_ranges.map(|(_, top)| top).max();
+
+        min.zip(max).map(|(min_slab, max_slab)| {
+            let min_slice = LocalSliceIndex::bottom().to_global(min_slab);
+            let max_slice = LocalSliceIndex::top().to_global(max_slab);
+            SliceRange::from_bounds_unchecked(min_slice, max_slice)
+        })
     }
 
     fn find_chunk_index(&self, chunk_pos: ChunkLocation) -> Result<usize, usize> {

@@ -283,7 +283,7 @@
    * `// TODO receive initial chunk+slab range from engine`
    * `// TODO do mesh generation on a worker thread`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
-   * `// TODO cache world slice_bounds()`
+   * `// TODO limit to loaded slab bounds if camera is not discovering`
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`

@@ -161,24 +161,28 @@ impl<D> WorldViewer<D> {
         self.clean_chunks.clear();
     }
 
-    fn update_range(&mut self, new_range: SliceRange, past_participle: &str, infinitive: &str) {
-        // TODO cache world slice_bounds()
-        let bounds = self.world.borrow().slice_bounds();
-        if let Some(slice_bounds) = bounds {
-            if slice_bounds.contains(new_range.0) && slice_bounds.contains(new_range.1) {
-                self.view_range = new_range;
-                self.invalidate_meshes();
-                info!(
-                    "{} view range",
-                    past_participle; "range" => %self.view_range,
-                );
-            } else {
-                info!(
-                    "cannot {} view range",
-                    infinitive; "range" => %self.view_range, "world_range" => %slice_bounds,
-                );
-            }
-        }
+    fn update_range(&mut self, new_range: SliceRange, wat: &str) {
+        // TODO limit to loaded slab bounds if camera is not discovering
+        self.view_range = new_range;
+        self.invalidate_meshes();
+        info!(
+            "{} view range",
+            wat; "range" => %self.view_range,
+        );
+
+        // request new slabs
+        // TODO only request slabs that are newly visible
+        let (bottom_slab, top_slab) = (
+            new_range.bottom().slab_index(),
+            new_range.top().slab_index(),
+        );
+        let (bottom_chunk, top_chunk) = self.chunk_range;
+
+        let from = SlabLocation::new(bottom_slab, bottom_chunk);
+        let to = SlabLocation::new(top_slab, top_chunk);
+        let (slabs, slab_count) = all_slabs_in_range(from, to);
+        self.requested_slabs.extend(slabs);
+        trace!("vertical camera movement requested loading of {count} slabs", count = slab_count; "from" => from, "to" => to);
     }
 
     // TODO which direction to stretch view range in? automatically determine or player input?
@@ -186,12 +190,12 @@ impl<D> WorldViewer<D> {
         let bottom = self.view_range.bottom();
         let new_top = self.view_range.top() + delta;
         if let Some(new_range) = SliceRange::from_bounds(bottom, new_top) {
-            self.update_range(new_range, "stretched", "stretch")
+            self.update_range(new_range, "stretched")
         }
     }
 
     pub fn move_by(&mut self, delta: i32) {
-        self.update_range(self.view_range + delta, "moved", "move");
+        self.update_range(self.view_range + delta, "moved");
     }
 
     pub fn move_by_multiple(&mut self, delta: i32) {
