@@ -3,7 +3,7 @@ use common::derive_more::{From, Into};
 use common::*;
 
 /// A slab in the world
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]
 pub struct SlabLocation {
     pub chunk: ChunkLocation,
     pub slab: SlabIndex,
@@ -15,6 +15,12 @@ impl SlabLocation {
             chunk: chunk.into(),
             slab: slab.into(),
         }
+    }
+}
+
+impl Debug for SlabLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}]", self.chunk.0, self.chunk.1, self.slab.0)
     }
 }
 

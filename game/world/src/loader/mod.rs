@@ -10,7 +10,7 @@ use unit::world::{SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::{AsyncWorkerPool, WorkerPool};
 
-use crate::chunk::slab::{Slab, SlabInternalNavigability};
+use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
 
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
@@ -136,6 +136,7 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
 
             // request the slab above the highest as all-air, so navigation discovery works
             // properly
+            // TODO this clobbers the slab
             let empty = highest + 1;
             extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
             chunk.mark_slab_requested(empty);
@@ -145,19 +146,13 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
         let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
         let mut real_count = 0;
 
-        #[derive(Copy, Clone)]
-        enum SlabRequest {
-            Real,
-            AirOnly,
-        }
-
         let all_slabs = {
-            let real_slabs = slabs.zip(repeat(SlabRequest::Real));
-            let air_slabs = extra_slabs.into_iter().zip(repeat(SlabRequest::AirOnly));
+            let real_slabs = slabs.zip(repeat(SlabType::Normal));
+            let air_slabs = extra_slabs.into_iter().zip(repeat(SlabType::Placeholder));
             real_slabs.chain(air_slabs)
         };
 
-        for (slab, request) in all_slabs {
+        for (slab, slab_type) in all_slabs {
             log_scope!(o!(slab));
 
             let chunk = world_mut.ensure_chunk(slab.chunk);
@@ -176,10 +171,10 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
             self.pool.submit(
                 move || {
                     // wrapped in closure for common error handling case
-                    let get_terrain = || -> Result<Slab, TerrainSourceError> {
-                        if matches!(request, SlabRequest::AirOnly) {
-                            // bit of a hack to force an all air slab
-                            return Err(TerrainSourceError::OutOfBounds(slab));
+                    let get_terrain = || -> Result<Option<Slab>, TerrainSourceError> {
+                        if matches!(slab_type, SlabType::Placeholder) {
+                            // empty placeholder
+                            return Ok(None);
                         }
 
                         // briefly hold the source lock to get a preprocess closure to run.
@@ -199,25 +194,22 @@ impl<P: WorkerPool<D>, D: 'static> WorldLoader<P, D> {
                             terrain_source.load_slab(slab, preprocess_result)?
                         };
 
-                        Ok(terrain)
+                        Ok(Some(terrain))
                     };
 
                     let mut terrain = match get_terrain() {
-                        Ok(terrain) => terrain,
+                        Ok(Some(terrain)) => terrain,
+                        Ok(None) => {
+                            debug!("adding placeholder slab to the top of the chunk"; slab);
+                            Slab::empty_placeholder()
+                        }
                         Err(TerrainSourceError::OutOfBounds(slab)) => {
-                            match request {
-                                SlabRequest::AirOnly => {
-                                    debug!("adding air only slab to the top of the chunk"; slab)
-                                }
-                                SlabRequest::Real => {
-                                    // soft error, we're at the world edge. treat as all air instead of
-                                    // crashing and burning
-                                    debug!("slab is out of bounds, swapping in an empty one"; slab);
-                                }
-                            }
+                            // soft error, we're at the world edge. treat as all air instead of
+                            // crashing and burning
+                            debug!("slab is out of bounds, swapping in an empty one"; slab);
 
                             // TODO shared instance of CoW for empty slab
-                            Slab::empty()
+                            Slab::empty_placeholder()
                         }
                         Err(err) => return Err(err),
                     };

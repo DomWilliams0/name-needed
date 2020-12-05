@@ -287,7 +287,7 @@ impl<D> WorldViewer<D> {
 
         // filter down any already loaded slabs
         let world = self.world.borrow();
-        world.retain_unloaded_slabs(&mut self.requested_slabs);
+        world.retain_slabs_to_load(&mut self.requested_slabs);
         drop(world);
 
         if len_before > 0 {
@@ -296,6 +296,8 @@ impl<D> WorldViewer<D> {
                 unfiltered = len_before,
                 filtered = self.requested_slabs.len()
             );
+
+            trace!("slab requests"; "slabs" => ?self.requested_slabs);
         }
 
         RequestedSlabs(&mut self.requested_slabs)

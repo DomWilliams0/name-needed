@@ -152,6 +152,8 @@ impl<D> World<D> {
         chunk: &Chunk<D>,
         terrain: &mut Slab,
     ) -> SlabInternalNavigability {
+        log_scope!(o!(chunk.pos()));
+
         // copy the top and bottom slices into chunk so neighbouring slabs can access it
         chunk.mark_slab_in_progress(slab, terrain);
 
@@ -689,13 +691,14 @@ impl<D> World<D> {
             .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
     }
 
+    /// Removes slabs that are already loaded and not placeholders.
     /// More efficient when sorted by slab
-    pub fn retain_unloaded_slabs(&self, slabs: &mut Vec<SlabLocation>) {
+    pub fn retain_slabs_to_load(&self, slabs: &mut Vec<SlabLocation>) {
         let mut contiguous_chunks = ContiguousChunkIterator::new(self);
 
         slabs.retain(|slab| {
             match contiguous_chunks.next(slab.chunk) {
-                Some(chunk) => !chunk.is_slab_loaded_or_loading(slab.slab),
+                Some(chunk) => chunk.should_slab_be_loaded(slab.slab),
                 None => {
                     // chunk is unloaded so its slabs are too
                     true

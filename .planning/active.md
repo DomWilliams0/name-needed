@@ -5,7 +5,7 @@
 	* [X] load slabs as camera pans
 	* [X] load slabs as camera moves up and down
 	* [ ] config opt to disable discovery by camera, only by society entities
-	* [ ] all-air placeholder slabs should not be marked as fully loaded
+	* [o] all-air placeholder slabs should not be marked as fully loaded
 	* [ ] bug: all air placeholders clobber existing terrain!
 	* [ ] restrict camera at world edge?
 * [ ] return full slab from procgen

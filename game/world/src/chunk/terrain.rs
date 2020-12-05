@@ -175,8 +175,9 @@ impl RawChunkTerrain {
         }
     }
 
-    pub(crate) fn add_empty_slab(&mut self, slab: impl Into<SlabIndex>) {
-        self.slabs.add(Slab::empty(), slab.into());
+    #[cfg(test)]
+    pub fn add_empty_placeholder_slab(&mut self, slab: impl Into<SlabIndex>) {
+        self.slabs.add(Slab::empty_placeholder(), slab.into());
     }
 
     pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab> {
@@ -192,10 +193,10 @@ impl RawChunkTerrain {
         self.slabs.get(index).map(|s| s.deep_clone())
     }
 
-    /// Fills in gaps in slabs up to the inclusive target with empty slab. Nop if zero
+    /// Fills in gaps in slabs up to the inclusive target with empty placeholder slabs. Nop if zero
     pub(crate) fn create_slabs_until(&mut self, target: SlabIndex) {
         if target != SlabIndex(0) {
-            self.slabs.fill_until(target, |_| Slab::empty())
+            self.slabs.fill_until(target, |_| Slab::empty_placeholder())
         }
     }
 
@@ -795,13 +796,13 @@ mod pair_walking {
 }
 
 impl Default for RawChunkTerrain {
-    /// has single empty slab at index 0
+    /// Has a single empty placeholder slab at index 0
     fn default() -> Self {
         let mut terrain = Self {
             slabs: DoubleSidedVec::with_capacity(8),
         };
 
-        terrain.add_empty_slab(0);
+        terrain.slabs.add(Slab::empty_placeholder(), 0);
 
         terrain
     }
@@ -837,18 +838,18 @@ mod tests {
     #[should_panic]
     fn no_dupes() {
         let mut terrain = RawChunkTerrain::default();
-        terrain.add_empty_slab(0);
+        terrain.add_empty_placeholder_slab(0);
     }
 
     #[test]
     fn slabs() {
         let mut terrain = RawChunkTerrain::default();
 
-        terrain.add_empty_slab(1);
-        terrain.add_empty_slab(2);
+        terrain.add_empty_placeholder_slab(1);
+        terrain.add_empty_placeholder_slab(2);
 
-        terrain.add_empty_slab(-1);
-        terrain.add_empty_slab(-2);
+        terrain.add_empty_placeholder_slab(-1);
+        terrain.add_empty_placeholder_slab(-2);
 
         let slabs: Vec<i32> = terrain
             .slabs_from_top()
@@ -889,7 +890,7 @@ mod tests {
         assert!(terrain.slice(SLAB_SIZE.as_i32()).is_none());
         assert!(terrain.slice(-1).is_none());
 
-        terrain.add_empty_slab(-1);
+        terrain.add_empty_placeholder_slab(-1);
         *terrain.slice_mut(-1).unwrap()[(3, 3)].block_type_mut() = BlockType::Grass;
         assert_eq!(
             terrain.slice(-1).unwrap()[(3, 3)].block_type(),

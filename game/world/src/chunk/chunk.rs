@@ -311,9 +311,23 @@ impl<D> Chunk<D> {
         ret
     }
 
-    /// Returns true if slab has been requested
-    pub fn is_slab_loaded_or_loading(&self, slab: SlabIndex) -> bool {
-        !matches!(self.slab_progress(slab), SlabLoadingStatus::Unloaded)
+    /// Returns true if slab has not been already requested/loaded or is a placeholder
+    pub fn should_slab_be_loaded(&self, slab: SlabIndex) -> bool {
+        match self.slab_progress(slab) {
+            SlabLoadingStatus::Unloaded => {
+                // has not been requested, pls load
+                true
+            }
+            SlabLoadingStatus::Requested | SlabLoadingStatus::InProgress { .. } => {
+                // is currently in progress, don't request again
+                false
+            }
+            SlabLoadingStatus::Done => {
+                // is already loaded, only load again if it is a placeholder
+                let slab = self.terrain.slab(slab).unwrap();
+                slab.is_placeholder()
+            }
+        }
     }
 }
 

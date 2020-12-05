@@ -21,10 +21,17 @@ grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
     SLAB_SIZE.as_usize()
 );
 
+#[derive(Copy, Clone)]
+pub enum SlabType {
+    Normal,
+
+    /// All air placeholder that should be overwritten with actual terrain
+    Placeholder,
+}
+
 /// CoW slab terrain
 #[derive(Clone)]
-#[repr(transparent)]
-pub struct Slab(Arc<SlabGridImpl>);
+pub struct Slab(Arc<SlabGridImpl>, SlabType);
 
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
 
@@ -34,9 +41,17 @@ pub trait DeepClone {
 
 impl Slab {
     pub fn empty() -> Self {
+        Self::new_empty(SlabType::Normal)
+    }
+
+    pub fn empty_placeholder() -> Self {
+        Self::new_empty(SlabType::Placeholder)
+    }
+
+    fn new_empty(ty: SlabType) -> Self {
         let terrain = SlabGrid::default().into_boxed_impl();
         let arc = Arc::from(terrain);
-        Self(arc)
+        Self(arc, ty)
     }
 
     pub fn cow_clone(&mut self) -> &mut Slab {
@@ -55,6 +70,10 @@ impl Slab {
 
     pub fn is_exclusive(&self) -> bool {
         Arc::strong_count(&self.0) == 1
+    }
+
+    pub fn is_placeholder(&self) -> bool {
+        matches!(self.1, SlabType::Placeholder)
     }
 
     /// Leaks
@@ -109,7 +128,7 @@ impl DeepClone for Slab {
         let mut new_copy = SlabGridImpl::default_boxed();
         new_copy.array.copy_from_slice(&self.array);
 
-        Self(Arc::from(new_copy))
+        Self(Arc::from(new_copy), self.1)
     }
 }
 
