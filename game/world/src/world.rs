@@ -65,6 +65,8 @@ struct ContiguousChunkIteratorMut<'a, D> {
 struct ContiguousChunkIterator<'a, D> {
     world: &'a World<D>,
     last_chunk: Option<(ChunkLocation, usize)>,
+    #[cfg(test)]
+    matched_last: bool,
 }
 
 impl<D> World<D> {
@@ -736,6 +738,8 @@ impl<'a, D> ContiguousChunkIterator<'a, D> {
         ContiguousChunkIterator {
             world,
             last_chunk: None,
+            #[cfg(test)]
+            matched_last: false,
         }
     }
 
@@ -746,12 +750,23 @@ impl<'a, D> ContiguousChunkIterator<'a, D> {
         match self.last_chunk.take() {
             Some((last_loc, idx)) if last_loc == chunk => {
                 // nice, reuse index of chunk without lookup
+                #[cfg(test)]
+                {
+                    self.matched_last = true;
+                }
+
                 // safety: index returned by last call and no chunks added since because this holds
                 // a world reference
                 Some(unsafe { self.world.chunks.get_unchecked(idx) })
             }
             _ => {
                 // new chunk
+
+                #[cfg(test)]
+                {
+                    self.matched_last = false;
+                }
+
                 match self.world.find_chunk_index(chunk) {
                     Ok(idx) => {
                         self.last_chunk = Some((chunk, idx));
@@ -885,6 +900,7 @@ mod tests {
     use crate::world::helpers::{
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
+    use crate::world::ContiguousChunkIterator;
     use crate::{all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
     use config::WorldPreset;
 
@@ -1370,5 +1386,45 @@ mod tests {
         assert_eq!(world.set_associated_block_data(pos, 100), Some(50));
 
         assert_eq!(world.associated_block_data(pos).copied(), Some(100));
+    }
+
+    #[test]
+    fn contiguous_chunk_iter() {
+        let chunks = vec![
+            ChunkBuilder::new().build((0, 0)),
+            ChunkBuilder::new().build((1, 0)),
+        ];
+        let world = world_from_chunks_blocking(chunks);
+        let world = world.borrow();
+        let mut iter = ContiguousChunkIterator::new(&*world);
+        let mut chunk;
+
+        chunk = iter.next(ChunkLocation(0, 0));
+        assert!(chunk.is_some());
+
+        // same as before
+        chunk = iter.next(ChunkLocation(0, 0));
+        assert!(chunk.is_some());
+        assert!(iter.matched_last);
+
+        // changed
+        chunk = iter.next(ChunkLocation(1, 0));
+        assert!(chunk.is_some());
+        assert!(!iter.matched_last);
+
+        // same
+        chunk = iter.next(ChunkLocation(1, 0));
+        assert!(chunk.is_some());
+        assert!(iter.matched_last);
+
+        // bad
+        chunk = iter.next(ChunkLocation(5, 0));
+        assert!(chunk.is_none());
+        assert!(!iter.matched_last);
+
+        // still bad
+        chunk = iter.next(ChunkLocation(5, 0));
+        assert!(chunk.is_none());
+        assert!(!iter.matched_last);
     }
 }
