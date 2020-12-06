@@ -1,7 +1,6 @@
 use common::derive_more::*;
 
-use crate::dim::CHUNK_SIZE;
-use crate::world::{BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition};
+use crate::world::{BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, CHUNK_SIZE};
 
 /// A block in a chunk x/y coordinate. Must be < chunk size
 pub type BlockCoord = u8;

@@ -1,9 +1,8 @@
 use common::derive_more::*;
 use common::*;
 
-use crate::dim::CHUNK_SIZE;
 use crate::world::{
-    BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
 };
 use std::ops::Add;
 

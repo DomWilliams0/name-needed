@@ -65,7 +65,7 @@ mod split {
     use std::iter::once;
 
     use common::*;
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
     use unit::world::{
         ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
         WorldRange, SLAB_SIZE,
@@ -164,7 +164,7 @@ mod split {
     #[cfg(test)]
     mod tests {
         use common::*;
-        use unit::dim::CHUNK_SIZE;
+        use unit::world::CHUNK_SIZE;
         use unit::world::{ChunkLocation, SlabIndex, WorldPositionRange, WorldRange, SLAB_SIZE};
 
         use crate::block::BlockType;

@@ -1,4 +1,3 @@
-use crate::chunk::RawChunkTerrain;
 use common::*;
 use unit::world::{ChunkLocation, SlabLocation};
 
@@ -21,18 +20,20 @@ pub enum TerrainSourceError {
 }
 
 pub trait PreprocessedTerrain: Send {
-    fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain;
+    fn into_slab(self: Box<Self>) -> Slab;
 }
 
 pub trait TerrainSource: Send + Sync {
     /// Bounding box, inclusive
-    fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation);
+    fn world_bounds(&self) -> (ChunkLocation, ChunkLocation);
 
+    /// Returns closure to run concurrently
     fn preprocess(
         &self,
         slab: SlabLocation,
     ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>>;
 
+    /// Mutable reference to self so can't be done concurrently
     fn load_slab(
         &mut self,
         slab: SlabLocation,
@@ -55,6 +56,7 @@ pub use memory::MemoryTerrainSource;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunk::RawChunkTerrain;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
     use matches::assert_matches;
     use std::iter::once;
@@ -77,7 +79,7 @@ mod tests {
         let mut just_one =
             MemoryTerrainSource::from_chunks(once(((0, 0), RawChunkTerrain::default()))).unwrap();
         assert_eq!(
-            *just_one.world_bounds(),
+            just_one.world_bounds(),
             (ChunkLocation(0, 0), ChunkLocation(0, 0))
         );
 
@@ -105,7 +107,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            *sparse.world_bounds(),
+            sparse.world_bounds(),
             (ChunkLocation(-8, -4), ChunkLocation(2, 6))
         );
     }

@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! grid_declare {
     ($vis:vis struct $name:ident < $implname:ident, $t:ty > , $x:expr, $y:expr, $z:expr) => {
-        $vis type $name = Grid<$implname>;
+        $vis type $name = $crate::Grid<$implname>;
 
         #[derive(Clone)]
         #[repr(transparent)]
@@ -9,7 +9,7 @@ macro_rules! grid_declare {
             array: [$t; Self::FULL_SIZE],
         }
 
-        impl GridImpl for $implname {
+        impl $crate::GridImpl for $implname {
             type Item = $t;
             const DIMS: [i32; 3] = [$x as i32, $y as i32, $z as i32];
             const FULL_SIZE: usize = $x * $y * $z;

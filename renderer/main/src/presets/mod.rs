@@ -3,8 +3,8 @@ use std::path::Path;
 
 use resources::resource::Resources;
 use simulation::{
-    all_slabs_in_range, presets, AsyncWorkerPool, GeneratedTerrainSource, Renderer, Simulation,
-    SlabLocation, ThreadedWorldLoader, WorldLoader,
+    all_slabs_in_range, presets, AsyncWorkerPool, GeneratedTerrainSource, PlanetParams, Renderer,
+    Simulation, SlabLocation, ThreadedWorldLoader, WorldLoader,
 };
 use std::time::Duration;
 
@@ -58,8 +58,19 @@ fn world_from_source(
         }
         config::WorldSource::Generate { seed, radius } => {
             debug!("generating world with radius {radius}", radius = radius);
-            let height_scale = config::get().world.generation_height_scale;
-            let source = GeneratedTerrainSource::new(seed, radius, height_scale)?;
+
+            let seed = if let Some(seed) = seed {
+                debug!("using specified planet seed"; "seed" => seed);
+                seed
+            } else {
+                let seed = thread_rng().gen();
+                debug!("using random planet seed"; "seed" => seed);
+                seed
+            };
+
+            // TODO deserialize planet params from config
+            let params = PlanetParams { seed, radius };
+            let source = GeneratedTerrainSource::new(params)?;
             WorldLoader::new(source, pool)
         }
     })

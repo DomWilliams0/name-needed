@@ -3,8 +3,6 @@ use common::{derive_more::*, *};
 use newtype_derive::*;
 use std::ops::{Div, Mul};
 
-pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
-
 /// Index of a slab in a chunk
 #[derive(
     Debug,

@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::{Block, BlockType};

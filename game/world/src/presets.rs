@@ -2,7 +2,7 @@ use std::iter::once;
 
 use common::*;
 use config::WorldPreset;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 
 use crate::block::BlockType;
 use crate::chunk::ChunkBuilder;

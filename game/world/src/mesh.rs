@@ -8,7 +8,7 @@ use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::{BaseTerrain, WorldContext};
 use std::mem::MaybeUninit;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
 
 // for ease of declaration. /2 for radius as this is based around the center of the block

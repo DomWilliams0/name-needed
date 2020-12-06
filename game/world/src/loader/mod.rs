@@ -4,6 +4,7 @@ use futures::channel::mpsc as async_channel;
 
 pub use batch::UpdateBatch;
 use common::*;
+pub use procgen::PlanetParams;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::{SlabIndex, SlabLocation};
@@ -418,7 +419,7 @@ mod tests {
 
     use std::time::Duration;
 
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;

@@ -2,8 +2,8 @@ use cgmath::ortho;
 
 use common::input::CameraDirection;
 use common::*;
-use unit::dim::CHUNK_SIZE;
 use unit::view::ViewPoint;
+use unit::world::CHUNK_SIZE;
 use unit::world::{ChunkLocation, WorldPoint, WorldPosition, SCALE};
 
 pub struct Camera {

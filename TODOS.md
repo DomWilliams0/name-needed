@@ -1,4 +1,4 @@
-# TODOs (237)
+# TODOs (244)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,8 +14,12 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
-   * `// TODO generate lower res noise and scale up`
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
+   * `// TODO square with width/height in some unit or circle?`
+   * `// TODO custom block types for procgen that are translated to game blocks`
+   * `// TODO move this`
+   * `// TODO actual error type`
+   * `// TODO begin actual generation? or up to the caller for async goodness`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
@@ -244,6 +248,9 @@
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (2)
+   * `// TODO might be able to use SlabGridImpl here and avoid double boxing`
+   * `// TODO populate slab grid from generated`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
@@ -317,8 +324,9 @@
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
- * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
+ * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (2)
    * `// TODO get initial slab range to request from engine`
+   * `// TODO deserialize planet params from config`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

@@ -1,8 +1,7 @@
 use common::derive_more::{From, Into};
 use common::*;
 
-use crate::dim::CHUNK_SIZE;
-use crate::world::{SlabIndex, SlabLocation, WorldPosition};
+use crate::world::{SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE};
 use std::convert::From;
 use std::ops::{Add, Sub};
 

@@ -3,7 +3,7 @@ use std::iter::once;
 
 use common::derive_more::Constructor;
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
     SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
@@ -1136,7 +1136,7 @@ mod tests {
     use std::time::Duration;
 
     use common::{seeded_rng, Itertools, Rng};
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
         WorldPositionRange, SLAB_SIZE,
@@ -1507,7 +1507,7 @@ mod tests {
         // let source =
         //     GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
         let source = from_preset(WorldPreset::MultiChunkWonder);
-        let (min, max) = *source.world_bounds();
+        let (min, max) = source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
 
         let max_slab = (TERRAIN_HEIGHT as f32 / SLAB_SIZE.as_f32()).ceil() as i32 + 1;

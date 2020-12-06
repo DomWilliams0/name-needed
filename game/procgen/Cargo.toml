@@ -8,6 +8,8 @@ edition = "2018"
 
 [dependencies]
 common = {path = "../../shared/common"}
+unit = {path = "../../shared/unit"}
+grid = {path = "../../shared/grid"}
 noise = "^0.6"
 image = {version = "^0.23", optional = true, default-features = false, features = ["png"]}
 

@@ -2,7 +2,7 @@ use std::iter::once;
 use std::ops::Deref;
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, WorldRange, SLAB_SIZE};
 
 use crate::block::Block;
@@ -12,7 +12,7 @@ use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
 use crate::WorldChangeEvent;
-use grid::{grid_declare, Grid, GridImpl};
+use grid::{grid_declare, GridImpl};
 use std::sync::Arc;
 
 grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
@@ -50,7 +50,11 @@ impl Slab {
     }
 
     fn new_empty(ty: SlabType) -> Self {
-        let terrain = SlabGrid::default().into_boxed_impl();
+        Self::from_grid(SlabGrid::default(), ty)
+    }
+
+    pub fn from_grid(grid: SlabGrid, ty: SlabType) -> Self {
+        let terrain = grid.into_boxed_impl();
         let arc = Arc::from(terrain);
         Self(arc, ty)
     }

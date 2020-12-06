@@ -5,8 +5,8 @@ pub use world::{
     all_slabs_in_range,
     block::{BlockType, IntoEnumIterator},
     loader::{
-        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, TerrainUpdatesRes, WorldLoader,
-        WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams, TerrainUpdatesRes,
+        WorldLoader, WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };

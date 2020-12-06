@@ -379,7 +379,7 @@ mod tests {
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder};
     use crate::helpers::DummyWorldContext;
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
 
     #[test]
     fn chunk_ops() {

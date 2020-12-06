@@ -1,8 +1,8 @@
 use common::derive_more::*;
 
-use crate::dim::CHUNK_SIZE;
 use crate::world::{
     BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, SliceIndex, WorldPosition,
+    CHUNK_SIZE,
 };
 
 // TODO consider using same generic pattern as SliceIndex for all points and positions

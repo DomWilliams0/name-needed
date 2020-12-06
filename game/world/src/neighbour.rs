@@ -1,7 +1,7 @@
 use std::hint::unreachable_unchecked;
 use std::marker::PhantomData;
 
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation};
 
 pub struct Neighbours<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]>> {

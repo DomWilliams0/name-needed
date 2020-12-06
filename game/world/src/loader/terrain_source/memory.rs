@@ -61,8 +61,8 @@ impl MemoryTerrainSource {
 }
 
 impl TerrainSource for MemoryTerrainSource {
-    fn world_bounds(&self) -> &(ChunkLocation, ChunkLocation) {
-        &self.bounds
+    fn world_bounds(&self) -> (ChunkLocation, ChunkLocation) {
+        self.bounds
     }
 
     fn preprocess(
@@ -86,28 +86,10 @@ impl TerrainSource for MemoryTerrainSource {
 
         Ok(slab)
     }
-
-    /*    fn preprocess(
-            &self,
-            _: ChunkLocation,
-        ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
-        }
-
-        fn load_chunk(
-            &mut self,
-            chunk: ChunkLocation,
-            _: Box<dyn PreprocessedTerrain>,
-        ) -> Result<RawChunkTerrain, TerrainSourceError> {
-            self.chunk_map
-                .get_mut(&chunk)
-                .ok_or(TerrainSourceError::OutOfBounds)
-                .and_then(|terrain| terrain.take().ok_or(TerrainSourceError::Duplicate(chunk)))
-        }
-    */
 }
 
 impl PreprocessedTerrain for () {
-    fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain {
+    fn into_slab(self: Box<Self>) -> Slab {
         unreachable!()
     }
 }

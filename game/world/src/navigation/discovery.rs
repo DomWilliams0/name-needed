@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
@@ -10,7 +10,7 @@ use crate::chunk::slice::Slice;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
-use grid::{grid_declare, CoordType, Grid, GridImpl};
+use grid::{grid_declare, CoordType, GridImpl};
 use std::ops::Deref;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,

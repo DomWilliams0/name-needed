@@ -4,7 +4,7 @@ use std::iter::{once, repeat};
 
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
     SLAB_SIZE,
@@ -812,7 +812,7 @@ impl Default for RawChunkTerrain {
 mod tests {
     use matches::assert_matches;
 
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
     use crate::block::BlockType;

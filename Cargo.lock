@@ -1936,8 +1936,10 @@ name = "procgen"
 version = "0.1.0"
 dependencies = [
  "common",
+ "grid",
  "image 0.23.10",
  "noise",
+ "unit",
 ]
 
 [[package]]

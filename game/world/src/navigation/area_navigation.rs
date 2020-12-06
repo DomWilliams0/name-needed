@@ -5,7 +5,7 @@ use petgraph::stable_graph::StableGraph;
 use petgraph::Directed;
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 
 use crate::navigation::astar::astar;
@@ -291,7 +291,7 @@ impl Debug for AreaNavEdge {
 mod tests {
     use matches::assert_matches;
 
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
     use crate::block::BlockType;

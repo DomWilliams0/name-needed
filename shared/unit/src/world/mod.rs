@@ -10,6 +10,14 @@ pub use slice_index::*;
 pub use world_point::*;
 pub use world_position::*;
 
+use crate::dim::SmallUnsignedConstant;
+
+/// Chunk size X and Y dimension
+pub const CHUNK_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(16);
+
+/// Chunk size Z dimension
+pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
+
 mod block_position;
 mod chunk_location;
 mod chunk_point;
@@ -33,8 +41,9 @@ mod tests {
 
     use common::*;
 
-    use crate::dim::CHUNK_SIZE;
-    use crate::world::{BlockPosition, ChunkLocation, SliceIndex, WorldPoint, WorldPosition};
+    use crate::world::{
+        BlockPosition, ChunkLocation, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+    };
 
     #[test]
     fn block_to_world() {

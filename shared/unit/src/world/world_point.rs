@@ -5,8 +5,7 @@ use common::derive_more::*;
 
 use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
-use crate::dim::CHUNK_SIZE;
-use crate::world::{ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPosition};
+use crate::world::{ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPosition, CHUNK_SIZE};
 
 /// A point anywhere in the world
 // TODO assert fields are not NaN in points
