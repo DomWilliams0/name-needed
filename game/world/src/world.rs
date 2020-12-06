@@ -21,9 +21,13 @@ use crate::navigation::{
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
 
+pub trait WorldContext: 'static {
+    type AssociatedBlockData;
+}
+
 /// All mutable world changes must go through `loader.apply_terrain_updates`
-pub struct World<D> {
-    chunks: Vec<Chunk<D>>,
+pub struct World<C: WorldContext> {
+    chunks: Vec<Chunk<C>>,
     area_graph: AreaGraph,
     dirty_slabs: HashSet<SlabLocation>,
 }
@@ -35,7 +39,7 @@ pub struct WorldChangeEvent {
     pub new: BlockType,
 }
 
-impl<D> Default for World<D> {
+impl<C: WorldContext> Default for World<C> {
     fn default() -> Self {
         Self::empty()
     }
@@ -57,19 +61,19 @@ pub enum RandomWalkableBlock {
     Local { from: WorldPosition, radius: u16 },
 }
 
-struct ContiguousChunkIteratorMut<'a, D> {
-    world: &'a mut World<D>,
+struct ContiguousChunkIteratorMut<'a, C: WorldContext> {
+    world: &'a mut World<C>,
     last_chunk: Option<(ChunkLocation, usize)>,
 }
 
-struct ContiguousChunkIterator<'a, D> {
-    world: &'a World<D>,
+struct ContiguousChunkIterator<'a, C: WorldContext> {
+    world: &'a World<C>,
     last_chunk: Option<(ChunkLocation, usize)>,
     #[cfg(test)]
     matched_last: bool,
 }
 
-impl<D> World<D> {
+impl<C: WorldContext> World<C> {
     pub fn empty() -> Self {
         Self {
             chunks: Vec::new(),
@@ -78,7 +82,7 @@ impl<D> World<D> {
         }
     }
 
-    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk<D>> {
+    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk<C>> {
         self.chunks.iter()
     }
 
@@ -105,13 +109,13 @@ impl<D> World<D> {
             .unwrap_or_default()
     }
 
-    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<D>> {
+    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<C>> {
         self.find_chunk_index(chunk_pos)
             .ok()
             .map(|idx| &self.chunks[idx])
     }
 
-    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkLocation) -> Option<&mut Chunk<D>> {
+    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkLocation) -> Option<&mut Chunk<C>> {
         self.find_chunk_index(chunk_pos)
             .ok()
             .map(move |idx| &mut self.chunks[idx])
@@ -149,7 +153,7 @@ impl<D> World<D> {
 
     fn process_slab_terrain_common(
         slab: SlabIndex,
-        chunk: &Chunk<D>,
+        chunk: &Chunk<C>,
         terrain: &mut Slab,
     ) -> SlabInternalNavigability {
         log_scope!(o!(chunk.pos()));
@@ -340,7 +344,7 @@ impl<D> World<D> {
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
-    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<D> {
+    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<C> {
         let idx = match self.find_chunk_index(chunk) {
             Ok(idx) => idx,
             Err(idx) => {
@@ -484,7 +488,7 @@ impl<D> World<D> {
 
         // safety: mutable chunk reference is stored in `completion` and is only used to update
         // slab progress. chunk reference is always valid
-        let mut completion: MarkSlabsComplete<D> =
+        let mut completion: MarkSlabsComplete<C> =
             unsafe { std::mem::transmute(chunk.begin_marking_slabs_complete()) };
 
         for mut slab in slabs {
@@ -676,17 +680,24 @@ impl<D> World<D> {
         .map(|(_, pos)| pos)
     }
 
-    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&D> {
+    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&C::AssociatedBlockData> {
         self.find_chunk_with_pos(pos.into())
             .and_then(|chunk| chunk.associated_block_data(pos.into()))
     }
 
-    pub fn set_associated_block_data(&mut self, pos: WorldPosition, data: D) -> Option<D> {
+    pub fn set_associated_block_data(
+        &mut self,
+        pos: WorldPosition,
+        data: C::AssociatedBlockData,
+    ) -> Option<C::AssociatedBlockData> {
         self.find_chunk_with_pos_mut(pos.into())
             .and_then(|chunk| chunk.set_associated_block_data(pos.into(), data))
     }
 
-    pub fn remove_associated_block_data(&mut self, pos: WorldPosition) -> Option<D> {
+    pub fn remove_associated_block_data(
+        &mut self,
+        pos: WorldPosition,
+    ) -> Option<C::AssociatedBlockData> {
         self.find_chunk_with_pos_mut(pos.into())
             .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
     }
@@ -708,8 +719,8 @@ impl<D> World<D> {
     }
 }
 
-impl<'a, D> ContiguousChunkIteratorMut<'a, D> {
-    pub fn new(world: &'a mut World<D>) -> Self {
+impl<'a, C: WorldContext> ContiguousChunkIteratorMut<'a, C> {
+    pub fn new(world: &'a mut World<C>) -> Self {
         ContiguousChunkIteratorMut {
             world,
             last_chunk: None,
@@ -719,7 +730,7 @@ impl<'a, D> ContiguousChunkIteratorMut<'a, D> {
     // Identical to ContiguousChunkIterator just different enough with mut to require too
     // much effort to reduce duplication :( lmao even this comment is the same
     // noinspection DuplicatedCode
-    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&mut Chunk<D>> {
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&mut Chunk<C>> {
         match self.last_chunk.take() {
             Some((last_loc, idx)) if last_loc == chunk => {
                 // nice, reuse index of chunk without lookup
@@ -743,8 +754,8 @@ impl<'a, D> ContiguousChunkIteratorMut<'a, D> {
     }
 }
 
-impl<'a, D> ContiguousChunkIterator<'a, D> {
-    pub fn new(world: &'a World<D>) -> Self {
+impl<'a, C: WorldContext> ContiguousChunkIterator<'a, C> {
+    pub fn new(world: &'a World<C>) -> Self {
         ContiguousChunkIterator {
             world,
             last_chunk: None,
@@ -756,7 +767,7 @@ impl<'a, D> ContiguousChunkIterator<'a, D> {
     // Identical to ContiguousChunkIteratorMut but just different enough with mut to require too
     // much effort to reduce duplication :( lmao even this comment is the same
     // noinspection DuplicatedCode
-    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&Chunk<D>> {
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&Chunk<C>> {
         match self.last_chunk.take() {
             Some((last_loc, idx)) if last_loc == chunk => {
                 // nice, reuse index of chunk without lookup
@@ -805,11 +816,17 @@ pub mod helpers {
     use std::time::Duration;
 
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
-    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldRef};
+    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
     use common::Itertools;
     use unit::world::ChunkLocation;
 
-    pub fn load_single_chunk(chunk: ChunkBuilder) -> Chunk<()> {
+    pub struct DummyWorldContext;
+
+    impl WorldContext for DummyWorldContext {
+        type AssociatedBlockData = ();
+    }
+
+    pub fn load_single_chunk(chunk: ChunkBuilder) -> Chunk<DummyWorldContext> {
         let pos = ChunkLocation(0, 0);
         let world = world_from_chunks_blocking(vec![chunk.build(pos)]);
         let mut world = world.borrow_mut();
@@ -817,11 +834,13 @@ pub mod helpers {
         std::mem::replace(chunk, Chunk::empty(pos))
     }
 
-    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
+    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<DummyWorldContext> {
         loader_from_chunks_blocking(chunks).world()
     }
 
-    pub fn loader_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldLoader<()> {
+    pub fn loader_from_chunks_blocking(
+        chunks: Vec<ChunkDescriptor>,
+    ) -> WorldLoader<DummyWorldContext> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
@@ -836,7 +855,7 @@ pub mod helpers {
     }
 
     pub fn apply_updates(
-        loader: &mut WorldLoader<()>,
+        loader: &mut WorldLoader<DummyWorldContext>,
         updates: &[WorldTerrainUpdate],
     ) -> Result<(), String> {
         let world = loader.world();
@@ -855,10 +874,10 @@ pub mod helpers {
         Ok(())
     }
 
-    pub(crate) fn load_world<D: 'static>(
+    pub(crate) fn load_world<C: WorldContext>(
         mut source: MemoryTerrainSource,
         pool: AsyncWorkerPool,
-    ) -> WorldLoader<D> {
+    ) -> WorldLoader<C> {
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
@@ -907,7 +926,9 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
+    use crate::{
+        all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext,
+    };
     use config::WorldPreset;
 
     #[test]
@@ -1376,6 +1397,10 @@ mod tests {
 
     #[test]
     fn associated_block_data() {
+        impl WorldContext for u32 {
+            type AssociatedBlockData = u32;
+        }
+
         let source =
             MemoryTerrainSource::from_chunks(vec![ChunkBuilder::new().build((0, 0))].into_iter())
                 .unwrap();

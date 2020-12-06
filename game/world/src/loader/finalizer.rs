@@ -3,7 +3,7 @@ use crate::loader::batch::UpdateBatcher;
 use crate::loader::LoadedSlab;
 use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
-use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldRef};
+use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldContext, WorldRef};
 use common::*;
 use futures::channel::mpsc as async_channel;
 
@@ -14,16 +14,16 @@ use unit::world::{ChunkLocation, SlabIndex};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
 
-pub struct SlabFinalizer<D> {
-    world: WorldRef<D>,
+pub struct SlabFinalizer<C: WorldContext> {
+    world: WorldRef<C>,
     updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     batcher: UpdateBatcher<LoadedSlab>,
     send_failures: usize,
 }
 
-impl<D> SlabFinalizer<D> {
+impl<C: WorldContext> SlabFinalizer<C> {
     pub fn new(
-        world: WorldRef<D>,
+        world: WorldRef<C>,
         updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     ) -> Self {
         Self {

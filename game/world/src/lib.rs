@@ -10,7 +10,7 @@ pub use self::chunk::{
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};
 pub use self::viewer::{SliceRange, WorldViewer};
-pub use self::world::{helpers, World, WorldChangeEvent};
+pub use self::world::{helpers, World, WorldChangeEvent, WorldContext};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 
 pub mod block;

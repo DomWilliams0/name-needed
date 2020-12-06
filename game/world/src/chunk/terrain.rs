@@ -820,7 +820,9 @@ mod tests {
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::VertexOcclusion;
-    use crate::world::helpers::{apply_updates, load_single_chunk, world_from_chunks_blocking};
+    use crate::world::helpers::{
+        apply_updates, load_single_chunk, world_from_chunks_blocking, DummyWorldContext,
+    };
     use crate::{World, WorldArea, WorldRef};
 
     use super::*;
@@ -1215,7 +1217,7 @@ mod tests {
     }
 
     fn occlusion(
-        world: &World<()>,
+        world: &World<DummyWorldContext>,
         chunk: ChunkLocation,
         block: (i32, i32, i32),
     ) -> [VertexOcclusion; 4] {
@@ -1262,7 +1264,7 @@ mod tests {
 
     #[test]
     fn lazy_occlusion_top_only() {
-        fn mk_chunks(block_off: bool) -> WorldRef<()> {
+        fn mk_chunks(block_off: bool) -> WorldRef<DummyWorldContext> {
             let a = ChunkBuilder::new()
                 .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), BlockType::Grass)
                 .build((-1, 0));

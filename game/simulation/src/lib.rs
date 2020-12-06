@@ -12,15 +12,16 @@ pub use world::{
 };
 
 // Rexports for specialised world types
-pub type WorldRef = world::WorldRef<simulation::AssociatedBlockData>;
-pub type World = world::World<simulation::AssociatedBlockData>;
-pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::AssociatedBlockData>;
-pub type WorldViewer = world::WorldViewer<simulation::AssociatedBlockData>;
+pub type WorldRef = world::WorldRef<simulation::WorldContext>;
+pub type World = world::World<simulation::WorldContext>;
+pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
+pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
+pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
-pub use crate::simulation::{AssociatedBlockData, Simulation, ThreadedWorldLoader};
+pub use crate::simulation::{AssociatedBlockData, Simulation, WorldContext};
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
 pub use definitions::EntityPosition;

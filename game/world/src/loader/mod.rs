@@ -16,7 +16,7 @@ use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
-use crate::{OcclusionChunkUpdate, WorldRef};
+use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use common::parking_lot::RwLock;
 use std::iter::repeat;
@@ -28,12 +28,12 @@ mod terrain_source;
 mod update;
 mod worker_pool;
 
-pub struct WorldLoader<D> {
+pub struct WorldLoader<C: WorldContext> {
     source: Arc<RwLock<dyn TerrainSource>>,
     pool: AsyncWorkerPool,
     finalization_channel: async_channel::Sender<LoadTerrainResult>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
-    world: WorldRef<D>,
+    world: WorldRef<C>,
     last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
 }
@@ -58,7 +58,7 @@ pub enum BlockForAllError {
     Error(#[from] TerrainSourceError),
 }
 
-impl<D: 'static> WorldLoader<D> {
+impl<C: WorldContext> WorldLoader<C> {
     pub fn new<S: TerrainSource + 'static>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
         let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
@@ -77,7 +77,7 @@ impl<D: 'static> WorldLoader<D> {
         }
     }
 
-    pub fn world(&self) -> WorldRef<D> {
+    pub fn world(&self) -> WorldRef<C> {
         self.world.clone()
     }
 
@@ -423,6 +423,7 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldLoader};
+    use crate::world::helpers::DummyWorldContext;
     use unit::world::SlabLocation;
 
     #[test]
@@ -438,7 +439,8 @@ mod tests {
         let source =
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
-        let mut loader = WorldLoader::<()>::new(source, AsyncWorkerPool::new_blocking().unwrap());
+        let mut loader =
+            WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new_blocking().unwrap());
         loader.request_slabs(vec![SlabLocation::new(1, (0, 0))].into_iter());
 
         let finalized = loader.block_on_next_finalization(Duration::from_secs(15), &|| false);

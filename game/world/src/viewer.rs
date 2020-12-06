@@ -1,14 +1,14 @@
 use common::*;
 
 use crate::mesh::BaseVertex;
-use crate::{all_slabs_in_range, mesh, InnerWorldRef, WorldRef};
+use crate::{all_slabs_in_range, mesh, InnerWorldRef, WorldContext, WorldRef};
 use std::collections::HashSet;
 use std::ops::{Add, RangeInclusive};
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation};
 
 #[derive(Clone)]
-pub struct WorldViewer<D> {
-    world: WorldRef<D>,
+pub struct WorldViewer<C: WorldContext> {
+    world: WorldRef<C>,
     view_range: SliceRange,
     chunk_range: (ChunkLocation, ChunkLocation),
     clean_slabs: HashSet<SlabLocation>,
@@ -99,8 +99,8 @@ impl Add<i32> for SliceRange {
     }
 }
 
-impl<D> WorldViewer<D> {
-    pub fn with_world(world: WorldRef<D>) -> Result<Self, WorldViewerError> {
+impl<C: WorldContext> WorldViewer<C> {
+    pub fn with_world(world: WorldRef<C>) -> Result<Self, WorldViewerError> {
         let world_borrowed = world.borrow();
 
         // TODO determine viewer start pos from world/randomly e.g. ground level
@@ -226,7 +226,7 @@ impl<D> WorldViewer<D> {
         slabs
     }
 
-    pub fn world(&self) -> InnerWorldRef<D> {
+    pub fn world(&self) -> InnerWorldRef<C> {
         self.world.borrow()
     }
 

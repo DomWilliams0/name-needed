@@ -11,20 +11,20 @@ use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
 use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
-use crate::SliceRange;
+use crate::{SliceRange, WorldContext};
 use parking_lot::{Condvar, Mutex, RwLock};
 use std::collections::HashMap;
 
 pub type ChunkId = u64;
 
-pub struct Chunk<D> {
+pub struct Chunk<C: WorldContext> {
     /// Unique for each chunk
     pos: ChunkLocation,
 
     terrain: RawChunkTerrain,
 
     /// Sparse associated data with each block
-    block_data: HashMap<BlockPosition, D>,
+    block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
 
     /// Navigation lookup
     areas: HashMap<ChunkArea, BlockGraph>,
@@ -55,9 +55,9 @@ pub(crate) enum SlabLoadingStatus {
     Done,
 }
 
-pub(crate) struct MarkSlabsComplete<'a, D>(&'a Chunk<D>, ArrayVec<[SlabIndex; 8]>);
+pub(crate) struct MarkSlabsComplete<'a, C: WorldContext>(&'a Chunk<C>, ArrayVec<[SlabIndex; 8]>);
 
-impl<D> Chunk<D> {
+impl<C: WorldContext> Chunk<C> {
     pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
         Self {
             pos: pos.into(),
@@ -70,7 +70,7 @@ impl<D> Chunk<D> {
         }
     }
 
-    pub const fn pos(&self) -> ChunkLocation {
+    pub fn pos(&self) -> ChunkLocation {
         self.pos
     }
 
@@ -159,15 +159,22 @@ impl<D> Chunk<D> {
             .map(|(z, _)| pos.to_block_position(z))
     }
 
-    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&D> {
+    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {
         self.block_data.get(&pos)
     }
 
-    pub fn set_associated_block_data(&mut self, pos: BlockPosition, data: D) -> Option<D> {
+    pub fn set_associated_block_data(
+        &mut self,
+        pos: BlockPosition,
+        data: C::AssociatedBlockData,
+    ) -> Option<C::AssociatedBlockData> {
         self.block_data.insert(pos, data)
     }
 
-    pub fn remove_associated_block_data(&mut self, pos: BlockPosition) -> Option<D> {
+    pub fn remove_associated_block_data(
+        &mut self,
+        pos: BlockPosition,
+    ) -> Option<C::AssociatedBlockData> {
         self.block_data.remove(&pos)
     }
 
@@ -182,7 +189,7 @@ impl<D> Chunk<D> {
         self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
     }
 
-    pub(crate) fn begin_marking_slabs_complete(&self) -> MarkSlabsComplete<D> {
+    pub(crate) fn begin_marking_slabs_complete(&self) -> MarkSlabsComplete<C> {
         MarkSlabsComplete(self, ArrayVec::new())
         // self.update_slab_status(slab, SlabLoadingStatus::Done);
     }
@@ -331,7 +338,7 @@ impl<D> Chunk<D> {
     }
 }
 
-impl<D> MarkSlabsComplete<'_, D> {
+impl<C: WorldContext> MarkSlabsComplete<'_, C> {
     fn flush(&mut self) {
         let slabs = self.1.iter().copied();
         self.0.update_slabs_status(slabs, SlabLoadingStatus::Done);
@@ -346,13 +353,13 @@ impl<D> MarkSlabsComplete<'_, D> {
     }
 }
 
-impl<D> Drop for MarkSlabsComplete<'_, D> {
+impl<C: WorldContext> Drop for MarkSlabsComplete<'_, C> {
     fn drop(&mut self) {
         self.flush();
     }
 }
 
-impl<D> BaseTerrain for Chunk<D> {
+impl<C: WorldContext> BaseTerrain for Chunk<C> {
     fn raw_terrain(&self) -> &RawChunkTerrain {
         &self.terrain
     }
@@ -369,6 +376,7 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder};
+    use crate::helpers::DummyWorldContext;
     use unit::dim::CHUNK_SIZE;
 
     #[test]
@@ -406,9 +414,9 @@ mod tests {
     #[test]
     fn chunk_id() {
         // check chunk ids are unique
-        let id1 = Chunk::<()>::empty((0, 0)).id();
-        let id2 = Chunk::<()>::empty((0, 1)).id();
-        let id3 = Chunk::<()>::empty((1, 0)).id();
+        let id1 = Chunk::<DummyWorldContext>::empty((0, 0)).id();
+        let id2 = Chunk::<DummyWorldContext>::empty((0, 1)).id();
+        let id3 = Chunk::<DummyWorldContext>::empty((1, 0)).id();
         assert_ne!(id1, id2);
         assert_ne!(id2, id3);
     }
@@ -416,7 +424,7 @@ mod tests {
     #[test]
     fn blocks() {
         // check individual block collection is ordered as intended
-        let c = Chunk::<()>::empty((0, 0));
+        let c = Chunk::<DummyWorldContext>::empty((0, 0));
         let mut blocks = Vec::new();
         c.blocks(&mut blocks);
         let mut b = blocks.into_iter();

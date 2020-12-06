@@ -1,35 +1,35 @@
 use common::parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::World;
+use crate::{World, WorldContext};
 use std::sync::Arc;
 
 /// Reference counted reference to the world
-pub struct WorldRef<D>(Arc<RwLock<World<D>>>);
+pub struct WorldRef<C: WorldContext>(Arc<RwLock<World<C>>>);
 
 // safety: contains an Arc and Mutex
-unsafe impl<D> Send for WorldRef<D> {}
-unsafe impl<D> Sync for WorldRef<D> {}
+unsafe impl<C: WorldContext> Send for WorldRef<C> {}
+unsafe impl<C: WorldContext> Sync for WorldRef<C> {}
 
-pub type InnerWorldRef<'a, D> = RwLockReadGuard<'a, World<D>>;
-pub type InnerWorldRefMut<'a, D> = RwLockWriteGuard<'a, World<D>>;
+pub type InnerWorldRef<'a, C> = RwLockReadGuard<'a, World<C>>;
+pub type InnerWorldRefMut<'a, C> = RwLockWriteGuard<'a, World<C>>;
 
-impl<D> WorldRef<D> {
-    pub fn new(world: World<D>) -> Self {
+impl<C: WorldContext> WorldRef<C> {
+    pub fn new(world: World<C>) -> Self {
         Self(Arc::new(RwLock::new(world)))
     }
 
     // TODO don't unwrap()
 
-    pub fn borrow(&self) -> InnerWorldRef<'_, D> {
+    pub fn borrow(&self) -> InnerWorldRef<'_, C> {
         (*self.0).read()
     }
 
-    pub fn borrow_mut(&self) -> InnerWorldRefMut<'_, D> {
+    pub fn borrow_mut(&self) -> InnerWorldRefMut<'_, C> {
         (*self.0).write()
     }
 
     #[cfg(test)]
-    pub fn into_inner(self) -> World<D> {
+    pub fn into_inner(self) -> World<C> {
         let mutex = Arc::try_unwrap(self.0).unwrap_or_else(|arc| {
             panic!(
                 "exclusive world reference needed but there are {}",
@@ -40,12 +40,12 @@ impl<D> WorldRef<D> {
     }
 }
 
-impl<D> Default for WorldRef<D> {
+impl<C: WorldContext> Default for WorldRef<C> {
     fn default() -> Self {
         WorldRef(Arc::new(RwLock::new(World::default())))
     }
 }
-impl<D> Clone for WorldRef<D> {
+impl<C: WorldContext> Clone for WorldRef<C> {
     fn clone(&self) -> Self {
         WorldRef(Arc::clone(&self.0))
     }

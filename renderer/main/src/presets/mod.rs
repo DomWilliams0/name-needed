@@ -46,10 +46,10 @@ pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
 use engine::panic;
 
-fn world_from_source<D: 'static>(
+fn world_from_source(
     source: config::WorldSource,
     pool: AsyncWorkerPool,
-) -> Result<WorldLoader<D>, &'static str> {
+) -> Result<WorldLoader<simulation::WorldContext>, &'static str> {
     Ok(match source {
         config::WorldSource::Preset(preset) => {
             debug!("loading world preset"; "preset" => ?preset);

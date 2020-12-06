@@ -6,7 +6,7 @@ use unit::world::SlabLocation;
 use crate::loader::finalizer::SlabFinalizer;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::LoadedSlab;
-use crate::{OcclusionChunkUpdate, WorldRef};
+use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
@@ -50,9 +50,9 @@ impl AsyncWorkerPool {
         })
     }
 
-    pub fn start_finalizer<D: 'static>(
+    pub fn start_finalizer<C: WorldContext>(
         &mut self,
-        world: WorldRef<D>,
+        world: WorldRef<C>,
         mut finalize_rx: async_channel::Receiver<LoadTerrainResult>,
         chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     ) {

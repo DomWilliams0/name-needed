@@ -5,7 +5,7 @@ use common::*;
 use resources::resource::Resources;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
-use world::loader::{TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate};
+use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
 use crate::activity::{ActivityEventSystem, ActivitySystem};
@@ -30,7 +30,7 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
-use crate::{definitions, Exit, WorldRef, WorldViewer};
+use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub enum AssociatedBlockData {
     Container(Entity),
 }
 
-pub type ThreadedWorldLoader = WorldLoader<AssociatedBlockData>;
+pub struct WorldContext;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
@@ -61,6 +61,10 @@ pub struct Simulation<R: Renderer> {
     change_events: Vec<WorldChangeEvent>,
 
     debug_renderers: DebugRenderers<R>,
+}
+
+impl world::WorldContext for WorldContext {
+    type AssociatedBlockData = AssociatedBlockData;
 }
 
 impl<R: Renderer> Simulation<R> {
