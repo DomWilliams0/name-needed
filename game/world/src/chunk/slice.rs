@@ -23,8 +23,7 @@ pub struct SliceMut<'a> {
 
 #[derive(Clone)]
 pub struct SliceOwned {
-    // TODO box this
-    slice: [Block; SLICE_SIZE],
+    slice: Box<[Block; SLICE_SIZE]>,
 }
 
 impl<'a> Slice<'a> {
@@ -80,7 +79,9 @@ impl<'a> Slice<'a> {
 
     pub fn to_owned(&self) -> SliceOwned {
         let slice = self.slice.try_into().expect("slice is the wrong length");
-        SliceOwned { slice }
+        SliceOwned {
+            slice: Box::new(slice),
+        }
     }
 
     pub fn into_iter(self) -> impl Iterator<Item = &'a Block> {
@@ -98,14 +99,16 @@ impl<'a> Deref for Slice<'a> {
 
 impl SliceOwned {
     pub fn borrow(&self) -> Slice {
-        Slice { slice: &self.slice }
+        Slice {
+            slice: &*self.slice,
+        }
     }
 }
 
 impl<'a> From<&'a SliceOwned> for Slice<'a> {
     fn from(slice: &'a SliceOwned) -> Self {
         Slice {
-            slice: &slice.slice,
+            slice: &*slice.slice,
         }
     }
 }

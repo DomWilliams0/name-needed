@@ -45,10 +45,10 @@ pub(crate) enum SlabLoadingStatus {
     /// Is in progress
     InProgress {
         /// Slab's top slice
-        top: Box<SliceOwned>,
+        top: SliceOwned,
 
         /// Slab's bottom slice
-        bottom: Box<SliceOwned>,
+        bottom: SliceOwned,
     },
 
     /// Finished and present in chunk.terrain
@@ -201,8 +201,8 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
-        let top = Box::new(terrain.slice_owned(LocalSliceIndex::top()));
-        let bottom = Box::new(terrain.slice_owned(LocalSliceIndex::bottom()));
+        let top = terrain.slice_owned(LocalSliceIndex::top());
+        let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
 
         self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
@@ -284,8 +284,8 @@ impl<C: WorldContext> Chunk<C> {
         let state = self.slab_progress(slab);
         match state {
             SlabLoadingStatus::InProgress { top, bottom } => {
-                let boxed = if top_slice { top } else { bottom };
-                SlabAvailability::TadaItsAvailable(*boxed)
+                let slice = if top_slice { top } else { bottom };
+                SlabAvailability::TadaItsAvailable(slice)
             }
             SlabLoadingStatus::Done => {
                 let slice = if top_slice {
@@ -316,8 +316,7 @@ impl<C: WorldContext> Chunk<C> {
     ) -> Option<SliceOwned> {
         match state {
             SlabLoadingStatus::InProgress { top, bottom } => {
-                let boxed = if top_slice { top } else { bottom };
-                Some(*boxed)
+                Some(if top_slice { top } else { bottom })
             }
             SlabLoadingStatus::Done => {
                 let slice = if top_slice {
