@@ -161,6 +161,9 @@ impl Slab {
     ) -> SlabInternalNavigability {
         log_scope!(o!(index));
 
+        // TODO detect when slab is all air and avoid expensive processing
+        // but remember an all air slab above a solid slab DOES have an area on the first slice..
+
         // flood fill to discover navigability
         let navigation = self.discover_areas(index, below.map(Into::into));
 

@@ -220,10 +220,12 @@ impl<C: WorldContext> WorldLoader<C> {
                             .await
                             .expect("chunk should be present");
 
+                    assert!(terrain.is_some(), "slab ownership expected");
+
                     // submit slab for finalization
                     Ok(LoadedSlab {
                         slab,
-                        terrain: Some(terrain),
+                        terrain,
                         navigation,
                         batch,
                     })
@@ -314,15 +316,13 @@ impl<C: WorldContext> WorldLoader<C> {
 
             let batch = batches.next_batch();
             let world_ref = world_ref.clone();
-            self.pool.submit(
-                move || {
-                    // need mutable world ref here to access the slab terrain mutably as we don't
-                    // have it in scope here
-                    let mut world = world_ref.borrow_mut();
-                    let navigation = world
-                        .process_inline_slab_terrain(slab_loc)
-                        .expect("slab should be present");
-                    drop(world);
+
+            self.pool.submit_async(
+                async move {
+                    let (_, navigation) =
+                        SlabProcessingFuture::with_inline_terrain(world_ref, slab_loc)
+                            .await
+                            .expect("chunk and slab should be present");
 
                     // submit for finalization
                     Ok(LoadedSlab {

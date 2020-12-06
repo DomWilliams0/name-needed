@@ -100,17 +100,6 @@ impl AsyncWorkerPool {
         })
     }
 
-    pub fn submit(
-        &mut self,
-        task: impl FnOnce() -> LoadTerrainResult + Send + 'static,
-        done_channel: async_channel::Sender<LoadTerrainResult>,
-    ) {
-        self.pool.spawn(async move {
-            let result = task();
-            Self::send_result(done_channel, result).await;
-        });
-    }
-
     pub fn submit_async(
         &mut self,
         task: impl Future<Output = LoadTerrainResult> + Send + 'static,

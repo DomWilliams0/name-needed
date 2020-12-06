@@ -304,9 +304,7 @@ impl<C: WorldContext> Chunk<C> {
             }
 
             SlabLoadingStatus::Unloaded => SlabAvailability::Never,
-            SlabLoadingStatus::Requested => {
-                SlabAvailability::OnItsWay
-            }
+            SlabLoadingStatus::Requested => SlabAvailability::OnItsWay,
         }
     }
 
@@ -357,6 +355,10 @@ impl<C: WorldContext> Chunk<C> {
                 slab.is_placeholder()
             }
         }
+    }
+
+    pub fn has_slab(&self, slab: SlabIndex) -> bool {
+        self.terrain.slab(slab).is_some()
     }
 }
 

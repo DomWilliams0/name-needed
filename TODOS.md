@@ -1,4 +1,4 @@
-# TODOs (240)
+# TODOs (239)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -216,7 +216,8 @@
    * `// TODO use an enum for the slice range rather than Options`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (4)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
+   * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO if exclusive we're in deep water with CoW`
    * `// TODO discover internal area links`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`
@@ -288,9 +289,7 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [game/world/src/world.rs](game/world/src/world.rs) (8)
-   * `// TODO fix world modficiation`
-   * `// TODO detect when slab is all air and avoid expensive processing`
+ * [game/world/src/world.rs](game/world/src/world.rs) (6)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
