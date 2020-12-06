@@ -1,8 +1,8 @@
 use common::*;
 
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
-    WorldPosition,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, WorldPosition,
 };
 
 use crate::block::BlockType;
@@ -11,8 +11,9 @@ use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
 use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
-use crate::{SliceRange, WorldContext};
-use parking_lot::{Condvar, Mutex, RwLock};
+use crate::world::LoadNotifier;
+use crate::{SliceRange, World, WorldContext};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 
 pub type ChunkId = u64;
@@ -30,8 +31,7 @@ pub struct Chunk<C: WorldContext> {
     areas: HashMap<ChunkArea, BlockGraph>,
 
     slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
-    slab_wait: Mutex<()>,
-    slab_wait_cvar: Condvar,
+    slab_notify: LoadNotifier,
 }
 
 #[derive(Clone, Debug)]
@@ -55,9 +55,26 @@ pub(crate) enum SlabLoadingStatus {
     Done,
 }
 
-pub(crate) struct MarkSlabsComplete<'a, C: WorldContext>(&'a Chunk<C>, ArrayVec<[SlabIndex; 8]>);
+enum SlabAvailability {
+    Never,
+    OnItsWay,
+    TadaItsAvailable(SliceOwned),
+}
 
 impl<C: WorldContext> Chunk<C> {
+    pub fn empty_with_world(world: &World<C>, pos: impl Into<ChunkLocation>) -> Self {
+        Self {
+            pos: pos.into(),
+            terrain: RawChunkTerrain::default(),
+            block_data: HashMap::new(),
+            areas: HashMap::new(),
+            slab_progress: RwLock::new(HashMap::new()),
+            slab_notify: world.load_notifications(),
+        }
+    }
+
+    /// Disconnected from any world's slab notifications
+    #[cfg(test)]
     pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
         Self {
             pos: pos.into(),
@@ -65,11 +82,11 @@ impl<C: WorldContext> Chunk<C> {
             block_data: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
-            slab_wait: Mutex::new(()),
-            slab_wait_cvar: Condvar::new(),
+            slab_notify: LoadNotifier::default(),
         }
     }
 
+    #[inline]
     pub fn pos(&self) -> ChunkLocation {
         self.pos
     }
@@ -180,6 +197,7 @@ impl<C: WorldContext> Chunk<C> {
 
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
+        // no notification necessary, nothing waits for a slab to be requested
     }
 
     pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
@@ -187,17 +205,21 @@ impl<C: WorldContext> Chunk<C> {
         let bottom = Box::new(terrain.slice_owned(LocalSliceIndex::bottom()));
 
         self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
+        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
-    pub(crate) fn begin_marking_slabs_complete(&self) -> MarkSlabsComplete<C> {
-        MarkSlabsComplete(self, ArrayVec::new())
-        // self.update_slab_status(slab, SlabLoadingStatus::Done);
+    pub(crate) fn mark_slabs_complete(&self, slabs: impl Iterator<Item = SlabIndex> + Clone) {
+        self.update_slabs_status(slabs.clone(), SlabLoadingStatus::Done);
+        for slab in slabs {
+            self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        }
     }
 
     fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
         self.update_slabs_status(once(slab), state)
     }
 
+    /// Does not notify
     fn update_slabs_status(
         &self,
         mut slabs: impl Iterator<Item = SlabIndex>,
@@ -206,7 +228,7 @@ impl<C: WorldContext> Chunk<C> {
         let mut map = self.slab_progress.write();
 
         let mut do_update = |slab, state| {
-            trace!("updating slab progress"; slab, "state" => ?state);
+            trace!("updating slab progress"; SlabLocation::new(slab, self.pos), "state" => ?state);
             map.insert(slab, state);
         };
 
@@ -221,27 +243,33 @@ impl<C: WorldContext> Chunk<C> {
         if let Some(slab) = first {
             do_update(slab, state);
         }
-
-        // notify once for all
-        self.slab_wait_cvar.notify_all();
     }
 
-    /// (slice above, slice below)
-    pub(crate) fn wait_for_neighbouring_slabs(
+    /// None if should wait
+    pub(crate) fn get_neighbouring_slabs(
         &self,
         slab: SlabIndex,
-    ) -> (Option<SliceOwned>, Option<SliceOwned>) {
-        // slice below is mandatory as it's used for navigation. wait for it if it's in progress
-        let slice_below = self.wait_for_slab(slab - 1, true);
+    ) -> Option<(Option<SliceOwned>, Option<SliceOwned>)> {
+        // slice below is mandatory as it's used for navigation. if its in progress then we need to wait
+        let below_availability = self.get_slab_slice_availability(slab - 1, true);
 
-        // slice above is optional, only used to calculate occlusion which can be updated later
-        let slice_above = {
-            let above = slab + 1;
-            let progress = self.slab_progress(above);
-            self.get_slab_slice(progress, above, false)
+        let below = match below_availability {
+            SlabAvailability::Never => {
+                // make do without
+                None
+            }
+            SlabAvailability::OnItsWay => {
+                // wait required
+                return None;
+            }
+            SlabAvailability::TadaItsAvailable(slice) => Some(slice),
         };
 
-        (slice_above, slice_below)
+        // slice above is optional, only used to calculate occlusion which can be updated later
+        let above = slab + 1;
+        let above = self.get_slab_slice(self.slab_progress(above), above, false);
+
+        Some((above, below))
     }
 
     fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
@@ -250,6 +278,36 @@ impl<C: WorldContext> Chunk<C> {
             .get(&slab)
             .unwrap_or(&SlabLoadingStatus::Unloaded)
             .clone()
+    }
+
+    fn get_slab_slice_availability(&self, slab: SlabIndex, top_slice: bool) -> SlabAvailability {
+        let state = self.slab_progress(slab);
+        match state {
+            SlabLoadingStatus::InProgress { top, bottom } => {
+                let boxed = if top_slice { top } else { bottom };
+                SlabAvailability::TadaItsAvailable(*boxed)
+            }
+            SlabLoadingStatus::Done => {
+                let slice = if top_slice {
+                    LocalSliceIndex::top()
+                } else {
+                    LocalSliceIndex::bottom()
+                };
+                let global_slice = slice.to_global(slab);
+                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
+                    panic!(
+                        "slab {:?} is apparently loaded but could not be found",
+                        slab
+                    )
+                });
+                SlabAvailability::TadaItsAvailable(slice.to_owned())
+            }
+
+            SlabLoadingStatus::Unloaded => SlabAvailability::Never,
+            SlabLoadingStatus::Requested => {
+                SlabAvailability::OnItsWay
+            }
+        }
     }
 
     fn get_slab_slice(
@@ -282,42 +340,6 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    fn wait_for_slab(&self, slab: SlabIndex, top_slice: bool) -> Option<SliceOwned> {
-        let mut ret = None;
-
-        let mut should_keep_waiting = || {
-            let state = self.slab_progress(slab);
-
-            match state {
-                SlabLoadingStatus::Requested => {
-                    // keep waiting
-                    trace!("waiting for other slab"; "index" => ?slab);
-                    true
-                }
-                SlabLoadingStatus::Unloaded => {
-                    // nothing to wait for
-                    debug!("slab of interest is unloaded"; slab);
-                    false
-                }
-
-                _ => {
-                    // it's available
-                    debug!("slab of interest is available"; slab, "state" => ?state);
-                    ret = self.get_slab_slice(state, slab, top_slice);
-                    false
-                }
-            }
-        };
-
-        let mut guard = self.slab_wait.lock();
-
-        while should_keep_waiting() {
-            self.slab_wait_cvar.wait(&mut guard);
-        }
-
-        ret
-    }
-
     /// Returns true if slab has not been already requested/loaded or is a placeholder
     pub fn should_slab_be_loaded(&self, slab: SlabIndex) -> bool {
         match self.slab_progress(slab) {
@@ -335,27 +357,6 @@ impl<C: WorldContext> Chunk<C> {
                 slab.is_placeholder()
             }
         }
-    }
-}
-
-impl<C: WorldContext> MarkSlabsComplete<'_, C> {
-    fn flush(&mut self) {
-        let slabs = self.1.iter().copied();
-        self.0.update_slabs_status(slabs, SlabLoadingStatus::Done);
-        self.1.clear();
-    }
-    pub fn mark_slab_complete(&mut self, slab: SlabIndex) {
-        if self.1.is_full() {
-            self.flush();
-        }
-
-        self.1.push(slab);
-    }
-}
-
-impl<C: WorldContext> Drop for MarkSlabsComplete<'_, C> {
-    fn drop(&mut self) {
-        self.flush();
     }
 }
 

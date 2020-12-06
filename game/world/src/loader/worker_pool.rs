@@ -10,6 +10,7 @@ use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
@@ -69,7 +70,7 @@ impl AsyncWorkerPool {
                     }
                     Ok(result) => {
                         let slab = result.slab;
-                        finalizer.finalize(result);
+                        finalizer.finalize(result).await;
                         Ok(slab)
                     }
                 };
@@ -99,19 +100,36 @@ impl AsyncWorkerPool {
         })
     }
 
-    pub fn submit<T: 'static + Send + FnOnce() -> LoadTerrainResult>(
+    pub fn submit(
         &mut self,
-        task: T,
-        mut done_channel: async_channel::Sender<LoadTerrainResult>,
+        task: impl FnOnce() -> LoadTerrainResult + Send + 'static,
+        done_channel: async_channel::Sender<LoadTerrainResult>,
     ) {
         self.pool.spawn(async move {
             let result = task();
-
-            // terrain has been processed in isolation on worker thread, now post to
-            // finalization thread
-            if let Err(e) = done_channel.send(result).await {
-                error!("failed to send terrain result to finalizer"; "error" => %e);
-            }
+            Self::send_result(done_channel, result).await;
         });
+    }
+
+    pub fn submit_async(
+        &mut self,
+        task: impl Future<Output = LoadTerrainResult> + Send + 'static,
+        done_channel: async_channel::Sender<LoadTerrainResult>,
+    ) {
+        self.pool.spawn(async move {
+            let result = task.await;
+            Self::send_result(done_channel, result).await;
+        });
+    }
+
+    async fn send_result(
+        mut done_channel: async_channel::Sender<LoadTerrainResult>,
+        result: LoadTerrainResult,
+    ) {
+        // terrain has been processed in isolation on worker thread, now post to
+        // finalization thread
+        if let Err(e) = done_channel.send(result).await {
+            error!("failed to send terrain result to finalizer"; "error" => %e);
+        }
     }
 }

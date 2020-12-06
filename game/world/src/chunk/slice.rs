@@ -23,6 +23,7 @@ pub struct SliceMut<'a> {
 
 #[derive(Clone)]
 pub struct SliceOwned {
+    // TODO box this
     slice: [Block; SLICE_SIZE],
 }
 

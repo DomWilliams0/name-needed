@@ -1,4 +1,4 @@
-# TODOs (238)
+# TODOs (240)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -221,8 +221,9 @@
    * `// TODO discover internal area links`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`
    * `// TODO reserve space in changes_out first`
- * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
+ * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (3)
    * `// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity`
+   * `// TODO box this`
    * `// TODO make not pub`
  * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (5)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
@@ -287,7 +288,8 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [game/world/src/world.rs](game/world/src/world.rs) (7)
+ * [game/world/src/world.rs](game/world/src/world.rs) (8)
+   * `// TODO fix world modficiation`
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`

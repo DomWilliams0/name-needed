@@ -33,6 +33,7 @@ pub enum SlabType {
 #[derive(Clone)]
 pub struct Slab(Arc<SlabGridImpl>, SlabType);
 
+#[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
 
 pub trait DeepClone {
@@ -152,19 +153,19 @@ impl IntoIterator for SlabInternalNavigability {
 /// Initialization functions
 impl Slab {
     /// Discover navigability and occlusion
-    pub(crate) fn process_terrain(
+    pub(crate) fn process_terrain<'s>(
         &mut self,
         index: SlabIndex,
-        above: Option<Slice>,
-        below: Option<Slice>,
+        above: Option<impl Into<Slice<'s>>>,
+        below: Option<impl Into<Slice<'s>>>,
     ) -> SlabInternalNavigability {
         log_scope!(o!(index));
 
         // flood fill to discover navigability
-        let navigation = self.discover_areas(index, below);
+        let navigation = self.discover_areas(index, below.map(Into::into));
 
         // occlusion
-        self.init_occlusion(above);
+        self.init_occlusion(above.map(Into::into));
 
         navigation
     }

@@ -18,6 +18,7 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
+use crate::world::slab_loading::SlabProcessingFuture;
 use common::parking_lot::RwLock;
 use std::iter::repeat;
 use std::sync::Arc;
@@ -155,9 +156,6 @@ impl<C: WorldContext> WorldLoader<C> {
         for (slab, slab_type) in all_slabs {
             log_scope!(o!(slab));
 
-            let chunk = world_mut.ensure_chunk(slab.chunk);
-            chunk.mark_slab_requested(slab.slab);
-
             let source = self.source.clone();
             let batch = batches.next_batch();
 
@@ -168,8 +166,8 @@ impl<C: WorldContext> WorldLoader<C> {
 
             // load raw terrain and do as much processing in isolation as possible on a worker thread
             let world = self.world();
-            self.pool.submit(
-                move || {
+            self.pool.submit_async(
+                async move {
                     // wrapped in closure for common error handling case
                     let get_terrain = || -> Result<Option<Slab>, TerrainSourceError> {
                         if matches!(slab_type, SlabType::Placeholder) {
@@ -197,7 +195,7 @@ impl<C: WorldContext> WorldLoader<C> {
                         Ok(Some(terrain))
                     };
 
-                    let mut terrain = match get_terrain() {
+                    let terrain = match get_terrain() {
                         Ok(Some(terrain)) => terrain,
                         Ok(None) => {
                             debug!("adding placeholder slab to the top of the chunk"; slab);
@@ -214,11 +212,13 @@ impl<C: WorldContext> WorldLoader<C> {
                         Err(err) => return Err(err),
                     };
 
-                    // slab terrain is now fixed, process it concurrently on worker thread
-                    let world = world.borrow();
-                    let navigation = world
-                        .process_given_slab_terrain(slab, &mut terrain)
-                        .expect("chunk should be present");
+                    // slab terrain is now fixed, process it concurrently on a worker thread.
+                    // may require waiting for another slab to finish, and world lock must be
+                    // released during the wait to prevent a deadlock.
+                    let (terrain, navigation) =
+                        SlabProcessingFuture::with_provided_terrain(world, slab, terrain)
+                            .await
+                            .expect("chunk should be present");
 
                     // submit slab for finalization
                     Ok(LoadedSlab {

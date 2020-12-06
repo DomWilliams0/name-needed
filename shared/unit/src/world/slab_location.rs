@@ -16,6 +16,11 @@ impl SlabLocation {
             slab: slab.into(),
         }
     }
+
+    pub fn below(mut self) -> Self {
+        self.slab.0 -= 1;
+        self
+    }
 }
 
 impl Debug for SlabLocation {

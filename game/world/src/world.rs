@@ -12,7 +12,7 @@ use unit::world::{
 use crate::block::{Block, BlockDurability, BlockType};
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability};
-use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, MarkSlabsComplete};
+use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
 use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
@@ -21,7 +21,11 @@ use crate::navigation::{
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
 
-pub trait WorldContext: 'static {
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::sync::broadcast;
+
+pub trait WorldContext: 'static + Send + Sync {
     type AssociatedBlockData;
 }
 
@@ -30,6 +34,14 @@ pub struct World<C: WorldContext> {
     chunks: Vec<Chunk<C>>,
     area_graph: AreaGraph,
     dirty_slabs: HashSet<SlabLocation>,
+    load_notifier: LoadNotifier,
+}
+
+pub struct LoadNotifier {
+    send: broadcast::Sender<SlabLocation>,
+    recv: broadcast::Receiver<SlabLocation>,
+    /// Dont bother sending anything if there are no receivers
+    waiters: Arc<AtomicUsize>,
 }
 
 #[derive(Constructor)]
@@ -66,7 +78,7 @@ struct ContiguousChunkIteratorMut<'a, C: WorldContext> {
     last_chunk: Option<(ChunkLocation, usize)>,
 }
 
-struct ContiguousChunkIterator<'a, C: WorldContext> {
+pub(crate) struct ContiguousChunkIterator<'a, C: WorldContext> {
     world: &'a World<C>,
     last_chunk: Option<(ChunkLocation, usize)>,
     #[cfg(test)]
@@ -79,6 +91,7 @@ impl<C: WorldContext> World<C> {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
             dirty_slabs: HashSet::with_capacity(32),
+            load_notifier: LoadNotifier::default(),
         }
     }
 
@@ -125,6 +138,7 @@ impl<C: WorldContext> World<C> {
     /// The given slab terrain is now fixed, it will be processed to discover areas/occlusion.
     /// Run this on a worker thread!
     /// Returns None if the chunk was not found
+    #[deprecated]
     pub(crate) fn process_given_slab_terrain(
         &self,
         slab: SlabLocation,
@@ -138,6 +152,7 @@ impl<C: WorldContext> World<C> {
     /// The slab terrain is now fixed after being modified in place, it will be processed to
     /// discover areas/occlusion. Run this on a worker thread!
     /// Returns None if the slab was not found
+    #[deprecated]
     pub(crate) fn process_inline_slab_terrain(
         &mut self,
         slab: SlabLocation,
@@ -151,6 +166,7 @@ impl<C: WorldContext> World<C> {
         Some(Self::process_slab_terrain_common(slab.slab, chunk, terrain))
     }
 
+    #[deprecated]
     fn process_slab_terrain_common(
         slab: SlabIndex,
         chunk: &Chunk<C>,
@@ -163,14 +179,10 @@ impl<C: WorldContext> World<C> {
 
         // wait for above+below slabs to be loaded if they're in progress, then
         // process raw terrain in context of own chunk (blocking this current thread)
-        let (above, below) = chunk.wait_for_neighbouring_slabs(slab);
+        // TODO fix world modficiation
         // TODO detect when slab is all air and avoid expensive processing
 
-        terrain.process_terrain(
-            slab,
-            above.as_ref().map(|s| s.into()), // gross
-            below.as_ref().map(|s| s.into()),
-        )
+        todo!()
     }
 
     pub(crate) fn find_area_path<F: Into<WorldPosition>, T: Into<WorldPosition>>(
@@ -349,13 +361,24 @@ impl<C: WorldContext> World<C> {
             Ok(idx) => idx,
             Err(idx) => {
                 debug!("adding empty chunk"; chunk);
-                self.chunks.insert(idx, Chunk::empty(chunk));
+                self.chunks
+                    .insert(idx, Chunk::empty_with_world(self, chunk));
                 idx
             }
         };
 
         // safety: index returned above
         unsafe { self.chunks.get_unchecked_mut(idx) }
+    }
+
+    pub(crate) fn load_notifications(&self) -> LoadNotifier {
+        let send = self.load_notifier.send.clone();
+        let recv = send.subscribe();
+        LoadNotifier {
+            recv,
+            send,
+            waiters: self.load_notifier.waiters.clone(),
+        }
     }
 
     pub(crate) fn finalize_chunk(
@@ -467,7 +490,8 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    /// Panics if chunk doesn't exist
+    /// Panics if chunk doesn't exist.
+    /// Does not update slab progress in chunk
     pub(crate) fn populate_chunk_with_slabs(
         &mut self,
         chunk_loc: ChunkLocation,
@@ -486,11 +510,6 @@ impl<C: WorldContext> World<C> {
         // remove all areas in the slab range, because we're about to add the new ones
         chunk.remove_block_graphs(slab_range);
 
-        // safety: mutable chunk reference is stored in `completion` and is only used to update
-        // slab progress. chunk reference is always valid
-        let mut completion: MarkSlabsComplete<C> =
-            unsafe { std::mem::transmute(chunk.begin_marking_slabs_complete()) };
-
         for mut slab in slabs {
             debug_assert_eq!(slab.slab.chunk, chunk_loc);
 
@@ -503,8 +522,6 @@ impl<C: WorldContext> World<C> {
 
             // update chunk area navigation
             chunk.update_block_graphs(slab.navigation.into_iter());
-
-            completion.mark_slab_complete(slab.slab.slab);
         }
     }
 
@@ -719,6 +736,176 @@ impl<C: WorldContext> World<C> {
     }
 }
 
+impl Default for LoadNotifier {
+    fn default() -> Self {
+        let (send, recv) = broadcast::channel(1024);
+        Self {
+            send,
+            recv,
+            waiters: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl LoadNotifier {
+    pub fn notify(&self, slab: SlabLocation) {
+        if self.waiters.load(Ordering::Relaxed) > 0 {
+            self.send.send(slab).expect("send channel is full");
+        }
+    }
+
+    /// Returns false on recv error
+    async fn wait_for_slab(&mut self, slab: SlabLocation) -> bool {
+        // increment waiter count
+        self.waiters.fetch_add(1, Ordering::SeqCst);
+
+        let ret = loop {
+            match self.recv.recv().await {
+                Err(e) => {
+                    error!("error waiting for slab notification: {}", e);
+                    break false;
+                }
+                Ok(recvd) if recvd == slab => break true,
+                Ok(_) => { /* keep waiting */ }
+            }
+        };
+
+        // // decrement before returning
+        self.waiters.fetch_sub(1, Ordering::SeqCst);
+        ret
+    }
+}
+
+pub mod slab_loading {
+    use crate::chunk::slab::{Slab, SlabInternalNavigability};
+    use crate::{WorldContext, WorldRef};
+    use common::*;
+    use futures::task::{Context, Poll};
+    use futures::Future;
+    use std::hint::unreachable_unchecked;
+    use tokio::macros::support::Pin;
+    use unit::world::SlabLocation;
+
+    pub(crate) struct SlabProcessingFuture<'a, C: WorldContext> {
+        phantom: PhantomData<&'a C>,
+        result: Outcome,
+    }
+
+    enum Outcome {
+        NoneYet(tokio::task::JoinHandle<Option<(Slab, SlabInternalNavigability)>>),
+        Failed,
+        Succeeded((Slab, SlabInternalNavigability)),
+    }
+
+    impl<'a, C: WorldContext> SlabProcessingFuture<'a, C> {
+        pub fn with_provided_terrain(
+            world: WorldRef<C>,
+            slab: SlabLocation,
+            mut terrain: Slab,
+        ) -> Self {
+            let w = world.borrow();
+            let chunk = w.find_chunk_with_pos(slab.chunk);
+            log_scope!(o!(slab.chunk));
+
+            let result = match chunk {
+                Some(chunk) => {
+                    // copy the top and bottom slices into chunk so neighbouring slabs can access it
+                    chunk.mark_slab_in_progress(slab.slab, &terrain);
+
+                    match chunk.get_neighbouring_slabs(slab.slab) {
+                        None => {
+                            // dependent slabs are in progress and should be waited for
+                            let mut notifier = w.load_notifications();
+                            let world = world.clone();
+                            let rt = tokio::runtime::Handle::current();
+
+                            let task = rt.spawn(async move {
+                                loop {
+                                    // attempt to get slabs again. do this before waiting to avoid
+                                    // TOCTOU where the dependent slab becomes available just before
+                                    // the wait and misses the notification it's expecting.
+                                    {
+                                        let w = world.borrow();
+                                        // the chunk exists for sure if it's sending notifications
+                                        let chunk = w.find_chunk_with_pos(slab.chunk).unwrap();
+                                        if let Some((above, below)) =
+                                            chunk.get_neighbouring_slabs(slab.slab)
+                                        {
+                                            // congrats we made it, do final processing
+                                            let result = terrain.process_terrain(
+                                                slab.slab,
+                                                above.as_ref(),
+                                                below.as_ref(),
+                                            );
+                                            break Some((terrain, result));
+                                        }
+                                    }
+
+                                    // still not available, wait for mandatory slab below to load
+                                    if !notifier.wait_for_slab(slab.below()).await {
+                                        // failure, guess we're shutting down
+                                        break None;
+                                    }
+                                }
+                            });
+                            Outcome::NoneYet(task)
+                        }
+                        Some((above, below)) => {
+                            // dependent slabs are available already, do processing now
+                            let result =
+                                terrain.process_terrain(slab.slab, above.as_ref(), below.as_ref());
+
+                            Outcome::Succeeded((terrain, result))
+                        }
+                    }
+                }
+
+                None => Outcome::Failed,
+            };
+
+            SlabProcessingFuture {
+                result,
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<'a, C: WorldContext> Future for SlabProcessingFuture<'a, C> {
+        type Output = Option<(Slab, SlabInternalNavigability)>;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let self_ = Pin::into_inner(self);
+
+            match &mut self_.result {
+                Outcome::NoneYet(task) => {
+                    // delegate to running task
+                    let result = Future::poll(Pin::new(task), cx).map(|res| res.ok().flatten());
+                    result
+                }
+                Outcome::Failed => Poll::Ready(None),
+                Outcome::Succeeded(_) => {
+                    let self_ = std::mem::replace(
+                        self_,
+                        SlabProcessingFuture {
+                            phantom: PhantomData,
+                            result: Outcome::Failed, // will be failed if this is called again
+                        },
+                    );
+
+                    let result = match self_.result {
+                        Outcome::Succeeded(result) => result,
+                        _ => unsafe {
+                            // safety: we're in the branch for this variant
+                            unreachable_unchecked()
+                        },
+                    };
+                    Poll::Ready(Some(result))
+                }
+            }
+        }
+    }
+}
+
 impl<'a, C: WorldContext> ContiguousChunkIteratorMut<'a, C> {
     pub fn new(world: &'a mut World<C>) -> Self {
         ContiguousChunkIteratorMut {
@@ -830,8 +1017,9 @@ pub mod helpers {
         let pos = ChunkLocation(0, 0);
         let world = world_from_chunks_blocking(vec![chunk.build(pos)]);
         let mut world = world.borrow_mut();
+        let new_chunk = Chunk::empty_with_world(&*world, pos);
         let chunk = world.find_chunk_with_pos_mut(pos).unwrap();
-        std::mem::replace(chunk, Chunk::empty(pos))
+        std::mem::replace(chunk, new_chunk)
     }
 
     pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<DummyWorldContext> {
@@ -906,7 +1094,7 @@ pub mod helpers {
 mod tests {
     use std::time::Duration;
 
-    use common::{seeded_rng, Itertools, Rng};
+    use common::{logging, seeded_rng, Itertools, Rng};
     use unit::dim::CHUNK_SIZE;
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
@@ -1070,6 +1258,7 @@ mod tests {
 
     #[test]
     fn ring_path() {
+        logging::for_tests();
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
         let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));

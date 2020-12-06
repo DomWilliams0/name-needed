@@ -197,6 +197,9 @@ pub fn stairs() -> MemoryTerrainSource {
         };
         chunk = chunk.set_block((x, y, z), bt);
     }
+    chunk = chunk
+        .fill_slice(-HEIGHT, BlockType::Dirt)
+        .fill_slice(HEIGHT, BlockType::Dirt);
 
     MemoryTerrainSource::from_chunks(once(chunk.build((0, 0))))
         .expect("hardcoded world preset is wrong??!!1!")

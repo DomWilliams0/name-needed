@@ -19,7 +19,7 @@ nd_iter = "0.0.4"
 threadpool = "^1.8"
 enum-iterator = "^0.6"
 futures = { version = "^0.3", default-features = false, features = ["std"] }
-tokio = { version = "^0.3", default-features = false, features = ["time", "rt", "rt-multi-thread"]}
+tokio = { version = "^0.3", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"]}
 
 [dev-dependencies]
 matches = "^0.1"

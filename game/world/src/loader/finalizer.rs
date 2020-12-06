@@ -10,6 +10,7 @@ use futures::channel::mpsc as async_channel;
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
 use crate::occlusion::NeighbourOpacity;
+
 use unit::world::{ChunkLocation, SlabIndex};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
@@ -34,7 +35,7 @@ impl<C: WorldContext> SlabFinalizer<C> {
         }
     }
 
-    pub fn finalize(&mut self, slab: LoadedSlab) {
+    pub async fn finalize(&mut self, slab: LoadedSlab) {
         // world lock is taken and released often to prevent holding up the main thread
 
         debug!(
@@ -89,18 +90,27 @@ impl<C: WorldContext> SlabFinalizer<C> {
             // finalize one chunk at a time
             for chunk in chunks.into_iter() {
                 log_scope!(o!(chunk));
-                self.finalize_chunk_between_slabs(chunk, slab_range);
+                self.finalize_chunk_between_slabs(chunk, slab_range).await;
             }
         }
     }
 
     /// Lower and upper slab range is inclusive
-    fn finalize_chunk_between_slabs(
+    async fn finalize_chunk_between_slabs(
         &mut self,
         chunk: ChunkLocation,
         slab_range: (SlabIndex, SlabIndex),
     ) {
         debug!("finalizing slab range in chunk"; "lower" => slab_range.0, "upper" => slab_range.1);
+
+        // mark slabs complete
+        {
+            let world = self.world.borrow();
+            if let Some(chunk) = world.find_chunk_with_pos(chunk) {
+                let slabs = (slab_range.0.as_i32()..=slab_range.1.as_i32()).map(SlabIndex);
+                chunk.mark_slabs_complete(slabs);
+            }
+        }
 
         // navigation
         let area_edges = self.finalize_chunk_navigation(chunk, slab_range);
