@@ -135,12 +135,13 @@ impl<C: WorldContext> WorldLoader<C> {
             // should have seen some slabs
             assert_ne!(highest, SlabIndex::MIN);
 
-            // request the slab above the highest as all-air, so navigation discovery works
-            // properly
-            // TODO this clobbers the slab
+            // request the slab above the highest as all-air if it's missing, so navigation
+            // discovery works properly
             let empty = highest + 1;
-            extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
-            chunk.mark_slab_requested(empty);
+            if !chunk.has_slab(empty) {
+                extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
+                chunk.mark_slab_requested(empty);
+            }
         }
 
         let count = count + extra_slabs.len();

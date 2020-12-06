@@ -5,8 +5,8 @@
 	* [X] load slabs as camera pans
 	* [X] load slabs as camera moves up and down
 	* [ ] config opt to disable discovery by camera, only by society entities
-	* [o] all-air placeholder slabs should not be marked as fully loaded
-	* [ ] bug: all air placeholders clobber existing terrain!
+	* [X] all-air placeholder slabs should not be marked as fully loaded
+	* [X] bug: all air placeholders clobber existing terrain!
 	* [ ] restrict camera at world edge?
 * [ ] return full slab from procgen
 * [o] block modification should be localised to the slabs
@@ -27,4 +27,3 @@
 * [ ] investigate flashing shadows when a lot of terrain updates happen
 	* probably because occlusion changes are queued for next tick
 	* doesnt happen in release mode
-* [ ] debug world loading takes way longer now
