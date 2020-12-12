@@ -65,7 +65,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * features e.g. trees, hills
 	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
+		* varying river width from streams to large uncrossable rivers
+		* varying river flow speed
 	* magma very low down, or it just gets too hot
+	* volcano affects world gen in past
 * finite pregenerated world in xy (planet), infinite in z
 * unique species and settlements with societies to discover in different environments
 	* underground species with no eyes, cave houses
@@ -87,6 +90,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* picked up and spread by entities
 * blocks that technically solid but possible to pass through
 	* hedges, bushes
+* map chunks to torus and make the world wrap-around
 
 ## Optimizations
 ### Performance

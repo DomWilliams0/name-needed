@@ -69,7 +69,7 @@ fn world_from_source(
             };
 
             // TODO deserialize planet params from config
-            let params = PlanetParams { seed, radius };
+            let params = PlanetParams { seed, radius, ..PlanetParams::default() };
             let source = GeneratedTerrainSource::new(params)?;
             WorldLoader::new(source, pool)
         }

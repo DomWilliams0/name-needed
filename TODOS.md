@@ -14,12 +14,14 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
+   * `// TODO actually configure from cmdline`
  * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
-   * `// TODO square with width/height in some unit or circle?`
    * `// TODO custom block types for procgen that are translated to game blocks`
    * `// TODO move this`
    * `// TODO actual error type`
-   * `// TODO begin actual generation? or up to the caller for async goodness`
+   * `.set_seed(params.seed as u32) // TODO seed loses half its entropy`
+   * `// TODO could have separate copy of planet params per thread if immutable`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
@@ -335,9 +337,8 @@
    * `# TODO feature for cgmath`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (2)
+ * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (1)
    * `// TODO allow smaller datatypes for dims`
-   * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)

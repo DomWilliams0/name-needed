@@ -12,7 +12,8 @@ unit = {path = "../../shared/unit"}
 grid = {path = "../../shared/grid"}
 noise = "^0.6"
 image = {version = "^0.23", optional = true, default-features = false, features = ["png"]}
+#clap = {version = "^2.33", optional = true}
 
 [features]
-default = ["bin"]
+default = []
 bin = ["image"]

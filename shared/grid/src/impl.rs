@@ -25,7 +25,6 @@ pub trait GridImpl {
     }
 
     fn unflatten(&self, index: usize) -> CoordType {
-        // TODO are %s optimised to bitwise ops if a multiple of 2?
         let [xs, ys, _zs] = Self::DIMS;
         //        let xs = usize::try_from(xs).unwrap();
         //        let ys = usize::try_from(ys).unwrap();
@@ -46,11 +45,62 @@ pub trait GridImpl {
 #[repr(transparent)]
 pub struct Grid<I: GridImpl>(#[deref(forward)] Box<I>);
 
-#[derive(Deref, From)]
-pub struct GridRef<'a, I: GridImpl>(&'a I);
+pub struct DynamicGrid<T> {
+    dims: [usize; 3],
+    data: Box<[T]>,
+}
 
-#[derive(Deref, DerefMut, From)]
-pub struct GridRefMut<'a, I: GridImpl>(&'a mut I);
+impl <T:Default> DynamicGrid<T> {
+    pub fn new(dims :(usize,usize,usize)) -> Self {
+        let len = dims.0 * dims.1 * dims.2;
+        assert_ne!(len ,0);
+
+        let data = {
+            let mut vec = Vec::with_capacity(len);
+            vec.resize_with(len, T::default);
+            vec.into_boxed_slice()
+        };
+
+        DynamicGrid {
+            dims: [dims.0, dims.1, dims.2],
+            data,
+        }
+    }
+
+    pub fn index(&self, idx: usize) -> &T {
+        &self.data[idx]
+    }
+
+    pub fn index_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.data[idx]
+    }
+
+    pub fn index_with_coords(&self, coords: [usize; 3]) -> &T {
+        self.index(self.flatten_coords(coords))
+    }
+
+    pub fn index_with_coords_mut(&mut self, coords: [usize; 3]) -> &mut T {
+        self.index_mut(self.flatten_coords(coords))
+    }
+
+    fn flatten_coords(&self, [x,y,z]:[usize;3]) -> usize {
+        let [xs, ys, _zs] = self.dims;
+        x + xs * (y + ys * z)
+    }
+
+    fn unflatten_index(&self, index: usize) -> [usize; 3] {
+        let [xs, ys, _zs] = self.dims;
+        [index % xs, (index / xs) % ys, index / (ys * xs)]
+    }
+
+    pub fn dimensions(&self) -> [usize; 3] {self.dims}
+
+    pub fn dimensions_xy(&self) -> [usize; 2] {[self.dims[0], self.dims[1]]}
+
+    pub fn iter(&self) -> impl Iterator<Item=([usize;3], &T)>{
+        self.data.iter().enumerate().map(move |(i, val)| (self.unflatten_index(i), val))
+    }
+}
 
 impl<I: GridImpl> Default for Grid<I> {
     fn default() -> Self {

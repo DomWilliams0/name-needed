@@ -1,41 +1,55 @@
-use image::{ImageBuffer, Rgb};
+use common::*;
+use image::{ImageBuffer, Rgb, DynamicImage, GenericImageView};
 use procgen::*;
+use std::io::Write;
+use image::imageops::FilterType;
+
+fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
+    write!(out, "the time")
+}
 
 #[cfg(feature = "bin")]
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let radius: i32 = args
-        .next()
-        .and_then(|s| s.parse().ok())
-        .expect("bad radius");
-    let seed: u32 = args.next().and_then(|s| s.parse().ok()).expect("bad seed");
-    let noise_scale: f64 = args.next().and_then(|s| s.parse().ok()).expect("bad scale");
-    assert!(args.next().is_none(), "trailing args");
-    let chunk_size = 8i32;
+    let _logging = logging::LoggerBuilder::with_env()
+        .and_then(|builder| builder.init(log_time))
+        .expect("logging failed");
+    info!("initialized logging"; "level" => ?_logging.level());
 
-    todo!()
+    // TODO actually configure from cmdline
 
-    // let diameter = (chunk_size * ((2 * radius) + 1)) as u32;
-    // let mut image = ImageBuffer::new(diameter, diameter);
-    //
-    // for cy in -radius..=radius {
-    //     for cx in -radius..=radius {
-    //         let chunk = generate_chunk((cx, cy), chunk_size as usize, seed as u64, noise_scale);
-    //
-    //         for (i, height) in chunk.heightmap.iter().enumerate() {
-    //             let i = i as i32;
-    //             let bx = i % chunk_size;
-    //             let by = i / chunk_size;
-    //
-    //             let px = ((cx + radius) * chunk_size) + bx;
-    //             let py = ((cy + radius) * chunk_size) + by;
-    //
-    //             let pixel = (*height * 220.0) as u8;
-    //             // println!("{},{} | {},{} => {},{} = {}", cx, cy, bx, by, px, py, pixel);
-    //             image.put_pixel(px as u32, py as u32, Rgb([pixel, pixel, pixel]));
-    //         }
-    //     }
-    // }
-    //
-    // image.save("procgen.png").expect("failed to write image");
+    let params = PlanetParams {
+        seed: 10230123,
+        planet_size: 32,
+        ..PlanetParams::default()
+    };
+
+    let mut planet = Planet::new(params).expect("failed");
+    planet.initial_generation();
+
+    let inner = planet.inner();
+
+    let regions = inner.regions();
+    let image = image_from_grid(
+        regions.iter().map(|([x, y, _], val)| ([x, y], val.height)),
+        regions.dimensions_xy(),
+    );
+
+    let dy = DynamicImage::ImageRgb8(image);
+    let image = dy.resize(dy.width() * 8, dy.height() * 8, FilterType::Gaussian);
+    image.save("procgen.png").expect("failed to write image");
+}
+
+fn image_from_grid(
+    grid: impl Iterator<Item = ([usize; 2], f64)>,
+    dims: [usize; 2],
+) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+    let mut image = ImageBuffer::new(dims[0] as u32, dims[1] as u32);
+
+    for ([x, y], val) in grid {
+        let pixel = (val * 220.0) as u8;
+        trace!("{},{} => {:?} => {}", x, y, val, pixel);
+        image.put_pixel(x as u32, y as u32, Rgb([pixel, pixel, pixel]));
+    }
+
+    image
 }
