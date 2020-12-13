@@ -2,7 +2,7 @@ use crate::PlanetParams;
 use common::*;
 use std::f32::consts::PI;
 
-pub struct Continent {
+pub struct LandBlob {
     pub pos: (i32, i32),
     pub radius: i32,
 }
@@ -10,7 +10,8 @@ pub struct Continent {
 pub struct ContinentMap {
     size: i32,
     max_continents: usize,
-    pub continents: Vec<Continent>,
+    /// Consecutive blobs belong to the same continent, partitioned by continent_range
+    land_blobs: Vec<LandBlob>,
     /// (continent idx, start idx, end idx (exclusive))
     continent_range: Vec<(ContinentIdx, usize, usize)>,
 }
@@ -18,8 +19,9 @@ pub struct ContinentMap {
 type ContinentIdx = usize;
 
 const STARTING_RADIUS: f32 = 14.0;
-const DECREMENT_RANGE: (f32, f32) = (0.4, 0.9);
+const DECREMENT_RANGE: (f32, f32) = (0.3, 0.6);
 const MIN_RADIUS: i32 = 2;
+const NEW_CONTINENT_MIN_DISTANCE: i32 = 30;
 
 impl ContinentMap {
     pub fn new(params: &PlanetParams) -> Self {
@@ -27,12 +29,12 @@ impl ContinentMap {
             size: params.planet_size as i32,
             max_continents: params.max_continents,
 
-            continents: Vec::with_capacity(128),
+            land_blobs: Vec::with_capacity(128),
             continent_range: Vec::with_capacity(params.max_continents),
         }
     }
 
-    pub fn generate(&mut self, rando: &mut dyn RngCore) -> usize {
+    pub fn generate(&mut self, rando: &mut dyn RngCore) -> (usize, usize) {
         macro_rules! new_decrement {
             () => {
                 rando.gen_range(DECREMENT_RANGE.0, DECREMENT_RANGE.1)
@@ -65,11 +67,17 @@ impl ContinentMap {
 
             if next_continent_pls {
                 // this continent is finished
+                let blob_count = self.land_blobs.len() - parent_start_idx;
+
+                if blob_count == 0 {
+                    // empty continent
+                    break;
+                }
+
                 self.continent_range
-                    .push((count, parent_start_idx, self.continents.len()));
+                    .push((count, parent_start_idx, self.land_blobs.len()));
 
                 count += 1;
-                let blob_count = self.continents.len() - parent_start_idx;
                 debug!("continent finished"; "index" => count, "blobs" => blob_count);
 
                 if count >= self.max_continents {
@@ -78,23 +86,27 @@ impl ContinentMap {
                 }
 
                 // prepare for next
-                parent_start_idx = self.continents.len();
+                parent_start_idx = self.land_blobs.len();
                 radius = STARTING_RADIUS;
                 decrement = new_decrement!();
                 continue;
             }
 
-            self.continents.push(Continent {
+            self.land_blobs.push(LandBlob {
                 pos: this_pos.expect("position not initialized"),
                 radius: this_radius,
             });
 
             debug!("placing shape on continent"; "pos" => ?this_pos, "radius" => ?this_radius, "continent" => parent_start_idx);
 
-            radius -= decrement;
+            // possibly reduce radius, gets less likely as it gets smaller so we have fewer large continents
+            let decrement_threshold = (radius / STARTING_RADIUS).max(0.1).min(0.8);
+            if rando.gen::<f32>() < decrement_threshold {
+                radius -= decrement;
+            }
         }
 
-        count
+        (count, self.land_blobs.len())
     }
 
     fn place_new_continent(
@@ -107,12 +119,12 @@ impl ContinentMap {
         const MAX_ATTEMPTS_PER_PARENT: usize = 5;
 
         // assume parent continent is up to the end of the vec
-        let max_parent = (self.continents.len()) as f32;
+        let max_parent = (self.land_blobs.len()) as f32;
         let min_parent = parent_start_idx as f32;
 
         for _ in 0..MAX_ATTEMPTS {
             // choose a parent to attach to
-            let parent_idx = if self.continents[parent_start_idx..].is_empty() {
+            let parent_idx = if self.land_blobs[parent_start_idx..].is_empty() {
                 None
             } else {
                 // later indices are more likely than early ones, i.e. attach to the branch shapes
@@ -125,14 +137,21 @@ impl ContinentMap {
             for _ in 0..MAX_ATTEMPTS_PER_PARENT {
                 let pos = match parent_idx {
                     None => {
-                        // random
+                        // new continent - must not be too close to others
                         let x = rando.gen_range(radius, self.size - radius);
                         let y = rando.gen_range(radius, self.size - radius);
-                        (x, y)
+                        let pos = (x, y);
+
+                        if self.min_distance_2_from_others(pos) <= NEW_CONTINENT_MIN_DISTANCE.pow(2)
+                        {
+                            // too close
+                            continue;
+                        }
+                        pos
                     }
                     Some(idx) => {
                         // on parent circumference
-                        let parent = &self.continents[idx];
+                        let parent = &self.land_blobs[idx];
                         let angle = rando.gen_range(0.0, PI * 2.0);
                         let parent_radius = parent.radius as f32 * 0.75;
                         let x = parent_radius * angle.cos();
@@ -145,7 +164,7 @@ impl ContinentMap {
                     }
                 };
 
-                if self.check_valid_circle(pos, radius, parent_start_idx) {
+                if self.check_valid_blob(pos, radius, parent_start_idx) {
                     return Some(pos);
                 }
             }
@@ -153,8 +172,8 @@ impl ContinentMap {
         None
     }
 
-    fn check_valid_circle(&self, pos: (i32, i32), radius: i32, continent_start_idx: usize) -> bool {
-        for (i, other) in self.continents.iter().enumerate() {
+    fn check_valid_blob(&self, pos: (i32, i32), radius: i32, blob_start_idx: usize) -> bool {
+        for (i, other) in self.land_blobs.iter().enumerate() {
             let d = (other.pos.0 - pos.0).pow(2) + (other.pos.1 - pos.1).pow(2);
 
             if d > (other.radius + radius).pow(2) {
@@ -167,7 +186,7 @@ impl ContinentMap {
                 return false;
             } else {
                 // overlaps
-                let is_my_continent = i >= continent_start_idx;
+                let is_my_continent = i >= blob_start_idx;
                 if !is_my_continent {
                     return false;
                 }
@@ -177,11 +196,21 @@ impl ContinentMap {
         true
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &Continent)> + '_ {
+    fn min_distance_2_from_others(&self, pos: (i32, i32)) -> i32 {
+        let mut dist = i32::MAX;
+        for other in &self.land_blobs {
+            let d2 = (other.pos.0 - pos.0).pow(2) + (other.pos.1 - pos.1).pow(2);
+            dist = dist.min(d2);
+        }
+
+        dist
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &LandBlob)> + '_ {
         self.continent_range
             .iter()
             .flat_map(move |(idx, start, end)| {
-                let blobs = &self.continents[*start..*end];
+                let blobs = &self.land_blobs[*start..*end];
                 blobs.iter().map(move |b| (*idx, b))
             })
     }

@@ -26,7 +26,7 @@ fn main() -> Result<(), ()> {
         let params = PlanetParams {
             seed,
             planet_size: 128,
-            max_continents: 8,
+            max_continents: 6,
             ..PlanetParams::default()
         };
 

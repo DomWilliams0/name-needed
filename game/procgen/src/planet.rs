@@ -61,8 +61,11 @@ impl Planet {
         let params = planet.params.clone();
 
         let mut planet_rando = StdRng::seed_from_u64(params.seed);
-        let continents = planet.continents.generate(&mut planet_rando);
-        debug!("placed {count} continents", count = continents);
+
+        // place continents
+        let (continents, total_blobs) = planet.continents.generate(&mut planet_rando);
+        // TODO reject if continent or land blob count is too low
+        debug!("placed {count} continents with {blobs} land blobs", count = continents, blobs = total_blobs);
 
         /*        // populate heightmap
                 let noise = Fbm::new()
@@ -114,7 +117,7 @@ impl Planet {
         use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
         use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut};
 
-        let debug_colors = true;
+        let debug_colors = false;
 
         let mut colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
