@@ -1,4 +1,4 @@
 mod declare;
 mod r#impl;
 
-pub use r#impl::{CoordType, Grid, GridImpl, DynamicGrid};
+pub use r#impl::{CoordType, DynamicGrid, Grid, GridImpl};

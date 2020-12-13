@@ -1,4 +1,4 @@
-# TODOs (243)
+# TODOs (244)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -21,6 +21,8 @@
    * `// TODO actual error type`
    * `.set_seed(params.seed as u32) // TODO seed loses so much of its entropy`
    * `// TODO could have separate copy of planet params per thread if immutable`
+ * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
+   * `// TODO custom block types for procgen that are translated to game blocks`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)

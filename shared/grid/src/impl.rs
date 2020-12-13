@@ -50,10 +50,10 @@ pub struct DynamicGrid<T> {
     data: Box<[T]>,
 }
 
-impl <T:Default> DynamicGrid<T> {
-    pub fn new(dims :(usize,usize,usize)) -> Self {
+impl<T: Default> DynamicGrid<T> {
+    pub fn new(dims: (usize, usize, usize)) -> Self {
         let len = dims.0 * dims.1 * dims.2;
-        assert_ne!(len ,0);
+        assert_ne!(len, 0);
 
         let data = {
             let mut vec = Vec::with_capacity(len);
@@ -83,7 +83,7 @@ impl <T:Default> DynamicGrid<T> {
         self.index_mut(self.flatten_coords(coords))
     }
 
-    fn flatten_coords(&self, [x,y,z]:[usize;3]) -> usize {
+    fn flatten_coords(&self, [x, y, z]: [usize; 3]) -> usize {
         let [xs, ys, _zs] = self.dims;
         x + xs * (y + ys * z)
     }
@@ -93,12 +93,19 @@ impl <T:Default> DynamicGrid<T> {
         [index % xs, (index / xs) % ys, index / (ys * xs)]
     }
 
-    pub fn dimensions(&self) -> [usize; 3] {self.dims}
+    pub fn dimensions(&self) -> [usize; 3] {
+        self.dims
+    }
 
-    pub fn dimensions_xy(&self) -> [usize; 2] {[self.dims[0], self.dims[1]]}
+    pub fn dimensions_xy(&self) -> [usize; 2] {
+        [self.dims[0], self.dims[1]]
+    }
 
-    pub fn iter(&self) -> impl Iterator<Item=([usize;3], &T)>{
-        self.data.iter().enumerate().map(move |(i, val)| (self.unflatten_index(i), val))
+    pub fn iter(&self) -> impl Iterator<Item = ([usize; 3], &T)> {
+        self.data
+            .iter()
+            .enumerate()
+            .map(move |(i, val)| (self.unflatten_index(i), val))
     }
 }
 
