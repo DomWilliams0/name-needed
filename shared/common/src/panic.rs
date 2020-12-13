@@ -3,7 +3,7 @@ use backtrace::Backtrace;
 
 use parking_lot::Mutex;
 use std::borrow::Cow;
-use std::panic::PanicInfo;
+use std::panic::{PanicInfo, UnwindSafe};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
@@ -61,4 +61,31 @@ fn register_panic(panic: &PanicInfo) {
         thread,
         backtrace,
     });
+}
+
+pub fn run_and_handle_panics<R>(do_me: impl FnOnce() -> R + UnwindSafe) -> Result<R, ()> {
+    let result = std::panic::catch_unwind(|| do_me());
+
+    let all_panics = panics();
+
+    debug_assert_eq!(all_panics.is_empty(), result.is_ok());
+
+    result.map_err(|_| {
+        crit!("{count} threads panicked", count = all_panics.len());
+
+        for Panic {
+            message,
+            thread,
+            mut backtrace,
+        } in all_panics
+        {
+            backtrace.resolve();
+
+            crit!("panic";
+            "backtrace" => ?backtrace,
+            "message" => message,
+            "thread" => thread,
+            );
+        }
+    })
 }

@@ -7,7 +7,6 @@ use simulation::{
 
 use crate::presets::ContinuousIntegrationGamePreset;
 
-use common::panic::Panic;
 use engine::Engine;
 use resources::resource::Resources;
 use resources::ResourceContainer;
@@ -164,7 +163,7 @@ fn main() {
 
     common::panic::init_panic_detection();
 
-    let result = std::panic::catch_unwind(|| {
+    let result = common::panic::run_and_handle_panics(|| {
         #[cfg(feature = "count-allocs")]
         {
             use alloc_counter::count_alloc;
@@ -183,34 +182,11 @@ fn main() {
         do_main()
     });
 
-    let all_panics = common::panic::panics();
-
     let exit = match result {
-        _ if !all_panics.is_empty() => {
-            crit!("{count} threads panicked", count = all_panics.len());
-
-            for Panic {
-                message,
-                thread,
-                mut backtrace,
-            } in all_panics
-            {
-                backtrace.resolve();
-
-                crit!("panic";
-                "backtrace" => ?backtrace,
-                "message" => message,
-                "thread" => thread,
-                );
-            }
-
+        Err(_) => {
+            // panic handled above
             1
         }
-        Err(_) => {
-            // panics are caught by the case above
-            unreachable!()
-        }
-
         Ok(Err(e)) => {
             crit!("critical error"; "error" => %e);
 
