@@ -1,5 +1,5 @@
+use crate::*;
 use backtrace::Backtrace;
-use common::*;
 
 use parking_lot::Mutex;
 use std::borrow::Cow;
@@ -10,10 +10,6 @@ lazy_static! {
     static ref HAS_PANICKED: AtomicBool = AtomicBool::default();
     static ref PANICS: Mutex<Vec<Panic>> = Mutex::new(Vec::new());
 }
-
-// thread_local! {
-//     static IS_MAIN_THREAD: AtomicBool = AtomicBool::default();
-// }
 
 #[derive(Debug)]
 pub struct Panic {
@@ -27,10 +23,6 @@ pub fn init_panic_detection() {
         register_panic(panic);
     }));
 
-    // IS_MAIN_THREAD.with(|b| {
-    //     b.store(true, Ordering::Relaxed);
-    // });
-
     info!("initialized panic handler");
 }
 
@@ -42,10 +34,6 @@ pub fn panics() -> Vec<Panic> {
 pub fn has_panicked() -> bool {
     HAS_PANICKED.load(Ordering::Relaxed)
 }
-
-// fn is_main_thread() -> bool {
-//     IS_MAIN_THREAD.with(|b| b.load(Ordering::Relaxed))
-// }
 
 fn register_panic(panic: &PanicInfo) {
     let thread = {

@@ -7,7 +7,7 @@ use simulation::{
 
 use crate::presets::ContinuousIntegrationGamePreset;
 
-use engine::panic::Panic;
+use common::panic::Panic;
 use engine::Engine;
 use resources::resource::Resources;
 use resources::ResourceContainer;
@@ -162,7 +162,7 @@ fn main() {
 
     info!("initialized logging"; "level" => ?logger_guard.level());
 
-    engine::panic::init_panic_detection();
+    common::panic::init_panic_detection();
 
     let result = std::panic::catch_unwind(|| {
         #[cfg(feature = "count-allocs")]
@@ -183,7 +183,7 @@ fn main() {
         do_main()
     });
 
-    let all_panics = engine::panic::panics();
+    let all_panics = common::panic::panics();
 
     let exit = match result {
         _ if !all_panics.is_empty() => {

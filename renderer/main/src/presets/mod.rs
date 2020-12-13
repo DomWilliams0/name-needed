@@ -42,9 +42,9 @@ mod empty;
 
 use crate::scenarios::Scenario;
 pub use ci::ContinuousIntegrationGamePreset;
+use common::panic;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
-use engine::panic;
 
 fn world_from_source(
     source: config::WorldSource,

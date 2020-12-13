@@ -305,8 +305,6 @@
    * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (1)
-   * `// TODO use panic.message() when it stabilises`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`
@@ -335,6 +333,8 @@
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)
    * `# TODO feature for cgmath`
+ * [shared/common/src/panic.rs](shared/common/src/panic.rs) (1)
+   * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (1)

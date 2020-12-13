@@ -356,6 +356,7 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "backtrace",
  "boolinator",
  "bumpalo",
  "cgmath",
@@ -706,7 +707,6 @@ dependencies = [
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "backtrace",
  "color",
  "common",
  "config",

@@ -78,6 +78,7 @@ pub fn truncate(vec: Vector2, max: F) -> Vector2 {
 
 pub mod input;
 pub mod newtype;
+pub mod panic;
 pub mod random;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {

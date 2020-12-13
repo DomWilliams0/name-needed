@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::panic;
+use common::panic;
 use common::*;
 use simulation::input::UiCommand;
 use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
