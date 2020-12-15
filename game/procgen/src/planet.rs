@@ -10,6 +10,9 @@ use unit::world::{ChunkLocation, SlabLocation};
 #[derive(Clone)]
 pub struct Planet(Arc<RwLock<PlanetInner>>);
 
+unsafe impl Send for Planet {}
+unsafe impl Sync for Planet {}
+
 #[derive(Default)]
 pub struct Region {
     pub height: f64,
@@ -65,7 +68,14 @@ impl Planet {
         // place continents
         let (continents, total_blobs) = planet.continents.generate(&mut planet_rando);
         // TODO reject if continent or land blob count is too low
-        debug!("placed {count} continents with {blobs} land blobs", count = continents, blobs = total_blobs);
+        info!(
+            "placed {count} continents with {blobs} land blobs",
+            count = continents,
+            blobs = total_blobs
+        );
+
+        // rasterize continents onto grid and discover depth i.e. distance from land/sea border
+        planet.continents.populate_depth();
 
         /*        // populate heightmap
                 let noise = Fbm::new()
@@ -117,52 +127,93 @@ impl Planet {
         use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
         use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut};
 
-        let debug_colors = false;
+        enum DrawMode {
+            Outlines { debug_colors: bool, outlines: bool },
+            Height,
+        }
 
-        let mut colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
+        let draw_mode = DrawMode::Outlines {
+            debug_colors: true,
+            outlines: false,
+        };
+
+        let draw_mode = DrawMode::Height;
 
         let planet = self.0.read();
-        let mut image = ImageBuffer::from_pixel(
-            planet.params.planet_size,
-            planet.params.planet_size,
-            Rgb(if debug_colors {
-                [240, 240, 240]
-            } else {
-                [44, 114, 161]
-            }),
-        );
+        let mut image = ImageBuffer::new(planet.params.planet_size, planet.params.planet_size);
 
-        for (_, blobs) in planet
-            .continents
-            .iter()
-            .group_by(|(idx, _)| *idx)
-            .into_iter()
-        {
-            let color = if debug_colors {
-                colors.next_please()
-            } else {
-                ColorRgb::new(185, 130, 82)
-            };
+        match draw_mode {
+            DrawMode::Outlines {
+                debug_colors,
+                outlines,
+            } => {
+                let mut colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
-            for (_, blob) in blobs {
-                draw_filled_circle_mut(
-                    &mut image,
-                    (blob.pos.0 as i32, blob.pos.1 as i32),
-                    blob.radius as i32,
-                    Rgb(color.into()),
-                );
+                let planet = self.0.read();
+                let bg = Rgb(if debug_colors {
+                    [240, 240, 240]
+                } else {
+                    [44, 114, 161]
+                });
 
-                if debug_colors {
-                    // outline
-                    draw_hollow_circle_mut(
-                        &mut image,
-                        (blob.pos.0 as i32, blob.pos.1 as i32),
-                        blob.radius as i32,
-                        Rgb([10, 10, 10]),
-                    );
+                image.pixels_mut().for_each(|p| *p = bg);
+
+                for (_, blobs) in planet
+                    .continents
+                    .iter()
+                    .group_by(|(idx, _)| *idx)
+                    .into_iter()
+                {
+                    let color = if debug_colors {
+                        colors.next_please()
+                    } else {
+                        ColorRgb::new(185, 130, 82)
+                    };
+
+                    for (_, blob) in blobs {
+                        draw_filled_circle_mut(
+                            &mut image,
+                            (blob.pos.0 as i32, blob.pos.1 as i32),
+                            blob.radius as i32,
+                            Rgb(color.into()),
+                        );
+
+                        if debug_colors && outlines {
+                            // outline
+                            draw_hollow_circle_mut(
+                                &mut image,
+                                (blob.pos.0 as i32, blob.pos.1 as i32),
+                                blob.radius as i32,
+                                Rgb([10, 10, 10]),
+                            );
+                        }
+                    }
                 }
             }
-        }
+
+            DrawMode::Height => {
+                let max_density = planet
+                    .continents
+                    .grid
+                    .iter_coords()
+                    .map(|(_, tile)| tile.depth.get())
+                    .max()
+                    .unwrap();
+
+                for (coord, tile) in planet.continents.grid.iter_coords() {
+                    let d = tile.depth.get();
+                    let f = d as f32 / max_density as f32;
+                    let c = if tile.is_land {
+                        ColorRgb::new_hsl(1.0, 0.8, f)
+                    } else {
+                        ColorRgb::new_hsl(0.5, 0.8, f)
+                    };
+
+                    let c = Rgb(c.into());
+                    draw_filled_circle_mut(&mut image, (coord[0] as i32, coord[1] as i32), 1, c);
+                }
+            }
+        };
 
         DynamicImage::ImageRgb8(image)
     }

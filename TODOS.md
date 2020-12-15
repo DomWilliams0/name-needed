@@ -15,7 +15,7 @@
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (1)
-   * `// TODO now what?`
+   * `// TODO agree api and stop making everything public`
  * [game/procgen/src/main.rs](game/procgen/src/main.rs) (2)
    * `// TODO actually log the time`
    * `// TODO actually configure from cmdline`
@@ -341,7 +341,7 @@
    * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/impl.rs](shared/grid/src/impl.rs) (1)
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
    * `// TODO allow smaller datatypes for dims`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`

@@ -1,11 +1,15 @@
 use crate::PlanetParams;
 use common::*;
+use grid::DynamicGrid;
+use std::cell::Cell;
 use std::f32::consts::PI;
 
 pub struct LandBlob {
     pub pos: (i32, i32),
     pub radius: i32,
 }
+
+// TODO agree api and stop making everything public
 
 pub struct ContinentMap {
     size: i32,
@@ -14,6 +18,8 @@ pub struct ContinentMap {
     land_blobs: Vec<LandBlob>,
     /// (continent idx, start idx, end idx (exclusive))
     continent_range: Vec<(ContinentIdx, usize, usize)>,
+
+    pub grid: DynamicGrid<Tile>,
 }
 
 type ContinentIdx = usize;
@@ -23,6 +29,11 @@ const DECREMENT_RANGE: (f32, f32) = (0.3, 0.6);
 const MIN_RADIUS: i32 = 2;
 const NEW_CONTINENT_MIN_DISTANCE: i32 = 30;
 
+pub struct Tile {
+    pub is_land: bool,
+    pub depth: Cell<u8>,
+}
+
 impl ContinentMap {
     pub fn new(params: &PlanetParams) -> Self {
         Self {
@@ -31,6 +42,12 @@ impl ContinentMap {
 
             land_blobs: Vec::with_capacity(128),
             continent_range: Vec::with_capacity(params.max_continents),
+
+            grid: DynamicGrid::<Tile>::new([
+                params.planet_size as usize,
+                params.planet_size as usize,
+                1,
+            ]),
         }
     }
 
@@ -213,5 +230,98 @@ impl ContinentMap {
                 let blobs = &self.land_blobs[*start..*end];
                 blobs.iter().map(move |b| (*idx, b))
             })
+    }
+
+    pub fn populate_depth(&mut self) {
+        macro_rules! set {
+            ($pos:expr) => {
+                let (x, y) = $pos;
+                let coord = [x as usize, y as usize, 0];
+                if self.grid.is_coord_in_range(coord) {
+                    self.grid[coord].is_land = true;
+                }
+            };
+        }
+
+        // rasterize blobs onto grid
+        for blob in &self.land_blobs {
+            // draw filled in circle
+            // https://stackoverflow.com/a/14976268
+            let mut x = blob.radius;
+            let mut y = 0;
+            let mut x_change = 1 - (blob.radius << 1);
+            let mut y_change = 0;
+            let mut radius_error = 0;
+
+            let x0 = blob.pos.0;
+            let y0 = blob.pos.1;
+            while x >= y {
+                for _x in (x0 - x)..=(x0 + x) {
+                    set!((_x, y0 + y));
+                    set!((_x, y0 - y));
+                }
+
+                for _x in (x0 - y)..=(x0 + y) {
+                    set!((_x, y0 + x));
+                    set!((_x, y0 - x));
+                }
+
+                y += 1;
+                radius_error += y_change;
+                y_change += 2;
+
+                if ((radius_error << 1) + x_change) > 0 {
+                    x -= 1;
+                    radius_error += x_change;
+                    x_change += 2;
+                }
+            }
+        }
+
+        let mut frontier = Vec::with_capacity((self.size * self.size / 2) as usize);
+        for idx in self
+            .grid
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, tile)| tile.is_land.as_some(idx))
+        {
+            for n in self.grid.neighbours(idx) {
+                let n_tile = &self.grid[n];
+                if n_tile.is_land {
+                    continue;
+                }
+
+                // this is border between land and sea
+                frontier.push((n, 1));
+            }
+
+            while let Some((idx, new_val)) = frontier.pop() {
+                let propagate = |tile: &Tile| {
+                    let current = tile.depth.get();
+                    if current == 0 || new_val < current {
+                        tile.depth.set(new_val);
+                        true
+                    } else {
+                        false
+                    }
+                };
+
+                let this_tile = &self.grid[idx];
+                if propagate(this_tile) {
+                    for n in self.grid.neighbours(idx) {
+                        frontier.push((n, new_val.saturating_add(1)));
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Default for Tile {
+    fn default() -> Self {
+        Tile {
+            is_land: false,
+            depth: Cell::new(0),
+        }
     }
 }
