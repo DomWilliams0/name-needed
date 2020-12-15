@@ -1,4 +1,4 @@
-# TODOs (245)
+# TODOs (246)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,6 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (1)
+   * `// TODO now what?`
  * [game/procgen/src/main.rs](game/procgen/src/main.rs) (2)
    * `// TODO actually log the time`
    * `// TODO actually configure from cmdline`

@@ -1,6 +1,6 @@
 use derive_more::*;
 use std::convert::TryFrom;
-use std::ops::Range;
+use std::ops::{Index, IndexMut, Range};
 
 // TODO allow smaller datatypes for dims
 pub type CoordType = [i32; 3];
@@ -67,22 +67,6 @@ impl<T: Default> DynamicGrid<T> {
         }
     }
 
-    pub fn index(&self, idx: usize) -> &T {
-        &self.data[idx]
-    }
-
-    pub fn index_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.data[idx]
-    }
-
-    pub fn index_with_coords(&self, coords: [usize; 3]) -> &T {
-        self.index(self.flatten_coords(coords))
-    }
-
-    pub fn index_with_coords_mut(&mut self, coords: [usize; 3]) -> &mut T {
-        self.index_mut(self.flatten_coords(coords))
-    }
-
     fn flatten_coords(&self, [x, y, z]: [usize; 3]) -> usize {
         let [xs, ys, _zs] = self.dims;
         x + xs * (y + ys * z)
@@ -91,6 +75,13 @@ impl<T: Default> DynamicGrid<T> {
     fn unflatten_index(&self, index: usize) -> [usize; 3] {
         let [xs, ys, _zs] = self.dims;
         [index % xs, (index / xs) % ys, index / (ys * xs)]
+    }
+
+    #[inline]
+    pub fn is_in_range(&self, [x, y, z]: [usize; 3]) -> bool {
+        x < self.dims[0] &&
+            y < self.dims[1] &&
+            z < self.dims[2]
     }
 
     pub fn dimensions(&self) -> [usize; 3] {
@@ -106,6 +97,40 @@ impl<T: Default> DynamicGrid<T> {
             .iter()
             .enumerate()
             .map(move |(i, val)| (self.unflatten_index(i), val))
+    }
+}
+
+impl<T> Index<usize> for DynamicGrid<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.data[index]
+    }
+}
+
+impl<T> IndexMut<usize> for DynamicGrid<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.data[index]
+    }
+}
+
+impl<T: Default> Index<[usize; 3]> for DynamicGrid<T> {
+    type Output = T;
+
+    fn index(&self, coords: [usize; 3]) -> &Self::Output {
+        self.index(self.flatten_coords(coords))
+    }
+}
+
+impl<T: Default> IndexMut<[usize; 3]> for DynamicGrid<T> {
+    fn index_mut(&mut self, coords: [usize; 3]) -> &mut Self::Output {
+        self.index_mut(self.flatten_coords(coords))
+    }
+}
+
+impl<T> AsRef<[T]> for DynamicGrid<T> {
+    fn as_ref(&self) -> &[T] {
+        &self.data
     }
 }
 
