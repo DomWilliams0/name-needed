@@ -16,8 +16,20 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "128")]
     pub planet_size: u32,
 
-    #[structopt(long, default_value = "6")]
+    #[structopt(long, default_value = "5")]
     pub max_continents: usize,
+
+    #[structopt(long, default_value = "10.0")]
+    pub continent_start_radius: f32,
+
+    #[structopt(long, default_value = "0.1")]
+    pub continent_dec_min: f32,
+
+    #[structopt(long, default_value = "0.3")]
+    pub continent_dec_max: f32,
+
+    #[structopt(long, default_value = "20")]
+    pub continent_min_distance: i32,
 
     #[cfg(feature = "bin")]
     #[structopt(flatten)]

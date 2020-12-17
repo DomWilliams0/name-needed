@@ -16,8 +16,7 @@ pub struct LandBlob {
 // TODO agree api and stop making everything public
 
 pub struct ContinentMap {
-    size: i32,
-    max_continents: usize,
+    params: PlanetParams,
     /// Consecutive blobs belong to the same continent, partitioned by continent_range
     land_blobs: Vec<LandBlob>,
     /// (continent idx, start idx, end idx (exclusive))
@@ -28,10 +27,7 @@ pub struct ContinentMap {
 
 type ContinentIdx = NonZeroUsize;
 
-const STARTING_RADIUS: f32 = 14.0;
-const DECREMENT_RANGE: (f32, f32) = (0.3, 0.6);
 const MIN_RADIUS: i32 = 2;
-const NEW_CONTINENT_MIN_DISTANCE: i32 = 30;
 
 pub struct Tile {
     density: Cell<f64>,
@@ -45,8 +41,7 @@ impl ContinentMap {
         assert!(params.planet_size > 0);
 
         Self {
-            size: params.planet_size as i32,
-            max_continents: params.max_continents,
+            params: params.clone(),
 
             land_blobs: Vec::with_capacity(128),
             continent_range: Vec::with_capacity(params.max_continents),
@@ -62,11 +57,11 @@ impl ContinentMap {
     pub fn generate(&mut self, rando: &mut dyn RngCore) -> (usize, usize) {
         macro_rules! new_decrement {
             () => {
-                rando.gen_range(DECREMENT_RANGE.0, DECREMENT_RANGE.1)
+                rando.gen_range(self.params.continent_dec_min, self.params.continent_dec_max)
             };
         }
 
-        let mut radius = STARTING_RADIUS;
+        let mut radius = self.params.continent_start_radius;
         let mut parent_start_idx = 0;
         let mut current_continent = ContinentIdx::new(1).unwrap();
         let mut decrement = new_decrement!();
@@ -110,14 +105,14 @@ impl ContinentMap {
                     unsafe { NonZeroUsize::new_unchecked(current_continent.get() + 1) };
                 debug!("continent finished"; "index" => current_continent.get(), "blobs" => blob_count);
 
-                if current_continent.get() >= self.max_continents {
+                if current_continent.get() >= self.params.max_continents {
                     // all done
                     break;
                 }
 
                 // prepare for next
                 parent_start_idx = self.land_blobs.len();
-                radius = STARTING_RADIUS;
+                radius = self.params.continent_start_radius;
                 decrement = new_decrement!();
                 continue;
             }
@@ -130,7 +125,9 @@ impl ContinentMap {
             debug!("placing shape on continent"; "pos" => ?this_pos, "radius" => ?this_radius, "continent" => parent_start_idx);
 
             // possibly reduce radius, gets less likely as it gets smaller so we have fewer large continents
-            let decrement_threshold = (radius / STARTING_RADIUS).max(0.1).min(0.8);
+            let decrement_threshold = (radius / self.params.continent_start_radius)
+                .max(0.1)
+                .min(0.8);
             if rando.gen::<f32>() < decrement_threshold {
                 radius -= decrement;
             }
@@ -169,12 +166,13 @@ impl ContinentMap {
                 let pos = match parent_idx {
                     None => {
                         // new continent - must not be too close to others
-                        let max = (self.size - radius).max(radius + 1);
+                        let max = (self.params.planet_size as i32 - radius).max(radius + 1);
                         let x = rando.gen_range(radius, max);
                         let y = rando.gen_range(radius, max);
                         let pos = (x, y);
 
-                        if self.min_distance_2_from_others(pos) <= NEW_CONTINENT_MIN_DISTANCE.pow(2)
+                        if self.min_distance_2_from_others(pos)
+                            <= self.params.continent_min_distance.pow(2)
                         {
                             // too close
                             continue;
@@ -305,7 +303,8 @@ impl ContinentMap {
         let increment = 0.1;
         let limit = 10.0;
 
-        let mut frontier = Vec::with_capacity((self.size * self.size / 2) as usize);
+        let size = self.params.planet_size as i32;
+        let mut frontier = Vec::with_capacity((size * size / 2) as usize);
         for (idx, tile) in self.grid.iter().enumerate() {
             let is_land = tile.is_land();
             for n in self.grid.wrapping_neighbours(idx) {
@@ -368,7 +367,7 @@ impl ContinentMap {
         let mut min = f64::MAX;
         let mut max = f64::MIN;
 
-        let size = self.size as f64;
+        let size = self.params.planet_size as f64;
         for (coord, tile) in self.grid.iter_coords_mut() {
             let (x, y) = (coord[0] as f64, coord[1] as f64);
 
