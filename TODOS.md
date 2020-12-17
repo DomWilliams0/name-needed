@@ -1,4 +1,4 @@
-# TODOs (248)
+# TODOs (247)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,10 +14,9 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
+ * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (2)
    * `// TODO agree api and stop making everything public`
    * `// TODO validate values with result type`
-   * `// TODO blur/average density`
  * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
    * `// TODO actually log the time`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)

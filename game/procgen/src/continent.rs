@@ -1,4 +1,5 @@
 use crate::params::PlanetParams;
+use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
 use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
@@ -351,7 +352,56 @@ impl ContinentMap {
             tile.density.set(scaled_val);
         }
 
-        // TODO blur/average density
+        // average density with gaussian blur filter
+        {
+            const HEIGHT: usize = 5;
+            const WIDTH: usize = 5;
+            const SIGMA: f64 = 3.0;
+
+            let kernel = {
+                let mut kernel = [0.0; HEIGHT * WIDTH];
+
+                let mut sum = 0.0;
+                for (idx, val) in kernel.iter_mut().enumerate() {
+                    let i = (idx / WIDTH) as f64;
+                    let j = (idx % WIDTH) as f64;
+
+                    *val = (-(i * i + j * j) / (2.0 * SIGMA * SIGMA)).exp() / (TAU * SIGMA * SIGMA);
+                    sum += *val;
+                }
+
+                for val in kernel.iter_mut() {
+                    *val /= sum;
+                }
+
+                kernel
+            };
+
+            for ([i, j, _], tile) in self.grid.iter_coords() {
+                let mut val = 0.0;
+
+                for h in i..i + HEIGHT {
+                    for w in j..j + WIDTH {
+                        let kernel_val = {
+                            let x = h - i;
+                            let y = w - j;
+                            kernel[x + (y * WIDTH)]
+                        };
+
+                        let grid_val = {
+                            let coord = [h as isize, w as isize, 0];
+                            let coord = self.grid.wrap_coord(coord);
+                            self.grid[coord].density.get()
+                        };
+                        val += kernel_val * grid_val;
+                    }
+                }
+
+                // ensure limits are maintained
+                val = clamp(val, 0.0, 1.0);
+                tile.density.set(val);
+            }
+        };
     }
 
     /// Generates noise and scales to 0.0-1.0
