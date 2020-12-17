@@ -302,24 +302,20 @@ impl ContinentMap {
 
     /// Discovers density and scales to 0.0-1.0
     fn discover_density(&mut self) {
-        let increment = 1.0;
-        let limit = self.size as f64 / 4.0;
+        let increment = 0.1;
+        let limit = 10.0;
 
         let mut frontier = Vec::with_capacity((self.size * self.size / 2) as usize);
-        for idx in self
-            .grid
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, tile)| tile.is_land().as_some(idx))
-        {
+        for (idx, tile) in self.grid.iter().enumerate() {
+            let is_land = tile.is_land();
             for n in self.grid.wrapping_neighbours(idx) {
                 let n_tile = &self.grid[n];
-                if n_tile.is_land() {
+                if is_land == n_tile.is_land() {
                     continue;
                 }
 
                 // this is border between land and sea
-                frontier.push((n, 1.0));
+                frontier.push((n, increment));
             }
 
             while let Some((idx, new_val)) = frontier.pop() {
@@ -353,6 +349,7 @@ impl ContinentMap {
         }
 
         // average density with gaussian blur filter
+        // TODO messes up boundaries
         apply_gaussian_filter(
             &mut self.grid,
             |tile| tile.density.get(),
@@ -404,15 +401,8 @@ impl ContinentMap {
 
         debug!("original noise limits"; "max" => max, "min" => min);
 
-        let rescale = |val: f64| {
-            // https://rosettacode.org/wiki/Map_range#Rust
-            let from = (min, max);
-            let to = (0.0, 1.0);
-            to.0 + (val - from.0) * (to.1 - to.0) / (from.1 - from.0)
-        };
-
         for tile in self.grid.iter_mut() {
-            let height = rescale(tile.height);
+            let height = map_range((min, max), (0.0, 1.0), tile.height);
             let density = tile.density.get();
 
             // multiply together so that height is lower at the borders between land+sea (density=0)
@@ -494,4 +484,10 @@ fn apply_gaussian_filter<T: Default>(
         val = clamp(val, 0.0, 1.0);
         set_value(value, val);
     }
+}
+
+/// https://rosettacode.org/wiki/Map_range#Rust
+#[inline]
+fn map_range(from_range: (f64, f64), to_range: (f64, f64), s: f64) -> f64 {
+    to_range.0 + (s - from_range.0) * (to_range.1 - to_range.0) / (from_range.1 - from_range.0)
 }
