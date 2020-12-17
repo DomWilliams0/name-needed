@@ -1,4 +1,4 @@
-# TODOs (246)
+# TODOs (247)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -16,14 +16,16 @@
    * `// TODO reuse allocation`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (1)
    * `// TODO agree api and stop making everything public`
- * [game/procgen/src/main.rs](game/procgen/src/main.rs) (2)
+ * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
    * `// TODO actually log the time`
-   * `// TODO actually configure from cmdline`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (4)
+ * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)
+   * `// TODO from file too and merge`
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
    * `.set_seed(params.seed as u32) // TODO seed loses so much of its entropy`
    * `// TODO could have separate copy of planet params per thread if immutable`
+   * `// TODO radius no longer makes sense`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)

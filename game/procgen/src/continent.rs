@@ -1,4 +1,4 @@
-use crate::PlanetParams;
+use crate::params::PlanetParams;
 use common::*;
 use grid::DynamicGrid;
 use std::cell::Cell;
@@ -155,8 +155,9 @@ impl ContinentMap {
                 let pos = match parent_idx {
                     None => {
                         // new continent - must not be too close to others
-                        let x = rando.gen_range(radius, self.size - radius);
-                        let y = rando.gen_range(radius, self.size - radius);
+                        let max = (self.size - radius).max(radius + 1);
+                        let x = rando.gen_range(radius, max);
+                        let y = rando.gen_range(radius, max);
                         let pos = (x, y);
 
                         if self.min_distance_2_from_others(pos) <= NEW_CONTINENT_MIN_DISTANCE.pow(2)

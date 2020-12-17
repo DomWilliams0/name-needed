@@ -9,27 +9,18 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
 
 #[cfg(feature = "bin")]
 fn main() -> Result<(), ()> {
+    // parse config and args first
+    let params = PlanetParams::load();
+
     let _logging = logging::LoggerBuilder::with_env()
         .and_then(|builder| builder.init(log_time))
         .expect("logging failed");
     info!("initialized logging"; "level" => ?_logging.level());
+    debug!("config: {:#?}", params);
 
     common::panic::init_panic_detection();
 
-    // TODO actually configure from cmdline
-
-    fn dew_it() {
-        let seed = std::env::var("NN_RANDO")
-            .ok()
-            .map(|_| thread_rng().gen())
-            .unwrap_or(12354);
-        let params = PlanetParams {
-            seed,
-            planet_size: 128,
-            max_continents: 6,
-            ..PlanetParams::default()
-        };
-
+    let dew_it = || {
         let mut planet = Planet::new(params).expect("failed");
         planet.initial_generation();
 
@@ -37,7 +28,7 @@ fn main() -> Result<(), ()> {
         let filename = "procgen.png";
         image.save(filename).expect("failed to write image");
         info!("created {file}", file = filename);
-    }
+    };
 
     common::panic::run_and_handle_panics(dew_it)
 }

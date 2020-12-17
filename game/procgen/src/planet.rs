@@ -3,6 +3,7 @@ use crate::rasterize::SlabGrid;
 use common::parking_lot::RwLock;
 use common::*;
 
+use crate::params::{DrawMode, PlanetParams};
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
 
@@ -21,27 +22,6 @@ pub struct Region {
 pub struct PlanetInner {
     params: PlanetParams,
     continents: ContinentMap,
-}
-
-#[derive(Debug, Clone)]
-pub struct PlanetParams {
-    pub seed: u64,
-    #[deprecated]
-    pub radius: u32,
-
-    /// Height and width of surface in some unit
-    pub planet_size: u32,
-    pub max_continents: usize,
-}
-impl Default for PlanetParams {
-    fn default() -> Self {
-        PlanetParams {
-            seed: 0,
-            radius: 4,
-            planet_size: 128,
-            max_continents: 12,
-        }
-    }
 }
 
 /// https://rosettacode.org/wiki/Map_range#Rust
@@ -63,7 +43,7 @@ impl Planet {
         let mut planet = self.0.write();
         let params = planet.params.clone();
 
-        let mut planet_rando = StdRng::seed_from_u64(params.seed);
+        let mut planet_rando = StdRng::seed_from_u64(params.seed());
 
         // place continents
         let (continents, total_blobs) = planet.continents.generate(&mut planet_rando);
@@ -102,10 +82,10 @@ impl Planet {
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
         // TODO could have separate copy of planet params per thread if immutable
-        let inner = self.0.read();
 
         // radius is excluding 0,0
-        let radius = inner.params.radius as i32;
+        // TODO radius no longer makes sense
+        let radius = 5;
         (
             ChunkLocation(-radius, -radius),
             ChunkLocation(radius, radius),
@@ -127,22 +107,11 @@ impl Planet {
         use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
         use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut};
 
-        enum DrawMode {
-            Outlines { debug_colors: bool, outlines: bool },
-            Height,
-        }
-
-        let draw_mode = DrawMode::Outlines {
-            debug_colors: true,
-            outlines: false,
-        };
-
-        let draw_mode = DrawMode::Height;
-
         let planet = self.0.read();
+
         let mut image = ImageBuffer::new(planet.params.planet_size, planet.params.planet_size);
 
-        match draw_mode {
+        match planet.params.draw_mode() {
             DrawMode::Outlines {
                 debug_colors,
                 outlines,
