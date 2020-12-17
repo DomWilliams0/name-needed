@@ -12,7 +12,7 @@ branches:
     only:
         - /.*/
     except:
-        - feature/better-procgen # huge breaking refactors
+        - feature/planet-generation
 
 install:
     - if [[ "$TRAVIS_BRANCH" = "develop" && -f .planning/active.md ]]; then echo "develop should not have an active.md"; exit 1; fi
