@@ -349,10 +349,10 @@ impl ContinentMap {
         }
 
         // average density with gaussian blur filter
-        // TODO messes up boundaries
         apply_gaussian_filter(
             &mut self.grid,
             |tile| tile.density.get(),
+            |tile, orig| tile.is_land() == orig.is_land(),
             |tile, val| tile.density.set(val),
         )
     }
@@ -435,6 +435,7 @@ impl Tile {
 fn apply_gaussian_filter<T: Default>(
     grid: &mut DynamicGrid<T>,
     mut gimme_value: impl FnMut(&T) -> f64,
+    mut should_average_value: impl FnMut(&T, &T) -> bool,
     mut set_value: impl FnMut(&T, f64),
 ) {
     const HEIGHT: usize = 5;
@@ -465,17 +466,22 @@ fn apply_gaussian_filter<T: Default>(
 
         for h in i..i + HEIGHT {
             for w in j..j + WIDTH {
-                let kernel_val = {
+                let grid_entry = {
+                    let coord = [h as isize, w as isize, 0];
+                    let coord = grid.wrap_coord(coord);
+                    &grid[coord]
+                };
+
+                let grid_val = gimme_value(grid_entry);
+
+                let kernel_val = if should_average_value(grid_entry, value) {
                     let x = h - i;
                     let y = w - j;
                     kernel[x + (y * WIDTH)]
+                } else {
+                    0.0
                 };
 
-                let grid_val = {
-                    let coord = [h as isize, w as isize, 0];
-                    let coord = grid.wrap_coord(coord);
-                    gimme_value(&grid[coord])
-                };
                 val += kernel_val * grid_val;
             }
         }
