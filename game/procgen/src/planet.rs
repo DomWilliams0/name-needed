@@ -138,14 +138,6 @@ impl Planet {
             }
 
             DrawMode::Density => {
-                // let max_density = planet
-                //     .continents
-                //     .grid
-                //     .iter_coords()
-                //     .map(|(_, tile)| tile.depth())
-                //     .max()
-                //     .unwrap();
-
                 for (coord, tile) in planet.continents.grid.iter_coords() {
                     let d = tile.density() as f32;
                     let c = if tile.is_land() {
@@ -164,15 +156,10 @@ impl Planet {
                     let c = if tile.is_land() {
                         ColorRgb::new_hsl(1.0, 0.8, height)
                     } else {
-                        continue;
+                        ColorRgb::new_hsl(0.5, 0.4, height)
                     };
 
-                    // let c = Rgb(c.into());
-
-                    let g = (height * 255.0) as u8;
-                    let c = Rgb([g, g, g]);
-                    // debug!("{} -> {}", height, g);
-
+                    let c = Rgb(c.into());
                     put_pixel!(coord, c);
                 }
             }

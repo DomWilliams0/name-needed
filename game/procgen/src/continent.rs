@@ -456,7 +456,12 @@ impl ContinentMap {
         };
 
         for tile in self.grid.iter_mut() {
-            tile.height = rescale(tile.height);
+            let height = rescale(tile.height);
+            let density = tile.density.get();
+
+            // multiply together so that height is lower at the borders between land+sea (density=0)
+            // and more diverse inland where density=1
+            tile.height = height * density;
         }
     }
 }
