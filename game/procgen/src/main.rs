@@ -8,7 +8,7 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
 }
 
 #[cfg(feature = "bin")]
-fn main() -> Result<(), ()> {
+fn main() {
     // parse config and args first
     let params = PlanetParams::load();
 
@@ -30,7 +30,16 @@ fn main() -> Result<(), ()> {
         info!("created {file}", file = filename);
     };
 
-    common::panic::run_and_handle_panics(dew_it)
+    let exit = match common::panic::run_and_handle_panics(dew_it) {
+        Ok(_) => 0,
+        Err(_) => 1,
+    };
+
+    // let logging end gracefully
+    drop(_logging);
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    std::process::exit(exit);
 }
 
 // fn image_from_grid(
