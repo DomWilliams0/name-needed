@@ -4,7 +4,7 @@ use futures::channel::mpsc as async_channel;
 
 pub use batch::UpdateBatch;
 use common::*;
-pub use procgen::params::PlanetParams;
+pub use procgen::PlanetParams;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
 use unit::world::{SlabIndex, SlabLocation};

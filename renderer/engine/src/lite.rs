@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use common::*;
-use resources::resource::Resources;
+use resources::Resources;
 use simulation::input::UiCommand;
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,

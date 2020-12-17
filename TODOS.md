@@ -1,4 +1,4 @@
-# TODOs (247)
+# TODOs (246)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -19,7 +19,7 @@
  * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
    * `// TODO actually log the time`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)
-   * `// TODO from file too and merge`
+   * `// TODO return a result instead of panicking`
  * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
@@ -330,9 +330,8 @@
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
- * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (2)
+ * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO get initial slab range to request from engine`
-   * `// TODO deserialize planet params from config`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

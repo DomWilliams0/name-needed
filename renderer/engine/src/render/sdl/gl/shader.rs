@@ -5,7 +5,7 @@ use common::*;
 use crate::errchk;
 use crate::render::sdl::gl::vertex::{Bindable, ScopedBind};
 use crate::render::sdl::gl::{GlError, GlResult};
-use resources::resource::Shaders;
+use resources::Shaders;
 use resources::{ReadResource, ResourceContainer};
 
 pub struct Shader(GLuint);

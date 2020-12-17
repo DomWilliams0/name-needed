@@ -17,10 +17,9 @@ rand_distr = "^0.3"
 image = { version = "^0.23", optional = true, default-features = false, features = ["png"] }
 imageproc = { version = "^0.22", optional = true, default-features = false }
 
-#serde = { version = "^1.0", features = ["derive"], optional = true }
-structopt-toml = { version = "^0.3", optional = true }
-structopt = { version = "^0.2", optional = true }
+structopt = "^0.2"
+serde = { version = "^1.0", features = ["derive"]}
 
 [features]
 default = []
-bin = ["image", "imageproc", "color", "structopt-toml", "structopt"]
+bin = ["image", "imageproc", "color"]

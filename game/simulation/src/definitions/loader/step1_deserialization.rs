@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use common::derive_more::IntoIterator;
 use common::*;
-use resources::{resource, ResourceError};
+use resources::ResourceError;
 
 use crate::definitions::loader::step2_preprocessing::ProcessedComponents;
 use crate::definitions::{DefinitionError, DefinitionErrorKind};
@@ -132,7 +132,7 @@ impl DeserializedDefinition {
 }
 
 pub fn collect_raw_definitions(
-    resources: resource::Definitions,
+    resources: resources::Definitions,
 ) -> (Vec<DeserializedDefinition>, Vec<DefinitionError>) {
     let mut definitions = Vec::with_capacity(512);
     let mut errors = Vec::new();

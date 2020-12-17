@@ -3,7 +3,7 @@ use crate::rasterize::SlabGrid;
 use common::parking_lot::RwLock;
 use common::*;
 
-use crate::params::{DrawMode, PlanetParams};
+use crate::params::PlanetParams;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
 
@@ -103,8 +103,9 @@ impl Planet {
 
     #[cfg(feature = "bin")]
     pub fn as_image(&self) -> image::DynamicImage {
+        use crate::params::DrawMode;
         use color::ColorRgb;
-        use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
+        use image::{DynamicImage, ImageBuffer, Rgb};
         use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut};
 
         let planet = self.0.read();

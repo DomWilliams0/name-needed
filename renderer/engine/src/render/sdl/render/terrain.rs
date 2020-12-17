@@ -11,7 +11,7 @@ use crate::render::sdl::gl::{
     Vao, Vbo,
 };
 use cgmath::Matrix;
-use resources::resource::Shaders;
+use resources::Shaders;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldVertex {

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -30,7 +31,8 @@ pub struct World {
 #[derive(Deserialize, Clone)]
 pub enum WorldSource {
     Preset(WorldPreset),
-    Generate { radius: u32, seed: Option<u64> },
+    /// Generate world using the given filename in worldgen resources for options
+    Generate(PathBuf),
 }
 
 #[derive(Deserialize, Clone, Debug)]

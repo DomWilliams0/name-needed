@@ -18,7 +18,7 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
         Some(Path::new("config.ron"))
     }
 
-    fn world(&self) -> BoxedResult<ThreadedWorldLoader> {
+    fn world(&self, _: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader> {
         let pool = AsyncWorkerPool::new(1)?;
         Ok(WorldLoader::new(presets::multi_chunk_wonder(), pool))
     }

@@ -8,8 +8,8 @@ use simulation::{
 use crate::presets::ContinuousIntegrationGamePreset;
 
 use engine::Engine;
-use resources::resource::Resources;
 use resources::ResourceContainer;
+use resources::Resources;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;

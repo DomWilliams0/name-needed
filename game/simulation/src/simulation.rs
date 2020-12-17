@@ -2,7 +2,7 @@ use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use common::*;
-use resources::resource::Resources;
+use resources::Resources;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};

@@ -1,3 +1,5 @@
+#![cfg(feature = "bin")]
+
 use common::*;
 use procgen::*;
 use std::io::Write;
@@ -7,10 +9,9 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
     write!(out, "the time")
 }
 
-#[cfg(feature = "bin")]
 fn main() {
     // parse config and args first
-    let params = PlanetParams::load();
+    let params = PlanetParams::load_with_args("procgen.txt");
 
     let _logging = logging::LoggerBuilder::with_env()
         .and_then(|builder| builder.init(log_time))

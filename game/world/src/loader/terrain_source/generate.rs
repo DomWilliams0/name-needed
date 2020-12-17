@@ -6,7 +6,6 @@ use crate::chunk::slab::{Slab, SlabGrid, SlabType};
 use grid::GridImpl;
 use procgen::{Planet, PlanetParams};
 use unit::world::{ChunkLocation, SlabLocation};
-use procgen::params::PlanetParams;
 
 pub struct GeneratedTerrainSource {
     planet: Planet,

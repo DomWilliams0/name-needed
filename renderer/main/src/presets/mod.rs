@@ -1,7 +1,7 @@
 use common::*;
 use std::path::Path;
 
-use resources::resource::Resources;
+use resources::{ResourceContainer, Resources};
 use simulation::{
     all_slabs_in_range, presets, AsyncWorkerPool, GeneratedTerrainSource, PlanetParams, Renderer,
     Simulation, SlabLocation, ThreadedWorldLoader, WorldLoader,
@@ -13,11 +13,11 @@ pub trait GamePreset<R: Renderer> {
     fn config(&self) -> Option<&Path> {
         None
     }
-    fn world(&self) -> BoxedResult<ThreadedWorldLoader>;
+    fn world(&self, resources: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader>;
     fn init(&self, sim: &mut Simulation<R>, scenario: Scenario) -> BoxedResult<()>;
 
     fn load(&self, resources: Resources, scenario: Scenario) -> BoxedResult<Simulation<R>> {
-        let mut world = self.world()?;
+        let mut world = self.world(&resources.world_gen()?)?;
 
         // TODO get initial slab range to request from engine
         let ((min_x, min_y, min_z), (max_x, max_y, max_z)) = config::get().world.initial_slab_range;
@@ -49,31 +49,19 @@ pub use empty::EmptyGamePreset;
 fn world_from_source(
     source: config::WorldSource,
     pool: AsyncWorkerPool,
-) -> Result<WorldLoader<simulation::WorldContext>, &'static str> {
+    resources: &resources::WorldGen,
+) -> BoxedResult<WorldLoader<simulation::WorldContext>> {
     Ok(match source {
         config::WorldSource::Preset(preset) => {
             debug!("loading world preset"; "preset" => ?preset);
             let source = presets::from_preset(preset);
             WorldLoader::new(source, pool)
         }
-        config::WorldSource::Generate { seed, radius } => {
-            debug!("generating world with radius {radius}", radius = radius);
+        config::WorldSource::Generate(file_path) => {
+            let config_res = resources.get_file(file_path)?;
+            debug!("generating world from config"; "path" => %config_res.display());
 
-            let seed = if let Some(seed) = seed {
-                debug!("using specified planet seed"; "seed" => seed);
-                seed
-            } else {
-                let seed = thread_rng().gen();
-                debug!("using random planet seed"; "seed" => seed);
-                seed
-            };
-
-            // TODO deserialize planet params from config
-            let params = PlanetParams {
-                seed,
-                radius,
-                ..PlanetParams::default()
-            };
+            let params = PlanetParams::load_with_only_file(config_res);
             let source = GeneratedTerrainSource::new(params)?;
             WorldLoader::new(source, pool)
         }
