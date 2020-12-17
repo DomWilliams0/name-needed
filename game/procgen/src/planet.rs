@@ -4,6 +4,7 @@ use common::parking_lot::RwLock;
 use common::*;
 
 use crate::params::PlanetParams;
+use image::GenericImage;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
 
@@ -55,7 +56,7 @@ impl Planet {
         );
 
         // rasterize continents onto grid and discover depth i.e. distance from land/sea border
-        planet.continents.populate_depth();
+        planet.continents.populate_density();
 
         /*        // populate heightmap
                 let noise = Fbm::new()
@@ -112,6 +113,17 @@ impl Planet {
 
         let mut image = ImageBuffer::new(planet.params.planet_size, planet.params.planet_size);
 
+        macro_rules! put_pixel {
+            ($xy:expr, $colour:expr) => {
+                let xy = $xy;
+                let (x, y) = (xy[0] as u32, xy[1] as u32);
+                debug_assert!(x < image.dimensions().0 && y < image.dimensions().1);
+                unsafe {
+                    image.unsafe_put_pixel(x, y, $colour);
+                }
+            };
+        }
+
         match planet.params.draw_mode() {
             DrawMode::Outlines {
                 debug_colors,
@@ -120,43 +132,34 @@ impl Planet {
                 let mut colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
                 let planet = self.0.read();
-                let bg = Rgb(if debug_colors {
-                    [240, 240, 240]
+
+                let (sea, land) = if debug_colors {
+                    (ColorRgb::new(240, 240, 240), colors.next_please())
                 } else {
-                    [44, 114, 161]
-                });
+                    (ColorRgb::new(44, 114, 161), ColorRgb::new(185, 130, 82))
+                };
 
-                image.pixels_mut().for_each(|p| *p = bg);
+                for (coord, tile) in planet.continents.grid.iter_coords() {
+                    let c = if tile.is_land() { land } else { sea };
 
-                for (_, blobs) in planet
-                    .continents
-                    .iter()
-                    .group_by(|(idx, _)| *idx)
-                    .into_iter()
-                {
-                    let color = if debug_colors {
-                        colors.next_please()
-                    } else {
-                        ColorRgb::new(185, 130, 82)
-                    };
+                    let c = Rgb(c.into());
+                    put_pixel!(coord, c);
+                }
 
-                    for (_, blob) in blobs {
+                if outlines {
+                    for (_, blob) in planet.continents.iter() {
                         draw_filled_circle_mut(
                             &mut image,
                             (blob.pos.0 as i32, blob.pos.1 as i32),
                             blob.radius as i32,
-                            Rgb(color.into()),
+                            Rgb(land.into()),
                         );
-
-                        if debug_colors && outlines {
-                            // outline
-                            draw_hollow_circle_mut(
-                                &mut image,
-                                (blob.pos.0 as i32, blob.pos.1 as i32),
-                                blob.radius as i32,
-                                Rgb([10, 10, 10]),
-                            );
-                        }
+                        draw_hollow_circle_mut(
+                            &mut image,
+                            (blob.pos.0 as i32, blob.pos.1 as i32),
+                            blob.radius as i32,
+                            Rgb([10, 10, 10]),
+                        );
                     }
                 }
             }
@@ -173,14 +176,14 @@ impl Planet {
                 for (coord, tile) in planet.continents.grid.iter_coords() {
                     let d = tile.depth.get();
                     let f = d as f32 / max_density as f32;
-                    let c = if tile.is_land {
+                    let c = if tile.is_land() {
                         ColorRgb::new_hsl(1.0, 0.8, f)
                     } else {
                         ColorRgb::new_hsl(0.5, 0.8, f)
                     };
 
                     let c = Rgb(c.into());
-                    draw_filled_circle_mut(&mut image, (coord[0] as i32, coord[1] as i32), 1, c);
+                    put_pixel!(coord, c);
                 }
             }
         };

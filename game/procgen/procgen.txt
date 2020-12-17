@@ -1,4 +1,4 @@
 # nice, comments
---draw-debug-colours
+--draw-density
 
-#--seed 50
+#--seed 13012197311494640832

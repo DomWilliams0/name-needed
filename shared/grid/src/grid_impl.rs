@@ -1,4 +1,4 @@
-use common::{ArrayVec, Boolinator, Itertools};
+use common::{ArrayVec, Itertools};
 use derive_more::*;
 use std::convert::TryFrom;
 use std::ops::{Index, IndexMut, Range};
@@ -85,6 +85,36 @@ impl<T: Default> DynamicGrid<T> {
         idx < self.data.len()
     }
 
+    // TODO profile and improve coord wrapping
+    #[inline]
+    pub fn wrap_coord(&self, mut coord: [isize; 3]) -> [usize; 3] {
+        let [x0, y0, z0] = &mut coord;
+        let [x1, y1, z1] = [
+            self.dims[0] as isize,
+            self.dims[1] as isize,
+            self.dims[2] as isize,
+        ];
+
+        if *x0 < 0 || *x0 >= x1 {
+            *x0 = x0.rem_euclid(x1);
+        }
+        if *y0 < 0 || *y0 >= y1 {
+            *y0 = y0.rem_euclid(y1);
+        }
+        if *z0 < 0 || *z0 >= z1 {
+            *z0 = z0.rem_euclid(z1);
+        }
+
+        let new_coord = [*x0 as usize, *y0 as usize, *z0 as usize];
+        debug_assert!(
+            self.is_coord_in_range(new_coord),
+            "wrapped {:?} to bad coord {:?}",
+            coord,
+            new_coord
+        );
+        new_coord
+    }
+
     pub fn dimensions(&self) -> [usize; 3] {
         self.dims
     }
@@ -139,6 +169,7 @@ impl<T: Default> DynamicGrid<T> {
         }
     */
 
+    /// Filters out out-of-bounds neighbours
     pub fn neighbours(&self, index: usize) -> impl Iterator<Item = usize> + '_ {
         // profiling shows it's better to pass around an idx and unflatten than it is to pass
         // around [usize; 3]
@@ -175,6 +206,40 @@ impl<T: Default> DynamicGrid<T> {
             } else {
                 None
             }
+        })
+    }
+
+    pub fn wrapping_neighbours(&self, index: usize) -> impl Iterator<Item = usize> + '_ {
+        let [x, y, z] = self.unflatten_index(index);
+        let coord = [x as isize, y as isize, z as isize];
+
+        let x0 = coord[0];
+        let xp1 = coord[0] + 1;
+        let xs1 = coord[0] - 1;
+
+        let y0 = coord[1];
+        let yp1 = coord[1] + 1;
+        let ys1 = coord[1] - 1;
+
+        ArrayVec::from([
+            (x0, ys1),
+            #[cfg(feature = "8neighbours")]
+            (xp1, ys1),
+            (xp1, y0),
+            #[cfg(feature = "8neighbours")]
+            (xp1, yp1),
+            (x0, yp1),
+            #[cfg(feature = "8neighbours")]
+            (xs1, yp1),
+            (xs1, y0),
+            #[cfg(feature = "8neighbours")]
+            (xs1, ys1),
+        ])
+        .into_iter()
+        .map(move |(x, y)| {
+            let coord = [x, y, 0];
+            let coord = self.wrap_coord(coord);
+            self.flatten_coords(coord)
         })
     }
 }
@@ -310,5 +375,16 @@ mod tests {
         let actual = grid.iter_coords().collect::<Vec<_>>();
 
         assert_eq!(dumb_expected, actual);
+    }
+
+    #[test]
+    fn dynamic_grid_wrap_coord() {
+        let grid = DynamicGrid::<()>::new([5, 4, 3]);
+
+        assert_eq!(grid.wrap_coord([1, 1, 1]), [1, 1, 1]);
+
+        assert_eq!(grid.wrap_coord([0, 1, 1]), [0, 1, 1]);
+        assert_eq!(grid.wrap_coord([-1, 1, 1]), [4, 1, 1]);
+        assert_eq!(grid.wrap_coord([-2, 1, 1]), [3, 1, 1]);
     }
 }

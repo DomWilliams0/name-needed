@@ -3,6 +3,7 @@ use common::*;
 use grid::DynamicGrid;
 use std::cell::Cell;
 use std::f32::consts::PI;
+use std::num::NonZeroUsize;
 
 pub struct LandBlob {
     pub pos: (i32, i32),
@@ -22,7 +23,7 @@ pub struct ContinentMap {
     pub grid: DynamicGrid<Tile>,
 }
 
-type ContinentIdx = usize;
+type ContinentIdx = NonZeroUsize;
 
 const STARTING_RADIUS: f32 = 14.0;
 const DECREMENT_RANGE: (f32, f32) = (0.3, 0.6);
@@ -30,8 +31,8 @@ const MIN_RADIUS: i32 = 2;
 const NEW_CONTINENT_MIN_DISTANCE: i32 = 30;
 
 pub struct Tile {
-    pub is_land: bool,
     pub depth: Cell<u8>,
+    pub continent: Option<ContinentIdx>,
 }
 
 impl ContinentMap {
@@ -60,7 +61,7 @@ impl ContinentMap {
 
         let mut radius = STARTING_RADIUS;
         let mut parent_start_idx = 0;
-        let mut count: ContinentIdx = 0;
+        let mut current_continent = ContinentIdx::new(1).unwrap();
         let mut decrement = new_decrement!();
 
         loop {
@@ -91,13 +92,18 @@ impl ContinentMap {
                     break;
                 }
 
-                self.continent_range
-                    .push((count, parent_start_idx, self.land_blobs.len()));
+                self.continent_range.push((
+                    current_continent,
+                    parent_start_idx,
+                    self.land_blobs.len(),
+                ));
 
-                count += 1;
-                debug!("continent finished"; "index" => count, "blobs" => blob_count);
+                // increment, overflow would panic before it wraps around to 0
+                current_continent =
+                    unsafe { NonZeroUsize::new_unchecked(current_continent.get() + 1) };
+                debug!("continent finished"; "index" => current_continent.get(), "blobs" => blob_count);
 
-                if count >= self.max_continents {
+                if current_continent.get() >= self.max_continents {
                     // all done
                     break;
                 }
@@ -123,6 +129,7 @@ impl ContinentMap {
             }
         }
 
+        let count = current_continent.get() - 1;
         (count, self.land_blobs.len())
     }
 
@@ -224,7 +231,7 @@ impl ContinentMap {
         dist
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &LandBlob)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (ContinentIdx, &LandBlob)> + '_ {
         self.continent_range
             .iter()
             .flat_map(move |(idx, start, end)| {
@@ -233,62 +240,69 @@ impl ContinentMap {
             })
     }
 
-    pub fn populate_depth(&mut self) {
-        macro_rules! set {
-            ($pos:expr) => {
-                let (x, y) = $pos;
-                let coord = [x as usize, y as usize, 0];
-                if self.grid.is_coord_in_range(coord) {
-                    self.grid[coord].is_land = true;
-                }
-            };
-        }
-
+    pub fn populate_density(&mut self) {
         // rasterize blobs onto grid
-        for blob in &self.land_blobs {
-            // draw filled in circle
-            // https://stackoverflow.com/a/14976268
-            let mut x = blob.radius;
-            let mut y = 0;
-            let mut x_change = 1 - (blob.radius << 1);
-            let mut y_change = 0;
-            let mut radius_error = 0;
 
-            let x0 = blob.pos.0;
-            let y0 = blob.pos.1;
-            while x >= y {
-                for _x in (x0 - x)..=(x0 + x) {
-                    set!((_x, y0 + y));
-                    set!((_x, y0 - y));
-                }
+        for &(continent, start, end) in self.continent_range.iter() {
+            macro_rules! set {
+                ($pos:expr) => {
+                    let (x, y) = $pos;
+                    let coord = [x as isize, y as isize, 0];
+                    let wrapped_coord = self.grid.wrap_coord(coord);
+                    self.grid[wrapped_coord].continent = Some(continent);
+                };
+            }
 
-                for _x in (x0 - y)..=(x0 + y) {
-                    set!((_x, y0 + x));
-                    set!((_x, y0 - x));
-                }
+            for blob in &self.land_blobs[start..end] {
+                // draw filled in circle
+                // https://stackoverflow.com/a/14976268
+                let mut x = blob.radius;
+                let mut y = 0;
+                let mut x_change = 1 - (blob.radius << 1);
+                let mut y_change = 0;
+                let mut radius_error = 0;
 
-                y += 1;
-                radius_error += y_change;
-                y_change += 2;
+                let x0 = blob.pos.0;
+                let y0 = blob.pos.1;
+                while x >= y {
+                    for _x in (x0 - x)..=(x0 + x) {
+                        set!((_x, y0 + y));
+                        set!((_x, y0 - y));
+                    }
 
-                if ((radius_error << 1) + x_change) > 0 {
-                    x -= 1;
-                    radius_error += x_change;
-                    x_change += 2;
+                    for _x in (x0 - y)..=(x0 + y) {
+                        set!((_x, y0 + x));
+                        set!((_x, y0 - x));
+                    }
+
+                    y += 1;
+                    radius_error += y_change;
+                    y_change += 2;
+
+                    if ((radius_error << 1) + x_change) > 0 {
+                        x -= 1;
+                        radius_error += x_change;
+                        x_change += 2;
+                    }
                 }
             }
+
+            // for (continent, blobs) in self.iter().group_by(|(idx, _)| *idx).into_iter() {
+            //
+            //     for (_, blob) in blobs {
         }
+        // }
 
         let mut frontier = Vec::with_capacity((self.size * self.size / 2) as usize);
         for idx in self
             .grid
             .iter()
             .enumerate()
-            .filter_map(|(idx, tile)| tile.is_land.as_some(idx))
+            .filter_map(|(idx, tile)| tile.is_land().as_some(idx))
         {
-            for n in self.grid.neighbours(idx) {
+            for n in self.grid.wrapping_neighbours(idx) {
                 let n_tile = &self.grid[n];
-                if n_tile.is_land {
+                if n_tile.is_land() {
                     continue;
                 }
 
@@ -309,7 +323,7 @@ impl ContinentMap {
 
                 let this_tile = &self.grid[idx];
                 if propagate(this_tile) {
-                    for n in self.grid.neighbours(idx) {
+                    for n in self.grid.wrapping_neighbours(idx) {
                         frontier.push((n, new_val.saturating_add(1)));
                     }
                 }
@@ -321,8 +335,14 @@ impl ContinentMap {
 impl Default for Tile {
     fn default() -> Self {
         Tile {
-            is_land: false,
             depth: Cell::new(0),
+            continent: None,
         }
+    }
+}
+
+impl Tile {
+    pub fn is_land(&self) -> bool {
+        self.continent.is_some()
     }
 }

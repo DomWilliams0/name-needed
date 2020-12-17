@@ -1,4 +1,4 @@
-# TODOs (246)
+# TODOs (247)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -342,8 +342,9 @@
    * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (2)
    * `// TODO allow smaller datatypes for dims`
+   * `// TODO profile and improve coord wrapping`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
