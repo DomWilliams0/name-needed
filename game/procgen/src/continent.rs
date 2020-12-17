@@ -1,8 +1,10 @@
 use crate::params::PlanetParams;
 use common::*;
 use grid::DynamicGrid;
+use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 use std::cell::Cell;
 use std::f32::consts::PI;
+use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
 
 pub struct LandBlob {
@@ -31,12 +33,16 @@ const MIN_RADIUS: i32 = 2;
 const NEW_CONTINENT_MIN_DISTANCE: i32 = 30;
 
 pub struct Tile {
-    pub depth: Cell<u8>,
+    density: Cell<f64>,
     pub continent: Option<ContinentIdx>,
+    pub height: f64,
 }
 
 impl ContinentMap {
     pub fn new(params: &PlanetParams) -> Self {
+        // TODO validate values with result type
+        assert!(params.planet_size > 0);
+
         Self {
             size: params.planet_size as i32,
             max_continents: params.max_continents,
@@ -240,9 +246,13 @@ impl ContinentMap {
             })
     }
 
-    pub fn populate_density(&mut self) {
-        // rasterize blobs onto grid
+    pub fn discover(&mut self, rando: &mut dyn RngCore) {
+        self.rasterize_land_blobs();
+        self.discover_density();
+        self.generate_initial_heightmap(rando);
+    }
 
+    fn rasterize_land_blobs(&mut self) {
         for &(continent, start, end) in self.continent_range.iter() {
             macro_rules! set {
                 ($pos:expr) => {
@@ -286,12 +296,13 @@ impl ContinentMap {
                     }
                 }
             }
-
-            // for (continent, blobs) in self.iter().group_by(|(idx, _)| *idx).into_iter() {
-            //
-            //     for (_, blob) in blobs {
         }
-        // }
+    }
+
+    /// Discovers density and scales to 0.0-1.0
+    fn discover_density(&mut self) {
+        let increment = 1.0;
+        let limit = self.size as f64 / 4.0;
 
         let mut frontier = Vec::with_capacity((self.size * self.size / 2) as usize);
         for idx in self
@@ -307,27 +318,95 @@ impl ContinentMap {
                 }
 
                 // this is border between land and sea
-                frontier.push((n, 1));
+                frontier.push((n, 1.0));
             }
 
             while let Some((idx, new_val)) = frontier.pop() {
-                let propagate = |tile: &Tile| {
-                    let current = tile.depth.get();
-                    if current == 0 || new_val < current {
-                        tile.depth.set(new_val);
-                        true
-                    } else {
-                        false
-                    }
-                };
-
                 let this_tile = &self.grid[idx];
-                if propagate(this_tile) {
+                let current = this_tile.density.get();
+                if current == 0.0 || new_val < current {
+                    this_tile.density.set(new_val);
                     for n in self.grid.wrapping_neighbours(idx) {
-                        frontier.push((n, new_val.saturating_add(1)));
+                        let incremented = (new_val + increment).min(limit);
+                        frontier.push((n, incremented));
                     }
                 }
             }
+        }
+
+        // normalize density values between 0 to 1
+        let max_density = self
+            .grid
+            .iter()
+            .map(|tile| OrderedFloat(tile.density.get()))
+            .max()
+            .unwrap() // not empty
+            .0;
+
+        info!("original density limit"; "max" => ?max_density);
+
+        for tile in self.grid.iter_mut() {
+            let val = tile.density.get();
+            let scaled_val = val / (max_density);
+            tile.density.set(scaled_val);
+        }
+
+        // TODO blur/average density
+    }
+
+    /// Generates noise and scales to 0.0-1.0
+    fn generate_initial_heightmap(&mut self, rando: &mut dyn RngCore) {
+        // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
+        let noise = Fbm::new()
+            .set_seed(rando.gen())
+            .set_octaves(4)
+            .set_frequency(9.0);
+
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+
+        let size = self.size as f64;
+        for (coord, tile) in self.grid.iter_coords_mut() {
+            let (x, y) = (coord[0] as f64, coord[1] as f64);
+
+            // noise range
+            let x1 = 0.0;
+            let x2 = 2.0;
+            let y1 = 0.0;
+            let y2 = 2.0;
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+
+            // sample at smaller intervals
+            let s = x / size;
+            let t = y / size;
+
+            // get 4d noise
+            let nx = x1 + (s * TAU).cos() * dx / TAU;
+            let ny = y1 + (t * TAU).cos() * dy / TAU;
+            let nz = x1 + (s * TAU).sin() * dx / TAU;
+            let nw = y1 + (t * TAU).sin() * dy / TAU;
+            let height = noise.get([nx, ny, nz, nw]);
+
+            // scale to density of land
+
+            min = min.min(height);
+            max = max.max(height);
+
+            tile.height = height;
+        }
+
+        debug!("original noise limits"; "max" => max, "min" => min);
+
+        let rescale = |val: f64| {
+            // https://rosettacode.org/wiki/Map_range#Rust
+            let from = (min, max);
+            let to = (0.0, 1.0);
+            to.0 + (val - from.0) * (to.1 - to.0) / (from.1 - from.0)
+        };
+
+        for tile in self.grid.iter_mut() {
+            tile.height = rescale(tile.height);
         }
     }
 }
@@ -335,8 +414,9 @@ impl ContinentMap {
 impl Default for Tile {
     fn default() -> Self {
         Tile {
-            depth: Cell::new(0),
+            density: Cell::new(0.0),
             continent: None,
+            height: 0.0,
         }
     }
 }
@@ -344,5 +424,9 @@ impl Default for Tile {
 impl Tile {
     pub fn is_land(&self) -> bool {
         self.continent.is_some()
+    }
+
+    pub fn density(&self) -> f64 {
+        self.density.get()
     }
 }

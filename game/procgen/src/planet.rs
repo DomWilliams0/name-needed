@@ -25,12 +25,6 @@ pub struct PlanetInner {
     continents: ContinentMap,
 }
 
-/// https://rosettacode.org/wiki/Map_range#Rust
-#[inline]
-fn map_range(from_range: (f64, f64), to_range: (f64, f64), s: f64) -> f64 {
-    to_range.0 + (s - from_range.0) * (to_range.1 - to_range.0) / (from_range.1 - from_range.0)
-}
-
 impl Planet {
     // TODO actual error type
     pub fn new(params: PlanetParams) -> Result<Planet, &'static str> {
@@ -55,30 +49,9 @@ impl Planet {
             blobs = total_blobs
         );
 
-        // rasterize continents onto grid and discover depth i.e. distance from land/sea border
-        planet.continents.populate_density();
-
-        /*        // populate heightmap
-                let noise = Fbm::new()
-                    .set_seed(params.seed as u32) // TODO seed loses so much of its entropy
-                    .set_octaves(5)
-                    .set_frequency(0.2);
-
-                let sz = params.planet_size;
-                let mut i = 0;
-                for ry in 0..sz {
-                    for rx in 0..sz {
-                        let scale = 4.0;
-                        let nx = rx as f64 / scale;
-                        let ny = ry as f64 / scale;
-                        let val = noise.get([nx, ny, 0.6]);
-
-                        let height = map_range((-1.0, 1.0), (0.0, 1.0), val);
-                        planet.regions.index_mut(i).height = height;
-                        i += 1;
-                    }
-                }
-        */
+        // rasterize continents onto grid and discover depth i.e. distance from land/sea border,
+        // and place initial heightmap
+        planet.continents.discover(&mut planet_rando);
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
@@ -164,25 +137,42 @@ impl Planet {
                 }
             }
 
-            DrawMode::Height => {
-                let max_density = planet
-                    .continents
-                    .grid
-                    .iter_coords()
-                    .map(|(_, tile)| tile.depth.get())
-                    .max()
-                    .unwrap();
+            DrawMode::Density => {
+                // let max_density = planet
+                //     .continents
+                //     .grid
+                //     .iter_coords()
+                //     .map(|(_, tile)| tile.depth())
+                //     .max()
+                //     .unwrap();
 
                 for (coord, tile) in planet.continents.grid.iter_coords() {
-                    let d = tile.depth.get();
-                    let f = d as f32 / max_density as f32;
+                    let d = tile.density() as f32;
                     let c = if tile.is_land() {
-                        ColorRgb::new_hsl(1.0, 0.8, f)
+                        ColorRgb::new_hsl(1.0, 0.8, d)
                     } else {
-                        ColorRgb::new_hsl(0.5, 0.8, f)
+                        ColorRgb::new_hsl(0.5, 0.8, d)
                     };
 
                     let c = Rgb(c.into());
+                    put_pixel!(coord, c);
+                }
+            }
+            DrawMode::Height => {
+                for (coord, tile) in planet.continents.grid.iter_coords() {
+                    let height = tile.height as f32;
+                    let c = if tile.is_land() {
+                        ColorRgb::new_hsl(1.0, 0.8, height)
+                    } else {
+                        continue;
+                    };
+
+                    // let c = Rgb(c.into());
+
+                    let g = (height * 255.0) as u8;
+                    let c = Rgb([g, g, g]);
+                    // debug!("{} -> {}", height, g);
+
                     put_pixel!(coord, c);
                 }
             }

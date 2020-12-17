@@ -1,7 +1,7 @@
 use common::{ArrayVec, Itertools};
 use derive_more::*;
 use std::convert::TryFrom;
-use std::ops::{Index, IndexMut, Range};
+use std::ops::{Index, IndexMut, Range, Deref, DerefMut};
 
 // TODO allow smaller datatypes for dims
 pub type CoordType = [i32; 3];
@@ -124,21 +124,18 @@ impl<T: Default> DynamicGrid<T> {
     }
 
     pub fn iter_coords(&self) -> impl Iterator<Item = ([usize; 3], &T)> + '_ {
-        let data = self.data.iter();
-        let coords = (0..self.dims[2])
+        self.iter_coords_alone().zip(self.data.iter())
+    }
+
+    pub fn iter_coords_mut(&mut self) -> impl Iterator<Item = ([usize; 3], &mut T)> + '_ {
+        self.iter_coords_alone().zip(self.data.iter_mut())
+    }
+
+    fn iter_coords_alone(&self) -> impl Iterator<Item = [usize; 3]> {
+        (0..self.dims[2])
             .cartesian_product(0..self.dims[1])
             .cartesian_product(0..self.dims[0])
-            .map(move |((z, y), x)| [x, y, z]);
-
-        coords.zip(data)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.data.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.data.iter_mut()
+            .map(move |((z, y), x)| [x, y, z])
     }
 
     /*    /// y-1
@@ -275,6 +272,20 @@ impl<T: Default> IndexMut<[usize; 3]> for DynamicGrid<T> {
 impl<T> AsRef<[T]> for DynamicGrid<T> {
     fn as_ref(&self) -> &[T] {
         &self.data
+    }
+}
+
+impl<T> Deref for DynamicGrid<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<T> DerefMut for DynamicGrid<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
     }
 }
 

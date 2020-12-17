@@ -28,17 +28,21 @@ pub struct PlanetParams {
 #[structopt(rename_all = "kebab-case")]
 pub struct RenderParams {
     #[structopt(long)]
-    draw_debug_colours: bool,
+    pub draw_debug_colours: bool,
 
     #[structopt(long)]
-    draw_blob_outlines: bool,
+    pub draw_blob_outlines: bool,
 
     #[structopt(long)]
-    draw_density: bool,
+    pub draw_density: bool,
+
+    #[structopt(long)]
+    pub draw_height: bool,
 }
 
 pub enum DrawMode {
     Outlines { debug_colors: bool, outlines: bool },
+    Density,
     Height,
 }
 
@@ -100,6 +104,8 @@ impl PlanetParams {
     #[cfg(feature = "bin")]
     pub fn draw_mode(&self) -> DrawMode {
         if self.render.draw_density {
+            DrawMode::Density
+        } else if self.render.draw_height {
             DrawMode::Height
         } else {
             DrawMode::Outlines {
