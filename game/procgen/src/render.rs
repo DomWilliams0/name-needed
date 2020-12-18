@@ -4,7 +4,7 @@ use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
 use common::*;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
-use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut};
+use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut, draw_line_segment_mut};
 use std::path::Path;
 
 pub struct Render {
@@ -111,17 +111,43 @@ impl Render {
         let planet = self.planet.inner();
         let params = &planet.params;
 
-        let vals = match params.render.draw_progress {
-            RenderProgressParams::None => return,
-            RenderProgressParams::Temperature => &climate.temperature,
-        };
+        if matches!(params.render.draw_progress, RenderProgressParams::None) {
+            return;
+        }
 
         let mut overlay = RgbaImage::new(params.planet_size, params.planet_size);
-        for (coord, val) in vals.iter_average() {
-            debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
-            let c = color_for_temperature(val as f32);
-            put_pixel(&mut overlay, coord, c.array_with_alpha(50));
-        }
+
+        match params.render.draw_progress {
+            RenderProgressParams::None => unreachable!(),
+            RenderProgressParams::Temperature => {
+                for (coord, val) in climate.temperature.iter_average() {
+                    debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
+                    let c = color_for_temperature(val as f32);
+                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
+                }
+            }
+            RenderProgressParams::Wind => {
+                let c = ColorRgb::new(150, 100, 100);
+                for wind in climate.wind_particles.iter() {
+                    let line_end = wind.position + wind.velocity;
+
+                    // height affects opacity
+                    let opacity = map_range(
+                        (0.0, ClimateIteration::MAX_WIND_HEIGHT as f32),
+                        (0.6, 0.9),
+                        wind.position.z,
+                    );
+                    let opacity = (opacity * 255.0) as u8;
+
+                    draw_line_segment_mut(
+                        &mut overlay,
+                        (wind.position.x, wind.position.y),
+                        (line_end.x, line_end.y),
+                        Rgba(c.array_with_alpha(opacity)),
+                    );
+                }
+            }
+        };
 
         let image = self
             .image

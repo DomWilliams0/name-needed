@@ -35,6 +35,9 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "5")]
     pub climate_iterations: usize,
 
+    #[structopt(long, default_value = "20")]
+    pub wind_particles: usize,
+
     #[cfg(feature = "bin")]
     #[structopt(flatten)]
     pub render: RenderParams,
@@ -50,6 +53,8 @@ pub enum RenderProgressParams {
 
     #[strum(serialize = "temp")]
     Temperature,
+
+    Wind,
 }
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
