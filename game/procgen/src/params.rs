@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, ErrorKind};
 use std::path::Path;
 use structopt::StructOpt;
+use strum_macros::EnumString;
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
@@ -34,6 +35,18 @@ pub struct PlanetParams {
     #[cfg(feature = "bin")]
     #[structopt(flatten)]
     pub render: RenderParams,
+
+    #[structopt(long)]
+    pub log_params_and_exit: bool,
+}
+
+#[derive(Debug, Clone, EnumString, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum RenderProgressParams {
+    None,
+
+    #[strum(serialize = "temp")]
+    Temperature,
 }
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
@@ -53,21 +66,27 @@ pub struct RenderParams {
 
     #[structopt(long)]
     pub draw_height: bool,
+
+    #[structopt(long, default_value = "None")]
+    pub draw_progress: RenderProgressParams,
+
+    #[structopt(long)]
+    pub create_climate_gif: bool,
 }
 
 impl PlanetParams {
-    pub fn load_with_args(file_path: impl AsRef<Path>) -> Self {
+    pub fn load_with_args(file_path: impl AsRef<Path>) -> BoxedResult<Self> {
         Self::load(file_path.as_ref(), std::env::args())
     }
 
-    pub fn load_with_only_file(file_path: impl AsRef<Path>) -> Self {
+    pub fn load_with_only_file(file_path: impl AsRef<Path>) -> BoxedResult<Self> {
         let fake_args = once(env!("CARGO_PKG_NAME").to_owned());
         Self::load(file_path.as_ref(), fake_args)
     }
 
     // TODO return a result instead of panicking
     /// Must be at least len 1, where first elem is binary name
-    fn load(file_path: &Path, mut args: impl Iterator<Item = String>) -> Self {
+    fn load(file_path: &Path, mut args: impl Iterator<Item = String>) -> BoxedResult<Self> {
         let mut params = {
             let mut config_params = Vec::new();
 
@@ -95,7 +114,7 @@ impl PlanetParams {
             };
 
             // binary name || args from file || args from cmdline
-            Self::from_iter(config_params.into_iter().chain(args))
+            Self::from_iter_safe(config_params.into_iter().chain(args))?
         };
 
         // generate random seed
@@ -103,7 +122,7 @@ impl PlanetParams {
             params.seed = Some(thread_rng().gen())
         }
 
-        params
+        Ok(params)
     }
 
     pub fn seed(&self) -> u64 {

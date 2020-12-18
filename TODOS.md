@@ -1,4 +1,4 @@
-# TODOs (248)
+# TODOs (249)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,6 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (1)
+   * `// TODO actually do climate things`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
    * `// TODO agree api and stop making everything public`
    * `// TODO validate values with result type`

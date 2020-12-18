@@ -3,6 +3,7 @@ use crate::rasterize::SlabGrid;
 use common::parking_lot::RwLock;
 use common::*;
 
+use crate::climate::Climate;
 use crate::params::PlanetParams;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
@@ -22,18 +23,24 @@ pub struct Region {
 pub struct PlanetInner {
     pub(crate) params: PlanetParams,
     pub(crate) continents: ContinentMap,
+    climate: Option<Climate>,
 }
 
 impl Planet {
     // TODO actual error type
-    pub fn new(params: PlanetParams) -> Result<Planet, &'static str> {
+    pub fn new(params: PlanetParams) -> BoxedResult<Planet> {
         debug!("creating planet with params {:?}", params);
         let continents = ContinentMap::new(&params);
-        let inner = Arc::new(RwLock::new(PlanetInner { params, continents }));
+        let inner = Arc::new(RwLock::new(PlanetInner {
+            params,
+            continents,
+            climate: None,
+        }));
         Ok(Self(inner))
     }
 
     pub fn initial_generation(&mut self) {
+        let planet_ref = self.clone();
         let mut planet = self.0.write();
         let params = planet.params.clone();
 
@@ -51,6 +58,32 @@ impl Planet {
         // rasterize continents onto grid and discover depth i.e. distance from land/sea border,
         // and place initial heightmap
         planet.continents.discover(&mut planet_rando);
+
+        use crate::progress::*;
+
+        let mut progress = match cfg!(feature = "bin") {
+            #[cfg(feature = "bin")]
+            true if params.render.create_climate_gif => {
+                Box::new(GifProgressTracker::new("progress.gif").expect("failed to init gif"))
+                    as Box<dyn ProgressTracker>
+            }
+
+            _ => Box::new(NopProgressTracker) as Box<dyn ProgressTracker>,
+        };
+
+        // downgrade planet reference so it can be read from multiple places
+        drop(planet);
+        let planet = self.0.read();
+
+        let climate =
+            Climate::simulate(&planet.continents, &params, &mut planet_rando, |climate| {
+                progress.update(planet_ref.clone(), climate);
+            });
+
+        // upgrade planet lock again
+        drop(planet);
+        let mut planet = self.0.write();
+        planet.climate = Some(climate);
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {

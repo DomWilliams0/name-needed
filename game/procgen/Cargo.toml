@@ -13,8 +13,10 @@ grid = { path = "../../shared/grid", default-features = false, features = ["8nei
 color = { path = "../../shared/color", optional = true }
 noise = "^0.6"
 rand_distr = "^0.3"
+strum = "^0.19"
+strum_macros = "^0.19"
 
-image = { version = "^0.23", optional = true, default-features = false, features = ["png"] }
+image = { version = "^0.23", optional = true, default-features = false, features = ["png", "gif"] }
 imageproc = { version = "^0.22", optional = true, default-features = false }
 
 structopt = "^0.2"

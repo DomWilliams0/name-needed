@@ -17,22 +17,35 @@ fn main() {
         .and_then(|builder| builder.init(log_time))
         .expect("logging failed");
     info!("initialized logging"; "level" => ?_logging.level());
-    debug!("config: {:#?}", params);
 
-    common::panic::init_panic_detection();
+    let exit = match params {
+        Err(err) => {
+            error!("failed to parse params: {}", err);
+            1
+        }
+        Ok(params) if params.log_params_and_exit => {
+            // nop
+            info!("config: {:#?}", params);
+            0
+        }
+        Ok(params) => {
+            debug!("config: {:#?}", params);
+            common::panic::init_panic_detection();
 
-    let dew_it = || {
-        let mut planet = Planet::new(params).expect("failed");
-        planet.initial_generation();
+            let dew_it = || {
+                let mut planet = Planet::new(params).expect("failed");
+                planet.initial_generation();
 
-        let mut render = Render::with_planet(planet);
-        render.draw_continents();
-        render.save("procgen.png").expect("failed to write image");
-    };
+                let mut render = Render::with_planet(planet);
+                render.draw_continents();
+                render.save("procgen.png").expect("failed to write image");
+            };
 
-    let exit = match common::panic::run_and_handle_panics(dew_it) {
-        Ok(_) => 0,
-        Err(_) => 1,
+            match common::panic::run_and_handle_panics(dew_it) {
+                Ok(_) => 0,
+                Err(_) => 1,
+            }
+        }
     };
 
     // let logging end gracefully

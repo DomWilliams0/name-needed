@@ -1,4 +1,6 @@
-use crate::{Planet, PlanetParams};
+use crate::climate::ClimateIteration;
+use crate::params::RenderProgressParams;
+use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
 use common::*;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
@@ -12,7 +14,11 @@ pub struct Render {
 }
 
 trait PixelPos {
-    fn pos(&self) -> (u32, u32);
+    fn pos(self) -> (u32, u32);
+}
+
+trait PixelColor {
+    fn color(self) -> Rgba<u8>;
 }
 
 impl Render {
@@ -101,6 +107,29 @@ impl Render {
         self.image = Some(image);
     }
 
+    pub fn draw_climate_overlay(&mut self, climate: &ClimateIteration) {
+        let planet = self.planet.inner();
+        let params = &planet.params;
+
+        let vals = match params.render.draw_progress {
+            RenderProgressParams::None => return,
+            RenderProgressParams::Temperature => &climate.temperature,
+        };
+
+        let mut overlay = RgbaImage::new(params.planet_size, params.planet_size);
+        for (coord, val) in vals.iter_coords() {
+            debug_assert!(*val >= 0.0 && *val <= 1.0, "val={:?}", val);
+            let c = color_for_temperature(*val as f32);
+            put_pixel(&mut overlay, coord, c.array_with_alpha(50));
+        }
+
+        let image = self
+            .image
+            .as_mut()
+            .expect("image was taken but not replaced");
+        image::imageops::overlay(image, &overlay, 0, 0);
+    }
+
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {
         let image = self
             .image
@@ -112,18 +141,122 @@ impl Render {
         info!("saved image to {file}", file = path.display());
         Ok(())
     }
+
+    pub fn into_image(mut self) -> RgbaImage {
+        self.image.take().expect("image was taken but not replaced")
+    }
 }
 
-fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: ColorRgb) {
+fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) {
     let (w, h) = image.dimensions();
     let (x, y) = pos.pos();
     debug_assert!(x < w && y < h);
 
-    unsafe { image.unsafe_put_pixel(x, y, Rgba(color.into())) }
+    unsafe { image.unsafe_put_pixel(x, y, color.color()) }
+}
+
+/// 0=cold, 1=hot
+/// https://gist.github.com/stasikos/06b02d18f570fc1eaa9f
+#[allow(clippy::excessive_precision)]
+fn color_for_temperature(temp: f32) -> ColorRgb {
+    // scale to kelvin
+    let kelvin = (1.0 - temp) * 6600.0;
+
+    let x = (kelvin / 1000.0).min(40.0);
+
+    fn poly(coefficients: &[f32], x: f32) -> f32 {
+        let mut result = coefficients[0];
+        let mut xn = x;
+        for c in &coefficients[1..] {
+            result += xn * *c;
+            xn *= x;
+        }
+        result
+    }
+
+    let temperature = kelvin;
+    let r = if temperature < 6527.0 {
+        1.0
+    } else {
+        const REDPOLY: [f32; 8] = [
+            4.93596077e0,
+            -1.29917429e0,
+            1.64810386e-01,
+            -1.16449912e-02,
+            4.86540872e-04,
+            -1.19453511e-05,
+            1.59255189e-07,
+            -8.89357601e-10,
+        ];
+        poly(&REDPOLY, x)
+    };
+
+    // G
+    let g = if temperature < 850.0 {
+        0.0
+    } else if temperature <= 6600.0 {
+        const GREENPOLY: [f32; 8] = [
+            -4.95931720e-01,
+            1.08442658e0,
+            -9.17444217e-01,
+            4.94501179e-01,
+            -1.48487675e-01,
+            2.49910386e-02,
+            -2.21528530e-03,
+            8.06118266e-05,
+        ];
+        poly(&GREENPOLY, x)
+    } else {
+        const GREENPOLY: [f32; 8] = [
+            3.06119745e0,
+            -6.76337896e-01,
+            8.28276286e-02,
+            -5.72828699e-03,
+            2.35931130e-04,
+            -5.73391101e-06,
+            7.58711054e-08,
+            -4.21266737e-10,
+        ];
+
+        poly(&GREENPOLY, x)
+    };
+
+    // B
+    let b = if temperature < 1900.0 {
+        0.0
+    } else if temperature < 6600.0 {
+        const BLUEPOLY: [f32; 8] = [
+            4.93997706e-01,
+            -8.59349314e-01,
+            5.45514949e-01,
+            -1.81694167e-01,
+            4.16704799e-02,
+            -6.01602324e-03,
+            4.80731598e-04,
+            -1.61366693e-05,
+        ];
+        poly(&BLUEPOLY, x)
+    } else {
+        1.0
+    };
+
+    ColorRgb::new_float(r, g, b)
 }
 
 impl PixelPos for [usize; 3] {
-    fn pos(&self) -> (u32, u32) {
+    fn pos(self) -> (u32, u32) {
         (self[0] as u32, self[1] as u32)
+    }
+}
+
+impl PixelColor for ColorRgb {
+    fn color(self) -> Rgba<u8> {
+        Rgba(self.array_with_alpha(255))
+    }
+}
+
+impl PixelColor for [u8; 4] {
+    fn color(self) -> Rgba<u8> {
+        Rgba(self)
     }
 }

@@ -3,3 +3,8 @@
 --draw-height
 
 --seed 123123
+
+--draw-progress temp
+
+# for debugging param parsing
+#--log-params-and-exit

@@ -3,6 +3,7 @@ use crate::loader::TerrainSource;
 
 use crate::block::{Block, BlockType};
 use crate::chunk::slab::{Slab, SlabGrid, SlabType};
+use common::BoxedResult;
 use grid::GridImpl;
 use procgen::{Planet, PlanetParams};
 use unit::world::{ChunkLocation, SlabLocation};
@@ -12,7 +13,7 @@ pub struct GeneratedTerrainSource {
 }
 
 impl GeneratedTerrainSource {
-    pub fn new(params: PlanetParams) -> Result<Self, &'static str> {
+    pub fn new(params: PlanetParams) -> BoxedResult<Self> {
         let planet = Planet::new(params)?;
 
         Ok(Self { planet })

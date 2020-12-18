@@ -1,3 +1,4 @@
+use crate::map_range;
 use crate::params::PlanetParams;
 use common::cgmath::num_traits::clamp;
 use common::*;
@@ -494,10 +495,4 @@ fn apply_gaussian_filter<T: Default>(
         val = clamp(val, 0.0, 1.0);
         set_value(value, val);
     }
-}
-
-/// https://rosettacode.org/wiki/Map_range#Rust
-#[inline]
-fn map_range(from_range: (f64, f64), to_range: (f64, f64), s: f64) -> f64 {
-    to_range.0 + (s - from_range.0) * (to_range.1 - to_range.0) / (from_range.1 - from_range.0)
 }
