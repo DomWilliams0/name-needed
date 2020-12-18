@@ -31,8 +31,8 @@ const MIN_RADIUS: i32 = 2;
 
 pub struct Tile {
     density: Cell<f64>,
-    pub continent: Option<ContinentIdx>,
-    pub height: f64,
+    continent: Option<ContinentIdx>,
+    height: f64,
 }
 
 impl ContinentMap {
@@ -359,6 +359,7 @@ impl ContinentMap {
     /// Generates noise and scales to 0.0-1.0
     fn generate_initial_heightmap(&mut self, rando: &mut dyn RngCore) {
         // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
+        // TODO adjust params for global height map
         let noise = Fbm::new()
             .set_seed(rando.gen())
             .set_octaves(4)
@@ -428,6 +429,10 @@ impl Tile {
 
     pub fn density(&self) -> f64 {
         self.density.get()
+    }
+
+    pub fn height(&self) -> f64 {
+        self.height
     }
 }
 

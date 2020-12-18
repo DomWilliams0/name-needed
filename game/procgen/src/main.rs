@@ -25,10 +25,9 @@ fn main() {
         let mut planet = Planet::new(params).expect("failed");
         planet.initial_generation();
 
-        let image = planet.as_image();
-        let filename = "procgen.png";
-        image.save(filename).expect("failed to write image");
-        info!("created {file}", file = filename);
+        let mut render = Render::with_planet(planet);
+        render.draw_continents();
+        render.save("procgen.png").expect("failed to write image");
     };
 
     let exit = match common::panic::run_and_handle_panics(dew_it) {

@@ -40,22 +40,19 @@ pub struct PlanetParams {
 #[structopt(rename_all = "kebab-case")]
 pub struct RenderParams {
     #[structopt(long)]
-    pub draw_debug_colours: bool,
+    pub draw_debug_colors: bool,
 
     #[structopt(long)]
-    pub draw_blob_outlines: bool,
+    pub draw_continent_blobs: bool,
+
+    #[structopt(long)]
+    pub draw_continent_blobs_outline: bool,
 
     #[structopt(long)]
     pub draw_density: bool,
 
     #[structopt(long)]
     pub draw_height: bool,
-}
-
-pub enum DrawMode {
-    Outlines { debug_colors: bool, outlines: bool },
-    Density,
-    Height,
 }
 
 impl PlanetParams {
@@ -111,19 +108,5 @@ impl PlanetParams {
 
     pub fn seed(&self) -> u64 {
         self.seed.expect("seed should have been initialized")
-    }
-
-    #[cfg(feature = "bin")]
-    pub fn draw_mode(&self) -> DrawMode {
-        if self.render.draw_density {
-            DrawMode::Density
-        } else if self.render.draw_height {
-            DrawMode::Height
-        } else {
-            DrawMode::Outlines {
-                debug_colors: self.render.draw_debug_colours,
-                outlines: self.render.draw_blob_outlines,
-            }
-        }
     }
 }

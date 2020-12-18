@@ -114,6 +114,12 @@ impl From<ColorRgb> for [u8; 3] {
     }
 }
 
+impl From<ColorRgb> for [u8; 4] {
+    fn from(c: ColorRgb) -> Self {
+        [c.r, c.g, c.b, 255]
+    }
+}
+
 /// Includes alpha value of 255
 /// TODO will this work with big endian?
 impl From<ColorRgb> for u32 {
