@@ -117,9 +117,9 @@ impl Render {
         };
 
         let mut overlay = RgbaImage::new(params.planet_size, params.planet_size);
-        for (coord, val) in vals.iter_coords() {
-            debug_assert!(*val >= 0.0 && *val <= 1.0, "val={:?}", val);
-            let c = color_for_temperature(*val as f32);
+        for (coord, val) in vals.iter_average() {
+            debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
+            let c = color_for_temperature(val as f32);
             put_pixel(&mut overlay, coord, c.array_with_alpha(50));
         }
 
@@ -244,6 +244,12 @@ fn color_for_temperature(temp: f32) -> ColorRgb {
 }
 
 impl PixelPos for [usize; 3] {
+    fn pos(self) -> (u32, u32) {
+        (self[0] as u32, self[1] as u32)
+    }
+}
+
+impl PixelPos for [usize; 2] {
     fn pos(self) -> (u32, u32) {
         (self[0] as u32, self[1] as u32)
     }

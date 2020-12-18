@@ -5,6 +5,8 @@
 --seed 123123
 
 --draw-progress temp
+#--create-climate-gif
+--climate-iterations 5
 
 # for debugging param parsing
 #--log-params-and-exit

@@ -32,6 +32,9 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "20")]
     pub continent_min_distance: i32,
 
+    #[structopt(long, default_value = "5")]
+    pub climate_iterations: usize,
+
     #[cfg(feature = "bin")]
     #[structopt(flatten)]
     pub render: RenderParams,
@@ -123,6 +126,11 @@ impl PlanetParams {
         }
 
         Ok(params)
+    }
+
+    #[cfg(test)]
+    pub fn dummy() -> Self {
+        Self::from_iter_safe(once("dummy")).expect("failed")
     }
 
     pub fn seed(&self) -> u64 {
