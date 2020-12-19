@@ -131,40 +131,42 @@ impl<T: Default> DynamicGrid<T> {
     }
 
     pub fn iter_coords(&self) -> impl Iterator<Item = ([usize; 3], &T)> + '_ {
-        self.iter_coords_alone(CoordRange::All)
-            .zip(self.data.iter())
+        self.iter_coords_with_z_range(CoordRange::All)
     }
 
     pub fn iter_coords_mut(&mut self) -> impl Iterator<Item = ([usize; 3], &mut T)> + '_ {
-        self.iter_coords_alone(CoordRange::All)
-            .zip(self.data.iter_mut())
+        self.iter_coords_with_z_range_mut(CoordRange::All)
     }
 
     pub fn iter_coords_with_z_range(
         &self,
         z_range: CoordRange,
     ) -> impl Iterator<Item = ([usize; 3], &T)> + '_ {
-        self.iter_coords_alone(z_range).zip(self.data.iter())
+        let (iter, start) = self.iter_coords_alone(z_range);
+        iter.zip(self.data.iter().skip(start))
     }
 
     pub fn iter_coords_with_z_range_mut(
         &mut self,
         z_range: CoordRange,
     ) -> impl Iterator<Item = ([usize; 3], &mut T)> + '_ {
-        self.iter_coords_alone(z_range).zip(self.data.iter_mut())
+        let (iter, start) = self.iter_coords_alone(z_range);
+        iter.zip(self.data.iter_mut().skip(start))
     }
 
-    fn iter_coords_alone(&self, z_range: CoordRange) -> impl Iterator<Item = [usize; 3]> {
+    fn iter_coords_alone(&self, z_range: CoordRange) -> (impl Iterator<Item = [usize; 3]>, usize) {
         let (min_z, max_z) = match z_range {
             CoordRange::All => (0, self.dims[2]),
             CoordRange::Single(i) => (i, i + 1),
             CoordRange::Range(i, j) => (i, j),
         };
 
-        (min_z..max_z)
+        let z_start = min_z * self.dims[0] * self.dims[1];
+        let iter = (min_z..max_z)
             .cartesian_product(0..self.dims[1])
             .cartesian_product(0..self.dims[0])
-            .map(move |((z, y), x)| [x, y, z])
+            .map(move |((z, y), x)| [x, y, z]);
+        (iter, z_start)
     }
 
     /*    /// y-1

@@ -1,4 +1,4 @@
-# TODOs (252)
+# TODOs (255)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,10 +14,13 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (4)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (7)
    * `// TODO moisture and temperature carried by wind`
+   * `// TODO across land`
+   * `// TODO`
    * `// TODO is averaging the wind direction the right way to go to help wind converge together?`
    * `// TODO helper on grid to unsafely lookup with a debug assert`
+   * `increment(above, dec); // TODO really limit to 1.0? or let pressure go higher`
    * `// TODO height doesnt change, calculate this once in a separate grid`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
    * `// TODO agree api and stop making everything public`

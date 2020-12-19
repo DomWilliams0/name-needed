@@ -1,5 +1,6 @@
 pub use crate::climate::iteration::ClimateIteration;
 use crate::continent::ContinentMap;
+use crate::params::AirLayer;
 use crate::PlanetParams;
 use common::num_traits::real::Real;
 use common::*;
@@ -37,7 +38,7 @@ impl Climate {
 pub struct PlanetGrid<T>(DynamicGrid<T>);
 
 impl<T: Default> PlanetGrid<T> {
-    const LAND_DIVISIONS: usize = 4;
+    const LAND_DIVISIONS: usize = 1;
     const LAND_DIVISIONS_F: f64 = Self::LAND_DIVISIONS as f64;
 
     /// Size of z axis in grid
@@ -66,6 +67,24 @@ impl<T: Default> PlanetGrid<T> {
 
         ((rounded * Self::LAND_DIVISIONS_F).floor() as usize).min(Self::LAND_DIVISIONS - 1)
     }
+
+    pub fn iter_layer(&self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &T)> {
+        let z = match layer {
+            AirLayer::Surface => CoordRange::Range(0, Self::LAND_DIVISIONS),
+            AirLayer::High => CoordRange::Single(Self::LAND_DIVISIONS),
+        };
+
+        self.0.iter_coords_with_z_range(z)
+    }
+
+    fn iter_layer_mut(&mut self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &mut T)> {
+        let z = match layer {
+            AirLayer::Surface => CoordRange::Range(0, Self::LAND_DIVISIONS),
+            AirLayer::High => CoordRange::Single(Self::LAND_DIVISIONS),
+        };
+
+        self.0.iter_coords_with_z_range_mut(z)
+    }
 }
 
 impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
@@ -89,6 +108,7 @@ impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
 mod iteration {
     use crate::climate::PlanetGrid;
     use crate::continent::ContinentMap;
+    use crate::params::AirLayer;
     use crate::PlanetParams;
     use common::cgmath::num_traits::clamp;
     use common::cgmath::{Basis3, Matrix3, Rotation};
@@ -105,7 +125,13 @@ mod iteration {
         step: usize,
 
         pub(crate) temperature: PlanetGrid<f64>,
+        pub(crate) wind: PlanetGrid<Wind>,
+        pub(crate) air_pressure: PlanetGrid<f64>,
         pub(crate) wind_particles: Vec<WindParticle>,
+    }
+
+    pub(crate) struct Wind {
+        pub velocity: cgmath::Vector3<f32>,
     }
 
     pub(crate) struct WindParticle {
@@ -129,6 +155,8 @@ mod iteration {
                 step: 0,
 
                 temperature: PlanetGrid::new(params),
+                wind: PlanetGrid::new(params),
+                air_pressure: PlanetGrid::new(params),
                 wind_particles: Vec::with_capacity(params.wind_particles),
             };
 
@@ -141,44 +169,48 @@ mod iteration {
             // set up initial temperature map
             (0..5).for_each(|_| self.apply_sunlight());
 
-            // spawn wind particles randomly above land
-            let rando = &mut self.rando;
-            let rando_distro_idx = Uniform::new(0, self.continents.grid.len());
+            // set up initial air pressure
+            // TODO across land
+            debug_assert_eq!(PlanetGrid::<f64>::LAND_DIVISIONS, 1);
 
-            let continents = self.continents;
-            self.wind_particles
-                .extend((0..self.params.wind_particles).map(|_| {
-                    // choose a random tile
-                    let idx = rando.sample(&rando_distro_idx);
-                    let tile_height = continents.grid[idx].height();
+            let mut pressure_rando = thread_rng();
+            let surface_distr = Uniform::new(0.8, 0.98);
+            let high_distr = Uniform::new(0.05, 0.15);
+            self.air_pressure
+                .iter_layer_mut(AirLayer::Surface)
+                .for_each(|(_, pressure)| {
+                    // surface is high pressure
+                    *pressure = pressure_rando.sample(&surface_distr);
+                });
 
-                    // position in the centre of the tile at a random height above it
-                    let [x, y, _] = continents.grid.unflatten_index(idx);
-                    // let z = rando.gen_range(tile_height + 0.1, Self::MAX_WIND_HEIGHT);
-                    let z = tile_height;
-
-                    WindParticle {
-                        velocity: Vector3::new(
-                            rando.gen_range(-1.0, 1.0),
-                            rando.gen_range(-1.0, 1.0),
-                            0.0,
-                        ),
-                        position: Point3::new(x as f32, y as f32, z as f32),
-                    }
-                }));
+            self.air_pressure
+                .iter_layer_mut(AirLayer::High)
+                .for_each(|(_, pressure)| {
+                    // high up is low pressure
+                    *pressure = pressure_rando.sample(&high_distr);
+                });
         }
 
         pub fn step(&mut self) {
             debug!("stepping climate simulation"; "step" => self.step);
             self.step += 1;
 
-            self.move_wind();
+            // self.move_wind();
             self.apply_sunlight();
+            self.move_air_vertically();
         }
 
         // --------
 
         fn move_wind(&mut self) {
+            let continents = self.continents;
+            let xy_limit = self.params.planet_size as f32;
+            let rando = &mut self.rando;
+            // TODO
+        }
+
+        #[deprecated]
+        fn move_wind_particle(&mut self) {
             const WIND_RISE_FALL_THRESHOLD: f32 = 0.1;
             const MAX_WIND_SPEED: f32 = 4.0;
 
@@ -330,6 +362,39 @@ mod iteration {
             });
         }
 
+        /// Warm surface air rises, so surface pressure decreases
+        fn move_air_vertically(&mut self) {
+            let temperature = &mut self.temperature;
+            let mut temp_rando = thread_rng();
+            let distr = Uniform::new(0.05, 0.15);
+
+            for ([x, y, z], pressure) in self.air_pressure.iter_land_mut() {
+                // no check needed if 1 land level
+                debug_assert_eq!(PlanetGrid::<f64>::LAND_DIVISIONS, 1);
+
+                let temp = &mut temperature.0[[x, y, z]];
+                if *temp > 0.7 {
+                    // eprintln!("RISING {:?}", [x,y,z]);
+                    let dec = temp_rando.sample(&distr);
+
+                    decrement(pressure, dec);
+                    decrement(temp, dec);
+
+                    let above = &mut temperature.0[[x, y, z + 1]];
+                    increment(above, dec); // TODO really limit to 1.0? or let pressure go higher
+                } else if *temp < 0.3 && z > 0 {
+                    // eprintln!("FALLING {:?}", [x,y,z]);
+                    let inc = temp_rando.sample(&distr);
+
+                    increment(pressure, inc);
+                    increment(temp, inc);
+
+                    let below = &mut temperature.0[[x, y, z - 1]];
+                    decrement(below, inc);
+                }
+            }
+        }
+
         /// Gently heat up air directly above the planet surface. Land heats up faster than water,
         /// and the equator heats up more than the poles.
         fn apply_sunlight(&mut self) {
@@ -365,6 +430,14 @@ mod iteration {
         }
     }
 
+    impl Default for Wind {
+        fn default() -> Self {
+            Wind {
+                velocity: Vector3::zero(),
+            }
+        }
+    }
+
     impl WindParticle {
         fn tile_below(&self) -> [isize; 3] {
             point_to_tile(self.position)
@@ -382,6 +455,16 @@ mod iteration {
             pos.z.floor() as isize,
         ]
     }
+
+    #[inline]
+    fn decrement(val: &mut f64, decrement: f64) {
+        *val = (*val - decrement).max(0.0);
+    }
+
+    #[inline]
+    fn increment(val: &mut f64, increment: f64) {
+        *val = (*val + increment).min(1.0);
+    }
 }
 
 #[cfg(test)]
@@ -395,15 +478,15 @@ mod tests {
         PlanetGrid::new(&params)
     }
 
-    #[test]
-    fn planet_grid_land_index() {
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.1), 0);
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.3), 1);
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.55), 2);
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.89), 3);
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(1.0), 3);
-        assert_eq!(PlanetGrid::<f64>::land_index_for_height(4.0), 3);
-    }
+    // #[test]
+    // fn planet_grid_land_index() {
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.1), 0);
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.3), 1);
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.55), 2);
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.89), 3);
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(1.0), 3);
+    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(4.0), 3);
+    // }
 
     #[test]
     fn planet_grid_average() {
@@ -419,5 +502,30 @@ mod tests {
                 _ => assert!(avg.approx_eq(0.0, (EPSILON, 2))),
             }
         }
+    }
+
+    //noinspection DuplicatedCode
+    #[test]
+    fn planet_grid_layers() {
+        let mut grid = grid::<i32>(2);
+
+        grid.iter_layer_mut(AirLayer::Surface)
+            .for_each(|([x, y, z], val)| {
+                assert_eq!(z, 0);
+                *val = 1;
+                eprintln!("{},{},{}", x, y, z);
+            });
+
+        grid.iter_layer_mut(AirLayer::High)
+            .for_each(|([x, y, z], val)| {
+                assert_eq!(z, 1);
+                *val = 5;
+                eprintln!(":: {},{},{}", x, y, z);
+            });
+
+        grid.iter_layer(AirLayer::Surface)
+            .for_each(|(_, val)| assert_eq!(*val, 1));
+        grid.iter_layer(AirLayer::High)
+            .for_each(|(_, val)| assert_eq!(*val, 5));
     }
 }

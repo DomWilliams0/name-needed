@@ -55,6 +55,15 @@ pub enum RenderProgressParams {
     Temperature,
 
     Wind,
+
+    AirPressure,
+}
+
+#[derive(Debug, Copy, Clone, EnumString, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum AirLayer {
+    Surface,
+    High,
 }
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
@@ -80,6 +89,12 @@ pub struct RenderParams {
 
     #[structopt(long)]
     pub create_climate_gif: bool,
+
+    #[structopt(long, default_value = "surface")]
+    pub climate_gif_layer: AirLayer,
+
+    #[structopt(long, default_value = "4")]
+    pub gif_fps: u32,
 }
 
 impl PlanetParams {

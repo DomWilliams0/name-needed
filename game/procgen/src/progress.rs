@@ -27,16 +27,23 @@ mod gif {
 
     impl ProgressTracker for GifProgressTracker {
         fn update(&mut self, planet: Planet, climate: &ClimateIteration) {
+            let (fps, layer) = {
+                let params = &planet.inner().params;
+
+                let fps = 1.0 / params.render.gif_fps as f32;
+                let layer = params.render.climate_gif_layer;
+                (fps, layer)
+            };
+
             let mut render = Render::with_planet(planet);
             render.draw_continents();
-            render.draw_climate_overlay(climate);
+            render.draw_climate_overlay(climate, layer);
 
-            const FPS: f32 = 8.0;
             let frame = Frame::from_parts(
                 render.into_image(),
                 0,
                 0,
-                Delay::from_saturating_duration(Duration::from_secs_f32(1.0 / FPS)),
+                Delay::from_saturating_duration(Duration::from_secs_f32(fps)),
             );
             self.0
                 .encode_frame(frame)

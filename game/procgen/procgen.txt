@@ -2,12 +2,13 @@
 #--draw-density
 --draw-height
 
---seed 1231231
+--seed 1231232
 
---draw-progress wind
+--draw-progress air-pressure
 --create-climate-gif
---climate-iterations 50
---wind-particles 1
+--climate-gif-layer surface
+--climate-iterations 20
+--gif-fps 10
 
 # for debugging param parsing
 #--log-params-and-exit

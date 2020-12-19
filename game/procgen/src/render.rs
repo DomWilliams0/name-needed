@@ -1,5 +1,5 @@
 use crate::climate::ClimateIteration;
-use crate::params::RenderProgressParams;
+use crate::params::{AirLayer, RenderProgressParams};
 use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
 use common::*;
@@ -107,7 +107,7 @@ impl Render {
         self.image = Some(image);
     }
 
-    pub fn draw_climate_overlay(&mut self, climate: &ClimateIteration) {
+    pub fn draw_climate_overlay(&mut self, climate: &ClimateIteration, layer: AirLayer) {
         let planet = self.planet.inner();
         let params = &planet.params;
 
@@ -120,7 +120,7 @@ impl Render {
         match params.render.draw_progress {
             RenderProgressParams::None => unreachable!(),
             RenderProgressParams::Temperature => {
-                for (coord, val) in climate.temperature.iter_average() {
+                for (coord, &val) in climate.temperature.iter_layer(layer) {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel(&mut overlay, coord, c.array_with_alpha(50));
@@ -145,6 +145,13 @@ impl Render {
                         (line_end.x, line_end.y),
                         Rgba(c.array_with_alpha(opacity)),
                     );
+                }
+            }
+            RenderProgressParams::AirPressure => {
+                for (coord, &val) in climate.air_pressure.iter_layer(layer) {
+                    debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
+                    let c = color_for_temperature(val as f32);
+                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
                 }
             }
         };
@@ -186,7 +193,7 @@ fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) 
 #[allow(clippy::excessive_precision)]
 fn color_for_temperature(temp: f32) -> ColorRgb {
     // scale to kelvin
-    let kelvin = (1.0 - temp) * 6600.0;
+    let kelvin = (1.0 - temp) * 8000.0;
 
     let x = (kelvin / 1000.0).min(40.0);
 
@@ -200,8 +207,7 @@ fn color_for_temperature(temp: f32) -> ColorRgb {
         result
     }
 
-    let temperature = kelvin;
-    let r = if temperature < 6527.0 {
+    let r = if kelvin < 6527.0 {
         1.0
     } else {
         const REDPOLY: [f32; 8] = [
@@ -218,9 +224,9 @@ fn color_for_temperature(temp: f32) -> ColorRgb {
     };
 
     // G
-    let g = if temperature < 850.0 {
+    let g = if kelvin < 850.0 {
         0.0
-    } else if temperature <= 6600.0 {
+    } else if kelvin <= 6600.0 {
         const GREENPOLY: [f32; 8] = [
             -4.95931720e-01,
             1.08442658e0,
@@ -248,9 +254,9 @@ fn color_for_temperature(temp: f32) -> ColorRgb {
     };
 
     // B
-    let b = if temperature < 1900.0 {
+    let b = if kelvin < 1900.0 {
         0.0
-    } else if temperature < 6600.0 {
+    } else if kelvin < 6600.0 {
         const BLUEPOLY: [f32; 8] = [
             4.93997706e-01,
             -8.59349314e-01,
