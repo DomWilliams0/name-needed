@@ -80,6 +80,8 @@ impl Planet {
                 progress.update(planet_ref.clone(), climate);
             });
 
+        progress.fini();
+
         // upgrade planet lock again
         drop(planet);
         let mut planet = self.0.write();
