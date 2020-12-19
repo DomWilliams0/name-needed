@@ -64,21 +64,16 @@ impl<T: Default> PlanetGrid<T> {
     }
 
     pub fn iter_layer(&self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &T)> {
-        let z = match layer {
-            AirLayer::Surface => CoordRange::Range(0, Self::LAND_DIVISIONS),
-            AirLayer::High => CoordRange::Single(Self::LAND_DIVISIONS),
-        };
-
-        self.0.iter_coords_with_z_range(z)
+        self.0.iter_coords_with_z_range(layer.into())
     }
 
+    pub fn iter_layer_data(&self, layer: AirLayer) -> impl Iterator<Item = &T> {
+        self.0
+            .iter_coords_with_z_range(layer.into())
+            .map(|(_, data)| data)
+    }
     fn iter_layer_mut(&mut self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &mut T)> {
-        let z = match layer {
-            AirLayer::Surface => CoordRange::Range(0, Self::LAND_DIVISIONS),
-            AirLayer::High => CoordRange::Single(Self::LAND_DIVISIONS),
-        };
-
-        self.0.iter_coords_with_z_range_mut(z)
+        self.0.iter_coords_with_z_range_mut(layer.into())
     }
 }
 
@@ -97,6 +92,15 @@ impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
 
                 ([x, y], val)
             })
+    }
+}
+
+impl From<AirLayer> for CoordRange {
+    fn from(layer: AirLayer) -> Self {
+        match layer {
+            AirLayer::Surface => CoordRange::Range(0, PlanetGrid::<f64>::LAND_DIVISIONS),
+            AirLayer::High => CoordRange::Single(PlanetGrid::<f64>::LAND_DIVISIONS),
+        }
     }
 }
 
@@ -202,7 +206,45 @@ mod iteration {
         // --------
         /// Apply wind velocities to transfer air pressure, temperature, moisture
         fn apply_wind(&mut self) {
-            // TODO wind behaviour
+            for layer in AirLayer::iter() {
+                let air = &mut self.air_pressure;
+                let temp = &mut self.temperature;
+                for (coord, wind) in self.wind.iter_layer(layer) {
+                    // TODO distribute across neighbours more smoothly, advection?
+
+                    let wind_mag = {
+                        let wind_mag = wind.velocity.magnitude2();
+                        if wind_mag < 0.1_f64.powi(2) {
+                            // too weak
+                            continue;
+                        }
+                        wind_mag.sqrt()
+                    };
+
+                    // get next tile in direction
+                    let dst = {
+                        let dx = wind.velocity.x.abs().ceil().copysign(wind.velocity.x) as isize;
+                        let dy = wind.velocity.y.abs().ceil().copysign(wind.velocity.y) as isize;
+                        debug_assert!(dx != 0 || dy != 0);
+                        let coord = [
+                            coord[0] as isize + dx,
+                            coord[1] as isize + dy,
+                            0, // TODO only works if 1 layer of each
+                        ];
+
+                        self.wind.0.wrap_coord(coord)
+                    };
+
+                    // transfer
+                    // TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(
+                    let transfer = wind_mag * self.params.wind_transfer_rate;
+                    decrement(&mut air.0[coord], transfer);
+                    increment(&mut air.0[dst], transfer);
+
+                    decrement(&mut temp.0[coord], transfer);
+                    increment(&mut temp.0[dst], transfer);
+                }
+            }
         }
 
         /// Calculate wind velocities based on air pressure differences

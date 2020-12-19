@@ -38,6 +38,9 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "20")]
     pub wind_particles: usize,
 
+    #[structopt(long, default_value = "0.005")]
+    pub wind_transfer_rate: f64,
+
     #[cfg(feature = "bin")]
     #[structopt(flatten)]
     pub render: RenderParams,
@@ -56,6 +59,7 @@ pub enum RenderProgressParams {
 
     Wind,
 
+    #[strum(serialize = "pressure")]
     AirPressure,
 }
 

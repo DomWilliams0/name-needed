@@ -4,11 +4,13 @@
 
 --seed 1231232
 
---draw-progress wind
+--draw-progress pressure
 --create-climate-gif
 --climate-gif-layer surface
---climate-iterations 30
+--climate-iterations 50
 --gif-fps 5
+
+--wind-transfer-rate 0.005
 
 # for debugging param parsing
 #--log-params-and-exit

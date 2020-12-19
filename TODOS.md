@@ -1,4 +1,4 @@
-# TODOs (259)
+# TODOs (260)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,11 +14,13 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (10)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (12)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO across land`
    * `// TODO wind moving brings air to level out pressure`
-   * `// TODO wind behaviour`
+   * `// TODO distribute across neighbours more smoothly, advection?`
+   * `0, // TODO only works if 1 layer of each`
+   * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
    * `// TODO diffuse/falloff to neighbouring neighbours too`
    * `// TODO is averaging the wind direction the right way to go to help wind converge together?`
    * `// TODO helper on grid to unsafely lookup with a debug assert`
@@ -33,10 +35,9 @@
    * `// TODO actually log the time`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)
    * `// TODO return a result instead of panicking`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (4)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
-   * `// TODO build up gif on another thread`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
