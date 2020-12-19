@@ -95,6 +95,10 @@ pub struct RenderParams {
 
     #[structopt(long, default_value = "4")]
     pub gif_fps: u32,
+
+    /// Per axis
+    #[structopt(long, default_value = "2")]
+    pub scale: u32,
 }
 
 impl PlanetParams {

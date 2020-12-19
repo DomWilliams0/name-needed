@@ -7,7 +7,7 @@
 --draw-progress wind
 --create-climate-gif
 --climate-gif-layer surface
---climate-iterations 50
+--climate-iterations 30
 --gif-fps 5
 
 # for debugging param parsing

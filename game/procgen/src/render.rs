@@ -4,7 +4,9 @@ use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
 use common::*;
 use image::error::UnsupportedErrorKind::Color;
+use image::imageops::FilterType;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
+use imageproc::definitions::HasBlack;
 use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut, draw_line_segment_mut};
 use std::path::Path;
 
@@ -18,7 +20,7 @@ trait PixelPos {
     fn pos(self) -> (u32, u32);
 }
 
-trait PixelColor {
+trait PixelColor: Clone {
     fn color(self) -> Rgba<u8>;
 }
 
@@ -26,21 +28,22 @@ impl Render {
     pub fn with_planet(planet: Planet) -> Self {
         let p = planet.inner();
         let params = &p.params;
-        let image = ImageBuffer::new(params.planet_size, params.planet_size);
+        assert!(params.render.scale > 0);
 
         drop(p);
         Render {
             planet,
-            image: Some(image),
+            image: None,
         }
     }
 
     pub fn draw_continents(&mut self) {
         let planet = self.planet.inner();
+        let planet_size = planet.params.planet_size;
         let params = &planet.params.render;
 
-        // take ownership of image
-        let mut image = self.image.take().expect("image was taken but not replaced");
+        // create 1:1 image
+        let mut image = ImageBuffer::new(planet_size, planet_size);
 
         if params.draw_continent_blobs {
             // special drawing of continents with land blobs
@@ -104,8 +107,13 @@ impl Render {
             }
         }
 
-        // put image back
-        self.image = Some(image);
+        // store scaled image
+        self.image = Some(if params.scale == 1 {
+            image
+        } else {
+            let new_size = params.scale * planet_size;
+            image::imageops::resize(&image, new_size, new_size, FilterType::Nearest)
+        });
     }
 
     pub fn draw_climate_overlay(&mut self, climate: &ClimateIteration, layer: AirLayer) {
@@ -116,7 +124,10 @@ impl Render {
             return;
         }
 
-        let mut overlay = RgbaImage::new(params.planet_size, params.planet_size);
+        let scale = params.render.scale;
+
+        // overlay is scaled size
+        let mut overlay = RgbaImage::new(params.planet_size * scale, params.planet_size * scale);
 
         match params.render.draw_progress {
             RenderProgressParams::None => unreachable!(),
@@ -124,44 +135,52 @@ impl Render {
                 for (coord, &val) in climate.temperature.iter_layer(layer) {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
-                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
+                    put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
                 }
             }
             RenderProgressParams::Wind => {
-                let c = match layer {
-                    AirLayer::Surface => ColorRgb::new(200, 10, 20),
-                    AirLayer::High => ColorRgb::new(30, 200, 20),
+                let opacity = match layer {
+                    AirLayer::Surface => 240,
+                    AirLayer::High => 100,
                 };
 
-                for (coord, wind) in climate.wind.iter_layer(layer) {
-                    /*
-                                        const EPSILON: f64 = 0.3;
-                                        if wind.velocity.magnitude2() <= EPSILON.powi(2) {
-                                            // too short
-                                            continue;
-                                        }
+                let scale = scale as f32;
 
-                                        let line_start = cgmath::Vector2::new(x as f32 + 0.5, y as f32+ 0.5);
-                                        let line_end = line_start + wind.velocity.cast().unwrap();
+                for ([x, y, _], wind) in climate.wind.iter_layer(layer) {
+                    const EPSILON: f64 = 0.3;
+                    if wind.velocity.magnitude2() <= EPSILON.powi(2) {
+                        // too short
+                        continue;
+                    }
 
-                                        draw_line_segment_mut(
-                                            &mut overlay,
-                                            (line_start.x, line_start.y),
-                                            (line_end.x, line_end.y),
-                                            Rgba(c.array_with_alpha(200)),
-                                        );
-                    */
+                    let line_start = cgmath::Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
+                    let line_end = line_start + wind.velocity.cast().unwrap();
 
-                    let magnitude = wind.velocity.magnitude();
-                    let c = color_for_temperature(magnitude as f32);
-                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
+                    let direction = wind.velocity.angle(cgmath::Vector2::unit_y()).normalize()
+                        / cgmath::Rad::full_turn();
+                    let color = ColorRgb::new_hsl(direction as f32, 0.7, 0.5);
+
+                    // color = direction
+                    // len = strength
+                    // opacity = height?
+
+                    draw_line_segment_mut(
+                        &mut overlay,
+                        (line_start.x * scale, line_start.y * scale),
+                        (line_end.x * scale, line_end.y * scale),
+                        Rgba(color.array_with_alpha(opacity)),
+                    );
+
+                    // let magnitude = wind.velocity.magnitude();
+                    // let c = color_for_temperature(magnitude as f32);
+                    // put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
                 }
             }
             RenderProgressParams::AirPressure => {
                 for (coord, &val) in climate.air_pressure.iter_layer(layer) {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
-                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
+                    put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
                 }
             }
         };
@@ -196,6 +215,13 @@ fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) 
     debug_assert!(x < w && y < h);
 
     unsafe { image.unsafe_put_pixel(x, y, color.color()) }
+}
+
+fn put_pixel_scaled(image: &mut RgbaImage, scale: u32, pos: impl PixelPos, color: impl PixelColor) {
+    let (x, y) = pos.pos();
+    (0..scale)
+        .cartesian_product(0..scale)
+        .for_each(|(i, j)| put_pixel(image, ((x * scale) + i, (y * scale) + j), color.clone()));
 }
 
 /// 0=cold, 1=hot
@@ -294,6 +320,12 @@ impl PixelPos for [usize; 3] {
 impl PixelPos for [usize; 2] {
     fn pos(self) -> (u32, u32) {
         (self[0] as u32, self[1] as u32)
+    }
+}
+
+impl PixelPos for (u32, u32) {
+    fn pos(self) -> (u32, u32) {
+        self
     }
 }
 
