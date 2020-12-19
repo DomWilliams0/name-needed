@@ -14,13 +14,12 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (11)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (10)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO across land`
    * `// TODO wind moving brings air to level out pressure`
    * `// TODO wind behaviour`
    * `// TODO diffuse/falloff to neighbouring neighbours too`
-   * `// TODO feature on common crate to not specialise cgmath types`
    * `// TODO is averaging the wind direction the right way to go to help wind converge together?`
    * `// TODO helper on grid to unsafely lookup with a debug assert`
    * `increment(above, dec); // TODO really limit to 1.0? or let pressure go higher`
@@ -34,9 +33,10 @@
    * `// TODO actually log the time`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)
    * `// TODO return a result instead of panicking`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (4)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
+   * `// TODO build up gif on another thread`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)

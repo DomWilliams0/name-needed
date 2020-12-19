@@ -5,7 +5,7 @@ use crate::PlanetParams;
 use common::num_traits::real::Real;
 use common::*;
 use grid::{CoordRange, DynamicGrid};
-use std::ops::{AddAssign, Deref, DivAssign};
+use std::ops::{AddAssign, DivAssign};
 
 pub struct Climate {}
 
@@ -105,13 +105,12 @@ mod iteration {
     use crate::continent::ContinentMap;
     use crate::params::AirLayer;
     use crate::PlanetParams;
-    use common::cgmath::num_traits::clamp;
-    use common::cgmath::{Basis3, Matrix3, Rotation};
-    use common::num_traits::real::Real;
-    use common::*;
-    use grid::DynamicGrid;
+    use common::cgmath::num_traits::{clamp, real::Real};
+    use common::cgmath::prelude::*;
+    use common::cgmath::{Basis3, Point3, Rad, Rotation, Vector2, Vector3};
+    use common::{debug, thread_rng, truncate, ArrayVec, OrderedFloat, Rng, RngCore};
     use rand_distr::Uniform;
-    use std::f32::consts::{FRAC_PI_2, PI as PI32, TAU};
+    use std::f32::consts::{FRAC_PI_2, TAU};
     use std::f64::consts::PI;
     use std::f64::EPSILON;
     use strum::IntoEnumIterator;
@@ -129,12 +128,12 @@ mod iteration {
     }
 
     pub(crate) struct Wind {
-        pub velocity: cgmath::Vector2<f64>,
+        pub velocity: Vector2<f64>,
     }
 
     pub(crate) struct WindParticle {
-        pub velocity: cgmath::Vector3<f32>,
-        pub position: cgmath::Point3<f32>,
+        pub velocity: Vector3<f32>,
+        pub position: Point3<f32>,
         // TODO moisture and temperature carried by wind
     }
 
@@ -233,12 +232,14 @@ mod iteration {
                     // TODO diffuse/falloff to neighbouring neighbours too
 
                     let wind_change = if max_diff.abs() < EPSILON {
-                        cgmath::Vector2::zero()
+                        Vector2::zero()
                     } else {
                         let tgt = air_pressure.0.unflatten_index(max_diff_idx);
-                        // TODO feature on common crate to not specialise cgmath types
-                        cgmath::Vector2::new((tgt[0] - coord[0]) as f64, (tgt[1] - coord[1]) as f64)
-                            .normalize_to(max_diff)
+                        Vector2::new(
+                            (tgt[0] as isize - coord[0] as isize) as f64,
+                            (tgt[1] as isize - coord[1] as isize) as f64,
+                        )
+                        .normalize_to(max_diff)
                     };
 
                     wind.velocity = wind.velocity.lerp(wind_change, 0.4);
@@ -305,7 +306,7 @@ mod iteration {
                         wind.velocity.y *= hor_slow;
 
                         // change direction a tad horizontally
-                        let rot = Basis3::from_angle_z(rad(rando.gen_range(-FRAC_PI_2, FRAC_PI_2)));
+                        let rot = Basis3::from_angle_z(Rad(rando.gen_range(-FRAC_PI_2, FRAC_PI_2)));
                         wind.velocity = rot.rotate_vector(wind.velocity);
 
                         eprintln!("RISE");
@@ -465,7 +466,7 @@ mod iteration {
     impl Default for Wind {
         fn default() -> Self {
             Wind {
-                velocity: cgmath::Vector2::zero(),
+                velocity: Vector2::zero(),
             }
         }
     }
@@ -480,7 +481,7 @@ mod iteration {
         }
     }
 
-    fn point_to_tile(pos: cgmath::Point3<f32>) -> [isize; 3] {
+    fn point_to_tile(pos: Point3<f32>) -> [isize; 3] {
         [
             pos.x.floor() as isize,
             pos.y.floor() as isize,
