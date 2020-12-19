@@ -51,6 +51,11 @@ pub struct DynamicGrid<T> {
     data: Box<[T]>,
 }
 
+pub trait GridCoord<T: Default> {
+    fn into_index(self, grid: &DynamicGrid<T>) -> usize;
+    fn into_coord(self, grid: &DynamicGrid<T>) -> [usize; 3];
+}
+
 pub enum CoordRange {
     All,
     Single(usize),
@@ -237,8 +242,11 @@ impl<T: Default> DynamicGrid<T> {
         })
     }
 
-    pub fn wrapping_neighbours(&self, index: usize) -> impl Iterator<Item = usize> + '_ {
-        let [x, y, z] = self.unflatten_index(index);
+    pub fn wrapping_neighbours(
+        &self,
+        coord: impl GridCoord<T>,
+    ) -> impl ExactSizeIterator<Item = usize> + '_ {
+        let [x, y, z] = coord.into_coord(self);
         let coord = [x as isize, y as isize, z as isize];
 
         let x0 = coord[0];
@@ -269,6 +277,26 @@ impl<T: Default> DynamicGrid<T> {
             let coord = self.wrap_coord(coord);
             self.flatten_coords(coord)
         })
+    }
+}
+
+impl<T: Default> GridCoord<T> for usize {
+    fn into_index(self, _: &DynamicGrid<T>) -> usize {
+        self
+    }
+
+    fn into_coord(self, grid: &DynamicGrid<T>) -> [usize; 3] {
+        grid.unflatten_index(self)
+    }
+}
+
+impl<T: Default> GridCoord<T> for [usize; 3] {
+    fn into_index(self, grid: &DynamicGrid<T>) -> usize {
+        grid.flatten_coords(self)
+    }
+
+    fn into_coord(self, _: &DynamicGrid<T>) -> [usize; 3] {
+        self
     }
 }
 

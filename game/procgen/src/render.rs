@@ -3,6 +3,7 @@ use crate::params::{AirLayer, RenderProgressParams};
 use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
 use common::*;
+use image::error::UnsupportedErrorKind::Color;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut, draw_line_segment_mut};
 use std::path::Path;
@@ -127,24 +128,33 @@ impl Render {
                 }
             }
             RenderProgressParams::Wind => {
-                let c = ColorRgb::new(150, 100, 100);
-                for wind in climate.wind_particles.iter() {
-                    let line_end = wind.position + wind.velocity;
+                let c = match layer {
+                    AirLayer::Surface => ColorRgb::new(200, 10, 20),
+                    AirLayer::High => ColorRgb::new(30, 200, 20),
+                };
 
-                    // height affects opacity
-                    let opacity = map_range(
-                        (0.0, ClimateIteration::MAX_WIND_HEIGHT as f32),
-                        (0.6, 0.9),
-                        wind.position.z,
-                    );
-                    let opacity = (opacity * 255.0) as u8;
+                for (coord, wind) in climate.wind.iter_layer(layer) {
+                    /*
+                                        const EPSILON: f64 = 0.3;
+                                        if wind.velocity.magnitude2() <= EPSILON.powi(2) {
+                                            // too short
+                                            continue;
+                                        }
 
-                    draw_line_segment_mut(
-                        &mut overlay,
-                        (wind.position.x, wind.position.y),
-                        (line_end.x, line_end.y),
-                        Rgba(c.array_with_alpha(opacity)),
-                    );
+                                        let line_start = cgmath::Vector2::new(x as f32 + 0.5, y as f32+ 0.5);
+                                        let line_end = line_start + wind.velocity.cast().unwrap();
+
+                                        draw_line_segment_mut(
+                                            &mut overlay,
+                                            (line_start.x, line_start.y),
+                                            (line_end.x, line_end.y),
+                                            Rgba(c.array_with_alpha(200)),
+                                        );
+                    */
+
+                    let magnitude = wind.velocity.magnitude();
+                    let c = color_for_temperature(magnitude as f32);
+                    put_pixel(&mut overlay, coord, c.array_with_alpha(50));
                 }
             }
             RenderProgressParams::AirPressure => {

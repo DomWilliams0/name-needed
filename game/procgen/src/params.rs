@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, ErrorKind};
 use std::path::Path;
 use structopt::StructOpt;
-use strum_macros::EnumString;
+use strum_macros::{EnumIter, EnumString};
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
 #[structopt(rename_all = "kebab-case")]
@@ -59,7 +59,7 @@ pub enum RenderProgressParams {
     AirPressure,
 }
 
-#[derive(Debug, Copy, Clone, EnumString, Deserialize)]
+#[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter)]
 #[strum(serialize_all = "kebab-case")]
 pub enum AirLayer {
     Surface,

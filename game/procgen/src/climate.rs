@@ -55,11 +55,6 @@ impl<T: Default> PlanetGrid<T> {
         ]))
     }
 
-    fn iter_land_mut(&mut self) -> impl Iterator<Item = ([usize; 3], &mut T)> {
-        self.0
-            .iter_coords_with_z_range_mut(CoordRange::Range(0, Self::LAND_DIVISIONS))
-    }
-
     #[inline]
     fn land_index_for_height(height: f64) -> usize {
         debug_assert!(height >= 0.0);
@@ -112,11 +107,14 @@ mod iteration {
     use crate::PlanetParams;
     use common::cgmath::num_traits::clamp;
     use common::cgmath::{Basis3, Matrix3, Rotation};
+    use common::num_traits::real::Real;
     use common::*;
     use grid::DynamicGrid;
     use rand_distr::Uniform;
     use std::f32::consts::{FRAC_PI_2, PI as PI32, TAU};
     use std::f64::consts::PI;
+    use std::f64::EPSILON;
+    use strum::IntoEnumIterator;
 
     pub struct ClimateIteration<'a> {
         params: PlanetParams,
@@ -131,7 +129,7 @@ mod iteration {
     }
 
     pub(crate) struct Wind {
-        pub velocity: cgmath::Vector3<f32>,
+        pub velocity: cgmath::Vector2<f64>,
     }
 
     pub(crate) struct WindParticle {
@@ -195,18 +193,57 @@ mod iteration {
             debug!("stepping climate simulation"; "step" => self.step);
             self.step += 1;
 
-            // self.move_wind();
             self.apply_sunlight();
             self.move_air_vertically();
+            self.make_wind();
+            self.apply_wind();
+            // TODO wind moving brings air to level out pressure
         }
 
         // --------
+        /// Apply wind velocities to transfer air pressure, temperature, moisture
+        fn apply_wind(&mut self) {
+            // TODO wind behaviour
+        }
 
-        fn move_wind(&mut self) {
-            let continents = self.continents;
-            let xy_limit = self.params.planet_size as f32;
-            let rando = &mut self.rando;
-            // TODO
+        /// Calculate wind velocities based on air pressure differences
+        fn make_wind(&mut self) {
+            let air_pressure = &self.air_pressure;
+
+            // treat surface and high air pressures separately
+            for layer in AirLayer::iter() {
+                for (coord, wind) in self.wind.iter_layer_mut(layer) {
+                    let this_pressure = air_pressure.0[coord];
+                    let neighbours = air_pressure
+                        .0
+                        .wrapping_neighbours(coord)
+                        .map(|idx| {
+                            let idx: usize = idx; // ide borked
+                            let n_value = air_pressure.0[idx];
+                            (idx, n_value - this_pressure)
+                        })
+                        .collect::<ArrayVec<[(usize, f64); grid::NEIGHBOURS_COUNT]>>();
+
+                    // find maximum difference
+                    let (max_diff_idx, max_diff) = *neighbours
+                        .iter()
+                        .max_by_key(|(_, diff)| OrderedFloat(diff.abs()))
+                        .unwrap();
+
+                    // TODO diffuse/falloff to neighbouring neighbours too
+
+                    let wind_change = if max_diff.abs() < EPSILON {
+                        cgmath::Vector2::zero()
+                    } else {
+                        let tgt = air_pressure.0.unflatten_index(max_diff_idx);
+                        // TODO feature on common crate to not specialise cgmath types
+                        cgmath::Vector2::new((tgt[0] - coord[0]) as f64, (tgt[1] - coord[1]) as f64)
+                            .normalize_to(max_diff)
+                    };
+
+                    wind.velocity = wind.velocity.lerp(wind_change, 0.4);
+                }
+            }
         }
 
         #[deprecated]
@@ -362,13 +399,15 @@ mod iteration {
             });
         }
 
-        /// Warm surface air rises, so surface pressure decreases
+        /// Warm surface air rises, so surface pressure decreases.
+        /// Cold high air falls, so high pressure decreases
         fn move_air_vertically(&mut self) {
             let temperature = &mut self.temperature;
             let mut temp_rando = thread_rng();
             let distr = Uniform::new(0.05, 0.15);
 
-            for ([x, y, z], pressure) in self.air_pressure.iter_land_mut() {
+            // warm surface air rises
+            for ([x, y, z], pressure) in self.air_pressure.iter_layer_mut(AirLayer::Surface) {
                 // no check needed if 1 land level
                 debug_assert_eq!(PlanetGrid::<f64>::LAND_DIVISIONS, 1);
 
@@ -382,17 +421,10 @@ mod iteration {
 
                     let above = &mut temperature.0[[x, y, z + 1]];
                     increment(above, dec); // TODO really limit to 1.0? or let pressure go higher
-                } else if *temp < 0.3 && z > 0 {
-                    // eprintln!("FALLING {:?}", [x,y,z]);
-                    let inc = temp_rando.sample(&distr);
-
-                    increment(pressure, inc);
-                    increment(temp, inc);
-
-                    let below = &mut temperature.0[[x, y, z - 1]];
-                    decrement(below, inc);
                 }
             }
+
+            // TODO cold high air falls?
         }
 
         /// Gently heat up air directly above the planet surface. Land heats up faster than water,
@@ -405,7 +437,7 @@ mod iteration {
             // e.g. height is 0.0, only heat z=0. height is 0.5, only heat up to z=half
             for (([_, y, z], temp), tile) in self
                 .temperature
-                .iter_land_mut()
+                .iter_layer_mut(AirLayer::Surface)
                 .zip(self.continents.grid.iter())
             {
                 // TODO height doesnt change, calculate this once in a separate grid
@@ -433,7 +465,7 @@ mod iteration {
     impl Default for Wind {
         fn default() -> Self {
             Wind {
-                velocity: Vector3::zero(),
+                velocity: cgmath::Vector2::zero(),
             }
         }
     }
