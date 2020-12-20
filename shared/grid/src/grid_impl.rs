@@ -1,4 +1,5 @@
-use common::{ArrayVec, Itertools};
+use common::cgmath::num_traits::clamp;
+use common::{ArrayVec, Boolinator, Itertools};
 use derive_more::*;
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Range};
@@ -113,9 +114,9 @@ impl<T: Default> DynamicGrid<T> {
         if *y0 < 0 || *y0 >= y1 {
             *y0 = y0.rem_euclid(y1);
         }
-        if *z0 < 0 || *z0 >= z1 {
-            *z0 = z0.rem_euclid(z1);
-        }
+
+        // clamp, dont wrap z
+        *z0 = clamp(*z0, 0, z1 - 1);
 
         let new_coord = [*x0 as usize, *y0 as usize, *z0 as usize];
         debug_assert!(
@@ -143,6 +144,7 @@ impl<T: Default> DynamicGrid<T> {
         self.iter_coords_with_z_range_mut(CoordRange::All)
     }
 
+    // TODO return <C: GridCoord>
     pub fn iter_coords_with_z_range(
         &self,
         z_range: CoordRange,
@@ -159,17 +161,25 @@ impl<T: Default> DynamicGrid<T> {
         iter.zip(self.data.iter_mut().skip(start))
     }
 
+    #[inline]
     fn iter_coords_alone(&self, z_range: CoordRange) -> (impl Iterator<Item = [usize; 3]>, usize) {
+        Self::iter_coords_alone_static(z_range, self.dims)
+    }
+
+    pub fn iter_coords_alone_static(
+        z_range: CoordRange,
+        dims: [usize; 3],
+    ) -> (impl Iterator<Item = [usize; 3]>, usize) {
         let (min_z, max_z) = match z_range {
-            CoordRange::All => (0, self.dims[2]),
+            CoordRange::All => (0, dims[2]),
             CoordRange::Single(i) => (i, i + 1),
             CoordRange::Range(i, j) => (i, j),
         };
 
-        let z_start = min_z * self.dims[0] * self.dims[1];
+        let z_start = min_z * dims[0] * dims[1];
         let iter = (min_z..max_z)
-            .cartesian_product(0..self.dims[1])
-            .cartesian_product(0..self.dims[0])
+            .cartesian_product(0..dims[1])
+            .cartesian_product(0..dims[0])
             .map(move |((z, y), x)| [x, y, z]);
         (iter, z_start)
     }
@@ -240,6 +250,21 @@ impl<T: Default> DynamicGrid<T> {
                 None
             }
         })
+    }
+
+    /// Wraps xy, clamps z
+    pub fn wrapping_neighbours_3d(
+        &self,
+        coord: impl GridCoord<T>,
+    ) -> impl Iterator<Item = usize> + '_ {
+        let [x, y, z] = coord.into_coord(self);
+
+        let below = (z > 0).as_some_from(|| z - 1);
+        let this = Some(z);
+        let above = (z < self.dims[2]).as_some_from(|| z + 1);
+
+        let zs = below.into_iter().chain(this).chain(above.into_iter());
+        zs.flat_map(move |z| self.wrapping_neighbours([x, y, z]))
     }
 
     pub fn wrapping_neighbours(

@@ -49,6 +49,7 @@ fn main() {
     };
 
     // let logging end gracefully
+    info!("all done");
     drop(_logging);
     std::thread::sleep(std::time::Duration::from_secs(1));
 

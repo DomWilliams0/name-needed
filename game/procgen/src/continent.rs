@@ -30,6 +30,7 @@ type ContinentIdx = NonZeroUsize;
 
 const MIN_RADIUS: i32 = 2;
 
+#[derive(Debug)]
 pub struct Tile {
     density: Cell<f64>,
     continent: Option<ContinentIdx>,
@@ -340,6 +341,11 @@ impl ContinentMap {
             .unwrap() // not empty
             .0;
 
+        assert!(
+            max_density > 0.0,
+            "all density is 0, world might be too small"
+        );
+
         info!("original density limit"; "max" => ?max_density);
 
         for tile in self.grid.iter_mut() {
@@ -434,6 +440,14 @@ impl Tile {
 
     pub fn height(&self) -> f64 {
         self.height
+    }
+
+    pub fn land_height(&self) -> f64 {
+        if self.is_land() {
+            self.height
+        } else {
+            0.0
+        }
     }
 }
 

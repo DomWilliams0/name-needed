@@ -43,8 +43,8 @@ impl<T: Default> PlanetGrid<T> {
     const LAND_DIVISIONS_F: f64 = LAND_DIVISIONS as f64;
 
     /// Size of z axis in grid
-    const TOTAL_HEIGHT: usize = LAND_DIVISIONS + 1;
-    const TOTAL_HEIGHT_F: f64 = Self::TOTAL_HEIGHT as f64;
+    pub const TOTAL_HEIGHT: usize = LAND_DIVISIONS + 1;
+    pub const TOTAL_HEIGHT_F: f64 = Self::TOTAL_HEIGHT as f64;
 
     fn new(params: &PlanetParams) -> Self {
         PlanetGrid(DynamicGrid::new([
@@ -56,7 +56,7 @@ impl<T: Default> PlanetGrid<T> {
 
     #[inline]
     fn land_index_for_height(height: f64) -> usize {
-        debug_assert!(height >= 0.0);
+        debug_assert!(height >= 0.0, "val={:?}", height);
         let rounded = (height * Self::LAND_DIVISIONS_F).floor() / Self::LAND_DIVISIONS_F;
 
         ((rounded * Self::LAND_DIVISIONS_F).floor() as usize).min(LAND_DIVISIONS - 1)
@@ -66,31 +66,58 @@ impl<T: Default> PlanetGrid<T> {
         self.0.iter_coords_with_z_range(layer.into())
     }
 
-    pub fn iter_layer_data(&self, layer: AirLayer) -> impl Iterator<Item = &T> {
-        self.0
-            .iter_coords_with_z_range(layer.into())
-            .map(|(_, data)| data)
-    }
     fn iter_layer_mut(&mut self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &mut T)> {
         self.0.iter_coords_with_z_range_mut(layer.into())
+    }
+
+    /// Each land layer followed by high air
+    fn iter_individual_layers_mut(&mut self) -> impl Iterator<Item = ([usize; 3], &mut T)> {
+        self.0.iter_coords_with_z_range_mut(CoordRange::All)
+    }
+
+    fn iter_individual_layers(&self) -> impl Iterator<Item = ([usize; 3], &T)> {
+        self.0.iter_coords_with_z_range(CoordRange::All)
+    }
+
+    pub fn iter_layer_coords(
+        coords: impl Into<CoordRange>,
+        params: &PlanetParams,
+    ) -> impl Iterator<Item = [usize; 3]> {
+        let (iter, _) = DynamicGrid::<()>::iter_coords_alone_static(
+            coords.into(),
+            [
+                params.planet_size as usize,
+                params.planet_size as usize,
+                Self::TOTAL_HEIGHT,
+            ],
+        );
+        iter
     }
 }
 
 impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
-    pub fn iter_average_surface(&self) -> impl Iterator<Item = ([usize; 2], T)> + '_ {
-        self.0
-            .iter_coords_with_z_range(CoordRange::Single(0))
-            .map(move |([x, y, _], val)| {
-                let mut val = *val;
+    pub fn iter_average(&self, layer: AirLayer, mut f: impl FnMut([usize; 2], T)) {
+        match layer {
+            AirLayer::High => {
+                // just one layer
+                self.iter_layer(layer)
+                    .for_each(|([x, y, _], val)| f([x, y], *val));
+            }
+            AirLayer::Surface => self
+                .0
+                .iter_coords_with_z_range(CoordRange::Single(0))
+                .for_each(move |([x, y, _], val)| {
+                    let mut val = *val;
 
-                for z in 1..Self::TOTAL_HEIGHT {
-                    val += self.0[[x, y, z]];
-                }
+                    for z in 1..Self::TOTAL_HEIGHT {
+                        val += self.0[[x, y, z]];
+                    }
 
-                val /= Self::TOTAL_HEIGHT_F.into();
+                    val /= Self::TOTAL_HEIGHT_F.into();
 
-                ([x, y], val)
-            })
+                    f([x, y], val);
+                }),
+        }
     }
 }
 
@@ -112,6 +139,7 @@ mod iteration {
     use common::cgmath::prelude::*;
     use common::cgmath::{Basis3, Point3, Rad, Rotation, Vector2, Vector3};
     use common::{debug, thread_rng, truncate, ArrayVec, OrderedFloat, Rng, RngCore};
+    use grid::CoordRange;
     use rand_distr::Uniform;
     use std::f32::consts::{FRAC_PI_2, TAU};
     use std::f64::consts::PI;
@@ -131,7 +159,7 @@ mod iteration {
     }
 
     pub(crate) struct Wind {
-        pub velocity: Vector2<f64>,
+        pub velocity: Vector3<f64>,
     }
 
     pub(crate) struct WindParticle {
@@ -200,94 +228,140 @@ mod iteration {
 
             self.apply_sunlight();
             self.move_air_vertically();
-            // self.make_wind();
+
+            self.make_wind();
+            self.propagate_wind();
             // self.apply_wind();
             // TODO wind moving brings air to level out pressure
+
+            // TODO wind is not being affected by terrain at all
+            // TODO wind is getting stuck low down and not rising
         }
 
         // --------
+
+        fn propagate_wind(&mut self) {
+            let mut new_vals = PlanetGrid::<Wind>::new(&self.params);
+
+            for ((coord, wind), tile) in self
+                .wind
+                .iter_individual_layers()
+                .zip(self.continents.grid.iter())
+            {
+                let mut new_vel = Vector3::zero();
+
+                // adjust speed based on angle
+                let angle = wind.velocity.angle(Vector3::unit_z());
+                let steepness = (angle.normalize() / 2.0).sin();
+                new_vel += wind
+                    .velocity
+                    .truncate()
+                    .normalize_to(steepness * 2.0)
+                    .extend(0.0);
+
+                new_vals.0[coord].velocity = wind.velocity.lerp(new_vel, 0.3);
+            }
+
+            // propagate forwards
+            for (coord, this_wind) in self.wind.iter_individual_layers() {
+                let [x, y, z] = coord;
+
+                let dest_coord = {
+                    let src = Point3::new(x as f64, y as f64, z as f64);
+                    let Point3 { x, y, z } = src + this_wind.velocity;
+                    let coord = [x.round() as isize, y.round() as isize, z.round() as isize];
+
+                    new_vals.0.wrap_coord(coord)
+                };
+
+                new_vals.0[dest_coord].velocity += this_wind.velocity;
+            }
+
+            for (_, wind) in new_vals.iter_individual_layers_mut() {
+                wind.velocity = truncate(wind.velocity, 1.0);
+            }
+
+            let _old = std::mem::replace(&mut self.wind, new_vals);
+        }
         /// Apply wind velocities to transfer air pressure, temperature, moisture
         fn apply_wind(&mut self) {
-            for layer in AirLayer::iter() {
-                let air = &mut self.air_pressure;
-                let temp = &mut self.temperature;
-                for (coord, wind) in self.wind.iter_layer(layer) {
-                    // TODO distribute across neighbours more smoothly, advection?
+            /*let air = &mut self.air_pressure;
+            let temp = &mut self.temperature;
+            for (coord, wind) in self.wind.iter_individual_layers_mut() {
+                // TODO distribute across neighbours more smoothly, advection?
 
-                    let wind_mag = {
-                        let wind_mag = wind.velocity.magnitude2();
-                        if wind_mag < 0.1_f64.powi(2) {
-                            // too weak
-                            continue;
-                        }
-                        wind_mag.sqrt()
-                    };
+                let wind_mag = {
+                    let wind_mag = wind.velocity.magnitude2();
+                    if wind_mag < 0.1_f64.powi(2) {
+                        // too weak
+                        continue;
+                    }
+                    wind_mag.sqrt()
+                };
 
-                    // get next tile in direction
-                    let dst = {
-                        let dx = wind.velocity.x.abs().ceil().copysign(wind.velocity.x) as isize;
-                        let dy = wind.velocity.y.abs().ceil().copysign(wind.velocity.y) as isize;
-                        debug_assert!(dx != 0 || dy != 0);
-                        let coord = [
-                            coord[0] as isize + dx,
-                            coord[1] as isize + dy,
-                            0, // TODO only works if 1 layer of each
-                        ];
+                // get next tile in direction
+                let dst = {
+                    let dx = wind.velocity.x.abs().ceil().copysign(wind.velocity.x) as isize;
+                    let dy = wind.velocity.y.abs().ceil().copysign(wind.velocity.y) as isize;
+                    debug_assert!(dx != 0 || dy != 0);
+                    let coord = [
+                        coord[0] as isize + dx,
+                        coord[1] as isize + dy,
+                        0, // TODO only works if 1 layer of each
+                    ];
 
-                        self.wind.0.wrap_coord(coord)
-                    };
+                    self.wind.0.wrap_coord(coord)
+                };
 
-                    // transfer
-                    // TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(
-                    let transfer = wind_mag * self.params.wind_transfer_rate;
-                    decrement(&mut air.0[coord], transfer);
-                    increment(&mut air.0[dst], transfer);
+                // transfer
+                // TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(
+                let transfer = wind_mag * self.params.wind_transfer_rate;
+                decrement(&mut air.0[coord], transfer);
+                increment(&mut air.0[dst], transfer);
 
-                    decrement(&mut temp.0[coord], transfer);
-                    increment(&mut temp.0[dst], transfer);
-                }
-            }
+                decrement(&mut temp.0[coord], transfer);
+                increment(&mut temp.0[dst], transfer);
+            }*/
         }
 
         /// Calculate wind velocities based on air pressure differences
         fn make_wind(&mut self) {
+            const MIN_DIFF: f64 = 0.001;
+
             let air_pressure = &self.air_pressure;
 
-            // treat surface and high air pressures separately
-            for layer in AirLayer::iter() {
-                for (coord, wind) in self.wind.iter_layer_mut(layer) {
-                    let this_pressure = air_pressure.0[coord];
-                    let neighbours = air_pressure
-                        .0
-                        .wrapping_neighbours(coord)
-                        .map(|idx| {
-                            let idx: usize = idx; // ide borked
-                            let n_value = air_pressure.0[idx];
-                            (idx, n_value - this_pressure)
-                        })
-                        .collect::<ArrayVec<[(usize, f64); grid::NEIGHBOURS_COUNT]>>();
+            for (coord, wind) in self.wind.iter_individual_layers_mut() {
+                let this_pressure = air_pressure.0[coord];
+                let neighbours = air_pressure
+                    .0
+                    .wrapping_neighbours_3d(coord)
+                    .map(|idx| {
+                        let n_value = air_pressure.0[idx];
+                        (idx, n_value - this_pressure)
+                    })
+                    .collect::<ArrayVec<[(usize, f64); grid::NEIGHBOURS_COUNT * 3]>>();
 
-                    // find maximum difference
-                    let (max_diff_idx, max_diff) = *neighbours
-                        .iter()
-                        .max_by_key(|(_, diff)| OrderedFloat(diff.abs()))
-                        .unwrap();
+                // find maximum difference
+                let (max_diff_idx, max_diff) = *neighbours
+                    .iter()
+                    .max_by_key(|(_, diff)| OrderedFloat(diff.abs()))
+                    .unwrap();
 
-                    // TODO diffuse/falloff to neighbouring neighbours too
+                // TODO diffuse/falloff to neighbouring neighbours too
 
-                    let wind_change = if max_diff.abs() < EPSILON {
-                        Vector2::zero()
-                    } else {
-                        let tgt = air_pressure.0.unflatten_index(max_diff_idx);
-                        Vector2::new(
-                            (tgt[0] as isize - coord[0] as isize) as f64,
-                            (tgt[1] as isize - coord[1] as isize) as f64,
-                        )
-                        .normalize_to(max_diff)
-                    };
+                let wind_change = if max_diff.abs() < MIN_DIFF {
+                    Vector3::zero()
+                } else {
+                    let tgt = air_pressure.0.unflatten_index(max_diff_idx);
+                    Vector3::new(
+                        (tgt[0] as isize - coord[0] as isize) as f64,
+                        (tgt[1] as isize - coord[1] as isize) as f64,
+                        (tgt[2] as isize - coord[2] as isize) as f64,
+                    )
+                    .normalize_to(max_diff)
+                };
 
-                    wind.velocity = wind.velocity.lerp(wind_change, 0.4);
-                }
+                wind.velocity = wind.velocity.lerp(wind_change, 0.1);
             }
         }
 
@@ -445,24 +519,29 @@ mod iteration {
         }
 
         /// Warm surface air rises, so surface pressure decreases.
-        /// Cold high air falls, so high pressure decreases
         fn move_air_vertically(&mut self) {
             let temperature = &mut self.temperature;
+            let air_pressure = &mut self.air_pressure;
             let mut temp_rando = thread_rng();
             let distr = Uniform::new(0.05, 0.15);
 
-            // warm surface air rises
-            for ([x, y, z], pressure) in self.air_pressure.iter_layer_mut(AirLayer::Surface) {
+            for [x, y, z] in PlanetGrid::<()>::iter_layer_coords(AirLayer::Surface, &self.params) {
                 let temp = &mut temperature.0[[x, y, z]];
                 if *temp > 0.7 {
+                    let pressure = &mut air_pressure.0[[x, y, z]];
+
                     // eprintln!("RISING {:?}", [x,y,z]);
                     let dec = temp_rando.sample(&distr);
 
+                    // rising warm air leaves lower pressure and cooler air below
                     decrement(pressure, dec);
                     decrement(temp, dec);
 
-                    let above = &mut temperature.0[[x, y, z + 1]];
-                    increment(above, dec); // TODO really limit to 1.0? or let pressure go higher
+                    // increases pressure and temperature above
+                    let temp_above = &mut temperature.0[[x, y, z + 1]];
+                    let pressure_above = &mut air_pressure.0[[x, y, z + 1]];
+                    increment(temp_above, dec);
+                    increment(pressure_above, dec);
                 }
             }
 
@@ -507,7 +586,7 @@ mod iteration {
     impl Default for Wind {
         fn default() -> Self {
             Wind {
-                velocity: Vector2::zero(),
+                velocity: Zero::zero(),
             }
         }
     }
@@ -568,14 +647,15 @@ mod tests {
 
         grid.0[[0, 0, 0]] = 1.0;
 
-        for (coord, avg) in grid.iter_average_surface() {
-            match coord {
-                [0, 0] => {
-                    assert!(avg.approx_eq(1.0 / PlanetGrid::<f64>::TOTAL_HEIGHT_F, (EPSILON, 2)))
-                }
-                _ => assert!(avg.approx_eq(0.0, (EPSILON, 2))),
-            }
-        }
+        grid.iter_average(AirLayer::Surface, |coord, avg| match coord {
+            [0, 0] => assert!(avg.approx_eq(1.0 / PlanetGrid::<f64>::TOTAL_HEIGHT_F, (EPSILON, 2))),
+            _ => assert!(avg.approx_eq(0.0, (EPSILON, 2))),
+        });
+
+        grid.iter_average(AirLayer::High, |coord, avg| {
+            // high air not touched
+            assert!(avg.approx_eq(0.0, (EPSILON, 2)));
+        });
     }
 
     //noinspection DuplicatedCode

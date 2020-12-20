@@ -1,4 +1,4 @@
-# TODOs (260)
+# TODOs (262)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -17,14 +17,14 @@
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (12)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind moving brings air to level out pressure`
-   * `// TODO redo air`
+   * `// TODO wind is not being affected by terrain at all`
+   * `// TODO wind is getting stuck low down and not rising`
    * `// TODO distribute across neighbours more smoothly, advection?`
    * `0, // TODO only works if 1 layer of each`
    * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
    * `// TODO diffuse/falloff to neighbouring neighbours too`
    * `// TODO is averaging the wind direction the right way to go to help wind converge together?`
    * `// TODO helper on grid to unsafely lookup with a debug assert`
-   * `increment(above, dec); // TODO really limit to 1.0? or let pressure go higher`
    * `// TODO cold high air falls?`
    * `// TODO height doesnt change, calculate this once in a separate grid`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
@@ -42,6 +42,8 @@
    * `// TODO radius no longer makes sense`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
+ * [game/procgen/src/render.rs](game/procgen/src/render.rs) (1)
+   * `// TODO per land layer?`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
@@ -356,9 +358,10 @@
    * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (2)
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (3)
    * `// TODO allow smaller datatypes for dims`
    * `// TODO profile and improve coord wrapping`
+   * `// TODO return <C: GridCoord>`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)

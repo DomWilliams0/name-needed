@@ -5,12 +5,14 @@
 --seed 1231232
 
 --gif-layer surface
---gif-progress temp
+--gif-progress wind
 --create-climate-gif
 --gif-all
 
 --climate-iterations 100
 --gif-fps 10
+--scale 4
+
 
 --wind-transfer-rate 0.005
 

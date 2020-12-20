@@ -1,4 +1,4 @@
-use crate::climate::ClimateIteration;
+use crate::climate::{ClimateIteration, PlanetGrid};
 use crate::params::{AirLayer, RenderProgressParams};
 use crate::{map_range, Planet, PlanetParams};
 use color::ColorRgb;
@@ -136,11 +136,11 @@ impl Render {
 
         match what {
             RenderProgressParams::Temperature => {
-                for (coord, val) in climate.temperature.iter_average_surface() {
+                climate.temperature.iter_average(layer, |coord, val| {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
-                }
+                })
             }
             RenderProgressParams::Wind => {
                 let opacity = match layer {
@@ -150,19 +150,30 @@ impl Render {
 
                 let scale = scale as f32;
 
-                for ([x, y, _], wind) in climate.wind.iter_layer(layer) {
+                // TODO per land layer?
+                for ([x, y, z], wind) in climate.wind.iter_layer(layer) {
                     const EPSILON: f64 = 0.3;
                     if wind.velocity.magnitude2() <= EPSILON.powi(2) {
                         // too short
                         continue;
                     }
+                    let velocity_trunc = wind.velocity.truncate().cast::<f32>().unwrap();
 
-                    let line_start = cgmath::Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
-                    let line_end = line_start + wind.velocity.cast().unwrap();
+                    let line_start = Vector2::new(x as f32, y as f32);
+                    let line_end = line_start + velocity_trunc;
 
-                    let direction = wind.velocity.angle(cgmath::Vector2::unit_y()).normalize()
+                    let direction = velocity_trunc.angle(Vector2::unit_y()).normalize()
                         / cgmath::Rad::full_turn();
-                    let color = ColorRgb::new_hsl(direction as f32, 0.7, 0.5);
+
+                    let hue = match layer {
+                        AirLayer::Surface => {
+                            let val = z as f64 / PlanetGrid::<f64>::TOTAL_HEIGHT_F;
+                            map_range((0.0, 1.0), (0.3, 0.8), val as f32)
+                        }
+                        AirLayer::High => 0.1,
+                    };
+
+                    let color = ColorRgb::new_hsl(hue, 0.6, 0.5);
 
                     // color = direction
                     // len = strength
@@ -181,11 +192,11 @@ impl Render {
                 }
             }
             RenderProgressParams::AirPressure => {
-                for (coord, &val) in climate.air_pressure.iter_layer(layer) {
+                climate.air_pressure.iter_average(layer, |coord, val| {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
-                }
+                });
             }
         };
 
