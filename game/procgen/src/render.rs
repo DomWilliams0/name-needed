@@ -7,9 +7,13 @@ use image::error::UnsupportedErrorKind::Color;
 use image::imageops::FilterType;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
 use imageproc::definitions::HasBlack;
-use imageproc::drawing::{draw_filled_circle_mut, draw_hollow_circle_mut, draw_line_segment_mut};
+use imageproc::drawing::{
+    draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
+};
+use imageproc::rect::Rect;
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct Render {
     planet: Planet,
     /// None during drawing only
@@ -116,21 +120,21 @@ impl Render {
         });
     }
 
-    pub fn draw_climate_overlay(&mut self, climate: &ClimateIteration, layer: AirLayer) {
+    pub fn draw_climate_overlay(
+        &mut self,
+        climate: &ClimateIteration,
+        layer: AirLayer,
+        what: RenderProgressParams,
+    ) {
         let planet = self.planet.inner();
         let params = &planet.params;
-
-        if matches!(params.render.draw_progress, RenderProgressParams::None) {
-            return;
-        }
 
         let scale = params.render.scale;
 
         // overlay is scaled size
         let mut overlay = RgbaImage::new(params.planet_size * scale, params.planet_size * scale);
 
-        match params.render.draw_progress {
-            RenderProgressParams::None => unreachable!(),
+        match what {
             RenderProgressParams::Temperature => {
                 for (coord, &val) in climate.temperature.iter_layer(layer) {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
@@ -219,9 +223,11 @@ fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) 
 
 fn put_pixel_scaled(image: &mut RgbaImage, scale: u32, pos: impl PixelPos, color: impl PixelColor) {
     let (x, y) = pos.pos();
-    (0..scale)
-        .cartesian_product(0..scale)
-        .for_each(|(i, j)| put_pixel(image, ((x * scale) + i, (y * scale) + j), color.clone()));
+    draw_filled_rect_mut(
+        image,
+        Rect::at((x * scale) as i32, (y * scale) as i32).of_size(scale, scale),
+        color.color(),
+    );
 }
 
 /// 0=cold, 1=hot

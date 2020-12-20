@@ -1,4 +1,4 @@
-# TODOs (260)
+# TODOs (261)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,10 +14,11 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (12)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (13)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO across land`
    * `// TODO wind moving brings air to level out pressure`
+   * `// TODO redo air`
    * `// TODO distribute across neighbours more smoothly, advection?`
    * `0, // TODO only works if 1 layer of each`
    * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`

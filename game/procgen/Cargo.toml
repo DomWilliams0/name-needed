@@ -16,7 +16,7 @@ rand_distr = "^0.3"
 strum = "^0.19"
 strum_macros = "^0.19"
 
-image = { version = "^0.23", optional = true, default-features = false, features = ["png", "gif"] }
+image = { version = "^0.23", optional = true, default-features = false, features = ["png"] }
 imageproc = { version = "^0.22", optional = true, default-features = false }
 
 structopt = "^0.2"

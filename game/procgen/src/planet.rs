@@ -63,10 +63,9 @@ impl Planet {
 
         let mut progress = match cfg!(feature = "bin") {
             #[cfg(feature = "bin")]
-            true if params.render.create_climate_gif => {
-                Box::new(GifProgressTracker::new("progress.gif").expect("failed to init gif"))
-                    as Box<dyn ProgressTracker>
-            }
+            true if params.render.create_climate_gif => Box::new(
+                GifProgressTracker::new("/tmp/gifs").expect("failed to init gif progress tracker"),
+            ) as Box<dyn ProgressTracker>,
 
             _ => Box::new(NopProgressTracker) as Box<dyn ProgressTracker>,
         };
@@ -75,10 +74,14 @@ impl Planet {
         drop(planet);
         let planet = self.0.read();
 
-        let climate =
-            Climate::simulate(&planet.continents, &params, &mut planet_rando, |climate| {
-                progress.update(planet_ref.clone(), climate);
-            });
+        let climate = Climate::simulate(
+            &planet.continents,
+            &params,
+            &mut planet_rando,
+            |step, climate| {
+                progress.update(step, planet_ref.clone(), climate);
+            },
+        );
 
         progress.fini();
 

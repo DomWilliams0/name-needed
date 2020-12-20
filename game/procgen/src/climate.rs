@@ -14,16 +14,16 @@ impl Climate {
         continents: &ContinentMap,
         params: &PlanetParams,
         rando: &mut dyn RngCore,
-        mut per_step: impl FnMut(&ClimateIteration),
+        mut per_step: impl FnMut(u32, &ClimateIteration),
     ) -> Self {
         let mut iter = ClimateIteration::new(continents, params, rando);
 
-        for _ in 0..params.climate_iterations {
-            per_step(&iter);
+        for step in 0..params.climate_iterations {
+            per_step(step as u32, &iter);
             iter.step();
         }
 
-        per_step(&iter);
+        per_step(params.climate_iterations as u32, &iter);
 
         Climate {}
     }

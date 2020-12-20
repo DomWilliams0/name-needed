@@ -1,95 +1,148 @@
 use crate::climate::ClimateIteration;
 
 pub trait ProgressTracker {
-    fn update(&mut self, planet: Planet, climate: &ClimateIteration);
+    fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration);
     fn fini(&mut self);
 }
 
 #[cfg(feature = "bin")]
 mod gif {
     use crate::climate::ClimateIteration;
+    use crate::params::{AirLayer, RenderProgressParams};
     use crate::progress::ProgressTracker;
     use crate::{Planet, Render};
-    use image::gif::GifEncoder;
+    use common::*;
     use image::{Delay, Frame};
-    use std::fs::File;
-    use std::path::Path;
+    use std::io::ErrorKind;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::sync::mpsc::{sync_channel, SyncSender};
     use std::thread;
     use std::thread::JoinHandle;
-    use std::time::Duration;
+    use strum::IntoEnumIterator;
 
     pub struct GifProgressTracker {
-        thread: Option<JoinHandle<GifEncoder<File>>>,
+        thread: Option<JoinHandle<PathBuf>>,
         frames_tx: SyncSender<Message>,
+        /// Has already rendered continents that don't change across frames
+        base: Option<Render>,
+        fps_str: Option<String>,
     }
 
     enum Message {
-        Frame(Frame),
+        Frame(u32, Render, String),
         Stop,
     }
 
     impl GifProgressTracker {
-        pub fn new(out_path: impl AsRef<Path>) -> std::io::Result<Self> {
-            let out_path = out_path.as_ref();
-            let file = File::create(out_path)?;
-            let mut encoder = GifEncoder::new(file);
-
-            common::info!("writing out gif to {path}", path = out_path.display());
+        /// Path is deleted then created!!
+        pub fn new(out_dir: impl AsRef<Path>) -> std::io::Result<Self> {
+            let out_dir = out_dir.as_ref().to_owned();
+            let _ = std::fs::remove_dir_all(&out_dir);
+            std::fs::create_dir_all(&out_dir)?;
 
             let (send, recv) = sync_channel(32);
             let thread = thread::spawn(move || {
-                let mut idx = 0;
-                while let Ok(Message::Frame(frame)) = recv.recv() {
-                    common::trace!("processing gif frame {frame}", frame = idx);
-                    idx += 1;
-                    encoder
-                        .encode_frame(frame)
-                        .expect("failed to encode progress gif frame");
+                while let Ok(Message::Frame(step, render, wat)) = recv.recv() {
+                    let mut path = out_dir.join(&wat);
+                    std::fs::create_dir_all(&path).expect("failed to create dir for layer");
+
+                    path.push(format!("{}-{:04}.png", wat, step));
+
+                    let image = render.into_image();
+                    image.save(path).expect("failed to save image to file");
                 }
 
-                encoder
+                out_dir
             });
 
             Ok(GifProgressTracker {
                 thread: Some(thread),
                 frames_tx: send,
+                base: None,    // populated on first image
+                fps_str: None, // populated on first image
             })
         }
     }
 
     impl ProgressTracker for GifProgressTracker {
-        fn update(&mut self, planet: Planet, climate: &ClimateIteration) {
-            let (fps, layer) = {
+        fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration) {
+            let (fps, to_do) = {
                 let params = &planet.inner().params;
 
-                let fps = 1.0 / params.render.gif_fps as f32;
-                let layer = params.render.climate_gif_layer;
-                (fps, layer)
+                let fps = params.render.gif_fps;
+                let to_do = if params.render.gif_all {
+                    None
+                } else {
+                    Some((params.render.gif_layer, params.render.draw_progress))
+                };
+                (fps, to_do)
             };
 
-            let mut render = Render::with_planet(planet);
-            render.draw_continents();
-            render.draw_climate_overlay(climate, layer);
+            self.fps_str = Some(fps.to_string());
 
-            let frame = Frame::from_parts(
-                render.into_image(),
-                0,
-                0,
-                Delay::from_saturating_duration(Duration::from_secs_f32(fps)),
-            );
+            let to_render = AirLayer::iter()
+                .cartesian_product(RenderProgressParams::iter())
+                .filter(|(layer, wat)| to_do.is_none() || to_do == Some((*layer, *wat)));
 
-            self.frames_tx
-                .send(Message::Frame(frame))
-                .expect("failed to send");
+            for (layer, wat) in to_render {
+                let mut render = match &self.base {
+                    None => {
+                        let mut render = Render::with_planet(planet.clone());
+                        render.draw_continents();
+                        self.base = Some(render.clone());
+                        render
+                    }
+                    Some(base) => base.clone(),
+                };
+
+                render.draw_climate_overlay(climate, layer, wat);
+                let mut gif_name = format!("{:?}-{:?}", wat, layer);
+                gif_name.make_ascii_lowercase();
+
+                self.frames_tx
+                    .send(Message::Frame(step, render, gif_name))
+                    .expect("failed to send");
+            }
         }
 
         fn fini(&mut self) {
             let _ = self.frames_tx.send(Message::Stop);
 
             let thread = self.thread.take().expect("no thread");
-            common::debug!("waiting on gif thread to finish");
-            let _encoder = thread.join().expect("failed to join");
+            let out_dir = thread.join().expect("failed to join");
+
+            let dew_it = || -> std::io::Result<()> {
+                for dir in std::fs::read_dir(&out_dir)? {
+                    let dir = dir?;
+                    if dir.file_type()?.is_dir() {
+                        let layer = dir.file_name().into_string().unwrap();
+                        let input_files = dir.path().join(format!("{}-%004d.png", layer));
+                        let output_gif = out_dir.join(format!("{}.gif", layer));
+                        common::debug!("writing gif to {file}", file = output_gif.display());
+                        let cmd = Command::new("ffmpeg")
+                            .args(&[
+                                "-f",
+                                "image2",
+                                "-framerate",
+                                self.fps_str.as_ref().expect("fps not set"),
+                                "-y", // overwrite
+                                "-i",
+                                &input_files.display().to_string(),
+                                &output_gif.display().to_string(),
+                            ])
+                            .spawn()?
+                            .wait()?;
+                        if !cmd.success() {
+                            return Err(std::io::Error::new(ErrorKind::Other, "ffpmeg failure"));
+                        }
+                    }
+                }
+
+                Ok(())
+            };
+
+            dew_it().expect("failed to export gifs")
         }
     }
 }
@@ -101,7 +154,7 @@ pub use gif::GifProgressTracker;
 pub struct NopProgressTracker;
 
 impl ProgressTracker for NopProgressTracker {
-    fn update(&mut self, _: Planet, _: &ClimateIteration) {}
+    fn update(&mut self, _: u32, _: Planet, _: &ClimateIteration) {}
 
     fn fini(&mut self) {}
 }

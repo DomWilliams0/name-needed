@@ -49,11 +49,9 @@ pub struct PlanetParams {
     pub log_params_and_exit: bool,
 }
 
-#[derive(Debug, Clone, EnumString, Deserialize)]
+#[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum RenderProgressParams {
-    None,
-
     #[strum(serialize = "temp")]
     Temperature,
 
@@ -63,7 +61,7 @@ pub enum RenderProgressParams {
     AirPressure,
 }
 
-#[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter)]
+#[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, Eq, PartialEq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum AirLayer {
     Surface,
@@ -88,14 +86,17 @@ pub struct RenderParams {
     #[structopt(long)]
     pub draw_height: bool,
 
-    #[structopt(long, default_value = "None")]
+    #[structopt(long, default_value = "temp")]
     pub draw_progress: RenderProgressParams,
 
     #[structopt(long)]
     pub create_climate_gif: bool,
 
     #[structopt(long, default_value = "surface")]
-    pub climate_gif_layer: AirLayer,
+    pub gif_layer: AirLayer,
+
+    #[structopt(long)]
+    pub gif_all: bool,
 
     #[structopt(long, default_value = "4")]
     pub gif_fps: u32,

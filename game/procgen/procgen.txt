@@ -6,7 +6,8 @@
 
 --draw-progress pressure
 --create-climate-gif
---climate-gif-layer surface
+--gif-all
+--gif-layer surface
 --climate-iterations 50
 --gif-fps 5
 
