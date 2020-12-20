@@ -1,4 +1,4 @@
-# TODOs (261)
+# TODOs (260)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,9 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (13)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (12)
    * `// TODO moisture and temperature carried by wind`
-   * `// TODO across land`
    * `// TODO wind moving brings air to level out pressure`
    * `// TODO redo air`
    * `// TODO distribute across neighbours more smoothly, advection?`

@@ -4,12 +4,13 @@
 
 --seed 1231232
 
---draw-progress pressure
+--gif-layer surface
+--gif-progress temp
 --create-climate-gif
 --gif-all
---gif-layer surface
---climate-iterations 50
---gif-fps 5
+
+--climate-iterations 100
+--gif-fps 10
 
 --wind-transfer-rate 0.005
 

@@ -87,7 +87,7 @@ pub struct RenderParams {
     pub draw_height: bool,
 
     #[structopt(long, default_value = "temp")]
-    pub draw_progress: RenderProgressParams,
+    pub gif_progress: RenderProgressParams,
 
     #[structopt(long)]
     pub create_climate_gif: bool,

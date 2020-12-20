@@ -37,14 +37,13 @@ impl Climate {
 /// reasonable value.
 pub struct PlanetGrid<T>(DynamicGrid<T>);
 
+const LAND_DIVISIONS: usize = 4;
+
 impl<T: Default> PlanetGrid<T> {
-    const LAND_DIVISIONS: usize = 1;
-    const LAND_DIVISIONS_F: f64 = Self::LAND_DIVISIONS as f64;
+    const LAND_DIVISIONS_F: f64 = LAND_DIVISIONS as f64;
 
     /// Size of z axis in grid
-    const TOTAL_HEIGHT: usize = Self::LAND_DIVISIONS + 1;
-
-    /// Size of z axis in grid e.g. 5.0
+    const TOTAL_HEIGHT: usize = LAND_DIVISIONS + 1;
     const TOTAL_HEIGHT_F: f64 = Self::TOTAL_HEIGHT as f64;
 
     fn new(params: &PlanetParams) -> Self {
@@ -60,7 +59,7 @@ impl<T: Default> PlanetGrid<T> {
         debug_assert!(height >= 0.0);
         let rounded = (height * Self::LAND_DIVISIONS_F).floor() / Self::LAND_DIVISIONS_F;
 
-        ((rounded * Self::LAND_DIVISIONS_F).floor() as usize).min(Self::LAND_DIVISIONS - 1)
+        ((rounded * Self::LAND_DIVISIONS_F).floor() as usize).min(LAND_DIVISIONS - 1)
     }
 
     pub fn iter_layer(&self, layer: AirLayer) -> impl Iterator<Item = ([usize; 3], &T)> {
@@ -78,7 +77,7 @@ impl<T: Default> PlanetGrid<T> {
 }
 
 impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
-    pub fn iter_average(&self) -> impl Iterator<Item = ([usize; 2], T)> + '_ {
+    pub fn iter_average_surface(&self) -> impl Iterator<Item = ([usize; 2], T)> + '_ {
         self.0
             .iter_coords_with_z_range(CoordRange::Single(0))
             .map(move |([x, y, _], val)| {
@@ -98,14 +97,14 @@ impl<T: Default + Real + AddAssign + DivAssign + From<f64>> PlanetGrid<T> {
 impl From<AirLayer> for CoordRange {
     fn from(layer: AirLayer) -> Self {
         match layer {
-            AirLayer::Surface => CoordRange::Range(0, PlanetGrid::<f64>::LAND_DIVISIONS),
-            AirLayer::High => CoordRange::Single(PlanetGrid::<f64>::LAND_DIVISIONS),
+            AirLayer::Surface => CoordRange::Range(0, LAND_DIVISIONS),
+            AirLayer::High => CoordRange::Single(LAND_DIVISIONS),
         }
     }
 }
 
 mod iteration {
-    use crate::climate::PlanetGrid;
+    use crate::climate::{PlanetGrid, LAND_DIVISIONS};
     use crate::continent::ContinentMap;
     use crate::params::AirLayer;
     use crate::PlanetParams;
@@ -171,17 +170,20 @@ mod iteration {
             (0..5).for_each(|_| self.apply_sunlight());
 
             // set up initial air pressure
-            // TODO across land
-            debug_assert_eq!(PlanetGrid::<f64>::LAND_DIVISIONS, 1);
-
             let mut pressure_rando = thread_rng();
-            let surface_distr = Uniform::new(0.8, 0.98);
+            let surface_distrs = [
+                Uniform::new(0.9, 0.98), // lowest land
+                Uniform::new(0.8, 0.9),
+                Uniform::new(0.7, 0.8),
+                Uniform::new(0.6, 0.7), // highest land
+            ];
+            debug_assert_eq!(surface_distrs.len(), LAND_DIVISIONS);
             let high_distr = Uniform::new(0.05, 0.15);
             self.air_pressure
                 .iter_layer_mut(AirLayer::Surface)
-                .for_each(|(_, pressure)| {
+                .for_each(|([_, _, z], pressure)| {
                     // surface is high pressure
-                    *pressure = pressure_rando.sample(&surface_distr);
+                    *pressure = pressure_rando.sample(&surface_distrs[z]);
                 });
 
             self.air_pressure
@@ -198,8 +200,8 @@ mod iteration {
 
             self.apply_sunlight();
             self.move_air_vertically();
-            self.make_wind();
-            self.apply_wind();
+            // self.make_wind();
+            // self.apply_wind();
             // TODO wind moving brings air to level out pressure
         }
 
@@ -451,9 +453,6 @@ mod iteration {
 
             // warm surface air rises
             for ([x, y, z], pressure) in self.air_pressure.iter_layer_mut(AirLayer::Surface) {
-                // no check needed if 1 land level
-                debug_assert_eq!(PlanetGrid::<f64>::LAND_DIVISIONS, 1);
-
                 let temp = &mut temperature.0[[x, y, z]];
                 if *temp > 0.7 {
                     // eprintln!("RISING {:?}", [x,y,z]);
@@ -553,15 +552,15 @@ mod tests {
         PlanetGrid::new(&params)
     }
 
-    // #[test]
-    // fn planet_grid_land_index() {
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.1), 0);
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.3), 1);
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.55), 2);
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.89), 3);
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(1.0), 3);
-    //     assert_eq!(PlanetGrid::<f64>::land_index_for_height(4.0), 3);
-    // }
+    #[test]
+    fn planet_grid_land_index() {
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.1), 0);
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.3), 1);
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.55), 2);
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(0.89), 3);
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(1.0), 3);
+        assert_eq!(PlanetGrid::<f64>::land_index_for_height(4.0), 3);
+    }
 
     #[test]
     fn planet_grid_average() {
@@ -569,7 +568,7 @@ mod tests {
 
         grid.0[[0, 0, 0]] = 1.0;
 
-        for (coord, avg) in grid.iter_average() {
+        for (coord, avg) in grid.iter_average_surface() {
             match coord {
                 [0, 0] => {
                     assert!(avg.approx_eq(1.0 / PlanetGrid::<f64>::TOTAL_HEIGHT_F, (EPSILON, 2)))

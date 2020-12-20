@@ -136,7 +136,7 @@ impl Render {
 
         match what {
             RenderProgressParams::Temperature => {
-                for (coord, &val) in climate.temperature.iter_layer(layer) {
+                for (coord, val) in climate.temperature.iter_average_surface() {
                     debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));

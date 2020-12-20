@@ -74,7 +74,7 @@ mod gif {
                 let to_do = if params.render.gif_all {
                     None
                 } else {
-                    Some((params.render.gif_layer, params.render.draw_progress))
+                    Some((params.render.gif_layer, params.render.gif_progress))
                 };
                 (fps, to_do)
             };
@@ -111,16 +111,46 @@ mod gif {
 
             let thread = self.thread.take().expect("no thread");
             let out_dir = thread.join().expect("failed to join");
+            debug!("creating progress gifs");
 
             let dew_it = || -> std::io::Result<()> {
                 for dir in std::fs::read_dir(&out_dir)? {
                     let dir = dir?;
                     if dir.file_type()?.is_dir() {
                         let layer = dir.file_name().into_string().unwrap();
-                        let input_files = dir.path().join(format!("{}-%004d.png", layer));
-                        let output_gif = out_dir.join(format!("{}.gif", layer));
-                        common::debug!("writing gif to {file}", file = output_gif.display());
-                        let cmd = Command::new("ffmpeg")
+                        let input_files = dir
+                            .path()
+                            .join(format!("{}-%004d.png", layer))
+                            .display()
+                            .to_string();
+                        let output_gif =
+                            out_dir.join(format!("{}.gif", layer)).display().to_string();
+                        let palette = out_dir.join(".palette.png").display().to_string();
+                        common::debug!("writing gif to {file}", file = &output_gif);
+
+                        // need to make palette first for smooth gif
+                        if !Command::new("ffmpeg")
+                            .args(&[
+                                "-f",
+                                "image2",
+                                "-y", // overwrite
+                                "-i",
+                                &input_files,
+                                "-vf",
+                                "palettegen",
+                                &palette,
+                            ])
+                            .spawn()?
+                            .wait()?
+                            .success()
+                        {
+                            return Err(std::io::Error::new(
+                                ErrorKind::Other,
+                                "ffpmeg palettegen failure",
+                            ));
+                        }
+
+                        if !Command::new("ffmpeg")
                             .args(&[
                                 "-f",
                                 "image2",
@@ -128,12 +158,17 @@ mod gif {
                                 self.fps_str.as_ref().expect("fps not set"),
                                 "-y", // overwrite
                                 "-i",
-                                &input_files.display().to_string(),
-                                &output_gif.display().to_string(),
+                                &input_files,
+                                "-i",
+                                &palette,
+                                "-lavfi",
+                                "paletteuse",
+                                &output_gif,
                             ])
                             .spawn()?
-                            .wait()?;
-                        if !cmd.success() {
+                            .wait()?
+                            .success()
+                        {
                             return Err(std::io::Error::new(ErrorKind::Other, "ffpmeg failure"));
                         }
                     }

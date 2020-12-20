@@ -26,8 +26,5 @@ members = [
 [profile.dev.package."procgen"]
 opt-level = 2 # ... but this is way too slow in debug mode
 
-[profile.dev.package."*"]
-opt-level = 2 # optimise all dependencies
-
 [profile.release]
 debug = 1 # for profiling
