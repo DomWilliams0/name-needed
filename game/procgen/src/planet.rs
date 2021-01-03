@@ -64,7 +64,8 @@ impl Planet {
         let mut progress = match cfg!(feature = "bin") {
             #[cfg(feature = "bin")]
             true if params.render.create_climate_gif => Box::new(
-                GifProgressTracker::new("/tmp/gifs").expect("failed to init gif progress tracker"),
+                GifProgressTracker::new("/tmp/gifs", params.render.gif_threads)
+                    .expect("failed to init gif progress tracker"),
             ) as Box<dyn ProgressTracker>,
 
             _ => Box::new(NopProgressTracker) as Box<dyn ProgressTracker>,

@@ -12,18 +12,18 @@ mod gif {
     use crate::progress::ProgressTracker;
     use crate::{Planet, Render};
     use common::*;
+    use crossbeam::channel::{unbounded, Sender};
     use image::{Delay, Frame};
     use std::io::ErrorKind;
     use std::path::{Path, PathBuf};
     use std::process::Command;
-    use std::sync::mpsc::{sync_channel, SyncSender};
     use std::thread;
     use std::thread::JoinHandle;
     use strum::IntoEnumIterator;
 
     pub struct GifProgressTracker {
-        thread: Option<JoinHandle<PathBuf>>,
-        frames_tx: SyncSender<Message>,
+        threads: Vec<JoinHandle<PathBuf>>,
+        frames_tx: Sender<Message>,
         /// Has already rendered continents that don't change across frames
         base: Option<Render>,
         fps_str: Option<String>,
@@ -36,28 +36,38 @@ mod gif {
 
     impl GifProgressTracker {
         /// Path is deleted then created!!
-        pub fn new(out_dir: impl AsRef<Path>) -> std::io::Result<Self> {
+        pub fn new(out_dir: impl AsRef<Path>, threads: usize) -> std::io::Result<Self> {
+            if threads < 1 {
+                return Err(std::io::Error::new(ErrorKind::Other, "bad thread count"));
+            }
+
             let out_dir = out_dir.as_ref().to_owned();
             let _ = std::fs::remove_dir_all(&out_dir);
             std::fs::create_dir_all(&out_dir)?;
 
-            let (send, recv) = sync_channel(32);
-            let thread = thread::spawn(move || {
-                while let Ok(Message::Frame(step, render, wat)) = recv.recv() {
-                    let mut path = out_dir.join(&wat);
-                    std::fs::create_dir_all(&path).expect("failed to create dir for layer");
+            let (send, recv) = unbounded();
+            let threads = (0..threads)
+                .map(|_| {
+                    let recv = recv.clone();
+                    let out_dir = out_dir.clone();
+                    thread::spawn(move || {
+                        while let Ok(Message::Frame(step, render, wat)) = recv.recv() {
+                            let mut path = out_dir.join(&wat);
+                            std::fs::create_dir_all(&path).expect("failed to create dir for layer");
 
-                    path.push(format!("{}-{:04}.png", wat, step));
+                            path.push(format!("{}-{:04}.png", wat, step));
 
-                    let image = render.into_image();
-                    image.save(path).expect("failed to save image to file");
-                }
+                            let image = render.into_image();
+                            image.save(path).expect("failed to save image to file");
+                        }
 
-                out_dir
-            });
+                        out_dir
+                    })
+                })
+                .collect();
 
             Ok(GifProgressTracker {
-                thread: Some(thread),
+                threads,
                 frames_tx: send,
                 base: None,    // populated on first image
                 fps_str: None, // populated on first image
@@ -107,10 +117,19 @@ mod gif {
         }
 
         fn fini(&mut self) {
-            let _ = self.frames_tx.send(Message::Stop);
+            for _ in 0..self.threads.len() {
+                let _ = self.frames_tx.send(Message::Stop);
+            }
 
-            let thread = self.thread.take().expect("no thread");
-            let out_dir = thread.join().expect("failed to join");
+            debug!("waiting on gif processing threads");
+
+            // TODO every thread returns the same pathbuf
+            let mut out_dir = None;
+            self.threads
+                .drain(..)
+                .for_each(|t| out_dir = Some(t.join().expect("failed to join")));
+
+            let out_dir = out_dir.expect("no threads?");
             debug!("creating progress gifs");
 
             let dew_it = || -> std::io::Result<()> {

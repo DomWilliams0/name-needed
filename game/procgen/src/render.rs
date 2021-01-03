@@ -173,11 +173,7 @@ impl Render {
                         AirLayer::High => 0.1,
                     };
 
-                    let color = ColorRgb::new_hsl(hue, 0.6, 0.5);
-
-                    // color = direction
-                    // len = strength
-                    // opacity = height?
+                    let color = ColorRgb::new_hsl(direction, 0.6, 0.5);
 
                     draw_line_segment_mut(
                         &mut overlay,

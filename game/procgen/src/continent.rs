@@ -30,7 +30,6 @@ type ContinentIdx = NonZeroUsize;
 
 const MIN_RADIUS: i32 = 2;
 
-#[derive(Debug)]
 pub struct Tile {
     density: Cell<f64>,
     continent: Option<ContinentIdx>,
@@ -309,7 +308,7 @@ impl ContinentMap {
         let mut frontier = Vec::with_capacity((size * size / 2) as usize);
         for (idx, tile) in self.grid.iter().enumerate() {
             let is_land = tile.is_land();
-            for n in self.grid.wrapping_neighbours(idx) {
+            for (n, _) in self.grid.wrapping_neighbours(idx) {
                 let n_tile = &self.grid[n];
                 if is_land == n_tile.is_land() {
                     continue;
@@ -324,7 +323,7 @@ impl ContinentMap {
                 let current = this_tile.density.get();
                 if current == 0.0 || new_val < current {
                     this_tile.density.set(new_val);
-                    for n in self.grid.wrapping_neighbours(idx) {
+                    for (n, _) in self.grid.wrapping_neighbours(idx) {
                         let incremented = (new_val + increment).min(limit);
                         frontier.push((n, incremented));
                     }

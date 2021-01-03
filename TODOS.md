@@ -1,4 +1,4 @@
-# TODOs (262)
+# TODOs (261)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,17 +14,14 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (12)
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
-   * `// TODO wind moving brings air to level out pressure`
+   * `// TODO wind movingbrings air to level out pressure`
    * `// TODO wind is not being affected by terrain at all`
    * `// TODO wind is getting stuck low down and not rising`
+   * `// TODO reuse alloc`
    * `// TODO distribute across neighbours more smoothly, advection?`
-   * `0, // TODO only works if 1 layer of each`
    * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
-   * `// TODO diffuse/falloff to neighbouring neighbours too`
-   * `// TODO is averaging the wind direction the right way to go to help wind converge together?`
-   * `// TODO helper on grid to unsafely lookup with a debug assert`
    * `// TODO cold high air falls?`
    * `// TODO height doesnt change, calculate this once in a separate grid`
  * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
@@ -33,13 +30,16 @@
    * `// TODO adjust params for global height map`
  * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
    * `// TODO actually log the time`
- * [game/procgen/src/params.rs](game/procgen/src/params.rs) (1)
+ * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
+   * `// TODO clap AppSettings::AllArgsOverrideSelf`
  * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (4)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
+ * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
+   * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (1)

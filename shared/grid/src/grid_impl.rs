@@ -256,7 +256,7 @@ impl<T: Default> DynamicGrid<T> {
     pub fn wrapping_neighbours_3d(
         &self,
         coord: impl GridCoord<T>,
-    ) -> impl Iterator<Item = usize> + '_ {
+    ) -> impl Iterator<Item = (usize, [isize; 3])> + '_ {
         let [x, y, z] = coord.into_coord(self);
 
         let below = (z > 0).as_some_from(|| z - 1);
@@ -264,13 +264,16 @@ impl<T: Default> DynamicGrid<T> {
         let above = (z < self.dims[2]).as_some_from(|| z + 1);
 
         let zs = below.into_iter().chain(this).chain(above.into_iter());
-        zs.flat_map(move |z| self.wrapping_neighbours([x, y, z]))
+        zs.flat_map(move |z| {
+            self.wrapping_neighbours([x, y, z])
+                .map(move |(n, [x, y])| (n, [x, y, z as isize]))
+        })
     }
 
     pub fn wrapping_neighbours(
         &self,
         coord: impl GridCoord<T>,
-    ) -> impl ExactSizeIterator<Item = usize> + '_ {
+    ) -> impl ExactSizeIterator<Item = (usize, [isize; 2])> + Clone + '_ {
         let [x, y, z] = coord.into_coord(self);
         let coord = [x as isize, y as isize, z as isize];
 
@@ -300,7 +303,7 @@ impl<T: Default> DynamicGrid<T> {
         .map(move |(x, y)| {
             let coord = [x, y, 0];
             let coord = self.wrap_coord(coord);
-            self.flatten_coords(coord)
+            (self.flatten_coords(coord), [x, y])
         })
     }
 }
@@ -392,6 +395,7 @@ impl<I: GridImpl> Grid<I> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use common::Itertools;
 
     #[test]
     fn simple() {
@@ -481,5 +485,22 @@ mod tests {
         assert_eq!(grid.wrap_coord([0, 1, 1]), [0, 1, 1]);
         assert_eq!(grid.wrap_coord([-1, 1, 1]), [4, 1, 1]);
         assert_eq!(grid.wrap_coord([-2, 1, 1]), [3, 1, 1]);
+
+        let grid = DynamicGrid::<()>::new([128, 128, 1]);
+        assert_eq!(grid.wrap_coord([128, 127, 0]), [0, 127, 0]);
+    }
+
+    #[test]
+    fn dynamic_grid_wrapping_original() {
+        let grid = DynamicGrid::<()>::new([3, 3, 3]);
+        let neighbours = grid.wrapping_neighbours([2, 0, 0]);
+
+        assert!(neighbours.clone().any(|n| n == (0, [3, 0])));
+        assert!(neighbours.clone().any(|n| n == (1, [1, 0])));
+        assert!(neighbours.clone().any(|n| n == (8, [2, -1])));
+
+        for n in neighbours {
+            eprintln!("{:?}", n);
+        }
     }
 }

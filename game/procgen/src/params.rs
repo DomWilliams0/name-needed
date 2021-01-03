@@ -41,6 +41,21 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "0.005")]
     pub wind_transfer_rate: f64,
 
+    #[structopt(long, default_value = "0.05")]
+    pub wind_pressure_threshold: f64,
+
+    #[structopt(long, default_value = "2.0")]
+    pub wind_speed_modifier: f64,
+
+    #[structopt(long, default_value = "1.2")]
+    pub wind_speed_base: f64,
+
+    #[structopt(long, default_value = "0.3")]
+    pub wind_direction_conformity: f64,
+
+    #[structopt(long, default_value = "0.8")]
+    pub sunlight_max: f64,
+
     #[cfg(feature = "bin")]
     #[structopt(flatten)]
     pub render: RenderParams,
@@ -99,6 +114,9 @@ pub struct RenderParams {
     pub gif_all: bool,
 
     #[structopt(long, default_value = "4")]
+    pub gif_threads: usize,
+
+    #[structopt(long, default_value = "4")]
     pub gif_fps: u32,
 
     /// Per axis
@@ -146,6 +164,7 @@ impl PlanetParams {
             };
 
             // binary name || args from file || args from cmdline
+            // TODO clap AppSettings::AllArgsOverrideSelf
             Self::from_iter_safe(config_params.into_iter().chain(args))?
         };
 
@@ -164,5 +183,9 @@ impl PlanetParams {
 
     pub fn seed(&self) -> u64 {
         self.seed.expect("seed should have been initialized")
+    }
+
+    pub fn planet_dims(&self, height: usize) -> [usize; 3] {
+        [self.planet_size as usize, self.planet_size as usize, height]
     }
 }
