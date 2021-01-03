@@ -2,6 +2,7 @@ mod continent;
 mod params;
 mod planet;
 mod rasterize;
+mod region;
 
 #[cfg(feature = "bin")]
 mod render;

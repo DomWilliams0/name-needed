@@ -3,7 +3,7 @@ use crate::loader::TerrainSource;
 
 use crate::block::{Block, BlockType};
 use crate::chunk::slab::{Slab, SlabGrid, SlabType};
-use common::BoxedResult;
+use common::*;
 use grid::GridImpl;
 use procgen::{Planet, PlanetParams};
 use unit::world::{ChunkLocation, SlabLocation};
@@ -14,7 +14,11 @@ pub struct GeneratedTerrainSource {
 
 impl GeneratedTerrainSource {
     pub fn new(params: PlanetParams) -> BoxedResult<Self> {
-        let planet = Planet::new(params)?;
+        // TODO load a serialized planet from disk to avoid constantly regenerating
+        let mut planet = Planet::new(params)?;
+
+        info!("generating planet");
+        planet.initial_generation();
 
         Ok(Self { planet })
     }

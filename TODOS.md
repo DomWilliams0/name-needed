@@ -1,4 +1,4 @@
-# TODOs (261)
+# TODOs (263)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -42,6 +42,8 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (1)
+   * `// TODO result for out of range`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (1)
    * `// TODO per land layer?`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
@@ -272,7 +274,8 @@
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
- * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (2)
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (3)
+   * `// TODO load a serialized planet from disk to avoid constantly regenerating`
    * `// TODO might be able to use SlabGridImpl here and avoid double boxing`
    * `// TODO populate slab grid from generated`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)

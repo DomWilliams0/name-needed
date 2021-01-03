@@ -21,10 +21,10 @@ members = [
 ]
 
 [profile.dev]
-#debug = 0 # for faster build times
+debug = 0 # for faster build times
 
 [profile.dev.package."procgen"]
-opt-level = 2 # ... but this is way too slow in debug mode
+opt-level = 2 # this is way too slow in debug mode
 
 [profile.release]
 debug = 1 # for profiling

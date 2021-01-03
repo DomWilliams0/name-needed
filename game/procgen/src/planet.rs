@@ -4,6 +4,7 @@ use common::parking_lot::RwLock;
 use common::*;
 
 use crate::params::PlanetParams;
+use crate::region::Regions;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
 
@@ -17,6 +18,7 @@ unsafe impl Sync for Planet {}
 pub struct PlanetInner {
     pub(crate) params: PlanetParams,
     pub(crate) continents: ContinentMap,
+    regions: Regions,
 
     #[cfg(feature = "climate")]
     climate: Option<crate::climate::Climate>,
@@ -27,9 +29,12 @@ impl Planet {
     pub fn new(params: PlanetParams) -> BoxedResult<Planet> {
         debug!("creating planet with params {:?}", params);
         let continents = ContinentMap::new(&params);
+        let regions = Regions::new(&params);
         let inner = Arc::new(RwLock::new(PlanetInner {
             params,
             continents,
+            regions,
+
             #[cfg(feature = "climate")]
             climate: None,
         }));
@@ -92,6 +97,12 @@ impl Planet {
             let mut planet = self.0.write();
             planet.climate = Some(climate);
         }
+    }
+
+    pub fn realize_region(&self, region: (u32, u32)) {
+        let mut inner = self.0.write();
+        let height_map = inner.continents.generator();
+        inner.regions.get_or_create(region, height_map);
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {

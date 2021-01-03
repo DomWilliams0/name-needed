@@ -2,7 +2,7 @@
 #--draw-density
 --draw-height
 
-#--seed 1231232
+--seed 1231232
 
 --gif-layer surface
 --gif-progress wind

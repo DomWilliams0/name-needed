@@ -8,6 +8,7 @@ use std::cell::Cell;
 use std::f32::consts::PI;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
+use std::rc::Rc;
 
 pub struct LandBlob {
     pub pos: (i32, i32),
@@ -24,6 +25,9 @@ pub struct ContinentMap {
     continent_range: Vec<(ContinentIdx, usize, usize)>,
 
     pub grid: DynamicGrid<Tile>,
+
+    /// None until discover() is called
+    generator: Option<Rc<Generator>>,
 }
 
 type ContinentIdx = NonZeroUsize;
@@ -34,6 +38,11 @@ pub struct Tile {
     density: Cell<f64>,
     continent: Option<ContinentIdx>,
     height: f64,
+}
+
+pub struct Generator {
+    height: Fbm,
+    scale: f64,
 }
 
 impl ContinentMap {
@@ -52,6 +61,8 @@ impl ContinentMap {
                 params.planet_size as usize,
                 1,
             ]),
+
+            generator: None,
         }
     }
 
@@ -123,7 +134,7 @@ impl ContinentMap {
                 radius: this_radius,
             });
 
-            debug!("placing shape on continent"; "pos" => ?this_pos, "radius" => ?this_radius, "continent" => parent_start_idx);
+            trace!("placing shape on continent"; "pos" => ?this_pos, "radius" => ?this_radius, "continent" => parent_start_idx);
 
             // possibly reduce radius, gets less likely as it gets smaller so we have fewer large continents
             let decrement_threshold = (radius / self.params.continent_start_radius)
@@ -345,7 +356,7 @@ impl ContinentMap {
             "all density is 0, world might be too small"
         );
 
-        info!("original density limit"; "max" => ?max_density);
+        debug!("original density limit"; "max" => ?max_density);
 
         for tile in self.grid.iter_mut() {
             let val = tile.density.get();
@@ -364,40 +375,14 @@ impl ContinentMap {
 
     /// Generates noise and scales to 0.0-1.0
     fn generate_initial_heightmap(&mut self, rando: &mut dyn RngCore) {
-        // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
-        // TODO adjust params for global height map
-        let noise = Fbm::new()
-            .set_seed(rando.gen())
-            .set_octaves(4)
-            .set_frequency(9.0);
+        let height_gen = Generator::new(rando, self.params.planet_size as f64);
 
         let mut min = f64::MAX;
         let mut max = f64::MIN;
 
-        let size = self.params.planet_size as f64;
         for (coord, tile) in self.grid.iter_coords_mut() {
-            let (x, y) = (coord[0] as f64, coord[1] as f64);
-
-            // noise range
-            let x1 = 0.0;
-            let x2 = 2.0;
-            let y1 = 0.0;
-            let y2 = 2.0;
-            let dx = x2 - x1;
-            let dy = y2 - y1;
-
-            // sample at smaller intervals
-            let s = x / size;
-            let t = y / size;
-
-            // get 4d noise
-            let nx = x1 + (s * TAU).cos() * dx / TAU;
-            let ny = y1 + (t * TAU).cos() * dy / TAU;
-            let nz = x1 + (s * TAU).sin() * dx / TAU;
-            let nw = y1 + (t * TAU).sin() * dy / TAU;
-            let height = noise.get([nx, ny, nz, nw]);
-
-            // scale to density of land
+            let pos = (coord[0] as f64, coord[1] as f64);
+            let height = height_gen.sample(pos);
 
             min = min.min(height);
             max = max.max(height);
@@ -415,6 +400,51 @@ impl ContinentMap {
             // and more diverse inland where density=1
             tile.height = height * density;
         }
+
+        self.generator = Some(Rc::new(height_gen));
+    }
+
+    /// Must be called after discover()
+    pub fn generator(&self) -> Rc<Generator> {
+        self.generator.clone().expect("generator not initialized")
+    }
+}
+
+impl Generator {
+    pub fn new(rando: &mut dyn RngCore, scale: f64) -> Self {
+        // TODO adjust params for global height map
+        let noise = Fbm::new()
+            .set_seed(rando.gen())
+            .set_octaves(4)
+            .set_frequency(9.0);
+
+        Generator {
+            height: noise,
+            scale,
+        }
+    }
+
+    pub fn sample(&self, (x, y): (f64, f64)) -> f64 {
+        // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
+
+        // noise range
+        let x1 = 0.0;
+        let x2 = 2.0;
+        let y1 = 0.0;
+        let y2 = 2.0;
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+
+        // sample at smaller intervals
+        let s = x / self.scale;
+        let t = y / self.scale;
+
+        // get 4d noise
+        let nx = x1 + (s * TAU).cos() * dx / TAU;
+        let ny = y1 + (t * TAU).cos() * dy / TAU;
+        let nz = x1 + (s * TAU).sin() * dx / TAU;
+        let nw = y1 + (t * TAU).sin() * dy / TAU;
+        self.height.get([nx, ny, nz, nw])
     }
 }
 

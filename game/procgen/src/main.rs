@@ -35,9 +35,20 @@ fn main() {
                 let mut planet = Planet::new(params).expect("failed");
                 planet.initial_generation();
 
-                let mut render = Render::with_planet(planet);
+                let mut render = Render::with_planet(planet.clone());
                 render.draw_continents();
                 render.save("procgen.png").expect("failed to write image");
+
+                let y = 50;
+                for x in 50..=52 {
+                    planet.realize_region((x, y));
+
+                    let mut render = Render::with_planet(planet.clone());
+                    render.draw_region((x, y));
+                    render
+                        .save(format!("procgen-region-{}-{}.png", x, y))
+                        .expect("failed to write image");
+                }
             };
 
             match common::panic::run_and_handle_panics(dew_it) {

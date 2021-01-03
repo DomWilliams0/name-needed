@@ -196,18 +196,16 @@ impl Render {
             }
         };
 
-        let image = self
-            .image
-            .as_mut()
-            .expect("image was taken but not replaced");
+        let image = self.image.as_mut().expect("image has not been created");
         image::imageops::overlay(image, &overlay, 0, 0);
     }
 
+    pub fn draw_region(&mut self, region: (u32, u32)) {
+        let inner = self.planet.inner();
+    }
+
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {
-        let image = self
-            .image
-            .as_ref()
-            .expect("image was taken but not replaced");
+        let image = self.image.as_ref().expect("image has not been created");
 
         let path = path.as_ref();
         image.save(path)?;
