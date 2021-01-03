@@ -13,7 +13,6 @@ mod gif {
     use crate::{Planet, Render};
     use common::*;
     use crossbeam::channel::{unbounded, Sender};
-    use image::{Delay, Frame};
     use std::io::ErrorKind;
     use std::path::{Path, PathBuf};
     use std::process::Command;

@@ -141,7 +141,7 @@ mod iteration {
     use grid::{DynamicGrid, NEIGHBOURS_COUNT};
     use rand_distr::Uniform;
 
-    use line_drawing::{Bresenham, Bresenham3d};
+    use line_drawing::Bresenham3d;
     use std::f64::consts::{PI, TAU};
 
     pub struct ClimateIteration<'a> {
@@ -271,11 +271,7 @@ mod iteration {
             let dir_conform = self.params.wind_direction_conformity;
 
             let terrain = &self.height_gradient;
-            for ((coord, wind), tile) in self
-                .wind
-                .iter_individual_layers()
-                .zip(self.continents.grid.iter())
-            {
+            for (coord, wind) in self.wind.iter_individual_layers() {
                 // speed up when going downhill or flat, slow down going up
                 let land_gradient = {
                     let angle = wind.velocity.angle(Vector3::unit_y()).normalize();

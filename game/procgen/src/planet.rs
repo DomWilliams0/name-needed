@@ -3,7 +3,6 @@ use crate::rasterize::SlabGrid;
 use common::parking_lot::RwLock;
 use common::*;
 
-use crate::climate::Climate;
 use crate::params::PlanetParams;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
@@ -15,15 +14,12 @@ pub struct Planet(Arc<RwLock<PlanetInner>>);
 unsafe impl Send for Planet {}
 unsafe impl Sync for Planet {}
 
-#[derive(Default)]
-pub struct Region {
-    pub height: f64,
-}
-
 pub struct PlanetInner {
     pub(crate) params: PlanetParams,
     pub(crate) continents: ContinentMap,
-    climate: Option<Climate>,
+
+    #[cfg(feature = "climate")]
+    climate: Option<crate::climate::Climate>,
 }
 
 impl Planet {
@@ -34,6 +30,7 @@ impl Planet {
         let inner = Arc::new(RwLock::new(PlanetInner {
             params,
             continents,
+            #[cfg(feature = "climate")]
             climate: None,
         }));
         Ok(Self(inner))
@@ -59,37 +56,42 @@ impl Planet {
         // and place initial heightmap
         planet.continents.discover(&mut planet_rando);
 
-        use crate::progress::*;
+        #[cfg(feature = "climate")]
+        {
+            use crate::climate::*;
+            use crate::progress::*;
 
-        let mut progress = match cfg!(feature = "bin") {
-            #[cfg(feature = "bin")]
-            true if params.render.create_climate_gif => Box::new(
-                GifProgressTracker::new("/tmp/gifs", params.render.gif_threads)
-                    .expect("failed to init gif progress tracker"),
-            ) as Box<dyn ProgressTracker>,
+            let mut progress = match cfg!(feature = "bin") {
+                #[cfg(feature = "bin")]
+                true if params.render.create_climate_gif => Box::new(
+                    GifProgressTracker::new("/tmp/gifs", params.render.gif_threads)
+                        .expect("failed to init gif progress tracker"),
+                )
+                    as Box<dyn ProgressTracker>,
 
-            _ => Box::new(NopProgressTracker) as Box<dyn ProgressTracker>,
-        };
+                _ => Box::new(NopProgressTracker) as Box<dyn ProgressTracker>,
+            };
 
-        // downgrade planet reference so it can be read from multiple places
-        drop(planet);
-        let planet = self.0.read();
+            // downgrade planet reference so it can be read from multiple places
+            drop(planet);
+            let planet = self.0.read();
 
-        let climate = Climate::simulate(
-            &planet.continents,
-            &params,
-            &mut planet_rando,
-            |step, climate| {
-                progress.update(step, planet_ref.clone(), climate);
-            },
-        );
+            let climate = Climate::simulate(
+                &planet.continents,
+                &params,
+                &mut planet_rando,
+                |step, climate| {
+                    progress.update(step, planet_ref.clone(), climate);
+                },
+            );
 
-        progress.fini();
+            progress.fini();
 
-        // upgrade planet lock again
-        drop(planet);
-        let mut planet = self.0.write();
-        planet.climate = Some(climate);
+            // upgrade planet lock again
+            drop(planet);
+            let mut planet = self.0.write();
+            planet.climate = Some(climate);
+        }
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {

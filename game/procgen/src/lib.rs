@@ -1,8 +1,6 @@
-mod climate;
 mod continent;
 mod params;
 mod planet;
-mod progress;
 mod rasterize;
 
 #[cfg(feature = "bin")]
@@ -10,6 +8,12 @@ mod render;
 
 #[cfg(feature = "bin")]
 pub use render::Render;
+
+#[cfg(feature = "climate")]
+mod progress;
+
+#[cfg(feature = "climate")]
+mod climate;
 
 pub use params::PlanetParams;
 pub use planet::Planet;

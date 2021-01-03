@@ -1,12 +1,9 @@
-use crate::climate::{ClimateIteration, PlanetGrid};
 use crate::params::{AirLayer, RenderProgressParams};
-use crate::{map_range, Planet, PlanetParams};
+use crate::{map_range, Planet};
 use color::ColorRgb;
 use common::*;
-use image::error::UnsupportedErrorKind::Color;
 use image::imageops::FilterType;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
-use imageproc::definitions::HasBlack;
 use imageproc::drawing::{
     draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
 };
@@ -120,12 +117,15 @@ impl Render {
         });
     }
 
+    #[cfg(feature = "climate")]
     pub fn draw_climate_overlay(
         &mut self,
-        climate: &ClimateIteration,
+        climate: &crate::climate::ClimateIteration,
         layer: AirLayer,
         what: RenderProgressParams,
     ) {
+        use crate::climate::PlanetGrid;
+
         let planet = self.planet.inner();
         let params = &planet.params;
 
@@ -165,7 +165,7 @@ impl Render {
                     let direction = velocity_trunc.angle(Vector2::unit_y()).normalize()
                         / cgmath::Rad::full_turn();
 
-                    let hue = match layer {
+                    let _hue = match layer {
                         AirLayer::Surface => {
                             let val = z as f64 / PlanetGrid::<f64>::TOTAL_HEIGHT_F;
                             map_range((0.0, 1.0), (0.3, 0.8), val as f32)

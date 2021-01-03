@@ -15,8 +15,9 @@ noise = "^0.6"
 rand_distr = "^0.3"
 strum = "^0.19"
 strum_macros = "^0.19"
-line_drawing = "^0.8"
-crossbeam = "^0.8"
+
+line_drawing = { version = "^0.8", optional = true }
+crossbeam = { version = "^0.8", optional = true }
 
 image = { version = "^0.23", optional = true, default-features = false, features = ["png"] }
 imageproc = { version = "^0.22", optional = true, default-features = false }
@@ -27,3 +28,4 @@ serde = { version = "^1.0", features = ["derive"]}
 [features]
 default = []
 bin = ["image", "imageproc", "color"]
+climate = ["crossbeam", "line_drawing"]
