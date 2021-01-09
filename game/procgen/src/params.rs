@@ -62,6 +62,9 @@ pub struct PlanetParams {
 
     #[structopt(long)]
     pub log_params_and_exit: bool,
+
+    #[structopt(long, default_value = "100")]
+    pub height_scale: u32,
 }
 
 #[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]

@@ -19,6 +19,7 @@ mod climate;
 pub use params::PlanetParams;
 pub use planet::Planet;
 pub use rasterize::SlabGrid;
+pub use region::RegionLocation;
 
 /// https://rosettacode.org/wiki/Map_range#Rust
 #[inline]

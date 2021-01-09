@@ -1,5 +1,5 @@
 use crate::params::{AirLayer, RenderProgressParams};
-use crate::{map_range, Planet};
+use crate::{map_range, Planet, RegionLocation};
 use color::ColorRgb;
 use common::*;
 use image::imageops::FilterType;
@@ -200,7 +200,7 @@ impl Render {
         image::imageops::overlay(image, &overlay, 0, 0);
     }
 
-    pub fn draw_region(&mut self, region: (u32, u32)) {
+    pub fn draw_region(&mut self, region: RegionLocation) {
         let inner = self.planet.inner();
     }
 

@@ -4,9 +4,9 @@ use common::parking_lot::RwLock;
 use common::*;
 
 use crate::params::PlanetParams;
-use crate::region::Regions;
+use crate::region::{RegionLocation, Regions};
 use std::sync::Arc;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -99,7 +99,7 @@ impl Planet {
         }
     }
 
-    pub fn realize_region(&self, region: (u32, u32)) {
+    pub fn realize_region(&self, region: RegionLocation) {
         let mut inner = self.0.write();
         let height_map = inner.continents.generator();
         inner.regions.get_or_create(region, height_map);
@@ -119,6 +119,18 @@ impl Planet {
 
     pub fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
         SlabGrid::default()
+    }
+
+    /// Instantiate regions and initialize chunks
+    pub fn prepare_for_chunks(&self, (min, max): (ChunkLocation, ChunkLocation)) {
+        let regions = (min.0..=max.0)
+            .cartesian_product(min.1..=max.1)
+            .map(|(cx, cy)| RegionLocation::from(ChunkLocation(cx, cy)))
+            .dedup();
+
+        for region in regions {
+            self.realize_region(region);
+        }
     }
 
     #[cfg(feature = "bin")]

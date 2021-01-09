@@ -1,4 +1,5 @@
 #[macro_export]
+// TODO call usize::from() on dims for nicer use with smallunsignedconstant
 macro_rules! grid_declare {
     ($vis:vis struct $name:ident < $implname:ident, $t:ty > , $x:expr, $y:expr, $z:expr) => {
         $vis type $name = $crate::Grid<$implname>;

@@ -9,6 +9,7 @@ use std::f32::consts::PI;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct LandBlob {
     pub pos: (i32, i32),
@@ -27,7 +28,7 @@ pub struct ContinentMap {
     pub grid: DynamicGrid<Tile>,
 
     /// None until discover() is called
-    generator: Option<Rc<Generator>>,
+    generator: Option<Arc<Generator>>,
 }
 
 type ContinentIdx = NonZeroUsize;
@@ -401,11 +402,11 @@ impl ContinentMap {
             tile.height = height * density;
         }
 
-        self.generator = Some(Rc::new(height_gen));
+        self.generator = Some(Arc::new(height_gen));
     }
 
     /// Must be called after discover()
-    pub fn generator(&self) -> Rc<Generator> {
+    pub fn generator(&self) -> Arc<Generator> {
         self.generator.clone().expect("generator not initialized")
     }
 }

@@ -183,11 +183,11 @@ fn main() {
     });
 
     let exit = match result {
-        Err(_) => {
+        None => {
             // panic handled above
             1
         }
-        Ok(Err(e)) => {
+        Some(Err(e)) => {
             crit!("critical error"; "error" => %e);
 
             if logger().is_enabled(MyLevel::Debug) {
@@ -203,7 +203,7 @@ fn main() {
 
             1
         }
-        Ok(Ok(())) => 0,
+        Some(Ok(())) => 0,
     };
 
     // unhook custom panic handler before dropping and flushing the logger

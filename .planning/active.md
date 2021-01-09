@@ -1,5 +1,12 @@
 # Active tasks
 
+* slab generation from planet
+	* [X] create regions
+	* [X] initialize chunks with default block density
+	* [ ] position simple large scale features (e.g. forest)
+	* [ ] generate sub features (e.g. tree placement)
+	* [ ] rasterize sub features (e.g. tree blocks)
+* [ ] add async to planet chunk initialization
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
 * [o] dynamic chunk loading
 	* [X] load slabs as camera pans

@@ -6,7 +6,7 @@ use crate::chunk::slab::{Slab, SlabGrid, SlabType};
 use common::*;
 use grid::GridImpl;
 use procgen::{Planet, PlanetParams};
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
 pub struct GeneratedTerrainSource {
     planet: Planet,
@@ -48,6 +48,10 @@ impl TerrainSource for GeneratedTerrainSource {
         preprocess_result: Box<dyn PreprocessedTerrain>,
     ) -> Result<Slab, TerrainSourceError> {
         Ok(preprocess_result.into_slab())
+    }
+
+    fn prepare_for_chunks(&mut self, range: (ChunkLocation, ChunkLocation)) {
+        self.planet.prepare_for_chunks(range);
     }
 }
 

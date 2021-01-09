@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
@@ -85,6 +85,10 @@ impl TerrainSource for MemoryTerrainSource {
             .ok_or(TerrainSourceError::OutOfBounds(slab))?;
 
         Ok(slab)
+    }
+
+    fn prepare_for_chunks(&mut self, _: (ChunkLocation, ChunkLocation)) {
+        // nothing to do
     }
 }
 

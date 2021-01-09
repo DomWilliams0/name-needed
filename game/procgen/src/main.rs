@@ -41,19 +41,20 @@ fn main() {
 
                 let y = 50;
                 for x in 50..=52 {
-                    planet.realize_region((x, y));
+                    let region = RegionLocation(x, y);
+                    planet.realize_region(region);
 
                     let mut render = Render::with_planet(planet.clone());
-                    render.draw_region((x, y));
-                    render
-                        .save(format!("procgen-region-{}-{}.png", x, y))
-                        .expect("failed to write image");
+                    // render.draw_region(region);
+                    // render
+                    //     .save(format!("procgen-region-{}-{}.png", x, y))
+                    //     .expect("failed to write image");
                 }
             };
 
             match common::panic::run_and_handle_panics(dew_it) {
-                Ok(_) => 0,
-                Err(_) => 1,
+                Some(_) => 0,
+                None => 1,
             }
         }
     };

@@ -28,6 +28,10 @@ impl SmallUnsignedConstant {
         self.0 as usize
     }
 
+    pub const fn as_f64(self) -> f64 {
+        self.0 as f64
+    }
+
     pub const fn as_block_coord(self) -> BlockCoord {
         // TODO helper for this-1
         self.0 as BlockCoord

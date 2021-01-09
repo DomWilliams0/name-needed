@@ -16,6 +16,9 @@ impl ChunkLocation {
             slab: slab.into(),
         }
     }
+
+    pub const MIN: Self = ChunkLocation(i32::MIN, i32::MIN);
+    pub const MAX: Self = ChunkLocation(i32::MAX, i32::MAX);
 }
 
 impl From<WorldPosition> for ChunkLocation {

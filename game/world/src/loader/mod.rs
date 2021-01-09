@@ -7,7 +7,7 @@ use common::*;
 pub use procgen::PlanetParams;
 pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::{SlabIndex, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::AsyncWorkerPool;
 
@@ -116,12 +116,15 @@ impl<C: WorldContext> WorldLoader<C> {
 
         let mut extra_slabs = SmallVec::<[SlabLocation; 16]>::new();
 
+        // calculate chunk range
+        let (mut chunk_min, mut chunk_max) = (ChunkLocation::MAX, ChunkLocation::MIN);
+
         // first iterate slabs to register them all with their chunk, so they know if their
         // neighbours have been requested/are being loaded too
-        for (chunk, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
-            log_scope!(o!(chunk));
+        for (chunk_loc, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
+            log_scope!(o!(chunk_loc));
 
-            let chunk = world_mut.ensure_chunk(chunk);
+            let chunk = world_mut.ensure_chunk(chunk_loc);
 
             // track the highest slab
             let mut highest = SlabIndex::MIN;
@@ -143,6 +146,10 @@ impl<C: WorldContext> WorldLoader<C> {
                 extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
                 chunk.mark_slab_requested(empty);
             }
+
+            // track chunk range
+            chunk_min = chunk_min.min(chunk_loc);
+            chunk_max = chunk_max.max(chunk_loc);
         }
 
         let count = count + extra_slabs.len();
@@ -154,6 +161,14 @@ impl<C: WorldContext> WorldLoader<C> {
             let air_slabs = extra_slabs.into_iter().zip(repeat(SlabType::Placeholder));
             real_slabs.chain(air_slabs)
         };
+
+        // let the terrain source know what's coming so it can kick off region generation
+        {
+            let source = self.source.clone();
+            self.pool.submit_void_async(async move {
+                source.write().prepare_for_chunks((chunk_min, chunk_max));
+            });
+        }
 
         for (slab, slab_type) in all_slabs {
             log_scope!(o!(slab));
@@ -188,7 +203,7 @@ impl<C: WorldContext> WorldLoader<C> {
                         let preprocess_result = preprocess_work()?;
 
                         // take the source write lock to convert preprocessing output into raw terrain
-                        // e.g. reading from a file cannot be done in parallel
+                        // TODO pass rwlock to terrain source to allow it to choose if it needs the lock
                         let terrain = {
                             let mut terrain_source = source.write();
                             terrain_source.load_slab(slab, preprocess_result)?

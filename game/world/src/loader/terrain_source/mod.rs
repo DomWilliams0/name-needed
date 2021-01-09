@@ -1,5 +1,5 @@
 use common::*;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -23,6 +23,8 @@ pub trait PreprocessedTerrain: Send {
     fn into_slab(self: Box<Self>) -> Slab;
 }
 
+// TODO remove boxing overhead of preprocess+load_slab rets
+// maybe use a wrapper trait to allow this one to have associated types: https://stackoverflow.com/a/48066387
 pub trait TerrainSource: Send + Sync {
     /// Bounding box, inclusive
     fn world_bounds(&self) -> (ChunkLocation, ChunkLocation);
@@ -45,6 +47,8 @@ pub trait TerrainSource: Send + Sync {
         let (min, max) = self.world_bounds();
         (min.0..=max.0).contains(&slab.chunk.0) && (min.1..=max.1).contains(&slab.chunk.1)
     }
+
+    fn prepare_for_chunks(&mut self, range: (ChunkLocation, ChunkLocation));
 }
 
 mod generate;

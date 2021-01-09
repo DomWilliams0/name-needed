@@ -111,6 +111,10 @@ impl AsyncWorkerPool {
         });
     }
 
+    pub fn submit_void_async(&mut self, task: impl Future<Output = ()> + Send + 'static) {
+        self.pool.spawn(async move { task.await });
+    }
+
     async fn send_result(
         mut done_channel: async_channel::Sender<LoadTerrainResult>,
         result: LoadTerrainResult,

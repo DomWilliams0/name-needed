@@ -1,4 +1,4 @@
-# TODOs (263)
+# TODOs (269)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -42,8 +42,11 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (1)
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (4)
+   * `// TODO store u8/u16 relative to range minimum to save space`
    * `// TODO result for out of range`
+   * `// TODO this can be parallelized, each chunk is processed in isolation`
+   * `// TODO depends on many local parameters e.g. biome, humidity`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (1)
    * `// TODO per land layer?`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
@@ -270,14 +273,17 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (3)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (4)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
+   * `// TODO pass rwlock to terrain source to allow it to choose if it needs the lock`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
  * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (3)
    * `// TODO load a serialized planet from disk to avoid constantly regenerating`
    * `// TODO might be able to use SlabGridImpl here and avoid double boxing`
    * `// TODO populate slab grid from generated`
+ * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
+   * `// TODO remove boxing overhead of preprocess+load_slab rets`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
@@ -361,6 +367,8 @@
    * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/grid/src/declare.rs](shared/grid/src/declare.rs) (1)
+   * `// TODO call usize::from() on dims for nicer use with smallunsignedconstant`
  * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (3)
    * `// TODO allow smaller datatypes for dims`
    * `// TODO profile and improve coord wrapping`
