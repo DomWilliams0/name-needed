@@ -11,7 +11,7 @@ lazy_static! {
     static ref PANICS: Mutex<Vec<Panic>> = Mutex::new(Vec::new());
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Panic {
     pub message: String,
     pub thread: String,
@@ -27,8 +27,8 @@ pub fn init_panic_detection() {
 }
 
 pub fn panics() -> Vec<Panic> {
-    let mut panics = PANICS.lock();
-    std::mem::take(&mut *panics)
+    let panics = PANICS.lock();
+    panics.clone() // efficiency be damned we're dying
 }
 
 pub fn has_panicked() -> bool {
@@ -63,29 +63,41 @@ fn register_panic(panic: &PanicInfo) {
     });
 }
 
-pub fn run_and_handle_panics<R>(do_me: impl FnOnce() -> R + UnwindSafe) -> Result<R, ()> {
+/// None on error
+pub fn run_and_handle_panics<R: Debug>(do_me: impl FnOnce() -> R + UnwindSafe) -> Option<R> {
     let result = std::panic::catch_unwind(|| do_me());
 
     let all_panics = panics();
 
-    debug_assert_eq!(all_panics.is_empty(), result.is_ok());
-
-    result.map_err(|_| {
-        crit!("{count} threads panicked", count = all_panics.len());
-
-        for Panic {
-            message,
-            thread,
-            mut backtrace,
-        } in all_panics
-        {
-            backtrace.resolve();
-
-            crit!("panic";
-            "backtrace" => ?backtrace,
-            "message" => message,
-            "thread" => thread,
-            );
+    match (result, all_panics.is_empty()) {
+        (Ok(res), true) => {
+            // no panics
+            return Some(res);
         }
-    })
+        (Ok(res), false) => {
+            warn!("panic occurred in another thread, swallowing unpanicked result"; "result" => ?res);
+        }
+        (Err(_), false) => {}
+        (Err(_), true) => unreachable!(),
+    };
+
+    debug_assert!(!all_panics.is_empty());
+    crit!("{count} threads panicked", count = all_panics.len());
+
+    for Panic {
+        message,
+        thread,
+        mut backtrace,
+    } in all_panics
+    {
+        backtrace.resolve();
+
+        crit!("panic";
+        "backtrace" => ?backtrace,
+        "message" => message,
+        "thread" => thread,
+        );
+    }
+
+    None
 }
