@@ -4,8 +4,7 @@ use unit::world::{CHUNK_SIZE, SLAB_SIZE};
 // TODO custom block types for procgen that are translated to game blocks
 #[derive(Clone, Default, Debug, Copy)]
 pub struct GeneratedBlock {
-    // cant be zst apparently
-    dummy: i32,
+    pub ty: BlockType,
 }
 
 // redeclaration of slab grid
@@ -21,4 +20,10 @@ pub enum BlockType {
     Stone,
     Dirt,
     Grass,
+}
+
+impl Default for BlockType {
+    fn default() -> Self {
+        Self::Air
+    }
 }

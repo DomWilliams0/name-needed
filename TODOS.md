@@ -33,11 +33,15 @@
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (4)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (8)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
+   * `// TODO result`
+   * `self.realize_region(region_loc); // TODO .await`
+   * `// TODO generate slab`
+   * `// TODO rasterize features onto slab`
  * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
@@ -273,17 +277,12 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (4)
+ * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (3)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
-   * `// TODO pass rwlock to terrain source to allow it to choose if it needs the lock`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
- * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (3)
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
    * `// TODO load a serialized planet from disk to avoid constantly regenerating`
-   * `// TODO might be able to use SlabGridImpl here and avoid double boxing`
-   * `// TODO populate slab grid from generated`
- * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
-   * `// TODO remove boxing overhead of preprocess+load_slab rets`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)

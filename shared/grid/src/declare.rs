@@ -36,13 +36,26 @@ macro_rules! grid_declare {
                 for elem in &mut slice[..] {*elem = Default::default(); }
 
 
-                // safety: pointer comes from Box::into_raw
+                // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
                 unsafe {
                     let raw_slice = Box::into_raw(slice);
                     Box::from_raw(raw_slice as *mut Self)
                 }
             }
+
+            fn from_iter<T: IntoIterator<Item = $t>>(iter: T) -> Box<Self> {
+                let vec: Vec<$t> = iter.into_iter().collect();
+                assert_eq!(vec.len(), Self::FULL_SIZE, "grid iterator is wrong length");
+
+                // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
+                unsafe {
+                    let slice = vec.into_boxed_slice();
+                    let raw_slice = Box::into_raw(slice);
+                    Box::from_raw(raw_slice as *mut Self)
+                }
+            }
         }
+
 
         impl std::ops::Index<&$crate::CoordType> for $implname {
             type Output = $t;

@@ -20,9 +20,7 @@ use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use crate::world::slab_loading::SlabProcessingFuture;
-use common::parking_lot::RwLock;
 use std::iter::repeat;
-use std::sync::Arc;
 
 mod batch;
 mod finalizer;
@@ -31,7 +29,7 @@ mod update;
 mod worker_pool;
 
 pub struct WorldLoader<C: WorldContext> {
-    source: Arc<RwLock<dyn TerrainSource>>,
+    source: TerrainSource,
     pool: AsyncWorkerPool,
     finalization_channel: async_channel::Sender<LoadTerrainResult>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
@@ -61,7 +59,7 @@ pub enum BlockForAllError {
 }
 
 impl<C: WorldContext> WorldLoader<C> {
-    pub fn new<S: TerrainSource + 'static>(source: S, mut pool: AsyncWorkerPool) -> Self {
+    pub fn new<S: Into<TerrainSource>>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
         let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
 
@@ -69,7 +67,7 @@ impl<C: WorldContext> WorldLoader<C> {
         pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
 
         Self {
-            source: Arc::new(RwLock::new(source)),
+            source: source.into(),
             pool,
             finalization_channel: finalize_tx,
             chunk_updates_rx,
@@ -166,7 +164,7 @@ impl<C: WorldContext> WorldLoader<C> {
         {
             let source = self.source.clone();
             self.pool.submit_void_async(async move {
-                source.write().prepare_for_chunks((chunk_min, chunk_max));
+                source.prepare_for_chunks((chunk_min, chunk_max));
             });
         }
 
@@ -185,34 +183,14 @@ impl<C: WorldContext> WorldLoader<C> {
             let world = self.world();
             self.pool.submit_async(
                 async move {
-                    // wrapped in closure for common error handling case
-                    let get_terrain = || -> Result<Option<Slab>, TerrainSourceError> {
-                        if matches!(slab_type, SlabType::Placeholder) {
-                            // empty placeholder
-                            return Ok(None);
-                        }
-
-                        // briefly hold the source lock to get a preprocess closure to run.
-                        // only read lock so all workers can do this concurrently
-                        let preprocess_work = {
-                            let terrain_source = source.read();
-                            terrain_source.preprocess(slab)
-                        };
-
-                        // run preprocessing work concurrently
-                        let preprocess_result = preprocess_work()?;
-
-                        // take the source write lock to convert preprocessing output into raw terrain
-                        // TODO pass rwlock to terrain source to allow it to choose if it needs the lock
-                        let terrain = {
-                            let mut terrain_source = source.write();
-                            terrain_source.load_slab(slab, preprocess_result)?
-                        };
-
-                        Ok(Some(terrain))
+                    let result = if let SlabType::Placeholder = slab_type {
+                        // empty placeholder
+                        Ok(None)
+                    } else {
+                        source.load_slab(slab).map(Some)
                     };
 
-                    let terrain = match get_terrain() {
+                    let terrain = match result {
                         Ok(Some(terrain)) => terrain,
                         Ok(None) => {
                             debug!("adding placeholder slab to the top of the chunk"; slab);

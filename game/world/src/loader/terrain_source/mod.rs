@@ -1,5 +1,5 @@
 use common::*;
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+use unit::world::{ChunkLocation, SlabLocation};
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -19,43 +19,51 @@ pub enum TerrainSourceError {
     Bailed,
 }
 
-pub trait PreprocessedTerrain: Send {
-    fn into_slab(self: Box<Self>) -> Slab;
+#[derive(Clone)]
+pub enum TerrainSource {
+    Memory(Arc<RwLock<MemoryTerrainSource>>),
+    Generated(GeneratedTerrainSource),
 }
 
-// TODO remove boxing overhead of preprocess+load_slab rets
-// maybe use a wrapper trait to allow this one to have associated types: https://stackoverflow.com/a/48066387
-pub trait TerrainSource: Send + Sync {
-    /// Bounding box, inclusive
-    fn world_bounds(&self) -> (ChunkLocation, ChunkLocation);
+unsafe impl Send for TerrainSource {}
+unsafe impl Sync for TerrainSource {}
 
-    /// Returns closure to run concurrently
-    fn preprocess(
-        &self,
-        slab: SlabLocation,
-    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>>;
+impl From<MemoryTerrainSource> for TerrainSource {
+    fn from(src: MemoryTerrainSource) -> Self {
+        Self::Memory(Arc::new(RwLock::new(src)))
+    }
+}
 
-    /// Mutable reference to self so can't be done concurrently
-    fn load_slab(
-        &mut self,
-        slab: SlabLocation,
-        preprocess_result: Box<dyn PreprocessedTerrain>,
-    ) -> Result<Slab, TerrainSourceError>;
+impl From<GeneratedTerrainSource> for TerrainSource {
+    fn from(src: GeneratedTerrainSource) -> Self {
+        Self::Generated(src)
+    }
+}
 
-    /// Checks chunk bounds only, assume infinite depth
-    fn is_in_bounds(&self, slab: SlabLocation) -> bool {
-        let (min, max) = self.world_bounds();
-        (min.0..=max.0).contains(&slab.chunk.0) && (min.1..=max.1).contains(&slab.chunk.1)
+impl TerrainSource {
+    pub fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
+        match self {
+            TerrainSource::Memory(_) => {}
+            TerrainSource::Generated(src) => src.planet().prepare_for_chunks(range),
+        }
     }
 
-    fn prepare_for_chunks(&mut self, range: (ChunkLocation, ChunkLocation));
+    pub fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+        match self {
+            TerrainSource::Memory(src) => src.read().get_slab_copy(slab),
+            TerrainSource::Generated(src) => src.load_slab(slab),
+        }
+    }
 }
 
 mod generate;
 mod memory;
 use crate::chunk::slab::Slab;
+use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
+
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
@@ -80,7 +88,7 @@ mod tests {
 
     #[test]
     fn bounds() {
-        let mut just_one =
+        let just_one =
             MemoryTerrainSource::from_chunks(once(((0, 0), RawChunkTerrain::default()))).unwrap();
         assert_eq!(
             just_one.world_bounds(),
@@ -91,12 +99,10 @@ mod tests {
         assert!(!just_one.is_in_bounds(ChunkLocation(1, 1).get_slab(0)));
 
         // make sure impl fails too
-        assert!(just_one
-            .load_slab(SlabLocation::new(0, (0, 0)), Box::new(()))
-            .is_ok());
+        assert!(just_one.get_slab_copy(SlabLocation::new(0, (0, 0))).is_ok());
 
         assert!(matches!(
-            just_one.load_slab(SlabLocation::new(0, (1, 1)), Box::new(())),
+            just_one.get_slab_copy(SlabLocation::new(0, (1, 1))),
             Err(TerrainSourceError::OutOfBounds(_))
         ));
         let sparse = MemoryTerrainSource::from_chunks(

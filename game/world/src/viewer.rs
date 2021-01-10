@@ -107,11 +107,8 @@ impl<C: WorldContext> WorldViewer<C> {
         let start_pos = (0, 0);
         let start = world_borrowed
             .find_accessible_block_in_column(start_pos.0, start_pos.1)
-            .ok_or(WorldViewerError::InvalidStartColumn(
-                start_pos.0,
-                start_pos.1,
-            ))?
-            .2;
+            .map(|pos| pos.slice())
+            .unwrap_or_else(|| GlobalSliceIndex::new(0));
 
         let world_bounds = world_borrowed.slice_bounds().unwrap(); // world has at least 1 slice as above
         drop(world_borrowed);

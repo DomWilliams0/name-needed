@@ -12,7 +12,7 @@ use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
 use crate::WorldChangeEvent;
-use grid::{grid_declare, GridImpl};
+use grid::{grid_declare, Grid, GridImpl};
 use std::sync::Arc;
 
 grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
@@ -55,6 +55,17 @@ impl Slab {
 
     pub fn from_grid(grid: SlabGrid, ty: SlabType) -> Self {
         let terrain = grid.into_boxed_impl();
+        let arc = Arc::from(terrain);
+        Self(arc, ty)
+    }
+
+    pub fn from_other_grid<I, G>(other: Grid<G>, ty: SlabType) -> Self
+    where
+        for<'a> &'a I: Into<<SlabGridImpl as GridImpl>::Item>,
+        G: GridImpl<Item = I>,
+    {
+        let new_vals = other.array().iter().map(|item| item.into());
+        let terrain = SlabGridImpl::from_iter(new_vals);
         let arc = Arc::from(terrain);
         Self(arc, ty)
     }

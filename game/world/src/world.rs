@@ -1145,9 +1145,7 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
     use crate::helpers::load_world;
-    use crate::loader::{
-        AsyncWorkerPool, MemoryTerrainSource, TerrainSource, WorldLoader, WorldTerrainUpdate,
-    };
+    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
     use crate::presets::from_preset;

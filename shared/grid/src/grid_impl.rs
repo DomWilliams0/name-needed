@@ -15,6 +15,7 @@ pub trait GridImpl {
     fn array(&self) -> &[Self::Item];
     fn array_mut(&mut self) -> &mut [Self::Item];
     fn default_boxed() -> Box<Self>;
+    fn from_iter<I: Iterator<Item = Self::Item>>(iter: I) -> Box<Self>;
 
     fn indices(&self) -> Range<usize> {
         0..Self::FULL_SIZE

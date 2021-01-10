@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+use unit::world::{ChunkLocation, SlabLocation};
 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
-use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSource, TerrainSourceError};
+use crate::loader::terrain_source::TerrainSourceError;
 
 /// Used for testing
 pub struct MemoryTerrainSource {
@@ -58,26 +58,8 @@ impl MemoryTerrainSource {
             (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
         })
     }
-}
 
-impl TerrainSource for MemoryTerrainSource {
-    fn world_bounds(&self) -> (ChunkLocation, ChunkLocation) {
-        self.bounds
-    }
-
-    fn preprocess(
-        &self,
-        _slab: SlabLocation,
-    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
-        // nothing to do
-        Box::new(|| Ok(Box::new(())))
-    }
-
-    fn load_slab(
-        &mut self,
-        slab: SlabLocation,
-        _: Box<dyn PreprocessedTerrain>,
-    ) -> Result<Slab, TerrainSourceError> {
+    pub fn get_slab_copy(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
         let slab = self
             .chunk_map
             .get(&slab.chunk)
@@ -87,13 +69,14 @@ impl TerrainSource for MemoryTerrainSource {
         Ok(slab)
     }
 
-    fn prepare_for_chunks(&mut self, _: (ChunkLocation, ChunkLocation)) {
-        // nothing to do
+    /// Bounding box, inclusive
+    pub fn world_bounds(&self) -> (ChunkLocation, ChunkLocation) {
+        self.bounds
     }
-}
 
-impl PreprocessedTerrain for () {
-    fn into_slab(self: Box<Self>) -> Slab {
-        unreachable!()
+    /// Checks chunk bounds only, assume infinite depth
+    pub fn is_in_bounds(&self, slab: SlabLocation) -> bool {
+        let (min, max) = self.bounds;
+        (min.0..=max.0).contains(&slab.chunk.0) && (min.1..=max.1).contains(&slab.chunk.1)
     }
 }

@@ -6,7 +6,9 @@
 	* [ ] position simple large scale features (e.g. forest)
 	* [ ] generate sub features (e.g. tree placement)
 	* [ ] rasterize sub features (e.g. tree blocks)
+	* [ ] rasterize slab and return to game
 * [ ] add async to planet chunk initialization
+* [X] refactor terrainsource usage to avoid so much boxing
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
 * [o] dynamic chunk loading
 	* [X] load slabs as camera pans

@@ -5,8 +5,9 @@ use common::*;
 
 use crate::params::PlanetParams;
 use crate::region::{RegionLocation, Regions};
+use crate::BlockType;
 use std::sync::Arc;
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+use unit::world::{ChunkLocation, SlabLocation};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -117,8 +118,23 @@ impl Planet {
         )
     }
 
+    // TODO result
     pub fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
-        SlabGrid::default()
+        // load region if not already
+        let region_loc = RegionLocation::from(slab.chunk);
+        self.realize_region(region_loc); // TODO .await
+
+        let inner = self.0.write();
+        let region = inner.regions.get_existing(region_loc).unwrap();
+        // let chunk_desc = region.chunk(slab.chunk).description();
+
+        // TODO generate slab
+
+        // TODO rasterize features onto slab
+
+        let mut slab = SlabGrid::default();
+        slab[&[0, 0, 0]].ty = BlockType::Stone;
+        slab
     }
 
     /// Instantiate regions and initialize chunks

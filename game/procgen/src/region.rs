@@ -4,7 +4,6 @@ use crate::{map_range, PlanetParams};
 use common::*;
 use grid::{grid_declare, GridImpl};
 use std::cmp::Ordering;
-use std::rc::Rc;
 use std::sync::Arc;
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
@@ -49,11 +48,11 @@ pub struct Region {
     chunks: [RegionChunk; CHUNKS_PER_REGION],
 }
 
-struct RegionChunk {
+pub struct RegionChunk {
     desc: ChunkDescription,
 }
 
-struct ChunkDescription {
+pub struct ChunkDescription {
     ranges: SmallVec<[Range; 4]>,
 }
 
@@ -183,6 +182,21 @@ impl Region {
         });
 
         Region { chunks }
+    }
+
+    pub fn chunk(&self, chunk: ChunkLocation) -> &RegionChunk {
+        let ChunkLocation(x, y) = chunk;
+        let x = x % CHUNKS_PER_REGION_SIDE.as_i32();
+        let y = y % CHUNKS_PER_REGION_SIDE.as_i32();
+
+        let idx = (y + (x * CHUNKS_PER_REGION_SIDE.as_i32())) as usize;
+        &self.chunks[idx]
+    }
+}
+
+impl RegionChunk {
+    pub fn description(&self) -> &ChunkDescription {
+        &self.desc
     }
 }
 

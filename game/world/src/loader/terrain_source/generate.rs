@@ -1,13 +1,16 @@
-use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSourceError};
-use crate::loader::TerrainSource;
+use crate::loader::terrain_source::TerrainSourceError;
 
-use crate::block::{Block, BlockType};
-use crate::chunk::slab::{Slab, SlabGrid, SlabType};
+use crate::block::Block;
+use crate::chunk::slab::{Slab, SlabType};
+
 use common::*;
-use grid::GridImpl;
-use procgen::{Planet, PlanetParams};
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
 
+use procgen::{GeneratedBlock, Planet, PlanetParams};
+
+use unit::world::SlabLocation;
+
+/// Holds lightweight arc'd and mutex'd reference to planet
+#[derive(Clone)]
 pub struct GeneratedTerrainSource {
     planet: Planet,
 }
@@ -22,52 +25,34 @@ impl GeneratedTerrainSource {
 
         Ok(Self { planet })
     }
-}
 
-impl TerrainSource for GeneratedTerrainSource {
-    fn world_bounds(&self) -> (ChunkLocation, ChunkLocation) {
-        self.planet.chunk_bounds()
+    pub fn planet(&self) -> &Planet {
+        &self.planet
     }
 
-    fn preprocess(
-        &self,
-        slab: SlabLocation,
-    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
-        let planet = self.planet.clone();
-        Box::new(move || {
-            let procgen_slab = planet.generate_slab(slab);
-            let slab_grid = convert_grid(procgen_slab);
-            // TODO might be able to use SlabGridImpl here and avoid double boxing
-            Ok(Box::new(Slab::from_grid(slab_grid, SlabType::Normal)))
-        })
-    }
-
-    fn load_slab(
-        &mut self,
-        _: SlabLocation,
-        preprocess_result: Box<dyn PreprocessedTerrain>,
-    ) -> Result<Slab, TerrainSourceError> {
-        Ok(preprocess_result.into_slab())
-    }
-
-    fn prepare_for_chunks(&mut self, range: (ChunkLocation, ChunkLocation)) {
-        self.planet.prepare_for_chunks(range);
+    pub fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+        let slab = self.planet.generate_slab(slab);
+        Ok(slab.into())
     }
 }
 
-fn convert_grid(generated: procgen::SlabGrid) -> SlabGrid {
-    assert_eq!(generated.array().len(), SlabGrid::FULL_SIZE);
-
-    let mut slab = SlabGrid::default();
-
-    // TODO populate slab grid from generated
-    slab[&[0, 0, 0]] = Block::with_block_type(BlockType::Grass);
-
-    slab
+impl From<procgen::SlabGrid> for Slab {
+    fn from(grid: procgen::SlabGrid) -> Self {
+        Slab::from_other_grid(grid, SlabType::Normal)
+    }
 }
 
-impl PreprocessedTerrain for Slab {
-    fn into_slab(self: Box<Self>) -> Slab {
-        *self
+impl From<&procgen::GeneratedBlock> for Block {
+    fn from(block: &GeneratedBlock) -> Self {
+        use crate::block::BlockType as B;
+        use procgen::BlockType as A;
+        let ty = match block.ty {
+            A::Air => B::Air,
+            A::Stone => B::Stone,
+            A::Dirt => B::Dirt,
+            A::Grass => B::Grass,
+        };
+
+        Block::with_block_type(ty)
     }
 }
