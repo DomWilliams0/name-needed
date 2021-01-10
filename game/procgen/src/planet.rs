@@ -6,8 +6,8 @@ use crate::params::PlanetParams;
 use crate::region::{RegionLocation, Regions};
 use crate::BlockType;
 use std::sync::Arc;
-use unit::world::{ChunkLocation, SlabLocation};
 use tokio::sync::RwLock;
+use unit::world::{ChunkLocation, SlabLocation};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -19,7 +19,7 @@ unsafe impl Sync for Planet {}
 pub struct PlanetInner {
     pub(crate) params: PlanetParams,
     pub(crate) continents: ContinentMap,
-    regions: Regions,
+    pub(crate) regions: Regions,
 
     #[cfg(feature = "climate")]
     climate: Option<crate::climate::Climate>,
@@ -118,6 +118,7 @@ impl Planet {
         )
     }
 
+    /// Generates now and does not cache
     pub async fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
         // load region if not already
         let region_loc = RegionLocation::from(slab.chunk);
@@ -125,15 +126,15 @@ impl Planet {
 
         let inner = self.0.write().await;
         let region = inner.regions.get_existing(region_loc).unwrap();
-        // let chunk_desc = region.chunk(slab.chunk).description();
+        let chunk_desc = region.chunk(slab.chunk).description();
 
-        // TODO generate slab
+        // generate base slab terrain from chunk description
+        let mut terrain = SlabGrid::default();
+        chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 
         // TODO rasterize features onto slab
 
-        let mut slab = SlabGrid::default();
-        slab[&[0, 0, 0]].ty = BlockType::Stone;
-        slab
+        terrain
     }
 
     /// Instantiate regions and initialize chunks

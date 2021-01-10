@@ -1,6 +1,6 @@
 use crate::continent::Generator;
 use crate::rasterize::BlockType;
-use crate::{map_range, PlanetParams};
+use crate::{map_range, PlanetParams, SlabGrid};
 use common::*;
 
 use grid::{grid_declare, GridImpl};
@@ -10,7 +10,10 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SliceIndex, CHUNK_SIZE};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
+    CHUNK_SIZE, SLAB_SIZE,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct RegionLocation(pub i32, pub i32);
@@ -160,12 +163,17 @@ impl Region {
         Region { chunks }
     }
 
-    pub fn chunk(&self, chunk: ChunkLocation) -> &RegionChunk {
+    fn chunk_index(chunk: ChunkLocation) -> usize {
         let ChunkLocation(x, y) = chunk;
-        let x = x % CHUNKS_PER_REGION_SIDE.as_i32();
-        let y = y % CHUNKS_PER_REGION_SIDE.as_i32();
+        let x = x.rem_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        let y = y.rem_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
 
-        let idx = (y + (x * CHUNKS_PER_REGION_SIDE.as_i32())) as usize;
+        (x + (y * CHUNKS_PER_REGION_SIDE.as_i32())) as usize
+    }
+
+    pub fn chunk(&self, chunk: ChunkLocation) -> &RegionChunk {
+        let idx = Self::chunk_index(chunk);
+        debug_assert!(idx < self.chunks.len(), "bad idx {}", idx);
         &self.chunks[idx]
     }
 }
@@ -187,7 +195,7 @@ impl RegionChunk {
         // get height for each surface block in chunk
         let mut height_map = ChunkHeightMap::default();
         let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
-        for (i, (bx, by)) in (0..CHUNK_SIZE.as_i32())
+        for (i, (by, bx)) in (0..CHUNK_SIZE.as_i32())
             .cartesian_product(0..CHUNK_SIZE.as_i32())
             .enumerate()
         {
@@ -284,6 +292,66 @@ impl ChunkDescription {
             }
         }
     }
+
+    pub fn apply_to_slab(&self, slab_idx: SlabIndex, slab: &mut SlabGrid) {
+        let from_slice = slab_idx.as_i32() * SLAB_SIZE.as_i32();
+        let to_slice = from_slice + SLAB_SIZE.as_i32();
+
+        let mut current_range = None;
+        let mut current_idx = 0;
+
+        let mut next_range = |z: GlobalSliceIndex| match current_range {
+            Some(max) if z < max => &self.ranges[current_idx],
+            _ => {
+                let (range_idx, range) = self
+                    .ranges
+                    .iter()
+                    .enumerate()
+                    .skip(current_idx)
+                    .find(|(_, range)| z < range.upper)
+                    .unwrap_or_else(|| panic!("slice {:?} matches no range", z));
+
+                current_range = Some(range.upper);
+                current_idx = range_idx;
+                range
+            }
+        };
+
+        for (z_global, z_local) in (from_slice..to_slice)
+            .map(GlobalSliceIndex::new)
+            .zip(LocalSliceIndex::range())
+        {
+            let range = next_range(z_global);
+            let slice = {
+                let (from, to) = slab.slice_range(z_local.slice_unsigned());
+                &mut slab.array_mut()[from..to]
+            };
+            match &range.ty {
+                RangeType::Solid(bt) => {
+                    slice.iter_mut().for_each(|b| b.ty = *bt);
+                }
+                RangeType::HeightMap {
+                    under,
+                    surface,
+                    height_map,
+                } => {
+                    for (i, (y, x)) in (0..CHUNK_SIZE.as_i32())
+                        .cartesian_product(0..CHUNK_SIZE.as_i32())
+                        .enumerate()
+                    {
+                        let height = SliceIndex::new(height_map[&[x, y, 0]]);
+                        let bt = match z_global.cmp(&height) {
+                            Ordering::Less => *under,
+                            Ordering::Equal => *surface,
+                            Ordering::Greater => BlockType::Air,
+                        };
+
+                        slice[i].ty = bt;
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Range {
@@ -298,10 +366,9 @@ impl Range {
 
 impl From<ChunkLocation> for RegionLocation {
     fn from(chunk: ChunkLocation) -> Self {
-        RegionLocation(
-            chunk.0 / CHUNKS_PER_REGION_SIDE.as_i32(),
-            chunk.1 / CHUNKS_PER_REGION_SIDE.as_i32(),
-        )
+        let x = chunk.0.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        let y = chunk.1.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        RegionLocation(x, y)
     }
 }
 
@@ -317,3 +384,43 @@ impl Debug for RangeType {
 }
 
 slog_value_debug!(RegionLocation);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn negative_region() {
+        assert_eq!(
+            RegionLocation::from(ChunkLocation(-2, 1)),
+            RegionLocation(-1, 0)
+        );
+
+        assert_eq!(
+            RegionLocation::from(ChunkLocation(-CHUNKS_PER_REGION_SIDE.as_i32() - 1, -2)),
+            RegionLocation(-2, -1)
+        );
+    }
+
+    #[test]
+    fn chunk_index() {
+        assert_eq!(
+            Region::chunk_index(ChunkLocation(0, 2)),
+            CHUNKS_PER_REGION_SIDE.as_usize() * 2
+        );
+
+        assert_eq!(Region::chunk_index(ChunkLocation(3, 0)), 3);
+
+        assert_eq!(
+            Region::chunk_index(ChunkLocation(3 + (CHUNKS_PER_REGION_SIDE.as_i32() * 3), 0)),
+            3
+        );
+
+        let idx = Region::chunk_index(ChunkLocation(
+            CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+            CHUNKS_PER_REGION_SIDE.as_i32() - 2,
+        ));
+        assert_eq!(idx, 55);
+        assert_eq!(Region::chunk_index(ChunkLocation(-1, -2)), idx);
+    }
+}

@@ -94,7 +94,7 @@ impl Render {
                 let float = if params.draw_height {
                     tile.height() as f32
                 } else if params.draw_density {
-                    unsafe {tile.density() as f32}
+                    unsafe { tile.density() as f32 }
                 } else {
                     0.8
                 };
@@ -200,8 +200,14 @@ impl Render {
         image::imageops::overlay(image, &overlay, 0, 0);
     }
 
-    pub fn draw_region(&mut self, region: RegionLocation) {
-        let inner = self.planet.inner();
+    pub async fn draw_region(&mut self, region: RegionLocation) {
+        let inner = self.planet.inner().await;
+        let region = inner
+            .regions
+            .get_existing(region)
+            .expect("region not found");
+        // TODO force generation of ground level slabs
+        // TODO position camera at a specific z above ground then render highest non-air block
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {

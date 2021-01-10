@@ -36,11 +36,22 @@ pub trait GridImpl {
     }
 
     /// Vertical slice in z direction
-    fn slice_range(&self, index: i32) -> (usize, usize) {
-        let [xs, ys, _zs] = Self::DIMS;
-        let slice_count = xs * ys;
-        let offset = index * slice_count;
-        (offset as usize, (offset + slice_count) as usize)
+    fn slice_range(&self, index: u32) -> (usize, usize) {
+        self.slice_range_multiple(index, index + 1)
+    }
+
+    /// Vertical slices in z direction, [from..to)
+    fn slice_range_multiple(&self, from: u32, to: u32) -> (usize, usize) {
+        assert!(from < to);
+
+        let [xs, ys, _] = Self::DIMS;
+        let slice_count = (xs * ys) as u32;
+        let offset = from * slice_count;
+        let n = to - from; // asserted to>from above
+        (
+            offset as usize,
+            (offset + (slice_count * n as u32)) as usize,
+        )
     }
 }
 
@@ -396,7 +407,6 @@ impl<I: GridImpl> Grid<I> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use common::Itertools;
 
     #[test]
     fn simple() {
@@ -425,6 +435,28 @@ mod tests {
         }
 
         assert_eq!(grid[&[2, 2, 3]], 1);
+    }
+
+    #[test]
+    fn cache_efficiency() {
+        grid_declare!(struct TestGrid<TestImpl, u32>, 4, 5, 6);
+        let grid = TestGrid::default();
+
+        let mut last = None;
+        for z in 0..TestImpl::DIMS[2] {
+            for y in 0..TestImpl::DIMS[1] {
+                for x in 0..TestImpl::DIMS[0] {
+                    let idx = grid.flatten(&[x, y, z]);
+
+                    if let Some(last) = last {
+                        assert_eq!(idx, last + 1);
+                    }
+
+                    last = Some(idx);
+                    eprintln!("{} -> {:?}", idx, (x, y, z));
+                }
+            }
+        }
     }
 
     #[test]

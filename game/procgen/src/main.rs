@@ -32,7 +32,9 @@ fn main() {
             common::panic::init_panic_detection();
 
             let dew_it = || {
-                let runtime =  tokio::runtime::Builder::new_current_thread().build().unwrap();
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .build()
+                    .unwrap();
                 runtime.block_on(async {
                     let mut planet = Planet::new(params).expect("failed");
                     planet.initial_generation().await;
@@ -47,10 +49,10 @@ fn main() {
                         planet.realize_region(region).await;
 
                         let mut render = Render::with_planet(planet.clone()).await;
-                        // render.draw_region(region);
-                        // render
-                        //     .save(format!("procgen-region-{}-{}.png", x, y))
-                        //     .expect("failed to write image");
+                        render.draw_region(region).await;
+                        render
+                            .save(format!("procgen-region-{}-{}.png", x, y))
+                            .expect("failed to write image");
                     }
                 })
             };

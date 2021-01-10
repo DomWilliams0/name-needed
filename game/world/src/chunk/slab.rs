@@ -100,13 +100,13 @@ impl Slab {
 
     pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
         let index = index.into();
-        let (from, to) = self.slice_range(index.slice());
+        let (from, to) = self.slice_range(index.slice_unsigned());
         Slice::new(&self.array()[from..to])
     }
 
     pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
         let index = index.into();
-        let (from, to) = self.slice_range(index.slice());
+        let (from, to) = self.slice_range(index.slice_unsigned());
         SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 

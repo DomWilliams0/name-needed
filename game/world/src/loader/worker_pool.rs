@@ -127,5 +127,7 @@ impl AsyncWorkerPool {
         }
     }
 
-    pub fn runtime(&self) -> &Runtime {&self.pool}
+    pub fn runtime(&self) -> &Runtime {
+        &self.pool
+    }
 }
