@@ -26,8 +26,8 @@ trait PixelColor: Clone {
 }
 
 impl Render {
-    pub fn with_planet(planet: Planet) -> Self {
-        let p = planet.inner();
+    pub async fn with_planet(planet: Planet) -> Self {
+        let p = planet.inner().await;
         let params = &p.params;
         assert!(params.render.scale > 0);
 
@@ -38,8 +38,8 @@ impl Render {
         }
     }
 
-    pub fn draw_continents(&mut self) {
-        let planet = self.planet.inner();
+    pub async fn draw_continents(&mut self) {
+        let planet = self.planet.inner().await;
         let planet_size = planet.params.planet_size;
         let params = &planet.params.render;
 
@@ -94,7 +94,7 @@ impl Render {
                 let float = if params.draw_height {
                     tile.height() as f32
                 } else if params.draw_density {
-                    tile.density() as f32
+                    unsafe {tile.density() as f32}
                 } else {
                     0.8
                 };
@@ -118,15 +118,15 @@ impl Render {
     }
 
     #[cfg(feature = "climate")]
-    pub fn draw_climate_overlay(
+    pub async fn draw_climate_overlay(
         &mut self,
-        climate: &crate::climate::ClimateIteration,
+        climate: &'_ crate::climate::ClimateIteration,
         layer: AirLayer,
         what: RenderProgressParams,
     ) {
         use crate::climate::PlanetGrid;
 
-        let planet = self.planet.inner();
+        let planet = self.planet.inner().await;
         let params = &planet.params;
 
         let scale = params.render.scale;

@@ -1,5 +1,7 @@
 use crate::climate::ClimateIteration;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait ProgressTracker {
     fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration);
     fn fini(&mut self);
@@ -75,9 +77,9 @@ mod gif {
     }
 
     impl ProgressTracker for GifProgressTracker {
-        fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration) {
+        async fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration) {
             let (fps, to_do) = {
-                let params = &planet.inner().params;
+                let params = &planet.inner().params.await;
 
                 let fps = params.render.gif_fps;
                 let to_do = if params.render.gif_all {

@@ -8,7 +8,6 @@ use std::cell::Cell;
 use std::f32::consts::PI;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
-use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct LandBlob {
@@ -40,6 +39,9 @@ pub struct Tile {
     continent: Option<ContinentIdx>,
     height: f64,
 }
+
+/// density: Cell<f64> is only written to during initial generation outside of any async functions
+unsafe impl Sync for Tile {}
 
 pub struct Generator {
     height: Fbm,
@@ -464,7 +466,9 @@ impl Tile {
         self.continent.is_some()
     }
 
-    pub fn density(&self) -> f64 {
+    /// density is not really Sync
+    #[cfg(feature = "bin")]
+    pub unsafe fn density(&self) -> f64 {
         self.density.get()
     }
 

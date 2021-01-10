@@ -158,6 +158,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
+name = "async-trait"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.51",
+]
+
+[[package]]
 name = "atom"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2106,9 +2117,11 @@ name = "procgen"
 version = "0.1.0"
 dependencies = [
  "array-init",
+ "async-trait",
  "color",
  "common",
  "crossbeam",
+ "futures 0.3.8",
  "grid",
  "image 0.23.10",
  "imageproc",
@@ -2119,6 +2132,7 @@ dependencies = [
  "structopt",
  "strum",
  "strum_macros",
+ "tokio 0.3.4",
  "unit",
 ]
 
@@ -2966,6 +2980,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9dfe2523e6fa84ddf5e688151d4e5fddc51678de9752c6512a24714c23818d61"
 dependencies = [
  "autocfg 1.0.1",
+ "futures-core",
  "num_cpus",
  "pin-project-lite",
  "slab",

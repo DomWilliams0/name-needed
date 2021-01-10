@@ -1,6 +1,5 @@
 use crate::continent::ContinentMap;
 use crate::rasterize::SlabGrid;
-use common::parking_lot::RwLock;
 use common::*;
 
 use crate::params::PlanetParams;
@@ -8,6 +7,7 @@ use crate::region::{RegionLocation, Regions};
 use crate::BlockType;
 use std::sync::Arc;
 use unit::world::{ChunkLocation, SlabLocation};
+use tokio::sync::RwLock;
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -42,9 +42,9 @@ impl Planet {
         Ok(Self(inner))
     }
 
-    pub fn initial_generation(&mut self) {
+    pub async fn initial_generation(&mut self) {
         let planet_ref = self.clone();
-        let mut planet = self.0.write();
+        let mut planet = self.0.write().await;
         let params = planet.params.clone();
 
         let mut planet_rando = StdRng::seed_from_u64(params.seed());
@@ -80,7 +80,7 @@ impl Planet {
 
             // downgrade planet reference so it can be read from multiple places
             drop(planet);
-            let planet = self.0.read();
+            let planet = self.0.read().await;
 
             let climate = Climate::simulate(
                 &planet.continents,
@@ -95,15 +95,15 @@ impl Planet {
 
             // upgrade planet lock again
             drop(planet);
-            let mut planet = self.0.write();
+            let mut planet = self.0.write().await;
             planet.climate = Some(climate);
         }
     }
 
-    pub fn realize_region(&self, region: RegionLocation) {
-        let mut inner = self.0.write();
+    pub async fn realize_region(&self, region: RegionLocation) {
+        let mut inner = self.0.write().await;
         let height_map = inner.continents.generator();
-        inner.regions.get_or_create(region, height_map);
+        inner.regions.get_or_create(region, height_map).await;
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
@@ -118,13 +118,12 @@ impl Planet {
         )
     }
 
-    // TODO result
-    pub fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
+    pub async fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
         // load region if not already
         let region_loc = RegionLocation::from(slab.chunk);
-        self.realize_region(region_loc); // TODO .await
+        self.realize_region(region_loc).await;
 
-        let inner = self.0.write();
+        let inner = self.0.write().await;
         let region = inner.regions.get_existing(region_loc).unwrap();
         // let chunk_desc = region.chunk(slab.chunk).description();
 
@@ -138,19 +137,19 @@ impl Planet {
     }
 
     /// Instantiate regions and initialize chunks
-    pub fn prepare_for_chunks(&self, (min, max): (ChunkLocation, ChunkLocation)) {
+    pub async fn prepare_for_chunks(&self, (min, max): (ChunkLocation, ChunkLocation)) {
         let regions = (min.0..=max.0)
             .cartesian_product(min.1..=max.1)
             .map(|(cx, cy)| RegionLocation::from(ChunkLocation(cx, cy)))
             .dedup();
 
         for region in regions {
-            self.realize_region(region);
+            self.realize_region(region).await;
         }
     }
 
     #[cfg(feature = "bin")]
-    pub fn inner(&self) -> impl std::ops::Deref<Target = PlanetInner> + '_ {
-        self.0.read()
+    pub async fn inner(&self) -> impl std::ops::Deref<Target = PlanetInner> + '_ {
+        self.0.read().await
     }
 }

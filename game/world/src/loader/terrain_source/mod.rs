@@ -41,17 +41,17 @@ impl From<GeneratedTerrainSource> for TerrainSource {
 }
 
 impl TerrainSource {
-    pub fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
+    pub async fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
         match self {
             TerrainSource::Memory(_) => {}
-            TerrainSource::Generated(src) => src.planet().prepare_for_chunks(range),
+            TerrainSource::Generated(src) => src.planet().prepare_for_chunks(range).await,
         }
     }
 
-    pub fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
         match self {
             TerrainSource::Memory(src) => src.read().get_slab_copy(slab),
-            TerrainSource::Generated(src) => src.load_slab(slab),
+            TerrainSource::Generated(src) => src.load_slab(slab).await,
         }
     }
 }

@@ -1,14 +1,16 @@
-use crate::continent::{ContinentMap, Generator};
+use crate::continent::Generator;
 use crate::rasterize::BlockType;
 use crate::{map_range, PlanetParams};
 use common::*;
+
 use grid::{grid_declare, GridImpl};
 use std::cmp::Ordering;
+
+use std::mem::MaybeUninit;
 use std::sync::Arc;
+
 use unit::dim::SmallUnsignedConstant;
-use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SliceIndex, CHUNK_SIZE,
-};
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SliceIndex, CHUNK_SIZE};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct RegionLocation(pub i32, pub i32);
@@ -88,7 +90,7 @@ impl Regions {
     }
 
     // TODO result for out of range
-    pub fn get_or_create(
+    pub async fn get_or_create(
         &mut self,
         location: RegionLocation,
         generator: Arc<Generator>,
@@ -97,7 +99,7 @@ impl Regions {
             Ok(idx) => &self.regions[idx].1,
             Err(idx) => {
                 debug!("creating new region"; "region" => ?location);
-                let region = Region::create(location, generator, &self.params);
+                let region = Region::create(location, generator, &self.params).await;
                 self.regions.insert(idx, (location, region));
                 &self.regions[idx].1
             }
@@ -116,70 +118,44 @@ impl Regions {
 }
 
 impl Region {
-    fn create(coords: RegionLocation, generator: Arc<Generator>, params: &PlanetParams) -> Self {
-        log_scope!(o!("region" => coords));
+    async fn create(
+        coords: RegionLocation,
+        generator: Arc<Generator>,
+        params: &PlanetParams,
+    ) -> Self {
+        // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
+        // times?
+        debug!("creating region"; "region" => ?coords);
 
-        let (rx, ry) = (coords.0 as f64, coords.1 as f64);
-        const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() + CHUNK_SIZE.as_f64());
+        let region = (coords.0 as f64, coords.1 as f64);
         let height_scale = params.height_scale as f64;
 
         // initialize chunk descriptions
-        // TODO this can be parallelized, each chunk is processed in isolation
-        let chunks = array_init::array_init(|chunk_idx| {
-            let chunk_idx = chunk_idx as i32;
-            let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
-            let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
-            let mut ranges = SmallVec::new();
+        let mut chunks: [MaybeUninit<RegionChunk>; CHUNKS_PER_REGION] =
+            unsafe { MaybeUninit::uninit().assume_init() };
 
-            // get height for each surface block in chunk
-            let mut height_map = ChunkHeightMap::default();
-            let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
-            for (i, (bx, by)) in (0..CHUNK_SIZE.as_i32())
-                .cartesian_product(0..CHUNK_SIZE.as_i32())
-                .enumerate()
-            {
-                let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
-                let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
-                let height = map_range((-1.0, 1.0), (0.0, 1.0), generator.sample((nx, ny)));
+        let handle = tokio::runtime::Handle::current();
+        futures::future::join_all((0..CHUNKS_PER_REGION).map(|idx| {
+            let generator = generator.clone();
 
-                // convert height map float into block coords
-                let block_height = (height * height_scale) as i32;
+            // cant pass a ptr across threads but you can an integer :^)
+            // the array is stack allocated and we dont leave this function while this closure is
+            // alive so this pointer is safe to use.
+            let this_chunk = chunks[idx].as_mut_ptr() as usize;
+            handle.spawn(async move {
+                let chunk = RegionChunk::new(idx, region, generator, height_scale);
 
-                height_map[i] = block_height;
+                // safety: each task has a single index in the chunk array
+                unsafe {
+                    let this_chunk = this_chunk as *mut RegionChunk;
+                    this_chunk.write(chunk);
+                }
+            })
+        }))
+        .await;
 
-                min_height = min_height.min(block_height);
-                max_height = max_height.max(block_height);
-            }
-
-            ranges.push(Range::new(
-                min_height,
-                max_height,
-                RangeType::HeightMap {
-                    height_map,
-                    under: BlockType::Dirt,
-                    surface: BlockType::Grass,
-                },
-            ));
-
-            // everything below is stone, everything above is air
-            ranges.push(Range::new(
-                i32::MIN,
-                min_height,
-                RangeType::Solid(BlockType::Stone),
-            ));
-            ranges.push(Range::new(
-                max_height,
-                i32::MAX,
-                RangeType::Solid(BlockType::Air),
-            ));
-
-            // TODO depends on many local parameters e.g. biome, humidity
-
-            trace!("generated region chunk"; "chunk" => ?(cx, cy));
-            RegionChunk {
-                desc: ChunkDescription::new(ranges),
-            }
-        });
+        // safety: all chunks have been initialized
+        let chunks: [RegionChunk; CHUNKS_PER_REGION] = unsafe { std::mem::transmute(chunks) };
 
         Region { chunks }
     }
@@ -195,6 +171,70 @@ impl Region {
 }
 
 impl RegionChunk {
+    fn new(
+        chunk_idx: usize,
+        (rx, ry): (f64, f64),
+        generator: Arc<Generator>,
+        height_scale: f64,
+    ) -> Self {
+        const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() + CHUNK_SIZE.as_f64());
+
+        let chunk_idx = chunk_idx as i32;
+        let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
+        let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
+        let mut ranges = SmallVec::new();
+
+        // get height for each surface block in chunk
+        let mut height_map = ChunkHeightMap::default();
+        let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
+        for (i, (bx, by)) in (0..CHUNK_SIZE.as_i32())
+            .cartesian_product(0..CHUNK_SIZE.as_i32())
+            .enumerate()
+        {
+            let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
+            let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
+            let height = map_range((-1.0, 1.0), (0.0, 1.0), generator.sample((nx, ny)));
+
+            // convert height map float into block coords
+            let block_height = (height * height_scale) as i32;
+
+            height_map[i] = block_height;
+
+            min_height = min_height.min(block_height);
+            max_height = max_height.max(block_height);
+        }
+
+        ranges.push(Range::new(
+            min_height,
+            max_height,
+            RangeType::HeightMap {
+                height_map,
+                under: BlockType::Dirt,
+                surface: BlockType::Grass,
+            },
+        ));
+
+        // everything below is stone, everything above is air
+        ranges.push(Range::new(
+            i32::MIN,
+            min_height,
+            RangeType::Solid(BlockType::Stone),
+        ));
+        ranges.push(Range::new(
+            max_height,
+            i32::MAX,
+            RangeType::Solid(BlockType::Air),
+        ));
+
+        // TODO depends on many local parameters e.g. biome, humidity
+
+        trace!("generated region chunk"; "chunk" => ?(cx, cy), "region" => ?(rx, ry));
+
+        RegionChunk {
+            desc: ChunkDescription::new(ranges),
+        }
+    }
+
     pub fn description(&self) -> &ChunkDescription {
         &self.desc
     }

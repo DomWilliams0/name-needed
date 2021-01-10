@@ -12,6 +12,7 @@ use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio::runtime::Runtime;
 
 pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
 
@@ -125,4 +126,6 @@ impl AsyncWorkerPool {
             error!("failed to send terrain result to finalizer"; "error" => %e);
         }
     }
+
+    pub fn runtime(&self) -> &Runtime {&self.pool}
 }

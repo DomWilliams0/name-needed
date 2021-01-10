@@ -32,24 +32,27 @@ fn main() {
             common::panic::init_panic_detection();
 
             let dew_it = || {
-                let mut planet = Planet::new(params).expect("failed");
-                planet.initial_generation();
+                let runtime =  tokio::runtime::Builder::new_current_thread().build().unwrap();
+                runtime.block_on(async {
+                    let mut planet = Planet::new(params).expect("failed");
+                    planet.initial_generation().await;
 
-                let mut render = Render::with_planet(planet.clone());
-                render.draw_continents();
-                render.save("procgen.png").expect("failed to write image");
+                    let mut render = Render::with_planet(planet.clone()).await;
+                    render.draw_continents().await;
+                    render.save("procgen.png").expect("failed to write image");
 
-                let y = 50;
-                for x in 50..=52 {
-                    let region = RegionLocation(x, y);
-                    planet.realize_region(region);
+                    let y = 50;
+                    for x in 50..=52 {
+                        let region = RegionLocation(x, y);
+                        planet.realize_region(region).await;
 
-                    let mut render = Render::with_planet(planet.clone());
-                    // render.draw_region(region);
-                    // render
-                    //     .save(format!("procgen-region-{}-{}.png", x, y))
-                    //     .expect("failed to write image");
-                }
+                        let mut render = Render::with_planet(planet.clone()).await;
+                        // render.draw_region(region);
+                        // render
+                        //     .save(format!("procgen-region-{}-{}.png", x, y))
+                        //     .expect("failed to write image");
+                    }
+                })
             };
 
             match common::panic::run_and_handle_panics(dew_it) {

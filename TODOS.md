@@ -1,4 +1,4 @@
-# TODOs (269)
+# TODOs (266)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -33,23 +33,20 @@
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (8)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (6)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
-   * `// TODO result`
-   * `self.realize_region(region_loc); // TODO .await`
    * `// TODO generate slab`
    * `// TODO rasterize features onto slab`
  * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (4)
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (3)
    * `// TODO store u8/u16 relative to range minimum to save space`
    * `// TODO result for out of range`
-   * `// TODO this can be parallelized, each chunk is processed in isolation`
    * `// TODO depends on many local parameters e.g. biome, humidity`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (1)
    * `// TODO per land layer?`

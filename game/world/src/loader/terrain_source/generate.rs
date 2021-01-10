@@ -16,12 +16,12 @@ pub struct GeneratedTerrainSource {
 }
 
 impl GeneratedTerrainSource {
-    pub fn new(params: PlanetParams) -> BoxedResult<Self> {
+    pub async fn new(params: PlanetParams) -> BoxedResult<Self> {
         // TODO load a serialized planet from disk to avoid constantly regenerating
         let mut planet = Planet::new(params)?;
 
         info!("generating planet");
-        planet.initial_generation();
+        planet.initial_generation().await;
 
         Ok(Self { planet })
     }
@@ -30,8 +30,8 @@ impl GeneratedTerrainSource {
         &self.planet
     }
 
-    pub fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
-        let slab = self.planet.generate_slab(slab);
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+        let slab = self.planet.generate_slab(slab).await;
         Ok(slab.into())
     }
 }

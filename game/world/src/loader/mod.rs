@@ -164,7 +164,7 @@ impl<C: WorldContext> WorldLoader<C> {
         {
             let source = self.source.clone();
             self.pool.submit_void_async(async move {
-                source.prepare_for_chunks((chunk_min, chunk_max));
+                source.prepare_for_chunks((chunk_min, chunk_max)).await;
             });
         }
 
@@ -187,7 +187,7 @@ impl<C: WorldContext> WorldLoader<C> {
                         // empty placeholder
                         Ok(None)
                     } else {
-                        source.load_slab(slab).map(Some)
+                        source.load_slab(slab).await.map(Some)
                     };
 
                     let terrain = match result {

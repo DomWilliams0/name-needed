@@ -62,7 +62,10 @@ fn world_from_source(
             debug!("generating world from config"; "path" => %config_res.display());
 
             let params = PlanetParams::load_with_only_file(config_res);
-            let source = params.and_then(GeneratedTerrainSource::new)?;
+            let source = params.and_then(|params| {
+                pool.runtime()
+                    .block_on(async { GeneratedTerrainSource::new(params).await })
+            })?;
             WorldLoader::new(source, pool)
         }
     })
