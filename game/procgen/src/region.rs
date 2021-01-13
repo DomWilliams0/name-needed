@@ -19,9 +19,9 @@ use unit::world::{
 pub struct RegionLocation(pub i32, pub i32);
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
-const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant::new(8);
+pub const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant::new(8);
 
-const CHUNKS_PER_REGION: usize =
+pub const CHUNKS_PER_REGION: usize =
     CHUNKS_PER_REGION_SIDE.as_usize() * CHUNKS_PER_REGION_SIDE.as_usize();
 
 pub struct Regions {
@@ -185,7 +185,7 @@ impl RegionChunk {
         generator: Arc<Generator>,
         height_scale: f64,
     ) -> Self {
-        const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() + CHUNK_SIZE.as_f64());
+        const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
 
         let chunk_idx = chunk_idx as i32;
         let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
@@ -256,10 +256,11 @@ impl ChunkDescription {
         let mut last_upper = i32::MIN;
         for range in &ranges {
             debug_assert!(
-                last_upper == range.lower.slice() && range.upper > range.lower,
-                "last={}, this={:?}",
+                last_upper == range.lower.slice() && range.upper >= range.lower,
+                "invalid chunk description, last={}, this={:?}, all={:#?}",
                 last_upper,
-                range
+                range,
+                ranges,
             );
             last_upper = range.upper.slice();
         }
@@ -372,12 +373,37 @@ impl From<ChunkLocation> for RegionLocation {
     }
 }
 
+impl RegionLocation {
+    /// Inclusive bounds
+    pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
+        let min = (
+            self.0 * CHUNKS_PER_REGION_SIDE.as_i32(),
+            self.1 * CHUNKS_PER_REGION_SIDE.as_i32(),
+        );
+        let max = (
+            min.0 + CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+            min.1 + CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+        );
+        (min.into(), max.into())
+    }
+
+    pub fn local_chunk_to_global(&self, local_chunk: ChunkLocation) -> ChunkLocation {
+        assert!((0..CHUNKS_PER_REGION_SIDE.as_i32()).contains(&local_chunk.x()));
+        assert!((0..CHUNKS_PER_REGION_SIDE.as_i32()).contains(&local_chunk.y()));
+
+        ChunkLocation(
+            (self.0 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.x(),
+            (self.1 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.y(),
+        )
+    }
+}
+
 impl Debug for RangeType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             RangeType::Solid(bt) => write!(f, "solid {:?}", bt),
             RangeType::HeightMap { under, surface, .. } => {
-                write!(f, "height map, {:?} below, {:?} above", under, surface)
+                write!(f, "height map, {:?} below, {:?} on surface", under, surface)
             }
         }
     }

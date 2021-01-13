@@ -1136,7 +1136,7 @@ mod tests {
     use std::time::Duration;
 
     use common::{seeded_rng, Itertools, Rng};
-    use unit::world::CHUNK_SIZE;
+    use unit::world::{all_slabs_in_range, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
         WorldPositionRange, SLAB_SIZE,
@@ -1153,9 +1153,7 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{
-        all_slabs_in_range, presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext,
-    };
+    use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext};
     use config::WorldPreset;
 
     #[test]

@@ -4,7 +4,6 @@ use common::*;
 
 use crate::params::PlanetParams;
 use crate::region::{RegionLocation, Regions};
-use crate::BlockType;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use unit::world::{ChunkLocation, SlabLocation};
@@ -43,7 +42,6 @@ impl Planet {
     }
 
     pub async fn initial_generation(&mut self) {
-        let planet_ref = self.clone();
         let mut planet = self.0.write().await;
         let params = planet.params.clone();
 
@@ -67,6 +65,7 @@ impl Planet {
             use crate::climate::*;
             use crate::progress::*;
 
+            let planet_ref = self.clone();
             let mut progress = match cfg!(feature = "bin") {
                 #[cfg(feature = "bin")]
                 true if params.render.create_climate_gif => Box::new(
@@ -129,6 +128,7 @@ impl Planet {
         let chunk_desc = region.chunk(slab.chunk).description();
 
         // generate base slab terrain from chunk description
+        trace!("generating slab terrain"; slab);
         let mut terrain = SlabGrid::default();
         chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 

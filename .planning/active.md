@@ -6,7 +6,8 @@
 	* [ ] position simple large scale features (e.g. forest)
 	* [ ] generate sub features (e.g. tree placement)
 	* [ ] rasterize sub features (e.g. tree blocks)
-	* [ ] rasterize slab and return to game
+	* [X] rasterize slab and return to game
+* [ ] fix unevenness of chunk descriptor heightmap ranges at chunk borders
 * [X] add async to planet chunk initialization
 * [X] refactor terrainsource usage to avoid so much boxing
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
@@ -17,8 +18,8 @@
 	* [X] all-air placeholder slabs should not be marked as fully loaded
 	* [X] bug: all air placeholders clobber existing terrain!
 	* [ ] restrict camera at world edge?
-* [ ] return full slab from procgen
-* [o] block modification should be localised to the slabs
+* [X] return full slab from procgen
+* [X] block modification should be localised to the slabs
 * [X] mark slabs as dirty instead of chunks in viewer
 * terrain should be generated at the slab level
 	* [X] pass slab range along with chunk pos to load

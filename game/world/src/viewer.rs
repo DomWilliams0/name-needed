@@ -1,10 +1,10 @@
 use common::*;
 
 use crate::mesh::BaseVertex;
-use crate::{all_slabs_in_range, mesh, InnerWorldRef, WorldContext, WorldRef};
+use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
 use std::collections::HashSet;
 use std::ops::{Add, RangeInclusive};
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation};
+use unit::world::{all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation};
 
 #[derive(Clone)]
 pub struct WorldViewer<C: WorldContext> {

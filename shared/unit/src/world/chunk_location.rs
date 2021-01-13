@@ -17,6 +17,27 @@ impl ChunkLocation {
         }
     }
 
+    pub const fn x(&self) -> i32 {
+        self.0
+    }
+    pub const fn y(&self) -> i32 {
+        self.1
+    }
+
+    /// Inclusive
+    pub fn iter_until(self, other: Self) -> impl Iterator<Item = ChunkLocation> {
+        let ChunkLocation(x0, y0) = self;
+        let ChunkLocation(x1, y1) = other;
+
+        let iter = (x0..=x1)
+            .cartesian_product(y0..=y1)
+            .map(|(x, y)| ChunkLocation(x, y));
+
+        debug_assert!(iter.clone().count() > 0, "chunk range is empty");
+
+        iter
+    }
+
     pub const MIN: Self = ChunkLocation(i32::MIN, i32::MIN);
     pub const MAX: Self = ChunkLocation(i32::MAX, i32::MAX);
 }

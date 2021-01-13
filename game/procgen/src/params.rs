@@ -65,6 +65,12 @@ pub struct PlanetParams {
 
     #[structopt(long, default_value = "100")]
     pub height_scale: u32,
+
+    #[structopt(long, default_value = "10")]
+    pub height_octaves: usize,
+
+    #[structopt(long, default_value = "10.0")]
+    pub height_freq: f64,
 }
 
 #[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]
@@ -125,6 +131,15 @@ pub struct RenderParams {
     /// Per axis
     #[structopt(long, default_value = "2")]
     pub scale: u32,
+
+    #[structopt(long, default_value = "5")]
+    pub region_start_slab: i32,
+
+    #[structopt(long, default_value = "10")]
+    pub region_max_depth: i32,
+
+    #[structopt(long, default_value = "4")]
+    pub threads: usize,
 }
 
 impl PlanetParams {

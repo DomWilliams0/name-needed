@@ -22,8 +22,27 @@ pub enum BlockType {
     Grass,
 }
 
+impl GeneratedBlock {
+    pub fn is_air(&self) -> bool {
+        matches!(self.ty, BlockType::Air)
+    }
+}
+
 impl Default for BlockType {
     fn default() -> Self {
         Self::Air
+    }
+}
+
+impl BlockType {
+    /// (hue, saturation)
+    #[cfg(feature = "bin")]
+    pub fn color_hs(&self) -> (f32, f32) {
+        match self {
+            BlockType::Air => (0.0, 0.0), // unused
+            BlockType::Stone => (0.66, 0.005),
+            BlockType::Dirt => (0.06, 0.4),
+            BlockType::Grass => (0.26, 0.16),
+        }
     }
 }

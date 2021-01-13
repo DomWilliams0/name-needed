@@ -378,7 +378,7 @@ impl ContinentMap {
 
     /// Generates noise and scales to 0.0-1.0
     fn generate_initial_heightmap(&mut self, rando: &mut dyn RngCore) {
-        let height_gen = Generator::new(rando, self.params.planet_size as f64);
+        let height_gen = Generator::new(rando, &self.params);
 
         let mut min = f64::MAX;
         let mut max = f64::MIN;
@@ -414,12 +414,13 @@ impl ContinentMap {
 }
 
 impl Generator {
-    pub fn new(rando: &mut dyn RngCore, scale: f64) -> Self {
+    pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
         // TODO adjust params for global height map
         let noise = Fbm::new()
             .set_seed(rando.gen())
-            .set_octaves(4)
-            .set_frequency(9.0);
+            .set_octaves(params.height_octaves)
+            .set_frequency(params.height_freq);
+        let scale = params.planet_size as f64;
 
         Generator {
             height: noise,

@@ -1,4 +1,4 @@
-# TODOs (267)
+# TODOs (266)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -47,10 +47,9 @@
    * `// TODO store u8/u16 relative to range minimum to save space`
    * `// TODO result for out of range`
    * `// TODO depends on many local parameters e.g. biome, humidity`
- * [game/procgen/src/render.rs](game/procgen/src/render.rs) (3)
+ * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
-   * `// TODO force generation of ground level slabs`
-   * `// TODO position camera at a specific z above ground then render highest non-air block`
+   * `// TODO fix log_scope crashing with async`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)

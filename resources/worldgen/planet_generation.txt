@@ -1,1 +1,4 @@
-# epic
+--seed 1231232
+
+--height-freq 12.0
+--height-octaves 8

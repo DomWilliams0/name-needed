@@ -1,14 +1,21 @@
-use crate::params::{AirLayer, RenderProgressParams};
-use crate::{map_range, Planet, RegionLocation};
-use color::ColorRgb;
-use common::*;
+use std::path::Path;
+
 use image::imageops::FilterType;
 use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
 use imageproc::drawing::{
     draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
 };
 use imageproc::rect::Rect;
-use std::path::Path;
+
+use color::ColorRgb;
+use common::*;
+use grid::{DynamicGrid, GridImpl};
+use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
+
+use crate::params::{AirLayer, RenderProgressParams};
+use crate::region::CHUNKS_PER_REGION_SIDE;
+use crate::{map_range, Planet, RegionLocation, SlabGrid};
+use common::num_traits::clamp;
 
 #[derive(Clone)]
 pub struct Render {
@@ -108,11 +115,16 @@ impl Render {
             }
         }
 
-        // store scaled image
-        self.image = Some(if params.scale == 1 {
+        let scale = params.scale;
+        drop(planet);
+        self.store_scaled_image(image, scale);
+    }
+
+    fn store_scaled_image(&mut self, image: RgbaImage, scale: u32) {
+        self.image = Some(if scale == 1 {
             image
         } else {
-            let new_size = params.scale * planet_size;
+            let new_size = scale * image.width();
             image::imageops::resize(&image, new_size, new_size, FilterType::Nearest)
         });
     }
@@ -120,7 +132,7 @@ impl Render {
     #[cfg(feature = "climate")]
     pub async fn draw_climate_overlay(
         &mut self,
-        climate: &'_ crate::climate::ClimateIteration,
+        climate: &crate::climate::ClimateIteration,
         layer: AirLayer,
         what: RenderProgressParams,
     ) {
@@ -200,14 +212,141 @@ impl Render {
         image::imageops::overlay(image, &overlay, 0, 0);
     }
 
-    pub async fn draw_region(&mut self, region: RegionLocation) {
+    pub async fn draw_region(&mut self, region_loc: RegionLocation) {
+        // params
         let inner = self.planet.inner().await;
-        let region = inner
-            .regions
-            .get_existing(region)
-            .expect("region not found");
-        // TODO force generation of ground level slabs
-        // TODO position camera at a specific z above ground then render highest non-air block
+        let start_slab = inner.params.render.region_start_slab;
+        let max_depth = inner.params.render.region_max_depth;
+        let scale = inner.params.render.scale;
+        drop(inner);
+
+        // create 1:1 image for region
+        let mut image = {
+            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32();
+            ImageBuffer::new(region_size, region_size)
+        };
+
+        let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
+        let mut processed_chunks = DynamicGrid::new([
+            CHUNKS_PER_REGION_SIDE.as_usize(),
+            CHUNKS_PER_REGION_SIDE.as_usize(),
+            1,
+        ]);
+
+        let (from_chunk_local, to_chunk_local) = (
+            ChunkLocation(0, 0),
+            ChunkLocation(
+                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+            ),
+        );
+
+        for chunk_local in from_chunk_local.iter_until(to_chunk_local) {
+            let chunk = region_loc.local_chunk_to_global(chunk_local);
+
+            // log_scope!(o!(chunk));
+            // TODO fix log_scope crashing with async
+            debug!("generating chunk"; chunk);
+
+            let mut visible_blocks =
+                DynamicGrid::new([CHUNK_SIZE.as_usize(), CHUNK_SIZE.as_usize(), 1]);
+
+            let mut initialized_count = 0;
+            const TOTAL_TO_INITIALIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
+
+            for slab_z in ((start_slab - max_depth + 1)..=start_slab).rev() {
+                debug!("generating slabs at {z}", z = slab_z);
+                // generate slab
+                let slab = SlabLocation::new(slab_z, chunk);
+                let generated = self.planet.generate_slab(slab).await;
+
+                // copy highest non-air blocks to image
+                for y in 0..CHUNK_SIZE.as_usize() {
+                    for x in 0..CHUNK_SIZE.as_usize() {
+                        for z in (0..SLAB_SIZE.as_usize()).rev() {
+                            let block = generated[&[x as i32, y as i32, z as i32]];
+                            if block.is_air() {
+                                continue;
+                            }
+
+                            // aha, solid block. store global z (possibly negative) to scale to
+                            // range later and make positive
+                            let z = (slab_z * SLAB_SIZE.as_i32()) + z as i32;
+                            visible_blocks[[x, y, 0]] = Some((z, block.ty));
+                            max_height = max_height.max(z);
+                            min_height = min_height.min(z);
+                            break;
+                        }
+                    }
+                }
+
+                initialized_count = visible_blocks.iter().filter(|opt| opt.is_some()).count();
+                debug_assert!(initialized_count <= TOTAL_TO_INITIALIZE);
+
+                trace!(
+                    "{left} blocks left to initialize",
+                    left = TOTAL_TO_INITIALIZE - initialized_count
+                );
+
+                if initialized_count == TOTAL_TO_INITIALIZE {
+                    // all done
+                    break;
+                }
+            }
+
+            if initialized_count < TOTAL_TO_INITIALIZE {
+                warn!(
+                    "there are {count} uninitialized blocks in the given slab range, try tweaking \
+                max depth or start slab",
+                    count = TOTAL_TO_INITIALIZE - initialized_count
+                );
+            }
+
+            processed_chunks[[chunk_local.x() as usize, chunk_local.y() as usize, 0]] =
+                Some(visible_blocks);
+        }
+
+        info!(
+            "z range from {min} to {max}",
+            min = min_height,
+            max = max_height
+        );
+        if min_height == max_height {
+            warn!("region might be filled with solid blocks, try tweaking start slab")
+        }
+
+        // render chunks to image
+        for ([cx, cy, _], chunk) in processed_chunks.iter_coords() {
+            let visible_blocks = chunk.as_ref().unwrap(); // definitely initialized
+
+            for ([bx, by, _], block) in visible_blocks.iter_coords() {
+                let color = match *block {
+                    Some((z, block_type)) => {
+                        let max_height = max_height as f32;
+                        let min_height = min_height as f32;
+
+                        let l = map_range(
+                            (min_height, max_height),
+                            (0.2, 0.8),
+                            clamp(z as f32, min_height, max_height),
+                        );
+
+                        let (h, s) = block_type.color_hs();
+                        ColorRgb::new_hsl(h, s, l)
+                    }
+                    None => {
+                        // hot pink if missing
+                        ColorRgb::new_hsl(0.83, 1.0, 0.7)
+                    }
+                };
+
+                let px = (cx * CHUNK_SIZE.as_usize()) + bx;
+                let py = (cy * CHUNK_SIZE.as_usize()) + by;
+                *image.get_pixel_mut(px as u32, py as u32) = color.color();
+            }
+        }
+
+        self.store_scaled_image(image, scale);
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {
