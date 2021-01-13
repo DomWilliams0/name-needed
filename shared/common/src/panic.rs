@@ -84,13 +84,25 @@ pub fn run_and_handle_panics<R: Debug>(do_me: impl FnOnce() -> R + UnwindSafe) -
     debug_assert!(!all_panics.is_empty());
     crit!("{count} threads panicked", count = all_panics.len());
 
-    for Panic {
-        message,
-        thread,
-        mut backtrace,
-    } in all_panics
+    const BACKTRACE_RESOLUTION_LIMIT: usize = 8;
+    for (
+        i,
+        Panic {
+            message,
+            thread,
+            mut backtrace,
+        },
+    ) in all_panics.into_iter().enumerate()
     {
-        backtrace.resolve();
+        if i == BACKTRACE_RESOLUTION_LIMIT {
+            warn!(
+                "handling more than {limit} panics, no longer resolving backtraces",
+                limit = BACKTRACE_RESOLUTION_LIMIT
+            );
+        }
+        if i < BACKTRACE_RESOLUTION_LIMIT {
+            backtrace.resolve();
+        }
 
         crit!("panic";
         "backtrace" => ?backtrace,
