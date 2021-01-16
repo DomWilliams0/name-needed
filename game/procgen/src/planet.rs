@@ -6,7 +6,7 @@ use crate::params::PlanetParams;
 use crate::region::{RegionLocation, Regions};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -119,12 +119,13 @@ impl Planet {
 
     /// Generates now and does not cache
     pub async fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
-        // load region if not already
         let region_loc = RegionLocation::from(slab.chunk);
-        self.realize_region(region_loc).await;
 
-        let inner = self.0.write().await;
-        let region = inner.regions.get_existing(region_loc).unwrap();
+        let mut inner = self.0.write().await;
+        let region = {
+            let generator = inner.continents.generator();
+            inner.regions.get_or_create(region_loc, generator).await
+        };
         let chunk_desc = region.chunk(slab.chunk).description();
 
         // generate base slab terrain from chunk description
@@ -135,6 +136,22 @@ impl Planet {
         // TODO rasterize features onto slab
 
         terrain
+    }
+
+    pub async fn find_ground_level(&self, block: WorldPosition) -> GlobalSliceIndex {
+        let chunk_loc = ChunkLocation::from(block);
+        let region_loc = RegionLocation::from(chunk_loc);
+
+        let mut inner = self.0.write().await;
+        let region = {
+            let generator = inner.continents.generator();
+            inner.regions.get_or_create(region_loc, generator).await
+        };
+
+        let chunk_desc = region.chunk(chunk_loc).description();
+
+        let block_pos = BlockPosition::from(block);
+        chunk_desc.ground_level(block_pos.into())
     }
 
     /// Instantiate regions and initialize chunks

@@ -1,4 +1,4 @@
-# TODOs (269)
+# TODOs (267)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -248,8 +248,6 @@
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
- * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
-   * `// TODO use an enum for the slice range rather than Options`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
@@ -261,10 +259,11 @@
  * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
    * `// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity`
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (5)
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (6)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
    * `// TODO this is sometimes a false positive, triggering unnecessary copies`
+   * `// TODO use an enum for the slice range rather than Options`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
  * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (9)
@@ -315,11 +314,9 @@
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (10)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (8)
    * `assert!(size > 0); // TODO Result`
-   * `// TODO determine viewer start pos from world/randomly e.g. ground level`
-   * `// TODO intelligently choose an initial view range`
-   * `// TODO receive initial chunk+slab range from engine`
+   * `chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?`
    * `// TODO do mesh generation on a worker thread? or just do this bit in a parallel iter`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
    * `// TODO limit to loaded slab bounds if camera is not discovering`
@@ -355,7 +352,7 @@
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
-   * `// TODO get initial slab range to request from engine`
+   * `// TODO middle of requested chunk instead of corner`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

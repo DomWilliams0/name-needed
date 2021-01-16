@@ -4,8 +4,8 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams, TerrainUpdatesRes,
-        WorldLoader, WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams,
+        TerrainSourceError, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };
@@ -29,7 +29,10 @@ pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent}
 pub use needs::HungerComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
-pub use unit::world::{all_slabs_in_range, SlabLocation, WorldPosition, WorldPositionRange};
+pub use unit::world::{
+    all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
+    WorldPositionRange,
+};
 
 pub const TICKS_PER_SECOND: usize = 20;
 

@@ -1,5 +1,5 @@
 use common::*;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -13,10 +13,16 @@ pub enum TerrainSourceError {
     Duplicate(ChunkLocation),
 
     #[error("Requested slab {0} is out of bounds")]
-    OutOfBounds(SlabLocation),
+    SlabOutOfBounds(SlabLocation),
+
+    #[error("Requested block {0} is out of bounds")]
+    BlockOutOfBounds(WorldPosition),
 
     #[error("Received signal to bail")]
     Bailed,
+
+    #[error("Async task failed to complete: {0}")]
+    Async(#[from] tokio::task::JoinError),
 }
 
 #[derive(Clone)]
@@ -52,6 +58,17 @@ impl TerrainSource {
         match self {
             TerrainSource::Memory(src) => src.read().get_slab_copy(slab),
             TerrainSource::Generated(src) => src.load_slab(slab).await,
+        }
+    }
+
+    /// z is ignored in input
+    pub async fn get_ground_level(
+        &self,
+        block: WorldPosition,
+    ) -> Result<GlobalSliceIndex, TerrainSourceError> {
+        match self {
+            TerrainSource::Memory(src) => src.read().get_ground_level(block),
+            TerrainSource::Generated(src) => Ok(src.get_ground_level(block).await),
         }
     }
 }
@@ -103,7 +120,7 @@ mod tests {
 
         assert!(matches!(
             just_one.get_slab_copy(SlabLocation::new(0, (1, 1))),
-            Err(TerrainSourceError::OutOfBounds(_))
+            Err(TerrainSourceError::SlabOutOfBounds(_))
         ));
         let sparse = MemoryTerrainSource::from_chunks(
             vec![

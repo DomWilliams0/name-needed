@@ -18,7 +18,7 @@ petgraph = "^0.5"
 nd_iter = "0.0.4"
 threadpool = "^1.8"
 enum-iterator = "^0.6"
-futures = { version = "^0.3", default-features = false, features = ["std"] }
+futures = { version = "^0.3", default-features = false, features = ["std", "executor"] }
 tokio = { version = "^0.3", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"]}
 
 [dev-dependencies]

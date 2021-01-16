@@ -10,7 +10,8 @@ use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
-    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex, CHUNK_SIZE, SLAB_SIZE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
+    SliceIndex, CHUNK_SIZE, SLAB_SIZE,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -244,6 +245,11 @@ impl ChunkDescription {
                 slice[i].ty = bt;
             }
         }
+    }
+
+    pub fn ground_level(&self, block: SliceBlock) -> GlobalSliceIndex {
+        let SliceBlock(x, y) = block;
+        GlobalSliceIndex::new(self.ground_height[&[x as i32, y as i32, 0]])
     }
 }
 

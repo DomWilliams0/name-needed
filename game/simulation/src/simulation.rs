@@ -68,7 +68,7 @@ impl world::WorldContext for WorldContext {
 }
 
 impl<R: Renderer> Simulation<R> {
-    /// world_loader should have had all chunks requested
+    /// world_loader should have had some slabs requested
     pub fn new(world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
         // load entity definitions from file system
         let definitions = {

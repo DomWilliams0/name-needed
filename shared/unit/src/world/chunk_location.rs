@@ -1,7 +1,7 @@
 use common::derive_more::{From, Into};
 use common::*;
 
-use crate::world::{SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE};
+use crate::world::{GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE};
 use std::convert::From;
 use std::ops::{Add, Sub};
 
@@ -20,6 +20,7 @@ impl ChunkLocation {
     pub const fn x(&self) -> i32 {
         self.0
     }
+
     pub const fn y(&self) -> i32 {
         self.1
     }
@@ -36,6 +37,14 @@ impl ChunkLocation {
         debug_assert!(iter.clone().count() > 0, "chunk range is empty");
 
         iter
+    }
+
+    pub fn get_block(self, z: impl Into<GlobalSliceIndex>) -> WorldPosition {
+        WorldPosition(
+            self.0 * CHUNK_SIZE.as_i32(),
+            self.1 * CHUNK_SIZE.as_i32(),
+            z.into(),
+        )
     }
 
     pub const MIN: Self = ChunkLocation(i32::MIN, i32::MIN);

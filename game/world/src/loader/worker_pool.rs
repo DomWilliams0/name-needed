@@ -13,6 +13,7 @@ use futures::{SinkExt, StreamExt};
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
 
 pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
 
@@ -112,8 +113,11 @@ impl AsyncWorkerPool {
         });
     }
 
-    pub fn submit_void_async(&mut self, task: impl Future<Output = ()> + Send + 'static) {
-        self.pool.spawn(async move { task.await });
+    pub fn submit_any_async_with_handle<R: Send + 'static>(
+        &self,
+        task: impl Future<Output = R> + Send + 'static,
+    ) -> JoinHandle<R> {
+        self.pool.spawn(async move { task.await })
     }
 
     async fn send_result(

@@ -7,7 +7,7 @@
 	* [ ] generate sub features (e.g. tree placement)
 	* [ ] rasterize sub features (e.g. tree blocks)
 	* [X] rasterize slab and return to game
-* [ ] fix unevenness of chunk descriptor heightmap ranges at chunk borders
+* [X] fix unevenness of chunk descriptor heightmap ranges at chunk borders
 * [X] add async to planet chunk initialization
 * [X] refactor terrainsource usage to avoid so much boxing
 * [X] refactor the entirety of world loading and modification to process slabs rather than full chunks
@@ -37,3 +37,5 @@
 * [ ] investigate flashing shadows when a lot of terrain updates happen
 	* probably because occlusion changes are queued for next tick
 	* doesnt happen in release mode
+* [ ] world or camera changes between restarts on world with same seed
+* [ ] fix random entity placement on planet

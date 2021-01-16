@@ -7,7 +7,7 @@ use common::*;
 
 use procgen::{GeneratedBlock, Planet, PlanetParams};
 
-use unit::world::SlabLocation;
+use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
 /// Holds lightweight arc'd and mutex'd reference to planet
 #[derive(Clone)]
@@ -33,6 +33,10 @@ impl GeneratedTerrainSource {
     pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
         let slab = self.planet.generate_slab(slab).await;
         Ok(slab.into())
+    }
+
+    pub async fn get_ground_level(&self, block: WorldPosition) -> GlobalSliceIndex {
+        self.planet.find_ground_level(block).await
     }
 }
 

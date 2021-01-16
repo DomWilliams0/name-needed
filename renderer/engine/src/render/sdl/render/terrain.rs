@@ -99,7 +99,7 @@ impl TerrainRenderer {
 
                 // offset chunk
                 let view = {
-                    let world_point = WorldPoint::from(mesh.chunk_pos);
+                    let world_point = WorldPoint::from(mesh.chunk_pos.get_block(0)); // z irrelevant
                     let view_point = ViewPoint::from(world_point);
                     let transform = Matrix4::from_translation(view_point.into());
 

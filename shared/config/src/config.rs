@@ -25,7 +25,9 @@ pub struct World {
     pub source: WorldSource,
     pub worker_threads: Option<usize>,
     pub generation_height_scale: f64,
-    pub initial_slab_range: ((i32, i32, i32), (i32, i32, i32)),
+    pub initial_chunk: (i32, i32),
+    pub initial_slab_depth: u32,
+    pub initial_chunk_radius: u32,
 }
 
 #[derive(Deserialize, Clone)]
@@ -51,4 +53,10 @@ pub struct Simulation {
     pub friction: f32,
     pub start_delay: u32,
     pub spawn_counts: HashMap<String, usize>,
+}
+
+impl WorldSource {
+    pub fn is_preset(&self) -> bool {
+        matches!(self, Self::Preset(_))
+    }
 }

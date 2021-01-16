@@ -4,7 +4,9 @@ use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
 use std::collections::HashSet;
 use std::ops::{Add, RangeInclusive};
-use unit::world::{all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation};
+use unit::world::{
+    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
+};
 
 #[derive(Clone)]
 pub struct WorldViewer<C: WorldContext> {
@@ -100,33 +102,33 @@ impl Add<i32> for SliceRange {
 }
 
 impl<C: WorldContext> WorldViewer<C> {
-    pub fn with_world(world: WorldRef<C>) -> Result<Self, WorldViewerError> {
-        let world_borrowed = world.borrow();
+    pub fn with_world(
+        world: WorldRef<C>,
+        initial_block: WorldPosition,
+    ) -> Result<Self, WorldViewerError> {
+        let world_bounds = {
+            let w = world.borrow();
+            w.slice_bounds().expect("world should not be empty")
+        };
 
-        // TODO determine viewer start pos from world/randomly e.g. ground level
-        let start_pos = (0, 0);
-        let start = world_borrowed
-            .find_accessible_block_in_column(start_pos.0, start_pos.1)
-            .map(|pos| pos.slice())
-            .unwrap_or_else(|| GlobalSliceIndex::new(0));
+        let view_range = {
+            let range_size = config::get().display.initial_view_range;
+            let half_range = (range_size / 2) as i32;
+            let centre_slice = initial_block.slice();
+            SliceRange::from_bounds(
+                (centre_slice - half_range).max(world_bounds.bottom()),
+                (centre_slice + half_range).min(world_bounds.top()),
+            )
+            .ok_or(WorldViewerError::InvalidRange(world_bounds))?
+        };
 
-        let world_bounds = world_borrowed.slice_bounds().unwrap(); // world has at least 1 slice as above
-        drop(world_borrowed);
+        info!("positioning world viewer at {:?}", view_range);
 
-        // TODO intelligently choose an initial view range
-        let range_size = config::get().display.initial_view_range;
-        let half_range = (range_size / 2) as i32;
-        let view_range = SliceRange::from_bounds(
-            (start - half_range).max(world_bounds.bottom()),
-            (start + half_range).min(world_bounds.top()),
-        )
-        .ok_or(WorldViewerError::InvalidRange(world_bounds))?;
-
+        let initial_chunk = ChunkLocation::from(initial_block);
         Ok(Self {
             world,
             view_range,
-            // TODO receive initial chunk+slab range from engine
-            chunk_range: (ChunkLocation(-1, -1), ChunkLocation(1, 1)),
+            chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?
             clean_slabs: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
         })
@@ -257,6 +259,10 @@ impl<C: WorldContext> WorldViewer<C> {
             self.requested_slabs.extend(slab_range);
             trace!("camera movement requested loading of {count} slabs", count = slab_count; "from" => from, "to" => to);
         }
+    }
+
+    pub fn chunk_range(&self) -> (ChunkLocation, ChunkLocation) {
+        self.chunk_range
     }
 
     fn is_slab_dirty(&self, slab: &SlabLocation) -> bool {

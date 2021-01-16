@@ -4,11 +4,11 @@ use std::iter::{once, repeat};
 
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
-use unit::world::CHUNK_SIZE;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
     SLAB_SIZE,
 };
+use unit::world::{SliceBlock, CHUNK_SIZE};
 
 use crate::block::{Block, BlockDurability, BlockType};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
@@ -620,6 +620,22 @@ impl RawChunkTerrain {
                     None
                 }
             })
+    }
+
+    // TODO use an enum for the slice range rather than Options
+    pub fn find_accessible_block(
+        &self,
+        pos: SliceBlock,
+        start_from: Option<GlobalSliceIndex>,
+        end_at: Option<GlobalSliceIndex>,
+    ) -> Option<BlockPosition> {
+        let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
+        let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
+        self.slices_from_top_offset()
+            .skip_while(|(s, _)| *s > start_from)
+            .take_while(|(s, _)| *s >= end_at)
+            .find(|(_, slice)| slice[pos].walkable())
+            .map(|(z, _)| pos.to_block_position(z))
     }
 
     // TODO set_block trait to reuse in ChunkBuilder (#46)

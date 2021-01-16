@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::{ChunkLocation, SlabLocation};
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
@@ -9,7 +9,6 @@ use crate::loader::terrain_source::TerrainSourceError;
 
 /// Used for testing
 pub struct MemoryTerrainSource {
-    /// Each slab is removed from terrain as it's loaded
     chunk_map: HashMap<ChunkLocation, RawChunkTerrain>,
     bounds: (ChunkLocation, ChunkLocation),
 }
@@ -52,7 +51,7 @@ impl MemoryTerrainSource {
         Ok(Self { chunk_map, bounds })
     }
 
-    pub fn all_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
+    pub fn all_slabs(&self) -> impl Iterator<Item = SlabLocation> + '_ {
         self.chunk_map.iter().flat_map(|(chunk, terrain)| {
             let (min, max) = terrain.slab_range();
             (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
@@ -64,9 +63,23 @@ impl MemoryTerrainSource {
             .chunk_map
             .get(&slab.chunk)
             .and_then(|terrain| terrain.copy_slab(slab.slab))
-            .ok_or(TerrainSourceError::OutOfBounds(slab))?;
+            .ok_or(TerrainSourceError::SlabOutOfBounds(slab))?;
 
         Ok(slab)
+    }
+
+    pub fn get_ground_level(
+        &self,
+        block: WorldPosition,
+    ) -> Result<GlobalSliceIndex, TerrainSourceError> {
+        self.chunk_map
+            .get(&block.into())
+            .and_then(|terrain| {
+                let block = BlockPosition::from(block);
+                terrain.find_accessible_block(block.into(), None, None)
+            })
+            .map(|block| block.z())
+            .ok_or(TerrainSourceError::BlockOutOfBounds(block))
     }
 
     /// Bounding box, inclusive

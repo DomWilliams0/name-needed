@@ -3,8 +3,9 @@ use std::path::Path;
 
 use resources::{ResourceContainer, Resources};
 use simulation::{
-    all_slabs_in_range, presets, AsyncWorkerPool, GeneratedTerrainSource, PlanetParams, Renderer,
-    Simulation, SlabLocation, ThreadedWorldLoader, WorldLoader,
+    all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
+    PlanetParams, Renderer, Simulation, SlabLocation, TerrainSourceError, ThreadedWorldLoader,
+    WorldLoader, WorldPosition,
 };
 use std::time::Duration;
 
@@ -16,15 +17,68 @@ pub trait GamePreset<R: Renderer> {
     fn world(&self, resources: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader>;
     fn init(&self, sim: &mut Simulation<R>, scenario: Scenario) -> BoxedResult<()>;
 
-    fn load(&self, resources: Resources, scenario: Scenario) -> BoxedResult<Simulation<R>> {
+    /// (_, block to initially centre renderer on)
+    fn load(
+        &self,
+        resources: Resources,
+        scenario: Scenario,
+    ) -> BoxedResult<(Simulation<R>, WorldPosition)> {
         let mut world = self.world(&resources.world_gen()?)?;
 
-        // TODO get initial slab range to request from engine
-        let ((min_x, min_y, min_z), (max_x, max_y, max_z)) = config::get().world.initial_slab_range;
-        debug!("waiting for world to load before initializing simulation");
+        let (chunk, slab_depth, chunk_radius, is_preset) = {
+            let cfg = config::get();
+            let (cx, cy) = cfg.world.initial_chunk;
+            (
+                ChunkLocation(cx, cy),
+                cfg.world.initial_slab_depth as i32,
+                cfg.world.initial_chunk_radius as i32,
+                cfg.world.source.is_preset(),
+            )
+        };
+
+        // request ground level in requested start chunk
+        // TODO middle of requested chunk instead of corner
+        let ground_level = {
+            let block = chunk.get_block(0); // z ignored
+            match world.get_ground_level(block) {
+                Ok(slice) => slice,
+                Err(TerrainSourceError::BlockOutOfBounds(_)) if is_preset => {
+                    // special case, assume preset starts at 0
+                    warn!(
+                        "could not find block {:?} in preset world, assuming ground is at 0",
+                        block
+                    );
+                    0.into()
+                }
+                err => err?,
+            }
+        };
+
+        debug!(
+            "ground level in {chunk:?} is {ground}",
+            chunk = chunk,
+            ground = ground_level.slice()
+        );
+
+        let initial_block = chunk.get_block(ground_level);
+        info!("centring camera on block"; "block" => %initial_block);
+
         let (slabs_to_request, slab_count) = all_slabs_in_range(
-            SlabLocation::new(min_z, (min_x, min_y)),
-            SlabLocation::new(max_z, (max_x, max_y)),
+            SlabLocation::new(
+                ground_level.slice() - slab_depth,
+                (chunk.x() - chunk_radius, chunk.y() - chunk_radius),
+            ),
+            SlabLocation::new(
+                ground_level.slice() + slab_depth,
+                (chunk.x() + chunk_radius, chunk.y() + chunk_radius),
+            ),
+        );
+
+        debug!(
+            "waiting for world to load {slabs} slabs around chunk {chunk:?} \
+            before initializing simulation",
+            chunk = chunk,
+            slabs = slab_count
         );
 
         world.request_slabs_with_count(slabs_to_request, slab_count);
@@ -32,7 +86,7 @@ pub trait GamePreset<R: Renderer> {
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;
-        Ok(sim)
+        Ok((sim, initial_block))
     }
 }
 

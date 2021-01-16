@@ -300,7 +300,10 @@ impl<C: WorldContext> World<C> {
         let chunk_pos = ChunkLocation::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
-            .and_then(|c| c.find_accessible_block(slice_block, Some(pos.2), z_min))
+            .and_then(|c| {
+                c.raw_terrain()
+                    .find_accessible_block(slice_block, Some(pos.2), z_min)
+            })
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
@@ -520,6 +523,7 @@ impl<C: WorldContext> World<C> {
                     let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                     let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                     chunk
+                        .raw_terrain()
                         .find_accessible_block(SliceBlock(x, y), None, None)
                         .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                 }
@@ -534,6 +538,7 @@ impl<C: WorldContext> World<C> {
                         .and_then(|chunk| {
                             let block_pos = BlockPosition::from(candidate);
                             chunk
+                                .raw_terrain()
                                 .find_accessible_block(block_pos.into(), None, None)
                                 .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                         })
@@ -1104,7 +1109,7 @@ pub mod helpers {
     }
 
     pub(crate) fn load_world<C: WorldContext>(
-        mut source: MemoryTerrainSource,
+        source: MemoryTerrainSource,
         pool: AsyncWorkerPool,
     ) -> WorldLoader<C> {
         // TODO build area graph in loader

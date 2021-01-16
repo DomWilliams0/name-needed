@@ -5,16 +5,15 @@ use futures::channel::mpsc as async_channel;
 pub use batch::UpdateBatch;
 use common::*;
 pub use procgen::PlanetParams;
-pub use terrain_source::TerrainSource;
 pub use terrain_source::{GeneratedTerrainSource, MemoryTerrainSource};
-use unit::world::{ChunkLocation, SlabIndex, SlabLocation};
+pub use terrain_source::{TerrainSource, TerrainSourceError};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::AsyncWorkerPool;
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
 
 use crate::loader::batch::UpdateBatchUniqueId;
-use crate::loader::terrain_source::TerrainSourceError;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
@@ -163,7 +162,7 @@ impl<C: WorldContext> WorldLoader<C> {
         // let the terrain source know what's coming so it can kick off region generation
         {
             let source = self.source.clone();
-            self.pool.submit_void_async(async move {
+            self.pool.submit_any_async_with_handle(async move {
                 source.prepare_for_chunks((chunk_min, chunk_max)).await;
             });
         }
@@ -196,7 +195,7 @@ impl<C: WorldContext> WorldLoader<C> {
                             debug!("adding placeholder slab to the top of the chunk"; slab);
                             Slab::empty_placeholder()
                         }
-                        Err(TerrainSourceError::OutOfBounds(slab)) => {
+                        Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
                             // soft error, we're at the world edge. treat as all air instead of
                             // crashing and burning
                             debug!("slab is out of bounds, swapping in an empty one"; slab);
@@ -404,6 +403,14 @@ impl<C: WorldContext> WorldLoader<C> {
         while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
             f(update)
         }
+    }
+
+    pub fn get_ground_level(
+        &self,
+        block: WorldPosition,
+    ) -> Result<GlobalSliceIndex, TerrainSourceError> {
+        let fut = self.source.get_ground_level(block);
+        self.pool.runtime().block_on(fut)
     }
 }
 

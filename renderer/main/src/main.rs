@@ -122,11 +122,11 @@ fn do_main() -> BoxedResult<()> {
 
     loop {
         // create simulation
-        let simulation = preset.load(resources.clone(), scenario)?;
+        let (simulation, initial_block) = preset.load(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
-        let world_viewer = WorldViewer::with_world(simulation.voxel_world())?;
-        let backend = backend_state.start(world_viewer);
+        let world_viewer = WorldViewer::with_world(simulation.voxel_world(), initial_block)?;
+        let backend = backend_state.start(world_viewer, initial_block);
 
         // create and run engine
         let engine = Engine::new(simulation, backend);

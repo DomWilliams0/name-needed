@@ -2,7 +2,7 @@ use common::*;
 
 use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
-    SliceBlock, WorldPosition,
+    WorldPosition,
 };
 
 use crate::block::BlockType;
@@ -157,23 +157,6 @@ impl<C: WorldContext> Chunk<C> {
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice {
         #[allow(clippy::redundant_closure)]
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
-    }
-
-    // TODO use an enum for the slice range rather than Options
-    pub fn find_accessible_block(
-        &self,
-        pos: SliceBlock,
-        start_from: Option<GlobalSliceIndex>,
-        end_at: Option<GlobalSliceIndex>,
-    ) -> Option<BlockPosition> {
-        let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
-        let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
-        self.terrain
-            .slices_from_top_offset()
-            .skip_while(|(s, _)| *s > start_from)
-            .take_while(|(s, _)| *s >= end_at)
-            .find(|(_, slice)| slice[pos].walkable())
-            .map(|(z, _)| pos.to_block_position(z))
     }
 
     pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {

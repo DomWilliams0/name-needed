@@ -11,9 +11,12 @@ Config(
     ),
     world: (
         // big random world
-        source: Generate (radius: 8, seed: None),
+        source: Generate("planet_generation.txt"),
         worker_threads: None,
         generation_height_scale: 15.0,
+        initial_chunk: (2, 2),
+        initial_slab_depth: 2,
+        initial_chunk_radius: 3,
     ),
     simulation: (
         random_seed: None,

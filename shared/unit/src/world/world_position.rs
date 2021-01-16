@@ -5,7 +5,7 @@ use common::derive_more::*;
 use common::*;
 
 use crate::view::ViewPoint;
-use crate::world::{ChunkLocation, GlobalSliceIndex, WorldPoint, SCALE};
+use crate::world::{GlobalSliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
@@ -48,12 +48,6 @@ impl From<(i32, i32, i32)> for WorldPosition {
 impl From<(u8, u8, GlobalSliceIndex)> for WorldPosition {
     fn from((x, y, z): (u8, u8, GlobalSliceIndex)) -> Self {
         Self(x as i32, y as i32, z)
-    }
-}
-
-impl From<ChunkLocation> for WorldPosition {
-    fn from(p: ChunkLocation) -> Self {
-        WorldPoint::from(p).floor()
     }
 }
 
