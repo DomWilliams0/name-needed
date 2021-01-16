@@ -1,12 +1,21 @@
 use common::*;
-use futures::stream::{FuturesOrdered, FuturesUnordered};
-use futures::StreamExt;
 use procgen::*;
 use std::io::Write;
+use std::time::{SystemTime};
 
-// TODO actually log the time
 fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
-    write!(out, "the time")
+    lazy_static! {
+        static ref START_TIME: SystemTime = SystemTime::now();
+    }
+
+    let now = SystemTime::now();
+    write!(
+        out,
+        "{:8}",
+        now.duration_since(*START_TIME)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    )
 }
 
 #[cfg(feature = "bin")]

@@ -1,4 +1,4 @@
-# TODOs (267)
+# TODOs (266)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -28,8 +28,6 @@
    * `// TODO agree api and stop making everything public`
    * `// TODO validate values with result type`
    * `// TODO adjust params for global height map`
- * [game/procgen/src/main.rs](game/procgen/src/main.rs) (1)
-   * `// TODO actually log the time`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`

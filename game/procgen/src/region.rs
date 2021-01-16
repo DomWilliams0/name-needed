@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
+    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
     SliceIndex, CHUNK_SIZE, SLAB_SIZE,
 };
 
