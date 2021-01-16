@@ -4,9 +4,10 @@
 
 --seed 1231232
 
---region-start-slab 7
+--region-start-slab 10
+--region-max-depth 10
 --threads 4
---height-freq 12.0
+--height-freq 6
 --height-octaves 8
 
 --gif-layer surface

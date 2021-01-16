@@ -1,4 +1,4 @@
-# TODOs (266)
+# TODOs (269)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -43,10 +43,12 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (3)
-   * `// TODO store u8/u16 relative to range minimum to save space`
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (5)
    * `// TODO result for out of range`
+   * `// TODO should height scale be per biome?`
    * `// TODO depends on many local parameters e.g. biome, humidity`
+   * `// TODO could do this multiple slices at a time`
+   * `// TODO these constants depend on biome, location etc`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`
@@ -265,7 +267,8 @@
    * `// TODO this is sometimes a false positive, triggering unnecessary copies`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
- * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (8)
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (9)
+   * `// TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`

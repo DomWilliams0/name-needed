@@ -46,6 +46,8 @@ unsafe impl Sync for Tile {}
 pub struct Generator {
     height: Fbm,
     scale: f64,
+    /// (min, max) after sampling a large number of points
+    limits: (f64, f64),
 }
 
 impl ContinentMap {
@@ -422,13 +424,44 @@ impl Generator {
             .set_frequency(params.height_freq);
         let scale = params.planet_size as f64;
 
-        Generator {
+        let mut this = Generator {
             height: noise,
             scale,
-        }
+            limits: (0.0, 0.0),
+        };
+
+        this.limits = this.find_limits();
+        this
     }
 
-    pub fn sample(&self, (x, y): (f64, f64)) -> f64 {
+    fn find_limits(&mut self) -> (f64, f64) {
+        let (mut min, mut max) = (100.0, -100.0);
+        let mut r = StdRng::from_entropy();
+        let iterations = 1_000; // _000;
+        debug!("finding generator limits"; "iterations" => iterations);
+
+        for _ in 0..iterations {
+            let f = self.sample((r.gen_range(-100.0, 100.0), r.gen_range(-100.0, 100.0)));
+            min = f.min(min);
+            max = f.max(max);
+        }
+
+        debug!(
+            "generator limits are {min:?} -> {max:?}",
+            min = min,
+            max = max
+        );
+
+        (min, max)
+    }
+
+    pub fn sample_normalized(&self, coord: (f64, f64)) -> f64 {
+        let value = self.sample(coord);
+        map_range(self.limits, (0.0, 1.0), value)
+    }
+
+    /// Produces seamlessly wrapping noise in the range self.limits
+    fn sample(&self, (x, y): (f64, f64)) -> f64 {
         // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
 
         // noise range

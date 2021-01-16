@@ -85,6 +85,9 @@ impl<C: WorldContext> SlabFinalizer<C> {
                 let mut world = self.world.borrow_mut();
                 world.populate_chunk_with_slabs(chunk, slab_range, slabs);
                 chunks.push(chunk);
+
+                // TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized
+                // otherwise the world might flicker as terrain is updated over several ticks
             }
 
             // finalize one chunk at a time

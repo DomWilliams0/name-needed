@@ -1,18 +1,16 @@
 use crate::continent::Generator;
 use crate::rasterize::BlockType;
-use crate::{map_range, PlanetParams, SlabGrid};
+use crate::{PlanetParams, SlabGrid};
 use common::*;
 
 use grid::{grid_declare, GridImpl};
-use std::cmp::Ordering;
 
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
-    CHUNK_SIZE, SLAB_SIZE,
+    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex, CHUNK_SIZE, SLAB_SIZE,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -58,24 +56,7 @@ pub struct RegionChunk {
 }
 
 pub struct ChunkDescription {
-    ranges: SmallVec<[Range; 4]>,
-}
-
-#[derive(Debug)]
-struct Range {
-    lower: GlobalSliceIndex,
-    upper: GlobalSliceIndex,
-    ty: RangeType,
-}
-
-enum RangeType {
-    Solid(BlockType),
-    HeightMap {
-        under: BlockType,
-        surface: BlockType,
-        // TODO store u8/u16 relative to range minimum to save space
-        height_map: ChunkHeightMap,
-    },
+    ground_height: ChunkHeightMap,
 }
 
 grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, i32>,
@@ -190,7 +171,6 @@ impl RegionChunk {
         let chunk_idx = chunk_idx as i32;
         let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
         let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
-        let mut ranges = SmallVec::new();
 
         // get height for each surface block in chunk
         let mut height_map = ChunkHeightMap::default();
@@ -201,9 +181,10 @@ impl RegionChunk {
         {
             let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
             let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
-            let height = map_range((-1.0, 1.0), (0.0, 1.0), generator.sample((nx, ny)));
+            let height = generator.sample_normalized((nx, ny));
 
             // convert height map float into block coords
+            // TODO should height scale be per biome?
             let block_height = (height * height_scale) as i32;
 
             height_map[i] = block_height;
@@ -212,34 +193,14 @@ impl RegionChunk {
             max_height = max_height.max(block_height);
         }
 
-        ranges.push(Range::new(
-            min_height,
-            max_height,
-            RangeType::HeightMap {
-                height_map,
-                under: BlockType::Dirt,
-                surface: BlockType::Grass,
-            },
-        ));
-
-        // everything below is stone, everything above is air
-        ranges.push(Range::new(
-            i32::MIN,
-            min_height,
-            RangeType::Solid(BlockType::Stone),
-        ));
-        ranges.push(Range::new(
-            max_height,
-            i32::MAX,
-            RangeType::Solid(BlockType::Air),
-        ));
-
         // TODO depends on many local parameters e.g. biome, humidity
 
         trace!("generated region chunk"; "chunk" => ?(cx, cy), "region" => ?(rx, ry));
 
         RegionChunk {
-            desc: ChunkDescription::new(ranges),
+            desc: ChunkDescription {
+                ground_height: height_map,
+            },
         }
     }
 
@@ -249,118 +210,39 @@ impl RegionChunk {
 }
 
 impl ChunkDescription {
-    fn new(mut ranges: SmallVec<[Range; 4]>) -> Self {
-        ranges.sort_unstable_by_key(|r: &Range| r.lower);
-
-        // ensure no overlap
-        let mut last_upper = i32::MIN;
-        for range in &ranges {
-            debug_assert!(
-                last_upper == range.lower.slice() && range.upper >= range.lower,
-                "invalid chunk description, last={}, this={:?}, all={:#?}",
-                last_upper,
-                range,
-                ranges,
-            );
-            last_upper = range.upper.slice();
-        }
-
-        ChunkDescription { ranges }
-    }
-
-    pub fn query_block(&self, block: BlockPosition) -> BlockType {
-        let range = self
-            .ranges
-            .iter()
-            .find(|range| block.z() < range.upper)
-            .unwrap_or_else(|| panic!("block {:?} matches no range", block));
-
-        debug_assert!(block.z() >= range.lower);
-
-        match &range.ty {
-            RangeType::Solid(bt) => *bt,
-            RangeType::HeightMap {
-                under,
-                surface,
-                height_map,
-            } => {
-                let height = SliceIndex::new(height_map[&[block.x() as i32, block.y() as i32, 0]]);
-                match block.z().cmp(&height) {
-                    Ordering::Less => *under,
-                    Ordering::Equal => *surface,
-                    Ordering::Greater => BlockType::Air,
-                }
-            }
-        }
-    }
-
     pub fn apply_to_slab(&self, slab_idx: SlabIndex, slab: &mut SlabGrid) {
         let from_slice = slab_idx.as_i32() * SLAB_SIZE.as_i32();
         let to_slice = from_slice + SLAB_SIZE.as_i32();
 
-        let mut current_range = None;
-        let mut current_idx = 0;
-
-        let mut next_range = |z: GlobalSliceIndex| match current_range {
-            Some(max) if z < max => &self.ranges[current_idx],
-            _ => {
-                let (range_idx, range) = self
-                    .ranges
-                    .iter()
-                    .enumerate()
-                    .skip(current_idx)
-                    .find(|(_, range)| z < range.upper)
-                    .unwrap_or_else(|| panic!("slice {:?} matches no range", z));
-
-                current_range = Some(range.upper);
-                current_idx = range_idx;
-                range
-            }
-        };
-
+        // TODO could do this multiple slices at a time
         for (z_global, z_local) in (from_slice..to_slice)
             .map(GlobalSliceIndex::new)
             .zip(LocalSliceIndex::range())
         {
-            let range = next_range(z_global);
             let slice = {
                 let (from, to) = slab.slice_range(z_local.slice_unsigned());
                 &mut slab.array_mut()[from..to]
             };
-            match &range.ty {
-                RangeType::Solid(bt) => {
-                    slice.iter_mut().for_each(|b| b.ty = *bt);
-                }
-                RangeType::HeightMap {
-                    under,
-                    surface,
-                    height_map,
-                } => {
-                    for (i, (y, x)) in (0..CHUNK_SIZE.as_i32())
-                        .cartesian_product(0..CHUNK_SIZE.as_i32())
-                        .enumerate()
-                    {
-                        let height = SliceIndex::new(height_map[&[x, y, 0]]);
-                        let bt = match z_global.cmp(&height) {
-                            Ordering::Less => *under,
-                            Ordering::Equal => *surface,
-                            Ordering::Greater => BlockType::Air,
-                        };
 
-                        slice[i].ty = bt;
-                    }
-                }
+            // TODO these constants depend on biome, location etc
+            let surface_block = BlockType::Grass;
+            let shallow_under_block = BlockType::Dirt;
+            let deep_under_block = BlockType::Stone;
+            let shallow_depth = 3;
+
+            for (i, (y, x)) in (0..CHUNK_SIZE.as_i32())
+                .cartesian_product(0..CHUNK_SIZE.as_i32())
+                .enumerate()
+            {
+                let ground = SliceIndex::new(self.ground_height[&[x, y, 0]]);
+                let bt = match (ground - z_global).slice() {
+                    0 => surface_block,
+                    d if d.is_positive() && d < shallow_depth => shallow_under_block,
+                    d if d.is_positive() => deep_under_block,
+                    _ => BlockType::Air,
+                };
+                slice[i].ty = bt;
             }
-        }
-    }
-}
-
-impl Range {
-    fn new(min: i32, max: i32, ty: RangeType) -> Self {
-        Range {
-            lower: SliceIndex::new(min),
-            upper: SliceIndex::new(max),
-            ty,
         }
     }
 }
@@ -395,17 +277,6 @@ impl RegionLocation {
             (self.0 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.x(),
             (self.1 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.y(),
         )
-    }
-}
-
-impl Debug for RangeType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RangeType::Solid(bt) => write!(f, "solid {:?}", bt),
-            RangeType::HeightMap { under, surface, .. } => {
-                write!(f, "height map, {:?} below, {:?} on surface", under, surface)
-            }
-        }
     }
 }
 

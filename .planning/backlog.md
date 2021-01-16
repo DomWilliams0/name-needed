@@ -70,6 +70,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* magma very low down, or it just gets too hot
 	* volcano affects world gen in past
 * finite pregenerated world in xy (planet), infinite in z
+	* wrapping x,y coordinates is a beefy task, for something that doesnt happen very often
+		world loader wraps coords so it never requests slabs out of bounds of the planet
+		chunks are loaded and rendered at their true wrapped positions e.g. if worldsize=8, chunks x=0, x=8, x=-8 are the same chunk
+		entities must be aware of this! all distance checks must take this into account (https://blog.demofox.org/2017/10/01/calculating-the-distance-between-points-in-wrap-around-toroidal-space/)
+		use different base noise for biomes and blend (http://parzivail.com/procedural-terrain-generaion/)
+	* chunk and region resolution should wrap around explicitly/fail in generator. should the world loader wrap coords
 * unique species and settlements with societies to discover in different environments
 	* underground species with no eyes, cave houses
 	* underwater people
