@@ -54,10 +54,13 @@ pub trait GamePreset<R: Renderer> {
             }
         };
 
+        let ground_slab = ground_level.slab_index();
+
         debug!(
             "ground level in {chunk:?} is {ground}",
             chunk = chunk,
-            ground = ground_level.slice()
+            ground = ground_level.slice();
+            ground_slab,
         );
 
         let initial_block = chunk.get_block(ground_level);
@@ -65,11 +68,11 @@ pub trait GamePreset<R: Renderer> {
 
         let (slabs_to_request, slab_count) = all_slabs_in_range(
             SlabLocation::new(
-                ground_level.slice() - slab_depth,
+                ground_slab - slab_depth,
                 (chunk.x() - chunk_radius, chunk.y() - chunk_radius),
             ),
             SlabLocation::new(
-                ground_level.slice() + slab_depth,
+                ground_slab + slab_depth,
                 (chunk.x() + chunk_radius, chunk.y() + chunk_radius),
             ),
         );

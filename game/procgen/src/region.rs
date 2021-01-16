@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
-    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock,
-    SliceIndex, CHUNK_SIZE, SLAB_SIZE,
+    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
+    CHUNK_SIZE, SLAB_SIZE,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]

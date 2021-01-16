@@ -463,6 +463,7 @@ impl<C: WorldContext> World<C> {
 
         for mut slab in slabs {
             debug_assert_eq!(slab.slab.chunk, chunk_loc);
+            trace!("populating slab"; slab.slab);
 
             // update slab terrain if necessary
             if let Some(terrain) = slab.terrain.take() {

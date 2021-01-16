@@ -1,7 +1,7 @@
 use common::*;
 use procgen::*;
 use std::io::Write;
-use std::time::{SystemTime};
+use std::time::SystemTime;
 
 fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
     lazy_static! {

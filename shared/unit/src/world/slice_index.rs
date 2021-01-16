@@ -153,6 +153,12 @@ impl From<i32> for LocalSliceIndex {
     }
 }
 
+impl From<SliceIndex<Chunk>> for SlabIndex {
+    fn from(slice: SliceIndex<Chunk>) -> Self {
+        slice.slab_index()
+    }
+}
+
 impl Debug for SliceIndex<Chunk> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("GlobalSliceIndex").field(&self.0).finish()
