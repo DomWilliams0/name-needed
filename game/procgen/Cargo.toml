@@ -36,3 +36,8 @@ default = ["cache"]
 bin = ["image", "imageproc", "color", "async-trait"]
 climate = ["crossbeam", "line_drawing"]
 cache = ["bincode", "sha2"]
+
+
+[dev-dependencies]
+# same as above but including macros feature
+tokio = { version = "^0.3", default-features = false, features = ["macros"] }

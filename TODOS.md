@@ -1,4 +1,4 @@
-# TODOs (266)
+# TODOs (268)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -31,18 +31,19 @@
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (7)
    * `// TODO actual error type`
    * `// TODO reject if continent or land blob count is too low`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
    * `// TODO rasterize features onto slab`
+   * `// TODO wrap chunks rather than ignoring those out of range`
+   * `.filter_map(|(cx, cy)| RegionLocation::try_from_chunk(ChunkLocation(cx, cy))) // TODO`
  * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (5)
-   * `// TODO result for out of range`
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (4)
    * `// TODO should height scale be per biome?`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
@@ -279,8 +280,9 @@
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
    * `// TODO reuse buf`
- * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (2)
    * `// TODO load a serialized planet from disk to avoid constantly regenerating`
+   * `// TODO handle wrapping of slabs around planet boundaries`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (1)

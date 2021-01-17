@@ -55,19 +55,22 @@ fn main() {
                 .expect("failed to create runtime");
 
                 runtime.block_on(async {
-                    let mut planet = Planet::new(params).expect("failed");
+                    let mut planet = Planet::new(params.clone()).expect("failed");
                     planet.initial_generation().await;
 
                     let mut render = Render::with_planet(planet.clone()).await;
                     render.draw_continents().await;
                     render.save("procgen.png").expect("failed to write image");
 
-                    for y in 20..=20 {
-                        for x in 20..=22 {
+                    for y in params.planet_size - 1..=params.planet_size {
+                        for x in 20..=21 {
                             let region = RegionLocation(x, y);
 
                             let mut render = Render::with_planet(planet.clone()).await;
-                            render.draw_region(region).await;
+                            if let Err(err) = render.draw_region(region).await {
+                                error!("bad slab: {}", err);
+                                break;
+                            }
                             render
                                 .save(format!("procgen-region-{}-{}.png", x, y))
                                 .expect("failed to write image");

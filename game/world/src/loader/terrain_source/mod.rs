@@ -68,7 +68,10 @@ impl TerrainSource {
     ) -> Result<GlobalSliceIndex, TerrainSourceError> {
         match self {
             TerrainSource::Memory(src) => src.read().get_ground_level(block),
-            TerrainSource::Generated(src) => Ok(src.get_ground_level(block).await),
+            TerrainSource::Generated(src) => src
+                .get_ground_level(block)
+                .await
+                .ok_or(TerrainSourceError::BlockOutOfBounds(block)),
         }
     }
 }

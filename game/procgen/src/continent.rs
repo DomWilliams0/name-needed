@@ -1,5 +1,5 @@
-use crate::map_range;
 use crate::params::PlanetParams;
+use crate::{map_range, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
@@ -80,6 +80,13 @@ impl ContinentMap {
 
     pub fn init_generator(&mut self, rando: &mut dyn RngCore) {
         self.generator = Some(Arc::new(Generator::new(rando, &self.params)))
+    }
+
+    #[cfg(test)]
+    pub fn new_with_rng(params: &PlanetParams, rando: &mut dyn RngCore) -> Self {
+        let mut this = Self::new(params);
+        this.init_generator(rando);
+        this
     }
 
     pub fn generate(&mut self, rando: &mut dyn RngCore) -> (usize, usize) {
@@ -421,8 +428,17 @@ impl ContinentMap {
         }
     }
 
-    pub fn generator(&self) -> Arc<Generator> {
+    pub fn generator_copy(&self) -> Arc<Generator> {
         self.generator.clone().expect("generator not initialized")
+    }
+
+    pub fn generator(&self) -> &Generator {
+        self.generator.as_ref().expect("generator not initialized")
+    }
+
+    pub fn tile_at(&self, region: RegionLocation) -> &Tile {
+        let RegionLocation(x, y) = region;
+        &self.grid[[x as usize, y as usize, 0]]
     }
 }
 

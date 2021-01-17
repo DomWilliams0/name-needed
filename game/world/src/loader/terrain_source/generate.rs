@@ -30,11 +30,16 @@ impl GeneratedTerrainSource {
     }
 
     pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
-        let slab = self.planet.generate_slab(slab).await;
+        // TODO handle wrapping of slabs around planet boundaries
+        let slab = self
+            .planet
+            .generate_slab(slab)
+            .await
+            .ok_or(TerrainSourceError::SlabOutOfBounds(slab))?;
         Ok(slab.into())
     }
 
-    pub async fn get_ground_level(&self, block: WorldPosition) -> GlobalSliceIndex {
+    pub async fn get_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
         self.planet.find_ground_level(block).await
     }
 }

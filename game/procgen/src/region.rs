@@ -1,4 +1,4 @@
-use crate::continent::Generator;
+use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
 use crate::{PlanetParams, SlabGrid};
 use common::*;
@@ -6,7 +6,6 @@ use common::*;
 use grid::{grid_declare, GridImpl};
 
 use std::mem::MaybeUninit;
-use std::sync::Arc;
 
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
@@ -14,8 +13,10 @@ use unit::world::{
     CHUNK_SIZE, SLAB_SIZE,
 };
 
+/// Is only valid between 0 and planet size, it's the responsibility of the world loader to only
+/// request slabs in valid regions
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct RegionLocation(pub i32, pub i32);
+pub struct RegionLocation(pub u32, pub u32);
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
 pub const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant::new(8);
@@ -58,6 +59,8 @@ pub struct RegionChunk {
 
 pub struct ChunkDescription {
     ground_height: ChunkHeightMap,
+    /// Incredibly temporary flag to identify "underwater". Exceedingly temporary!!
+    is_region_land: bool,
 }
 
 grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, i32>,
@@ -74,61 +77,63 @@ impl Regions {
         }
     }
 
-    // TODO result for out of range
     pub async fn get_or_create(
         &mut self,
         location: RegionLocation,
-        generator: Arc<Generator>,
-    ) -> &Region {
-        match self.region_index(location) {
+        continents: &ContinentMap,
+    ) -> Option<&Region> {
+        Some(match self.region_index(location)? {
             Ok(idx) => &self.regions[idx].1,
             Err(idx) => {
                 debug!("creating new region"; "region" => ?location);
-                let region = Region::create(location, generator, &self.params).await;
+                let region = Region::create(location, continents, &self.params).await;
                 self.regions.insert(idx, (location, region));
                 &self.regions[idx].1
             }
-        }
+        })
     }
 
     pub fn get_existing(&self, region: RegionLocation) -> Option<&Region> {
         self.region_index(region)
-            .ok()
+            .and_then(|idx| idx.ok())
             .map(|idx| &self.regions[idx].1)
     }
 
-    fn region_index(&self, region: RegionLocation) -> Result<usize, usize> {
-        self.regions.binary_search_by_key(&region, |(pos, _)| *pos)
+    /// None if out of range of the planet, otherwise Ok(idx) if present or Err(idx) if in range but
+    /// not present
+    fn region_index(&self, region: RegionLocation) -> Option<Result<usize, usize>> {
+        self.params
+            .is_region_in_range(region)
+            .as_some_from(|| self.regions.binary_search_by_key(&region, |(pos, _)| *pos))
     }
 }
 
 impl Region {
     async fn create(
-        coords: RegionLocation,
-        generator: Arc<Generator>,
+        region: RegionLocation,
+        continents: &ContinentMap,
         params: &PlanetParams,
     ) -> Self {
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
         // times?
-        debug!("creating region"; "region" => ?coords);
+        debug!("creating region"; "region" => ?region);
 
-        let region = (coords.0 as f64, coords.1 as f64);
         let height_scale = params.height_scale as f64;
 
         // initialize chunk descriptions
         let mut chunks: [MaybeUninit<RegionChunk>; CHUNKS_PER_REGION] =
             unsafe { MaybeUninit::uninit().assume_init() };
 
-        let handle = tokio::runtime::Handle::current();
-        futures::future::join_all((0..CHUNKS_PER_REGION).map(|idx| {
-            let generator = generator.clone();
+        let continents: &'static ContinentMap = unsafe { std::mem::transmute(continents) };
 
+        let handle = tokio::runtime::Handle::current();
+        let results = futures::future::join_all((0..CHUNKS_PER_REGION).map(|idx| {
             // cant pass a ptr across threads but you can an integer :^)
             // the array is stack allocated and we dont leave this function while this closure is
             // alive so this pointer is safe to use.
             let this_chunk = chunks[idx].as_mut_ptr() as usize;
             handle.spawn(async move {
-                let chunk = RegionChunk::new(idx, region, generator, height_scale);
+                let chunk = RegionChunk::new(idx, region, continents, height_scale);
 
                 // safety: each task has a single index in the chunk array
                 unsafe {
@@ -163,15 +168,19 @@ impl Region {
 impl RegionChunk {
     fn new(
         chunk_idx: usize,
-        (rx, ry): (f64, f64),
-        generator: Arc<Generator>,
+        region: RegionLocation,
+        continents: &ContinentMap,
         height_scale: f64,
     ) -> Self {
         const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
 
+        let (rx, ry) = (region.0 as f64, region.1 as f64);
+
         let chunk_idx = chunk_idx as i32;
         let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
         let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
+        let continent_tile = continents.tile_at(region);
+        let generator = continents.generator();
 
         // get height for each surface block in chunk
         let mut height_map = ChunkHeightMap::default();
@@ -201,6 +210,7 @@ impl RegionChunk {
         RegionChunk {
             desc: ChunkDescription {
                 ground_height: height_map,
+                is_region_land: continent_tile.is_land(),
             },
         }
     }
@@ -237,11 +247,13 @@ impl ChunkDescription {
             {
                 let ground = SliceIndex::new(self.ground_height[&[x, y, 0]]);
                 let bt = match (ground - z_global).slice() {
+                    d if d >= 0 && !self.is_region_land => BlockType::Stone, // temporary, underwater = stone
                     0 => surface_block,
-                    d if d.is_positive() && d < shallow_depth => shallow_under_block,
-                    d if d.is_positive() => deep_under_block,
-                    _ => BlockType::Air,
+                    d if d.is_negative() => BlockType::Air,
+                    d if d < shallow_depth => shallow_under_block,
+                    _ => deep_under_block,
                 };
+
                 slice[i].ty = bt;
             }
         }
@@ -253,20 +265,40 @@ impl ChunkDescription {
     }
 }
 
-impl From<ChunkLocation> for RegionLocation {
-    fn from(chunk: ChunkLocation) -> Self {
+impl RegionLocation {
+    /// None if negative
+    pub fn try_from_chunk(chunk: ChunkLocation) -> Option<Self> {
         let x = chunk.0.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
         let y = chunk.1.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
-        RegionLocation(x, y)
-    }
-}
 
-impl RegionLocation {
+        if x >= 0 && y >= 0 {
+            Some(RegionLocation(x as u32, y as u32))
+        } else {
+            None
+        }
+    }
+
+    /// None if negative or greater than planet size
+    pub fn try_from_chunk_with_params(chunk: ChunkLocation, params: &PlanetParams) -> Option<Self> {
+        let x = chunk.0.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        let y = chunk.1.div_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        let limit = 0..params.planet_size as i32;
+
+        if limit.contains(&x) && limit.contains(&y) {
+            Some(RegionLocation(x as u32, y as u32))
+        } else {
+            None
+        }
+    }
+
     /// Inclusive bounds
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
+        let x = self.0 as i32;
+        let y = self.1 as i32;
+
         let min = (
-            self.0 * CHUNKS_PER_REGION_SIDE.as_i32(),
-            self.1 * CHUNKS_PER_REGION_SIDE.as_i32(),
+            x * CHUNKS_PER_REGION_SIDE.as_i32(),
+            y * CHUNKS_PER_REGION_SIDE.as_i32(),
         );
         let max = (
             min.0 + CHUNKS_PER_REGION_SIDE.as_i32() - 1,
@@ -280,8 +312,8 @@ impl RegionLocation {
         assert!((0..CHUNKS_PER_REGION_SIDE.as_i32()).contains(&local_chunk.y()));
 
         ChunkLocation(
-            (self.0 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.x(),
-            (self.1 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.y(),
+            (self.0 as i32 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.x(),
+            (self.1 as i32 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.y(),
         )
     }
 }
@@ -293,15 +325,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn negative_region() {
-        assert_eq!(
-            RegionLocation::from(ChunkLocation(-2, 1)),
-            RegionLocation(-1, 0)
-        );
+    fn chunk_to_region() {
+        // negative is always out of range
+        assert_eq!(RegionLocation::try_from_chunk(ChunkLocation(-2, 1)), None);
 
         assert_eq!(
-            RegionLocation::from(ChunkLocation(-CHUNKS_PER_REGION_SIDE.as_i32() - 1, -2)),
-            RegionLocation(-2, -1)
+            RegionLocation::try_from_chunk(ChunkLocation(
+                CHUNKS_PER_REGION_SIDE.as_i32() / 2,
+                CHUNKS_PER_REGION_SIDE.as_i32()
+            )),
+            Some(RegionLocation(0, 1))
         );
     }
 
@@ -325,5 +358,31 @@ mod tests {
         ));
         assert_eq!(idx, 55);
         assert_eq!(Region::chunk_index(ChunkLocation(-1, -2)), idx);
+    }
+
+    #[tokio::test]
+    async fn get_existing_region() {
+        let params = {
+            let mut params = PlanetParams::dummy();
+            params.planet_size = 100;
+            params
+        };
+        let mut regions = Regions::new(&params);
+        let mut continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+
+        let loc = RegionLocation(10, 20);
+        let bad_loc = RegionLocation(10, 200);
+
+        assert!(regions.get_existing(loc).is_none());
+        assert!(regions.get_existing(bad_loc).is_none());
+
+        assert!(params.is_region_in_range(loc));
+        assert!(!params.is_region_in_range(bad_loc));
+
+        assert!(regions.get_or_create(loc, &continents).await.is_some());
+        assert!(regions.get_or_create(bad_loc, &continents).await.is_none());
+
+        assert!(regions.get_existing(loc).is_some());
+        assert!(regions.get_existing(bad_loc).is_none());
     }
 }

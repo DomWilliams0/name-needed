@@ -3,7 +3,7 @@ use crate::rasterize::SlabGrid;
 use common::*;
 
 use crate::params::PlanetParams;
-use crate::region::{RegionLocation, Regions};
+use crate::region::{Region, RegionLocation, Regions};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
@@ -150,8 +150,7 @@ impl Planet {
 
     pub async fn realize_region(&self, region: RegionLocation) {
         let mut inner = self.0.write().await;
-        let height_map = inner.continents.generator();
-        inner.regions.get_or_create(region, height_map).await;
+        inner.get_or_create_region(region).await;
     }
 
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
@@ -166,15 +165,11 @@ impl Planet {
         )
     }
 
-    /// Generates now and does not cache
-    pub async fn generate_slab(&self, slab: SlabLocation) -> SlabGrid {
-        let region_loc = RegionLocation::from(slab.chunk);
-
+    /// Generates now and does not cache. Returns None if slab is out of range
+    pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
         let mut inner = self.0.write().await;
-        let region = {
-            let generator = inner.continents.generator();
-            inner.regions.get_or_create(region_loc, generator).await
-        };
+        let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &inner.params)?;
+        let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
         let chunk_desc = region.chunk(slab.chunk).description();
 
         // generate base slab terrain from chunk description
@@ -184,30 +179,27 @@ impl Planet {
 
         // TODO rasterize features onto slab
 
-        terrain
+        Some(terrain)
     }
 
-    pub async fn find_ground_level(&self, block: WorldPosition) -> GlobalSliceIndex {
-        let chunk_loc = ChunkLocation::from(block);
-        let region_loc = RegionLocation::from(chunk_loc);
-
+    pub async fn find_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
         let mut inner = self.0.write().await;
-        let region = {
-            let generator = inner.continents.generator();
-            inner.regions.get_or_create(region_loc, generator).await
-        };
+
+        let chunk_loc = ChunkLocation::from(block);
+        let region_loc = RegionLocation::try_from_chunk_with_params(chunk_loc, &inner.params)?;
+        let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
 
         let chunk_desc = region.chunk(chunk_loc).description();
-
         let block_pos = BlockPosition::from(block);
-        chunk_desc.ground_level(block_pos.into())
+        Some(chunk_desc.ground_level(block_pos.into()))
     }
 
-    /// Instantiate regions and initialize chunks
+    /// Instantiate regions and initialize chunks. Ignores those out of range
+    // TODO wrap chunks rather than ignoring those out of range
     pub async fn prepare_for_chunks(&self, (min, max): (ChunkLocation, ChunkLocation)) {
         let regions = (min.0..=max.0)
             .cartesian_product(min.1..=max.1)
-            .map(|(cx, cy)| RegionLocation::from(ChunkLocation(cx, cy)))
+            .filter_map(|(cx, cy)| RegionLocation::try_from_chunk(ChunkLocation(cx, cy))) // TODO
             .dedup();
 
         for region in regions {
@@ -218,5 +210,13 @@ impl Planet {
     #[cfg(feature = "bin")]
     pub async fn inner(&self) -> impl std::ops::Deref<Target = PlanetInner> + '_ {
         self.0.read().await
+    }
+}
+
+impl PlanetInner {
+    async fn get_or_create_region(&mut self, region: RegionLocation) -> Option<&Region> {
+        // safety: regions and continents fields don't alias or reference each other
+        let continents: &ContinentMap = unsafe { std::mem::transmute(&self.continents) };
+        self.regions.get_or_create(region, continents).await
     }
 }

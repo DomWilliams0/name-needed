@@ -6,6 +6,7 @@ use std::path::Path;
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
+use crate::RegionLocation;
 #[cfg(feature = "cache")]
 use serde::Serialize;
 
@@ -214,5 +215,9 @@ impl PlanetParams {
 
     pub fn planet_dims(&self, height: usize) -> [usize; 3] {
         [self.planet_size as usize, self.planet_size as usize, height]
+    }
+
+    pub fn is_region_in_range(&self, region: RegionLocation) -> bool {
+        region.0 < self.planet_size && region.1 < self.planet_size
     }
 }

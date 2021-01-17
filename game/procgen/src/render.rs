@@ -212,7 +212,7 @@ impl Render {
         image::imageops::overlay(image, &overlay, 0, 0);
     }
 
-    pub async fn draw_region(&mut self, region_loc: RegionLocation) {
+    pub async fn draw_region(&mut self, region_loc: RegionLocation) -> Result<(), SlabLocation> {
         // params
         let inner = self.planet.inner().await;
         let start_slab = inner.params.render.region_start_slab;
@@ -258,7 +258,7 @@ impl Render {
                 debug!("generating slabs at {z}", z = slab_z);
                 // generate slab
                 let slab = SlabLocation::new(slab_z, chunk);
-                let generated = self.planet.generate_slab(slab).await;
+                let generated = self.planet.generate_slab(slab).await.ok_or(slab)?;
 
                 // copy highest non-air blocks to image
                 for y in 0..CHUNK_SIZE.as_usize() {
@@ -347,6 +347,7 @@ impl Render {
         }
 
         self.store_scaled_image(image, scale);
+        Ok(())
     }
 
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {

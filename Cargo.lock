@@ -3062,6 +3062,7 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "slab",
+ "tokio-macros",
 ]
 
 [[package]]
@@ -3104,6 +3105,17 @@ dependencies = [
  "bytes",
  "futures 0.1.29",
  "log",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46dfffa59fc3c8aad216ed61bdc2c263d2b9d87a9c8ac9de0c11a813e51b6db7"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.51",
 ]
 
 [[package]]
