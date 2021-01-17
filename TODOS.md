@@ -1,4 +1,6 @@
-# TODOs (266)
+# TODOs (267)
+ * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
+   * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
