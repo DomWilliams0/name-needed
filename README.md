@@ -1,6 +1,6 @@
 # name-needed
 
-[![Build Status](https://travis-ci.com/DomWilliams0/name-needed.svg?branch=develop)](https://travis-ci.com/DomWilliams0/name-needed)
+![Build Status](https://img.shields.io/github/workflow/status/DomWilliams0/name-needed/Build%20and%20test)
 [![Devlog](https://img.shields.io/badge/devlog-domwillia.ms-orange)](https://domwillia.ms)
 [![Lines](https://tokei.rs/b1/github/DomWilliams0/name-needed)](https://github.com/XAMPPRocky/tokei)
 [![Files](https://tokei.rs/b1/github/DomWilliams0/name-needed?category=files)](https://github.com/XAMPPRocky/tokei)
