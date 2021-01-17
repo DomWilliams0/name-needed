@@ -1,6 +1,5 @@
 use crate::loader::batch::UpdateBatcher;
 
-use crate::loader::LoadedSlab;
 use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
 use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldContext, WorldRef};
@@ -11,6 +10,7 @@ use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
 use crate::occlusion::NeighbourOpacity;
 
+use crate::loader::loading::LoadedSlab;
 use unit::world::{ChunkLocation, SlabIndex};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;

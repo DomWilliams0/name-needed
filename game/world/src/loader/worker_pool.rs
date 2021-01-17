@@ -5,9 +5,9 @@ use unit::world::SlabLocation;
 
 use crate::loader::finalizer::SlabFinalizer;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::loader::LoadedSlab;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
+use crate::loader::loading::LoadedSlab;
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
 use std::future::Future;

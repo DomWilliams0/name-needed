@@ -14,28 +14,22 @@
 * [o] dynamic chunk loading
 	* [X] load slabs as camera pans
 	* [X] load slabs as camera moves up and down
-	* [ ] config opt to disable discovery by camera, only by society entities
+	* [~] config opt to disable discovery by camera, only by society entities
 	* [X] all-air placeholder slabs should not be marked as fully loaded
 	* [X] bug: all air placeholders clobber existing terrain!
-	* [ ] restrict camera at world edge?
+	* [~] restrict camera at world edge?
 * [X] return full slab from procgen
 * [X] block modification should be localised to the slabs
 * [X] mark slabs as dirty instead of chunks in viewer
 * terrain should be generated at the slab level
 	* [X] pass slab range along with chunk pos to load
-	* [o] load result should only hold slabs, chunk container should be lightweight
-* actual generation
-	* [ ] position trees with poisson disk sampling
-	* [ ] derive a seed per slab using world seed + coords
+	* [X] load result should only hold slabs, chunk container should be lightweight
 * [X] replace threadpool with async
 	* required to allow blocking of slab tasks
 	* simplfies tests, dont need to use crappy blocking impl
 * [ ] add test for single slab navigability > load slab below > is navigation as expected between the 2
-* [ ] dont require doublesizedvec to have no holes
-	* the impl can have no holes and store options instead or something
-* [o] split up loader/mod.rs into a few separate modules
+* [X] split up loader/mod.rs into a few separate modules
 * [ ] investigate flashing shadows when a lot of terrain updates happen
 	* probably because occlusion changes are queued for next tick
-	* doesnt happen in release mode
 * [X] world or camera changes between restarts on world with same seed
 * [X] fix random entity placement on planet
