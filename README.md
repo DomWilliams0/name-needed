@@ -4,6 +4,7 @@
 [![Devlog](https://img.shields.io/badge/devlog-domwillia.ms-orange)](https://domwillia.ms)
 [![Lines](https://tokei.rs/b1/github/DomWilliams0/name-needed)](https://github.com/XAMPPRocky/tokei)
 [![Files](https://tokei.rs/b1/github/DomWilliams0/name-needed?category=files)](https://github.com/XAMPPRocky/tokei)
+![Test Count](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FDomWilliams0%2Fname-needed%2Fdevelop%2F.build%2Ftest_count.json)
 
 A one man effort to produce an **open source**, **intuitive** and **high performance**  Dwarf Fortress-esque game. Needs a name.
 
