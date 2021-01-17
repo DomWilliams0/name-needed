@@ -22,13 +22,38 @@ pub struct PlanetInner {
 
     #[cfg(feature = "climate")]
     climate: Option<crate::climate::Climate>,
+
+    #[cfg(feature = "cache")]
+    was_loaded: bool,
 }
 
 impl Planet {
     // TODO actual error type
     pub fn new(params: PlanetParams) -> BoxedResult<Planet> {
         debug!("creating planet with params {:?}", params);
-        let continents = ContinentMap::new(&params);
+
+        let mut continents = None;
+
+        #[cfg(feature = "cache")]
+        {
+            if !params.no_cache {
+                match crate::cache::try_load(&params) {
+                    Ok(None) => info!("no cache found, generating from scratch"),
+                    Ok(Some(nice)) => {
+                        info!("loaded cached planet from disk");
+                        continents = Some(nice);
+                    }
+                    Err(e) => {
+                        error!("failed to load planet from cache: {}", e);
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "cache")]
+        let was_loaded = continents.is_some();
+        let continents = continents.unwrap_or_else(|| ContinentMap::new(&params));
+
         let regions = Regions::new(&params);
         let inner = Arc::new(RwLock::new(PlanetInner {
             params,
@@ -37,15 +62,31 @@ impl Planet {
 
             #[cfg(feature = "climate")]
             climate: None,
+
+            #[cfg(feature = "cache")]
+            was_loaded,
         }));
+
         Ok(Self(inner))
     }
 
     pub async fn initial_generation(&mut self) {
         let mut planet = self.0.write().await;
-        let params = planet.params.clone();
+        let mut planet_rando = StdRng::seed_from_u64(planet.params.seed());
 
-        let mut planet_rando = StdRng::seed_from_u64(params.seed());
+        // initialize generator unconditionally
+        planet.continents.init_generator(&mut planet_rando);
+
+        #[cfg(feature = "cache")]
+        {
+            if planet.was_loaded {
+                debug!("skipping generation for planet loaded from cache");
+                return;
+            }
+        }
+
+        info!("generating planet");
+        let params = planet.params.clone();
 
         // place continents
         let (continents, total_blobs) = planet.continents.generate(&mut planet_rando);
@@ -58,7 +99,8 @@ impl Planet {
 
         // rasterize continents onto grid and discover depth i.e. distance from land/sea border,
         // and place initial heightmap
-        planet.continents.discover(&mut planet_rando);
+        planet.continents.discover();
+        drop(planet);
 
         #[cfg(feature = "climate")]
         {
@@ -78,7 +120,6 @@ impl Planet {
             };
 
             // downgrade planet reference so it can be read from multiple places
-            drop(planet);
             let planet = self.0.read().await;
 
             let climate = Climate::simulate(
@@ -96,6 +137,14 @@ impl Planet {
             drop(planet);
             let mut planet = self.0.write().await;
             planet.climate = Some(climate);
+        }
+
+        #[cfg(feature = "cache")]
+        if !params.no_cache {
+            let planet = self.0.read().await;
+            if let Err(e) = crate::cache::save(&planet) {
+                error!("failed to serialize planet: {}", e);
+            }
         }
     }
 

@@ -6,7 +6,11 @@ use std::path::Path;
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
-#[derive(Debug, Clone, StructOpt, Deserialize)]
+#[cfg(feature = "cache")]
+use serde::Serialize;
+
+#[derive(Debug, Clone, StructOpt)]
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 #[structopt(rename_all = "kebab-case")]
 pub struct PlanetParams {
     /// Random if not specified
@@ -71,9 +75,12 @@ pub struct PlanetParams {
 
     #[structopt(long, default_value = "10.0")]
     pub height_freq: f64,
+
+    pub no_cache: bool,
 }
 
 #[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]
+#[cfg_attr(feature = "cache", derive(Serialize))]
 #[strum(serialize_all = "kebab-case")]
 pub enum RenderProgressParams {
     #[strum(serialize = "temp")]
@@ -86,6 +93,7 @@ pub enum RenderProgressParams {
 }
 
 #[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, Eq, PartialEq)]
+#[cfg_attr(feature = "cache", derive(Serialize))]
 #[strum(serialize_all = "kebab-case")]
 pub enum AirLayer {
     Surface,
@@ -93,6 +101,7 @@ pub enum AirLayer {
 }
 
 #[derive(Debug, Clone, StructOpt, Deserialize)]
+#[cfg_attr(feature = "cache", derive(Serialize))]
 #[structopt(rename_all = "kebab-case")]
 pub struct RenderParams {
     #[structopt(long)]

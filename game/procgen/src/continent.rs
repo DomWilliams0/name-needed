@@ -10,6 +10,10 @@ use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
+#[cfg(feature = "cache")]
+use serde::{Deserialize, Serialize};
+
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 pub struct LandBlob {
     pub pos: (i32, i32),
     pub radius: i32,
@@ -17,6 +21,7 @@ pub struct LandBlob {
 
 // TODO agree api and stop making everything public
 
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 pub struct ContinentMap {
     params: PlanetParams,
     /// Consecutive blobs belong to the same continent, partitioned by continent_range
@@ -26,7 +31,8 @@ pub struct ContinentMap {
 
     pub grid: DynamicGrid<Tile>,
 
-    /// None until discover() is called
+    /// None until init_generator()
+    #[cfg_attr(feature = "cache", serde(skip))]
     generator: Option<Arc<Generator>>,
 }
 
@@ -34,6 +40,7 @@ type ContinentIdx = NonZeroUsize;
 
 const MIN_RADIUS: i32 = 2;
 
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 pub struct Tile {
     density: Cell<f64>,
     continent: Option<ContinentIdx>,
@@ -69,6 +76,10 @@ impl ContinentMap {
 
             generator: None,
         }
+    }
+
+    pub fn init_generator(&mut self, rando: &mut dyn RngCore) {
+        self.generator = Some(Arc::new(Generator::new(rando, &self.params)))
     }
 
     pub fn generate(&mut self, rando: &mut dyn RngCore) -> (usize, usize) {
@@ -262,10 +273,10 @@ impl ContinentMap {
             })
     }
 
-    pub fn discover(&mut self, rando: &mut dyn RngCore) {
+    pub fn discover(&mut self) {
         self.rasterize_land_blobs();
         self.discover_density();
-        self.generate_initial_heightmap(rando);
+        self.generate_initial_heightmap();
     }
 
     fn rasterize_land_blobs(&mut self) {
@@ -379,8 +390,11 @@ impl ContinentMap {
     }
 
     /// Generates noise and scales to 0.0-1.0
-    fn generate_initial_heightmap(&mut self, rando: &mut dyn RngCore) {
-        let height_gen = Generator::new(rando, &self.params);
+    fn generate_initial_heightmap(&mut self) {
+        let height_gen = self
+            .generator
+            .as_mut()
+            .expect("generator has not been initialized");
 
         let mut min = f64::MAX;
         let mut max = f64::MIN;
@@ -405,11 +419,8 @@ impl ContinentMap {
             // and more diverse inland where density=1
             tile.height = height * density;
         }
-
-        self.generator = Some(Arc::new(height_gen));
     }
 
-    /// Must be called after discover()
     pub fn generator(&self) -> Arc<Generator> {
         self.generator.clone().expect("generator not initialized")
     }

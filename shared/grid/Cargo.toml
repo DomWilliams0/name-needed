@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 common = { path = "../common" }
 derive_more = "^0.99"
+serde = { version = "^1.0", features = ["derive"]}
 
 [features]
 default = ["8neighbours"]

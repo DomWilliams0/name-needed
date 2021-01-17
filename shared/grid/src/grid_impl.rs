@@ -1,6 +1,7 @@
 use common::cgmath::num_traits::clamp;
 use common::{ArrayVec, Boolinator, Itertools};
 use derive_more::*;
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut, Index, IndexMut, Range};
 
@@ -59,6 +60,7 @@ pub trait GridImpl {
 #[repr(transparent)]
 pub struct Grid<I: GridImpl>(#[deref(forward)] Box<I>);
 
+#[derive(Serialize, Deserialize)]
 pub struct DynamicGrid<T> {
     dims: [usize; 3],
     data: Box<[T]>,
@@ -407,6 +409,7 @@ impl<I: GridImpl> Grid<I> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use std::ptr::null;
 
     #[test]
     fn simple() {
@@ -535,5 +538,19 @@ mod tests {
         for n in neighbours {
             eprintln!("{:?}", n);
         }
+    }
+
+    #[test]
+    fn dynamic_grid_non_serializable_type() {
+        struct A(*const i32);
+
+        impl Default for A {
+            fn default() -> Self {
+                Self(null())
+            }
+        }
+
+        // wew it compiles, that's a relief
+        let _grid = DynamicGrid::<A>::new([1, 2, 3]);
     }
 }

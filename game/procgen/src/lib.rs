@@ -16,6 +16,9 @@ mod progress;
 #[cfg(feature = "climate")]
 mod climate;
 
+#[cfg(feature = "cache")]
+mod cache;
+
 pub use params::PlanetParams;
 pub use planet::Planet;
 pub use rasterize::{BlockType, GeneratedBlock, SlabGrid};

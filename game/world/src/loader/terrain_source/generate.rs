@@ -20,7 +20,6 @@ impl GeneratedTerrainSource {
         // TODO load a serialized planet from disk to avoid constantly regenerating
         let mut planet = Planet::new(params)?;
 
-        info!("generating planet");
         planet.initial_generation().await;
 
         Ok(Self { planet })
