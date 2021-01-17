@@ -37,5 +37,5 @@
 * [ ] investigate flashing shadows when a lot of terrain updates happen
 	* probably because occlusion changes are queued for next tick
 	* doesnt happen in release mode
-* [ ] world or camera changes between restarts on world with same seed
+* [X] world or camera changes between restarts on world with same seed
 * [X] fix random entity placement on planet

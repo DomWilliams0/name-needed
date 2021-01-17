@@ -418,8 +418,9 @@ impl ContinentMap {
 impl Generator {
     pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
         // TODO adjust params for global height map
+        let seed = rando.gen::<u64>();
         let noise = Fbm::new()
-            .set_seed(rando.gen())
+            .set_seed(seed as u32)
             .set_octaves(params.height_octaves)
             .set_frequency(params.height_freq);
         let scale = params.planet_size as f64;
@@ -430,13 +431,13 @@ impl Generator {
             limits: (0.0, 0.0),
         };
 
-        this.limits = this.find_limits();
+        this.limits = this.find_limits(seed);
         this
     }
 
-    fn find_limits(&mut self) -> (f64, f64) {
+    fn find_limits(&mut self, seed: u64) -> (f64, f64) {
         let (mut min, mut max) = (100.0, -100.0);
-        let mut r = StdRng::from_entropy();
+        let mut r = StdRng::seed_from_u64(seed);
         let iterations = 1_000; // _000;
         debug!("finding generator limits"; "iterations" => iterations);
 
