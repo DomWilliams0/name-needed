@@ -144,7 +144,13 @@ impl Region {
         }))
         .await;
 
-        // safety: all chunks have been initialized
+        for result in results {
+            if let Err(err) = result {
+                panic!("panic occurred in future: {}", err);
+            }
+        }
+
+        // safety: all chunks have been initialized and any panics have been propagated
         let chunks: [RegionChunk; CHUNKS_PER_REGION] = unsafe { std::mem::transmute(chunks) };
 
         Region { chunks }
