@@ -81,9 +81,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* underwater people
 	* mud crabs with human arms
 	* savage cavemen who sneak around in darkness, break bones then drag them back to the cave
-* generate and load world in SLABS, not full chunks
-	* config option to generate new land for camera, otherwise society member must be there
+* generate new terrain when society member explores, rather than just camera movement. config option!
 * bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
+* grass colour and flora depends on biome/moisture
 
 ## Voxel world mechanics
 * fluid blocks
@@ -142,6 +142,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * textures/sprites/animations
 * improved terrain colour palette
 * very simple oval shadows beneath entities to show height
+* bug: occlusion flickers after world changes, updates are probably being queued for too long
 
 ## Building and testing
 * separate config and preset for tests

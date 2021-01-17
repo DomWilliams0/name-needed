@@ -13,7 +13,7 @@
 *.trace
 cmake-build-*
 *.so
-procgen.png
+procgen*.png
 imgui.ini
 perf.data*
 progress.gif
