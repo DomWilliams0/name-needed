@@ -13,6 +13,7 @@ type Update = dyn FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>;
 type Entry = (&'static str, Box<Update>);
 
 pub struct QueuedUpdates {
+    // TODO use dynstack for updates to avoid a separate box per entry
     updates: RefCell<Vec<Entry>>,
 }
 

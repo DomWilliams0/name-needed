@@ -11,14 +11,15 @@ unit = {path = "../../shared/unit"}
 config = {path = "../../shared/config"}
 common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
+grid = { path = "../../shared/grid" }
 procgen = { path = "../procgen", default-features = false } # no bin
 
 petgraph = "^0.5"
 nd_iter = "0.0.4"
 threadpool = "^1.8"
-crossbeam = "^0.7"
-spiral = "^0.1"
 enum-iterator = "^0.6"
+futures = { version = "^0.3", default-features = false, features = ["std", "executor"] }
+tokio = { version = "^0.3", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"]}
 
 [dev-dependencies]
 matches = "^0.1"

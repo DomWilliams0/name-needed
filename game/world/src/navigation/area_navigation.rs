@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-use petgraph::prelude::EdgeRef;
 use petgraph::stable_graph::StableGraph;
 use petgraph::Directed;
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition, GlobalSliceIndex, SliceBlock};
+use unit::world::CHUNK_SIZE;
+use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 
 use crate::navigation::astar::astar;
 use crate::navigation::path::AreaPathNode;
@@ -164,8 +163,8 @@ impl AreaGraph {
             |edge| edge.weight().cost.weight(), // TODO could prefer wider ports
             |n| {
                 // manhattan distance * chunk size, underestimates
-                let ChunkPosition(nx, ny) = &self.graph[n].0.chunk;
-                let ChunkPosition(gx, gy) = goal.chunk;
+                let ChunkLocation(nx, ny) = &self.graph[n].0.chunk;
+                let ChunkLocation(gx, gy) = goal.chunk;
 
                 let dx = (nx - gx).abs() * CHUNK_SIZE.as_i32();
                 let dy = (ny - gy).abs() * CHUNK_SIZE.as_i32();
@@ -195,11 +194,11 @@ impl AreaGraph {
     }
 
     pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
-        info!("adding edge"; "source" => ?from, "dest" => ?to, "edge" => ?edge);
+        debug!("adding 2-way edge"; "source" => ?from, "dest" => ?to, "edge" => ?edge);
 
         let (a, b) = (self.add_node(from), self.add_node(to));
         self.graph.add_edge(a, b, edge);
-        // self.graph.add_edge(b, a, edge.reversed());
+        self.graph.add_edge(b, a, edge.reversed());
     }
 
     pub(crate) fn add_node(&mut self, area: WorldArea) -> NodeIndex {
@@ -222,28 +221,39 @@ impl AreaGraph {
 
     pub(crate) fn remove_node(&mut self, area: &WorldArea) {
         if let Some(node) = self.node_lookup.remove(area) {
-            // invalidate edges first
-            let edges: Vec<_> = self.graph.edges(node).map(|e| e.id()).collect();
-            for edge in edges {
-                self.graph.remove_edge(edge);
-            }
-
-            // invalidate node
+            // invalidate node, which removes all its edges too
             let old = self.graph.remove_node(node);
             debug_assert!(old.is_some(), "node was not in both lookup and graph")
         }
+    }
+
+    /// Removes all where f(area) == false.
+    /// Returns number removed
+    pub(crate) fn retain(&mut self, mut f: impl FnMut(&WorldArea) -> bool) -> usize {
+        let prev_n = (self.node_lookup.len(), self.graph.node_count());
+        debug_assert_eq!(prev_n.0, prev_n.1);
+
+        self.node_lookup.retain(|n, _| f(n));
+        self.graph.retain_nodes(|graph, idx| {
+            let node = graph.node_weight(idx).unwrap();
+            f(&node.0)
+        });
+
+        let new_n = (self.node_lookup.len(), self.graph.node_count());
+        debug_assert_eq!(new_n.0, new_n.1);
+        prev_n.0 - new_n.0
     }
 
     fn get_node(&self, area: WorldArea) -> Result<NodeIndex, AreaPathError> {
         self.node_lookup
             .get(&area)
             .copied()
-            .ok_or_else(|| AreaPathError::NoSuchNode(area))
+            .ok_or(AreaPathError::NoSuchNode(area))
     }
 
     #[cfg(test)]
     fn get_edges(&self, from: WorldArea, to: WorldArea) -> Vec<AreaNavEdge> {
-        use petgraph::prelude::Direction;
+        use petgraph::prelude::*;
 
         match (self.get_node(from), self.get_node(to)) {
             (Ok(from), Ok(to)) => self
@@ -281,8 +291,8 @@ impl Debug for AreaNavEdge {
 mod tests {
     use matches::assert_matches;
 
-    use unit::dim::CHUNK_SIZE;
-    use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
+    use unit::world::CHUNK_SIZE;
+    use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
@@ -311,10 +321,9 @@ mod tests {
 
     #[test]
     fn one_block_one_side_flat() {
-        // logging::for_tests();
         let chunks = vec![
             ChunkBuilder::new()
-                .set_block((15, 5, 0), BlockType::Stone)
+                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), BlockType::Stone)
                 .build((0, 0)),
             ChunkBuilder::new()
                 .set_block((0, 5, 0), BlockType::Grass)
@@ -400,12 +409,12 @@ mod tests {
         assert_eq!(graph.edge_count(), 2); // 1 each way
 
         let a = WorldArea {
-            chunk: ChunkPosition(0, 0),
+            chunk: ChunkLocation(0, 0),
             slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
         let b = WorldArea {
-            chunk: ChunkPosition(-1, 0),
+            chunk: ChunkLocation(-1, 0),
             slab: 1.into(),
             area: SlabAreaIndex::FIRST,
         };
@@ -422,6 +431,7 @@ mod tests {
             .set_block((2, 2, SLAB_SIZE.as_i32()), BlockType::Stone)
             .build((0, 0))]);
 
+        // BUG: area is not created because no neighbouring chunks found
         assert_eq!(graph.node_count(), 1); // just one area in slab idx 1
     }
 
@@ -454,8 +464,8 @@ mod tests {
                 .graph
                 .edge_indices()
                 .map(|e| (graph.graph[e], graph.graph.edge_endpoints(e).unwrap()))
-                .filter(|(_, (a, b))| graph.graph[*a].0.chunk == ChunkPosition(0, 0)
-                    || graph.graph[*b].0.chunk == ChunkPosition(0, 0))
+                .filter(|(_, (a, b))| graph.graph[*a].0.chunk == ChunkLocation(0, 0)
+                    || graph.graph[*b].0.chunk == ChunkLocation(0, 0))
                 .count(),
             4 * 2
         );

@@ -1,12 +1,13 @@
 use std::time::{Duration, Instant};
 
 use common::*;
-use resources::resource::Resources;
+use resources::Resources;
 use simulation::input::UiCommand;
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,
     RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
 };
+use unit::world::WorldPosition;
 
 pub struct DummyRenderer;
 
@@ -77,7 +78,7 @@ impl PersistentSimulationBackend for DummyBackendPersistent {
         Ok(Self)
     }
 
-    fn start(self, world_viewer: WorldViewer) -> Self::Initialized {
+    fn start(self, world_viewer: WorldViewer, _: WorldPosition) -> Self::Initialized {
         DummyBackendInit {
             end_time: Instant::now() + Duration::from_secs(30),
             world_viewer,

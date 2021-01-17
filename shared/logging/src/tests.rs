@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use once_cell::sync::OnceCell;
-use slog::Drain;
+use slog::{Drain, Level};
 use slog_scope::GlobalLoggerGuard;
 
 static LOGGER: OnceCell<GlobalLoggerGuard> = OnceCell::new();
@@ -16,7 +16,7 @@ pub fn for_tests() {
             .force_color()
             .build();
         let drain = slog_term::CompactFormat::new(drain).build();
-        let drain = Mutex::new(drain).fuse();
+        let drain = Mutex::new(drain.filter_level(Level::Trace)).fuse();
         let logger = slog::Logger::root(drain, slog::o!());
         slog_scope::set_global_logger(logger)
     });

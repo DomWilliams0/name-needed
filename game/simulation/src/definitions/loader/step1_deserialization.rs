@@ -1,14 +1,14 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::fs::File;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
 
 use serde::Deserialize;
 
 use common::derive_more::IntoIterator;
 use common::*;
-use resources::{resource, ResourceError};
+use resources::ResourceError;
 
 use crate::definitions::loader::step2_preprocessing::ProcessedComponents;
 use crate::definitions::{DefinitionError, DefinitionErrorKind};
@@ -39,7 +39,7 @@ pub struct DeserializedDefinition {
 }
 #[derive(Debug, Clone)]
 pub enum DefinitionSource {
-    File(Rc<PathBuf>),
+    File(Rc<Path>),
     Memory,
 }
 
@@ -132,17 +132,17 @@ impl DeserializedDefinition {
 }
 
 pub fn collect_raw_definitions(
-    resources: resource::Definitions,
+    resources: resources::Definitions,
 ) -> (Vec<DeserializedDefinition>, Vec<DefinitionError>) {
     let mut definitions = Vec::with_capacity(512);
     let mut errors = Vec::new();
 
     // collect unprocessed definitions
-    for file in resources::recurse::<_, (File, resources::Mmap, Rc<PathBuf>)>(&resources, "ron") {
+    for file in resources::recurse::<_, (File, resources::Mmap, Rc<Path>)>(&resources, "ron") {
         // handle resource error
         let file = file.map_err(|ResourceError(path, e)| {
             DefinitionError(
-                DefinitionSource::File(Rc::new(path)),
+                DefinitionSource::File(path.into()),
                 DefinitionErrorKind::Resource(e),
             )
         });

@@ -4,14 +4,14 @@ use color::ColorRgb;
 use common::*;
 use simulation::{BaseVertex, WorldViewer};
 use unit::view::ViewPoint;
-use unit::world::{ChunkPosition, WorldPoint};
+use unit::world::{ChunkLocation, WorldPoint};
 
 use crate::render::sdl::gl::{
     AttribType, BufferUsage, Capability, GlResult, Normalized, Primitive, Program, ScopedBindable,
     Vao, Vbo,
 };
 use cgmath::Matrix;
-use resources::resource::Shaders;
+use resources::Shaders;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldVertex {
@@ -31,12 +31,12 @@ impl BaseVertex for WorldVertex {
 pub struct ChunkMesh {
     vao: Vao,
     vbo: Vbo,
-    chunk_pos: ChunkPosition,
+    chunk_pos: ChunkLocation,
 }
 
 pub struct TerrainRenderer {
     program: Program,
-    chunk_meshes: HashMap<ChunkPosition, ChunkMesh>,
+    chunk_meshes: HashMap<ChunkLocation, ChunkMesh>,
 }
 
 impl TerrainRenderer {
@@ -51,7 +51,7 @@ impl TerrainRenderer {
 
     pub fn update_chunk_mesh(
         &mut self,
-        chunk_pos: ChunkPosition,
+        chunk_pos: ChunkLocation,
         new_mesh: Vec<WorldVertex>,
     ) -> GlResult<()> {
         let mesh = self
@@ -99,7 +99,7 @@ impl TerrainRenderer {
 
                 // offset chunk
                 let view = {
-                    let world_point = WorldPoint::from(mesh.chunk_pos);
+                    let world_point = WorldPoint::from(mesh.chunk_pos.get_block(0)); // z irrelevant
                     let view_point = ViewPoint::from(world_point);
                     let transform = Matrix4::from_translation(view_point.into());
 

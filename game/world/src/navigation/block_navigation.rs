@@ -111,7 +111,7 @@ impl BlockGraph {
             |(_, _, e)| e.0.weight(),
             |n| manhattan(&n.0, &dst.0) as f32,
         )
-        .ok_or_else(|| BlockPathError::NoPath(to, from))?;
+        .ok_or(BlockPathError::NoPath(to, from))?;
 
         // TODO reuse vec allocation
         let mut out_path = Vec::with_capacity(path.len());
@@ -131,11 +131,18 @@ impl BlockGraph {
             target,
         })
     }
+
+    /// (edges, nodes)
+    pub fn len(&self) -> (usize, usize) {
+        let edges = self.graph.edge_count();
+        let nodes = self.graph.node_count();
+        (edges, nodes)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use unit::world::ChunkPosition;
+    use unit::world::ChunkLocation;
 
     use crate::block::BlockType;
     use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
@@ -150,7 +157,7 @@ mod tests {
             .set_block((6, 5, 3), BlockType::Grass)
             .build((0, 0))])
         .into_inner();
-        let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+        let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
         let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
 
         let path = graph
@@ -214,7 +221,7 @@ mod tests {
         let end = (5, 3, 2); // walk around the first step to here pls
 
         let path = {
-            let chunk = world.find_chunk_with_pos(ChunkPosition(0, 0)).unwrap();
+            let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
             let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
             graph
                 .find_block_path(start, end, SearchGoal::Arrive)

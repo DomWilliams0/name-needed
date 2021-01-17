@@ -9,10 +9,13 @@ Config(
         nav_paths_by_default: false,
     ),
     world: (
-        // source: Preset(OneChunkWonder),
-        source: Generate (radius: 2, seed: Some(342882)),
+        // source: Preset(Stairs),
+        source: Generate("planet_generation.txt"),
         worker_threads: None,
         generation_height_scale: 15.0,
+        initial_chunk: (2, 2),
+        initial_slab_depth: 2,
+        initial_chunk_radius: 2,
     ),
     simulation: (
         random_seed: Some(67853852415423),

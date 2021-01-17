@@ -12,13 +12,16 @@ pub use itertools::*;
 pub use num_derive;
 pub use num_traits;
 pub use ordered_float::OrderedFloat;
+pub use parking_lot;
 pub use parse_display;
-pub use rand::prelude::*;
+pub use rand::{self, prelude::*};
 pub use smallvec::*;
 pub use thiserror::{self, Error};
 
 pub use lazy_static::lazy_static;
-pub use logging::{self, prelude::*, slog_kv_debug, slog_value_debug};
+pub use logging::{
+    self, prelude::*, slog_kv_debug, slog_kv_display, slog_value_debug, slog_value_display,
+};
 pub use metrics::{self, declare_entity_metric, entity_metric};
 pub use newtype::{NormalizedFloat, Proportion};
 
@@ -65,7 +68,7 @@ pub fn forward_angle(angle: Rad) -> Vector2 {
     rotation.rotate_vector(AXIS_FWD_2)
 }
 
-pub fn truncate(vec: Vector2, max: F) -> Vector2 {
+pub fn truncate<F: cgmath::BaseFloat, V: cgmath::InnerSpace<Scalar = F>>(vec: V, max: F) -> V {
     if vec.magnitude2() > (max * max) {
         vec.normalize_to(max)
     } else {
@@ -75,6 +78,7 @@ pub fn truncate(vec: Vector2, max: F) -> Vector2 {
 
 pub mod input;
 pub mod newtype;
+pub mod panic;
 pub mod random;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {

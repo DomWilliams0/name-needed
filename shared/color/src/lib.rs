@@ -58,6 +58,10 @@ impl ColorRgb {
         }
         .into()
     }
+
+    pub fn array_with_alpha(self, alpha: u8) -> [u8; 4] {
+        [self.r, self.g, self.b, alpha]
+    }
 }
 
 pub struct UniqueRandomColors {
@@ -105,6 +109,18 @@ impl From<ColorRgb> for [f32; 3] {
 impl From<ColorRgb> for (u8, u8, u8) {
     fn from(c: ColorRgb) -> Self {
         (c.r, c.g, c.b)
+    }
+}
+
+impl From<ColorRgb> for [u8; 3] {
+    fn from(c: ColorRgb) -> Self {
+        [c.r, c.g, c.b]
+    }
+}
+
+impl From<ColorRgb> for [u8; 4] {
+    fn from(c: ColorRgb) -> Self {
+        c.array_with_alpha(255)
     }
 }
 

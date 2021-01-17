@@ -1,19 +1,29 @@
 pub use block_position::*;
+pub use chunk_location::*;
 pub use chunk_point::*;
-pub use chunk_position::*;
 pub use range::*;
 pub use slab_index::*;
+pub use slab_location::*;
 pub use slab_position::*;
 pub use slice_block::*;
 pub use slice_index::*;
 pub use world_point::*;
 pub use world_position::*;
 
+use crate::dim::SmallUnsignedConstant;
+
+/// Chunk size X and Y dimension
+pub const CHUNK_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(16);
+
+/// Chunk size Z dimension
+pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
+
 mod block_position;
+mod chunk_location;
 mod chunk_point;
-mod chunk_position;
 mod range;
 mod slab_index;
+mod slab_location;
 mod slab_position;
 mod slice_block;
 mod slice_index;
@@ -31,8 +41,9 @@ mod tests {
 
     use common::*;
 
-    use crate::dim::CHUNK_SIZE;
-    use crate::world::{BlockPosition, ChunkPosition, SliceIndex, WorldPoint, WorldPosition};
+    use crate::world::{
+        BlockPosition, ChunkLocation, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+    };
 
     #[test]
     fn block_to_world() {
@@ -67,17 +78,17 @@ mod tests {
     #[test]
     fn world_to_chunk() {
         assert_eq!(
-            ChunkPosition::from(WorldPosition(10, 20, SliceIndex::new(50))),
-            ChunkPosition(0, 1)
+            ChunkLocation::from(WorldPosition(10, 20, SliceIndex::new(50))),
+            ChunkLocation(0, 1)
         );
         assert_eq!(
-            ChunkPosition::from(WorldPosition(-20, -40, SliceIndex::new(50))),
-            ChunkPosition(-2, -3)
+            ChunkLocation::from(WorldPosition(-20, -40, SliceIndex::new(50))),
+            ChunkLocation(-2, -3)
         );
 
         assert_eq!(
-            ChunkPosition::from(WorldPosition(-2, 2, SliceIndex::new(0))),
-            ChunkPosition(-1, 0)
+            ChunkLocation::from(WorldPosition(-2, 2, SliceIndex::new(0))),
+            ChunkLocation(-1, 0)
         );
     }
 

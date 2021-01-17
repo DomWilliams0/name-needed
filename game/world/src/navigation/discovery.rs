@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
 
 use crate::block::Block;
-use crate::chunk::slab::Slab;
+use crate::chunk::slab::SlabGridImpl;
 use crate::chunk::slice::Slice;
-use crate::grid::{CoordType, Grid, GridImpl};
-use crate::grid_declare;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
+use grid::{grid_declare, CoordType, GridImpl};
+use std::ops::Deref;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,
     CHUNK_SIZE.as_usize(),
@@ -45,7 +45,6 @@ pub(crate) struct AreaDiscovery<'a> {
     slab_index: SlabIndex,
 
     below_top_slice: Option<Slice<'a>>,
-    above_bot_slice: Option<Slice<'a>>,
 }
 
 impl Into<AreaDiscoveryGridBlock> for &Block {
@@ -65,10 +64,9 @@ enum VerticalOffset {
 
 impl<'a> AreaDiscovery<'a> {
     pub fn from_slab(
-        slab: &Slab,
+        slab: &impl Deref<Target = SlabGridImpl>,
         slab_index: SlabIndex,
         below_top_slice: Option<Slice<'a>>,
-        above_bot_slice: Option<Slice<'a>>,
     ) -> Self {
         let mut grid = AreaDiscoveryGrid::default();
 
@@ -85,7 +83,6 @@ impl<'a> AreaDiscovery<'a> {
             block_graphs: HashMap::new(),
             slab_index,
             below_top_slice,
-            above_bot_slice,
         }
     }
 
@@ -227,6 +224,7 @@ impl<'a> AreaDiscovery<'a> {
         true
     }
 
+    /// Can check below into slab below, but not above into slab above
     fn get_vertical_offset(
         &self,
         block: CoordType,
@@ -236,19 +234,8 @@ impl<'a> AreaDiscovery<'a> {
         const TOP: i32 = SLAB_SIZE.as_i32() - 1;
 
         match z {
-            // top of the slab: check slab above
-            TOP if offset == VerticalOffset::Above => {
-                if let Some(above_slice) = &self.above_bot_slice {
-                    // it is present
-                    (&above_slice[(x as BlockCoord, y as BlockCoord)]).into()
-                } else {
-                    // not present: this must be the top of the world
-                    AreaDiscoveryGridBlock {
-                        opacity: OcclusionOpacity::Unknown,
-                        ..Default::default()
-                    }
-                }
-            }
+            // top of the slab: never check the slab above
+            TOP if offset == VerticalOffset::Above => unreachable!(),
 
             // bottom of the slab: check slab below
             0 if offset == VerticalOffset::Below => {
@@ -282,9 +269,9 @@ impl<'a> AreaDiscovery<'a> {
         block_graphs.into_iter()
     }
 
-    pub fn apply(self, slab: &mut Slab) {
+    /// Assign areas to the blocks in the slab
+    pub fn apply(self, slab: &mut SlabGridImpl) {
         for i in slab.indices() {
-            let slab = slab.expect_mut();
             *slab[i].area_mut() = self.grid[i].area;
         }
     }

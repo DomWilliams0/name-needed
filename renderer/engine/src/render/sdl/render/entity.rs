@@ -5,7 +5,7 @@ use crate::render::sdl::gl::{
 use crate::render::sdl::render::FrameTarget;
 use color::ColorRgb;
 use common::*;
-use resources::resource::Shaders;
+use resources::Shaders;
 use simulation::Shape2d;
 use unit::view::ViewPoint;
 use unit::world::{WorldPoint, SCALE};

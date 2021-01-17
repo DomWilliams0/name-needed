@@ -7,12 +7,12 @@ use simulation::{
 
 use crate::presets::ContinuousIntegrationGamePreset;
 
-use engine::panic::Panic;
 use engine::Engine;
-use resources::resource::Resources;
 use resources::ResourceContainer;
+use resources::Resources;
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -122,11 +122,11 @@ fn do_main() -> BoxedResult<()> {
 
     loop {
         // create simulation
-        let simulation = preset.load(resources.clone(), scenario)?;
+        let (simulation, initial_block) = preset.load(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
-        let world_viewer = WorldViewer::from_world(simulation.voxel_world())?;
-        let backend = backend_state.start(world_viewer);
+        let world_viewer = WorldViewer::with_world(simulation.voxel_world(), initial_block)?;
+        let backend = backend_state.start(world_viewer, initial_block);
 
         // create and run engine
         let engine = Engine::new(simulation, backend);
@@ -161,9 +161,9 @@ fn main() {
 
     info!("initialized logging"; "level" => ?logger_guard.level());
 
-    engine::panic::init_panic_detection();
+    common::panic::init_panic_detection();
 
-    let result = std::panic::catch_unwind(|| {
+    let result = common::panic::run_and_handle_panics(|| {
         #[cfg(feature = "count-allocs")]
         {
             use alloc_counter::count_alloc;
@@ -182,35 +182,12 @@ fn main() {
         do_main()
     });
 
-    let all_panics = engine::panic::panics().collect_vec();
-
     let exit = match result {
-        _ if !all_panics.is_empty() => {
-            crit!("{count} threads panicked", count = all_panics.len());
-
-            for Panic {
-                message,
-                thread,
-                mut backtrace,
-            } in all_panics
-            {
-                backtrace.resolve();
-
-                crit!("panic";
-                "backtrace" => ?backtrace,
-                "message" => message,
-                "thread" => thread,
-                );
-            }
-
+        None => {
+            // panic handled above
             1
         }
-        Err(_) => {
-            // panics are caught by the case above
-            unreachable!()
-        }
-
-        Ok(Err(e)) => {
+        Some(Err(e)) => {
             crit!("critical error"; "error" => %e);
 
             if logger().is_enabled(MyLevel::Debug) {
@@ -226,13 +203,20 @@ fn main() {
 
             1
         }
-        Ok(Ok(())) => 0,
+        Some(Ok(())) => 0,
     };
-
-    info!("exiting cleanly"; "code"=>exit);
 
     // unhook custom panic handler before dropping and flushing the logger
     let _ = std::panic::take_hook();
+    if exit != 0 {
+        const SECONDS: u64 = 2;
+        info!(
+            "waiting {seconds} seconds to allow other threads to finish logging",
+            seconds = SECONDS
+        );
+        std::thread::sleep(Duration::from_secs(SECONDS));
+    }
+    info!("exiting cleanly"; "code" => exit);
     drop(logger_guard);
 
     std::process::exit(exit);

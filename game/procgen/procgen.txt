@@ -1,0 +1,34 @@
+# nice, comments
+#--draw-density
+--draw-height
+
+--seed 1231232
+
+--region-start-slab 10
+--region-max-depth 10
+--threads 4
+--height-freq 6
+--height-octaves 8
+
+--gif-layer surface
+--gif-progress wind
+--create-climate-gif
+#--gif-all
+--gif-threads 8
+
+--climate-iterations 200
+--gif-fps 16
+--scale 4
+
+--wind-transfer-rate 0.05
+--wind-pressure-threshold 0.2
+--sunlight-max 0.8
+
+--wind-speed-modifier 3.0
+--wind-speed-base 1.4
+
+# way better results the lower this is!!
+--wind-direction-conformity 0.02
+
+# for debugging param parsing
+#--log-params-and-exit

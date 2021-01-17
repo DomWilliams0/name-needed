@@ -92,6 +92,6 @@ impl EntityPosition for (i32, i32) {
         let (x, y) = *self;
         world
             .find_accessible_block_in_column(x, y)
-            .ok_or_else(|| BuilderError::InaccessibleColumn((x, y)))
+            .ok_or(BuilderError::InaccessibleColumn((x, y)))
     }
 }

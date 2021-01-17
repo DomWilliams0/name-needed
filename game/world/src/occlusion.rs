@@ -2,8 +2,10 @@ use common::derive_more::{Deref, DerefMut};
 use common::*;
 
 use crate::block::BlockOpacity;
+use crate::chunk::slice::Slice;
 use crate::neighbour::NeighbourOffset;
 use std::ops::Add;
+use unit::world::SliceBlock;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {
@@ -38,6 +40,7 @@ pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
 
 impl NeighbourOpacity {
     pub const fn default_const() -> Self {
+        // TODO this is different to the actual Default!
         Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
     }
 
@@ -59,6 +62,18 @@ impl NeighbourOpacity {
     #[cfg(test)]
     pub fn all_solid() -> Self {
         Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
+    }
+
+    pub fn with_slice_above(this_block: SliceBlock, slice_above: Slice) -> NeighbourOpacity {
+        // collect blocked state of each neighbour on the top face
+        let mut opacity = NeighbourOpacity::default();
+        for (n, offset) in NeighbourOffset::offsets() {
+            if let Some(neighbour_block) = this_block.try_add(offset) {
+                opacity[n as usize] = slice_above[neighbour_block].opacity().into();
+            }
+        }
+
+        opacity
     }
 }
 
@@ -92,10 +107,7 @@ impl Default for OcclusionOpacity {
 
 impl OcclusionOpacity {
     pub fn solid(self) -> bool {
-        match self {
-            OcclusionOpacity::Unknown => false,
-            OcclusionOpacity::Known(opacity) => opacity.solid(),
-        }
+        matches!(self, OcclusionOpacity::Known(BlockOpacity::Solid))
     }
 
     pub fn transparent(self) -> bool {
@@ -221,27 +233,27 @@ impl PartialEq<NeighbourOpacity> for BlockOcclusion {
 mod tests {
     use matches::assert_matches;
 
-    use unit::world::ChunkPosition;
+    use unit::world::ChunkLocation;
 
     use super::*;
 
     #[test]
     fn offset_between_aligned_chunks() {
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(5, 5), ChunkPosition(5, 6)),
+            NeighbourOffset::between_aligned(ChunkLocation(5, 5), ChunkLocation(5, 6)),
             NeighbourOffset::North
         );
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(5, 5), ChunkPosition(5, 1)),
+            NeighbourOffset::between_aligned(ChunkLocation(5, 5), ChunkLocation(5, 1)),
             NeighbourOffset::South
         );
 
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(-2, 5), ChunkPosition(-3, 5)),
+            NeighbourOffset::between_aligned(ChunkLocation(-2, 5), ChunkLocation(-3, 5)),
             NeighbourOffset::West
         );
         assert_matches!(
-            NeighbourOffset::between_aligned(ChunkPosition(-2, 5), ChunkPosition(33, 5)),
+            NeighbourOffset::between_aligned(ChunkLocation(-2, 5), ChunkLocation(33, 5)),
             NeighbourOffset::East
         );
     }

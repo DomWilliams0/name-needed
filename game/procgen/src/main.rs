@@ -1,39 +1,97 @@
-use image::{ImageBuffer, Rgb};
-use procgen::generate_chunk;
+use common::*;
+use procgen::*;
+use std::io::Write;
+use std::time::SystemTime;
+
+fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
+    lazy_static! {
+        static ref START_TIME: SystemTime = SystemTime::now();
+    }
+
+    let now = SystemTime::now();
+    write!(
+        out,
+        "{:8}",
+        now.duration_since(*START_TIME)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    )
+}
 
 #[cfg(feature = "bin")]
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let radius: i32 = args
-        .next()
-        .and_then(|s| s.parse().ok())
-        .expect("bad radius");
-    let seed: u32 = args.next().and_then(|s| s.parse().ok()).expect("bad seed");
-    let noise_scale: f64 = args.next().and_then(|s| s.parse().ok()).expect("bad scale");
-    assert!(args.next().is_none(), "trailing args");
-    let chunk_size = 8i32;
+    // parse config and args first
+    let params = PlanetParams::load_with_args("procgen.txt");
 
-    let diameter = (chunk_size * ((2 * radius) + 1)) as u32;
-    let mut image = ImageBuffer::new(diameter, diameter);
+    let _logging = logging::LoggerBuilder::with_env()
+        .and_then(|builder| builder.init(log_time))
+        .expect("logging failed");
+    info!("initialized logging"; "level" => ?_logging.level());
 
-    for cy in -radius..=radius {
-        for cx in -radius..=radius {
-            let chunk = generate_chunk((cx, cy), chunk_size as usize, seed as u64, noise_scale);
+    let exit = match params {
+        Err(err) => {
+            error!("failed to parse params: {}", err);
+            1
+        }
+        Ok(params) if params.log_params_and_exit => {
+            // nop
+            info!("config: {:#?}", params);
+            0
+        }
+        Ok(params) => {
+            debug!("config: {:#?}", params);
+            common::panic::init_panic_detection();
 
-            for (i, height) in chunk.heightmap.iter().enumerate() {
-                let i = i as i32;
-                let bx = i % chunk_size;
-                let by = i / chunk_size;
+            let dew_it = || {
+                use tokio::runtime as rt;
+                let runtime = if params.render.threads == 1 {
+                    rt::Builder::new_current_thread()
+                } else {
+                    rt::Builder::new_multi_thread()
+                }
+                .worker_threads(params.render.threads)
+                .max_threads(params.render.threads)
+                .build()
+                .expect("failed to create runtime");
 
-                let px = ((cx + radius) * chunk_size) + bx;
-                let py = ((cy + radius) * chunk_size) + by;
+                runtime.block_on(async {
+                    let mut planet = Planet::new(params).expect("failed");
+                    planet.initial_generation().await;
 
-                let pixel = (*height * 220.0) as u8;
-                // println!("{},{} | {},{} => {},{} = {}", cx, cy, bx, by, px, py, pixel);
-                image.put_pixel(px as u32, py as u32, Rgb([pixel, pixel, pixel]));
+                    let mut render = Render::with_planet(planet.clone()).await;
+                    render.draw_continents().await;
+                    render.save("procgen.png").expect("failed to write image");
+
+                    for y in 20..=20 {
+                        for x in 20..=22 {
+                            let region = RegionLocation(x, y);
+
+                            let mut render = Render::with_planet(planet.clone()).await;
+                            render.draw_region(region).await;
+                            render
+                                .save(format!("procgen-region-{}-{}.png", x, y))
+                                .expect("failed to write image");
+                        }
+                    }
+                })
+            };
+
+            match common::panic::run_and_handle_panics(dew_it) {
+                Some(_) => 0,
+                None => 1,
             }
         }
-    }
+    };
 
-    image.save("procgen.png").expect("failed to write image");
+    // let logging end gracefully
+    info!("all done");
+    drop(_logging);
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    std::process::exit(exit);
+}
+
+#[cfg(not(feature = "bin"))]
+fn main() {
+    unreachable!("missing feature \"bin\"")
 }

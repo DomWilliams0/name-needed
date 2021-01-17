@@ -1,0 +1,16 @@
+[package]
+name = "grid"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "../common" }
+derive_more = "^0.99"
+serde = { version = "^1.0", features = ["derive"]}
+
+[features]
+default = ["8neighbours"]
+8neighbours = []

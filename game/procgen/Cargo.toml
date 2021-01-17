@@ -7,10 +7,32 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-common = {path = "../../shared/common"}
+common = { path = "../../shared/common" }
+unit = { path = "../../shared/unit" }
+grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
+color = { path = "../../shared/color", optional = true }
 noise = "^0.6"
-image = {version = "^0.23", optional = true, default-features = false, features = ["png"]}
+rand_distr = "^0.3"
+strum = "^0.19"
+strum_macros = "^0.19"
+array-init = "^1.0"
+tokio = { version = "^0.3", default-features = false, features = ["rt", "rt-multi-thread", "sync", "stream"] }
+futures = { version = "^0.3", default-features = false, features = ["std", "alloc"] }
+
+line_drawing = { version = "^0.8", optional = true }
+crossbeam = { version = "^0.8", optional = true }
+async-trait = { version = "^0.1", optional = true }
+
+image = { version = "^0.23", optional = true, default-features = false, features = ["png"] }
+imageproc = { version = "^0.22", optional = true, default-features = false }
+
+structopt = "^0.2"
+serde = { version = "^1.0", features = ["derive"] }
+bincode = { version = "^1.3", optional = true }
+sha2 = { version = "^0.9", optional = true }
 
 [features]
-default = ["bin"]
-bin = ["image"]
+default = ["cache"]
+bin = ["image", "imageproc", "color", "async-trait"]
+climate = ["crossbeam", "line_drawing"]
+cache = ["bincode", "sha2"]

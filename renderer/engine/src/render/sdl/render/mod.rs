@@ -9,7 +9,7 @@ use crate::render::sdl::gl::{
 };
 use crate::render::sdl::render::entity::EntityPipeline;
 use crate::render::sdl::render::terrain::TerrainRenderer;
-use resources::resource::Shaders;
+use resources::Shaders;
 use std::f32::consts::PI;
 use unit::world::WorldPoint;
 

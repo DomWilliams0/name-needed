@@ -1,7 +1,7 @@
 use nd_iter::iter_3d;
 
 use common::*;
-use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex};
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex};
 
 use crate::block::Block;
 use crate::chunk::slab::DeepClone;
@@ -100,7 +100,7 @@ impl ChunkBuilder {
         Self::with_terrain(apply.0)
     }
 
-    pub fn build<P: Into<ChunkPosition>>(self, pos: P) -> ChunkDescriptor {
+    pub fn build<P: Into<ChunkLocation>>(self, pos: P) -> ChunkDescriptor {
         ChunkDescriptor {
             terrain: self.into_inner(),
             chunk_pos: pos.into(),
@@ -131,14 +131,13 @@ impl Default for ChunkBuilder {
     }
 }
 
-#[derive(Clone)]
 pub struct ChunkDescriptor {
     pub terrain: RawChunkTerrain,
-    pub chunk_pos: ChunkPosition,
+    pub chunk_pos: ChunkLocation,
 }
 
-impl Into<(ChunkPosition, RawChunkTerrain)> for ChunkDescriptor {
-    fn into(self) -> (ChunkPosition, RawChunkTerrain) {
+impl Into<(ChunkLocation, RawChunkTerrain)> for ChunkDescriptor {
+    fn into(self) -> (ChunkLocation, RawChunkTerrain) {
         (self.chunk_pos, self.terrain)
     }
 }
@@ -149,6 +148,12 @@ impl DeepClone for ChunkDescriptor {
             chunk_pos: self.chunk_pos,
             terrain: self.terrain.deep_clone(),
         }
+    }
+}
+
+impl DeepClone for ChunkBuilder {
+    fn deep_clone(&self) -> Self {
+        ChunkBuilder(self.0.as_ref().map(|t| t.deep_clone()))
     }
 }
 

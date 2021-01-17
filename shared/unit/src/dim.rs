@@ -3,9 +3,6 @@ use crate::world::BlockCoord;
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct SmallUnsignedConstant(u32);
 
-/// Chunk size X and Y dimension
-pub const CHUNK_SIZE: SmallUnsignedConstant = SmallUnsignedConstant(16);
-
 impl SmallUnsignedConstant {
     pub const fn as_f32(self) -> f32 {
         self.0 as f32
@@ -13,6 +10,10 @@ impl SmallUnsignedConstant {
 
     pub const fn as_i32(self) -> i32 {
         self.0 as i32
+    }
+
+    pub const fn as_u32(self) -> u32 {
+        self.0 as u32
     }
 
     pub const fn as_u16(self) -> u16 {
@@ -29,6 +30,10 @@ impl SmallUnsignedConstant {
 
     pub const fn as_usize(self) -> usize {
         self.0 as usize
+    }
+
+    pub const fn as_f64(self) -> f64 {
+        self.0 as f64
     }
 
     pub const fn as_block_coord(self) -> BlockCoord {

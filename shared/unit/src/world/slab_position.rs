@@ -1,8 +1,8 @@
 use common::derive_more::*;
 
-use crate::dim::CHUNK_SIZE;
 use crate::world::{
-    BlockCoord, BlockPosition, ChunkPosition, LocalSliceIndex, SlabIndex, SliceIndex, WorldPosition,
+    BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, SliceIndex, WorldPosition,
+    CHUNK_SIZE,
 };
 
 // TODO consider using same generic pattern as SliceIndex for all points and positions
@@ -19,13 +19,9 @@ impl SlabPosition {
         Self(x, y, z)
     }
 
-    pub fn to_world_position<P: Into<ChunkPosition>>(
-        self,
-        chunk_pos: P,
-        slab_index: SlabIndex,
-    ) -> WorldPosition {
-        self.to_block_position(slab_index)
-            .to_world_position(chunk_pos)
+    pub fn to_world_position(self, slab: SlabLocation) -> WorldPosition {
+        self.to_block_position(slab.slab)
+            .to_world_position(slab.chunk)
     }
 
     pub fn to_block_position(self, slab_index: SlabIndex) -> BlockPosition {

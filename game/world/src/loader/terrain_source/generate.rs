@@ -1,107 +1,61 @@
-use crate::block::BlockType;
-use crate::chunk::ChunkBuilder;
-use crate::chunk::RawChunkTerrain;
-use crate::loader::terrain_source::{PreprocessedTerrain, TerrainSourceError};
-use crate::loader::TerrainSource;
-use common::*;
-use unit::dim::CHUNK_SIZE;
-use unit::world::ChunkPosition;
+use crate::loader::terrain_source::TerrainSourceError;
 
+use crate::block::Block;
+use crate::chunk::slab::{Slab, SlabType};
+
+use common::*;
+
+use procgen::{GeneratedBlock, Planet, PlanetParams};
+
+use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
+
+/// Holds lightweight arc'd and mutex'd reference to planet
+#[derive(Clone)]
 pub struct GeneratedTerrainSource {
-    bounds: (ChunkPosition, ChunkPosition),
-    seed: u64,
-    height_scale: f64,
+    planet: Planet,
 }
 
 impl GeneratedTerrainSource {
-    pub fn new(seed: Option<u64>, radius: u32, height_scale: f64) -> Result<Self, &'static str> {
-        if radius < 1 {
-            return Err("radius should be >0");
-        }
+    pub async fn new(params: PlanetParams) -> BoxedResult<Self> {
+        // TODO load a serialized planet from disk to avoid constantly regenerating
+        let mut planet = Planet::new(params)?;
 
-        let seed = if let Some(seed) = seed {
-            debug!("using specified seed for terrain generation"; "seed" => seed);
-            seed
-        } else {
-            let seed = thread_rng().gen();
-            debug!("using random seed for terrain generation"; "seed" => seed);
-            seed
+        planet.initial_generation().await;
+
+        Ok(Self { planet })
+    }
+
+    pub fn planet(&self) -> &Planet {
+        &self.planet
+    }
+
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+        let slab = self.planet.generate_slab(slab).await;
+        Ok(slab.into())
+    }
+
+    pub async fn get_ground_level(&self, block: WorldPosition) -> GlobalSliceIndex {
+        self.planet.find_ground_level(block).await
+    }
+}
+
+impl From<procgen::SlabGrid> for Slab {
+    fn from(grid: procgen::SlabGrid) -> Self {
+        Slab::from_other_grid(grid, SlabType::Normal)
+    }
+}
+
+impl From<&procgen::GeneratedBlock> for Block {
+    fn from(block: &GeneratedBlock) -> Self {
+        use crate::block::BlockType as B;
+        use procgen::BlockType as A;
+        let ty = match block.ty {
+            A::Air => B::Air,
+            A::Stone => B::Stone,
+            A::Dirt => B::Dirt,
+            A::Grass => B::Grass,
         };
 
-        // radius is excluding 0,0
-        let radius = radius as i32;
-        let bounds = (
-            ChunkPosition(-radius, -radius),
-            ChunkPosition(radius, radius),
-        );
-
-        Ok(Self {
-            seed,
-            bounds,
-            height_scale,
-        })
-    }
-}
-
-impl TerrainSource for GeneratedTerrainSource {
-    fn world_bounds(&self) -> &(ChunkPosition, ChunkPosition) {
-        &self.bounds
-    }
-
-    fn all_chunks(&mut self) -> Vec<ChunkPosition> {
-        let radius = (self.bounds.1).0 as u16;
-        spiral::ChebyshevIterator::new(0, 0, radius)
-            .map(|(x, y)| ChunkPosition(x, y))
-            .collect()
-    }
-
-    fn preprocess(
-        &self,
-        chunk: ChunkPosition,
-    ) -> Box<dyn FnOnce() -> Result<Box<dyn PreprocessedTerrain>, TerrainSourceError>> {
-        let seed = self.seed;
-        let height_scale = self.height_scale;
-        Box::new(move || {
-            let chunk = chunk.into();
-            let terrain_desc = procgen::generate_chunk(chunk, CHUNK_SIZE.as_usize(), seed, 30.0);
-
-            // height map -> raw chunk terrain
-            let mut terrain = ChunkBuilder::new();
-            for ((y, x), height) in (0..CHUNK_SIZE.as_i32())
-                .cartesian_product(0..CHUNK_SIZE.as_i32())
-                .zip(terrain_desc.heightmap.into_iter())
-            {
-                let mul = height * height_scale;
-                let ground = mul as i32;
-                let block_type = if mul.fract() < 0.2 {
-                    BlockType::LightGrass
-                } else {
-                    BlockType::Grass
-                };
-                terrain = terrain.fill_range((x, y, 0), (x, y, ground), |(_, _, z)| {
-                    if z < ground {
-                        BlockType::Stone
-                    } else {
-                        block_type
-                    }
-                });
-            }
-
-            Ok(Box::new(terrain.into_inner()))
-        })
-    }
-
-    fn load_chunk(
-        &mut self,
-        _: ChunkPosition,
-        preprocessed: Box<dyn PreprocessedTerrain>,
-    ) -> Result<RawChunkTerrain, TerrainSourceError> {
-        Ok(preprocessed.into_raw_terrain())
-    }
-}
-
-impl PreprocessedTerrain for RawChunkTerrain {
-    fn into_raw_terrain(self: Box<Self>) -> RawChunkTerrain {
-        *self
+        Block::with_block_type(ty)
     }
 }

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -24,12 +25,16 @@ pub struct World {
     pub source: WorldSource,
     pub worker_threads: Option<usize>,
     pub generation_height_scale: f64,
+    pub initial_chunk: (i32, i32),
+    pub initial_slab_depth: u32,
+    pub initial_chunk_radius: u32,
 }
 
 #[derive(Deserialize, Clone)]
 pub enum WorldSource {
     Preset(WorldPreset),
-    Generate { radius: u32, seed: Option<u64> },
+    /// Generate world using the given filename in worldgen resources for options
+    Generate(PathBuf),
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -39,6 +44,7 @@ pub enum WorldPreset {
     OneBlockWonder,
     FlatLands,
     Bottleneck,
+    Stairs,
 }
 
 #[derive(Deserialize)]
@@ -47,4 +53,10 @@ pub struct Simulation {
     pub friction: f32,
     pub start_delay: u32,
     pub spawn_counts: HashMap<String, usize>,
+}
+
+impl WorldSource {
+    pub fn is_preset(&self) -> bool {
+        matches!(self, Self::Preset(_))
+    }
 }

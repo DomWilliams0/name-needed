@@ -36,7 +36,7 @@ macro_rules! child {
 resources!(Resources, "resources");
 
 resources!(Definitions, "definitions");
-resources!(ItemDefinitions, "items");
+resources!(WorldGen, "worldgen");
 resources!(Shaders, "shaders");
 
 impl Resources {
@@ -45,11 +45,8 @@ impl Resources {
     }
 
     child!(definitions, Definitions);
+    child!(world_gen, WorldGen);
     child!(shaders, Shaders);
-}
-
-impl Definitions {
-    child!(items, ItemDefinitions);
 }
 
 fn get_dir<R: AsRef<Path>, D: AsRef<Path>>(root: R, dir: D) -> Result<PathBuf, ResourceError> {

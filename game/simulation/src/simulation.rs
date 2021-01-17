@@ -1,14 +1,12 @@
 use std::ops::Add;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crossbeam::crossbeam_channel::Receiver;
-
 use common::*;
-use resources::resource::Resources;
+use resources::Resources;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
-use world::loader::{TerrainUpdatesRes, ThreadedWorkerPool, WorldLoader, WorldTerrainUpdate};
-use world::{OcclusionChunkUpdate, WorldChangeEvent};
+use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
+use world::WorldChangeEvent;
 
 use crate::activity::{ActivityEventSystem, ActivitySystem};
 use crate::ai::{AiAction, AiComponent, AiSystem};
@@ -32,7 +30,7 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
-use crate::{definitions, Exit, WorldRef, WorldViewer};
+use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
 #[derive(Debug)]
@@ -40,7 +38,7 @@ pub enum AssociatedBlockData {
     Container(Entity),
 }
 
-pub type ThreadedWorldLoader = WorldLoader<ThreadedWorkerPool, AssociatedBlockData>;
+pub struct WorldContext;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
@@ -56,9 +54,6 @@ pub struct Simulation<R: Renderer> {
 
     world_loader: ThreadedWorldLoader,
 
-    /// Occlusion updates received from world loader
-    chunk_updates: Receiver<OcclusionChunkUpdate>,
-
     /// Terrain updates, queued and applied per tick
     terrain_changes: Vec<WorldTerrainUpdate>,
 
@@ -68,9 +63,13 @@ pub struct Simulation<R: Renderer> {
     debug_renderers: DebugRenderers<R>,
 }
 
+impl world::WorldContext for WorldContext {
+    type AssociatedBlockData = AssociatedBlockData;
+}
+
 impl<R: Renderer> Simulation<R> {
-    /// world_loader should have had all chunks requested
-    pub fn new(mut world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
+    /// world_loader should have had some slabs requested
+    pub fn new(world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
         // load entity definitions from file system
         let definitions = {
             let def_root = resources.definitions()?;
@@ -85,7 +84,6 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
-        let chunk_updates = world_loader.chunk_updates_rx().unwrap();
         let mut debug_renderers = DebugRenderers::new();
         register_debug_renderers(&mut debug_renderers)?;
 
@@ -93,7 +91,6 @@ impl<R: Renderer> Simulation<R> {
             ecs_world,
             voxel_world,
             world_loader,
-            chunk_updates,
             debug_renderers,
             terrain_changes: Vec::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
@@ -195,21 +192,24 @@ impl<R: Renderer> Simulation<R> {
     }
 
     fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
-        {
-            let mut world = self.voxel_world.borrow_mut();
+        // request new slabs
+        let discovered = empty(); // TODO include slabs discovered by members of player's society
+        let requested_slabs = world_viewer.requested_slabs(discovered);
+        let actual_requested_slabs = requested_slabs.as_ref().iter().copied();
+        self.world_loader.request_slabs(actual_requested_slabs);
+        drop(requested_slabs);
 
-            // occlusion updates
-            while let Ok(update) = self.chunk_updates.try_recv() {
-                world.apply_occlusion_update(update);
-            }
+        let mut world = self.voxel_world.borrow_mut();
 
-            // mark modified chunks as dirty in world viewer
-            world
-                .dirty_chunks()
-                .for_each(|c| world_viewer.mark_dirty(c));
-        }
+        // apply occlusion updates
+        self.world_loader
+            .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
-        // terrain changes
+        // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
+        world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
+        drop(world);
+
+        // apply terrain changes
         // TODO per tick alloc/reuse buf
         let terrain_updates = self
             .terrain_changes
@@ -228,6 +228,7 @@ impl<R: Renderer> Simulation<R> {
 
         // swap storage back and forget empty vec
         let empty = std::mem::replace(&mut self.change_events, events);
+        debug_assert!(empty.is_empty());
         std::mem::forget(empty);
     }
 

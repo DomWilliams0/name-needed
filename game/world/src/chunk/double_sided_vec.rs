@@ -67,12 +67,13 @@ impl<T> DoubleSidedVec<T> {
 
         if idx != expected_idx {
             panic!(
-                "no gaps allowed, next {} index must be {}",
+                "no gaps allowed, next {} index must be {} but got {}",
                 if index.is_positive() {
                     "positive"
                 } else {
                     "negative"
                 },
+                expected_idx,
                 index
             )
         }
@@ -121,6 +122,7 @@ impl<T> DoubleSidedVec<T> {
         (lowest..highest).rev()
     }
 
+    /// Inclusive range
     fn range(&self) -> (i32, i32) {
         let lowest = -(self.negative.len() as i32);
         let highest = self.positive.len() as i32;
@@ -128,34 +130,11 @@ impl<T> DoubleSidedVec<T> {
         (lowest, highest)
     }
 
+    /// Exclusive range
     pub fn index_range(&self) -> (i32, i32) {
         let (lowest, highest) = self.range();
         (lowest, highest - 1)
     }
-
-    pub fn add_to_top<F: FnOnce(i32) -> T>(&mut self, f: F) {
-        let idx = self.positive.len() as i32;
-        let val = f(idx);
-        self.positive.push(val);
-    }
-
-    // pub fn iter_mut_increasing_in_range<I: Into<i32>>(
-    //     &mut self,
-    //     start: I,
-    //     end: I,
-    // ) -> impl Iterator<Item = Option<&mut T>> {
-    //     let range = self.range();
-    //     let start = start.into();
-    //     let end = end.into();
-    //
-    //     let empty_space_start = start..range.0;
-    //     let empty_space_end = range.1..end;
-    //
-    //     empty_space_start
-    //         .map(|_| None)
-    //         .chain(self.iter_mut_increasing().map(Some))
-    //         .chain(empty_space_end.map(|_| None))
-    // }
 
     #[cfg(test)]
     pub fn iter_mut_increasing(&mut self) -> impl Iterator<Item = &mut T> {

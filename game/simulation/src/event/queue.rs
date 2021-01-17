@@ -5,8 +5,10 @@ use common::{num_traits::FromPrimitive, *};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
+type BitsetInner = u32;
+
 #[derive(Default)]
-struct BitSet(usize);
+struct BitSet(BitsetInner);
 
 // TODO event queue generic over event type
 pub struct EntityEventQueue {
@@ -227,8 +229,8 @@ impl BitSet {
 
     pub fn add(&mut self, subscription: EventSubscription) {
         match subscription {
-            EventSubscription::Specific(evt) => self.0 |= 1 << (evt as usize),
-            EventSubscription::All => self.0 = usize::MAX,
+            EventSubscription::Specific(evt) => self.0 |= 1 << (evt as BitsetInner),
+            EventSubscription::All => self.0 = BitsetInner::MAX,
         }
     }
 
@@ -246,10 +248,10 @@ impl BitSet {
     }
 
     pub fn contains<E: Into<EntityEventType>>(&self, ty: E) -> bool {
-        self.contains_type(ty.into() as usize)
+        self.contains_type(ty.into() as BitsetInner)
     }
 
-    fn contains_type(&self, ordinal: usize) -> bool {
+    fn contains_type(&self, ordinal: BitsetInner) -> bool {
         let bit = 1 << ordinal;
         self.0 & bit != 0
     }
@@ -270,7 +272,7 @@ impl BitSet {
                 true
             }
             EventSubscription::Specific(ty) => {
-                let bit = 1usize << ty as usize;
+                let bit = 1 << ty as BitsetInner;
                 self.0 &= !bit;
                 self.is_empty()
             }
@@ -278,10 +280,10 @@ impl BitSet {
     }
 
     fn iter(&self) -> impl Iterator<Item = EntityEventType> + '_ {
-        let bit_count = std::mem::size_of::<usize>() * 8;
+        let bit_count = (std::mem::size_of::<BitsetInner>() * 8) as BitsetInner;
         (0..bit_count).filter_map(move |ord| {
             if self.contains_type(ord) {
-                let ty = EntityEventType::from_usize(ord)
+                let ty = EntityEventType::from_u32(ord)
                     .unwrap_or_else(|| panic!("invalid event type bit set {}", ord));
                 Some(ty)
             } else {
@@ -293,7 +295,7 @@ impl BitSet {
 
 impl Debug for BitSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if self.0 == usize::MAX {
+        if self.0 == BitsetInner::MAX {
             write!(f, "Bitset(ALL)")
         } else {
             write!(f, "Bitset(")?;

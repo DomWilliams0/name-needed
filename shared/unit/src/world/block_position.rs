@@ -1,9 +1,8 @@
 use common::derive_more::*;
 use common::*;
 
-use crate::dim::CHUNK_SIZE;
 use crate::world::{
-    BlockCoord, ChunkPosition, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
 };
 use std::ops::Add;
 
@@ -18,8 +17,8 @@ impl BlockPosition {
         Self(x, y, z)
     }
 
-    pub fn to_world_position<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPosition {
-        let ChunkPosition(cx, cy) = chunk_pos.into();
+    pub fn to_world_position<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPosition {
+        let ChunkLocation(cx, cy) = chunk_pos.into();
         let BlockPosition(x, y, z) = self;
         WorldPosition(
             i32::from(x) + cx * CHUNK_SIZE.as_i32(),
@@ -27,12 +26,12 @@ impl BlockPosition {
             z,
         )
     }
-    pub fn to_world_point<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
+    pub fn to_world_point<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPoint {
         let WorldPosition(x, y, z) = self.to_world_position(chunk_pos);
         WorldPoint(x as f32, y as f32, z.slice() as f32)
     }
 
-    pub fn to_world_point_centered<P: Into<ChunkPosition>>(self, chunk_pos: P) -> WorldPoint {
+    pub fn to_world_point_centered<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPoint {
         let WorldPoint(x, y, z) = self.to_world_point(chunk_pos);
         WorldPoint(x + 0.5, y + 0.5, z)
     }

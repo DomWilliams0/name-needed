@@ -3,7 +3,7 @@ pub use slab::DeepClone;
 pub use self::builder::{ChunkBuilder, ChunkDescriptor};
 pub use self::chunk::{Chunk, ChunkId};
 pub use self::terrain::{BaseTerrain, BlockDamageResult, OcclusionChunkUpdate};
-pub(crate) use self::terrain::{ChunkTerrain, RawChunkTerrain, WhichChunk};
+pub(crate) use self::terrain::{RawChunkTerrain, WhichChunk};
 
 mod builder;
 

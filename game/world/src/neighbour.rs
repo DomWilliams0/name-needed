@@ -1,8 +1,8 @@
 use std::hint::unreachable_unchecked;
 use std::marker::PhantomData;
 
-use unit::dim::CHUNK_SIZE;
-use unit::world::{BlockCoord, BlockPosition, ChunkPosition};
+use unit::world::CHUNK_SIZE;
+use unit::world::{BlockCoord, BlockPosition, ChunkLocation};
 
 pub struct Neighbours<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]>> {
     block: P,
@@ -166,25 +166,22 @@ impl NeighbourOffset {
     }
 
     pub fn is_aligned(self) -> bool {
-        match self {
+        matches!(
+            self,
             NeighbourOffset::South
-            | NeighbourOffset::East
-            | NeighbourOffset::North
-            | NeighbourOffset::West => true,
-            _ => false,
-        }
+                | NeighbourOffset::East
+                | NeighbourOffset::North
+                | NeighbourOffset::West
+        )
     }
 
     pub fn is_vertical(self) -> bool {
         debug_assert!(self.is_aligned());
-        match self {
-            NeighbourOffset::North | NeighbourOffset::South => true,
-            _ => false,
-        }
+        matches!(self, NeighbourOffset::North | NeighbourOffset::South)
     }
 
-    pub fn between_aligned(from: ChunkPosition, to: ChunkPosition) -> Self {
-        let ChunkPosition(dx, dy) = to - from;
+    pub fn between_aligned(from: ChunkLocation, to: ChunkLocation) -> Self {
+        let ChunkLocation(dx, dy) = to - from;
         let (dx, dy) = (dx.signum(), dy.signum());
 
         match (dx, dy) {

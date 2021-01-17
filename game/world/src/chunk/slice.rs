@@ -1,20 +1,29 @@
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::{Block, BlockType};
+use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
-const DUMMY_SLICE_BLOCKS: [Block; CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()] =
-    [Block::air(); CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()];
+const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
+const DUMMY_SLICE_BLOCKS: [Block; SLICE_SIZE] = [Block::air(); SLICE_SIZE];
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Slice<'a> {
     slice: &'a [Block],
 }
 
 pub struct SliceMut<'a> {
     slice: &'a mut [Block],
+}
+
+// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity
+
+#[derive(Clone)]
+pub struct SliceOwned {
+    slice: Box<[Block; SLICE_SIZE]>,
 }
 
 impl<'a> Slice<'a> {
@@ -67,6 +76,17 @@ impl<'a> Slice<'a> {
         debug_assert!(idx < self.slice.len());
         unsafe { self.slice.get_unchecked(idx) }
     }
+
+    pub fn to_owned(&self) -> SliceOwned {
+        let slice = self.slice.try_into().expect("slice is the wrong length");
+        SliceOwned {
+            slice: Box::new(slice),
+        }
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = &'a Block> {
+        self.slice.iter()
+    }
 }
 
 impl<'a> Deref for Slice<'a> {
@@ -74,6 +94,34 @@ impl<'a> Deref for Slice<'a> {
 
     fn deref(&self) -> &Self::Target {
         self.slice
+    }
+}
+
+impl SliceOwned {
+    pub fn borrow(&self) -> Slice {
+        Slice {
+            slice: &*self.slice,
+        }
+    }
+}
+
+impl<'a> From<&'a SliceOwned> for Slice<'a> {
+    fn from(slice: &'a SliceOwned) -> Self {
+        Slice {
+            slice: &*slice.slice,
+        }
+    }
+}
+
+impl<'a> From<SliceMut<'a>> for Slice<'a> {
+    fn from(slice: SliceMut<'a>) -> Self {
+        Slice { slice: slice.slice }
+    }
+}
+
+impl Debug for SliceOwned {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SliceOwned({} blocks)", self.slice.len())
     }
 }
 

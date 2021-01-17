@@ -19,14 +19,16 @@ use crate::render::sdl::render::FrameTarget;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
-use resources::resource::Resources;
 use resources::ResourceError;
+use resources::Resources;
 use sdl2::mouse::{MouseButton, MouseState};
 use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
 use std::hint::unreachable_unchecked;
+use unit::world::{WorldPoint, WorldPosition};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
+    is_first_init: bool,
 
     /// `take`n out and replaced each tick
     sdl_events: Option<EventPump>,
@@ -117,6 +119,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
 
         Ok(Self {
             camera,
+            is_first_init: true,
             sdl_events: Some(events),
             keep_alive: GraphicsKeepAlive { sdl, video, gl },
             window,
@@ -127,11 +130,19 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         })
     }
 
-    fn start(self, world: WorldViewer) -> Self::Initialized {
-        SdlBackendInit {
+    fn start(self, world: WorldViewer, initial_block: WorldPosition) -> Self::Initialized {
+        let mut backend = SdlBackendInit {
             backend: self,
             world_viewer: world,
+        };
+
+        // move camera to focus on the initial block
+        // only do on first instance, preserve player's camera position across other restarts
+        if std::mem::take(&mut backend.is_first_init) {
+            backend.camera.set_centre(WorldPoint::from(initial_block));
         }
+
+        backend
     }
 
     fn name() -> &'static str {

@@ -1,52 +1,98 @@
-use std::ops::{Deref, DerefMut};
-
 use common::*;
 
-use unit::world::{BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    WorldPosition,
+};
 
 use crate::block::BlockType;
-use crate::chunk::slice::Slice;
-use crate::chunk::terrain::{ChunkTerrain, RawChunkTerrain};
+use crate::chunk::slab::Slab;
+use crate::chunk::slice::{Slice, SliceOwned};
+use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
-use crate::navigation::WorldArea;
-use crate::SliceRange;
+use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
+use crate::world::LoadNotifier;
+use crate::{SliceRange, World, WorldContext};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 
 pub type ChunkId = u64;
 
-pub struct Chunk<D> {
+pub struct Chunk<C: WorldContext> {
     /// Unique for each chunk
-    pos: ChunkPosition,
+    pos: ChunkLocation,
 
-    terrain: ChunkTerrain,
+    terrain: RawChunkTerrain,
 
     /// Sparse associated data with each block
-    block_data: HashMap<BlockPosition, D>,
+    block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
+
+    /// Navigation lookup
+    areas: HashMap<ChunkArea, BlockGraph>,
+
+    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
+    slab_notify: LoadNotifier,
 }
 
-impl<D> Chunk<D> {
-    pub fn empty<P: Into<ChunkPosition>>(pos: P) -> Self {
-        let pos = pos.into();
-        // TODO still does a lot of unnecessary initialization
-        let terrain = ChunkTerrain::from_new_raw_terrain(RawChunkTerrain::default(), pos);
-        Self::with_completed_terrain(pos, terrain)
-    }
+#[derive(Clone, Debug)]
+pub(crate) enum SlabLoadingStatus {
+    /// Not available
+    Unloaded,
 
-    /// Called by ChunkBuilder when terrain has been finalized
-    pub(crate) fn with_completed_terrain(pos: ChunkPosition, terrain: ChunkTerrain) -> Self {
+    /// Has been requested
+    Requested,
+
+    /// Is in progress
+    InProgress {
+        /// Slab's top slice
+        top: SliceOwned,
+
+        /// Slab's bottom slice
+        bottom: SliceOwned,
+    },
+
+    /// Finished and present in chunk.terrain
+    Done,
+}
+
+enum SlabAvailability {
+    Never,
+    OnItsWay,
+    TadaItsAvailable(SliceOwned),
+}
+
+impl<C: WorldContext> Chunk<C> {
+    pub fn empty_with_world(world: &World<C>, pos: impl Into<ChunkLocation>) -> Self {
         Self {
-            pos,
-            terrain,
+            pos: pos.into(),
+            terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
+            areas: HashMap::new(),
+            slab_progress: RwLock::new(HashMap::new()),
+            slab_notify: world.load_notifications(),
         }
     }
 
-    pub const fn pos(&self) -> ChunkPosition {
+    /// Disconnected from any world's slab notifications
+    #[cfg(test)]
+    pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
+        Self {
+            pos: pos.into(),
+            terrain: RawChunkTerrain::default(),
+            block_data: HashMap::new(),
+            areas: HashMap::new(),
+            slab_progress: RwLock::new(HashMap::new()),
+            slab_notify: LoadNotifier::default(),
+        }
+    }
+
+    #[inline]
+    pub fn pos(&self) -> ChunkLocation {
         self.pos
     }
 
     pub fn id(&self) -> ChunkId {
-        let ChunkPosition(x, y) = self.pos;
+        let ChunkLocation(x, y) = self.pos;
         (x as u64) << 32 | (y as u64)
     }
 
@@ -66,6 +112,37 @@ impl<D> Chunk<D> {
         })
     }
 
+    pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> {
+        self.areas.keys()
+    }
+
+    pub(crate) fn area_count(&self) -> usize {
+        self.areas.len()
+    }
+
+    pub(crate) fn remove_block_graphs(&mut self, (min, max): (SlabIndex, SlabIndex)) {
+        let n = self.areas.len();
+        self.areas
+            .retain(|area, _| !(area.slab >= min && area.slab <= max));
+        let m = self.areas.len();
+        debug!("removed {removed} nodes in slab range", removed=n-m; "lower"=>min, "upper"=>max);
+    }
+
+    pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
+        self.areas.get(&area.into())
+    }
+
+    pub(crate) fn update_block_graphs(
+        &mut self,
+        slab_nav: impl Iterator<Item = (ChunkArea, BlockGraph)>,
+    ) {
+        for (area, graph) in slab_nav {
+            let (new_edges, new_nodes) = graph.len();
+            self.areas.insert(area, graph);
+            debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
+        }
+    }
+
     pub fn slice_range(
         &self,
         range: SliceRange,
@@ -82,44 +159,198 @@ impl<D> Chunk<D> {
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 
-    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&D> {
+    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {
         self.block_data.get(&pos)
     }
 
-    pub fn set_associated_block_data(&mut self, pos: BlockPosition, data: D) -> Option<D> {
+    pub fn set_associated_block_data(
+        &mut self,
+        pos: BlockPosition,
+        data: C::AssociatedBlockData,
+    ) -> Option<C::AssociatedBlockData> {
         self.block_data.insert(pos, data)
     }
 
-    pub fn remove_associated_block_data(&mut self, pos: BlockPosition) -> Option<D> {
+    pub fn remove_associated_block_data(
+        &mut self,
+        pos: BlockPosition,
+    ) -> Option<C::AssociatedBlockData> {
         self.block_data.remove(&pos)
     }
 
-    pub(crate) fn swap_with(&mut self, other: &mut Self) {
-        std::mem::swap(&mut self.block_data, &mut other.block_data)
+    pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::Requested);
+        // no notification necessary, nothing waits for a slab to be requested
+    }
+
+    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
+        let top = terrain.slice_owned(LocalSliceIndex::top());
+        let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
+
+        self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
+        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+    }
+
+    pub(crate) fn mark_slabs_complete(&self, slabs: impl Iterator<Item = SlabIndex> + Clone) {
+        self.update_slabs_status(slabs.clone(), SlabLoadingStatus::Done);
+        for slab in slabs {
+            self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        }
+    }
+
+    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
+        self.update_slabs_status(once(slab), state)
+    }
+
+    /// Does not notify
+    fn update_slabs_status(
+        &self,
+        mut slabs: impl Iterator<Item = SlabIndex>,
+        state: SlabLoadingStatus,
+    ) {
+        let mut map = self.slab_progress.write();
+
+        let mut do_update = |slab, state| {
+            trace!("updating slab progress"; SlabLocation::new(slab, self.pos), "state" => ?state);
+            map.insert(slab, state);
+        };
+
+        let first = slabs.next();
+
+        // clone for all except first
+        for slab in slabs {
+            do_update(slab, state.clone());
+        }
+
+        // use original for last
+        if let Some(slab) = first {
+            do_update(slab, state);
+        }
+    }
+
+    /// None if should wait
+    pub(crate) fn get_neighbouring_slabs(
+        &self,
+        slab: SlabIndex,
+    ) -> Option<(Option<SliceOwned>, Option<SliceOwned>)> {
+        // slice below is mandatory as it's used for navigation. if its in progress then we need to wait
+        let below_availability = self.get_slab_slice_availability(slab - 1, true);
+
+        let below = match below_availability {
+            SlabAvailability::Never => {
+                // make do without
+                None
+            }
+            SlabAvailability::OnItsWay => {
+                // wait required
+                return None;
+            }
+            SlabAvailability::TadaItsAvailable(slice) => Some(slice),
+        };
+
+        // slice above is optional, only used to calculate occlusion which can be updated later
+        let above = slab + 1;
+        let above = self.get_slab_slice(self.slab_progress(above), above, false);
+
+        Some((above, below))
+    }
+
+    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
+        let guard = self.slab_progress.read();
+        guard
+            .get(&slab)
+            .unwrap_or(&SlabLoadingStatus::Unloaded)
+            .clone()
+    }
+
+    fn get_slab_slice_availability(&self, slab: SlabIndex, top_slice: bool) -> SlabAvailability {
+        let state = self.slab_progress(slab);
+        match state {
+            SlabLoadingStatus::InProgress { top, bottom } => {
+                let slice = if top_slice { top } else { bottom };
+                SlabAvailability::TadaItsAvailable(slice)
+            }
+            SlabLoadingStatus::Done => {
+                let slice = if top_slice {
+                    LocalSliceIndex::top()
+                } else {
+                    LocalSliceIndex::bottom()
+                };
+                let global_slice = slice.to_global(slab);
+                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
+                    panic!(
+                        "slab {:?} is apparently loaded but could not be found",
+                        slab
+                    )
+                });
+                SlabAvailability::TadaItsAvailable(slice.to_owned())
+            }
+
+            SlabLoadingStatus::Unloaded => SlabAvailability::Never,
+            SlabLoadingStatus::Requested => SlabAvailability::OnItsWay,
+        }
+    }
+
+    fn get_slab_slice(
+        &self,
+        state: SlabLoadingStatus,
+        slab: SlabIndex,
+        top_slice: bool,
+    ) -> Option<SliceOwned> {
+        match state {
+            SlabLoadingStatus::InProgress { top, bottom } => {
+                Some(if top_slice { top } else { bottom })
+            }
+            SlabLoadingStatus::Done => {
+                let slice = if top_slice {
+                    LocalSliceIndex::top()
+                } else {
+                    LocalSliceIndex::bottom()
+                };
+                let global_slice = slice.to_global(slab);
+                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
+                    panic!(
+                        "slab {:?} is apparently loaded but could not be found",
+                        slab
+                    )
+                });
+                Some(slice.to_owned())
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns true if slab has not been already requested/loaded or is a placeholder
+    pub fn should_slab_be_loaded(&self, slab: SlabIndex) -> bool {
+        match self.slab_progress(slab) {
+            SlabLoadingStatus::Unloaded => {
+                // has not been requested, pls load
+                true
+            }
+            SlabLoadingStatus::Requested | SlabLoadingStatus::InProgress { .. } => {
+                // is currently in progress, don't request again
+                false
+            }
+            SlabLoadingStatus::Done => {
+                // is already loaded, only load again if it is a placeholder
+                let slab = self.terrain.slab(slab).unwrap();
+                slab.is_placeholder()
+            }
+        }
+    }
+
+    pub fn has_slab(&self, slab: SlabIndex) -> bool {
+        self.terrain.slab(slab).is_some()
     }
 }
 
-impl<D> Deref for Chunk<D> {
-    type Target = ChunkTerrain;
-
-    fn deref(&self) -> &Self::Target {
-        &self.terrain
-    }
-}
-
-impl<D> DerefMut for Chunk<D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.terrain
-    }
-}
-
-impl<D> BaseTerrain for Chunk<D> {
+impl<C: WorldContext> BaseTerrain for Chunk<C> {
     fn raw_terrain(&self) -> &RawChunkTerrain {
-        self.terrain.raw_terrain()
+        &self.terrain
     }
 
     fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
-        self.terrain.raw_terrain_mut()
+        &mut self.terrain
     }
 }
 
@@ -130,7 +361,8 @@ mod tests {
     use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder};
-    use unit::dim::CHUNK_SIZE;
+    use crate::helpers::DummyWorldContext;
+    use unit::world::CHUNK_SIZE;
 
     #[test]
     fn chunk_ops() {
@@ -167,9 +399,9 @@ mod tests {
     #[test]
     fn chunk_id() {
         // check chunk ids are unique
-        let id1 = Chunk::<()>::empty((0, 0)).id();
-        let id2 = Chunk::<()>::empty((0, 1)).id();
-        let id3 = Chunk::<()>::empty((1, 0)).id();
+        let id1 = Chunk::<DummyWorldContext>::empty((0, 0)).id();
+        let id2 = Chunk::<DummyWorldContext>::empty((0, 1)).id();
+        let id3 = Chunk::<DummyWorldContext>::empty((1, 0)).id();
         assert_ne!(id1, id2);
         assert_ne!(id2, id3);
     }
@@ -177,7 +409,7 @@ mod tests {
     #[test]
     fn blocks() {
         // check individual block collection is ordered as intended
-        let c = Chunk::<()>::empty((0, 0));
+        let c = Chunk::<DummyWorldContext>::empty((0, 0));
         let mut blocks = Vec::new();
         c.blocks(&mut blocks);
         let mut b = blocks.into_iter();

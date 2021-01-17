@@ -1,4 +1,4 @@
-# TODOs (223)
+# TODOs (266)
  * [.travis.yml](.travis.yml) (1)
    * `# TODO windows and osx`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,8 +14,42 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/lib.rs](game/procgen/src/lib.rs) (1)
-   * `// TODO generate lower res noise and scale up`
+ * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
+   * `// TODO moisture and temperature carried by wind`
+   * `// TODO wind movingbrings air to level out pressure`
+   * `// TODO wind is not being affected by terrain at all`
+   * `// TODO wind is getting stuck low down and not rising`
+   * `// TODO reuse alloc`
+   * `// TODO distribute across neighbours more smoothly, advection?`
+   * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
+   * `// TODO cold high air falls?`
+   * `// TODO height doesnt change, calculate this once in a separate grid`
+ * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
+   * `// TODO agree api and stop making everything public`
+   * `// TODO validate values with result type`
+   * `// TODO adjust params for global height map`
+ * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
+   * `// TODO return a result instead of panicking`
+   * `// TODO clap AppSettings::AllArgsOverrideSelf`
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
+   * `// TODO actual error type`
+   * `// TODO reject if continent or land blob count is too low`
+   * `// TODO could have separate copy of planet params per thread if immutable`
+   * `// TODO radius no longer makes sense`
+   * `// TODO rasterize features onto slab`
+ * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
+   * `// TODO every thread returns the same pathbuf`
+ * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
+   * `// TODO custom block types for procgen that are translated to game blocks`
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (5)
+   * `// TODO result for out of range`
+   * `// TODO should height scale be per biome?`
+   * `// TODO depends on many local parameters e.g. biome, humidity`
+   * `// TODO could do this multiple slices at a time`
+   * `// TODO these constants depend on biome, location etc`
+ * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
+   * `// TODO per land layer?`
+   * `// TODO fix log_scope crashing with async`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
@@ -25,13 +59,14 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
+ * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (10)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
    * `// TODO events for items entering/exiting containers`
    * `// TODO arrival radius depends on the size of the item`
    * `// TODO could the item ever move while we're going to it? only by gravity?`
+   * `// TODO this should be in the/a subactivity`
    * `// TODO don't always drop item in centre`
    * `// TODO explicit access side for container, e.g. front of chest`
    * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
@@ -165,7 +200,8 @@
  * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (2)
    * `// TODO apply fall damage if applicable`
    * `// TODO lerp towards new rotation`
- * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (1)
+ * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (2)
+   * `// TODO use dynstack for updates to avoid a separate box per entry`
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
@@ -179,9 +215,10 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (3)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
+   * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
    * `// TODO per tick alloc/reuse buf`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
@@ -209,38 +246,44 @@
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
- * [game/world/src/chunk/chunk.rs](game/world/src/chunk/chunk.rs) (1)
-   * `// TODO still does a lot of unnecessary initialization`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (1)
+ * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
+   * `// TODO detect when slab is all air and avoid expensive processing`
+   * `// TODO if exclusive we're in deep water with CoW`
+   * `// TODO discover internal area links`
+   * `// TODO consider resizing/populating changes_out initially with empty events for performance`
+   * `// TODO reserve space in changes_out first`
+ * [game/world/src/chunk/slice.rs](game/world/src/chunk/slice.rs) (2)
+   * `// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity`
    * `// TODO make not pub`
- * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (9)
+ * [game/world/src/chunk/terrain.rs](game/world/src/chunk/terrain.rs) (6)
    * `// TODO actually add get_{mut_}unchecked to slabs for performance`
    * `// TODO could skip next slice because it cant be walkable if this one was?`
-   * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
-   * `// TODO shared cow instance for empty slab`
-   * `// TODO reuse a buffer for each slab`
-   * `// TODO discover internal area links`
-   * `// TODO transmute lifetimes instead`
+   * `// TODO this is sometimes a false positive, triggering unnecessary copies`
    * `// TODO use an enum for the slice range rather than Options`
+   * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
- * [game/world/src/grid.rs](game/world/src/grid.rs) (1)
-   * `// TODO are %s optimised to bitwise ops if a multiple of 2?`
- * [game/world/src/loader/mod.rs](game/world/src/loader/mod.rs) (7)
-   * `// TODO cache full finalized chunks`
-   * `// TODO sort out the lifetimes instead of cheating and using transmute`
-   * `// TODO reuse/pool bufs, and initialize with proper expected size`
-   * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (9)
+   * `// TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
    * `let mut ports = Vec::new(); // TODO reuse buf`
- * [game/world/src/loader/terrain_source/mod.rs](game/world/src/loader/terrain_source/mod.rs) (1)
-   * `fn all_chunks(&mut self) -> Vec<ChunkPosition>; // TODO gross`
+   * `// TODO is it worth combining occlusion+nav by doing cross chunk iteration only once?`
+   * `// TODO only propagate across chunk boundaries if the changes were near to a boundary?`
+   * `// TODO reuse/pool bufs, and initialize with proper expected size`
+   * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
+   * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
+ * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (3)
+   * `// TODO add more efficient version that takes chunk+multiple slabs`
+   * `// TODO shared instance of CoW for empty slab`
+   * `// TODO reuse vec alloc`
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
+   * `// TODO load a serialized planet from disk to avoid constantly regenerating`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
-   * `// TODO if this thread panics, propagate to main game thread`
+   * `// TODO prioritize finalizer task - separate OS thread or runtime?`
    * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
@@ -265,28 +308,28 @@
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
- * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (2)
+ * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
+   * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [game/world/src/viewer.rs](game/world/src/viewer.rs) (6)
+ * [game/world/src/viewer.rs](game/world/src/viewer.rs) (8)
    * `assert!(size > 0); // TODO Result`
-   * `// TODO intelligently choose an initial view range`
-   * `// TODO do mesh generation on a worker thread`
+   * `chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?`
+   * `// TODO do mesh generation on a worker thread? or just do this bit in a parallel iter`
    * `// TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly`
-   * `// TODO cache world slice_bounds()`
+   * `// TODO limit to loaded slab bounds if camera is not discovering`
+   * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
+   * `// TODO submit only the new chunks in range`
  * [game/world/src/world.rs](game/world/src/world.rs) (6)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
-   * `// TODO reuse hashset allocation`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
+   * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/panic.rs](renderer/engine/src/panic.rs) (2)
-   * `// TODO use panic.message() when it stabilises`
-   * `// TODO use mutex that cant be poisoned`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`
@@ -306,14 +349,24 @@
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
+ * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
+   * `// TODO middle of requested chunk instead of corner`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)
    * `# TODO feature for cgmath`
+ * [shared/common/src/panic.rs](shared/common/src/panic.rs) (1)
+   * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
+ * [shared/grid/src/declare.rs](shared/grid/src/declare.rs) (1)
+   * `// TODO call usize::from() on dims for nicer use with smallunsignedconstant`
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (3)
+   * `// TODO allow smaller datatypes for dims`
+   * `// TODO profile and improve coord wrapping`
+   * `// TODO return <C: GridCoord>`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)

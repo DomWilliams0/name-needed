@@ -54,7 +54,7 @@ impl BlockOpacity {
 }
 
 impl Block {
-    fn with_block_type(block_type: BlockType) -> Self {
+    pub fn with_block_type(block_type: BlockType) -> Self {
         Self {
             block_type,
             durability: block_type.durability(),

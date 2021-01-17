@@ -6,9 +6,9 @@ use crate::chunk::slice::unflatten_index;
 use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
-use crate::BaseTerrain;
+use crate::{BaseTerrain, WorldContext};
 use std::mem::MaybeUninit;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
@@ -21,8 +21,8 @@ pub trait BaseVertex: Copy + Debug {
     fn new(pos: (f32, f32, f32), color: ColorRgb) -> Self;
 }
 
-pub fn make_simple_render_mesh<V: BaseVertex, D>(
-    chunk: &Chunk<D>,
+pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
+    chunk: &Chunk<C>,
     slice_range: SliceRange,
 ) -> Vec<V> {
     let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first

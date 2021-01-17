@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 use common::*;
-use unit::dim::CHUNK_SIZE;
 use unit::world::WorldPositionRange;
+use unit::world::CHUNK_SIZE;
 use world::block::BlockType;
 use world::helpers::{apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking};
 use world::loader::WorldTerrainUpdate;

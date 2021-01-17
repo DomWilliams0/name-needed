@@ -65,7 +65,25 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * features e.g. trees, hills
 	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
+		* varying river width from streams to large uncrossable rivers
+		* varying river flow speed
 	* magma very low down, or it just gets too hot
+	* volcano affects world gen in past
+* finite pregenerated world in xy (planet), infinite in z
+	* wrapping x,y coordinates is a beefy task, for something that doesnt happen very often
+		world loader wraps coords so it never requests slabs out of bounds of the planet
+		chunks are loaded and rendered at their true wrapped positions e.g. if worldsize=8, chunks x=0, x=8, x=-8 are the same chunk
+		entities must be aware of this! all distance checks must take this into account (https://blog.demofox.org/2017/10/01/calculating-the-distance-between-points-in-wrap-around-toroidal-space/)
+		use different base noise for biomes and blend (http://parzivail.com/procedural-terrain-generaion/)
+	* chunk and region resolution should wrap around explicitly/fail in generator. should the world loader wrap coords
+* unique species and settlements with societies to discover in different environments
+	* underground species with no eyes, cave houses
+	* underwater people
+	* mud crabs with human arms
+	* savage cavemen who sneak around in darkness, break bones then drag them back to the cave
+* generate new terrain when society member explores, rather than just camera movement. config option!
+* bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
+* grass colour and flora depends on biome/moisture
 
 ## Voxel world mechanics
 * fluid blocks
@@ -78,6 +96,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* picked up and spread by entities
 * blocks that technically solid but possible to pass through
 	* hedges, bushes
+* map chunks to torus and make the world wrap-around
 
 ## Optimizations
 ### Performance
@@ -105,10 +124,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * experiment with PGO
 * consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
 * physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed
+* when submitting slab changes to the worker pool, cancel any other tasks queued for the same slab as they're now outdated
 
 ### Memory usage
 * CoW terrain slabs
 * store sparse block metadata in the containing slab instead of in each block
+* LEAK: opengl sub buffers are being leaked, ~3MB per restart
 
 ## Crate release
 * voxel world
@@ -121,6 +142,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * textures/sprites/animations
 * improved terrain colour palette
 * very simple oval shadows beneath entities to show height
+* bug: occlusion flickers after world changes, updates are probably being queued for too long
 
 ## Building and testing
 * separate config and preset for tests
@@ -140,6 +162,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * explicit namespacing for entity definitions e.g. "core:food_apple"
 * detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
 * separate binary for definition file validation
+* instead of sleeping to wait for world to load, check if panicked every second
+* consider replacing 1:1 world threadpool with async threadpool
 
 ## Entity diversity
 * animal species

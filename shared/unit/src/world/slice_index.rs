@@ -62,6 +62,10 @@ impl<S: SliceIndexScale> SliceIndex<S> {
     pub fn bottom() -> Self {
         Self::new(S::MIN)
     }
+
+    pub fn range() -> impl Iterator<Item = Self> {
+        (S::MIN..=S::MAX).map(Self::new)
+    }
 }
 
 impl SliceIndex<Chunk> {
@@ -93,6 +97,11 @@ impl SliceIndex<Slab> {
     /// All slices except the last, 0..=SLAB_SIZE-2
     pub fn slices_except_last() -> impl Iterator<Item = Self> {
         (Slab::MIN..Slab::MAX).map(|i| Self(i, PhantomData))
+    }
+
+    pub fn slice_unsigned(&self) -> u32 {
+        debug_assert!(self.0 >= 0);
+        self.0 as u32
     }
 }
 
@@ -141,6 +150,12 @@ impl From<i32> for GlobalSliceIndex {
 impl From<i32> for LocalSliceIndex {
     fn from(slice: i32) -> Self {
         Self::new(slice)
+    }
+}
+
+impl From<SliceIndex<Chunk>> for SlabIndex {
+    fn from(slice: SliceIndex<Chunk>) -> Self {
+        slice.slab_index()
     }
 }
 

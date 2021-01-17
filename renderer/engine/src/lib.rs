@@ -11,5 +11,3 @@ pub use lite::{DummyBackendInit, DummyBackendPersistent};
 
 mod engine;
 pub use crate::engine::Engine;
-
-pub mod panic;

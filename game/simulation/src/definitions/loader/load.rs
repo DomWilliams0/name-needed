@@ -1,5 +1,3 @@
-use resources::resource;
-
 use crate::definitions::loader::step1_deserialization::{
     collect_raw_definitions, DefinitionUid, DeserializedDefinition,
 };
@@ -9,7 +7,7 @@ use crate::definitions::loader::template_lookup::TemplateLookup;
 use crate::definitions::registry::RegistryBuilder;
 use crate::definitions::{DefinitionError, DefinitionErrors, Registry};
 
-pub fn load(resources: resource::Definitions) -> Result<Registry, DefinitionErrors> {
+pub fn load(resources: resources::Definitions) -> Result<Registry, DefinitionErrors> {
     let defs = load_and_preprocess_with(|| collect_raw_definitions(resources))?;
     let instantiated = instantiate(defs, &TemplateLookup::init())?;
     build_registry(instantiated)

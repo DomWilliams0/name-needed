@@ -3,15 +3,16 @@ use std::iter::once;
 
 use common::derive_more::Constructor;
 use common::*;
-use unit::dim::CHUNK_SIZE;
+use unit::world::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkPosition, GlobalSliceIndex, SlabIndex, SlabPosition, SliceBlock,
-    SliceIndex, WorldPosition, WorldPositionRange, WorldRange,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
-use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, RawChunkTerrain};
-use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
+
+use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
+use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
     AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
     WorldPathNode,
@@ -19,11 +20,27 @@ use crate::navigation::{
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
 
-/// All mutable world changes must go through `apply_terrain_updates`
-pub struct World<D> {
-    chunks: Vec<Chunk<D>>,
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::sync::broadcast;
+
+pub trait WorldContext: 'static + Send + Sync {
+    type AssociatedBlockData;
+}
+
+/// All mutable world changes must go through `loader.apply_terrain_updates`
+pub struct World<C: WorldContext> {
+    chunks: Vec<Chunk<C>>,
     area_graph: AreaGraph,
-    dirty_chunks: HashSet<ChunkPosition>,
+    dirty_slabs: HashSet<SlabLocation>,
+    load_notifier: LoadNotifier,
+}
+
+pub struct LoadNotifier {
+    send: broadcast::Sender<SlabLocation>,
+    recv: broadcast::Receiver<SlabLocation>,
+    /// Dont bother sending anything if there are no receivers
+    waiters: Arc<AtomicUsize>,
 }
 
 #[derive(Constructor)]
@@ -33,7 +50,7 @@ pub struct WorldChangeEvent {
     pub new: BlockType,
 }
 
-impl<D> Default for World<D> {
+impl<C: WorldContext> Default for World<C> {
     fn default() -> Self {
         Self::empty()
     }
@@ -55,56 +72,64 @@ pub enum RandomWalkableBlock {
     Local { from: WorldPosition, radius: u16 },
 }
 
-impl<D> World<D> {
-    pub fn empty() -> Self {
-        fn nop_callback(_: WorldPosition, _: BlockType, _: BlockType) {}
+struct ContiguousChunkIteratorMut<'a, C: WorldContext> {
+    world: &'a mut World<C>,
+    last_chunk: Option<(ChunkLocation, usize)>,
+}
 
+pub(crate) struct ContiguousChunkIterator<'a, C: WorldContext> {
+    world: &'a World<C>,
+    last_chunk: Option<(ChunkLocation, usize)>,
+    #[cfg(test)]
+    matched_last: bool,
+}
+
+impl<C: WorldContext> World<C> {
+    pub fn empty() -> Self {
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
-            dirty_chunks: HashSet::with_capacity(32),
+            dirty_slabs: HashSet::with_capacity(32),
+            load_notifier: LoadNotifier::default(),
         }
     }
 
-    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk<D>> {
+    pub fn all_chunks(&self) -> impl Iterator<Item = &Chunk<C>> {
         self.chunks.iter()
     }
 
     pub fn slice_bounds(&self) -> Option<SliceRange> {
-        let min = self
-            .chunks
-            .iter()
-            .map(|c| c.slice_bounds_as_slabs().bottom())
-            .min();
-        let max = self
-            .chunks
-            .iter()
-            .map(|c| c.slice_bounds_as_slabs().top())
-            .max();
+        let slab_ranges = self.chunks.iter().map(|c| c.raw_terrain().slab_range());
 
-        match (min, max) {
-            (Some(min), Some(max)) => Some(SliceRange::from_bounds_unchecked(min, max)),
-            _ => None,
-        }
+        let min = slab_ranges.clone().map(|(bottom, _)| bottom).min();
+        let max = slab_ranges.map(|(_, top)| top).max();
+
+        min.zip(max).map(|(min_slab, max_slab)| {
+            let min_slice = LocalSliceIndex::bottom().to_global(min_slab);
+            let max_slice = LocalSliceIndex::top().to_global(max_slab);
+            SliceRange::from_bounds_unchecked(min_slice, max_slice)
+        })
     }
 
-    fn find_chunk_index(&self, chunk_pos: ChunkPosition) -> Option<usize> {
-        self.chunks
-            .binary_search_by_key(&chunk_pos, |c| c.pos())
-            .ok()
+    fn find_chunk_index(&self, chunk_pos: ChunkLocation) -> Result<usize, usize> {
+        self.chunks.binary_search_by_key(&chunk_pos, |c| c.pos())
     }
 
-    pub fn has_chunk(&self, chunk_pos: ChunkPosition) -> bool {
-        self.find_chunk_index(chunk_pos).is_some()
+    pub fn has_slab(&self, slab_pos: SlabLocation) -> bool {
+        self.find_chunk_with_pos(slab_pos.chunk)
+            .map(|chunk| chunk.raw_terrain().slab(slab_pos.slab).is_some())
+            .unwrap_or_default()
     }
 
-    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkPosition) -> Option<&Chunk<D>> {
+    pub fn find_chunk_with_pos(&self, chunk_pos: ChunkLocation) -> Option<&Chunk<C>> {
         self.find_chunk_index(chunk_pos)
+            .ok()
             .map(|idx| &self.chunks[idx])
     }
 
-    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkPosition) -> Option<&mut Chunk<D>> {
+    fn find_chunk_with_pos_mut(&mut self, chunk_pos: ChunkLocation) -> Option<&mut Chunk<C>> {
         self.find_chunk_index(chunk_pos)
+            .ok()
             .map(move |idx| &mut self.chunks[idx])
     }
 
@@ -115,7 +140,7 @@ impl<D> World<D> {
     ) -> Result<AreaPath, NavigationError> {
         // resolve areas
         let resolve_area = |pos: WorldPosition| {
-            let chunk_pos: ChunkPosition = pos.into();
+            let chunk_pos: ChunkLocation = pos.into();
             self.find_chunk_with_pos(chunk_pos)
                 .and_then(|c| c.area_for_block(pos))
         };
@@ -123,10 +148,9 @@ impl<D> World<D> {
         let from = from.into();
         let to = to.into();
 
-        let from_area =
-            resolve_area(from).ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+        let from_area = resolve_area(from).ok_or(NavigationError::SourceNotWalkable(from))?;
 
-        let to_area = resolve_area(to).ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
+        let to_area = resolve_area(to).ok_or(NavigationError::TargetNotWalkable(to))?;
 
         Ok(self.area_graph.find_area_path(from_area, to_area)?)
     }
@@ -141,7 +165,7 @@ impl<D> World<D> {
         let block_graph = self
             .find_chunk_with_pos(area.chunk)
             .and_then(|c| c.block_graph_for_area(area))
-            .ok_or_else(|| NavigationError::NoSuchArea(area))?;
+            .ok_or(NavigationError::NoSuchArea(area))?;
 
         block_graph
             .find_block_path(from, to, target)
@@ -165,7 +189,7 @@ impl<D> World<D> {
     ) -> Result<WorldPath, NavigationError> {
         let from = self
             .find_accessible_block_in_column_with_range(from, None)
-            .ok_or_else(|| NavigationError::SourceNotWalkable(from))?;
+            .ok_or(NavigationError::SourceNotWalkable(from))?;
 
         let to_accessible = self.find_accessible_block_in_column_with_range(to, None);
         let (to, goal) = match goal {
@@ -192,7 +216,7 @@ impl<D> World<D> {
                 }
             }
         }
-        .ok_or_else(|| NavigationError::TargetNotWalkable(to))?;
+        .ok_or(NavigationError::TargetNotWalkable(to))?;
 
         // same blocks
         if from == to {
@@ -273,177 +297,204 @@ impl<D> World<D> {
         pos: WorldPosition,
         z_min: Option<GlobalSliceIndex>,
     ) -> Option<WorldPosition> {
-        let chunk_pos = ChunkPosition::from(pos);
+        let chunk_pos = ChunkLocation::from(pos);
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
-            .and_then(|c| c.find_accessible_block(slice_block, Some(pos.2), z_min))
+            .and_then(|c| {
+                c.raw_terrain()
+                    .find_accessible_block(slice_block, Some(pos.2), z_min)
+            })
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
-    pub(crate) fn add_loaded_chunk(
+    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<C> {
+        let idx = match self.find_chunk_index(chunk) {
+            Ok(idx) => idx,
+            Err(idx) => {
+                debug!("adding empty chunk"; chunk);
+                self.chunks
+                    .insert(idx, Chunk::empty_with_world(self, chunk));
+                idx
+            }
+        };
+
+        // safety: index returned above
+        unsafe { self.chunks.get_unchecked_mut(idx) }
+    }
+
+    pub(crate) fn load_notifications(&self) -> LoadNotifier {
+        let send = self.load_notifier.send.clone();
+        let recv = send.subscribe();
+        LoadNotifier {
+            recv,
+            send,
+            waiters: self.load_notifier.waiters.clone(),
+        }
+    }
+
+    pub(crate) fn finalize_chunk(
         &mut self,
-        chunk: Chunk<D>,
+        chunk_loc: ChunkLocation,
         area_nav: &[(WorldArea, WorldArea, AreaNavEdge)],
+        slab_range: (SlabIndex, SlabIndex),
     ) {
-        let chunk_pos = chunk.pos();
-        if let Some(idx) = self.find_chunk_index(chunk_pos) {
-            // chunk already exists
+        // add all areas even if they currently have no edges
+        {
+            // safety: area graph is totally separate from chunk lookup
+            let naughty_area_graph: &mut AreaGraph =
+                unsafe { std::mem::transmute(&mut self.area_graph) };
 
-            // swap out the chunk inline, no need to push it or resort the vec
-            // safety: idx returned by find_chunk_index
-            let (old_chunk, new_chunk) = unsafe {
-                let mut old_chunk = std::mem::replace(self.chunks.get_unchecked_mut(idx), chunk);
-                let new_chunk = self.chunks.get_unchecked_mut(idx);
+            let chunk = self.find_chunk_with_pos(chunk_loc).expect("no such chunk");
 
-                old_chunk.swap_with(new_chunk);
+            // remove all previous areas and edges for the slab range in this chunk
+            let removed = naughty_area_graph.retain(|area| {
+                !(area.chunk == chunk_loc
+                    && (area.slab >= slab_range.0 && area.slab <= slab_range.1))
+            });
 
-                (old_chunk, new_chunk)
-            };
-
-            // remove old area nodes that aren't in the new chunk
-            // TODO reuse hashset allocation
-            let new_areas: HashSet<WorldArea> = new_chunk.areas().copied().collect();
-
-            for area in old_chunk.areas() {
-                if !new_areas.contains(area) {
-                    // expired area
-                    trace!("removing expired world area"; "area" => ?area);
-                    self.area_graph.remove_node(&area);
-                } else {
-                    // new area
-                    self.area_graph.add_node(*area);
-                }
-            }
-        } else {
-            // chunk is new, just add all areas as fresh
             for area in chunk.areas() {
-                self.area_graph.add_node(*area);
+                trace!("has area {:?}", area);
+                naughty_area_graph.add_node(area.into_world_area(chunk_loc));
             }
 
-            // add chunk to vec, maintaining sorted order
-            self.chunks.push(chunk);
-            self.chunks.sort_unstable_by_key(|c| c.pos());
+            let added = chunk.area_count();
+            debug!(
+                "removed {removed} areas and added {added}",
+                removed = removed,
+                added = added
+            );
         }
 
-        // update area edges
+        // update area nodes and edges
         for &(src, dst, edge) in area_nav {
             self.area_graph.add_edge(src, dst, edge);
         }
 
-        // mark chunk as dirty
-        self.dirty_chunks.insert(chunk_pos);
+        // mark slabs dirty
+        let slabs = slab_range.0.as_i32()..=slab_range.1.as_i32();
+        self.dirty_slabs
+            .extend(slabs.map(|s| SlabLocation::new(s, chunk_loc)));
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
         let OcclusionChunkUpdate(chunk_pos, updates) = update;
+        let len_before = self.dirty_slabs.len();
+
+        // safety: dirty_slabs is not referenced anywhere else through &mut self
+        let dirty_slabs: &mut HashSet<_> = unsafe { std::mem::transmute(&mut self.dirty_slabs) };
+
         if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
-            let applied_count = chunk.raw_terrain_mut().apply_occlusion_updates(&updates);
+            let mut applied_count = 0usize;
+            for affected_slab in chunk.raw_terrain_mut().apply_occlusion_updates(&updates) {
+                applied_count += 1;
+
+                let slab_loc = SlabLocation::new(affected_slab, chunk_pos);
+                dirty_slabs.insert(slab_loc);
+            }
+
             if applied_count > 0 {
                 debug!(
-                    "applied {applied}/{total} queued occlusion updates",
+                    "applied {applied}/{total} queued occlusion updates across {slabs} slabs",
                     applied = applied_count,
-                    total = updates.len();
+                    total = updates.len(),
+                    slabs = self.dirty_slabs.len() - len_before;
                     chunk_pos
                 );
-
-                // mark chunk as dirty
-                self.dirty_chunks.insert(chunk_pos);
             }
         }
     }
 
-    /// Entrypoint for all world changes. Note changes are not immediate, but queued to the loader
-    /// thread pool.
-    /// Panics if chunk is not found - check it exists with `world.has_chunk` first
-    pub fn apply_terrain_updates(
-        &self,
-        chunk_pos: ChunkPosition,
-        updates: impl Iterator<Item = (SlabIndex, SlabTerrainUpdate)>,
+    pub(crate) fn apply_terrain_updates_in_place(
+        &mut self,
+        updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate>)>,
         changes_out: &mut Vec<WorldChangeEvent>,
-    ) -> RawChunkTerrain {
-        let chunk = self
-            .find_chunk_with_pos(chunk_pos)
-            .expect("chunk expected to be loaded");
+        mut per_slab: impl FnMut(SlabLocation),
+    ) {
+        let mut contiguous_chunks = ContiguousChunkIteratorMut::new(self);
 
-        // shallow clone terrain, no terrain is copied yet
-        let mut terrain = chunk.raw_terrain().clone();
-
-        // debug_assert!(
-        //     IsSorted::is_sorted_by_key(&mut updates.clone(), |(slab, _)| *slab),
-        //     "slab updates should be sorted by slab index for maximum efficiency"
-        // );
-
-        for (slab_idx, updates) in updates.group_by(|(slab, _)| *slab).into_iter() {
-            log_scope!(o!(chunk_pos, slab_idx));
-
-            // copy slab for modification
-            let slab = match terrain.slab_mut(slab_idx) {
+        for (slab_loc, slab_updates) in updates {
+            // fetch chunk, reusing the last one if it's the same, as it should be in this sorted iterator
+            let chunk = match contiguous_chunks.next(slab_loc.chunk) {
+                Some(chunk) => chunk,
                 None => {
-                    let count = updates.count();
-                    warn!(
-                        "ignoring {count} slab updates because the slab doesn't exist",
-                        count = count
-                    );
+                    let count = slab_updates.count();
+                    debug!("skipping {count} terrain updates for chunk because it's not loaded", count = count; slab_loc.chunk);
                     continue;
-                }
-                Some(s) => {
-                    debug!("apply terrain updates to slab");
-                    s
                 }
             };
 
-            // apply changes to new slab
-            for (_, update) in updates {
-                let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
-                trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
-
-                match range {
-                    WorldRange::Single(pos) => {
-                        let prev_block = slab.slice_mut(pos.z()).set_block(pos, block_type);
-                        let world_pos = pos.to_world_position(chunk_pos, slab_idx);
-                        changes_out.push(WorldChangeEvent::new(world_pos, prev_block, block_type));
-                    }
-                    range @ WorldRange::Range(_, _) => {
-                        let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
-                        for z in za..=zb {
-                            let mut slice = slab.slice_mut(z);
-                            for x in xa..=xb {
-                                for y in ya..=yb {
-                                    let prev_block = slice.set_block((x, y), block_type);
-                                    let world_pos = SlabPosition::new(x, y, z.into())
-                                        .to_world_position(chunk_pos, slab_idx);
-                                    changes_out.push(WorldChangeEvent::new(
-                                        world_pos, prev_block, block_type,
-                                    ));
-                                }
-                            }
-                        }
-                    }
+            let slab = match chunk.raw_terrain_mut().slab_mut(slab_loc.slab) {
+                Some(slab) => slab,
+                None => {
+                    let count = slab_updates.count();
+                    debug!("skipping {count} terrain updates for slab because it's not loaded", count = count; slab_loc);
+                    continue;
                 }
-            }
-        }
+            };
 
-        // to be submitted to world loader
-        terrain
+            let prev_len = changes_out.len();
+            slab.apply_terrain_updates(slab_loc, slab_updates, changes_out);
+            let count = changes_out.len() - prev_len;
+            debug!("applied {count} terrain updates to slab", count = count; slab_loc);
+
+            per_slab(slab_loc);
+        }
     }
 
-    /// Drains all dirty chunks
-    pub fn dirty_chunks(&mut self) -> impl Iterator<Item = ChunkPosition> + '_ {
-        self.dirty_chunks.drain()
+    /// Panics if chunk doesn't exist.
+    /// Does not update slab progress in chunk
+    pub(crate) fn populate_chunk_with_slabs(
+        &mut self,
+        chunk_loc: ChunkLocation,
+        slab_range: (SlabIndex, SlabIndex),
+        slabs: impl Iterator<Item = LoadedSlab>,
+    ) {
+        let chunk = self
+            .find_chunk_with_pos_mut(chunk_loc)
+            .expect("no such chunk");
+
+        // create missing chunks
+        let terrain = chunk.raw_terrain_mut();
+        terrain.create_slabs_until(slab_range.0);
+        terrain.create_slabs_until(slab_range.1);
+
+        // remove all areas in the slab range, because we're about to add the new ones
+        chunk.remove_block_graphs(slab_range);
+
+        for mut slab in slabs {
+            debug_assert_eq!(slab.slab.chunk, chunk_loc);
+            trace!("populating slab"; slab.slab);
+
+            // update slab terrain if necessary
+            if let Some(terrain) = slab.terrain.take() {
+                chunk
+                    .raw_terrain_mut()
+                    .replace_slab(slab.slab.slab /* lmao */, terrain);
+            }
+
+            // update chunk area navigation
+            chunk.update_block_graphs(slab.navigation.into_iter());
+        }
+    }
+
+    /// Drains all dirty slabs
+    pub fn dirty_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.dirty_slabs.drain()
     }
 
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
         let pos = pos.into();
-        self.find_chunk_with_pos(ChunkPosition::from(pos))
+        self.find_chunk_with_pos(ChunkLocation::from(pos))
             .and_then(|chunk| chunk.get_block(pos))
     }
 
+    /// Mutates terrain silently to the loader, ensure the loader knows about this
     pub fn damage_block(
         &mut self,
         pos: WorldPosition,
         damage: BlockDurability,
     ) -> Option<BlockDamageResult> {
-        self.find_chunk_with_pos_mut(ChunkPosition::from(pos))
+        self.find_chunk_with_pos_mut(ChunkLocation::from(pos))
             .and_then(|chunk| {
                 chunk
                     .raw_terrain_mut()
@@ -473,6 +524,7 @@ impl<D> World<D> {
                     let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                     let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                     chunk
+                        .raw_terrain()
                         .find_accessible_block(SliceBlock(x, y), None, None)
                         .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                 }
@@ -487,6 +539,7 @@ impl<D> World<D> {
                         .and_then(|chunk| {
                             let block_pos = BlockPosition::from(candidate);
                             chunk
+                                .raw_terrain()
                                 .find_accessible_block(block_pos.into(), None, None)
                                 .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                         })
@@ -530,7 +583,7 @@ impl<D> World<D> {
 
     pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {
         let block_pos = pos.into();
-        let chunk_pos = ChunkPosition::from(block_pos);
+        let chunk_pos = ChunkLocation::from(block_pos);
         let block = self
             .find_chunk_with_pos(chunk_pos)
             .and_then(|chunk| chunk.get_block(block_pos));
@@ -598,19 +651,388 @@ impl<D> World<D> {
         .map(|(_, pos)| pos)
     }
 
-    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&D> {
+    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&C::AssociatedBlockData> {
         self.find_chunk_with_pos(pos.into())
             .and_then(|chunk| chunk.associated_block_data(pos.into()))
     }
 
-    pub fn set_associated_block_data(&mut self, pos: WorldPosition, data: D) -> Option<D> {
+    pub fn set_associated_block_data(
+        &mut self,
+        pos: WorldPosition,
+        data: C::AssociatedBlockData,
+    ) -> Option<C::AssociatedBlockData> {
         self.find_chunk_with_pos_mut(pos.into())
             .and_then(|chunk| chunk.set_associated_block_data(pos.into(), data))
     }
 
-    pub fn remove_associated_block_data(&mut self, pos: WorldPosition) -> Option<D> {
+    pub fn remove_associated_block_data(
+        &mut self,
+        pos: WorldPosition,
+    ) -> Option<C::AssociatedBlockData> {
         self.find_chunk_with_pos_mut(pos.into())
             .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
+    }
+
+    /// Removes slabs that are already loaded and not placeholders.
+    /// More efficient when sorted by slab
+    pub fn retain_slabs_to_load(&self, slabs: &mut Vec<SlabLocation>) {
+        let mut contiguous_chunks = ContiguousChunkIterator::new(self);
+
+        slabs.retain(|slab| {
+            match contiguous_chunks.next(slab.chunk) {
+                Some(chunk) => chunk.should_slab_be_loaded(slab.slab),
+                None => {
+                    // chunk is unloaded so its slabs are too
+                    true
+                }
+            }
+        });
+    }
+}
+
+impl Default for LoadNotifier {
+    fn default() -> Self {
+        let (send, recv) = broadcast::channel(1024);
+        Self {
+            send,
+            recv,
+            waiters: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl LoadNotifier {
+    pub fn notify(&self, slab: SlabLocation) {
+        if self.waiters.load(Ordering::Relaxed) > 0 {
+            self.send.send(slab).expect("send channel is full");
+        }
+    }
+
+    /// Returns false on recv error
+    async fn wait_for_slab(&mut self, slab: SlabLocation) -> bool {
+        // increment waiter count
+        self.waiters.fetch_add(1, Ordering::SeqCst);
+
+        let ret = loop {
+            match self.recv.recv().await {
+                Err(e) => {
+                    error!("error waiting for slab notification: {}", e);
+                    break false;
+                }
+                Ok(recvd) if recvd == slab => break true,
+                Ok(_) => { /* keep waiting */ }
+            }
+        };
+
+        // // decrement before returning
+        self.waiters.fetch_sub(1, Ordering::SeqCst);
+        ret
+    }
+}
+
+pub mod slab_loading {
+    use crate::chunk::slab::{Slab, SlabInternalNavigability};
+    use crate::{BaseTerrain, WorldContext, WorldRef};
+    use common::*;
+    use futures::task::{Context, Poll};
+    use futures::Future;
+    use std::hint::unreachable_unchecked;
+    use tokio::macros::support::Pin;
+    use unit::world::SlabLocation;
+
+    pub(crate) struct SlabProcessingFuture<'a, C: WorldContext> {
+        phantom: PhantomData<&'a C>,
+        result: Outcome,
+    }
+
+    enum Outcome {
+        NoneYet(tokio::task::JoinHandle<Option<(Option<Slab>, SlabInternalNavigability)>>),
+        Failed,
+        Succeeded((Option<Slab>, SlabInternalNavigability)),
+    }
+
+    impl<'a, C: WorldContext> SlabProcessingFuture<'a, C> {
+        pub fn with_provided_terrain(
+            world: WorldRef<C>,
+            slab: SlabLocation,
+            mut terrain: Slab,
+        ) -> Self {
+            log_scope!(o!(slab.chunk));
+
+            let w = world.borrow();
+            let chunk = w.find_chunk_with_pos(slab.chunk);
+
+            let result = match chunk {
+                Some(chunk) => {
+                    // copy the top and bottom slices into chunk so neighbouring slabs can access it
+                    chunk.mark_slab_in_progress(slab.slab, &terrain);
+
+                    match chunk.get_neighbouring_slabs(slab.slab) {
+                        None => {
+                            // dependent slabs are in progress and should be waited for
+                            let mut notifier = w.load_notifications();
+                            let world = world.clone();
+                            let rt = tokio::runtime::Handle::current();
+
+                            let task = rt.spawn(async move {
+                                loop {
+                                    // attempt to get slabs again. do this before waiting to avoid
+                                    // TOCTOU where the dependent slab becomes available just before
+                                    // the wait and misses the notification it's expecting.
+                                    {
+                                        let w = world.borrow();
+                                        // the chunk exists for sure if it's sending notifications
+                                        let chunk = w.find_chunk_with_pos(slab.chunk).unwrap();
+                                        if let Some((above, below)) =
+                                            chunk.get_neighbouring_slabs(slab.slab)
+                                        {
+                                            // congrats we made it, do final processing
+                                            let result = terrain.process_terrain(
+                                                slab.slab,
+                                                above.as_ref(),
+                                                below.as_ref(),
+                                            );
+                                            break Some((Some(terrain), result));
+                                        }
+                                    }
+
+                                    // still not available, wait for mandatory slab below to load
+                                    if !notifier.wait_for_slab(slab.below()).await {
+                                        // failure, guess we're shutting down
+                                        break None;
+                                    }
+                                }
+                            });
+                            Outcome::NoneYet(task)
+                        }
+                        Some((above, below)) => {
+                            // dependent slabs are available already, do processing now
+                            let result =
+                                terrain.process_terrain(slab.slab, above.as_ref(), below.as_ref());
+
+                            Outcome::Succeeded((Some(terrain), result))
+                        }
+                    }
+                }
+
+                None => Outcome::Failed,
+            };
+
+            SlabProcessingFuture {
+                result,
+                phantom: PhantomData,
+            }
+        }
+
+        pub fn with_inline_terrain(world: WorldRef<C>, slab: SlabLocation) -> Self {
+            log_scope!(o!(slab.chunk));
+
+            // need mutable world ref here to access the slab terrain mutably as we don't
+            // have it in scope here
+            let mut w = world.borrow_mut();
+            let chunk = w.find_chunk_with_pos_mut(slab.chunk);
+
+            let result = {
+                match chunk {
+                    Some(chunk) if chunk.has_slab(slab.slab) => {
+                        let terrain = chunk.raw_terrain_mut().slab_mut(slab.slab).unwrap();
+
+                        // safety: terrain belongs to chunk but we need access to the slab
+                        // progress too, and they dont overlap. but make sure not to
+                        // access this in a newly spawned task!!!
+                        let terrain: &mut Slab = unsafe { std::mem::transmute(terrain) };
+
+                        // copy the top and bottom slices into chunk so neighbouring slabs can access it
+                        chunk.mark_slab_in_progress(slab.slab, terrain);
+
+                        match chunk.get_neighbouring_slabs(slab.slab) {
+                            None => {
+                                // dependent slabs are in progress and should be waited for
+                                let mut notifier = w.load_notifications();
+                                let world = world.clone();
+                                let rt = tokio::runtime::Handle::current();
+
+                                let task = rt.spawn(async move {
+                                    // we must clobber the unsafely screwed up lifetime of terrain
+                                    // in the scope of this task
+                                    let terrain;
+
+                                    loop {
+                                        // attempt to get slabs again. do this before waiting to avoid
+                                        // TOCTOU where the dependent slab becomes available just before
+                                        // the wait and misses the notification it's expecting.
+                                        {
+                                            let mut w = world.borrow_mut();
+                                            // the chunk exists for sure if it's sending notifications
+                                            let chunk =
+                                                w.find_chunk_with_pos_mut(slab.chunk).unwrap();
+                                            if let Some((above, below)) =
+                                                chunk.get_neighbouring_slabs(slab.slab)
+                                            {
+                                                // congrats we made it, do final processing - need to
+                                                // get out terrain from the slab again because we
+                                                // don't own it
+                                                terrain = chunk
+                                                    .raw_terrain_mut()
+                                                    .slab_mut(slab.slab)
+                                                    .unwrap(); // definitely exists
+
+                                                let result = terrain.process_terrain(
+                                                    slab.slab,
+                                                    above.as_ref(),
+                                                    below.as_ref(),
+                                                );
+                                                break Some((None, result));
+                                            }
+                                        }
+
+                                        // still not available, wait for mandatory slab below to load
+                                        if !notifier.wait_for_slab(slab.below()).await {
+                                            // failure, guess we're shutting down
+                                            break None;
+                                        }
+                                    }
+                                });
+                                Outcome::NoneYet(task)
+                            }
+                            Some((above, below)) => {
+                                // dependent slabs are available already, do processing now
+                                let result = terrain.process_terrain(
+                                    slab.slab,
+                                    above.as_ref(),
+                                    below.as_ref(),
+                                );
+
+                                Outcome::Succeeded((None, result))
+                            }
+                        }
+                    }
+                    _ => Outcome::Failed,
+                }
+            };
+
+            SlabProcessingFuture {
+                result,
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<'a, C: WorldContext> Future for SlabProcessingFuture<'a, C> {
+        type Output = Option<(Option<Slab>, SlabInternalNavigability)>;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let self_ = Pin::into_inner(self);
+
+            match &mut self_.result {
+                Outcome::NoneYet(task) => {
+                    // delegate to running task
+                    Future::poll(Pin::new(task), cx).map(|res| res.ok().flatten())
+                }
+                Outcome::Failed => Poll::Ready(None),
+                Outcome::Succeeded(_) => {
+                    let self_ = std::mem::replace(
+                        self_,
+                        SlabProcessingFuture {
+                            phantom: PhantomData,
+                            result: Outcome::Failed, // will be failed if this is called again
+                        },
+                    );
+
+                    let result = match self_.result {
+                        Outcome::Succeeded(result) => result,
+                        _ => unsafe {
+                            // safety: we're in the branch for this variant
+                            unreachable_unchecked()
+                        },
+                    };
+                    Poll::Ready(Some(result))
+                }
+            }
+        }
+    }
+}
+
+impl<'a, C: WorldContext> ContiguousChunkIteratorMut<'a, C> {
+    pub fn new(world: &'a mut World<C>) -> Self {
+        ContiguousChunkIteratorMut {
+            world,
+            last_chunk: None,
+        }
+    }
+
+    // Identical to ContiguousChunkIterator just different enough with mut to require too
+    // much effort to reduce duplication :( lmao even this comment is the same
+    // noinspection DuplicatedCode
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&mut Chunk<C>> {
+        match self.last_chunk.take() {
+            Some((last_loc, idx)) if last_loc == chunk => {
+                // nice, reuse index of chunk without lookup
+                // safety: index returned by last call and no chunks added since because this holds
+                // a world reference
+                Some(unsafe { self.world.chunks.get_unchecked_mut(idx) })
+            }
+            _ => {
+                // new chunk
+                match self.world.find_chunk_index(chunk) {
+                    Ok(idx) => {
+                        self.last_chunk = Some((chunk, idx));
+
+                        // safety: index returned by find_chunk_index
+                        Some(unsafe { self.world.chunks.get_unchecked_mut(idx) })
+                    }
+                    Err(_) => None,
+                }
+            }
+        }
+    }
+}
+
+impl<'a, C: WorldContext> ContiguousChunkIterator<'a, C> {
+    pub fn new(world: &'a World<C>) -> Self {
+        ContiguousChunkIterator {
+            world,
+            last_chunk: None,
+            #[cfg(test)]
+            matched_last: false,
+        }
+    }
+
+    // Identical to ContiguousChunkIteratorMut but just different enough with mut to require too
+    // much effort to reduce duplication :( lmao even this comment is the same
+    // noinspection DuplicatedCode
+    pub fn next(&mut self, chunk: ChunkLocation) -> Option<&Chunk<C>> {
+        match self.last_chunk.take() {
+            Some((last_loc, idx)) if last_loc == chunk => {
+                // nice, reuse index of chunk without lookup
+                #[cfg(test)]
+                {
+                    self.matched_last = true;
+                }
+
+                // safety: index returned by last call and no chunks added since because this holds
+                // a world reference
+                Some(unsafe { self.world.chunks.get_unchecked(idx) })
+            }
+            _ => {
+                // new chunk
+
+                #[cfg(test)]
+                {
+                    self.matched_last = false;
+                }
+
+                match self.world.find_chunk_index(chunk) {
+                    Ok(idx) => {
+                        self.last_chunk = Some((chunk, idx));
+
+                        // safety: index returned by find_chunk_index
+                        Some(unsafe { self.world.chunks.get_unchecked(idx) })
+                    }
+                    Err(_) => None,
+                }
+            }
+        }
     }
 }
 
@@ -627,34 +1049,48 @@ impl AreaLookup {
 pub mod helpers {
     use std::time::Duration;
 
-    use crate::loader::{
-        BlockingWorkerPool, MemoryTerrainSource, TerrainSource, ThreadedWorkerPool, WorkerPool,
-        WorldLoader, WorldTerrainUpdate,
-    };
-    use crate::{ChunkDescriptor, WorldRef};
+    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
+    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
+    use common::Itertools;
+    use unit::world::ChunkLocation;
 
-    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<()> {
+    pub struct DummyWorldContext;
+
+    impl WorldContext for DummyWorldContext {
+        type AssociatedBlockData = ();
+    }
+
+    pub fn load_single_chunk(chunk: ChunkBuilder) -> Chunk<DummyWorldContext> {
+        let pos = ChunkLocation(0, 0);
+        let world = world_from_chunks_blocking(vec![chunk.build(pos)]);
+        let mut world = world.borrow_mut();
+        let new_chunk = Chunk::empty_with_world(&*world, pos);
+        let chunk = world.find_chunk_with_pos_mut(pos).unwrap();
+        std::mem::replace(chunk, new_chunk)
+    }
+
+    pub fn world_from_chunks_blocking(chunks: Vec<ChunkDescriptor>) -> WorldRef<DummyWorldContext> {
         loader_from_chunks_blocking(chunks).world()
     }
 
     pub fn loader_from_chunks_blocking(
         chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<BlockingWorkerPool<()>, ()> {
+    ) -> WorldLoader<DummyWorldContext> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world(source, BlockingWorkerPool::default())
+        load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
-    pub fn loader_from_chunks_threaded(
-        threads: usize,
-        chunks: Vec<ChunkDescriptor>,
-    ) -> WorldLoader<ThreadedWorkerPool, ()> {
-        let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        let pool = ThreadedWorkerPool::new(threads);
-        load_world(source, pool)
+    fn timeout() -> Duration {
+        let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(5);
+
+        Duration::from_secs(seconds)
     }
 
     pub fn apply_updates(
-        loader: &mut WorldLoader<BlockingWorkerPool<()>, ()>,
+        loader: &mut WorldLoader<DummyWorldContext>,
         updates: &[WorldTerrainUpdate],
     ) -> Result<(), String> {
         let world = loader.world();
@@ -662,43 +1098,39 @@ pub mod helpers {
         let mut _updates = Vec::new();
         loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
 
-        // blocking pool doesn't use timeout
-        while let Some(result) = loader.block_on_next_finalization(Duration::default()) {
-            if let Err(e) = result {
-                return Err(format!("error applying updates: {}", e));
-            }
-        }
+        loader.block_for_last_batch(timeout()).unwrap();
 
-        // apply all occlusion updates
-        let occlusion_updates = loader.chunk_updates_rx_clone().unwrap();
-        let mut w = world.borrow_mut();
-        while let Ok(update) = occlusion_updates.try_recv() {
-            w.apply_occlusion_update(update);
-        }
+        // apply occlusion updates
+        let mut world = world.borrow_mut();
+        loader.iter_occlusion_updates(|update| {
+            world.apply_occlusion_update(update);
+        });
 
         Ok(())
     }
 
-    pub(crate) fn load_world<P: WorkerPool<D>, D>(
-        mut source: MemoryTerrainSource,
-        pool: P,
-    ) -> WorldLoader<P, D> {
-        let chunks_pos = source.all_chunks();
-
+    pub(crate) fn load_world<C: WorldContext>(
+        source: MemoryTerrainSource,
+        pool: AsyncWorkerPool,
+    ) -> WorldLoader<C> {
         // TODO build area graph in loader
         // let area_graph = AreaGraph::from_chunks(&[]);
 
-        let mut loader = WorldLoader::new(source, pool);
-        loader.request_chunks(chunks_pos.iter().copied());
-        for _ in chunks_pos {
-            let _ = loader.block_on_next_finalization(Duration::from_secs(20));
-        }
+        let slabs_to_load = source
+            .all_slabs()
+            .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)))
+            .collect_vec();
 
-        // apply all chunk updates
-        let updates = loader.chunk_updates_rx_clone().unwrap();
-        while let Ok(update) = updates.try_recv() {
-            loader.world().borrow_mut().apply_occlusion_update(update);
-        }
+        let mut loader = WorldLoader::new(source, pool);
+        loader.request_slabs(slabs_to_load.into_iter());
+        loader.block_for_last_batch(timeout()).unwrap();
+
+        // apply occlusion updates
+        let world = loader.world();
+        let mut world = world.borrow_mut();
+        loader.iter_occlusion_updates(|update| {
+            world.apply_occlusion_update(update);
+        });
 
         loader
     }
@@ -710,24 +1142,25 @@ mod tests {
     use std::time::Duration;
 
     use common::{seeded_rng, Itertools, Rng};
-    use unit::dim::CHUNK_SIZE;
+    use unit::world::{all_slabs_in_range, CHUNK_SIZE};
     use unit::world::{
-        BlockPosition, ChunkPosition, GlobalSliceIndex, WorldPosition, WorldPositionRange,
+        BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
+        WorldPositionRange, SLAB_SIZE,
     };
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
     use crate::helpers::load_world;
-    use crate::loader::{
-        BlockingWorkerPool, GeneratedTerrainSource, MemoryTerrainSource, WorldLoader,
-        WorldTerrainUpdate,
-    };
+    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
+    use crate::presets::from_preset;
     use crate::world::helpers::{
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
-    use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal};
+    use crate::world::ContiguousChunkIterator;
+    use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext};
+    use config::WorldPreset;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -817,8 +1250,6 @@ mod tests {
 
     #[test]
     fn world_path_cross_areas() {
-        // logging::for_tests();
-
         // cross chunks
         let world = world_from_chunks_blocking(vec![
             ChunkBuilder::new()
@@ -871,7 +1302,6 @@ mod tests {
     #[test]
     fn ring_path() {
         // logging::for_tests();
-
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
         let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
@@ -916,7 +1346,7 @@ mod tests {
             );
         }
 
-        assert!(world.find_chunk_with_pos(ChunkPosition(10, 10)).is_none());
+        assert!(world.find_chunk_with_pos(ChunkLocation(10, 10)).is_none());
     }
 
     #[test]
@@ -1019,12 +1449,12 @@ mod tests {
         // hold a reference to slab to trigger CoW
         let slab = w.chunks[0]
             .raw_terrain()
-            .slab_ptr(GlobalSliceIndex::new(pos.2).slab_index())
+            .slab(GlobalSliceIndex::new(pos.2).slab_index())
             .unwrap()
             .clone();
 
         w.apply_occlusion_update(OcclusionChunkUpdate(
-            ChunkPosition(0, 0),
+            ChunkLocation(0, 0),
             vec![(pos.into(), NeighbourOpacity::all_solid())],
         ));
 
@@ -1056,7 +1486,7 @@ mod tests {
 
         assert_eq!(w.block((0, 0, 0)).unwrap().block_type(), BlockType::Air);
 
-        *w.find_chunk_with_pos_mut(ChunkPosition(0, 0))
+        *w.find_chunk_with_pos_mut(ChunkLocation(0, 0))
             .unwrap()
             .slice_mut(0)
             .unwrap()[(0, 0)]
@@ -1068,18 +1498,28 @@ mod tests {
     #[ignore]
     #[test]
     fn random_terrain_updates_stresser() {
-        const CHUNK_RADIUS: u32 = 8;
+        const CHUNK_RADIUS: i32 = 8;
         const TERRAIN_HEIGHT: f64 = 400.0;
 
         const UPDATE_SETS: usize = 100;
         const UPDATE_REPS: usize = 10;
 
-        let pool = BlockingWorkerPool::default();
-        let source = GeneratedTerrainSource::new(None, CHUNK_RADIUS, TERRAIN_HEIGHT).unwrap();
+        let pool = AsyncWorkerPool::new(4).unwrap();
+        // TODO make stresser use generated terrain again
+        // let source =
+        //     GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
+        let source = from_preset(WorldPreset::MultiChunkWonder);
+        let (min, max) = source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
-        loader.request_all_chunks();
 
-        assert!(loader.block_for_all(Duration::from_secs(60)).is_ok());
+        let max_slab = (TERRAIN_HEIGHT as f32 / SLAB_SIZE.as_f32()).ceil() as i32 + 1;
+        let (all_slabs, count) = all_slabs_in_range(
+            SlabLocation::new(-max_slab, min),
+            SlabLocation::new(max_slab, max),
+        );
+        loader.request_slabs_with_count(all_slabs, count);
+
+        assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
 
         let world = loader.world();
 
@@ -1189,10 +1629,14 @@ mod tests {
 
     #[test]
     fn associated_block_data() {
+        impl WorldContext for u32 {
+            type AssociatedBlockData = u32;
+        }
+
         let source =
             MemoryTerrainSource::from_chunks(vec![ChunkBuilder::new().build((0, 0))].into_iter())
                 .unwrap();
-        let loader: WorldLoader<_, u32> = load_world(source, BlockingWorkerPool::default());
+        let loader: WorldLoader<u32> = load_world(source, AsyncWorkerPool::new_blocking().unwrap());
         let worldref = loader.world();
         let mut world = worldref.borrow_mut();
 
@@ -1204,5 +1648,45 @@ mod tests {
         assert_eq!(world.set_associated_block_data(pos, 100), Some(50));
 
         assert_eq!(world.associated_block_data(pos).copied(), Some(100));
+    }
+
+    #[test]
+    fn contiguous_chunk_iter() {
+        let chunks = vec![
+            ChunkBuilder::new().build((0, 0)),
+            ChunkBuilder::new().build((1, 0)),
+        ];
+        let world = world_from_chunks_blocking(chunks);
+        let world = world.borrow();
+        let mut iter = ContiguousChunkIterator::new(&*world);
+        let mut chunk;
+
+        chunk = iter.next(ChunkLocation(0, 0));
+        assert!(chunk.is_some());
+
+        // same as before
+        chunk = iter.next(ChunkLocation(0, 0));
+        assert!(chunk.is_some());
+        assert!(iter.matched_last);
+
+        // changed
+        chunk = iter.next(ChunkLocation(1, 0));
+        assert!(chunk.is_some());
+        assert!(!iter.matched_last);
+
+        // same
+        chunk = iter.next(ChunkLocation(1, 0));
+        assert!(chunk.is_some());
+        assert!(iter.matched_last);
+
+        // bad
+        chunk = iter.next(ChunkLocation(5, 0));
+        assert!(chunk.is_none());
+        assert!(!iter.matched_last);
+
+        // still bad
+        chunk = iter.next(ChunkLocation(5, 0));
+        assert!(chunk.is_none());
+        assert!(!iter.matched_last);
     }
 }

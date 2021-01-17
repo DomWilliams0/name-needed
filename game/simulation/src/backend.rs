@@ -2,7 +2,8 @@ use crate::input::UiCommand;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation, WorldViewer};
 use common::Error;
-use resources::resource::Resources;
+use resources::Resources;
+use unit::world::WorldPosition;
 
 #[derive(Debug)]
 pub enum Exit {
@@ -38,14 +39,15 @@ pub trait PersistentSimulationBackend: Sized {
     /// One time setup
     fn new(resources: &Resources) -> Result<Self, Self::Error>;
 
-    fn start(self, world: WorldViewer) -> Self::Initialized;
+    fn start(self, world: WorldViewer, initial_block: WorldPosition) -> Self::Initialized;
 
     fn name() -> &'static str;
 }
 
 pub mod state {
     use crate::{InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
-    use resources::resource::Resources;
+    use resources::Resources;
+    use unit::world::WorldPosition;
 
     #[allow(clippy::manual_non_exhaustive)]
     enum State<B: PersistentSimulationBackend> {
@@ -67,11 +69,15 @@ pub mod state {
             Ok(Self(State::Uninit(backend)))
         }
 
-        pub fn start(&mut self, world: WorldViewer) -> &mut B::Initialized {
+        pub fn start(
+            &mut self,
+            world: WorldViewer,
+            initial_block: WorldPosition,
+        ) -> &mut B::Initialized {
             let state = std::mem::replace(&mut self.0, State::_Ephemeral);
 
             self.0 = match state {
-                State::Uninit(b) => State::Init(b.start(world)),
+                State::Uninit(b) => State::Init(b.start(world, initial_block)),
                 _ => panic!("must be uninitialized to use start()"),
             };
 
