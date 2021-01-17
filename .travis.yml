@@ -8,11 +8,10 @@ cache:
 before_cache:
     - rm -rf /home/travis/.cargo/registry
 
+# disabled!
 branches:
-    only:
-        - /.*/
     except:
-        - feature/planet-generation
+        - /.*/
 
 install:
     - if [[ "$TRAVIS_BRANCH" = "develop" && -f .planning/active.md ]]; then echo "develop should not have an active.md"; exit 1; fi
