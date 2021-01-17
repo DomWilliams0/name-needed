@@ -60,32 +60,36 @@ impl AsyncWorkerPool {
         chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     ) {
         let mut success_tx = self.success_tx.clone();
-        // TODO prioritize finalizer task - separate OS thread or runtime?
-        self.pool.spawn(async move {
-            let mut finalizer = SlabFinalizer::new(world, chunk_updates_tx);
+        std::thread::Builder::new()
+            .name("wlrd-finalize".to_owned())
+            .spawn(|| {
+                futures::executor::block_on(async move {
+                    let mut finalizer = SlabFinalizer::new(world, chunk_updates_tx);
 
-            while let Some(result) = finalize_rx.next().await {
-                let result = match result {
-                    Err(e) => {
-                        error!("failed to load requested slab"; "error" => %e);
-                        Err(e)
+                    while let Some(result) = finalize_rx.next().await {
+                        let result = match result {
+                            Err(e) => {
+                                error!("failed to load requested slab"; "error" => %e);
+                                Err(e)
+                            }
+                            Ok(result) => {
+                                let slab = result.slab;
+                                finalizer.finalize(result).await;
+                                Ok(slab)
+                            }
+                        };
+
+                        if let Err(e) = success_tx.send(result).await {
+                            error!("failed to report finalized terrain result"; "error" => %e);
+                            // trace!("lost result"; "result" => ?e.0);
+                        }
                     }
-                    Ok(result) => {
-                        let slab = result.slab;
-                        finalizer.finalize(result).await;
-                        Ok(slab)
-                    }
-                };
 
-                if let Err(e) = success_tx.send(result).await {
-                    error!("failed to report finalized terrain result"; "error" => %e);
-                    // trace!("lost result"; "result" => ?e.0);
-                }
-            }
-
-            // TODO detect this as an error condition?
-            info!("terrain finalizer thread exiting")
-        });
+                    // TODO detect this as an error condition?
+                    info!("terrain finalizer thread exiting")
+                });
+            })
+            .expect("failed to start finalizer thread");
     }
 
     pub fn block_on_next_finalize(

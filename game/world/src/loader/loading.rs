@@ -277,6 +277,7 @@ impl<C: WorldContext> WorldLoader<C> {
         // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
         // navigation or rendering), world queries in the next game tick will be current with the
         // changes applied now.
+        // TODO reuse buf
         let mut slab_locs = Vec::with_capacity(upper_slab_limit);
         let mut world = world_ref.borrow_mut();
         world.apply_terrain_updates_in_place(

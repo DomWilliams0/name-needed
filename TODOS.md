@@ -274,16 +274,16 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (3)
+ * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (4)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
+   * `// TODO reuse buf`
  * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
    * `// TODO load a serialized planet from disk to avoid constantly regenerating`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
- * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (2)
-   * `// TODO prioritize finalizer task - separate OS thread or runtime?`
+ * [game/world/src/loader/worker_pool.rs](game/world/src/loader/worker_pool.rs) (1)
    * `// TODO detect this as an error condition?`
  * [game/world/src/mesh.rs](game/world/src/mesh.rs) (5)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
