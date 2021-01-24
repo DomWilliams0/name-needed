@@ -51,110 +51,130 @@ impl Render {
         use geo::coords_iter::CoordsIter;
         use geo::Point;
 
-        debug!("drawing continents");
-
         let planet = self.planet.inner().await;
         let planet_size = planet.params.planet_size;
-        let params = &planet.params.render;
-        let zoom = params.zoom as f64;
 
-        let mut image = {
-            let sz = planet_size * params.zoom;
-            ImageBuffer::new(sz, sz)
-        };
+        let params = planet.params.render.clone();
+        let scale = params.scale;
+        let zoom = params.zoom as f64;
+        let image_size = planet_size * params.zoom;
 
         let sea = ColorRgb::new(44, 114, 161);
         let land = ColorRgb::new(185, 130, 82);
 
-        if params.draw_biomes {
-            // sample biome at every pixel
+        let planet_ref = self.planet.clone();
+        let fut_image = tokio::spawn(async move {
+            debug!("drawing continents");
+            let planet = planet_ref.inner().await;
+
+            let mut image = { ImageBuffer::new(image_size, image_size) };
+
             let biomes = planet.continents.biome_sampler();
-            image.enumerate_pixels_mut().for_each(|(x, y, p)| {
-                let point = (x as f64 / zoom, y as f64 / zoom);
-                let biome = biomes.sample_biome(point, &planet.continents);
+            if params.draw_biomes {
+                // sample biome at every pixel
+                image.enumerate_pixels_mut().for_each(|(x, y, p)| {
+                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let biome = biomes.sample_biome(point, &planet.continents);
 
-                let colour: u32 = match biome {
-                    Biome::Ocean => 0x228ff5,
-                    Biome::CoastOcean => 0x5dabf5,
-                    Biome::Beach => 0xf0d051,
-                    Biome::Plains => 0x84e065,
-                    Biome::Forest => 0x36bf2c,
-                    Biome::Desert => 0xffe83d,
-                    Biome::Tundra => 0xedfeff,
-                };
+                    let colour: u32 = match biome {
+                        Biome::Ocean => 0x228ff5,
+                        Biome::CoastOcean => 0x5dabf5,
+                        Biome::Beach => 0xf0d051,
+                        Biome::Plains => 0x84e065,
+                        Biome::Forest => 0x36bf2c,
+                        Biome::Desert => 0xffe83d,
+                        Biome::Tundra => 0xedfeff,
+                    };
 
-                // set alpha
-                let c = (colour << 8) | 0xff;
-                *p = Rgba(c.to_be_bytes());
-            });
-        } else {
-            // solid colours
+                    // set alpha
+                    let c = (colour << 8) | 0xff;
+                    *p = Rgba(c.to_be_bytes());
+                });
+            } else {
+                // solid colours
 
-            // initialize with sea
-            image.pixels_mut().for_each(|p| *p = Rgba(sea.into()));
+                // initialize with sea
+                image.pixels_mut().for_each(|p| *p = Rgba(sea.into()));
 
-            // fill in polygons with land
-            image
-                .enumerate_pixels_mut()
-                .filter_map(|(x, y, p)| {
-                    let point = Point::from((x as f64 / zoom, y as f64 / zoom));
-                    planet
-                        .continents
-                        .continent_polygons()
-                        .any(|(_, poly)| poly.contains(&point))
-                        .as_some(p)
-                })
-                .for_each(|p| *p = Rgba(land.into()));
-        }
+                // fill in polygons with land
+                image
+                    .enumerate_pixels_mut()
+                    .filter_map(|(x, y, p)| {
+                        let point = Point::from((x as f64 / zoom, y as f64 / zoom));
+                        planet
+                            .continents
+                            .continent_polygons()
+                            .any(|(_, poly)| poly.contains(&point))
+                            .as_some(p)
+                    })
+                    .for_each(|p| *p = Rgba(land.into()));
+            }
 
-        if params.draw_continent_polygons {
-            let mut random_colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
+            if params.draw_continent_polygons {
+                let mut random_colors =
+                    ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
-            // draw polygon outlines
-            let zoom = zoom as f32;
-            for (_, polygon) in planet.continents.continent_polygons() {
-                let color = random_colors.next_please();
-                let coords = {
-                    let most = polygon.coords_iter().tuple_windows();
-                    let last = polygon.coords_iter().last().unwrap();
-                    let first = polygon.coords_iter().next().unwrap();
-                    most.chain(once((last, first)))
-                };
-                for (a, b) in coords {
-                    draw_line_segment_mut(
-                        &mut image,
-                        (a.x as f32 * zoom, a.y as f32 * zoom),
-                        (b.x as f32 * zoom, b.y as f32 * zoom),
-                        Rgba(color.into()),
-                    );
+                // draw polygon outlines
+                let zoom = zoom as f32;
+                for (_, polygon) in planet.continents.continent_polygons() {
+                    let color = random_colors.next_please();
+                    let coords = {
+                        let most = polygon.coords_iter().tuple_windows();
+                        let last = polygon.coords_iter().last().unwrap();
+                        let first = polygon.coords_iter().next().unwrap();
+                        most.chain(once((last, first)))
+                    };
+                    for (a, b) in coords {
+                        draw_line_segment_mut(
+                            &mut image,
+                            (a.x as f32 * zoom, a.y as f32 * zoom),
+                            (b.x as f32 * zoom, b.y as f32 * zoom),
+                            Rgba(color.into()),
+                        );
+                    }
                 }
             }
+
+            image
+        });
+
+        let planet_ref = self.planet.clone();
+        let fut_overlay = tokio::spawn(async move {
+            let planet = planet_ref.inner().await;
+            if let Some(overlay) = planet.params.render.draw_overlay {
+                let mut overlay_img = RgbaImage::new(image_size, image_size);
+                debug!("drawing continent overlay");
+
+                let biomes = planet.continents.biome_sampler();
+                let alpha = planet.params.render.overlay_alpha;
+                overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
+                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let (coastline_proximity, elevation, moisture, temperature) =
+                        biomes.sample(point, &planet.continents);
+
+                    let value = match overlay {
+                        RenderOverlay::Moisture => moisture,
+                        RenderOverlay::Temperature => temperature,
+                        RenderOverlay::Elevation => elevation,
+                    };
+
+                    let c = map_range((0.0, 1.0), (0.0, 255.0), value) as u8;
+                    *p = Rgba([c, c, c, alpha]);
+                });
+
+                Some(overlay_img)
+            } else {
+                None
+            }
+        });
+
+        let mut image = fut_image.await.expect("continent rendering failed");
+        let overlay = fut_overlay.await.expect("overlay rendering failed");
+
+        if let Some(overlay) = overlay {
+            image::imageops::overlay(&mut image, &overlay, 0, 0);
         }
 
-        if let Some(overlay) = params.draw_overlay {
-            let mut overlay_img = RgbaImage::new(image.width(), image.height());
-
-            let biomes = planet.continents.biome_sampler();
-            let alpha = params.overlay_alpha;
-            overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
-                let point = (x as f64 / zoom, y as f64 / zoom);
-                let (coastline_proximity, elevation, moisture, temperature) =
-                    biomes.sample(point, &planet.continents);
-
-                let value = match overlay {
-                    RenderOverlay::Moisture => moisture,
-                    RenderOverlay::Temperature => temperature,
-                    RenderOverlay::Elevation => elevation,
-                };
-
-                let c = map_range((0.0, 1.0), (0.0, 255.0), value) as u8;
-                *p = Rgba([c, c, c, alpha]);
-            });
-
-            image::imageops::overlay(&mut image, &overlay_img, 0, 0);
-        }
-
-        let scale = params.scale;
         drop(planet);
         self.store_scaled_image(image, scale);
     }
