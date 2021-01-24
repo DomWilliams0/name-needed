@@ -15,10 +15,12 @@ pub struct BiomeSampler {
 #[derive(Debug)]
 pub enum Biome {
     Ocean,
+    IcyOcean,
     CoastOcean,
     Beach,
     Plains,
     Forest,
+    RainForest,
     Desert,
     Tundra,
 }
@@ -76,16 +78,7 @@ impl BiomeSampler {
 
     pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> Biome {
         let (coastline_proximity, elevation, moisture, temperature) = self.sample(pos, continents);
-
-        if coastline_proximity < 0.0 {
-            if coastline_proximity > -0.3 {
-                Biome::CoastOcean
-            } else {
-                Biome::Ocean
-            }
-        } else {
-            Biome::map(coastline_proximity, elevation, temperature, moisture)
-        }
+        Biome::map(coastline_proximity, elevation, temperature, moisture)
     }
 
     // -------
@@ -99,7 +92,7 @@ impl BiomeSampler {
         }
 
         // moister closer to the sea
-        let mul = map_range((0.0, 1.0), (0.9, 1.3), 1.0 - coastline_proximity);
+        let mul = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - coastline_proximity);
 
         raw_moisture * mul
     }
@@ -117,7 +110,7 @@ impl BiomeSampler {
         //  - latitude: lower at poles, higher at equator
         //  - elevation: lower by sea, higher in-land
         //  - raw noise: 0-1
-        (raw_temp + elevation + latitude) / 3.0
+        (raw_temp * 0.2) + (elevation * 0.2) + (latitude * 0.6)
     }
 
     fn elevation(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
@@ -125,7 +118,13 @@ impl BiomeSampler {
         let raw_height = self.height.sample_wrapped_normalized(pos);
 
         // coastline tends toward 0 i.e. sea level
-        raw_height * coastline_proximity
+        if coastline_proximity >= 0.0 {
+            raw_height * coastline_proximity
+        } else {
+            // underwater
+            // TODO treat negative elevation as normal heightmap underwater
+            0.0
+        }
     }
 }
 
@@ -134,13 +133,23 @@ impl Biome {
         use Biome::*;
         // TODO 3d nearest neighbour into biome space instead of this noddy lookup
 
-        if coast_proximity < 0.2 {
+        if coast_proximity < 0.0 {
+            return if temperature < 0.2 {
+                IcyOcean
+            } else if coast_proximity > -0.3 {
+                CoastOcean
+            } else {
+                Ocean
+            };
+        }
+
+        if coast_proximity < 0.2 && temperature > 0.3 {
             return Beach;
         }
 
         if temperature < 0.3 {
             Tundra
-        } else if temperature < 0.8 {
+        } else if temperature < 0.75 {
             if moisture < 0.45 {
                 Plains
             } else {
@@ -148,10 +157,10 @@ impl Biome {
             }
         } else {
             // hot
-            if moisture < 0.5 {
+            if moisture < 0.7 {
                 Desert
             } else {
-                Forest
+                RainForest
             }
         }
     }
@@ -166,31 +175,30 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
         };
 
         let limits = {
-            // let (mut min, mut max) = (100.0, -100.0);
-            // let mut r = thread_rng();
-            // let iterations = 10_000;
-            // let buffer = 0.25;
-            //
-            // trace!("finding generator limits"; "iterations" => iterations, "generator" => what);
-            //
-            // for _ in 0..iterations {
-            //     let f = this.sample_wrapped((
-            //         r.gen_range(-this.planet_size, this.planet_size),
-            //         r.gen_range(-this.planet_size, this.planet_size),
-            //     ));
-            //     min = f.min(min);
-            //     max = f.max(max);
-            // }
-            //
-            // debug!(
-            //     "'{generator}' generator limits are {min:?} -> {max:?}",
-            //     min = min - buffer,
-            //     max = max + buffer,
-            //     generator = what,
-            // );
-            //
-            // (min, max)
-            (-1.0, 1.0)
+            let (mut min, mut max) = (1.0, 0.0);
+            let mut r = thread_rng();
+            let iterations = 10_000;
+            let buffer = 0.25;
+
+            trace!("finding generator limits"; "iterations" => iterations, "generator" => what);
+
+            for _ in 0..iterations {
+                let f = this.sample_wrapped((
+                    r.gen_range(-this.planet_size, this.planet_size),
+                    r.gen_range(-this.planet_size, this.planet_size),
+                ));
+                min = f.min(min);
+                max = f.max(max);
+            }
+
+            debug!(
+                "'{generator}' generator limits are {min:?} -> {max:?}",
+                min = min - buffer,
+                max = max + buffer,
+                generator = what,
+            );
+
+            (min, max)
         };
 
         this.limits = limits;

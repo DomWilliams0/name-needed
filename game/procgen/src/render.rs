@@ -78,10 +78,12 @@ impl Render {
 
                     let colour: u32 = match biome {
                         Biome::Ocean => 0x228ff5,
+                        Biome::IcyOcean => 0x85e0fe,
                         Biome::CoastOcean => 0x5dabf5,
                         Biome::Beach => 0xf0d051,
                         Biome::Plains => 0x84e065,
                         Biome::Forest => 0x36bf2c,
+                        Biome::RainForest => 0x278f1c,
                         Biome::Desert => 0xffe83d,
                         Biome::Tundra => 0xedfeff,
                     };

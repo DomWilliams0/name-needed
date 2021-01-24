@@ -157,7 +157,13 @@ impl ContinentMap {
 
             for polygon in polygons {
                 let mut multi = continent_polygon.union(&polygon);
-                debug_assert_eq!(multi.0.len(), 1);
+                if multi.0.len() > 1 {
+                    warn!(
+                        "polygon union produced {count} polygons instead of 1. skipping extra",
+                        count = multi.0.len()
+                    );
+                }
+
                 continent_polygon = multi.0.remove(0);
             }
 

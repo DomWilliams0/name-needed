@@ -3,14 +3,13 @@
 #--draw-height
 #--draw-continent-polygons
 --draw-biomes
---draw-overlay elevation
---overlay-alpha 100
+#--draw-overlay moisture
+--overlay-alpha 170
 
 
-#--seed 1231232
---seed 6602665379705208987
---max-continents 6
---continent-start-radius 12
+--seed 1231232
+--max-continents 8
+--continent-start-radius 10
 
 --region-start-slab 10
 --region-max-depth 20
@@ -19,9 +18,9 @@
 --coastline-thickness 4.0
 
 # noise syntax: octaves,freq,persistence,lacunarity
---height-noise 8,6
---moisture-noise 20,50,0.9,0.8
---temp-noise 10,30,1.2,0.9
+--height-noise 18,13,0.7,1.5
+--moisture-noise 12,6,0.4,2.4
+--temp-noise 11,11,0.1,1.0
 
 
 --gif-layer surface
@@ -33,7 +32,7 @@
 --climate-iterations 200
 --gif-fps 16
 --scale 1
---zoom 6
+--zoom 4
 
 --wind-transfer-rate 0.05
 --wind-pressure-threshold 0.2
