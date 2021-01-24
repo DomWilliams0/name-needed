@@ -50,8 +50,10 @@ impl Render {
         let planet_size = planet.params.planet_size;
         let params = &planet.params.render;
 
-        // create 1:1 image
-        let mut image = ImageBuffer::new(planet_size, planet_size);
+        let mut image = {
+            let sz = (planet_size as f64 * params.zoom) as u32;
+            ImageBuffer::new(sz, sz)
+        };
 
         if params.draw_continent_polygons {
             let mut random_colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
@@ -75,18 +77,18 @@ impl Render {
             image
                 .enumerate_pixels_mut()
                 .filter_map(|(x, y, p)| {
-                    let point = Point::from((x as f64, y as f64));
+                    let point = Point::from((x as f64 / params.zoom, y as f64 / params.zoom));
                     planet
                         .continents
-                        .continent_polygons
-                        .iter()
+                        .continent_polygons()
                         .any(|(_, poly)| poly.contains(&point))
                         .as_some(p)
                 })
                 .for_each(|p| *p = Rgba(land_nondebug.into()));
 
             // draw polygon outlines
-            for (_, polygon) in planet.continents.continent_polygons.iter() {
+            let zoom = params.zoom as f32;
+            for (_, polygon) in planet.continents.continent_polygons() {
                 let color = random_colors.next_please();
                 let coords = {
                     let most = polygon.coords_iter().tuple_windows();
@@ -97,13 +99,14 @@ impl Render {
                 for (a, b) in coords {
                     draw_line_segment_mut(
                         &mut image,
-                        (a.x as f32, a.y as f32),
-                        (b.x as f32, b.y as f32),
+                        (a.x as f32 * zoom, a.y as f32 * zoom),
+                        (b.x as f32 * zoom, b.y as f32 * zoom),
                         Rgba(color.into()),
                     );
                 }
             }
         } else {
+            todo!();
             for (coord, tile) in planet.continents.grid.iter_coords() {
                 let float = if params.draw_height {
                     tile.height() as f32

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 pub struct ContinentMap {
     params: PlanetParams,
 
-    pub continent_polygons: Vec<(ContinentIdx, Polygon<f64>)>,
+    continent_polygons: Vec<(ContinentIdx, Polygon<f64>)>,
 
     pub grid: DynamicGrid<RegionTile>,
 
@@ -168,6 +168,10 @@ impl ContinentMap {
         }
 
         continent_polygons
+    }
+
+    pub fn continent_polygons(&self) -> impl Iterator<Item = &(ContinentIdx, Polygon<f64>)> {
+        self.continent_polygons.iter()
     }
 
     pub fn discover(&mut self) {

@@ -138,9 +138,13 @@ pub struct RenderParams {
     #[structopt(long, default_value = "4")]
     pub gif_fps: u32,
 
-    /// Per axis
+    /// Image scale per axis
     #[structopt(long, default_value = "2")]
     pub scale: u32,
+
+    /// Per axis
+    #[structopt(long, default_value = "1.0")]
+    pub zoom: f64,
 
     #[structopt(long, default_value = "5")]
     pub region_start_slab: i32,

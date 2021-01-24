@@ -7,11 +7,11 @@
 --seed 1231232
 
 --region-start-slab 10
---region-max-depth 10
+--region-max-depth 20
 --threads 4
 --height-freq 6
 --height-octaves 8
---continent-polygon-epsilon 0.2
+--continent-polygon-epsilon 0.05
 
 --gif-layer surface
 --gif-progress wind
@@ -21,7 +21,8 @@
 
 --climate-iterations 200
 --gif-fps 16
---scale 4
+--scale 1
+--zoom 8
 
 --wind-transfer-rate 0.05
 --wind-pressure-threshold 0.2
