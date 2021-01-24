@@ -1,4 +1,4 @@
-# TODOs (268)
+# TODOs (270)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -24,16 +24,18 @@
    * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
    * `// TODO cold high air falls?`
    * `// TODO height doesnt change, calculate this once in a separate grid`
- * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (3)
+ * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (6)
    * `// TODO agree api and stop making everything public`
    * `// TODO validate values with result type`
+   * `// TODO reject if continent or land blob count is too low`
+   * `let mut vertices = [(0.0, 0.0); CIRCLE_VERTICES]; // TODO could be uninitialized`
+   * `// TODO reimplement or add back density if needed`
    * `// TODO adjust params for global height map`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (7)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (6)
    * `// TODO actual error type`
-   * `// TODO reject if continent or land blob count is too low`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
    * `// TODO rasterize features onto slab`

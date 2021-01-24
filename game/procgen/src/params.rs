@@ -37,6 +37,9 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "20")]
     pub continent_min_distance: i32,
 
+    #[structopt(long, default_value = "0.2")]
+    pub continent_polygon_epsilon: f64,
+
     #[structopt(long, default_value = "5")]
     pub climate_iterations: usize,
 
@@ -109,10 +112,7 @@ pub struct RenderParams {
     pub draw_debug_colors: bool,
 
     #[structopt(long)]
-    pub draw_continent_blobs: bool,
-
-    #[structopt(long)]
-    pub draw_continent_blobs_outline: bool,
+    pub draw_continent_polygons: bool,
 
     #[structopt(long)]
     pub draw_density: bool,

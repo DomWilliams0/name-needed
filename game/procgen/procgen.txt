@@ -1,6 +1,8 @@
 # nice, comments
 #--draw-density
---draw-height
+#--draw-height
+--draw-continent-polygons
+#--draw-debug-colors
 
 --seed 1231232
 
@@ -9,6 +11,7 @@
 --threads 4
 --height-freq 6
 --height-octaves 8
+--continent-polygon-epsilon 0.2
 
 --gif-layer surface
 --gif-progress wind

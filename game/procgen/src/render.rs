@@ -53,8 +53,7 @@ impl Render {
         // create 1:1 image
         let mut image = ImageBuffer::new(planet_size, planet_size);
 
-        if params.draw_continent_blobs {
-            // special drawing of continents with land blobs
+        if params.draw_continent_polygons {
             let mut random_colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
             let sea = if params.draw_debug_colors {
@@ -63,37 +62,45 @@ impl Render {
                 ColorRgb::new(44, 114, 161)
             };
 
+            let land_nondebug = ColorRgb::new(185, 130, 82);
+
+            // initialize with sea
             image.pixels_mut().for_each(|p| *p = Rgba(sea.into()));
 
-            for (_continent, blobs) in planet
-                .continents
-                .iter()
-                .group_by(|(continent, _)| *continent)
-                .into_iter()
-            {
-                let land = if params.draw_debug_colors {
-                    // separate colour per continent
-                    random_colors.next_please()
-                } else {
-                    ColorRgb::new(185, 130, 82)
+            use geo::contains::Contains;
+            use geo::coords_iter::CoordsIter;
+            use geo::Point;
+
+            // fill in polygons first
+            image
+                .enumerate_pixels_mut()
+                .filter_map(|(x, y, p)| {
+                    let point = Point::from((x as f64, y as f64));
+                    planet
+                        .continents
+                        .continent_polygons
+                        .iter()
+                        .any(|(_, poly)| poly.contains(&point))
+                        .as_some(p)
+                })
+                .for_each(|p| *p = Rgba(land_nondebug.into()));
+
+            // draw polygon outlines
+            for (_, polygon) in planet.continents.continent_polygons.iter() {
+                let color = random_colors.next_please();
+                let coords = {
+                    let most = polygon.coords_iter().tuple_windows();
+                    let last = polygon.coords_iter().last().unwrap();
+                    let first = polygon.coords_iter().next().unwrap();
+                    most.chain(once((last, first)))
                 };
-
-                for (_, blob) in blobs {
-                    draw_filled_circle_mut(
+                for (a, b) in coords {
+                    draw_line_segment_mut(
                         &mut image,
-                        (blob.pos.0 as i32, blob.pos.1 as i32),
-                        blob.radius as i32,
-                        Rgba(land.into()),
+                        (a.x as f32, a.y as f32),
+                        (b.x as f32, b.y as f32),
+                        Rgba(color.into()),
                     );
-
-                    if params.draw_continent_blobs_outline {
-                        draw_hollow_circle_mut(
-                            &mut image,
-                            (blob.pos.0 as i32, blob.pos.1 as i32),
-                            blob.radius as i32,
-                            Rgba([10, 10, 10, 255]),
-                        );
-                    }
                 }
             }
         } else {

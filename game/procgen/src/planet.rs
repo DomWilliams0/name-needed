@@ -88,18 +88,7 @@ impl Planet {
         info!("generating planet");
         let params = planet.params.clone();
 
-        // place continents
-        let (continents, total_blobs) = planet.continents.generate(&mut planet_rando);
-        // TODO reject if continent or land blob count is too low
-        info!(
-            "placed {count} continents with {blobs} land blobs",
-            count = continents,
-            blobs = total_blobs
-        );
-
-        // rasterize continents onto grid and discover depth i.e. distance from land/sea border,
-        // and place initial heightmap
-        planet.continents.discover();
+        planet.continents.generate(&mut planet_rando);
         drop(planet);
 
         #[cfg(feature = "climate")]
