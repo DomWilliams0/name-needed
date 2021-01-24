@@ -1,17 +1,28 @@
 # nice, comments
 #--draw-density
 #--draw-height
---draw-continent-polygons
-#--draw-debug-colors
+#--draw-continent-polygons
+--draw-biomes
+--draw-overlay elevation
+--overlay-alpha 100
 
---seed 1231232
+
+#--seed 1231232
+--seed 6602665379705208987
+--max-continents 6
+--continent-start-radius 12
 
 --region-start-slab 10
 --region-max-depth 20
 --threads 4
---height-freq 6
---height-octaves 8
 --continent-polygon-epsilon 0.05
+--coastline-thickness 4.0
+
+# noise syntax: octaves,freq,persistence,lacunarity
+--height-noise 8,6
+--moisture-noise 20,50,0.9,0.8
+--temp-noise 10,30,1.2,0.9
+
 
 --gif-layer surface
 --gif-progress wind
@@ -22,7 +33,7 @@
 --climate-iterations 200
 --gif-fps 16
 --scale 1
---zoom 8
+--zoom 6
 
 --wind-transfer-rate 0.05
 --wind-pressure-threshold 0.2

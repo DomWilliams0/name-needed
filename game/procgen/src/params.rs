@@ -7,8 +7,11 @@ use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
 use crate::RegionLocation;
+use common::alloc::str::FromStr;
+use noise::MultiFractal;
 #[cfg(feature = "cache")]
 use serde::Serialize;
+use std::num::ParseIntError;
 
 #[derive(Debug, Clone, StructOpt)]
 #[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
@@ -72,15 +75,43 @@ pub struct PlanetParams {
     pub log_params_and_exit: bool,
 
     #[structopt(long, default_value = "100")]
+    #[deprecated]
     pub height_scale: u32,
 
-    #[structopt(long, default_value = "10")]
-    pub height_octaves: usize,
+    #[structopt(long, default_value = "NoiseParams::default()")]
+    pub height_noise: NoiseParams,
 
-    #[structopt(long, default_value = "10.0")]
-    pub height_freq: f64,
+    #[structopt(long, default_value = "NoiseParams::default()")]
+    pub moisture_noise: NoiseParams,
+
+    #[structopt(long, default_value = "NoiseParams::default()")]
+    pub temp_noise: NoiseParams,
+
+    #[structopt(long, default_value = "2.0")]
+    pub coastline_thickness: f64,
 
     pub no_cache: bool,
+}
+
+#[derive(Debug, Clone, Default, StructOpt)]
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
+pub struct NoiseParams {
+    pub octaves: Option<usize>,
+    pub freq: Option<f64>,
+    pub persistence: Option<f64>,
+    pub lacunarity: Option<f64>,
+}
+
+#[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]
+#[cfg_attr(feature = "cache", derive(Serialize))]
+#[strum(serialize_all = "kebab-case")]
+pub enum RenderOverlay {
+    Moisture,
+
+    #[strum(serialize = "temp")]
+    Temperature,
+
+    Elevation,
 }
 
 #[derive(Debug, Copy, Clone, EnumString, Deserialize, EnumIter, PartialEq, Eq)]
@@ -109,7 +140,13 @@ pub enum AirLayer {
 #[structopt(rename_all = "kebab-case")]
 pub struct RenderParams {
     #[structopt(long)]
-    pub draw_debug_colors: bool,
+    pub draw_biomes: bool,
+
+    #[structopt(long)]
+    pub draw_overlay: Option<RenderOverlay>,
+
+    #[structopt(long, default_value = "150")]
+    pub overlay_alpha: u8,
 
     #[structopt(long)]
     pub draw_continent_polygons: bool,
@@ -143,8 +180,8 @@ pub struct RenderParams {
     pub scale: u32,
 
     /// Per axis
-    #[structopt(long, default_value = "1.0")]
-    pub zoom: f64,
+    #[structopt(long, default_value = "1")]
+    pub zoom: u32,
 
     #[structopt(long, default_value = "5")]
     pub region_start_slab: i32,
@@ -223,5 +260,58 @@ impl PlanetParams {
 
     pub fn is_region_in_range(&self, region: RegionLocation) -> bool {
         region.0 < self.planet_size && region.1 < self.planet_size
+    }
+}
+
+impl std::str::FromStr for NoiseParams {
+    type Err = Box<dyn Error>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut this = NoiseParams::default();
+
+        fn parse_val<T: FromStr>(str: &str) -> Result<Option<T>, T::Err> {
+            if str.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(str.parse()?))
+            }
+        }
+
+        // default check lmao
+        if s != "NoiseParams::default()" {
+            for (idx, int) in s.split(',').enumerate() {
+                match idx {
+                    0 => this.octaves = parse_val(int)?,
+                    1 => this.freq = parse_val(int)?,
+                    2 => this.persistence = parse_val(int)?,
+                    3 => this.lacunarity = parse_val(int)?,
+                    _ => return Err("too many fields".into()),
+                }
+            }
+        }
+
+        Ok(this)
+    }
+}
+
+impl NoiseParams {
+    pub fn configure<F: MultiFractal>(&self, mut noise: F) -> F {
+        if let Some(val) = self.freq {
+            noise = noise.set_frequency(val);
+        }
+
+        if let Some(val) = self.octaves {
+            noise = noise.set_octaves(val);
+        }
+
+        if let Some(val) = self.persistence {
+            noise = noise.set_persistence(val);
+        }
+
+        if let Some(val) = self.lacunarity {
+            noise = noise.set_lacunarity(val);
+        }
+
+        noise
     }
 }

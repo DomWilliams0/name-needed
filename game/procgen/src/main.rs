@@ -39,7 +39,7 @@ fn main() {
             0
         }
         Ok(params) => {
-            debug!("config: {:#?}", params);
+            info!("config: {:#?}", params);
             common::panic::init_panic_detection();
 
             let dew_it = || {

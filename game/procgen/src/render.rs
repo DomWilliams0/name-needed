@@ -12,7 +12,8 @@ use common::*;
 use grid::{DynamicGrid, GridImpl};
 use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
 
-use crate::params::{AirLayer, RenderProgressParams};
+use crate::biome::Biome;
+use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
 use crate::region::CHUNKS_PER_REGION_SIDE;
 use crate::{map_range, Planet, RegionLocation, SlabGrid};
 use common::num_traits::clamp;
@@ -46,48 +47,71 @@ impl Render {
     }
 
     pub async fn draw_continents(&mut self) {
+        use geo::contains::Contains;
+        use geo::coords_iter::CoordsIter;
+        use geo::Point;
+
+        debug!("drawing continents");
+
         let planet = self.planet.inner().await;
         let planet_size = planet.params.planet_size;
         let params = &planet.params.render;
+        let zoom = params.zoom as f64;
 
         let mut image = {
-            let sz = (planet_size as f64 * params.zoom) as u32;
+            let sz = planet_size * params.zoom;
             ImageBuffer::new(sz, sz)
         };
 
-        if params.draw_continent_polygons {
-            let mut random_colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
+        let sea = ColorRgb::new(44, 114, 161);
+        let land = ColorRgb::new(185, 130, 82);
 
-            let sea = if params.draw_debug_colors {
-                ColorRgb::new(240, 240, 240)
-            } else {
-                ColorRgb::new(44, 114, 161)
-            };
+        if params.draw_biomes {
+            // sample biome at every pixel
+            let biomes = planet.continents.biome_sampler();
+            image.enumerate_pixels_mut().for_each(|(x, y, p)| {
+                let point = (x as f64 / zoom, y as f64 / zoom);
+                let biome = biomes.sample_biome(point, &planet.continents);
 
-            let land_nondebug = ColorRgb::new(185, 130, 82);
+                let colour: u32 = match biome {
+                    Biome::Ocean => 0x228ff5,
+                    Biome::CoastOcean => 0x5dabf5,
+                    Biome::Beach => 0xf0d051,
+                    Biome::Plains => 0x84e065,
+                    Biome::Forest => 0x36bf2c,
+                    Biome::Desert => 0xffe83d,
+                    Biome::Tundra => 0xedfeff,
+                };
+
+                // set alpha
+                let c = (colour << 8) | 0xff;
+                *p = Rgba(c.to_be_bytes());
+            });
+        } else {
+            // solid colours
 
             // initialize with sea
             image.pixels_mut().for_each(|p| *p = Rgba(sea.into()));
 
-            use geo::contains::Contains;
-            use geo::coords_iter::CoordsIter;
-            use geo::Point;
-
-            // fill in polygons first
+            // fill in polygons with land
             image
                 .enumerate_pixels_mut()
                 .filter_map(|(x, y, p)| {
-                    let point = Point::from((x as f64 / params.zoom, y as f64 / params.zoom));
+                    let point = Point::from((x as f64 / zoom, y as f64 / zoom));
                     planet
                         .continents
                         .continent_polygons()
                         .any(|(_, poly)| poly.contains(&point))
                         .as_some(p)
                 })
-                .for_each(|p| *p = Rgba(land_nondebug.into()));
+                .for_each(|p| *p = Rgba(land.into()));
+        }
+
+        if params.draw_continent_polygons {
+            let mut random_colors = ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
 
             // draw polygon outlines
-            let zoom = params.zoom as f32;
+            let zoom = zoom as f32;
             for (_, polygon) in planet.continents.continent_polygons() {
                 let color = random_colors.next_please();
                 let coords = {
@@ -105,24 +129,29 @@ impl Render {
                     );
                 }
             }
-        } else {
-            todo!();
-            for (coord, tile) in planet.continents.grid.iter_coords() {
-                let float = if params.draw_height {
-                    tile.height() as f32
-                } else if params.draw_density {
-                    unsafe { tile.density() as f32 }
-                } else {
-                    0.8
-                };
-                let c = if tile.is_land() {
-                    ColorRgb::new_hsl(1.0, 0.8, float)
-                } else {
-                    ColorRgb::new_hsl(0.5, 0.4, float)
+        }
+
+        if let Some(overlay) = params.draw_overlay {
+            let mut overlay_img = RgbaImage::new(image.width(), image.height());
+
+            let biomes = planet.continents.biome_sampler();
+            let alpha = params.overlay_alpha;
+            overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
+                let point = (x as f64 / zoom, y as f64 / zoom);
+                let (coastline_proximity, elevation, moisture, temperature) =
+                    biomes.sample(point, &planet.continents);
+
+                let value = match overlay {
+                    RenderOverlay::Moisture => moisture,
+                    RenderOverlay::Temperature => temperature,
+                    RenderOverlay::Elevation => elevation,
                 };
 
-                put_pixel(&mut image, coord, c);
-            }
+                let c = map_range((0.0, 1.0), (0.0, 255.0), value) as u8;
+                *p = Rgba([c, c, c, alpha]);
+            });
+
+            image::imageops::overlay(&mut image, &overlay_img, 0, 0);
         }
 
         let scale = params.scale;
@@ -223,16 +252,19 @@ impl Render {
     }
 
     pub async fn draw_region(&mut self, region_loc: RegionLocation) -> Result<(), SlabLocation> {
+        debug!("drawing region"; "region" => region_loc);
+
         // params
         let inner = self.planet.inner().await;
         let start_slab = inner.params.render.region_start_slab;
         let max_depth = inner.params.render.region_max_depth;
         let scale = inner.params.render.scale;
+        let zoom = inner.params.render.zoom;
         drop(inner);
 
         // create 1:1 image for region
         let mut image = {
-            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32();
+            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32() * zoom;
             ImageBuffer::new(region_size, region_size)
         };
 

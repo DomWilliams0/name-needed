@@ -1,3 +1,4 @@
+mod biome;
 mod continent;
 mod params;
 mod planet;

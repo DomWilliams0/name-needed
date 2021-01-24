@@ -59,6 +59,7 @@ impl<T: Saturating + Copy> SubAssign<T> for Proportion<T> {
     }
 }
 
+// TODO support f64 too
 #[derive(Copy, Clone, Default, PartialOrd, PartialEq, Debug, Deref)]
 pub struct NormalizedFloat(f32);
 

@@ -9,7 +9,8 @@ use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use geo::{LineString, Polygon};
+use crate::biome::BiomeSampler;
+use geo::{LineString, Point, Polygon};
 #[cfg(feature = "cache")]
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +26,12 @@ pub struct ContinentMap {
 
     /// None until init_generator()
     #[cfg_attr(feature = "cache", serde(skip))]
+    #[deprecated]
     generator: Option<Arc<Generator>>,
+
+    /// None until init_generator()
+    #[cfg_attr(feature = "cache", serde(skip))]
+    biomes: Option<BiomeSampler>,
 }
 
 type ContinentIdx = NonZeroUsize;
@@ -64,10 +70,12 @@ impl ContinentMap {
             ]),
 
             generator: None,
+            biomes: None,
         }
     }
 
     pub fn init_generator(&mut self, rando: &mut dyn RngCore) {
+        self.biomes = Some(BiomeSampler::new(rando, &self.params));
         self.generator = Some(Arc::new(Generator::new(rando, &self.params)))
     }
 
@@ -172,6 +180,65 @@ impl ContinentMap {
 
     pub fn continent_polygons(&self) -> impl Iterator<Item = &(ContinentIdx, Polygon<f64>)> {
         self.continent_polygons.iter()
+    }
+
+    /// -1.0: sea far away from coastline
+    /// -0.2: sea close to coastline
+    ///  0.0: coastline
+    /// +0.2: land close to coastline
+    /// +1.0: land far away from coastline
+    ///
+    pub fn coastline_proximity(&self, pos: (f64, f64)) -> f64 {
+        use geo::contains::Contains;
+        use geo::euclidean_distance::EuclideanDistance;
+
+        let point = Point::from(pos);
+
+        let (inland, polygons_to_check) = match self
+            .continent_polygons()
+            .enumerate()
+            .find(|(i, (_, polygon))| polygon.contains(&point))
+        {
+            Some((idx, _)) => {
+                // contained by a polygon, only check its lines
+                // TODO intersecting polygons!!
+                (true, idx..idx + 1)
+            }
+            None => {
+                // in the ocean, check all
+                (false, 0..self.continent_polygons.len())
+            }
+        };
+
+        let closest = (&self.continent_polygons[polygons_to_check])
+            .iter()
+            .enumerate()
+            .flat_map(|(i, (_, polygon))| polygon.exterior().lines().map(move |line| (i, line)))
+            .fold(
+                (usize::MAX, f64::MAX),
+                |(min_idx, min), (poly_idx, line)| {
+                    let distance = point.euclidean_distance(&line);
+                    if distance < min {
+                        (poly_idx, distance)
+                    } else {
+                        (min_idx, min)
+                    }
+                },
+            );
+
+        debug_assert_ne!(closest, (usize::MAX, f64::MAX));
+        let (idx, distance) = closest;
+
+        let mul = if inland { 1.0 } else { -1.0 };
+        let coast_thickness = self.params.coastline_thickness;
+        let scaled = if distance >= coast_thickness {
+            // far away
+            1.0
+        } else {
+            distance / coast_thickness
+        };
+
+        scaled * mul
     }
 
     pub fn discover(&mut self) {
@@ -285,6 +352,12 @@ impl ContinentMap {
         self.generator.as_ref().expect("generator not initialized")
     }
 
+    pub fn biome_sampler(&self) -> &BiomeSampler {
+        self.biomes
+            .as_ref()
+            .expect("biome sampler not initialized with init_generator()")
+    }
+
     pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
         let RegionLocation(x, y) = region;
         &self.grid[[x as usize, y as usize, 0]]
@@ -295,10 +368,9 @@ impl Generator {
     pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
         // TODO adjust params for global height map
         let seed = rando.gen::<u64>();
-        let noise = Fbm::new()
-            .set_seed(seed as u32)
-            .set_octaves(params.height_octaves)
-            .set_frequency(params.height_freq);
+        let noise = params
+            .height_noise
+            .configure(Fbm::new().set_seed(seed as u32));
         let scale = params.planet_size as f64;
 
         let mut this = Generator {
@@ -337,7 +409,7 @@ impl Generator {
         map_range(self.limits, (0.0, 1.0), value)
     }
 
-    /// Produces seamlessly wrapping noise in the range self.limits
+    /// Produces seamlessly wrapping noise
     fn sample(&self, (x, y): (f64, f64)) -> f64 {
         // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
 
