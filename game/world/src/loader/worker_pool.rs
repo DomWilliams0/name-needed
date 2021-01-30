@@ -32,14 +32,11 @@ impl AsyncWorkerPool {
     /// Runs tasks on a thread pool
     pub fn new(threads: usize) -> Result<Self, futures::io::Error> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
-        builder
-            .worker_threads(threads)
-            .max_threads(threads)
-            .thread_name_fn(|| {
-                static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                format!("wrld-worker-{}", id)
-            });
+        builder.worker_threads(threads).thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("wrld-worker-{}", id)
+        });
         Self::with_rt_builder(builder)
     }
 

@@ -43,4 +43,4 @@ cache = ["bincode", "sha2", "geo/use-serde"]
 
 [dev-dependencies]
 # same as above but including macros feature
-tokio = { version = "0.3", default-features = false, features = ["macros"] }
+tokio = { version = "1.0", default-features = false, features = ["macros"] }
