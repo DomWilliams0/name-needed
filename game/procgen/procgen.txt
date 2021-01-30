@@ -18,9 +18,9 @@
 --coastline-thickness 4.0
 
 # noise syntax: octaves,freq,persistence,lacunarity
---height-noise 18,13,0.7,1.5
---moisture-noise 12,6,0.4,2.4
---temp-noise 11,11,0.1,1.0
+--height-noise 10,8,0.7,1.5
+--moisture-noise 8,6,0.4,2.4
+--temp-noise 7,8,0.1,1.0
 
 
 --gif-layer surface
@@ -32,7 +32,7 @@
 --climate-iterations 200
 --gif-fps 16
 --scale 1
---zoom 4
+--zoom 2
 
 --wind-transfer-rate 0.05
 --wind-pressure-threshold 0.2

@@ -94,23 +94,23 @@ impl BiomeSampler {
         // moister closer to the sea
         let mul = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - coastline_proximity);
 
-        raw_moisture * mul
+        // less moist at equator from the heat, but dont increase moisture at poles any more
+        let latitude = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - self.latitude_mul(pos.1)).min(1.0);
+
+        raw_moisture * mul * latitude
     }
 
     fn temperature(&self, (x, y): (f64, f64), elevation: f64) -> f64 {
-        // 0 at poles, 1 at equator
-        let latitude = (y * self.latitude_coefficient).sin();
-
+        let latitude = self.latitude_mul(y);
         let raw_temp = self.temperature.sample_wrapped_normalized((x, y));
 
-        // TODO give latitude more weight
         // TODO elevation is negative sometimes at the coasts?
 
         // average sum of:
         //  - latitude: lower at poles, higher at equator
         //  - elevation: lower by sea, higher in-land
         //  - raw noise: 0-1
-        (raw_temp * 0.2) + (elevation * 0.2) + (latitude * 0.6)
+        (raw_temp * 0.25) + (elevation * 0.25) + (latitude * 0.5)
     }
 
     fn elevation(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
@@ -125,6 +125,11 @@ impl BiomeSampler {
             // TODO treat negative elevation as normal heightmap underwater
             0.0
         }
+    }
+
+    /// 0 at poles, 1 at equator
+    fn latitude_mul(&self, y: f64) -> f64 {
+        (y * self.latitude_coefficient).sin()
     }
 }
 
