@@ -67,12 +67,12 @@ impl Render {
             debug!("drawing continents");
             let planet = planet_ref.inner().await;
 
-            let mut image = { ImageBuffer::new(image_size, image_size) };
+            let mut image = ImageBuffer::new(image_size, image_size);
 
             let biomes = planet.continents.biome_sampler();
             if params.draw_biomes {
                 // sample biome at every pixel
-                image.enumerate_pixels_mut().for_each(|(x, y, p)| {
+                image = put_pixels_par(image, &|x, y| {
                     let point = (x as f64 / zoom, y as f64 / zoom);
                     let biome = biomes.sample_biome(point, &planet.continents);
 
@@ -90,26 +90,27 @@ impl Render {
 
                     // set alpha
                     let c = (colour << 8) | 0xff;
-                    *p = Rgba(c.to_be_bytes());
-                });
+                    Rgba(c.to_be_bytes())
+                })
+                .await;
             } else {
                 // solid colours
 
-                // initialize with sea
-                image.pixels_mut().for_each(|p| *p = Rgba(sea.into()));
-
                 // fill in polygons with land
-                image
-                    .enumerate_pixels_mut()
-                    .filter_map(|(x, y, p)| {
-                        let point = Point::from((x as f64 / zoom, y as f64 / zoom));
-                        planet
-                            .continents
-                            .continent_polygons()
-                            .any(|(_, poly)| poly.contains(&point))
-                            .as_some(p)
-                    })
-                    .for_each(|p| *p = Rgba(land.into()));
+                image = put_pixels_par(image, &|x, y| {
+                    let point = Point::from((x as f64 / zoom, y as f64 / zoom));
+                    let color = if planet
+                        .continents
+                        .continent_polygons()
+                        .any(|(_, poly)| poly.contains(&point))
+                    {
+                        land
+                    } else {
+                        sea
+                    };
+                    Rgba(color.into())
+                })
+                .await;
             }
 
             if params.draw_continent_polygons {
@@ -426,6 +427,47 @@ impl Render {
     pub fn into_image(mut self) -> RgbaImage {
         self.image.take().expect("image was taken but not replaced")
     }
+}
+
+async fn put_pixels_par(
+    mut image: RgbaImage,
+    per: &(impl Send + Sync + Fn(u32, u32) -> Rgba<u8>),
+) -> RgbaImage {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+    let (w, h) = image.dimensions();
+    let n = (w * h) as usize;
+
+    // start consumer task first
+    let fut = tokio::spawn(async move {
+        for i in 0..n {
+            let (x, y, pixel) = rx
+                .recv()
+                .await
+                .unwrap_or_else(|| panic!("failed on pixel {}", i));
+
+            // safety: coords in range
+            unsafe {
+                image.unsafe_put_pixel(x, y, pixel);
+            }
+        }
+
+        image
+    });
+
+    // spawn producer tasks and block until all complete
+    async_scoped::TokioScope::scope_and_block(|scope| {
+        for (x, y) in (0..h).cartesian_product(0..w) {
+            let tx = tx.clone();
+            scope.spawn(async move {
+                let pixel = per(x, y);
+                tx.send((x, y, pixel)).unwrap();
+            });
+        }
+    });
+
+    // consume them all
+    fut.await.unwrap()
 }
 
 fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) {

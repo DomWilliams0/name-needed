@@ -13,7 +13,7 @@
 
 --region-start-slab 10
 --region-max-depth 20
---threads 4
+--threads 8
 --continent-polygon-epsilon 0.05
 --coastline-thickness 4.0
 
