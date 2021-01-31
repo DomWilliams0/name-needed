@@ -50,6 +50,7 @@ fn main() {
                     rt::Builder::new_multi_thread()
                 }
                 .worker_threads(params.render.threads)
+                .enable_time()
                 .build()
                 .expect("failed to create runtime");
 

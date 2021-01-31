@@ -16,7 +16,7 @@ rand_distr = "0.3"
 strum = "0.19"
 strum_macros = "0.19"
 array-init = "1.0"
-tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync"] }
+tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
 futures = { version = "0.3", default-features = false, features = ["std", "alloc"] }
 geo = "0.16"
 geo-booleanop = "0.3"

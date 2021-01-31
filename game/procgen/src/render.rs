@@ -17,6 +17,7 @@ use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
 use crate::region::CHUNKS_PER_REGION_SIDE;
 use crate::{map_range, Planet, RegionLocation, SlabGrid};
 use common::num_traits::clamp;
+use tokio::time::Duration;
 
 #[derive(Clone)]
 pub struct Render {
@@ -441,9 +442,9 @@ async fn put_pixels_par(
     // start consumer task first
     let fut = tokio::spawn(async move {
         for i in 0..n {
-            let (x, y, pixel) = rx
-                .recv()
+            let (x, y, pixel) = tokio::time::timeout(Duration::from_secs(3), rx.recv())
                 .await
+                .expect("timed out waiting for pixel")
                 .unwrap_or_else(|| panic!("failed on pixel {}", i));
 
             // safety: coords in range
@@ -461,7 +462,7 @@ async fn put_pixels_par(
             let tx = tx.clone();
             scope.spawn(async move {
                 let pixel = per(x, y);
-                tx.send((x, y, pixel)).unwrap();
+                let _ = tx.send((x, y, pixel));
             });
         }
     });
