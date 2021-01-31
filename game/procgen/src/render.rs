@@ -286,9 +286,9 @@ impl Render {
         let zoom = inner.params.render.zoom;
         drop(inner);
 
-        // create 1:1 image for region
+        // create 1:1 image for region, zoom is equivalent to scale here
         let mut image = {
-            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32() * zoom;
+            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32();
             ImageBuffer::new(region_size, region_size)
         };
 
@@ -393,7 +393,7 @@ impl Render {
 
                         let l = map_range(
                             (min_height, max_height),
-                            (0.2, 0.8),
+                            (0.1, 0.9),
                             clamp(z as f32, min_height, max_height),
                         );
 
@@ -412,7 +412,7 @@ impl Render {
             }
         }
 
-        self.store_scaled_image(image, scale);
+        self.store_scaled_image(image, scale * zoom);
         Ok(())
     }
 

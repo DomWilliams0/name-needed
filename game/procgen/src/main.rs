@@ -62,8 +62,7 @@ fn main() {
                     render.draw_continents().await;
                     render.save("procgen.png").expect("failed to write image");
 
-                    return;
-                    for y in params.planet_size - 1..=params.planet_size {
+                    for y in 5..6 {
                         for x in 20..=21 {
                             let region = RegionLocation(x, y);
 

@@ -34,6 +34,10 @@ pub enum BlockType {
     #[display(fmt = "Light grass")]
     LightGrass,
     Stone,
+    Sand,
+    #[display(fmt = "Solid water")]
+    SolidWater,
+
     Chest,
 }
 
@@ -145,6 +149,8 @@ impl BlockType {
             BlockType::Grass => ColorRgb::new(49, 152, 56),
             BlockType::LightGrass => ColorRgb::new(91, 152, 51),
             BlockType::Stone => ColorRgb::new(106, 106, 117),
+            BlockType::Sand => 0xBCA748FF.into(),
+            BlockType::SolidWater => 0x3374BCFF.into(),
             BlockType::Chest => ColorRgb::new(184, 125, 31),
         }
     }
@@ -158,11 +164,14 @@ impl BlockType {
     }
 
     fn durability(self) -> Proportion<BlockDurability> {
+        use BlockType::*;
         let max = match self {
-            BlockType::Air => 0,
-            BlockType::Dirt | BlockType::Grass | BlockType::LightGrass => 40,
-            BlockType::Stone => 90,
-            BlockType::Chest => 60,
+            Air => 0,
+            Sand => 30,
+            Dirt | Grass | LightGrass => 40,
+            Stone => 90,
+            Chest => 60,
+            SolidWater => u8::MAX,
         };
 
         Proportion::with_value(max, max)

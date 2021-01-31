@@ -14,10 +14,11 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (4)
    * `// TODO elevation is negative sometimes at the coasts?`
    * `// TODO treat negative elevation as normal heightmap underwater`
    * `// TODO 3d nearest neighbour into biome space instead of this noddy lookup`
+   * `// TODO move biome definitions into data`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind movingbrings air to level out pressure`
@@ -50,11 +51,10 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (4)
-   * `// TODO should height scale be per biome?`
+ * [game/procgen/src/region.rs](game/procgen/src/region.rs) (3)
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
-   * `// TODO these constants depend on biome, location etc`
+   * `// TODO calculate these better`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`

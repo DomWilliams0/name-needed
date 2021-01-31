@@ -20,6 +20,10 @@ pub enum BlockType {
     Stone,
     Dirt,
     Grass,
+    Sand,
+
+    /// Temporary flowing water substitute
+    SolidWater,
 }
 
 impl GeneratedBlock {
@@ -43,6 +47,8 @@ impl BlockType {
             BlockType::Stone => (0.66, 0.005),
             BlockType::Dirt => (0.06, 0.4),
             BlockType::Grass => (0.26, 0.16),
+            BlockType::Sand => (0.14, 0.19),
+            BlockType::SolidWater => (0.22, 0.22),
         }
     }
 }

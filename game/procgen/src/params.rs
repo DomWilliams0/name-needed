@@ -74,10 +74,6 @@ pub struct PlanetParams {
     #[structopt(long)]
     pub log_params_and_exit: bool,
 
-    #[structopt(long, default_value = "100")]
-    #[deprecated]
-    pub height_scale: u32,
-
     #[structopt(long, default_value = "NoiseParams::default()")]
     pub height_noise: NoiseParams,
 

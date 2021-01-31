@@ -106,7 +106,7 @@ impl ContinentMap {
         &self,
         blobs: &mr_blobby::BlobPlacement,
     ) -> Vec<(ContinentIdx, Polygon<f64>)> {
-        const CIRCLE_VERTICES: usize = 16;
+        const CIRCLE_VERTICES: usize = 64;
         fn polygon_from_blob(blob: &mr_blobby::LandBlob) -> [(f64, f64); CIRCLE_VERTICES] {
             // ty http://slabode.exofire.net/circle_draw.shtml
 
@@ -350,10 +350,7 @@ impl ContinentMap {
         }
     }
 
-    pub fn generator_copy(&self) -> Arc<Generator> {
-        self.generator.clone().expect("generator not initialized")
-    }
-
+    #[deprecated]
     pub fn generator(&self) -> &Generator {
         self.generator.as_ref().expect("generator not initialized")
     }

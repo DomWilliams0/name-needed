@@ -5,7 +5,7 @@ use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
 
-use procgen::{GeneratedBlock, Planet, PlanetParams};
+use procgen::{BlockType, GeneratedBlock, Planet, PlanetParams};
 
 use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
@@ -59,6 +59,8 @@ impl From<&procgen::GeneratedBlock> for Block {
             A::Stone => B::Stone,
             A::Dirt => B::Dirt,
             A::Grass => B::Grass,
+            A::Sand => B::Sand,
+            A::SolidWater => B::SolidWater,
         };
 
         Block::with_block_type(ty)

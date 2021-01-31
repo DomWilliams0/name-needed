@@ -84,6 +84,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * generate new terrain when society member explores, rather than just camera movement. config option!
 * bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
 * grass colour and flora depends on biome/moisture
+* different continents could have different variations
 
 ## Voxel world mechanics
 * fluid blocks

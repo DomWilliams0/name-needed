@@ -1,12 +1,13 @@
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
-use crate::{PlanetParams, SlabGrid};
+use crate::{map_range, PlanetParams, SlabGrid};
 use common::*;
 
 use grid::{grid_declare, GridImpl};
 
 use std::mem::MaybeUninit;
 
+use crate::biome::Biome;
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
@@ -59,15 +60,29 @@ pub struct RegionChunk {
 
 pub struct ChunkDescription {
     ground_height: ChunkHeightMap,
-    /// Incredibly temporary flag to identify "underwater". Exceedingly temporary!!
-    is_region_land: bool,
 }
 
-grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, i32>,
+#[derive(Clone, Copy)]
+struct BlockHeight {
+    height: i32,
+    biome: Biome,
+}
+
+grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, BlockHeight>,
     CHUNK_SIZE.as_usize(),
     CHUNK_SIZE.as_usize(),
     1
 );
+
+impl Default for BlockHeight {
+    fn default() -> Self {
+        // not important
+        Self {
+            height: 0,
+            biome: Biome::Ocean,
+        }
+    }
+}
 
 impl Regions {
     pub fn new(params: &PlanetParams) -> Self {
@@ -118,8 +133,6 @@ impl Region {
         // times?
         debug!("creating region"; "region" => ?region);
 
-        let height_scale = params.height_scale as f64;
-
         // initialize chunk descriptions
         let mut chunks: [MaybeUninit<RegionChunk>; CHUNKS_PER_REGION] =
             unsafe { MaybeUninit::uninit().assume_init() };
@@ -133,7 +146,7 @@ impl Region {
             // alive so this pointer is safe to use.
             let this_chunk = chunks[idx].as_mut_ptr() as usize;
             handle.spawn(async move {
-                let chunk = RegionChunk::new(idx, region, continents, height_scale);
+                let chunk = RegionChunk::new(idx, region, continents);
 
                 // safety: each task has a single index in the chunk array
                 unsafe {
@@ -176,7 +189,6 @@ impl RegionChunk {
         chunk_idx: usize,
         region: RegionLocation,
         continents: &ContinentMap,
-        height_scale: f64,
     ) -> Self {
         const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
 
@@ -185,8 +197,7 @@ impl RegionChunk {
         let chunk_idx = chunk_idx as i32;
         let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
         let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
-        let continent_tile = continents.tile_at(region);
-        let generator = continents.generator();
+        let sampler = continents.biome_sampler();
 
         // get height for each surface block in chunk
         let mut height_map = ChunkHeightMap::default();
@@ -197,14 +208,20 @@ impl RegionChunk {
         {
             let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
             let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
-            let height = generator.sample_normalized((nx, ny));
 
-            // convert height map float into block coords
-            // TODO should height scale be per biome?
-            let block_height = (height * height_scale) as i32;
+            let (coastline_proximity, elevation, moisture, temperature) =
+                sampler.sample((nx, ny), continents);
 
-            height_map[i] = block_height;
+            let biome = Biome::map(coastline_proximity, elevation, temperature, moisture);
 
+            // get block height from elevation and biome range
+            let height_range = biome.height_range();
+            let block_height = map_range((0.0, 1.0), height_range, elevation) as i32;
+
+            height_map[i] = BlockHeight {
+                height: block_height,
+                biome,
+            };
             min_height = min_height.min(block_height);
             max_height = max_height.max(block_height);
         }
@@ -216,7 +233,6 @@ impl RegionChunk {
         RegionChunk {
             desc: ChunkDescription {
                 ground_height: height_map,
-                is_region_land: continent_tile.is_land(),
             },
         }
     }
@@ -241,19 +257,28 @@ impl ChunkDescription {
                 &mut slab.array_mut()[from..to]
             };
 
-            // TODO these constants depend on biome, location etc
-            let surface_block = BlockType::Grass;
-            let shallow_under_block = BlockType::Dirt;
-            let deep_under_block = BlockType::Stone;
-            let shallow_depth = 3;
-
             for (i, (y, x)) in (0..CHUNK_SIZE.as_i32())
                 .cartesian_product(0..CHUNK_SIZE.as_i32())
                 .enumerate()
             {
-                let ground = SliceIndex::new(self.ground_height[&[x, y, 0]]);
+                let BlockHeight { height, biome } = self.ground_height[&[x, y, 0]];
+
+                // TODO calculate these better
+                use BlockType::*;
+                let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
+                    match biome {
+                        Biome::Ocean | Biome::IcyOcean | Biome::CoastOcean => {
+                            (SolidWater, SolidWater, SolidWater, 0)
+                        }
+                        Biome::Beach => (Sand, Dirt, Stone, 4),
+                        Biome::Plains | Biome::Forest | Biome::Tundra | Biome::RainForest => {
+                            (Grass, Dirt, Stone, 3)
+                        }
+                        Biome::Desert => (Sand, Sand, Stone, 6),
+                    };
+
+                let ground = SliceIndex::new(height);
                 let bt = match (ground - z_global).slice() {
-                    d if d >= 0 && !self.is_region_land => BlockType::Stone, // temporary, underwater = stone
                     0 => surface_block,
                     d if d.is_negative() => BlockType::Air,
                     d if d < shallow_depth => shallow_under_block,
@@ -267,7 +292,7 @@ impl ChunkDescription {
 
     pub fn ground_level(&self, block: SliceBlock) -> GlobalSliceIndex {
         let SliceBlock(x, y) = block;
-        GlobalSliceIndex::new(self.ground_height[&[x as i32, y as i32, 0]])
+        GlobalSliceIndex::new(self.ground_height[&[x as i32, y as i32, 0]].height)
     }
 }
 

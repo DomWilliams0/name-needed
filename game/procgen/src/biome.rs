@@ -12,7 +12,7 @@ pub struct BiomeSampler {
     moisture: Noise<Fbm>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Biome {
     Ocean,
     IcyOcean,
@@ -134,7 +134,12 @@ impl BiomeSampler {
 }
 
 impl Biome {
-    fn map(coast_proximity: f64, _elevation: f64, temperature: f64, moisture: f64) -> Self {
+    pub(crate) fn map(
+        coast_proximity: f64,
+        _elevation: f64,
+        temperature: f64,
+        moisture: f64,
+    ) -> Self {
         use Biome::*;
         // TODO 3d nearest neighbour into biome space instead of this noddy lookup
 
@@ -168,6 +173,19 @@ impl Biome {
                 RainForest
             }
         }
+    }
+
+    pub fn height_range(&self) -> (f64, f64) {
+        // TODO move biome definitions into data
+        use Biome::*;
+        let (min, max) = match self {
+            Ocean | IcyOcean => (-40, -10),
+            CoastOcean => (-20, 0),
+            Beach => (0, 20),
+            Tundra | Plains => (10, 50),
+            RainForest | Desert | Forest => (10, 30),
+        };
+        (min as f64, max as f64)
     }
 }
 
