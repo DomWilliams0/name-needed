@@ -1,4 +1,4 @@
-# TODOs (275)
+# TODOs (277)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,11 +14,13 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (4)
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (6)
+   * `choices.choices.get(0).unwrap().0 // TODO use choices properly`
    * `// TODO elevation is negative sometimes at the coasts?`
    * `// TODO treat negative elevation as normal heightmap underwater`
    * `// TODO 3d nearest neighbour into biome space instead of this noddy lookup`
    * `// TODO move biome definitions into data`
+   * `// TODO return result for IO/deserialization errors`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind movingbrings air to level out pressure`
@@ -29,14 +31,13 @@
    * `// TODO if too big (>0.01) we end up with little pockets of unchanging high pressure :(`
    * `// TODO cold high air falls?`
    * `// TODO height doesnt change, calculate this once in a separate grid`
- * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (7)
+ * [game/procgen/src/continent.rs](game/procgen/src/continent.rs) (6)
    * `// TODO agree api and stop making everything public`
    * `// TODO validate values with result type`
    * `// TODO reject if continent or land blob count is too low`
    * `let mut vertices = [(0.0, 0.0); CIRCLE_VERTICES]; // TODO could be uninitialized`
    * `// TODO intersecting polygons!!`
    * `// TODO reimplement or add back density if needed`
-   * `// TODO adjust params for global height map`
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
@@ -362,6 +363,8 @@
    * `// TODO middle of requested chunk instead of corner`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
+ * [resources/worldgen/planet_generation.txt](resources/worldgen/planet_generation.txt) (1)
+   * `# TODO define biomes`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

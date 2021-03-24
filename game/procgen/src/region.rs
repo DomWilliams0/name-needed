@@ -185,11 +185,7 @@ impl Region {
 }
 
 impl RegionChunk {
-    fn new(
-        chunk_idx: usize,
-        region: RegionLocation,
-        continents: &ContinentMap,
-    ) -> Self {
+    fn new(chunk_idx: usize, region: RegionLocation, continents: &ContinentMap) -> Self {
         const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
 
         let (rx, ry) = (region.0 as f64, region.1 as f64);
@@ -395,11 +391,12 @@ mod tests {
     async fn get_existing_region() {
         let params = {
             let mut params = PlanetParams::dummy();
-            params.planet_size = 100;
+            params.planet_size = 32;
+            params.max_continents = 1;
             params
         };
         let mut regions = Regions::new(&params);
-        let mut continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+        let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
 
         let loc = RegionLocation(10, 20);
         let bad_loc = RegionLocation(10, 200);

@@ -2,7 +2,7 @@ use common::*;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::{BufRead, BufReader, ErrorKind};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
@@ -11,7 +11,6 @@ use common::alloc::str::FromStr;
 use noise::MultiFractal;
 #[cfg(feature = "cache")]
 use serde::Serialize;
-use std::num::ParseIntError;
 
 #[derive(Debug, Clone, StructOpt)]
 #[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
@@ -87,6 +86,9 @@ pub struct PlanetParams {
     pub coastline_thickness: f64,
 
     pub no_cache: bool,
+
+    #[structopt(long, default_value = "biomes.ron")]
+    pub biomes_cfg: PathBuf,
 }
 
 #[derive(Debug, Clone, Default, StructOpt)]

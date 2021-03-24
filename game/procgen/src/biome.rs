@@ -1,8 +1,15 @@
 use crate::continent::ContinentMap;
 use crate::{map_range, PlanetParams};
 use common::*;
-use noise::{Fbm, MultiFractal, NoiseFn, Point4, Seedable};
+use noise::{Fbm, NoiseFn, Point4, Seedable};
+
+use rstar::{Envelope, Point, RTree, AABB};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer};
 use std::f64::consts::{PI, TAU};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
 pub struct BiomeSampler {
     latitude_coefficient: f64,
@@ -10,9 +17,11 @@ pub struct BiomeSampler {
     height: Noise<Fbm>,
     temperature: Noise<Fbm>,
     moisture: Noise<Fbm>,
+
+    biome_lookup: RTree<BiomeNode>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
 pub enum Biome {
     Ocean,
     IcyOcean,
@@ -23,6 +32,46 @@ pub enum Biome {
     RainForest,
     Desert,
     Tundra,
+}
+
+#[derive(Copy, Clone)]
+struct Range<L: RangeLimit>(f32, f32, PhantomData<L>);
+
+#[derive(Copy, Clone)]
+struct CoastlineLimit;
+
+#[derive(Copy, Clone)]
+struct NormalizedLimit;
+
+trait RangeLimit {
+    fn range() -> (f32, f32);
+
+    fn is_valid(val: f32) -> bool {
+        let (min, max) = Self::range();
+        (min..=max).contains(&val)
+    }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct BiomeNode {
+    biome: Biome,
+    #[serde(rename = "coastal", default = "full_range")]
+    coastline_proximity: Range<CoastlineLimit>,
+    #[serde(default = "full_range")]
+    moisture: Range<NormalizedLimit>,
+    #[serde(default = "full_range")]
+    temperature: Range<NormalizedLimit>,
+    #[serde(default = "full_range")]
+    elevation: Range<NormalizedLimit>,
+}
+
+const CHOICE_COUNT: usize = 3;
+
+pub struct BiomeChoices {
+    /// (biome, weight). weight=1.0 is max, 0.0 is min.
+    ///
+    /// Must not be empty
+    choices: ArrayVec<[(Biome, NormalizedFloat); CHOICE_COUNT]>,
 }
 
 /// Noise generator with its rough limits
@@ -58,11 +107,14 @@ impl BiomeSampler {
             "moisture",
         );
 
+        let biome_lookup = Biome::create_map(&params.biomes_cfg);
+        debug_assert_ne!(biome_lookup.iter().count(), 0, "no biomes registered");
         Self {
             latitude_coefficient,
             height,
             temperature,
             moisture,
+            biome_lookup,
         }
     }
 
@@ -76,9 +128,50 @@ impl BiomeSampler {
         (coastline_proximity, elevation, moisture, temperature)
     }
 
+    pub fn choose_biomes(
+        &self,
+        coast_proximity: f64,
+        elevation: f64,
+        temperature: f64,
+        moisture: f64,
+    ) -> BiomeChoices {
+        let point = [
+            coast_proximity as f32,
+            moisture as f32,
+            temperature as f32,
+            elevation as f32,
+        ];
+
+        let choices = {
+            let biomes: ArrayVec<[(Biome, f32); CHOICE_COUNT]> = self
+                .biome_lookup
+                .nearest_neighbor_iter_with_distance_2(&point)
+                .map(|(node, weight)| (node.biome, weight))
+                .collect();
+
+            // unwrap ok because biome lookup is not empty
+            let max_distance = biomes
+                .iter()
+                .max_by_key(|(_, dist_2)| OrderedFloat(*dist_2))
+                .map(|&(_, dist_2)| dist_2.max(1.0))
+                .unwrap();
+
+            // normalize distance to 0-1
+            biomes
+                .into_iter()
+                .map(|(biome, dist_2)| (biome, NormalizedFloat::new(dist_2 / max_distance)))
+                .collect()
+        };
+
+        let choices = BiomeChoices { choices };
+        assert!(!choices.choices.is_empty(), "no biome selected");
+        choices
+    }
+
     pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> Biome {
         let (coastline_proximity, elevation, moisture, temperature) = self.sample(pos, continents);
-        Biome::map(coastline_proximity, elevation, temperature, moisture)
+        let choices = self.choose_biomes(coastline_proximity, elevation, temperature, moisture);
+        choices.choices.get(0).unwrap().0 // TODO use choices properly
     }
 
     // -------
@@ -134,6 +227,7 @@ impl BiomeSampler {
 }
 
 impl Biome {
+    #[deprecated]
     pub(crate) fn map(
         coast_proximity: f64,
         _elevation: f64,
@@ -186,6 +280,16 @@ impl Biome {
             RainForest | Desert | Forest => (10, 30),
         };
         (min as f64, max as f64)
+    }
+
+    fn create_map(biomes_cfg: &Path) -> RTree<BiomeNode> {
+        let biomes: Vec<BiomeNode> = {
+            // TODO return result for IO/deserialization errors
+            let reader = BufReader::new(File::open(biomes_cfg).expect("io error"));
+            ron::de::from_reader(reader).expect("biomes error")
+        };
+
+        RTree::bulk_load(biomes)
     }
 }
 
@@ -265,5 +369,102 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
     fn sample_wrapped_normalized(&self, pos: (f64, f64)) -> f64 {
         let value = self.sample_wrapped(pos);
         map_range(self.limits, (0.0, 1.0), value)
+    }
+}
+
+impl rstar::RTreeObject for BiomeNode {
+    type Envelope = AABB<[f32; 4]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        self.aabb()
+    }
+}
+
+impl PartialEq for BiomeNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.biome == other.biome
+    }
+}
+
+impl BiomeNode {
+    fn aabb(&self) -> AABB<[f32; 4]> {
+        let a = self.coastline_proximity.iter_points();
+        let b = self.moisture.iter_points();
+        let c = self.temperature.iter_points();
+        let d = self.elevation.iter_points();
+
+        let points: ArrayVec<[[f32; 4]; 16 /* 2^4 */ ]> = a
+            .cartesian_product(b)
+            .cartesian_product(c)
+            .cartesian_product(d)
+            .map(|(((a, b), c), d)| [a, b, c, d])
+            .collect();
+
+        AABB::from_points(points.iter())
+    }
+}
+
+impl rstar::PointDistance for BiomeNode {
+    fn distance_2(
+        &self,
+        point: &<Self::Envelope as Envelope>::Point,
+    ) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+        self.aabb().distance_2(point)
+    }
+}
+
+impl<L: RangeLimit> Range<L> {
+    fn new(min: f32, max: f32) -> Option<Self> {
+        if L::is_valid(min) && L::is_valid(max) {
+            Some(Self(min, max, PhantomData))
+        } else {
+            None
+        }
+    }
+
+    fn full() -> Self {
+        let (min, max) = L::range();
+        Self(min, max, PhantomData)
+    }
+
+    fn iter_points(self) -> impl Iterator<Item = f32> + Clone {
+        ArrayVec::from([self.0, self.1]).into_iter()
+    }
+}
+
+/// Freestanding fn for use as as a serde default
+fn full_range<L: RangeLimit>() -> Range<L> {
+    Range::full()
+}
+
+impl RangeLimit for CoastlineLimit {
+    fn range() -> (f32, f32) {
+        (-1.0, 1.0)
+    }
+}
+
+impl RangeLimit for NormalizedLimit {
+    fn range() -> (f32, f32) {
+        (0.0, 1.0)
+    }
+}
+
+impl<'de, L: RangeLimit> Deserialize<'de> for Range<L> {
+    fn deserialize<D>(deserializer: D) -> Result<Range<L>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RangeTuple(f32, f32);
+
+        let RangeTuple(min, max): RangeTuple = Deserialize::deserialize(deserializer)?;
+        Range::new(min, max).ok_or_else(|| {
+            D::Error::custom(format!(
+                "bad range [{:?}, {:?}] for range {}",
+                min,
+                max,
+                std::any::type_name::<L>()
+            ))
+        })
     }
 }

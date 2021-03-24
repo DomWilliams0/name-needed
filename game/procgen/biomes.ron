@@ -1,0 +1,48 @@
+[
+    (
+        biome: IcyOcean,
+        coastal: (-1.0, -0.2),
+        temperature: (0.0, 0.2),
+    ),
+    (
+        biome: Ocean,
+        coastal: (-1.0, -0.2),
+        temperature: (0.25, 1.0),
+    ),
+    (
+        biome: CoastOcean,
+        coastal: (-0.25, 0.0),
+        temperature: (0.25, 1.0),
+    ),
+    (
+        biome: Beach,
+        coastal: (0.0, 0.2),
+        temperature: (0.4, 1.0),
+    ),
+    (
+        biome: Plains,
+        coastal: (0.2, 1.0),
+        temperature: (0.3, 0.7),
+        moisture: (0.2, 0.65),
+        elevation: (0.0, 0.5),
+    ),
+    (
+        biome: Forest,
+        coastal: (0.2, 1.0),
+        temperature: (0.4, 0.7),
+        moisture: (0.4, 0.8),
+        elevation: (0.0, 0.8),
+    ),
+    (
+        biome: Desert,
+        coastal: (0.2, 1.0),
+        temperature: (0.9, 1.0),
+        moisture: (0.0, 0.3),
+        elevation: (0.2, 0.6),
+    ),
+    (
+        biome: Tundra,
+        temperature: (0.0, 0.3),
+        moisture: (0.0, 0.7),
+    ),
+]

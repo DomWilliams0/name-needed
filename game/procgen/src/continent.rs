@@ -3,11 +3,10 @@ use crate::{map_range, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
-use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
+use noise::{Fbm, NoiseFn, Seedable};
 use std::cell::Cell;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
-use std::sync::Arc;
 
 use crate::biome::BiomeSampler;
 use geo::{LineString, Point, Polygon};
@@ -26,11 +25,6 @@ pub struct ContinentMap {
 
     /// None until init_generator()
     #[cfg_attr(feature = "cache", serde(skip))]
-    #[deprecated]
-    generator: Option<Arc<Generator>>,
-
-    /// None until init_generator()
-    #[cfg_attr(feature = "cache", serde(skip))]
     biomes: Option<BiomeSampler>,
 }
 
@@ -45,13 +39,6 @@ pub struct RegionTile {
 
 /// density: Cell<f64> is only written to during initial generation outside of any async functions
 unsafe impl Sync for RegionTile {}
-
-pub struct Generator {
-    height: Fbm,
-    scale: f64,
-    /// (min, max) after sampling a large number of points
-    limits: (f64, f64),
-}
 
 impl ContinentMap {
     pub fn new(params: &PlanetParams) -> Self {
@@ -69,19 +56,18 @@ impl ContinentMap {
                 1,
             ]),
 
-            generator: None,
             biomes: None,
         }
     }
 
     pub fn init_generator(&mut self, rando: &mut dyn RngCore) {
         self.biomes = Some(BiomeSampler::new(rando, &self.params));
-        self.generator = Some(Arc::new(Generator::new(rando, &self.params)))
     }
 
     #[cfg(test)]
     pub fn new_with_rng(params: &PlanetParams, rando: &mut dyn RngCore) -> Self {
         let mut this = Self::new(params);
+        this.generate(rando);
         this.init_generator(rando);
         this
     }
@@ -233,7 +219,7 @@ impl ContinentMap {
             );
 
         debug_assert_ne!(closest, (usize::MAX, f64::MAX));
-        let (idx, distance) = closest;
+        let (_idx, distance) = closest;
 
         let mul = if inland { 1.0 } else { -1.0 };
         let coast_thickness = self.params.coastline_thickness;
@@ -318,43 +304,6 @@ impl ContinentMap {
         )
     }
 
-    /// Generates noise and scales to 0.0-1.0
-    fn generate_initial_heightmap(&mut self) {
-        let height_gen = self
-            .generator
-            .as_mut()
-            .expect("generator has not been initialized");
-
-        let mut min = f64::MAX;
-        let mut max = f64::MIN;
-
-        for (coord, tile) in self.grid.iter_coords_mut() {
-            let pos = (coord[0] as f64, coord[1] as f64);
-            let height = height_gen.sample(pos);
-
-            min = min.min(height);
-            max = max.max(height);
-
-            tile.height = height;
-        }
-
-        debug!("original noise limits"; "max" => max, "min" => min);
-
-        for tile in self.grid.iter_mut() {
-            let height = map_range((min, max), (0.0, 1.0), tile.height);
-            let density = tile.density.get();
-
-            // multiply together so that height is lower at the borders between land+sea (density=0)
-            // and more diverse inland where density=1
-            tile.height = height * density;
-        }
-    }
-
-    #[deprecated]
-    pub fn generator(&self) -> &Generator {
-        self.generator.as_ref().expect("generator not initialized")
-    }
-
     pub fn biome_sampler(&self) -> &BiomeSampler {
         self.biomes
             .as_ref()
@@ -364,76 +313,6 @@ impl ContinentMap {
     pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
         let RegionLocation(x, y) = region;
         &self.grid[[x as usize, y as usize, 0]]
-    }
-}
-
-impl Generator {
-    pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
-        // TODO adjust params for global height map
-        let seed = rando.gen::<u64>();
-        let noise = params
-            .height_noise
-            .configure(Fbm::new().set_seed(seed as u32));
-        let scale = params.planet_size as f64;
-
-        let mut this = Generator {
-            height: noise,
-            scale,
-            limits: (0.0, 0.0),
-        };
-
-        this.limits = this.find_limits(seed);
-        this
-    }
-
-    fn find_limits(&mut self, seed: u64) -> (f64, f64) {
-        let (mut min, mut max) = (100.0, -100.0);
-        let mut r = StdRng::seed_from_u64(seed);
-        let iterations = 1_000; // _000;
-        debug!("finding generator limits"; "iterations" => iterations);
-
-        for _ in 0..iterations {
-            let f = self.sample((r.gen_range(-100.0, 100.0), r.gen_range(-100.0, 100.0)));
-            min = f.min(min);
-            max = f.max(max);
-        }
-
-        debug!(
-            "generator limits are {min:?} -> {max:?}",
-            min = min,
-            max = max
-        );
-
-        (min, max)
-    }
-
-    pub fn sample_normalized(&self, coord: (f64, f64)) -> f64 {
-        let value = self.sample(coord);
-        map_range(self.limits, (0.0, 1.0), value)
-    }
-
-    /// Produces seamlessly wrapping noise
-    fn sample(&self, (x, y): (f64, f64)) -> f64 {
-        // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
-
-        // noise range
-        let x1 = 0.0;
-        let x2 = 2.0;
-        let y1 = 0.0;
-        let y2 = 2.0;
-        let dx = x2 - x1;
-        let dy = y2 - y1;
-
-        // sample at smaller intervals
-        let s = x / self.scale;
-        let t = y / self.scale;
-
-        // get 4d noise
-        let nx = x1 + (s * TAU).cos() * dx / TAU;
-        let ny = y1 + (t * TAU).cos() * dy / TAU;
-        let nz = x1 + (s * TAU).sin() * dx / TAU;
-        let nw = y1 + (t * TAU).sin() * dy / TAU;
-        self.height.get([nx, ny, nz, nw])
     }
 }
 
