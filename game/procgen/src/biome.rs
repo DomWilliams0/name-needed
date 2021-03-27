@@ -85,11 +85,14 @@ impl BiomeSampler {
     pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
         let latitude_coefficient = PI / params.planet_size as f64;
 
+        // must be constant seed to ensure constant limits
+        let mut limit_rando = StdRng::seed_from_u64(5555);
         let height = Noise::new(
             params
                 .height_noise
                 .configure(Fbm::new().set_seed(rando.gen())),
             params,
+            &mut limit_rando,
             "height",
         );
         let temperature = Noise::new(
@@ -97,6 +100,7 @@ impl BiomeSampler {
                 .temp_noise
                 .configure(Fbm::new().set_seed(rando.gen())),
             params,
+            &mut limit_rando,
             "temperature",
         );
         let moisture = Noise::new(
@@ -104,6 +108,7 @@ impl BiomeSampler {
                 .moisture_noise
                 .configure(Fbm::new().set_seed(rando.gen())),
             params,
+            &mut limit_rando,
             "moisture",
         );
 
@@ -294,7 +299,7 @@ impl Biome {
 }
 
 impl<N: NoiseFn<Point4<f64>>> Noise<N> {
-    fn new(noise: N, params: &PlanetParams, what: &str) -> Self {
+    fn new(noise: N, params: &PlanetParams, limit_rando: &mut dyn RngCore, what: &str) -> Self {
         let mut this = Noise {
             noise,
             limits: (f64::MIN, f64::MAX), // placeholders
@@ -303,7 +308,6 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
 
         let limits = {
             let (mut min, mut max) = (1.0, 0.0);
-            let mut r = thread_rng();
             let iterations = 10_000;
             let buffer = 0.25;
 
@@ -311,8 +315,8 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
 
             for _ in 0..iterations {
                 let f = this.sample_wrapped((
-                    r.gen_range(-this.planet_size, this.planet_size),
-                    r.gen_range(-this.planet_size, this.planet_size),
+                    limit_rando.gen_range(-this.planet_size, this.planet_size),
+                    limit_rando.gen_range(-this.planet_size, this.planet_size),
                 ));
                 min = f.min(min);
                 max = f.max(max);
@@ -466,5 +470,22 @@ impl<'de, L: RangeLimit> Deserialize<'de> for Range<L> {
                 std::any::type_name::<L>()
             ))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deterministic() {
+        let params = PlanetParams::dummy();
+        let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+
+        let a = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params);
+        let b = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params);
+
+        let pos = (9.41234, 4.98899);
+        assert_eq!(a.sample(pos, &continents), b.sample(pos, &continents));
     }
 }
