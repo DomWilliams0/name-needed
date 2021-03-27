@@ -1,4 +1,4 @@
-# TODOs (277)
+# TODOs (275)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,11 +14,9 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (6)
-   * `choices.choices.get(0).unwrap().0 // TODO use choices properly`
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (4)
    * `// TODO elevation is negative sometimes at the coasts?`
    * `// TODO treat negative elevation as normal heightmap underwater`
-   * `// TODO 3d nearest neighbour into biome space instead of this noddy lookup`
    * `// TODO move biome definitions into data`
    * `// TODO return result for IO/deserialization errors`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)

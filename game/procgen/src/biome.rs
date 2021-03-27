@@ -65,13 +65,16 @@ pub struct BiomeNode {
     elevation: Range<NormalizedLimit>,
 }
 
-const CHOICE_COUNT: usize = 3;
+const CHOICE_COUNT: usize = 2;
 
 pub struct BiomeChoices {
     /// (biome, weight). weight=1.0 is max, 0.0 is min.
-    ///
-    /// Must not be empty
-    choices: ArrayVec<[(Biome, NormalizedFloat); CHOICE_COUNT]>,
+    /// Highest weight
+    primary: (Biome, NormalizedFloat),
+
+    /// (biome, weight). weight=1.0 is max, 0.0 is min.
+    /// Sorted with highest weight first
+    secondary: ArrayVec<[(Biome, NormalizedFloat); CHOICE_COUNT - 1]>,
 }
 
 /// Noise generator with its rough limits
@@ -147,36 +150,16 @@ impl BiomeSampler {
             elevation as f32,
         ];
 
-        let choices = {
-            let biomes: ArrayVec<[(Biome, f32); CHOICE_COUNT]> = self
-                .biome_lookup
+        BiomeChoices::from_nearest_neighbours(
+            self.biome_lookup
                 .nearest_neighbor_iter_with_distance_2(&point)
-                .map(|(node, weight)| (node.biome, weight))
-                .collect();
-
-            // unwrap ok because biome lookup is not empty
-            let max_distance = biomes
-                .iter()
-                .max_by_key(|(_, dist_2)| OrderedFloat(*dist_2))
-                .map(|&(_, dist_2)| dist_2.max(1.0))
-                .unwrap();
-
-            // normalize distance to 0-1
-            biomes
-                .into_iter()
-                .map(|(biome, dist_2)| (biome, NormalizedFloat::new(dist_2 / max_distance)))
-                .collect()
-        };
-
-        let choices = BiomeChoices { choices };
-        assert!(!choices.choices.is_empty(), "no biome selected");
-        choices
+                .map(|(node, weight)| (node.biome, weight)),
+        )
     }
 
-    pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> Biome {
+    pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> BiomeChoices {
         let (coastline_proximity, elevation, moisture, temperature) = self.sample(pos, continents);
-        let choices = self.choose_biomes(coastline_proximity, elevation, temperature, moisture);
-        choices.choices.get(0).unwrap().0 // TODO use choices properly
+        self.choose_biomes(coastline_proximity, elevation, temperature, moisture)
     }
 
     // -------
@@ -232,48 +215,6 @@ impl BiomeSampler {
 }
 
 impl Biome {
-    #[deprecated]
-    pub(crate) fn map(
-        coast_proximity: f64,
-        _elevation: f64,
-        temperature: f64,
-        moisture: f64,
-    ) -> Self {
-        use Biome::*;
-        // TODO 3d nearest neighbour into biome space instead of this noddy lookup
-
-        if coast_proximity < 0.0 {
-            return if temperature < 0.2 {
-                IcyOcean
-            } else if coast_proximity > -0.3 {
-                CoastOcean
-            } else {
-                Ocean
-            };
-        }
-
-        if coast_proximity < 0.2 && temperature > 0.3 {
-            return Beach;
-        }
-
-        if temperature < 0.3 {
-            Tundra
-        } else if temperature < 0.75 {
-            if moisture < 0.45 {
-                Plains
-            } else {
-                Forest
-            }
-        } else {
-            // hot
-            if moisture < 0.7 {
-                Desert
-            } else {
-                RainForest
-            }
-        }
-    }
-
     pub fn height_range(&self) -> (f64, f64) {
         // TODO move biome definitions into data
         use Biome::*;
@@ -373,6 +314,81 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
     fn sample_wrapped_normalized(&self, pos: (f64, f64)) -> f64 {
         let value = self.sample_wrapped(pos);
         map_range(self.limits, (0.0, 1.0), value)
+    }
+}
+
+impl BiomeChoices {
+    /// * Panics if choices is empty, must be of length [1, CHOICE_COUNT].
+    /// * Should be sorted in ascending order
+    fn from_nearest_neighbours(choices: impl Iterator<Item = (Biome, f32)>) -> Self {
+        let choices: ArrayVec<[(Biome, f32); CHOICE_COUNT]> = choices.collect();
+
+        // ensure sorted in ascending order originally
+        debug_assert!(
+            choices
+                .iter()
+                .map(|(_, distance)| distance)
+                .all(|f| f.is_finite()),
+            "bad biome choice"
+        );
+        debug_assert!(
+            choices
+                .iter()
+                .map(|(_, distance)| distance)
+                .tuple_windows()
+                .all(|(a, b)| a <= b),
+            "bad original biome choice order"
+        );
+
+        // normalize distances to weights in descending order
+        let inverted: ArrayVec<[(Biome, f32); CHOICE_COUNT]> = choices
+            .into_iter()
+            .map(|(biome, dist_2)| {
+                // +0.01 to ensure no div by zero
+                // ^2 to give more weight to the closer ones
+                let dist_inverted = 1.0 / (dist_2 + 0.01).powi(2);
+                (biome, dist_inverted)
+            })
+            .collect();
+
+        let sum: f32 = inverted.iter().map(|(_, w)| w).sum();
+        let mut normalized = inverted
+            .into_iter()
+            .map(|(b, w)| (b, NormalizedFloat::new(w / sum)));
+
+        let primary = normalized.next().expect("didn't find a nearest biome");
+        let secondary = normalized.collect();
+
+        let choices = BiomeChoices { primary, secondary };
+
+        // ensure weights are now sorted as expected
+        debug_assert!(
+            choices
+                .choices()
+                .map(|(_, weight)| weight.value())
+                .tuple_windows()
+                .all(|(a, b)| a >= b),
+            "biome choices aren't sorted"
+        );
+
+        // ensure weights add up to 1
+        debug_assert!({
+            let sum: f32 = choices.choices().map(|(_, weight)| weight.value()).sum();
+            const EXPECTED: f32 = 1.0;
+
+            (EXPECTED - sum).abs() < 0.0001
+        });
+
+        choices
+    }
+
+    pub fn primary(&self) -> Biome {
+        self.primary.0
+    }
+
+    /// Sorted with highest weight first
+    pub fn choices(&self) -> impl Iterator<Item = (Biome, NormalizedFloat)> + '_ {
+        once(self.primary).chain(self.secondary.iter().copied())
     }
 }
 
@@ -487,5 +503,21 @@ mod tests {
 
         let pos = (9.41234, 4.98899);
         assert_eq!(a.sample(pos, &continents), b.sample(pos, &continents));
+    }
+
+    #[test]
+    fn biome_choice_order() {
+        let nearest_neighbours = vec![
+            (Biome::Plains, 0.01),
+            (Biome::Ocean, 0.4),
+            (Biome::Beach, 0.7),
+        ];
+        let choices = BiomeChoices::from_nearest_neighbours(nearest_neighbours.into_iter());
+
+        assert_eq!(choices.primary.0, Biome::Plains);
+        assert_equal(
+            choices.choices().map(|(b, _)| b),
+            vec![Biome::Plains, Biome::Ocean, Biome::Beach].into_iter(),
+        );
     }
 }

@@ -75,7 +75,7 @@ impl Render {
                 // sample biome at every pixel
                 image = put_pixels_par(image, &|x, y| {
                     let point = (x as f64 / zoom, y as f64 / zoom);
-                    let biome = biomes.sample_biome(point, &planet.continents);
+                    let biome = biomes.sample_biome(point, &planet.continents).primary();
 
                     let colour: u32 = match biome {
                         Biome::Ocean => 0x228ff5,

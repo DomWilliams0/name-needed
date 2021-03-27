@@ -9,7 +9,9 @@
 * [X] biomes dictate basic height range
 	* e.g. sea = -40-0, coast = 0-20, hilly = 15-40 etc
 	* [X] choose biome(s) with weights for each block
-	* [ ] smooth transitions between biome heights
+	* [o] smooth transitions between biome heights
+	* [ ] tweak biome height ranges
+	* [ ] specify height range and colour in biomes.cfg
 * [ ] fix temperature when combined with elevation
 * [ ] ensure heightmap is still present underwater
 * [ ] override initial camera chunk with 0,0 for preset worlds
@@ -19,6 +21,5 @@
 * [ ] rough up coastline edges
 * [ ] rough up elevation some more (more octaves?)
 * [ ] merge intersecting continents
-* [ ] fix continents no longer wrapping
 * [ ] return Result from loading biome map
 * [X] noise sampling is non determinstic

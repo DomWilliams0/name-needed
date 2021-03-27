@@ -205,21 +205,26 @@ impl RegionChunk {
             let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
             let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
 
-            let (coastline_proximity, elevation, moisture, temperature) =
-                sampler.sample((nx, ny), continents);
+            let (coastal, elevation, moisture, temperature) = sampler.sample((nx, ny), continents);
 
-            let biome = Biome::map(coastline_proximity, elevation, temperature, moisture);
+            let biome_choices = sampler.choose_biomes(coastal, elevation, temperature, moisture);
+            let biome = biome_choices.primary();
 
-            // get block height from elevation and biome range
-            let height_range = biome.height_range();
-            let block_height = map_range((0.0, 1.0), height_range, elevation) as i32;
-
-            height_map[i] = BlockHeight {
-                height: block_height,
-                biome,
+            // get block height from elevation, weighted by biome(s)
+            let height_range = {
+                biome_choices
+                    .choices()
+                    .map(|(biome, weight)| {
+                        let (min, max) = biome.height_range();
+                        (min * weight.value() as f64, max * weight.value() as f64)
+                    })
+                    .fold((0.0, 0.0), |acc, range| (acc.0 + range.0, acc.1 + range.1))
             };
-            min_height = min_height.min(block_height);
-            max_height = max_height.max(block_height);
+            let height = map_range((0.0, 1.0), height_range, elevation) as i32;
+
+            height_map[i] = BlockHeight { height, biome };
+            min_height = min_height.min(height);
+            max_height = max_height.max(height);
         }
 
         // TODO depends on many local parameters e.g. biome, humidity
