@@ -517,7 +517,7 @@ mod tests {
         assert_eq!(choices.primary.0, Biome::Plains);
         assert_equal(
             choices.choices().map(|(b, _)| b),
-            vec![Biome::Plains, Biome::Ocean, Biome::Beach].into_iter(),
+            vec![Biome::Plains, Biome::Ocean].into_iter(),
         );
     }
 }
