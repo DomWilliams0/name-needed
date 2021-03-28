@@ -17,10 +17,9 @@ pub struct GeneratedTerrainSource {
 
 impl GeneratedTerrainSource {
     pub async fn new(params: PlanetParams) -> BoxedResult<Self> {
-        // TODO load a serialized planet from disk to avoid constantly regenerating
         let mut planet = Planet::new(params)?;
 
-        planet.initial_generation().await;
+        planet.initial_generation().await?;
 
         Ok(Self { planet })
     }

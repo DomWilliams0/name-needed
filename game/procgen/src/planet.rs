@@ -71,18 +71,18 @@ impl Planet {
         Ok(Self(inner))
     }
 
-    pub async fn initial_generation(&mut self) {
+    pub async fn initial_generation(&mut self) -> BoxedResult<()> {
         let mut planet = self.0.write().await;
         let mut planet_rando = StdRng::seed_from_u64(planet.params.seed());
 
         // initialize generator unconditionally
-        planet.continents.init_generator(&mut planet_rando);
+        planet.continents.init_generator(&mut planet_rando)?;
 
         #[cfg(feature = "cache")]
         {
             if planet.was_loaded {
                 debug!("skipping generation for planet loaded from cache");
-                return;
+                return Ok(());
             }
         }
 
@@ -136,6 +136,8 @@ impl Planet {
                 error!("failed to serialize planet: {}", e);
             }
         }
+
+        Ok(())
     }
 
     pub async fn realize_region(&self, region: RegionLocation) {

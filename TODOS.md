@@ -1,4 +1,4 @@
-# TODOs (274)
+# TODOs (273)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -285,8 +285,7 @@
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec alloc`
    * `// TODO reuse buf`
- * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (2)
-   * `// TODO load a serialized planet from disk to avoid constantly regenerating`
+ * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
    * `// TODO handle wrapping of slabs around planet boundaries`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`

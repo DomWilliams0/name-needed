@@ -43,6 +43,18 @@ pub struct BiomeInfo {
     height_range: Range<HeightLimit>,
 }
 
+#[derive(Error, Debug)]
+pub enum BiomeConfigError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Deserialization error: {0}")]
+    Deserialize(#[from] ron::Error),
+
+    #[error("Bad range for {ty}: {range}")]
+    BadRange { range: String, ty: &'static str },
+}
+
 #[derive(Copy, Clone)]
 struct Range<L: RangeLimit>(L::Primitive, L::Primitive);
 
@@ -101,7 +113,7 @@ struct Noise<N: NoiseFn<Point4<f64>>> {
 }
 
 impl BiomeSampler {
-    pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Self {
+    pub fn new(rando: &mut dyn RngCore, params: &PlanetParams) -> Result<Self, BiomeConfigError> {
         let latitude_coefficient = PI / params.planet_size as f64;
 
         // must be constant seed to ensure constant limits
@@ -133,22 +145,22 @@ impl BiomeSampler {
 
         let cfg: Vec<BiomeConfig> = {
             // TODO return result for IO/deserialization errors
-            let reader = BufReader::new(File::open(&params.biomes_cfg).expect("io error"));
-            ron::de::from_reader(reader).expect("biomes error")
+            let reader = BufReader::new(File::open(&params.biomes_cfg)?);
+            ron::de::from_reader(reader)?
         };
 
         let biomes = cfg.iter().map(BiomeParams::from).collect();
         let biome_lookup = RTree::bulk_load(cfg.into_iter().map(BiomeNode::from).collect());
         debug_assert_ne!(biome_lookup.iter().count(), 0, "no biomes registered");
 
-        Self {
+        Ok(Self {
             latitude_coefficient,
             height,
             temperature,
             moisture,
             biome_lookup,
             biomes,
-        }
+        })
     }
 
     /// (coastline_proximity, elevation, moisture, temperature)
@@ -571,7 +583,8 @@ impl<'a> From<&'a BiomeConfig> for BiomeParams {
 
 mod deserialize {
     use crate::biome::{
-        BiomeType, CoastlineLimit, HeightLimit, NormalizedLimit, Range, RangeLimit,
+        BiomeConfigError, BiomeType, CoastlineLimit, HeightLimit, NormalizedLimit, Range,
+        RangeLimit,
     };
     use serde::de::{Error, SeqAccess, Visitor};
     use serde::{de, Deserialize, Deserializer};
@@ -632,12 +645,10 @@ mod deserialize {
         {
             let (min, max) = deserializer.deserialize_tuple(2, RangeVisitor::<L>(PhantomData))?;
             Range::new(min, max).ok_or_else(|| {
-                D::Error::custom(format!(
-                    "bad range [{:?}, {:?}] for range {}",
-                    min,
-                    max,
-                    std::any::type_name::<L>()
-                ))
+                D::Error::custom(BiomeConfigError::BadRange {
+                    ty: std::any::type_name::<L>(),
+                    range: format!("[{:?}, {:?}]", min, max,),
+                })
             })
         }
     }
@@ -657,8 +668,8 @@ mod tests {
         let params = PlanetParams::dummy();
         let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
 
-        let a = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params);
-        let b = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params);
+        let a = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();
+        let b = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();
 
         let pos = (9.41234, 4.98899);
         assert_eq!(a.sample(pos, &continents), b.sample(pos, &continents));

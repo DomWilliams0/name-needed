@@ -21,5 +21,5 @@
 * [ ] rough up coastline edges
 * [ ] rough up elevation some more (more octaves?)
 * [ ] merge intersecting continents
-* [ ] return Result from loading biome map
+* [X] return Result from loading biome map
 * [X] noise sampling is non determinstic

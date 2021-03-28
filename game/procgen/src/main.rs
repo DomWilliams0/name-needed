@@ -56,7 +56,7 @@ fn main() {
 
                 runtime.block_on(async {
                     let mut planet = Planet::new(params.clone()).expect("failed");
-                    planet.initial_generation().await;
+                    planet.initial_generation().await.expect("failed");
 
                     let mut render = Render::with_planet(planet.clone()).await;
                     render.draw_continents().await;

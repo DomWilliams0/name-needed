@@ -60,8 +60,10 @@ impl ContinentMap {
         }
     }
 
-    pub fn init_generator(&mut self, rando: &mut dyn RngCore) {
-        self.biomes = Some(BiomeSampler::new(rando, &self.params));
+    pub fn init_generator(&mut self, rando: &mut dyn RngCore) -> BoxedResult<()> {
+        let sampler = BiomeSampler::new(rando, &self.params)?;
+        self.biomes = Some(sampler);
+        Ok(())
     }
 
     #[cfg(test)]
@@ -70,7 +72,7 @@ impl ContinentMap {
 
         // skip expensive generation with single dummy continent placement
         this.continent_polygons = dummy_continent_polygons();
-        this.init_generator(rando);
+        this.init_generator(rando).expect("failed");
         this
     }
 
