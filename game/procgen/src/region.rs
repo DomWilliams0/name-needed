@@ -7,7 +7,7 @@ use grid::{grid_declare, GridImpl};
 
 use std::mem::MaybeUninit;
 
-use crate::biome::Biome;
+use crate::biome::BiomeType;
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
@@ -65,7 +65,7 @@ pub struct ChunkDescription {
 #[derive(Clone, Copy)]
 struct BlockHeight {
     height: i32,
-    biome: Biome,
+    biome: BiomeType,
 }
 
 grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, BlockHeight>,
@@ -79,7 +79,7 @@ impl Default for BlockHeight {
         // not important
         Self {
             height: 0,
-            biome: Biome::Ocean,
+            biome: BiomeType::Ocean,
         }
     }
 }
@@ -216,13 +216,17 @@ impl RegionChunk {
                     .choices()
                     .map(|(biome, weight)| {
                         let (min, max) = biome.height_range();
-                        (min * weight.value() as f64, max * weight.value() as f64)
+                        let (min, max) = (min as f32, max as f32);
+                        (min * weight.value(), max * weight.value())
                     })
                     .fold((0.0, 0.0), |acc, range| (acc.0 + range.0, acc.1 + range.1))
             };
-            let height = map_range((0.0, 1.0), height_range, elevation) as i32;
+            let height = map_range((0.0, 1.0), height_range, elevation as f32) as i32;
 
-            height_map[i] = BlockHeight { height, biome };
+            height_map[i] = BlockHeight {
+                height,
+                biome: biome.ty(),
+            };
             min_height = min_height.min(height);
             max_height = max_height.max(height);
         }
@@ -268,14 +272,15 @@ impl ChunkDescription {
                 use BlockType::*;
                 let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
                     match biome {
-                        Biome::Ocean | Biome::IcyOcean | Biome::CoastOcean => {
+                        BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {
                             (SolidWater, SolidWater, SolidWater, 0)
                         }
-                        Biome::Beach => (Sand, Dirt, Stone, 4),
-                        Biome::Plains | Biome::Forest | Biome::Tundra | Biome::RainForest => {
-                            (Grass, Dirt, Stone, 3)
-                        }
-                        Biome::Desert => (Sand, Sand, Stone, 6),
+                        BiomeType::Beach => (Sand, Dirt, Stone, 4),
+                        BiomeType::Plains
+                        | BiomeType::Forest
+                        | BiomeType::Tundra
+                        | BiomeType::RainForest => (Grass, Dirt, Stone, 3),
+                        BiomeType::Desert => (Sand, Sand, Stone, 6),
                     };
 
                 let ground = SliceIndex::new(height);

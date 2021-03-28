@@ -12,7 +12,7 @@ use common::*;
 use grid::{DynamicGrid, GridImpl};
 use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
 
-use crate::biome::Biome;
+use crate::biome::BiomeType;
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
 use crate::region::CHUNKS_PER_REGION_SIDE;
 use crate::{map_range, Planet, RegionLocation, SlabGrid};
@@ -77,17 +77,7 @@ impl Render {
                     let point = (x as f64 / zoom, y as f64 / zoom);
                     let biome = biomes.sample_biome(point, &planet.continents).primary();
 
-                    let colour: u32 = match biome {
-                        Biome::Ocean => 0x228ff5,
-                        Biome::IcyOcean => 0x85e0fe,
-                        Biome::CoastOcean => 0x5dabf5,
-                        Biome::Beach => 0xf0d051,
-                        Biome::Plains => 0x84e065,
-                        Biome::Forest => 0x36bf2c,
-                        Biome::RainForest => 0x278f1c,
-                        Biome::Desert => 0xffe83d,
-                        Biome::Tundra => 0xedfeff,
-                    };
+                    let colour = biome.map_color();
 
                     // set alpha
                     let c = (colour << 8) | 0xff;
