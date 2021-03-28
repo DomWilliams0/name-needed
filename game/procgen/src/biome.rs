@@ -81,7 +81,7 @@ struct BiomeParams {
     height: Range<HeightLimit>,
 }
 
-const CHOICE_COUNT: usize = 2;
+const CHOICE_COUNT: usize = 3;
 
 pub struct BiomeChoices {
     /// (biome, weight). weight=1.0 is max, 0.0 is min.
@@ -656,17 +656,23 @@ mod tests {
             (BiomeType::Plains, 0.01),
             (BiomeType::Ocean, 0.4),
             (BiomeType::Beach, 0.7),
+            (BiomeType::IcyOcean, 0.8),
+            (BiomeType::Forest, 0.9),
+            (BiomeType::Tundra, 0.95),
         ];
         let choices = BiomeChoices::from_nearest_neighbours(
             nearest_neighbours
-                .into_iter()
-                .map(|(b, w)| (BiomeType::dummy_info(b), w)),
+                .iter()
+                .map(|&(b, w)| (BiomeType::dummy_info(b), w)),
         );
 
         assert_eq!(choices.primary.0.ty, BiomeType::Plains);
         assert_equal(
             choices.choices().map(|(b, _)| b.ty),
-            vec![BiomeType::Plains, BiomeType::Ocean].into_iter(),
+            nearest_neighbours
+                .iter()
+                .map(|(b, _)| *b)
+                .take(choices.choices().count()),
         );
     }
 }
