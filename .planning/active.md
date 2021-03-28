@@ -17,7 +17,7 @@
 * [ ] override initial camera chunk with 0,0 for preset worlds
 * [X] restrict slab loading to planet boundary, wrapping can wait
 * [ ] ui button to jump camera up/down to next surface
-* [ ] remove old grid code
+* [~] remove old grid code
 * [ ] rough up coastline edges
 * [ ] rough up elevation some more (more octaves?)
 * [ ] merge intersecting continents

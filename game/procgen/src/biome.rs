@@ -413,6 +413,20 @@ impl BiomeChoices {
     }
 }
 
+impl Debug for BiomeChoices {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        #[derive(Debug)]
+        struct Entry(BiomeType, f32);
+
+        let mut list = f.debug_list();
+        for (biome, weight) in self.choices() {
+            list.entry(&Entry(biome.ty, weight.value()));
+        }
+
+        list.finish()
+    }
+}
+
 impl BiomeInfo {
     pub const fn ty(&self) -> BiomeType {
         self.ty

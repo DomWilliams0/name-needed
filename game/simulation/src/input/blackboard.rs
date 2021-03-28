@@ -13,14 +13,16 @@ use crate::simulation::AssociatedBlockData;
 use crate::society::{PlayerSociety, SocietyComponent};
 use crate::{
     ComponentWorld, ConditionComponent, InventoryComponent, NameComponent, PhysicalComponent,
-    Societies, SocietyHandle, TransformComponent,
+    Societies, SocietyHandle, ThreadedWorldLoader, TransformComponent,
 };
+use world::loader::BlockDetails;
 
 /// Dump of game info for the UI to render
 /// TODO this can probably just hold the world and have some helper functions
 pub struct UiBlackboard<'a> {
     pub selected_entity: Option<SelectedEntityDetails<'a>>,
     pub selected_tiles: &'a SelectedTiles,
+    pub selected_block_details: Option<BlockDetails>,
     pub selected_container: Option<(Entity, &'a str, &'a ContainerComponent)>,
     pub player_society: PlayerSociety,
     pub societies: &'a Societies,
@@ -54,7 +56,11 @@ pub enum EntityDetails<'a> {
 }
 
 impl<'a> UiBlackboard<'a> {
-    pub fn fetch(world: &'a EcsWorld, debug_renderers: &'a HashSet<&'static str>) -> Self {
+    pub fn fetch(
+        world: &'a EcsWorld,
+        world_loader: &ThreadedWorldLoader,
+        debug_renderers: &'a HashSet<&'static str>,
+    ) -> Self {
         let selected_entity = world.resource_mut::<SelectedEntity>().get(world).map(|e| {
             let transform = world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
             let name = world.component::<NameComponent>(e).ok();
@@ -88,6 +94,10 @@ impl<'a> UiBlackboard<'a> {
         });
 
         let selected_tiles = world.resource::<SelectedTiles>();
+        let selected_tile_biome = selected_tiles
+            .single_tile()
+            .and_then(|pos| world_loader.query_block(pos));
+
         let selected_container = selected_tiles.single_tile().and_then(|pos| {
             let world_ref = world.voxel_world();
             let voxel_world = world_ref.borrow();
@@ -110,6 +120,7 @@ impl<'a> UiBlackboard<'a> {
         Self {
             selected_entity,
             selected_tiles,
+            selected_block_details: selected_tile_biome,
             selected_container,
             player_society,
             societies,

@@ -11,7 +11,7 @@ use simulation::{
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
-    UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
+    UiBundle, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE, COLOR_RED,
 };
 use crate::ui_str;
 
@@ -249,6 +249,38 @@ impl SelectionWindow {
                 None,
                 COLOR_ORANGE,
             );
+
+            TreeNode::new(im_str!("Biome"))
+                .default_open(false)
+                .build(ui, || {
+                    let details = match bundle.blackboard.selected_block_details.as_ref() {
+                        None => {
+                            ui.text_disabled(im_str!("Single selection required"));
+                            return;
+                        }
+                        Some(t) => t,
+                    };
+
+                    let (primary, _) = match details.biome_choices.iter().next() {
+                        Some(b) => b,
+                        None => {
+                            ui.text_colored(COLOR_RED, im_str!("Error: missing biome"));
+                            return;
+                        }
+                    };
+
+                    ui.key_value(
+                        im_str!("Biome:  "),
+                        || Value::Some(ui_str!(in strings, "{:?}", primary)),
+                        None,
+                        COLOR_GREEN,
+                    );
+
+                    ui.text(ui_str!(in strings, "{} candidates", details.biome_choices.len()));
+                    for (biome, weight) in details.biome_choices.iter() {
+                        ui.text(ui_str!(in strings, " - {:?} ({})", biome, weight));
+                    }
+                });
 
             ui.separator();
             ui.radio_button(

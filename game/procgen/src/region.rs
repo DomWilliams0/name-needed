@@ -10,8 +10,8 @@ use std::mem::MaybeUninit;
 use crate::biome::BiomeType;
 use unit::dim::SmallUnsignedConstant;
 use unit::world::{
-    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
-    CHUNK_SIZE, SLAB_SIZE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, RangePosition, SlabIndex,
+    SliceBlock, SliceIndex, WorldPosition, CHUNK_SIZE, SLAB_SIZE,
 };
 
 /// Is only valid between 0 and planet size, it's the responsibility of the world loader to only
@@ -24,6 +24,8 @@ pub const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant:
 
 pub const CHUNKS_PER_REGION: usize =
     CHUNKS_PER_REGION_SIDE.as_usize() * CHUNKS_PER_REGION_SIDE.as_usize();
+
+const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
 
 pub struct Regions {
     params: PlanetParams,
@@ -184,10 +186,25 @@ impl Region {
     }
 }
 
+pub fn noise_pos_for_block(block: WorldPosition) -> Option<(f64, f64)> {
+    let chunk = ChunkLocation::from(block);
+    let chunk_idx = Region::chunk_index(chunk);
+    let region = RegionLocation::try_from_chunk(chunk)?;
+    let (rx, ry) = (region.0 as f64, region.1 as f64);
+
+    let chunk_idx = chunk_idx as i32;
+    let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
+    let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
+
+    let (bx, by, _) = BlockPosition::from(block).xyz();
+
+    let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx as i32) as f64 * PER_BLOCK);
+    let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by as i32) as f64 * PER_BLOCK);
+    Some((nx, ny))
+}
+
 impl RegionChunk {
     fn new(chunk_idx: usize, region: RegionLocation, continents: &ContinentMap) -> Self {
-        const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
-
         let (rx, ry) = (region.0 as f64, region.1 as f64);
 
         let chunk_idx = chunk_idx as i32;

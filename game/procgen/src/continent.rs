@@ -20,6 +20,7 @@ pub struct ContinentMap {
 
     continent_polygons: Vec<(ContinentIdx, Polygon<f64>)>,
 
+    /// Only used in climate
     pub grid: DynamicGrid<RegionTile>,
 
     /// None until init_generator()

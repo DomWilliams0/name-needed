@@ -395,7 +395,11 @@ impl<R: Renderer> Simulation<R> {
         let target = renderer.deinit();
 
         // gather blackboard for ui
-        let blackboard = UiBlackboard::fetch(&self.ecs_world, &self.debug_renderers.summarise());
+        let blackboard = UiBlackboard::fetch(
+            &self.ecs_world,
+            &self.world_loader,
+            &self.debug_renderers.summarise(),
+        );
 
         (target, blackboard)
     }

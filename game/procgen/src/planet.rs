@@ -2,8 +2,9 @@ use crate::continent::ContinentMap;
 use crate::rasterize::SlabGrid;
 use common::*;
 
+use crate::biome::BiomeChoices;
 use crate::params::PlanetParams;
-use crate::region::{Region, RegionLocation, Regions};
+use crate::region::{noise_pos_for_block, Region, RegionLocation, Regions};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
@@ -199,6 +200,13 @@ impl Planet {
     #[cfg(feature = "bin")]
     pub async fn inner(&self) -> impl std::ops::Deref<Target = PlanetInner> + '_ {
         self.0.read().await
+    }
+
+    pub async fn query_block(&self, block: WorldPosition) -> Option<BiomeChoices> {
+        let inner = self.0.read().await;
+        let sampler = inner.continents.biome_sampler();
+        let pos = noise_pos_for_block(block)?;
+        Some(sampler.sample_biome(pos, &inner.continents))
     }
 }
 

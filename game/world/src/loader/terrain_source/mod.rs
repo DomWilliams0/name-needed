@@ -34,6 +34,10 @@ pub enum TerrainSource {
 unsafe impl Send for TerrainSource {}
 unsafe impl Sync for TerrainSource {}
 
+pub struct BlockDetails {
+    pub biome_choices: SmallVec<[(BiomeType, f32); 4]>,
+}
+
 impl From<MemoryTerrainSource> for TerrainSource {
     fn from(src: MemoryTerrainSource) -> Self {
         Self::Memory(Arc::new(RwLock::new(src)))
@@ -74,6 +78,23 @@ impl TerrainSource {
                 .ok_or(TerrainSourceError::BlockOutOfBounds(block)),
         }
     }
+
+    pub async fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
+        match self {
+            TerrainSource::Memory(_) => None,
+            TerrainSource::Generated(src) => {
+                src.planet()
+                    .query_block(block)
+                    .await
+                    .map(|choices| BlockDetails {
+                        biome_choices: choices
+                            .choices()
+                            .map(|(b, w)| (b.ty(), w.value()))
+                            .collect(),
+                    })
+            }
+        }
+    }
 }
 
 mod generate;
@@ -83,6 +104,7 @@ use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
+use procgen::BiomeType;
 use std::sync::Arc;
 
 #[cfg(test)]

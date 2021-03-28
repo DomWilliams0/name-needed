@@ -11,6 +11,7 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::WorldChangeEvent;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
+use crate::loader::terrain_source::BlockDetails;
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
@@ -401,6 +402,11 @@ impl<C: WorldContext> WorldLoader<C> {
         block: WorldPosition,
     ) -> Result<GlobalSliceIndex, TerrainSourceError> {
         let fut = self.source.get_ground_level(block);
+        self.pool.runtime().block_on(fut)
+    }
+
+    pub fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
+        let fut = self.source.query_block(block);
         self.pool.runtime().block_on(fut)
     }
 }

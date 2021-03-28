@@ -5,7 +5,7 @@ use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
 
-use procgen::{BlockType, GeneratedBlock, Planet, PlanetParams};
+use procgen::{GeneratedBlock, Planet, PlanetParams};
 
 use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
