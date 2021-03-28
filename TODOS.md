@@ -1,4 +1,4 @@
-# TODOs (273)
+# TODOs (272)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -359,8 +359,6 @@
    * `// TODO middle of requested chunk instead of corner`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
- * [resources/worldgen/planet_generation.txt](resources/worldgen/planet_generation.txt) (1)
-   * `# TODO define biomes`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

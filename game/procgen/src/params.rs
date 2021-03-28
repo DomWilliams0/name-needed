@@ -85,9 +85,10 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "2.0")]
     pub coastline_thickness: f64,
 
+    #[structopt(long, parse(try_from_str), default_value)]
     pub no_cache: bool,
 
-    #[structopt(long, default_value = "biomes.ron")]
+    #[structopt(skip)] // set manually to "biomes.ron" as sibling to this file
     pub biomes_cfg: PathBuf,
 }
 
@@ -239,6 +240,11 @@ impl PlanetParams {
         if params.seed.is_none() {
             params.seed = Some(thread_rng().gen())
         }
+
+        params.biomes_cfg = {
+            let mut path = file_path.parent().unwrap(); // definitely a file by this point
+            path.join("biomes.ron")
+        };
 
         Ok(params)
     }
