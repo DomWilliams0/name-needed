@@ -4,6 +4,7 @@ use common::*;
 use noise::{Fbm, NoiseFn, Point4, Seedable};
 
 use crate::biome::deserialize::BiomeConfig;
+use crate::params::BiomesConfig;
 use rstar::{Envelope, Point, RTree, AABB};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -143,10 +144,13 @@ impl BiomeSampler {
             "moisture",
         );
 
-        let cfg: Vec<BiomeConfig> = {
-            // TODO return result for IO/deserialization errors
-            let reader = BufReader::new(File::open(&params.biomes_cfg)?);
-            ron::de::from_reader(reader)?
+        let cfg: Vec<BiomeConfig> = match &params.biomes_cfg {
+            BiomesConfig::File(path) => {
+                let reader = BufReader::new(File::open(path)?);
+                ron::de::from_reader(reader)?
+            }
+            #[cfg(test)]
+            BiomesConfig::Hardcoded(str) => ron::de::from_str(str)?,
         };
 
         let biomes = cfg.iter().map(BiomeParams::from).collect();

@@ -88,8 +88,20 @@ pub struct PlanetParams {
     #[structopt(long, parse(try_from_str), default_value)]
     pub no_cache: bool,
 
-    #[structopt(skip)] // set manually to "biomes.ron" as sibling to this file
-    pub biomes_cfg: PathBuf,
+    /// Set manually to "biomes.ron" as sibling to this file during loading
+    #[structopt(skip)]
+    pub biomes_cfg: BiomesConfig,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
+pub enum BiomesConfig {
+    // No overhead in non-test builds: "Data-carrying enums with a single variant without a repr()
+    // annotation have the same layout as the variant field."
+    File(PathBuf),
+
+    #[cfg(test)]
+    Hardcoded(String),
 }
 
 #[derive(Debug, Clone, Default, StructOpt)]
@@ -242,16 +254,25 @@ impl PlanetParams {
         }
 
         params.biomes_cfg = {
-            let mut path = file_path.parent().unwrap(); // definitely a file by this point
-            path.join("biomes.ron")
+            let path = file_path.parent().unwrap(); // definitely a file by this point
+            BiomesConfig::File(path.join("biomes.ron"))
         };
 
         Ok(params)
     }
 
     #[cfg(test)]
+    pub fn dummy_with_biomes(biomes: String) -> Self {
+        let mut params = Self::from_iter_safe(once("dummy")).expect("failed");
+        params.biomes_cfg = BiomesConfig::Hardcoded(biomes);
+        params
+    }
+
+    #[cfg(test)]
     pub fn dummy() -> Self {
-        Self::from_iter_safe(once("dummy")).expect("failed")
+        Self::dummy_with_biomes(
+            r#"[ (biome: Plains, color: 0x84e065, height: (10, 18), sampling: ()) ]"#.to_owned(),
+        )
     }
 
     pub fn seed(&self) -> u64 {
@@ -317,5 +338,11 @@ impl NoiseParams {
         }
 
         noise
+    }
+}
+
+impl Default for BiomesConfig {
+    fn default() -> Self {
+        Self::File(Default::default())
     }
 }
