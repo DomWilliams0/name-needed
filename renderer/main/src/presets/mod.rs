@@ -27,7 +27,11 @@ pub trait GamePreset<R: Renderer> {
 
         let (chunk, slab_depth, chunk_radius, is_preset) = {
             let cfg = config::get();
-            let (cx, cy) = cfg.world.initial_chunk;
+            let (cx, cy) = match cfg.world.source {
+                WorldSource::Preset(_) => (0, 0), // ignore config for preset worlds
+                WorldSource::Generate(_) => cfg.world.initial_chunk,
+            };
+
             (
                 ChunkLocation(cx, cy),
                 cfg.world.initial_slab_depth as i32,
@@ -100,6 +104,7 @@ mod empty;
 use crate::scenarios::Scenario;
 pub use ci::ContinuousIntegrationGamePreset;
 use common::panic;
+use config::WorldSource;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;
 

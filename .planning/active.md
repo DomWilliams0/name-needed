@@ -14,7 +14,7 @@
 	* [X] specify height range and colour in biomes.cfg
 * [ ] fix temperature when combined with elevation
 * [X] ensure heightmap is still present underwater
-* [ ] override initial camera chunk with 0,0 for preset worlds
+* [X] override initial camera chunk with 0,0 for preset worlds
 * [X] restrict slab loading to planet boundary, wrapping can wait
 * [ ] ui button to jump camera up/down to next surface
 * [~] remove old grid code
@@ -23,3 +23,4 @@
 * [ ] merge intersecting continents
 * [X] return Result from loading biome map
 * [X] noise sampling is non determinstic
+* [ ] each biome should have its own elevation noise parameters
