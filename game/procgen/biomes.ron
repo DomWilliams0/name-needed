@@ -2,7 +2,7 @@
     (
         biome: IcyOcean,
         color: 0x85e0fe,
-        height: (0, 0),
+        height: (-20, -1),
         sampling: (
             coastal: (-1.0, -0.2),
             temperature: (0.0, 0.2),
@@ -11,7 +11,7 @@
     (
         biome: Ocean,
         color: 0x228ff5,
-        height: (0, 0),
+        height: (-20, -5),
         sampling: (
             coastal: (-1.0, -0.2),
             temperature: (0.25, 1.0),
@@ -20,7 +20,7 @@
     (
         biome: CoastOcean,
         color: 0x5dabf5,
-        height: (0, 0),
+        height: (-5, 0),
         sampling: (
             coastal: (-0.25, 0.0),
             temperature: (0.25, 1.0),

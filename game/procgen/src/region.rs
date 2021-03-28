@@ -268,12 +268,12 @@ impl ChunkDescription {
             {
                 let BlockHeight { height, biome } = self.ground_height[&[x, y, 0]];
 
-                // TODO calculate these better
+                // TODO calculate these better, and store them in data
                 use BlockType::*;
                 let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
                     match biome {
                         BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {
-                            (SolidWater, SolidWater, SolidWater, 0)
+                            (Dirt, Sand, Stone, 1)
                         }
                         BiomeType::Beach => (Sand, Dirt, Stone, 4),
                         BiomeType::Plains

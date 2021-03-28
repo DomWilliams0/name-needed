@@ -144,6 +144,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * improved terrain colour palette
 * very simple oval shadows beneath entities to show height
 * bug: occlusion flickers after world changes, updates are probably being queued for too long
+* bug: occlusion shadows above a 9 block drop
 
 ## Building and testing
 * separate config and preset for tests
