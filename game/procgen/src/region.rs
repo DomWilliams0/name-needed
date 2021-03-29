@@ -222,9 +222,11 @@ impl RegionChunk {
             let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
             let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
 
-            let (coastal, elevation, moisture, temperature) = sampler.sample((nx, ny), continents);
+            let (coastal, base_elevation, moisture, temperature) =
+                sampler.sample((nx, ny), continents);
 
-            let biome_choices = sampler.choose_biomes(coastal, elevation, temperature, moisture);
+            let biome_choices =
+                sampler.choose_biomes(coastal, base_elevation, temperature, moisture);
             let biome = biome_choices.primary();
 
             // get block height from elevation, weighted by biome(s)
@@ -232,13 +234,13 @@ impl RegionChunk {
                 biome_choices
                     .choices()
                     .map(|(biome, weight)| {
-                        let (min, max) = biome.height_range();
+                        let (min, max) = biome.elevation_range();
                         let (min, max) = (min as f32, max as f32);
                         (min * weight.value(), max * weight.value())
                     })
                     .fold((0.0, 0.0), |acc, range| (acc.0 + range.0, acc.1 + range.1))
             };
-            let height = map_range((0.0, 1.0), height_range, elevation as f32) as i32;
+            let height = map_range((0.0, 1.0), height_range, base_elevation as f32) as i32;
 
             height_map[i] = BlockHeight {
                 height,

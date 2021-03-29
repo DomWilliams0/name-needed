@@ -271,7 +271,7 @@ impl PlanetParams {
     #[cfg(test)]
     pub fn dummy() -> Self {
         Self::dummy_with_biomes(
-            r#"[ (biome: Plains, color: 0x84e065, height: (10, 18), sampling: ()) ]"#.to_owned(),
+            r#"[ (biome: Plains, color: 0x84e065, elevation: (10, 18), sampling: ()) ]"#.to_owned(),
         )
     }
 

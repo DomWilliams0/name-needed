@@ -1,4 +1,4 @@
-# TODOs (271)
+# TODOs (270)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,9 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (2)
-   * `// TODO elevation is negative sometimes at the coasts?`
-   * `// TODO treat negative elevation as normal heightmap underwater`
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (1)
+   * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind movingbrings air to level out pressure`

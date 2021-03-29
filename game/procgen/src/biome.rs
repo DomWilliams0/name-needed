@@ -41,7 +41,7 @@ pub struct BiomeInfo {
     ty: BiomeType,
     #[cfg(feature = "bin")]
     map_color: u32,
-    height_range: Range<HeightLimit>,
+    elevation: Range<ElevationLimit>,
 }
 
 #[derive(Error, Debug)]
@@ -66,7 +66,7 @@ struct CoastlineLimit;
 struct NormalizedLimit;
 
 #[derive(Copy, Clone)]
-struct HeightLimit;
+struct ElevationLimit;
 
 trait RangeLimit {
     type Primitive: PartialOrd + Copy + Debug + DeserializeOwned;
@@ -91,7 +91,7 @@ struct BiomeNode {
 struct BiomeParams {
     biome: BiomeType,
     color: u32,
-    height: Range<HeightLimit>,
+    elevation: Range<ElevationLimit>,
 }
 
 const CHOICE_COUNT: usize = 3;
@@ -167,10 +167,10 @@ impl BiomeSampler {
         })
     }
 
-    /// (coastline_proximity, elevation, moisture, temperature)
+    /// (coastline_proximity, base elevation, moisture, temperature)
     pub fn sample(&self, pos: (f64, f64), continents: &ContinentMap) -> (f64, f64, f64, f64) {
         let coastline_proximity = continents.coastline_proximity(pos);
-        let elevation = self.elevation(pos, coastline_proximity);
+        let elevation = self.base_elevation(pos, coastline_proximity);
         let moisture = self.moisture(pos, coastline_proximity);
         let temperature = self.temperature(pos, elevation);
 
@@ -216,7 +216,7 @@ impl BiomeSampler {
                     ty: b.biome,
                     #[cfg(feature = "bin")]
                     map_color: b.color,
-                    height_range: b.height,
+                    elevation: b.elevation,
                 })
             } else {
                 None
@@ -247,16 +247,18 @@ impl BiomeSampler {
         let latitude = self.latitude_mul(y);
         let raw_temp = self.temperature.sample_wrapped_normalized((x, y));
 
-        // TODO elevation is negative sometimes at the coasts?
+        // TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).
+        //  need to decide on moderate range, tropical range and icy range
 
         // average sum of:
         //  - latitude: lower at poles, higher at equator
         //  - elevation: lower by sea, higher in-land
         //  - raw noise: 0-1
-        (raw_temp * 0.25) + (elevation * 0.25) + (latitude * 0.5)
+        (raw_temp * 0.25) + ((1.0 - elevation) * 0.25) + (latitude * 0.5)
     }
 
-    fn elevation(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
+    /// Base elevation for determining biomes
+    fn base_elevation(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
         // sample height map in normalized range
         let raw_height = self.height.sample_wrapped_normalized(pos);
 
@@ -265,7 +267,6 @@ impl BiomeSampler {
             raw_height * coastline_proximity
         } else {
             // underwater
-            // TODO treat negative elevation as normal heightmap underwater
             0.0
         }
     }
@@ -448,8 +449,8 @@ impl BiomeInfo {
         self.ty
     }
 
-    pub fn height_range(&self) -> (i32, i32) {
-        self.height_range.range()
+    pub fn elevation_range(&self) -> (i32, i32) {
+        self.elevation.range()
     }
 
     #[cfg(feature = "bin")]
@@ -465,7 +466,7 @@ impl BiomeType {
             ty: self,
             #[cfg(feature = "bin")]
             map_color: 0,
-            height_range: Range::full(),
+            elevation: Range::full(),
         }
     }
 }
@@ -549,7 +550,7 @@ impl RangeLimit for NormalizedLimit {
     }
 }
 
-impl RangeLimit for HeightLimit {
+impl RangeLimit for ElevationLimit {
     type Primitive = i32;
 
     fn range() -> (Self::Primitive, Self::Primitive) {
@@ -580,14 +581,14 @@ impl<'a> From<&'a BiomeConfig> for BiomeParams {
         BiomeParams {
             biome: cfg.biome,
             color: cfg.color,
-            height: cfg.height,
+            elevation: cfg.elevation,
         }
     }
 }
 
 mod deserialize {
     use crate::biome::{
-        BiomeConfigError, BiomeType, CoastlineLimit, HeightLimit, NormalizedLimit, Range,
+        BiomeConfigError, BiomeType, CoastlineLimit, ElevationLimit, NormalizedLimit, Range,
         RangeLimit,
     };
     use serde::de::{Error, SeqAccess, Visitor};
@@ -599,7 +600,7 @@ mod deserialize {
     pub(super) struct BiomeConfig {
         pub(super) biome: BiomeType,
         pub(super) color: u32,
-        pub(super) height: Range<HeightLimit>,
+        pub(super) elevation: Range<ElevationLimit>,
         pub(super) sampling: BiomeSampling,
     }
 

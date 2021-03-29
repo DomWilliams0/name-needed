@@ -17,3 +17,4 @@ procgen*.png
 imgui.ini
 perf.data*
 progress.gif
+*.ron.bak
