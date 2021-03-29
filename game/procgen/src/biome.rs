@@ -263,7 +263,7 @@ impl BiomeSampler {
         //  - latitude: lower at poles, higher at equator
         //  - elevation: lower by sea, higher in-land
         //  - raw noise: 0-1
-        (raw_temp * 0.25) + ((1.0 - elevation) * 0.25) + (latitude * 0.5)
+        (raw_temp * 0.25) + ((1.0 - elevation) * 0.15) + (latitude * 0.6)
     }
 
     /// Base elevation for determining biomes
