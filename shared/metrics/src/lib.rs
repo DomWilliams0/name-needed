@@ -1,4 +1,3 @@
-use prometheus_exporter::PrometheusExporter;
 use std::net::SocketAddr;
 
 pub type EntityId = u64;
@@ -37,7 +36,7 @@ macro_rules! entity_metric {
 pub fn start_serving() {
     std::thread::spawn(|| {
         let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 9898);
-        if let Err(e) = PrometheusExporter::run(&addr) {
+        if let Err(e) = prometheus_exporter::start(addr) {
             eprintln!("failed to start metrics server: {}", e);
         }
     });

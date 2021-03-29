@@ -1,8 +1,8 @@
 use common::*;
-use procgen::*;
 use std::io::Write;
 use std::time::SystemTime;
 
+#[allow(dead_code)]
 fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
     lazy_static! {
         static ref START_TIME: SystemTime = SystemTime::now();
@@ -20,6 +20,8 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
 
 #[cfg(feature = "bin")]
 fn main() {
+    use procgen::*;
+
     // parse config and args first
     let params = PlanetParams::load_with_args("procgen.txt");
 

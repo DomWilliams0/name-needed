@@ -11,11 +11,10 @@ common = { path = "../../shared/common" }
 unit = { path = "../../shared/unit" }
 grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
 color = { path = "../../shared/color", optional = true }
-noise = "0.6" # 0.7 changes noise parameters, avoid upgrade for now
-rand_distr = "0.3"
+noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
+rand_distr = { version = "0.4", optional = true } # used by climate only
 strum = "0.19"
 strum_macros = "0.19"
-array-init = "1.0"
 tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
 futures = { version = "0.3", default-features = false, features = ["std", "alloc"] }
 geo = "0.16"
@@ -25,7 +24,7 @@ rstar = "0.8"
 line_drawing = { version = "0.8", optional = true }
 crossbeam = { version = "0.8", optional = true }
 async-trait = { version = "0.1", optional = true }
-async-scoped = { version = "0.6.0", features = ["use-tokio"], optional = true }
+async-scoped = { version = "0.6", features = ["use-tokio"], optional = true }
 
 image = { version = "0.23", optional = true, default-features = false, features = ["png"] }
 imageproc = { version = "0.22", optional = true, default-features = false }
@@ -39,7 +38,7 @@ sha2 = { version = "0.9", optional = true }
 [features]
 default = []
 bin = ["image", "imageproc", "color", "async-trait", "async-scoped"]
-climate = ["crossbeam", "line_drawing"]
+climate = ["crossbeam", "line_drawing", "rand_distr"]
 cache = ["bincode", "sha2", "geo/use-serde"]
 
 

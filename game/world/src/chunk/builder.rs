@@ -136,9 +136,9 @@ pub struct ChunkDescriptor {
     pub chunk_pos: ChunkLocation,
 }
 
-impl Into<(ChunkLocation, RawChunkTerrain)> for ChunkDescriptor {
-    fn into(self) -> (ChunkLocation, RawChunkTerrain) {
-        (self.chunk_pos, self.terrain)
+impl From<ChunkDescriptor> for (ChunkLocation, RawChunkTerrain) {
+    fn from(desc: ChunkDescriptor) -> Self {
+        (desc.chunk_pos, desc.terrain)
     }
 }
 

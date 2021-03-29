@@ -64,10 +64,10 @@ impl From<Rad> for Direction {
     }
 }
 
-impl Into<Rad> for Direction {
-    fn into(self) -> Rad {
+impl From<Direction> for Rad {
+    fn from(dir: Direction) -> Self {
         const MULT: f32 = (2.0 * PI) / Direction::COUNT.as_f32();
-        rad((self as u8 as f32) * MULT).normalize()
+        rad((dir as u8 as f32) * MULT).normalize()
     }
 }
 
@@ -82,7 +82,7 @@ impl Desire {
     /// (value, falloff value)
     fn from_float(value: f32) -> (Desire, Desire) {
         debug_assert!(
-            value >= 0.0 && value <= 1.0,
+            (0.0..=1.0).contains(&value),
             "value out of range: {}",
             value
         );
@@ -99,13 +99,13 @@ impl Desire {
     }
 }
 
-impl Into<f32> for Desire {
-    fn into(self) -> f32 {
-        if self.0 == 255 {
+impl From<Desire> for f32 {
+    fn from(desire: Desire) -> Self {
+        if desire.0 == 255 {
             // special edge case
             1.0
         } else {
-            self.0 as f32 / (u8::MAX as f32 + 1.0)
+            desire.0 as f32 / (u8::MAX as f32 + 1.0)
         }
     }
 }

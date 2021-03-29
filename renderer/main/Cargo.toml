@@ -8,19 +8,19 @@ default-run = "main"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-engine = {path = "../engine"}
+engine = { path = "../engine" }
 
-simulation = {path = "../../game/simulation"}
-resources = {path = "../../game/resources"}
+simulation = { path = "../../game/simulation" }
+resources = { path = "../../game/resources" }
 
-config = {path = "../../shared/config"}
+config = { path = "../../shared/config" }
 common = { path = "../../shared/common", features = ["binary"] }
-color = { path = "../../shared/color"}
+color = { path = "../../shared/color" }
 
-alloc_counter = {version = "^0.0", optional = true}
-num_cpus = "^1.13"
-inventory = "^0.1"
-argh = "^0.1"
+alloc_counter = { version = "0.0", optional = true }
+num_cpus = "1.13"
+inventory = "0.1"
+argh = "0.1"
 
 [features]
 default = ["use-sdl"]

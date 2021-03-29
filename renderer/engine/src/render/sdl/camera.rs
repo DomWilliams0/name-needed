@@ -105,7 +105,7 @@ impl Camera {
     pub fn view_matrix(&mut self, interpolation: f64, z: f32) -> Matrix4 {
         let pos = self.position(interpolation, z);
         self.last_extrapolated_pos = Point2::new(pos.x, pos.y);
-        Matrix4::look_at_dir(pos, -AXIS_UP, AXIS_FWD)
+        Matrix4::look_to_rh(pos, -AXIS_UP, AXIS_FWD)
     }
 
     pub fn projection_matrix(&self) -> Matrix4 {

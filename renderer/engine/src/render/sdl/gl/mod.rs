@@ -61,8 +61,8 @@ macro_rules! errchk {
     };
 }
 
-struct GLHex(u64);
-struct GLString<'a>(&'a CStr);
+struct GlHex(u64);
+struct GlString<'a>(&'a CStr);
 
 extern "system" fn on_debug_message(
     source: GLenum,
@@ -73,7 +73,7 @@ extern "system" fn on_debug_message(
     message: *const GLchar,
     _user_param: *mut c_void,
 ) {
-    let msg = GLString(unsafe { CStr::from_ptr(message) });
+    let msg = GlString(unsafe { CStr::from_ptr(message) });
     if gltype == gl::DEBUG_TYPE_ERROR {
         error!("GL error"; "severity" => severity, "message" => msg);
     } else {
@@ -83,7 +83,7 @@ extern "system" fn on_debug_message(
         }
 
         let o =
-            o!("source" => GLHex(source.into()), "type" => GLHex(gltype.into()), "message" => msg);
+            o!("source" => GlHex(source.into()), "type" => GlHex(gltype.into()), "message" => msg);
 
         match severity {
             gl::DEBUG_SEVERITY_HIGH => warn!("GL message"; o),
@@ -203,7 +203,7 @@ impl InstancedPipeline {
     }
 }
 
-impl slog::Value for GLHex {
+impl slog::Value for GlHex {
     //noinspection DuplicatedCode
     fn serialize(
         &self,
@@ -215,7 +215,7 @@ impl slog::Value for GLHex {
     }
 }
 
-impl slog::Value for GLString<'_> {
+impl slog::Value for GlString<'_> {
     //noinspection DuplicatedCode
     fn serialize(
         &self,

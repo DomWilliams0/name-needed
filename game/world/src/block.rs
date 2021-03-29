@@ -179,8 +179,8 @@ impl BlockType {
 }
 
 /// Helper
-impl Into<Block> for BlockType {
-    fn into(self) -> Block {
-        Block::with_block_type(self)
+impl From<BlockType> for Block {
+    fn from(bt: BlockType) -> Self {
+        Block::with_block_type(bt)
     }
 }

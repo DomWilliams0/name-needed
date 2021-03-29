@@ -66,7 +66,7 @@ pub struct NormalizedFloat(f32);
 impl NormalizedFloat {
     pub fn new(f: f32) -> Self {
         debug_assert!(
-            f >= 0.0 && f <= 1.0,
+            (0.0..=1.0).contains(&f),
             "{} out of range for normalized float",
             f
         );

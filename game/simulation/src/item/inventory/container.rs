@@ -9,7 +9,7 @@ use crate::item::inventory::container::contents::SortedContents;
 use crate::item::inventory::HeldEntity;
 
 mod contents {
-    #![allow(clippy::toplevel_ref_arg)]
+    #![allow(clippy::toplevel_ref_arg, clippy::from_over_into)]
     use super::*;
 
     // TODO sort by some item type identifier so common items are grouped together

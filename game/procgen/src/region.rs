@@ -129,7 +129,7 @@ impl Region {
     async fn create(
         region: RegionLocation,
         continents: &ContinentMap,
-        params: &PlanetParams,
+        _params: &PlanetParams,
     ) -> Self {
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
         // times?

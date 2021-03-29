@@ -209,10 +209,8 @@ impl PlanetParams {
     /// Must be at least len 1, where first elem is binary name
     fn load(file_path: &Path, mut args: impl Iterator<Item = String>) -> BoxedResult<Self> {
         let mut params = {
-            let mut config_params = Vec::new();
-
-            // binary name
-            config_params.push(args.next().expect("no 0th arg"));
+            let binary_name = args.next().expect("no 0th arg");
+            let mut config_params = vec![binary_name];
 
             match File::open(file_path) {
                 Err(e) if e.kind() == ErrorKind::NotFound => {

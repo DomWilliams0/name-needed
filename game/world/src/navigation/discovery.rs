@@ -47,10 +47,10 @@ pub(crate) struct AreaDiscovery<'a> {
     below_top_slice: Option<Slice<'a>>,
 }
 
-impl Into<AreaDiscoveryGridBlock> for &Block {
-    fn into(self) -> AreaDiscoveryGridBlock {
+impl From<&Block> for AreaDiscoveryGridBlock {
+    fn from(block: &Block) -> Self {
         AreaDiscoveryGridBlock {
-            opacity: self.opacity().into(),
+            opacity: block.opacity().into(),
             area: Default::default(),
         }
     }

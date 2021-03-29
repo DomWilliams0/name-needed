@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 common = { path = "../../shared/common" }
 
-float-ord = "^0.2"
+float-ord = "0.2"
 
 [features]
 default = []

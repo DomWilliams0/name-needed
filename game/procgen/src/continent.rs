@@ -193,7 +193,7 @@ impl ContinentMap {
         let (inland, polygons_to_check) = match self
             .continent_polygons()
             .enumerate()
-            .find(|(i, (_, polygon))| polygon.contains(&point))
+            .find(|(_i, (_, polygon))| polygon.contains(&point))
         {
             Some((idx, _)) => {
                 // contained by a polygon, only check its lines

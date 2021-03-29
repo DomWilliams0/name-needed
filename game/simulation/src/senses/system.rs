@@ -16,8 +16,8 @@ const SENSE_DECAY: u8 = 40;
 #[storage(DenseVecStorage)]
 #[name("senses")]
 pub struct SensesComponent {
-    pub vision: ArrayVec<[VisionCone; 1]>,
-    pub hearing: ArrayVec<[HearingSphere; 1]>,
+    pub vision: ArrayVec<VisionCone, 1>,
+    pub hearing: ArrayVec<HearingSphere, 1>,
 
     /// Sensed entities this tick
     /// TODO maybe the ecs bitmask can be reused here instead of a huge alloc per entity

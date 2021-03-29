@@ -1,7 +1,7 @@
 use crate::continent::ContinentMap;
 use crate::{map_range, PlanetParams};
 use common::*;
-use noise::{Fbm, NoiseFn, Point4, Seedable};
+use noise::{Fbm, NoiseFn, Seedable};
 
 use crate::biome::deserialize::BiomeConfig;
 use crate::params::BiomesConfig;
@@ -103,7 +103,7 @@ pub struct BiomeChoices {
 
     /// (biome, weight). weight=1.0 is max, 0.0 is min.
     /// Sorted with highest weight first
-    secondary: ArrayVec<[(BiomeInfo, NormalizedFloat); CHOICE_COUNT - 1]>,
+    secondary: ArrayVec<(BiomeInfo, NormalizedFloat), { CHOICE_COUNT - 1 }>,
 }
 
 /// Returned by a query about a specific block
@@ -116,7 +116,7 @@ pub struct BlockQueryResult {
 }
 
 /// Noise generator with its rough limits
-struct Noise<N: NoiseFn<Point4<f64>>> {
+struct Noise<N: NoiseFn<[f64; 4]>> {
     noise: N,
     limits: (f64, f64),
     planet_size: f64,
@@ -213,6 +213,7 @@ impl BiomeSampler {
         )
     }
 
+    #[cfg(feature = "bin")]
     pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> BiomeChoices {
         let (coastline_proximity, elevation, moisture, temperature) = self.sample(pos, continents);
         self.choose_biomes(coastline_proximity, elevation, temperature, moisture)
@@ -286,7 +287,7 @@ impl BiomeSampler {
     }
 }
 
-impl<N: NoiseFn<Point4<f64>>> Noise<N> {
+impl<N: NoiseFn<[f64; 4]>> Noise<N> {
     fn new(noise: N, params: &PlanetParams, limit_rando: &mut dyn RngCore, what: &str) -> Self {
         let mut this = Noise {
             noise,
@@ -346,7 +347,6 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
         let nz = x1 + (s * TAU).sin() * dx / TAU;
         let nw = y1 + (t * TAU).sin() * dy / TAU;
 
-        let value = self.noise.get([nx, ny, nz, nw]);
         // debug_assert!(
         //     (self.limits.0..self.limits.1).contains(&value),
         //     "noise limits are wrong (value={:?}, limits={:?} -> {:?})",
@@ -354,7 +354,7 @@ impl<N: NoiseFn<Point4<f64>>> Noise<N> {
         //     self.limits.0,
         //     self.limits.1,
         // );
-        value
+        self.noise.get([nx, ny, nz, nw])
     }
 
     /// Produces seamlessly wrapping noise scaled from 0-1 by limits of this generator
@@ -368,7 +368,8 @@ impl BiomeChoices {
     /// * Panics if choices is empty, must be of length [1, CHOICE_COUNT].
     /// * Should be sorted in ascending order
     fn from_nearest_neighbours(choices: impl Iterator<Item = (BiomeInfo, f32)>) -> Self {
-        let choices: ArrayVec<[(BiomeInfo, f32); CHOICE_COUNT]> = choices.collect();
+        let choices: ArrayVec<(BiomeInfo, f32), CHOICE_COUNT> =
+            choices.take(CHOICE_COUNT).collect();
 
         // ensure sorted in ascending order originally
         debug_assert!(
@@ -388,7 +389,7 @@ impl BiomeChoices {
         );
 
         // normalize distances to weights in descending order
-        let inverted: ArrayVec<[(BiomeInfo, f32); CHOICE_COUNT]> = choices
+        let inverted: ArrayVec<(BiomeInfo, f32), CHOICE_COUNT> = choices
             .into_iter()
             .map(|(biome, dist_2)| {
                 // +0.01 to ensure no div by zero
@@ -501,7 +502,7 @@ impl BiomeNode {
         let c = self.temperature.iter_points();
         let d = self.elevation.iter_points();
 
-        let points: ArrayVec<[[f32; 4]; 16 /* 2^4 */ ]> = a
+        let points: ArrayVec<[f32; 4], 16 /* 2^4 */> = a
             .cartesian_product(b)
             .cartesian_product(c)
             .cartesian_product(d)

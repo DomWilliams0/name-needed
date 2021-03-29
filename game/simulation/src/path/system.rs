@@ -143,12 +143,10 @@ impl<'a> System<'a> for PathSteeringSystem {
 
 impl FollowPathComponent {
     fn set_request(&mut self, req: PathRequest) {
-        if let Some(old) = self.request.as_ref() {
-            if let PathRequest::NewTarget { .. } = old {
-                warn!("follow path target was overwritten before it could be used";
-                    "previous" => ?old, "new" => ?req
-                );
-            }
+        if let Some(prev @ PathRequest::NewTarget { .. }) = self.request.as_ref() {
+            warn!("follow path target was overwritten before it could be used";
+                "previous" => ?prev, "new" => ?req
+            );
         }
 
         trace!("assigning new follow path request"; "request" => ?req);

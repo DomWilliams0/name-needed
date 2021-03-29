@@ -18,12 +18,12 @@ unit = { path = "../../shared/unit" }
 common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 
-gameloop = "^0.2"
-sdl2 = { version = "^0.34", optional = true, features = ["bundled"] }
-gl = { version = "^0.14", optional = true }
-imgui-sdl2 = { version = "^0.12", optional = true}
-imgui-opengl-renderer = { version = "^0.9", optional = true}
-imgui = { version = "^0.5", optional = true }
+gameloop = "0.2"
+sdl2 = { version = "0.34", optional = true, features = ["bundled"] }
+gl = { version = "0.14", optional = true }
+imgui-sdl2 = { version = "0.14", optional = true }
+imgui-opengl-renderer = { version = "0.11", optional = true }
+imgui = { version = "0.7", optional = true }
 
 [features]
 default = []
