@@ -43,6 +43,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
 * resolve an entity to its displayable name including state in the UI layer only
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
+* ui button to skip up/down to next surface
 
 ## Entity behaviour
 * more society level jobs
@@ -61,7 +62,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* a set of completed tasks should be maintained per job
 
 ## World generation
-* biomes
+* better biome generation
+	* each biome should define its own elevation noise params to add to base elevation
+* improve coastlines
+	* rough up coastlines via e.g. random subdivisions or erosion simulation
+	* dont treat as a fixed width border around continents
+	* merge continents that intersect, instead of forcing a coastline through them
 * features e.g. trees, hills
 	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
@@ -75,7 +81,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		chunks are loaded and rendered at their true wrapped positions e.g. if worldsize=8, chunks x=0, x=8, x=-8 are the same chunk
 		entities must be aware of this! all distance checks must take this into account (https://blog.demofox.org/2017/10/01/calculating-the-distance-between-points-in-wrap-around-toroidal-space/)
 		use different base noise for biomes and blend (http://parzivail.com/procedural-terrain-generaion/)
-	* chunk and region resolution should wrap around explicitly/fail in generator. should the world loader wrap coords
+		* chunk and region resolution should wrap around explicitly/fail in generator. should the world loader wrap coords
 * unique species and settlements with societies to discover in different environments
 	* underground species with no eyes, cave houses
 	* underwater people
