@@ -2,7 +2,7 @@ use crate::continent::ContinentMap;
 use crate::rasterize::SlabGrid;
 use common::*;
 
-use crate::biome::BiomeChoices;
+use crate::biome::BlockQueryResult;
 use crate::params::PlanetParams;
 use crate::region::{noise_pos_for_block, Region, RegionLocation, Regions};
 use std::sync::Arc;
@@ -204,11 +204,22 @@ impl Planet {
         self.0.read().await
     }
 
-    pub async fn query_block(&self, block: WorldPosition) -> Option<BiomeChoices> {
+    pub async fn query_block(&self, block: WorldPosition) -> Option<BlockQueryResult> {
         let inner = self.0.read().await;
         let sampler = inner.continents.biome_sampler();
         let pos = noise_pos_for_block(block)?;
-        Some(sampler.sample_biome(pos, &inner.continents))
+        let (coastline_proximity, base_elevation, moisture, temperature) =
+            sampler.sample(pos, &inner.continents);
+        let biomes =
+            sampler.choose_biomes(coastline_proximity, base_elevation, temperature, moisture);
+
+        Some(BlockQueryResult {
+            biome_choices: biomes,
+            coastal_proximity: coastline_proximity,
+            base_elevation,
+            moisture,
+            temperature,
+        })
     }
 }
 

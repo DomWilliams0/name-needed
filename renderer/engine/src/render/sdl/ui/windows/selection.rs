@@ -250,15 +250,22 @@ impl SelectionWindow {
                 COLOR_ORANGE,
             );
 
-            TreeNode::new(im_str!("Biome"))
+            TreeNode::new(im_str!("Generation info"))
                 .default_open(false)
                 .build(ui, || {
-                    let details = match bundle.blackboard.selected_block_details.as_ref() {
-                        None => {
+                    let details = match (
+                        bundle.blackboard.selected_block_details.as_ref(),
+                        bundle.blackboard.selected_tiles.single_tile(),
+                    ) {
+                        (None, Some(_)) => {
+                            ui.text_disabled(im_str!("Incompatible terrain source"));
+                            return;
+                        }
+                        (None, _) => {
                             ui.text_disabled(im_str!("Single selection required"));
                             return;
                         }
-                        Some(t) => t,
+                        (Some(t), _) => t,
                     };
 
                     let (primary, _) = match details.biome_choices.iter().next() {
@@ -280,6 +287,31 @@ impl SelectionWindow {
                     for (biome, weight) in details.biome_choices.iter() {
                         ui.text(ui_str!(in strings, " - {:?} ({})", biome, weight));
                     }
+
+                    ui.key_value(
+                        im_str!("Coastline proximity:  "),
+                        || Value::Some(ui_str!(in strings, "{:.4}", details.coastal_proximity)),
+                        None,
+                        COLOR_GREEN,
+                    );
+                    ui.key_value(
+                        im_str!("Elevation:  "),
+                        || Value::Some(ui_str!(in strings, "{:.4}", details.base_elevation)),
+                        None,
+                        COLOR_GREEN,
+                    );
+                    ui.key_value(
+                        im_str!("Temperature:  "),
+                        || Value::Some(ui_str!(in strings, "{:.4}", details.temperature)),
+                        None,
+                        COLOR_GREEN,
+                    );
+                    ui.key_value(
+                        im_str!("Moisture:  "),
+                        || Value::Some(ui_str!(in strings, "{:.4}", details.moisture)),
+                        None,
+                        COLOR_GREEN,
+                    );
                 });
 
             ui.separator();

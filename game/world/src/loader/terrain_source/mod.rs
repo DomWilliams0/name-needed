@@ -36,6 +36,10 @@ unsafe impl Sync for TerrainSource {}
 
 pub struct BlockDetails {
     pub biome_choices: SmallVec<[(BiomeType, f32); 4]>,
+    pub coastal_proximity: f64,
+    pub base_elevation: f64,
+    pub moisture: f64,
+    pub temperature: f64,
 }
 
 impl From<MemoryTerrainSource> for TerrainSource {
@@ -86,11 +90,16 @@ impl TerrainSource {
                 src.planet()
                     .query_block(block)
                     .await
-                    .map(|choices| BlockDetails {
-                        biome_choices: choices
+                    .map(|result| BlockDetails {
+                        biome_choices: result
+                            .biome_choices
                             .choices()
                             .map(|(b, w)| (b.ty(), w.value()))
                             .collect(),
+                        coastal_proximity: result.coastal_proximity,
+                        base_elevation: result.base_elevation,
+                        moisture: result.moisture,
+                        temperature: result.temperature,
                     })
             }
         }

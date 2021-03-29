@@ -106,6 +106,15 @@ pub struct BiomeChoices {
     secondary: ArrayVec<[(BiomeInfo, NormalizedFloat); CHOICE_COUNT - 1]>,
 }
 
+/// Returned by a query about a specific block
+pub struct BlockQueryResult {
+    pub biome_choices: BiomeChoices,
+    pub coastal_proximity: f64,
+    pub base_elevation: f64,
+    pub moisture: f64,
+    pub temperature: f64,
+}
+
 /// Noise generator with its rough limits
 struct Noise<N: NoiseFn<Point4<f64>>> {
     noise: N,
