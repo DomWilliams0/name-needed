@@ -68,6 +68,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* rough up coastlines via e.g. random subdivisions or erosion simulation
 	* dont treat as a fixed width border around continents
 	* merge continents that intersect, instead of forcing a coastline through them
+* continent blobs should wrap across planet boundaries
 * features e.g. trees, hills
 	* trees are entities, not (only) blocks
 	* accurate-ish rivers, caves
