@@ -1,10 +1,8 @@
 # nice, comments
-#--draw-density
-#--draw-height
 #--draw-continent-polygons
 --draw-biomes
-#--draw-overlay moisture
---overlay-alpha 170
+--draw-overlay elevation
+--overlay-alpha 110
 
 
 --seed 1231232

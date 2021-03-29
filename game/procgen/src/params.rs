@@ -162,12 +162,6 @@ pub struct RenderParams {
     #[structopt(long)]
     pub draw_continent_polygons: bool,
 
-    #[structopt(long)]
-    pub draw_density: bool,
-
-    #[structopt(long)]
-    pub draw_height: bool,
-
     #[structopt(long, default_value = "temp")]
     pub gif_progress: RenderProgressParams,
 
@@ -176,9 +170,6 @@ pub struct RenderParams {
 
     #[structopt(long, default_value = "surface")]
     pub gif_layer: AirLayer,
-
-    #[structopt(long)]
-    pub gif_all: bool,
 
     #[structopt(long, default_value = "4")]
     pub gif_threads: usize,
