@@ -1,5 +1,5 @@
 use crate::params::PlanetParams;
-use crate::RegionLocation;
+use crate::region::RegionLocation;
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;

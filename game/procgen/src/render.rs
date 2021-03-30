@@ -6,18 +6,19 @@ use imageproc::drawing::{
     draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
 };
 use imageproc::rect::Rect;
+use tokio::time::Duration;
 
 use color::ColorRgb;
+use common::num_traits::clamp;
 use common::*;
 use grid::{DynamicGrid, GridImpl};
 use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
 
 use crate::biome::BiomeType;
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
+use crate::region::RegionLocation;
 use crate::region::CHUNKS_PER_REGION_SIDE;
-use crate::{map_range, Planet, RegionLocation, SlabGrid};
-use common::num_traits::clamp;
-use tokio::time::Duration;
+use crate::{map_range, Planet, SlabGrid};
 
 #[derive(Clone)]
 pub struct Render {

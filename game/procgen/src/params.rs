@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
-use crate::RegionLocation;
+use crate::region::RegionLocation;
 use common::alloc::str::FromStr;
 use noise::MultiFractal;
 #[cfg(feature = "cache")]

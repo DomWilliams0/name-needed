@@ -1,9 +1,11 @@
+use std::hint::unreachable_unchecked;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use common::*;
 use procgen::benchmark_exports::*;
-use procgen::{PlanetParams, RegionLocation};
-use std::hint::unreachable_unchecked;
+use procgen::region::unit::RegionLocation;
+use procgen::PlanetParams;
 
 pub fn creation(c: &mut Criterion) {
     let params = PlanetParams::dummy();

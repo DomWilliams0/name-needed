@@ -1,13 +1,16 @@
-use crate::continent::ContinentMap;
-use crate::rasterize::SlabGrid;
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+
 use common::*;
+use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::biome::BlockQueryResult;
+use crate::continent::ContinentMap;
 use crate::params::PlanetParams;
-use crate::region::{noise_pos_for_block, Region, RegionLocation, Regions};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use crate::rasterize::SlabGrid;
+use crate::region::{noise_pos_for_block, RegionLocation};
+use crate::region::{Region, Regions};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
