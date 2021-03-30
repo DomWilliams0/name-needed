@@ -6,4 +6,4 @@
 	* [ ] forest bounds
 * [ ] individual tree placement via poisson disks
 * [ ] tree sub feature block placement
-* [ ] remove redundant matches dependency
+* [X] remove redundant matches dependency

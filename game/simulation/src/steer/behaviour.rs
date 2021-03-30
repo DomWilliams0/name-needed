@@ -152,8 +152,6 @@ mod tests {
     use crate::steer::Seek;
     use crate::TransformComponent;
     use common::NormalizedFloat;
-    use matches::assert_matches;
-    use std::f32::EPSILON;
     use unit::world::WorldPoint;
 
     #[test]
@@ -165,19 +163,19 @@ mod tests {
         let mut output = InterestsContextMap::default();
 
         // first ticks takes us toward
-        assert_matches!(
+        assert!(matches!(
             seek.tick(&transform, 0.5, &mut output),
             SteeringResult::Ongoing
-        );
+        ));
 
         // overshoot, but not in arrival range - should still finish because the direction changed
         // we're halfway there but going fast enough to arrive next tick
         transform.position.0 = 5.0;
         transform.velocity.x = 4.8;
-        assert_matches!(
+        assert!(matches!(
             seek.tick(&transform, 0.5, &mut output),
             SteeringResult::Finished
-        );
+        ));
     }
     #[test]
     fn seek_arrived_already() {
@@ -186,10 +184,10 @@ mod tests {
         let mut output = InterestsContextMap::default();
 
         // already arrived
-        assert_matches!(
+        assert!(matches!(
             seek.tick(&transform, 0.5, &mut output),
             SteeringResult::Finished
-        );
+        ));
     }
 
     #[test]
@@ -200,13 +198,13 @@ mod tests {
         let mut output = ContextMap::default();
 
         // output should be towards the block
-        assert_matches!(
+        assert!(matches!(
             seek.tick(&transform, 0.2, output.interests_mut()),
             SteeringResult::Ongoing
-        );
+        ));
         let (dir, _) = output.resolve();
         assert!(dir
             .0
-            .approx_eq(Into::<Rad>::into(Direction::East).0, (EPSILON, 2)));
+            .approx_eq(Into::<Rad>::into(Direction::East).0, (f32::EPSILON, 2)));
     }
 }

@@ -289,8 +289,6 @@ impl Debug for AreaNavEdge {
 
 #[cfg(test)]
 mod tests {
-    use matches::assert_matches;
-
     use unit::world::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
@@ -808,7 +806,7 @@ mod tests {
 
         let err = graph.find_area_path(WorldArea::new((0, 0)), WorldArea::new((100, 20)));
 
-        assert_matches!(err, Err(AreaPathError::NoSuchNode(_)));
+        assert!(matches!(err, Err(AreaPathError::NoSuchNode(_))));
     }
 
     #[test]

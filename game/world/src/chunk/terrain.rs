@@ -826,8 +826,6 @@ impl Default for RawChunkTerrain {
 
 #[cfg(test)]
 mod tests {
-    use matches::assert_matches;
-
     use unit::world::CHUNK_SIZE;
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
@@ -1267,7 +1265,7 @@ mod tests {
         // 0,0,0 occluded by 2 chunk neighbours
         assert!(world.block((-1, 0, 1)).unwrap().opacity().solid());
         assert!(world.block((0, -1, 1)).unwrap().opacity().solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, 0)),
             [
                 VertexOcclusion::Full,
@@ -1275,7 +1273,7 @@ mod tests {
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly
             ]
-        );
+        ));
     }
 
     #[test]
@@ -1307,7 +1305,7 @@ mod tests {
         assert!(world.block((0, 0, -1)).unwrap().opacity().solid());
         assert!(world.block((-1, 0, 0)).unwrap().opacity().solid());
         assert!(world.block((0, 0, 0)).unwrap().opacity().transparent());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::Mildly,
@@ -1315,14 +1313,14 @@ mod tests {
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly
             ]
-        );
+        ));
 
         // ... but when (0,0,0) is solid, (0,0,-1) is hidden so it shouldnt be updated
         let world_ref = mk_chunks(true);
         let world = world_ref.borrow();
 
         assert!(world.block((0, 0, 0)).unwrap().opacity().solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::NotAtAll,
@@ -1330,7 +1328,7 @@ mod tests {
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll
             ]
-        );
+        ));
     }
 
     #[test]
@@ -1368,7 +1366,7 @@ mod tests {
             .unwrap()
             .opacity()
             .solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, CHUNK_SIZE.as_i32() - 1, 0)),
             [
                 VertexOcclusion::NotAtAll,
@@ -1376,7 +1374,7 @@ mod tests {
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mostly,
             ]
-        );
+        ));
     }
 
     #[test]

@@ -121,20 +121,19 @@ mod tests {
     use super::*;
     use crate::chunk::RawChunkTerrain;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
-    use matches::assert_matches;
     use std::iter::once;
 
     #[test]
     fn invalid() {
         let no_chunks: Vec<(ChunkLocation, RawChunkTerrain)> = vec![];
         let empty = MemoryTerrainSource::from_chunks(no_chunks.into_iter());
-        assert_matches!(empty.err().unwrap(), TerrainSourceError::NoChunks);
+        assert!(matches!(empty.err().unwrap(), TerrainSourceError::NoChunks));
 
         let random = MemoryTerrainSource::from_chunks(once(((5, 5), RawChunkTerrain::default())));
-        assert_matches!(
+        assert!(matches!(
             random.err().unwrap(),
             TerrainSourceError::MissingCentreChunk
-        );
+        ));
     }
 
     #[test]
