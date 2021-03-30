@@ -16,8 +16,8 @@ use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, S
 
 use crate::biome::BiomeType;
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
-use crate::region::RegionLocation;
 use crate::region::CHUNKS_PER_REGION_SIDE;
+use crate::region::{PlanetPoint, RegionLocation};
 use crate::{map_range, Planet, SlabGrid};
 
 #[derive(Clone)]
@@ -75,7 +75,7 @@ impl Render {
             if params.draw_biomes {
                 // sample biome at every pixel
                 image = put_pixels_par(image, &|x, y| {
-                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let point = PlanetPoint::new(x as f64 / zoom, y as f64 / zoom);
                     let biome = biomes.sample_biome(point, &planet.continents).primary();
 
                     let colour = biome.map_color();
@@ -143,7 +143,7 @@ impl Render {
                 let biomes = planet.continents.biome_sampler();
                 let alpha = planet.params.render.overlay_alpha;
                 overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
-                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let point = PlanetPoint::new(x as f64 / zoom, y as f64 / zoom);
                     let (coastline_proximity, elevation, moisture, temperature) =
                         biomes.sample(point, &planet.continents);
 

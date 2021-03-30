@@ -1,5 +1,5 @@
 use crate::params::PlanetParams;
-use crate::region::RegionLocation;
+use crate::region::{PlanetPoint, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
@@ -184,11 +184,11 @@ impl ContinentMap {
     /// +0.2: land close to coastline
     /// +1.0: land far away from coastline
     ///
-    pub fn coastline_proximity(&self, pos: (f64, f64)) -> f64 {
+    pub fn coastline_proximity(&self, pos: PlanetPoint) -> f64 {
         use geo::contains::Contains;
         use geo::euclidean_distance::EuclideanDistance;
 
-        let point = Point::from(pos);
+        let point = Point::from(pos.get());
 
         let (inland, polygons_to_check) = match self
             .continent_polygons()

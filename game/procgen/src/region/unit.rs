@@ -9,23 +9,13 @@ use crate::PlanetParams;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct RegionLocation(pub u32, pub u32);
 
-pub const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
+/// A point on the planet's surface
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub struct PlanetPoint(f64, f64);
 
-pub fn noise_pos_for_block(block: WorldPosition) -> Option<(f64, f64)> {
-    let chunk = ChunkLocation::from(block);
-    let chunk_idx = Region::chunk_index(chunk);
-    let region = RegionLocation::try_from_chunk(chunk)?;
-    let (rx, ry) = (region.0 as f64, region.1 as f64);
-
-    let chunk_idx = chunk_idx as i32;
-    let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
-    let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
-
-    let (bx, by, _) = BlockPosition::from(block).xyz();
-
-    let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx as i32) as f64 * PER_BLOCK);
-    let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by as i32) as f64 * PER_BLOCK);
-    Some((nx, ny))
+pub struct PlanetPointPrecalculated {
+    region: (f64, f64),
+    chunk: (i32, i32),
 }
 
 impl RegionLocation {
@@ -78,5 +68,71 @@ impl RegionLocation {
             (self.0 as i32 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.x(),
             (self.1 as i32 * CHUNKS_PER_REGION_SIDE.as_i32()) + local_chunk.y(),
         )
+    }
+}
+
+impl PlanetPoint {
+    const PER_BLOCK: f64 = 1.0 / (CHUNKS_PER_REGION_SIDE.as_f64() * CHUNK_SIZE.as_f64());
+
+    /// If needed for multiple blocks in the same chunk, use [precalculate] and [with_precalculated]
+    pub fn from_block(block: WorldPosition) -> Option<Self> {
+        let chunk = ChunkLocation::from(block);
+        let chunk_idx = Region::chunk_index(chunk);
+        let region = RegionLocation::try_from_chunk(chunk)?;
+
+        let precalc = Self::precalculate(region, chunk_idx);
+        Some(Self::with_precalculated(&precalc, block.into()))
+    }
+
+    pub fn precalculate(region: RegionLocation, chunk_idx: usize) -> PlanetPointPrecalculated {
+        let (rx, ry) = (region.0 as f64, region.1 as f64);
+
+        let chunk_idx = chunk_idx as i32;
+        let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
+        let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
+        PlanetPointPrecalculated {
+            region: (rx, ry),
+            chunk: (cx, cy),
+        }
+    }
+
+    pub fn with_precalculated(precalc: &PlanetPointPrecalculated, block: BlockPosition) -> Self {
+        let (bx, by, _) = BlockPosition::from(block).xyz();
+        let &PlanetPointPrecalculated {
+            region: (rx, ry),
+            chunk: (cx, cy),
+        } = precalc;
+
+        let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx as i32) as f64 * Self::PER_BLOCK);
+        let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by as i32) as f64 * Self::PER_BLOCK);
+        Self(nx, ny)
+    }
+
+    #[inline]
+    pub const fn get(&self) -> (f64, f64) {
+        (self.0, self.1)
+    }
+
+    #[inline]
+    pub const fn x(&self) -> f64 {
+        self.0
+    }
+
+    #[inline]
+    pub const fn y(&self) -> f64 {
+        self.1
+    }
+
+    pub const fn new(x: f64, y: f64) -> Self {
+        Self(x, y)
+    }
+}
+
+impl PlanetPointPrecalculated {
+    pub const fn chunk(&self) -> (i32, i32) {
+        self.chunk
+    }
+    pub const fn region(&self) -> (f64, f64) {
+        self.region
     }
 }

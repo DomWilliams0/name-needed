@@ -9,7 +9,7 @@ use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParams;
 use crate::rasterize::SlabGrid;
-use crate::region::{noise_pos_for_block, RegionLocation};
+use crate::region::{PlanetPoint, RegionLocation};
 use crate::region::{Region, Regions};
 
 /// Global (heh) state for a full planet, shared between threads
@@ -210,7 +210,7 @@ impl Planet {
     pub async fn query_block(&self, block: WorldPosition) -> Option<BlockQueryResult> {
         let inner = self.0.read().await;
         let sampler = inner.continents.biome_sampler();
-        let pos = noise_pos_for_block(block)?;
+        let pos = PlanetPoint::from_block(block)?;
         let (coastline_proximity, base_elevation, moisture, temperature) =
             sampler.sample(pos, &inner.continents);
         let biomes =

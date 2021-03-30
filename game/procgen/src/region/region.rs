@@ -11,8 +11,9 @@ use grid::{grid_declare, GridImpl};
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
-use crate::region::unit::PER_BLOCK;
+use crate::region::unit::PlanetPoint;
 use crate::{map_range, region::RegionLocation, PlanetParams, SlabGrid};
+use unit::world::BlockPosition;
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
 pub const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant::new(8);
@@ -191,25 +192,21 @@ impl Region {
 
 impl RegionChunk {
     fn new(chunk_idx: usize, region: RegionLocation, continents: &ContinentMap) -> Self {
-        let (rx, ry) = (region.0 as f64, region.1 as f64);
-
-        let chunk_idx = chunk_idx as i32;
-        let cx = chunk_idx % CHUNKS_PER_REGION_SIDE.as_i32();
-        let cy = chunk_idx / CHUNKS_PER_REGION_SIDE.as_i32();
+        let precalc = PlanetPoint::precalculate(region, chunk_idx);
         let sampler = continents.biome_sampler();
 
         // get height for each surface block in chunk
         let mut height_map = ChunkHeightMap::default();
         let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
-        for (i, (by, bx)) in (0..CHUNK_SIZE.as_i32())
-            .cartesian_product(0..CHUNK_SIZE.as_i32())
+        for (i, (by, bx)) in (0..CHUNK_SIZE.as_u8())
+            .cartesian_product(0..CHUNK_SIZE.as_u8())
             .enumerate()
         {
-            let nx = rx + (((cx * CHUNK_SIZE.as_i32()) + bx) as f64 * PER_BLOCK);
-            let ny = ry + (((cy * CHUNK_SIZE.as_i32()) + by) as f64 * PER_BLOCK);
+            let point =
+                PlanetPoint::with_precalculated(&precalc, BlockPosition::new(bx, by, 0.into()));
 
             let (coastal, base_elevation, moisture, temperature) =
-                sampler.sample((nx, ny), continents);
+                sampler.sample(point, continents);
 
             let biome_choices =
                 sampler.choose_biomes(coastal, base_elevation, temperature, moisture);
@@ -238,7 +235,7 @@ impl RegionChunk {
 
         // TODO depends on many local parameters e.g. biome, humidity
 
-        trace!("generated region chunk"; "chunk" => ?(cx, cy), "region" => ?(rx, ry));
+        trace!("generated region chunk"; "chunk" => ?precalc.chunk(), "region" => ?precalc.region());
 
         RegionChunk {
             desc: ChunkDescription {
