@@ -1,4 +1,4 @@
-# TODOs (270)
+# TODOs (271)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,6 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/procgen/benches/region.rs](game/procgen/benches/region.rs) (1)
+   * `// TODO make region size a const generic and vary`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (1)
    * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)

@@ -158,7 +158,7 @@ impl BiomeSampler {
                 let reader = BufReader::new(File::open(path)?);
                 ron::de::from_reader(reader)?
             }
-            #[cfg(test)]
+            #[cfg(any(test, feature = "benchmarking"))]
             BiomesConfig::Hardcoded(str) => ron::de::from_str(str)?,
         };
 

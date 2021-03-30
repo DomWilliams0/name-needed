@@ -171,6 +171,16 @@ impl Region {
         Region { chunks }
     }
 
+    #[cfg(any(test, feature = "benchmarking"))]
+    #[inline]
+    pub async fn create_for_benchmark(
+        region: RegionLocation,
+        continents: &ContinentMap,
+        params: &PlanetParams,
+    ) -> Self {
+        Self::create(region, continents, params).await
+    }
+
     fn chunk_index(chunk: ChunkLocation) -> usize {
         let ChunkLocation(x, y) = chunk;
         let x = x.rem_euclid(CHUNKS_PER_REGION_SIDE.as_i32());

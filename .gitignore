@@ -18,3 +18,4 @@ imgui.ini
 perf.data*
 progress.gif
 *.ron.bak
+flamegraph.svg

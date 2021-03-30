@@ -100,7 +100,7 @@ pub enum BiomesConfig {
     // annotation have the same layout as the variant field."
     File(PathBuf),
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmarking"))]
     Hardcoded(String),
 }
 
@@ -250,14 +250,14 @@ impl PlanetParams {
         Ok(params)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmarking"))]
     pub fn dummy_with_biomes(biomes: String) -> Self {
         let mut params = Self::from_iter_safe(once("dummy")).expect("failed");
         params.biomes_cfg = BiomesConfig::Hardcoded(biomes);
         params
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmarking"))]
     pub fn dummy() -> Self {
         Self::dummy_with_biomes(
             r#"[ (biome: Plains, color: 0x84e065, elevation: (10, 18), sampling: ()) ]"#.to_owned(),

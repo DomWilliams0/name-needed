@@ -66,7 +66,7 @@ impl ContinentMap {
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmarking"))]
     pub fn new_with_rng(params: &PlanetParams, rando: &mut dyn RngCore) -> Self {
         let mut this = Self::new(params);
 
@@ -693,7 +693,7 @@ mod mr_blobby {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmarking"))]
 fn dummy_continent_polygons() -> Vec<(ContinentIdx, Polygon<f64>)> {
     let c = |x, y| geo::Coordinate { x, y };
     vec![(

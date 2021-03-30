@@ -40,8 +40,14 @@ default = []
 bin = ["image", "imageproc", "color", "async-trait", "async-scoped"]
 climate = ["crossbeam", "line_drawing", "rand_distr"]
 cache = ["bincode", "sha2", "geo/use-serde"]
+benchmarking = []
 
 
 [dev-dependencies]
 # same as above but including macros feature
 tokio = { version = "1.0", default-features = false, features = ["macros"] }
+criterion = { version = "0.3", features = ["async_tokio"] }
+
+[[bench]]
+name = "region"
+harness = false

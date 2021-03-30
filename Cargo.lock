@@ -491,6 +491,7 @@ dependencies = [
  "clap",
  "criterion-plot",
  "csv",
+ "futures",
  "itertools 0.10.0",
  "lazy_static",
  "num-traits 0.2.14",
@@ -503,6 +504,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
@@ -2037,6 +2039,7 @@ dependencies = [
  "bincode",
  "color",
  "common",
+ "criterion",
  "crossbeam",
  "futures",
  "geo",

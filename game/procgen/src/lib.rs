@@ -26,6 +26,12 @@ pub use planet::Planet;
 pub use rasterize::{BlockType, GeneratedBlock, SlabGrid};
 pub use region::RegionLocation;
 
+#[cfg(feature = "benchmarking")]
+pub mod benchmark_exports {
+    pub use super::continent::ContinentMap;
+    pub use super::region::{Region, RegionChunk};
+}
+
 /// https://rosettacode.org/wiki/Map_range#Rust
 #[inline]
 pub(crate) fn map_range<F: common::num_traits::Float>(
