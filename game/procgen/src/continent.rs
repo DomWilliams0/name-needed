@@ -315,7 +315,7 @@ impl ContinentMap {
     }
 
     pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
-        let RegionLocation(x, y) = region;
+        let (x, y) = region.xy();
         &self.grid[[x as usize, y as usize, 0]]
     }
 }

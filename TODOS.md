@@ -14,8 +14,6 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/benches/region.rs](game/procgen/benches/region.rs) (1)
-   * `// TODO make region size a const generic and vary`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (1)
    * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
@@ -49,7 +47,8 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (3)
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (4)
+   * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`

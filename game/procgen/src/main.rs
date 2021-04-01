@@ -66,7 +66,7 @@ fn main() {
 
                     for y in 5..6 {
                         for x in 20..=21 {
-                            let region = RegionLocation(x, y);
+                            let region = RegionLocation::new(x, y);
 
                             let mut render = Render::with_planet(planet.clone()).await;
                             if let Err(err) = render.draw_region(region).await {

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
-use crate::region::RegionLocation;
+use crate::region::RegionLocationUnspecialized;
 use common::alloc::str::FromStr;
 use noise::MultiFractal;
 #[cfg(feature = "cache")]
@@ -272,8 +272,12 @@ impl PlanetParams {
         [self.planet_size as usize, self.planet_size as usize, height]
     }
 
-    pub fn is_region_in_range(&self, region: RegionLocation) -> bool {
-        region.0 < self.planet_size && region.1 < self.planet_size
+    pub fn is_region_in_range<const SIZE: usize>(
+        &self,
+        region: RegionLocationUnspecialized<SIZE>,
+    ) -> bool {
+        let (x, y) = region.xy();
+        x < self.planet_size && y < self.planet_size
     }
 }
 

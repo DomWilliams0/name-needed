@@ -29,7 +29,9 @@ pub use region::RegionLocation;
 #[cfg(feature = "benchmarking")]
 pub mod benchmark_exports {
     pub use super::continent::ContinentMap;
-    pub use super::region::{Region, RegionChunk};
+    pub use super::region::{
+        RegionChunkUnspecialized, RegionLocationUnspecialized, RegionUnspecialized,
+    };
 }
 
 /// https://rosettacode.org/wiki/Map_range#Rust

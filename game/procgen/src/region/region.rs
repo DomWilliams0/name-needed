@@ -1,6 +1,5 @@
 use std::mem::MaybeUninit;
 
-use ::unit::dim::SmallUnsignedConstant;
 pub use ::unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
     CHUNK_SIZE, SLAB_SIZE,
@@ -12,18 +11,12 @@ use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
 use crate::region::unit::PlanetPoint;
-use crate::{map_range, region::RegionLocation, PlanetParams, SlabGrid};
+use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
 use unit::world::BlockPosition;
 
-/// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
-pub const CHUNKS_PER_REGION_SIDE: SmallUnsignedConstant = SmallUnsignedConstant::new(8);
-
-pub const CHUNKS_PER_REGION: usize =
-    CHUNKS_PER_REGION_SIDE.as_usize() * CHUNKS_PER_REGION_SIDE.as_usize();
-
-pub struct Regions {
+pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParams,
-    regions: Vec<(RegionLocation, Region)>,
+    regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
 }
 
 /// Each pixel in the continent map is a region. Each region is a 2d grid of chunks.
@@ -46,11 +39,12 @@ pub struct Regions {
 ///       river curve rasterization into blocks, etc)
 ///     * Attempt to place all blocks in each subfeature in this region and slab range only
 ///         * The first time a slab is touched, use chunk description to rasterize initial blocks
-pub struct Region {
-    chunks: [RegionChunk; CHUNKS_PER_REGION],
+// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)
+pub struct Region<const SIZE: usize, const SIZE_2: usize> {
+    chunks: [RegionChunk<SIZE>; SIZE_2],
 }
 
-pub struct RegionChunk {
+pub struct RegionChunk<const SIZE: usize> {
     desc: ChunkDescription,
 }
 
@@ -80,7 +74,7 @@ impl Default for BlockHeight {
     }
 }
 
-impl Regions {
+impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
     pub fn new(params: &PlanetParams) -> Self {
         Regions {
             params: params.clone(),
@@ -90,9 +84,9 @@ impl Regions {
 
     pub async fn get_or_create(
         &mut self,
-        location: RegionLocation,
+        location: RegionLocation<SIZE>,
         continents: &ContinentMap,
-    ) -> Option<&Region> {
+    ) -> Option<&Region<SIZE, SIZE_2>> {
         Some(match self.region_index(location)? {
             Ok(idx) => &self.regions[idx].1,
             Err(idx) => {
@@ -104,7 +98,7 @@ impl Regions {
         })
     }
 
-    pub fn get_existing(&self, region: RegionLocation) -> Option<&Region> {
+    pub fn get_existing(&self, region: RegionLocation<SIZE>) -> Option<&Region<SIZE, SIZE_2>> {
         self.region_index(region)
             .and_then(|idx| idx.ok())
             .map(|idx| &self.regions[idx].1)
@@ -112,31 +106,33 @@ impl Regions {
 
     /// None if out of range of the planet, otherwise Ok(idx) if present or Err(idx) if in range but
     /// not present
-    fn region_index(&self, region: RegionLocation) -> Option<Result<usize, usize>> {
+    fn region_index(&self, region: RegionLocation<SIZE>) -> Option<Result<usize, usize>> {
         self.params
             .is_region_in_range(region)
             .as_some_from(|| self.regions.binary_search_by_key(&region, |(pos, _)| *pos))
     }
 }
 
-impl Region {
+impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     async fn create(
-        region: RegionLocation,
+        region: RegionLocation<SIZE>,
         continents: &ContinentMap,
         _params: &PlanetParams,
     ) -> Self {
+        debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
+
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
         // times?
         debug!("creating region"; "region" => ?region);
 
         // initialize chunk descriptions
-        let mut chunks: [MaybeUninit<RegionChunk>; CHUNKS_PER_REGION] =
+        let mut chunks: [MaybeUninit<RegionChunk<SIZE>>; SIZE_2] =
             unsafe { MaybeUninit::uninit().assume_init() };
 
         let continents: &'static ContinentMap = unsafe { std::mem::transmute(continents) };
 
         let handle = tokio::runtime::Handle::current();
-        let results = futures::future::join_all((0..CHUNKS_PER_REGION).map(|idx| {
+        let results = futures::future::join_all((0..SIZE_2).map(|idx| {
             // cant pass a ptr across threads but you can an integer :^)
             // the array is stack allocated and we dont leave this function while this closure is
             // alive so this pointer is safe to use.
@@ -146,7 +142,7 @@ impl Region {
 
                 // safety: each task has a single index in the chunk array
                 unsafe {
-                    let this_chunk = this_chunk as *mut RegionChunk;
+                    let this_chunk = this_chunk as *mut RegionChunk<SIZE>;
                     this_chunk.write(chunk);
                 }
             })
@@ -160,7 +156,12 @@ impl Region {
         }
 
         // safety: all chunks have been initialized and any panics have been propagated
-        let chunks: [RegionChunk; CHUNKS_PER_REGION] = unsafe { std::mem::transmute(chunks) };
+        let chunks: [RegionChunk<SIZE>; SIZE_2] = unsafe {
+            let ptr = &mut chunks as *mut _ as *mut [RegionChunk<SIZE>; SIZE_2];
+            let res = ptr.read();
+            core::mem::forget(chunks);
+            res
+        };
 
         Region { chunks }
     }
@@ -168,7 +169,7 @@ impl Region {
     #[cfg(any(test, feature = "benchmarking"))]
     #[inline]
     pub async fn create_for_benchmark(
-        region: RegionLocation,
+        region: RegionLocation<SIZE>,
         continents: &ContinentMap,
         params: &PlanetParams,
     ) -> Self {
@@ -177,21 +178,21 @@ impl Region {
 
     pub(crate) fn chunk_index(chunk: ChunkLocation) -> usize {
         let ChunkLocation(x, y) = chunk;
-        let x = x.rem_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
-        let y = y.rem_euclid(CHUNKS_PER_REGION_SIDE.as_i32());
+        let x = x.rem_euclid(SIZE as i32);
+        let y = y.rem_euclid(SIZE as i32);
 
-        (x + (y * CHUNKS_PER_REGION_SIDE.as_i32())) as usize
+        (x + (y * SIZE as i32)) as usize
     }
 
-    pub fn chunk(&self, chunk: ChunkLocation) -> &RegionChunk {
+    pub fn chunk(&self, chunk: ChunkLocation) -> &RegionChunk<SIZE> {
         let idx = Self::chunk_index(chunk);
         debug_assert!(idx < self.chunks.len(), "bad idx {}", idx);
         &self.chunks[idx]
     }
 }
 
-impl RegionChunk {
-    fn new(chunk_idx: usize, region: RegionLocation, continents: &ContinentMap) -> Self {
+impl<const SIZE: usize> RegionChunk<SIZE> {
+    fn new(chunk_idx: usize, region: RegionLocation<SIZE>, continents: &ContinentMap) -> Self {
         let precalc = PlanetPoint::precalculate(region, chunk_idx);
         let sampler = continents.biome_sampler();
 
@@ -304,46 +305,54 @@ impl ChunkDescription {
     }
 }
 
-slog_value_debug!(RegionLocation);
+// slog_value_debug!(RegionLocation);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::continent::ContinentMap;
+    use crate::region::region::{Region, Regions};
+    use crate::region::unit::RegionLocation;
+    use crate::PlanetParams;
+    use common::thread_rng;
+    use unit::dim::SmallUnsignedConstant;
+    use unit::world::ChunkLocation;
+
+    const SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(4);
+    type SmolRegionLocation = RegionLocation<4>;
+    type SmolRegion = Region<4, 16>;
+    type SmolRegions = Regions<4, 16>;
 
     #[test]
     fn chunk_to_region() {
         // negative is always out of range
-        assert_eq!(RegionLocation::try_from_chunk(ChunkLocation(-2, 1)), None);
+        assert_eq!(
+            SmolRegionLocation::try_from_chunk(ChunkLocation(-2, 1)),
+            None
+        );
 
         assert_eq!(
-            RegionLocation::try_from_chunk(ChunkLocation(
-                CHUNKS_PER_REGION_SIDE.as_i32() / 2,
-                CHUNKS_PER_REGION_SIDE.as_i32()
-            )),
-            Some(RegionLocation(0, 1))
+            SmolRegionLocation::try_from_chunk(ChunkLocation(SIZE.as_i32() / 2, SIZE.as_i32())),
+            Some(SmolRegionLocation::new(0, 1))
         );
     }
 
     #[test]
     fn chunk_index() {
         assert_eq!(
-            Region::chunk_index(ChunkLocation(0, 2)),
-            CHUNKS_PER_REGION_SIDE.as_usize() * 2
+            SmolRegion::chunk_index(ChunkLocation(0, 2)),
+            SIZE.as_usize() * 2
         );
 
-        assert_eq!(Region::chunk_index(ChunkLocation(3, 0)), 3);
+        assert_eq!(SmolRegion::chunk_index(ChunkLocation(3, 0)), 3);
 
         assert_eq!(
-            Region::chunk_index(ChunkLocation(3 + (CHUNKS_PER_REGION_SIDE.as_i32() * 3), 0)),
+            SmolRegion::chunk_index(ChunkLocation(3 + (SIZE.as_i32() * 3), 0)),
             3
         );
 
-        let idx = Region::chunk_index(ChunkLocation(
-            CHUNKS_PER_REGION_SIDE.as_i32() - 1,
-            CHUNKS_PER_REGION_SIDE.as_i32() - 2,
-        ));
-        assert_eq!(idx, 55);
-        assert_eq!(Region::chunk_index(ChunkLocation(-1, -2)), idx);
+        let idx = SmolRegion::chunk_index(ChunkLocation(3, 2));
+        assert_eq!(idx, 11);
+        assert_eq!(SmolRegion::chunk_index(ChunkLocation(-1, -2)), idx);
     }
 
     #[tokio::test]
@@ -354,11 +363,11 @@ mod tests {
             params.max_continents = 1;
             params
         };
-        let mut regions = Regions::new(&params);
+        let mut regions = SmolRegions::new(&params);
         let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
 
-        let loc = RegionLocation(10, 20);
-        let bad_loc = RegionLocation(10, 200);
+        let loc = SmolRegionLocation::new(10, 20);
+        let bad_loc = SmolRegionLocation::new(10, 200);
 
         assert!(regions.get_existing(loc).is_none());
         assert!(regions.get_existing(bad_loc).is_none());

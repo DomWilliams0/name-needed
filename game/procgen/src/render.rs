@@ -1,24 +1,20 @@
 use std::path::Path;
 
 use image::imageops::FilterType;
-use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
-use imageproc::drawing::{
-    draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
-};
+use image::{GenericImage, ImageBuffer, Rgba, RgbaImage};
+use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut};
 use imageproc::rect::Rect;
 use tokio::time::Duration;
 
 use color::ColorRgb;
 use common::num_traits::clamp;
 use common::*;
-use grid::{DynamicGrid, GridImpl};
-use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
+use grid::DynamicGrid;
+use unit::world::{ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
 
-use crate::biome::BiomeType;
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
-use crate::region::CHUNKS_PER_REGION_SIDE;
-use crate::region::{PlanetPoint, RegionLocation};
-use crate::{map_range, Planet, SlabGrid};
+use crate::region::{PlanetPoint, RegionLocation, CHUNKS_PER_REGION_SIDE};
+use crate::{map_range, Planet};
 
 #[derive(Clone)]
 pub struct Render {
@@ -267,7 +263,7 @@ impl Render {
     }
 
     pub async fn draw_region(&mut self, region_loc: RegionLocation) -> Result<(), SlabLocation> {
-        debug!("drawing region"; "region" => region_loc);
+        debug!("drawing region"; "region" => ?region_loc);
 
         // params
         let inner = self.planet.inner().await;
@@ -279,22 +275,19 @@ impl Render {
 
         // create 1:1 image for region, zoom is equivalent to scale here
         let mut image = {
-            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32();
+            let region_size = CHUNKS_PER_REGION_SIDE as u32 * CHUNK_SIZE.as_u32();
             ImageBuffer::new(region_size, region_size)
         };
 
         let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
-        let mut processed_chunks = DynamicGrid::new([
-            CHUNKS_PER_REGION_SIDE.as_usize(),
-            CHUNKS_PER_REGION_SIDE.as_usize(),
-            1,
-        ]);
+        let mut processed_chunks =
+            DynamicGrid::new([CHUNKS_PER_REGION_SIDE, CHUNKS_PER_REGION_SIDE, 1]);
 
         let (from_chunk_local, to_chunk_local) = (
             ChunkLocation(0, 0),
             ChunkLocation(
-                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
-                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+                CHUNKS_PER_REGION_SIDE as i32 - 1,
+                CHUNKS_PER_REGION_SIDE as i32 - 1,
             ),
         );
 
