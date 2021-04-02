@@ -1,4 +1,4 @@
-# TODOs (282)
+# TODOs (287)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -39,19 +39,24 @@
  * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (6)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
    * `// TODO actual error type`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
-   * `// TODO rasterize features onto slab`
    * `// TODO wrap chunks rather than ignoring those out of range`
    * `.filter_map(|(cx, cy)| RegionLocation::try_from_chunk(ChunkLocation(cx, cy))) // TODO`
  * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (1)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (7)
+   * `#[derive(Debug)] // TODO custom debug to not print full bounding polygon`
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
+   * `// TODO remove magic value, use real max tree height`
+   * `// TODO tree roots`
+   * `// TODO generate tree locations with poisson disk sampling`
+   * `// TODO attempt to place tree model at location in this slab`
+   * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
  * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
    * `// TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate`
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`

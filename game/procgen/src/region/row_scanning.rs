@@ -1,3 +1,4 @@
+use crate::region::feature::FeatureZRange;
 use crate::region::region::RegionChunk;
 use crate::region::RegionLocationUnspecialized;
 use crate::BiomeType;
@@ -18,7 +19,6 @@ pub enum RegionNeighbour {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct BiomeRow<const SIZE: usize> {
     /// Column idx in grid of blocks_per_chunk_side*chunks_per_region_side
     pub col: usize,
@@ -28,6 +28,9 @@ pub struct BiomeRow<const SIZE: usize> {
 
     /// Inclusive row end as block index in row
     pub end: RowIndex,
+
+    /// Inclusive range of ground height between start and end
+    pub z_range: FeatureZRange,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -46,7 +49,6 @@ pub fn scan<const SIZE: usize>(
     mut per_row: impl FnMut(BiomeRow<SIZE>),
 ) -> ArrayVec<RegionNeighbour, 4> {
     let region_side_length = SIZE * CHUNK_SIZE.as_usize();
-    // let convert_idx = |col, i| (col * region_side_length) + i;
 
     let rows = chunks
         .iter()
@@ -62,27 +64,36 @@ pub fn scan<const SIZE: usize>(
     for (col, row) in (&rows).into_iter().enumerate() {
         let mut row = row.enumerate().peekable();
         loop {
-            let start = match row.find(|(_, b)| b.biome() == biome) {
-                Some((i, _)) => {
+            let (start_ground, start_idx) = match row.find(|(_, b)| b.biome() == biome) {
+                Some((i, b)) => (
+                    b.ground(),
                     if i == 0 {
                         RowIndex::Continued
                     } else {
                         RowIndex::Index(i)
-                    }
-                }
+                    },
+                ),
                 None => break, // next row
             };
-            let end = match row.find(|(_, b)| b.biome() != biome) {
-                Some((i, _)) => RowIndex::Index(i - 1), // -1 to make inclusive
-                None => RowIndex::Continued,
+            let (end_ground, end_idx) = {
+                let mut highest_ground = start_ground;
+                let idx = match row.find(|(_, b)| {
+                    highest_ground = highest_ground.max(b.ground());
+                    b.biome() != biome
+                }) {
+                    Some((i, _)) => RowIndex::Index(i - 1), // -1 to make inclusive
+                    None => RowIndex::Continued,
+                };
+
+                (highest_ground, idx)
             };
 
             // calculate possible overflows
-            if let RowIndex::Continued = start {
+            if let RowIndex::Continued = start_idx {
                 add_overflow(RegionNeighbour::Left);
             }
 
-            if let RowIndex::Continued = end {
+            if let RowIndex::Continued = end_idx {
                 add_overflow(RegionNeighbour::Right);
             }
 
@@ -94,7 +105,12 @@ pub fn scan<const SIZE: usize>(
                 add_overflow(RegionNeighbour::Down);
             }
 
-            per_row(BiomeRow { col, start, end });
+            per_row(BiomeRow {
+                col,
+                start: start_idx,
+                end: end_idx,
+                z_range: FeatureZRange::new(start_ground, end_ground),
+            });
 
             if row.peek().is_none() {
                 // row finished
@@ -132,6 +148,16 @@ impl<const SIZE: usize> BiomeRow<SIZE> {
         once(start).chain(end)
     }
 }
+
+#[cfg(test)]
+impl<const SIZE: usize> PartialEq for BiomeRow<SIZE> {
+    fn eq(&self, other: &Self) -> bool {
+        self.col == other.col && self.start == other.start && self.end == other.end
+    }
+}
+
+#[cfg(test)]
+impl<const SIZE: usize> Eq for BiomeRow<SIZE> {}
 
 impl RowIndex {
     fn into_option(self) -> Option<usize> {
@@ -197,7 +223,8 @@ mod tests {
             vec![BiomeRow {
                 col: 1,
                 start: RowIndex::Index(1),
-                end: RowIndex::Index(5)
+                end: RowIndex::Index(5),
+                z_range: FeatureZRange::null()
             }]
         );
         assert!(overflow.is_empty());
@@ -225,7 +252,8 @@ mod tests {
             vec![BiomeRow {
                 col: 4,
                 start: RowIndex::Index(5),
-                end: RowIndex::Index(5)
+                end: RowIndex::Index(5),
+                z_range: FeatureZRange::null()
             }]
         );
         assert!(overflow.is_empty());
@@ -254,7 +282,8 @@ mod tests {
             vec![BiomeRow {
                 col: 0,
                 start: RowIndex::Index(4),
-                end: RowIndex::Index(9)
+                end: RowIndex::Index(9),
+                z_range: FeatureZRange::null()
             }]
         );
         assert_eq!(overflow, vec![RegionNeighbour::Up]);
@@ -275,6 +304,7 @@ mod tests {
                 col: 0,
                 start: RowIndex::Continued,
                 end: RowIndex::Continued,
+                z_range: FeatureZRange::null()
             }]
         );
         assert_eq!(
@@ -308,11 +338,13 @@ mod tests {
                     col: 2,
                     start: RowIndex::Index(1),
                     end: RowIndex::Index(3),
+                    z_range: FeatureZRange::null()
                 },
                 BiomeRow {
                     col: 2,
                     start: RowIndex::Index(10),
                     end: RowIndex::Index(11),
+                    z_range: FeatureZRange::null()
                 }
             ]
         );
@@ -337,6 +369,7 @@ mod tests {
                 col,
                 start: RowIndex::Continued,
                 end: RowIndex::Continued,
+                z_range: FeatureZRange::null(),
             })
             .collect();
 

@@ -25,6 +25,10 @@ impl ChunkLocation {
         self.1
     }
 
+    pub const fn xy(&self) -> (i32, i32) {
+        (self.0, self.1)
+    }
+
     /// Inclusive
     pub fn iter_until(self, other: Self) -> impl Iterator<Item = ChunkLocation> {
         let ChunkLocation(x0, y0) = self;

@@ -3,6 +3,7 @@ use crate::region::{PlanetPoint, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
+use std::array::IntoIter;
 use std::cell::Cell;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
@@ -138,7 +139,7 @@ impl ContinentMap {
 
             let mut polygons = blobs.map(|(_, blob): (_, &mr_blobby::LandBlob)| {
                 let vertices = polygon_from_blob(blob);
-                let exterior = vertices.iter().copied().collect::<LineString<f64>>();
+                let exterior = IntoIter::new(vertices).collect::<LineString<f64>>();
                 debug_assert!(exterior.is_closed());
                 Polygon::new(exterior, vec![])
             });
@@ -415,10 +416,10 @@ fn apply_gaussian_filter<T: Default>(
 }
 
 mod mr_blobby {
-    use super::{ContinentIdx, RegionTile};
+    use super::ContinentIdx;
     use crate::PlanetParams;
     use common::*;
-    use grid::DynamicGrid;
+
     use std::f32::consts::PI;
     use std::num::NonZeroUsize;
 
@@ -641,54 +642,6 @@ mod mr_blobby {
 
         pub fn continent_count(&self) -> usize {
             self.continent_range.len()
-        }
-
-        #[deprecated]
-        fn rasterize_land_blobs(&self, grid: &mut DynamicGrid<RegionTile>) {
-            for &(continent, start, end) in self.continent_range.iter() {
-                macro_rules! set {
-                    ($pos:expr) => {
-                        let (x, y) = $pos;
-                        let coord = [x as isize, y as isize, 0];
-                        let wrapped_coord = grid.wrap_coord(coord);
-                        grid[wrapped_coord].continent = Some(continent);
-                    };
-                }
-
-                for blob in &self.land_blobs[start..end] {
-                    // draw filled in circle
-                    // https://stackoverflow.com/a/14976268
-                    let mut x = blob.radius;
-                    let mut y = 0;
-                    let mut x_change = 1 - (blob.radius << 1);
-                    let mut y_change = 0;
-                    let mut radius_error = 0;
-
-                    let x0 = blob.pos.0;
-                    let y0 = blob.pos.1;
-                    while x >= y {
-                        for _x in (x0 - x)..=(x0 + x) {
-                            set!((_x, y0 + y));
-                            set!((_x, y0 - y));
-                        }
-
-                        for _x in (x0 - y)..=(x0 + y) {
-                            set!((_x, y0 + x));
-                            set!((_x, y0 - x));
-                        }
-
-                        y += 1;
-                        radius_error += y_change;
-                        y_change += 2;
-
-                        if ((radius_error << 1) + x_change) > 0 {
-                            x -= 1;
-                            radius_error += x_change;
-                            x_change += 2;
-                        }
-                    }
-                }
-            }
         }
     }
 }

@@ -174,7 +174,11 @@ impl Planet {
         let mut terrain = SlabGrid::default();
         chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 
-        // TODO rasterize features onto slab
+        // rasterize features onto slab
+        for feature in region.features_for_slab(slab) {
+            debug!("applying feature to slab"; "feature" => ?feature, slab);
+            feature.apply_to_slab(slab, &mut terrain).await;
+        }
 
         Some(terrain)
     }

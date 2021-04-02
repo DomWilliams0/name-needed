@@ -10,16 +10,16 @@ use grid::{grid_declare, GridImpl};
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
-use crate::region::feature::{ForestFeature, SharedRegionalFeature};
+use crate::region::feature::{FeatureZRange, ForestFeature, SharedRegionalFeature};
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
 use geo::concave_hull::ConcaveHull;
-use geo::{MultiPoint, Point, Polygon};
+use geo::{MultiPoint, Point};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use unit::world::BlockPosition;
+use unit::world::{BlockPosition, SlabLocation};
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParams,
@@ -72,10 +72,10 @@ struct RegionContinuations<const SIZE: usize>(
     Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation>>>,
 );
 
+// TODO rename me
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct BlockHeight {
-    // TODO rename me
-    height: i32,
+    ground: GlobalSliceIndex,
     biome: BiomeType,
 }
 
@@ -87,9 +87,9 @@ grid_declare!(pub(crate) struct ChunkHeightMap<ChunkHeightMapImpl, BlockHeight>,
 
 impl Default for BlockHeight {
     fn default() -> Self {
-        // not important
+        // not important, will be overwritten by real values
         Self {
-            height: 0,
+            ground: GlobalSliceIndex::bottom(),
             biome: BiomeType::Ocean,
         }
     }
@@ -220,7 +220,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         continuations: RegionContinuations<SIZE>,
     ) {
         let mut points = Vec::new();
+        let mut feature_range = FeatureZRange::null();
         let overflows = super::row_scanning::scan(&self.chunks, BiomeType::Forest, |forest_row| {
+            feature_range = feature_range.max_of(forest_row.z_range);
             points.extend(forest_row.into_points(region).map(|(x, y)| {
                 // centre of each block
                 Point::new(x as f64 + 0.5, y as f64 + 0.5)
@@ -231,6 +233,8 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             // no feature, yippee
             return;
         }
+
+        debug_assert_ne!(feature_range, FeatureZRange::null());
 
         let bounding = {
             let points = MultiPoint(points);
@@ -246,7 +250,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         // TODO check continuations to see if this is the extension of an existing feature
         // TODO pass onto the overflow regions for continuation
 
-        let feature = RegionalFeature::new(bounding, ForestFeature::default());
+        let feature = RegionalFeature::new(bounding, feature_range, ForestFeature::default());
         self.features.push(feature);
     }
     #[cfg(any(test, feature = "benchmarking"))]
@@ -272,6 +276,15 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         let idx = Self::chunk_index(chunk);
         debug_assert!(idx < self.chunks.len(), "bad idx {}", idx);
         &self.chunks[idx]
+    }
+
+    pub fn features_for_slab(
+        &self,
+        slab: SlabLocation,
+    ) -> impl Iterator<Item = &SharedRegionalFeature> + '_ {
+        self.features
+            .iter()
+            .filter(move |feature| feature.applies_to(slab))
     }
 }
 
@@ -321,14 +334,17 @@ impl<const SIZE: usize> RegionChunk<SIZE> {
                     })
                     .fold((0.0, 0.0), |acc, range| (acc.0 + range.0, acc.1 + range.1))
             };
-            let height = map_range((0.0, 1.0), height_range, base_elevation as f32) as i32;
+            let ground =
+                GlobalSliceIndex::new(
+                    map_range((0.0, 1.0), height_range, base_elevation as f32) as i32
+                );
 
             height_map[i] = BlockHeight {
-                height,
+                ground,
                 biome: biome.ty(),
             };
-            min_height = min_height.min(height);
-            max_height = max_height.max(height);
+            min_height = min_height.min(ground.slice());
+            max_height = max_height.max(ground.slice());
         }
 
         // TODO depends on many local parameters e.g. biome, humidity
@@ -379,7 +395,7 @@ impl ChunkDescription {
                 .cartesian_product(0..CHUNK_SIZE.as_i32())
                 .enumerate()
             {
-                let BlockHeight { height, biome } = self.ground_height[&[x, y, 0]];
+                let BlockHeight { ground, biome } = self.ground_height[&[x, y, 0]];
 
                 // TODO calculate these better, and store them in data
                 use BlockType::*;
@@ -394,7 +410,6 @@ impl ChunkDescription {
                         BiomeType::Desert => (Sand, Sand, Stone, 6),
                     };
 
-                let ground = SliceIndex::new(height);
                 let bt = match (ground - z_global).slice() {
                     0 => surface_block,
                     d if d.is_negative() => BlockType::Air,
@@ -409,7 +424,7 @@ impl ChunkDescription {
 
     pub fn ground_level(&self, block: SliceBlock) -> GlobalSliceIndex {
         let SliceBlock(x, y) = block;
-        GlobalSliceIndex::new(self.ground_height[&[x as i32, y as i32, 0]].height)
+        self.ground_height[&[x as i32, y as i32, 0]].ground
     }
 
     pub(crate) fn blocks(&self) -> impl Iterator<Item = &BlockHeight> + '_ {
@@ -420,6 +435,10 @@ impl ChunkDescription {
 impl BlockHeight {
     pub const fn biome(&self) -> BiomeType {
         self.biome
+    }
+
+    pub const fn ground(&self) -> GlobalSliceIndex {
+        self.ground
     }
 
     #[cfg(test)]

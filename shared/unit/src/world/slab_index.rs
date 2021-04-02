@@ -1,4 +1,5 @@
 use crate::dim::SmallUnsignedConstant;
+use crate::world::{GlobalSliceIndex, SLAB_SIZE};
 use common::{derive_more::*, *};
 use newtype_derive::*;
 use std::ops::{Div, Mul};
@@ -34,6 +35,18 @@ impl SlabIndex {
     pub fn floored(float: f32) -> Self {
         Self(float.floor() as i32)
     }
+
+    /// Bottom block of slab as global slice
+    pub fn as_slice(self) -> GlobalSliceIndex {
+        GlobalSliceIndex::new(self.0 * SLAB_SIZE.as_i32())
+    }
+
+    /// [bottom slice, top slice)
+    pub fn slice_range(self) -> (GlobalSliceIndex, GlobalSliceIndex) {
+        let bottom = self.as_slice();
+        let top = bottom + SLAB_SIZE.as_i32();
+        (bottom, top)
+    }
 }
 
 NewtypeAdd! {(i32) pub struct SlabIndex(i32);}
@@ -65,3 +78,24 @@ impl From<SlabIndex> for f32 {
 
 slog_value_debug!(SlabIndex);
 slog_kv_debug!(SlabIndex, "slab");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::world::SLAB_SIZE;
+
+    fn check(slab: i32, slice: i32) {
+        let slab = SlabIndex(slab);
+        assert_eq!(slab.as_slice().slice(), slice);
+        assert_eq!(slab.as_slice().slab_index(), slab);
+    }
+
+    #[test]
+    fn slab_index_to_slice() {
+        // (slab, slice)
+        check(0, 0);
+        check(1, SLAB_SIZE.as_i32());
+        check(4, SLAB_SIZE.as_i32() * 4);
+        check(-2, SLAB_SIZE.as_i32() * -2);
+    }
+}
