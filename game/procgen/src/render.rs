@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use image::imageops::FilterType;
+use image::imageops::{flip_vertical, FilterType};
 use image::{GenericImage, ImageBuffer, Rgba, RgbaImage};
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut};
 use imageproc::rect::Rect;
@@ -402,6 +402,9 @@ impl Render {
 
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {
         let image = self.image.as_ref().expect("image has not been created");
+
+        // origin is at bottom left rather than top left
+        let image = flip_vertical(image);
 
         let path = path.as_ref();
         image.save(path)?;

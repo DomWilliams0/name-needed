@@ -9,5 +9,5 @@
 * [ ] individual tree placement via poisson disks
 * [ ] tree sub feature block placement
 * [X] remove redundant matches dependency
-* [ ] bug: procgen world is vertically flipped ingame
+* [X] bug: procgen world is vertically flipped ingame
 * [ ] remove unwraps in grid coord (un)flattening and handle properly
