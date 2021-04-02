@@ -58,6 +58,7 @@ impl From<&procgen::GeneratedBlock> for Block {
             A::Stone => B::Stone,
             A::Dirt => B::Dirt,
             A::Grass => B::Grass,
+            A::LightGrass => B::LightGrass,
             A::Sand => B::Sand,
             A::SolidWater => B::SolidWater,
         };

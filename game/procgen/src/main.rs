@@ -64,8 +64,8 @@ fn main() {
                     render.draw_continents().await;
                     render.save("procgen.png").expect("failed to write image");
 
-                    for y in 5..6 {
-                        for x in 20..=21 {
+                    for y in 64..65 {
+                        for x in 4..5 {
                             let region = RegionLocation::new(x, y);
 
                             let mut render = Render::with_planet(planet.clone()).await;

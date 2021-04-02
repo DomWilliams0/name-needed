@@ -109,7 +109,7 @@ impl<'a> AreaDiscovery<'a> {
         let mut count = 0;
 
         self.queue.clear();
-        self.queue.push((self.grid.unflatten(start), None));
+        self.queue.push((AreaDiscoveryGrid::unflatten(start), None));
         let mut graph = BlockGraph::new();
 
         while let Some((current, src)) = self.queue.pop() {

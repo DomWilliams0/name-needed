@@ -362,7 +362,7 @@ impl Render {
             max = max_height
         );
         if min_height == max_height {
-            warn!("region might be filled with solid blocks, try tweaking start slab")
+            warn!("region might be filled with solid blocks (or entirely flat), try tweaking start slab?")
         }
 
         // render chunks to image

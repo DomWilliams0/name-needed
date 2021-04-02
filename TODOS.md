@@ -1,4 +1,4 @@
-# TODOs (271)
+# TODOs (282)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,8 +14,11 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (1)
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (2)
+   * `// TODO make poles more moist`
    * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
+ * [game/procgen/src/cache.rs](game/procgen/src/cache.rs) (1)
+   * `// TODO cache global features too`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind movingbrings air to level out pressure`
@@ -47,8 +50,16 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (4)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (1)
+   * `// TODO make this struct a dst and store trait object inline without extra indirection`
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
+   * `// TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate`
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
+   * `// TODO rename me`
+   * `// TODO expand polygon out to ensure it covers the entire biome area?`
+   * `// TODO check continuations to see if this is the extension of an existing feature`
+   * `// TODO pass onto the overflow regions for continuation`
+   * `// TODO null continuations for benchmark`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
@@ -370,8 +381,10 @@
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/grid/src/declare.rs](shared/grid/src/declare.rs) (1)
    * `// TODO call usize::from() on dims for nicer use with smallunsignedconstant`
- * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (3)
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (5)
    * `// TODO allow smaller datatypes for dims`
+   * `// TODO handle this deadly unwrap!`
+   * `// TODO handle this deadly unwrap!`
    * `// TODO profile and improve coord wrapping`
    * `// TODO return <C: GridCoord>`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)

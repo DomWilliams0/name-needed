@@ -13,6 +13,7 @@ pub fn save(planet: &PlanetInner) -> BoxedResult<()> {
 
     let mut file = OpenOptions::new().write(true).create(true).open(&path)?;
 
+    // TODO cache global features too
     bincode::serialize_into(&mut file, &planet.continents)?;
 
     Ok(())

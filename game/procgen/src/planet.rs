@@ -92,7 +92,9 @@ impl Planet {
         info!("generating planet");
         let params = planet.params.clone();
 
+        // place continents and seed temp/moisture etc
         planet.continents.generate(&mut planet_rando);
+
         drop(planet);
 
         #[cfg(feature = "climate")]

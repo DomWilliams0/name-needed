@@ -214,6 +214,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* woven plant materials
 	* milk
 	* fur
+* seasons that affect weather/events depending on biomes
+	* savanna dry season
+	* trees lose leaves as a reaction to prolonged cold
 
 ### Physical wellbeing
 * distinct body parts

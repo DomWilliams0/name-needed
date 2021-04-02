@@ -22,16 +22,16 @@ pub trait GridImpl {
         0..Self::FULL_SIZE
     }
 
-    fn flatten(&self, coord: &CoordType) -> usize {
+    fn flatten(coord: &CoordType) -> usize {
         let &[x, y, z] = coord;
-        let [xs, ys, _zs] = Self::DIMS;
+        let [xs, ys, _] = Self::DIMS;
+        // TODO handle this deadly unwrap!
         usize::try_from(x + xs * (y + ys * z)).unwrap()
     }
 
-    fn unflatten(&self, index: usize) -> CoordType {
-        let [xs, ys, _zs] = Self::DIMS;
-        //        let xs = usize::try_from(xs).unwrap();
-        //        let ys = usize::try_from(ys).unwrap();
+    fn unflatten(index: usize) -> CoordType {
+        let [xs, ys, _] = Self::DIMS;
+        // TODO handle this deadly unwrap!
         let index = i32::try_from(index).unwrap();
         [index % xs, (index / xs) % ys, index / (ys * xs)]
     }
@@ -404,6 +404,16 @@ impl<I: GridImpl> Grid<I> {
     pub fn into_boxed_impl(self) -> Box<I> {
         self.0
     }
+
+    #[inline]
+    pub fn flatten(coord: &CoordType) -> usize {
+        I::flatten(coord)
+    }
+
+    #[inline]
+    pub fn unflatten(index: usize) -> CoordType {
+        I::unflatten(index)
+    }
 }
 
 #[cfg(test)]
@@ -421,14 +431,14 @@ mod tests {
         assert_eq!(TestGrid::FULL_SIZE, 4 * 5 * 6);
         assert_eq!(TestGrid::FULL_SIZE, grid.indices().len());
         // check coordinate resolution works
-        assert_eq!(grid.flatten(&[0, 0, 0]), 0);
-        assert_eq!(grid.flatten(&[1, 0, 0]), 1);
-        assert_eq!(grid.flatten(&[0, 1, 0]), 4);
-        assert_eq!(grid.flatten(&[0, 0, 1]), 20);
+        assert_eq!(TestGrid::flatten(&[0, 0, 0]), 0);
+        assert_eq!(TestGrid::flatten(&[1, 0, 0]), 1);
+        assert_eq!(TestGrid::flatten(&[0, 1, 0]), 4);
+        assert_eq!(TestGrid::flatten(&[0, 0, 1]), 20);
 
         for i in grid.indices() {
-            let coord = grid.unflatten(i);
-            let j = grid.flatten(&coord);
+            let coord = TestGrid::unflatten(i);
+            let j = TestGrid::flatten(&coord);
             assert_eq!(i, j);
         }
 
@@ -443,13 +453,12 @@ mod tests {
     #[test]
     fn cache_efficiency() {
         grid_declare!(struct TestGrid<TestImpl, u32>, 4, 5, 6);
-        let grid = TestGrid::default();
 
         let mut last = None;
         for z in 0..TestImpl::DIMS[2] {
             for y in 0..TestImpl::DIMS[1] {
                 for x in 0..TestImpl::DIMS[0] {
-                    let idx = grid.flatten(&[x, y, z]);
+                    let idx = TestGrid::flatten(&[x, y, z]);
 
                     if let Some(last) = last {
                         assert_eq!(idx, last + 1);

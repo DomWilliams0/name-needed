@@ -32,7 +32,6 @@ pub enum BiomeType {
     Beach,
     Plains,
     Forest,
-    RainForest,
     Desert,
     Tundra,
 }
@@ -249,6 +248,7 @@ impl BiomeSampler {
         let mul = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - coastline_proximity);
 
         // less moist at equator from the heat, but dont increase moisture at poles any more
+        // TODO make poles more moist
         let latitude = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - self.latitude_mul(pos.y())).min(1.0);
 
         raw_moisture * mul * latitude

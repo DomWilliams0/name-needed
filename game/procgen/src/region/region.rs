@@ -10,13 +10,23 @@ use grid::{grid_declare, GridImpl};
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
+use crate::region::feature::{ForestFeature, SharedRegionalFeature};
 use crate::region::unit::PlanetPoint;
+use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
+use geo::concave_hull::ConcaveHull;
+use geo::{MultiPoint, Point, Polygon};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use unit::world::BlockPosition;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParams,
+    // TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate
     regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
+
+    continuations: RegionContinuations<SIZE>,
 }
 
 /// Each pixel in the continent map is a region. Each region is a 2d grid of chunks.
@@ -42,6 +52,7 @@ pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
 // TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)
 pub struct Region<const SIZE: usize, const SIZE_2: usize> {
     chunks: [RegionChunk<SIZE>; SIZE_2],
+    features: Vec<SharedRegionalFeature>,
 }
 
 pub struct RegionChunk<const SIZE: usize> {
@@ -52,13 +63,23 @@ pub struct ChunkDescription {
     ground_height: ChunkHeightMap,
 }
 
-#[derive(Clone, Copy)]
-struct BlockHeight {
+/// Info about features/generation from neighbouring regions that is to be carried over the
+/// boundary
+struct RegionContinuation {}
+
+#[derive(Clone)]
+struct RegionContinuations<const SIZE: usize>(
+    Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation>>>,
+);
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BlockHeight {
+    // TODO rename me
     height: i32,
     biome: BiomeType,
 }
 
-grid_declare!(struct ChunkHeightMap<ChunkHeightMapImpl, BlockHeight>,
+grid_declare!(pub(crate) struct ChunkHeightMap<ChunkHeightMapImpl, BlockHeight>,
     CHUNK_SIZE.as_usize(),
     CHUNK_SIZE.as_usize(),
     1
@@ -79,6 +100,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         Regions {
             params: params.clone(),
             regions: Vec::with_capacity(64),
+            continuations: RegionContinuations::default(),
         }
     }
 
@@ -91,7 +113,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
             Ok(idx) => &self.regions[idx].1,
             Err(idx) => {
                 debug!("creating new region"; "region" => ?location);
-                let region = Region::create(location, continents, &self.params).await;
+
+                let region = Region::create(
+                    location,
+                    continents,
+                    self.continuations.clone(), // wrapper around Arc
+                    &self.params,
+                )
+                .await;
                 self.regions.insert(idx, (location, region));
                 &self.regions[idx].1
             }
@@ -114,17 +143,36 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
 }
 
 impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
-    async fn create(
-        region: RegionLocation<SIZE>,
+    async fn create<'c>(
+        loc: RegionLocation<SIZE>,
         continents: &ContinentMap,
+        continuations: RegionContinuations<SIZE>,
         _params: &PlanetParams,
     ) -> Self {
         debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
 
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
         // times?
-        debug!("creating region"; "region" => ?region);
+        debug!("creating region"; "region" => ?loc);
 
+        // initialize terrain description for chunks, and sample biome at each block
+        let chunks = Self::init_region_chunks(loc, continents).await;
+
+        let mut region = Region {
+            chunks,
+            features: Vec::with_capacity(16),
+        };
+
+        // regional feature discovery
+        region.discover_regional_features(loc, continuations).await;
+
+        region
+    }
+
+    async fn init_region_chunks(
+        region: RegionLocation<SIZE>,
+        continents: &ContinentMap,
+    ) -> [RegionChunk<SIZE>; SIZE_2] {
         // initialize chunk descriptions
         let mut chunks: [MaybeUninit<RegionChunk<SIZE>>; SIZE_2] =
             unsafe { MaybeUninit::uninit().assume_init() };
@@ -163,9 +211,44 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             res
         };
 
-        Region { chunks }
+        chunks
     }
 
+    async fn discover_regional_features(
+        &mut self,
+        region: RegionLocation<SIZE>,
+        continuations: RegionContinuations<SIZE>,
+    ) {
+        let mut points = Vec::new();
+        let overflows = super::row_scanning::scan(&self.chunks, BiomeType::Forest, |forest_row| {
+            points.extend(forest_row.into_points(region).map(|(x, y)| {
+                // centre of each block
+                Point::new(x as f64 + 0.5, y as f64 + 0.5)
+            }));
+        });
+
+        if points.is_empty() {
+            // no feature, yippee
+            return;
+        }
+
+        let bounding = {
+            let points = MultiPoint(points);
+            let polygon = points.concave_hull(2.0);
+            // TODO expand polygon out to ensure it covers the entire biome area?
+            // polygon.simplify(&1.0);
+            polygon
+        };
+
+        // pop continuations for this region
+        let continuation = continuations.pop(region).await;
+
+        // TODO check continuations to see if this is the extension of an existing feature
+        // TODO pass onto the overflow regions for continuation
+
+        let feature = RegionalFeature::new(bounding, ForestFeature::default());
+        self.features.push(feature);
+    }
     #[cfg(any(test, feature = "benchmarking"))]
     #[inline]
     pub async fn create_for_benchmark(
@@ -173,7 +256,8 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         continents: &ContinentMap,
         params: &PlanetParams,
     ) -> Self {
-        Self::create(region, continents, params).await
+        // TODO null continuations for benchmark
+        Self::create(region, continents, todo!(), params).await
     }
 
     pub(crate) fn chunk_index(chunk: ChunkLocation) -> usize {
@@ -188,6 +272,19 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         let idx = Self::chunk_index(chunk);
         debug_assert!(idx < self.chunks.len(), "bad idx {}", idx);
         &self.chunks[idx]
+    }
+}
+
+impl<const SIZE: usize> Default for RegionContinuations<SIZE> {
+    fn default() -> Self {
+        Self(Arc::new(Mutex::new(HashMap::with_capacity(32))))
+    }
+}
+
+impl<const SIZE: usize> RegionContinuations<SIZE> {
+    async fn pop(&self, region: RegionLocation<SIZE>) -> Option<RegionContinuation> {
+        let mut guard = self.0.lock().await;
+        guard.remove(&region)
     }
 }
 
@@ -248,6 +345,19 @@ impl<const SIZE: usize> RegionChunk<SIZE> {
     pub fn description(&self) -> &ChunkDescription {
         &self.desc
     }
+
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        RegionChunk {
+            desc: ChunkDescription {
+                ground_height: Default::default(),
+            },
+        }
+    }
+    #[cfg(test)]
+    pub(crate) fn biomes_mut(&mut self) -> &mut ChunkHeightMap {
+        &mut self.desc.ground_height
+    }
 }
 
 impl ChunkDescription {
@@ -279,10 +389,8 @@ impl ChunkDescription {
                             (Dirt, Sand, Stone, 1)
                         }
                         BiomeType::Beach => (Sand, Dirt, Stone, 4),
-                        BiomeType::Plains
-                        | BiomeType::Forest
-                        | BiomeType::Tundra
-                        | BiomeType::RainForest => (Grass, Dirt, Stone, 3),
+                        BiomeType::Plains => (LightGrass, Dirt, Stone, 3),
+                        BiomeType::Forest | BiomeType::Tundra => (Grass, Dirt, Stone, 3),
                         BiomeType::Desert => (Sand, Sand, Stone, 6),
                     };
 
@@ -302,6 +410,21 @@ impl ChunkDescription {
     pub fn ground_level(&self, block: SliceBlock) -> GlobalSliceIndex {
         let SliceBlock(x, y) = block;
         GlobalSliceIndex::new(self.ground_height[&[x as i32, y as i32, 0]].height)
+    }
+
+    pub(crate) fn blocks(&self) -> impl Iterator<Item = &BlockHeight> + '_ {
+        self.ground_height.array().iter()
+    }
+}
+
+impl BlockHeight {
+    pub const fn biome(&self) -> BiomeType {
+        self.biome
+    }
+
+    #[cfg(test)]
+    pub fn set_biome(&mut self, biome: BiomeType) {
+        self.biome = biome;
     }
 }
 
