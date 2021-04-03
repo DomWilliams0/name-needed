@@ -12,7 +12,7 @@ unit = { path = "../../shared/unit" }
 grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
 color = { path = "../../shared/color", optional = true }
 noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
-rand_distr = { version = "0.4", optional = true } # used by climate only
+rand_distr = { version = "0.3" }
 strum = "0.19"
 strum_macros = "0.19"
 tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
@@ -38,7 +38,7 @@ sha2 = { version = "0.9", optional = true }
 [features]
 default = []
 bin = ["image", "imageproc", "color", "async-trait", "async-scoped"]
-climate = ["crossbeam", "line_drawing", "rand_distr"]
+climate = ["crossbeam", "line_drawing"]
 cache = ["bincode", "sha2", "geo/use-serde"]
 benchmarking = []
 

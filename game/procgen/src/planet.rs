@@ -3,14 +3,18 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use common::*;
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition,
+    SliceIndex, WorldPosition, CHUNK_SIZE,
+};
 
 use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParams;
 use crate::rasterize::SlabGrid;
-use crate::region::{PlanetPoint, RegionLocation};
+use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation};
 use crate::region::{Region, Regions};
+use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -165,6 +169,8 @@ impl Planet {
     /// Generates now and does not cache. Returns None if slab is out of range
     pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
         let mut inner = self.0.write().await;
+        let planet_seed = inner.params.seed();
+
         let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &inner.params)?;
         let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
         let chunk_desc = region.chunk(slab.chunk).description();
@@ -175,9 +181,17 @@ impl Planet {
         chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 
         // rasterize features onto slab
-        for feature in region.features_for_slab(slab) {
+        let slab_bounds = slab_bounds(slab);
+        let mut ctx = ApplyFeatureContext {
+            chunk_desc,
+            terrain: &mut terrain,
+            planet_seed,
+            slab_bounds: &slab_bounds,
+        };
+
+        for feature in region.features_for_slab(slab, &slab_bounds) {
             debug!("applying feature to slab"; "feature" => ?feature, slab);
-            feature.apply_to_slab(slab, &mut terrain).await;
+            feature.apply_to_slab(slab, &mut ctx).await;
         }
 
         Some(terrain)
@@ -237,5 +251,50 @@ impl PlanetInner {
         // safety: regions and continents fields don't alias or reference each other
         let continents: &ContinentMap = unsafe { std::mem::transmute(&self.continents) };
         self.regions.get_or_create(region, continents).await
+    }
+}
+
+/// Expensive, result should be cached
+///
+/// Panics if slab location is invalid
+fn slab_bounds(slab: SlabLocation) -> Rect<f64> {
+    let min = SlabPosition::new(0, 0, SliceIndex::bottom()).to_world_position(slab);
+    let min_point = PlanetPoint::from_block(min).unwrap(); // slab location assumed to be fine
+
+    let min_coord = Coordinate::from(min_point.get_array());
+    let max_coord = {
+        let offset = PlanetPoint::PER_BLOCK * CHUNK_SIZE.as_f64();
+        min_coord + Coordinate::from([offset, offset])
+    };
+
+    Rect::new(min_coord, max_coord)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RegionLocation;
+    use geo::coords_iter::CoordsIter;
+
+    #[test]
+    fn slab_bounds_in_region() {
+        let region = RegionLocation::new(5, 6);
+        let slab = region.chunk_bounds().0.get_slab(8);
+
+        let bounds = slab_bounds(slab);
+        for coord in bounds.coords_iter() {
+            let (x, y) = coord.x_y();
+            let (rx, ry) = region.xy();
+
+            assert_eq!(rx, x.floor() as u32);
+            assert_eq!(ry, y.floor() as u32);
+        }
+
+        // square and 1 chunk in size
+        assert_eq!(
+            bounds.height(),
+            PlanetPoint::PER_BLOCK * CHUNK_SIZE.as_f64()
+        );
+        assert_eq!(bounds.height(), bounds.width());
     }
 }

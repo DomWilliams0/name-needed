@@ -60,6 +60,10 @@ impl BlockPosition {
     pub const fn z(self) -> GlobalSliceIndex {
         self.2
     }
+
+    pub fn xyz(self) -> [i32; 3] {
+        [self.0 as i32, self.1 as i32, self.2.slice()]
+    }
 }
 
 impl Display for BlockPosition {

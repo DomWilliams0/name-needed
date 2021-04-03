@@ -1,9 +1,10 @@
 mod feature;
+mod features;
 mod region;
 mod row_scanning;
 mod unit;
 
-pub use feature::{Feature, RegionalFeature};
+pub use feature::{ApplyFeatureContext, Feature, RegionalFeature};
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
 pub const CHUNKS_PER_REGION_SIDE: usize = 8;

@@ -15,7 +15,7 @@ cgmath = "0.18"
 num-traits = "0.2"
 num-derive = "0.3"
 itertools = "0.10"
-rand = "0.7" # updating to 0.8 changes terrain seeds
+rand = { version = "0.7", features = ["small_rng"] } # updating to 0.8 changes terrain seeds
 float-cmp = "0.8"
 derive_more = "0.99"
 parse-display = "0.4"

@@ -44,6 +44,7 @@ impl<S: SliceIndexScale> SliceIndex<S> {
         self
     }
 
+    #[inline]
     pub fn slice(self) -> i32 {
         self.0
     }

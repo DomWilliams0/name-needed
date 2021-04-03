@@ -19,7 +19,7 @@ pub struct PlanetParams {
     /// Random if not specified
     #[structopt(long)]
     seed: Option<u64>,
-
+    // TODO remove overhead of option and default to 0
     /// Height and width of surface in some unit
     #[structopt(long, default_value = "128")]
     pub planet_size: u32,

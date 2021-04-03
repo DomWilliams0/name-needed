@@ -1,4 +1,10 @@
+use std::collections::HashMap;
 use std::mem::MaybeUninit;
+use std::sync::Arc;
+
+use geo::concave_hull::ConcaveHull;
+use geo::{MultiPoint, Point, Rect};
+use tokio::sync::Mutex;
 
 pub use ::unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
@@ -6,20 +12,17 @@ pub use ::unit::world::{
 };
 use common::*;
 use grid::{grid_declare, GridImpl};
+use unit::world::{BlockPosition, SlabLocation};
 
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
-use crate::region::feature::{FeatureZRange, ForestFeature, SharedRegionalFeature};
+use crate::region::feature::{FeatureZRange, SharedRegionalFeature};
+use crate::region::features::ForestFeature;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
-use geo::concave_hull::ConcaveHull;
-use geo::{MultiPoint, Point};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use unit::world::{BlockPosition, SlabLocation};
+use geo::prelude::Simplify;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParams,
@@ -278,13 +281,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         &self.chunks[idx]
     }
 
-    pub fn features_for_slab(
-        &self,
+    pub fn features_for_slab<'a>(
+        &'a self,
         slab: SlabLocation,
-    ) -> impl Iterator<Item = &SharedRegionalFeature> + '_ {
+        slab_bounds: &'a Rect<f64>,
+    ) -> impl Iterator<Item = &SharedRegionalFeature> + 'a {
         self.features
             .iter()
-            .filter(move |feature| feature.applies_to(slab))
+            .filter(move |feature| feature.applies_to(slab, slab_bounds))
     }
 }
 
@@ -451,13 +455,14 @@ impl BlockHeight {
 
 #[cfg(test)]
 mod tests {
+    use common::thread_rng;
+    use unit::dim::SmallUnsignedConstant;
+    use unit::world::ChunkLocation;
+
     use crate::continent::ContinentMap;
     use crate::region::region::{Region, Regions};
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;
-    use common::thread_rng;
-    use unit::dim::SmallUnsignedConstant;
-    use unit::world::ChunkLocation;
 
     const SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(4);
     type SmolRegionLocation = RegionLocation<4>;
