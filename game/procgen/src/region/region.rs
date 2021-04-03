@@ -223,9 +223,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         let mut feature_range = FeatureZRange::null();
         let overflows = super::row_scanning::scan(&self.chunks, BiomeType::Forest, |forest_row| {
             feature_range = feature_range.max_of(forest_row.z_range);
-            points.extend(forest_row.into_points(region).map(|(x, y)| {
-                // centre of each block
-                Point::new(x as f64 + 0.5, y as f64 + 0.5)
+            points.extend(forest_row.into_points(region).into_iter().map(|point| {
+                // TODO offset to centre of each block?
+                Point::from(point.get_array())
             }));
         });
 

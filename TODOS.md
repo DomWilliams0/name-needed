@@ -1,4 +1,4 @@
-# TODOs (287)
+# TODOs (288)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -57,10 +57,11 @@
    * `// TODO generate tree locations with poisson disk sampling`
    * `// TODO attempt to place tree model at location in this slab`
    * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (11)
    * `// TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate`
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
    * `// TODO rename me`
+   * `// TODO offset to centre of each block?`
    * `// TODO expand polygon out to ensure it covers the entire biome area?`
    * `// TODO check continuations to see if this is the extension of an existing feature`
    * `// TODO pass onto the overflow regions for continuation`

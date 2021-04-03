@@ -1,8 +1,9 @@
 use crate::region::feature::FeatureZRange;
 use crate::region::region::RegionChunk;
+use crate::region::unit::PlanetPoint;
 use crate::region::RegionLocationUnspecialized;
 use crate::BiomeType;
-use common::{once, ArrayVec, Itertools};
+use common::{ArrayVec, Itertools};
 use unit::world::CHUNK_SIZE;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -126,26 +127,40 @@ impl<const SIZE: usize> BiomeRow<SIZE> {
     pub fn into_points(
         self,
         region: RegionLocationUnspecialized<SIZE>,
-    ) -> impl Iterator<Item = (u32, u32)> {
-        let row_length = CHUNK_SIZE.as_usize() * SIZE;
-        let row_start_idx = self.col * row_length;
+    ) -> ArrayVec<PlanetPoint<SIZE>, 2> {
+        let mut points = ArrayVec::new();
+
+        // find coordinates in 2d block grid within regions
+
+        // block grid is this length along each side
+        let region_block_grid_size = CHUNK_SIZE.as_usize() * SIZE;
         let (row_x, row_y) = {
             let (rx, ry) = region.xy();
-            (rx, ry + row_start_idx as u32)
+            (
+                rx * region_block_grid_size as u32,
+                (ry * region_block_grid_size as u32) + self.col as u32,
+            )
+        };
+
+        let mut add_point = |block: (u32, u32)| {
+            points.push(PlanetPoint::new(
+                block.0 as f64 / region_block_grid_size as f64,
+                block.1 as f64 / region_block_grid_size as f64,
+            ))
         };
 
         let start_idx = self.start.into_option().unwrap_or(0);
         let start = (row_x + start_idx as u32, row_y);
+        add_point(start);
 
-        let end_idx = self.end.into_option().unwrap_or(row_length - 1);
-        let end = if end_idx == start_idx {
+        let end_idx = self.end.into_option().unwrap_or(region_block_grid_size - 1);
+        if end_idx == start_idx {
             // single block, only yield 1 point
-            None
         } else {
-            Some((row_x + end_idx as u32, row_y))
+            add_point((row_x + end_idx as u32, row_y))
         };
 
-        once(start).chain(end)
+        points
     }
 }
 
@@ -175,6 +190,7 @@ mod tests {
     use crate::region::region::{ChunkHeightMap, Region, RegionChunk, Regions};
     use crate::region::unit::RegionLocation;
     use grid::GridImpl;
+    use unit::world::ChunkLocation;
 
     const SIZE: usize = 2;
     const SIZE_2: usize = SIZE * SIZE;
@@ -229,11 +245,14 @@ mod tests {
         );
         assert!(overflow.is_empty());
 
-        let y_offset = row_start as u32; // 2nd row in 2x2 region chunk grid
+        let y_offset = 1; // 2nd row
         assert_eq!(
             rows[0]
                 .clone()
                 .into_points(SmolRegionLocation::new(0, 0))
+                .into_iter()
+                .map(|point| point.into_block(0.into()))
+                .map(|pos| (pos.0 as u32, pos.1 as u32))
                 .collect_vec(),
             vec![(1, y_offset), (5, y_offset)]
         );
@@ -263,7 +282,7 @@ mod tests {
             rows[0]
                 .clone()
                 .into_points(SmolRegionLocation::new(3, 4))
-                .count(),
+                .len(),
             1
         );
     }
@@ -383,5 +402,16 @@ mod tests {
                 RegionNeighbour::Right
             ]
         );
+
+        // ensure all planet points when converted back to WorldPositions are within the region
+        let reg = SmolRegionLocation::new(1, 1);
+        rows.iter()
+            .flat_map(|row| row.clone().into_points(reg))
+            .map(|p| p.into_block(0.into()))
+            .for_each(|block| {
+                let chunk = ChunkLocation::from(block);
+                let this_reg = RegionLocation::try_from_chunk(chunk).expect("should be good");
+                assert_eq!(reg, this_reg);
+            });
     }
 }

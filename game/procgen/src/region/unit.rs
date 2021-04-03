@@ -1,4 +1,6 @@
-use unit::world::{BlockPosition, ChunkLocation, RangePosition, WorldPosition, CHUNK_SIZE};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, RangePosition, WorldPosition, CHUNK_SIZE,
+};
 
 use crate::region::Region;
 use crate::PlanetParams;
@@ -116,9 +118,23 @@ impl<const SIZE: usize> PlanetPoint<SIZE> {
         Self(nx, ny)
     }
 
+    pub fn into_block(self, z: GlobalSliceIndex) -> WorldPosition {
+        let (x, y) = self.get();
+        WorldPosition::from((
+            (x / Self::PER_BLOCK) as i32,
+            (y / Self::PER_BLOCK) as i32,
+            z,
+        ))
+    }
+
     #[inline]
     pub const fn get(&self) -> (f64, f64) {
         (self.0, self.1)
+    }
+
+    #[inline]
+    pub const fn get_array(&self) -> [f64; 2] {
+        [self.0, self.1]
     }
 
     #[inline]
@@ -142,5 +158,11 @@ impl PlanetPointPrecalculated {
     }
     pub const fn region(&self) -> (f64, f64) {
         self.region
+    }
+}
+
+impl<const SIZE: usize> From<[f64; 2]> for PlanetPoint<SIZE> {
+    fn from([x, y]: [f64; 2]) -> Self {
+        Self(x, y)
     }
 }
