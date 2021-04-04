@@ -1,4 +1,4 @@
-# TODOs (294)
+# TODOs (295)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -51,28 +51,29 @@
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
  * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (3)
-   * `#[derive(Debug)] // TODO custom debug to not print full bounding polygon`
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
+   * `// TODO ensure these are optimised out`
    * `// TODO faster hash`
- * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (9)
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
    * `// TODO this does SO many temporary allocations`
-   * `// TODO this is broken for now`
+   * `return; // TODO*/`
    * `// TODO unchecked unwrap, can never be None`
    * `// TODO generate tree locations with poisson disk sampling`
    * `// TODO attempt to place tree model at location in this slab`
    * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
+   * `// TODO replace this rtree with a new bulk loaded one?`
+   * `// TODO PR to move nodes out of the tree instead of copy`
    * `// TODO consider rtree params`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (11)
-   * `// TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate`
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
+   * `// TODO can probably remove the newtype`
    * `// TODO rename me`
    * `// TODO offset to centre of each block?`
    * `// TODO expand polygon out to ensure it covers the entire biome area?`
-   * `// TODO check continuations to see if this is the extension of an existing feature`
-   * `// TODO pass onto the overflow regions for continuation`
-   * `// TODO null continuations for benchmark`
+   * `// TODO will need to filter on feature type when there are multiple`
+   * `// TODO null params for benchmark`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`

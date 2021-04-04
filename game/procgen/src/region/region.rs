@@ -75,9 +75,11 @@ struct RegionContinuations<const SIZE: usize>(
     Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation>>>,
 );
 
+pub struct RegionChunksBlockRows<'a, const SIZE: usize>(&'a [RegionChunk<SIZE>]);
+
 // TODO rename me
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct BlockHeight {
+pub struct BlockHeight {
     ground: GlobalSliceIndex,
     biome: BiomeType,
 }
@@ -224,13 +226,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     ) {
         let mut points = Vec::new();
         let mut feature_range = FeatureZRange::null();
-        let overflows = super::row_scanning::scan(&self.chunks, BiomeType::Forest, |forest_row| {
-            feature_range = feature_range.max_of(forest_row.z_range);
-            points.extend(forest_row.into_points(region).into_iter().map(|point| {
-                // TODO offset to centre of each block?
-                Point::from(point.get_array())
-            }));
-        });
+        let overflows =
+            super::row_scanning::scan(self.block_rows(), BiomeType::Forest, |forest_row| {
+                feature_range = feature_range.max_of(forest_row.z_range);
+                points.extend(forest_row.into_points(region).into_iter().map(|point| {
+                    // TODO offset to centre of each block?
+                    Point::from(point.get_array())
+                }));
+            });
 
         if points.is_empty() {
             // no feature, yippee
@@ -289,6 +292,40 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         self.features
             .iter()
             .filter(move |feature| feature.applies_to(slab, slab_bounds))
+    }
+
+    /// Iterator that yields rows of blocks across the entire region. Fiddly because of the memory
+    /// layout of each region chunk
+    pub fn block_rows(&self) -> RegionChunksBlockRows<'_, SIZE> {
+        RegionChunksBlockRows(&self.chunks)
+    }
+}
+
+impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
+    pub fn blocks(self) -> impl Iterator<Item = &'a BlockHeight> + 'a {
+        (0..SIZE)
+            .map(move |col| {
+                let row_offset = col * SIZE;
+                &self.0[row_offset..row_offset + SIZE]
+            })
+            .flat_map(move |row_of_chunks| {
+                (0..CHUNK_SIZE.as_usize())
+                    .cartesian_product(0..SIZE)
+                    .cartesian_product(0..CHUNK_SIZE.as_usize())
+                    .map(move |((by, cx), bx)| {
+                        debug_assert!(cx < row_of_chunks.len());
+                        // safety: cx is limited to 0..SIZE, same as slice len
+                        let chunk = unsafe { row_of_chunks.get_unchecked(cx) };
+
+                        let i = (by * CHUNK_SIZE.as_usize()) + bx;
+                        &chunk.desc.ground_height[i]
+                    })
+            })
+    }
+
+    #[cfg(test)]
+    pub fn with_chunks(chunks: &'a [RegionChunk<SIZE>]) -> Self {
+        Self(chunks)
     }
 }
 
@@ -431,6 +468,13 @@ impl ChunkDescription {
         self.ground_height[&[x as i32, y as i32, 0]].ground
     }
 
+    /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
+    /// a chunk size of 4:
+    ///
+    /// 12  13  14  15
+    /// 8   9   10  11
+    /// 4   5   6   7
+    /// 0   1   2   3
     pub(crate) fn blocks(&self) -> impl Iterator<Item = &BlockHeight> + '_ {
         self.ground_height.array().iter()
     }

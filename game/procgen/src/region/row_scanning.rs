@@ -1,17 +1,18 @@
 use crate::region::feature::FeatureZRange;
-use crate::region::region::RegionChunk;
+use crate::region::region::RegionChunksBlockRows;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionLocationUnspecialized;
 use crate::BiomeType;
 use common::{ArrayVec, Itertools};
+
 use unit::world::CHUNK_SIZE;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(test, derive(Ord, PartialOrd))]
 pub enum RegionNeighbour {
-    /// y-1
-    Up = 1,
     /// y+1
+    Up = 1,
+    /// y-1
     Down,
     /// x-1
     Left,
@@ -45,16 +46,13 @@ pub enum RowIndex {
 /// Scans rows of blocks within the region to collect points that form a concave hull around blocks
 /// of the same biome
 pub fn scan<const SIZE: usize>(
-    chunks: &[RegionChunk<SIZE>],
+    chunks: RegionChunksBlockRows<SIZE>,
     biome: BiomeType,
     mut per_row: impl FnMut(BiomeRow<SIZE>),
 ) -> ArrayVec<RegionNeighbour, 4> {
     let region_side_length = SIZE * CHUNK_SIZE.as_usize();
 
-    let rows = chunks
-        .iter()
-        .flat_map(|chunk| chunk.description().blocks())
-        .chunks(region_side_length);
+    let rows = chunks.blocks().chunks(region_side_length);
 
     // indexed by RegionNeighbour idx - 1
     let mut overflows = [None; 4];
@@ -99,11 +97,11 @@ pub fn scan<const SIZE: usize>(
             }
 
             if col == 0 {
-                add_overflow(RegionNeighbour::Up);
+                add_overflow(RegionNeighbour::Down);
             }
 
             if col == region_side_length - 1 {
-                add_overflow(RegionNeighbour::Down);
+                add_overflow(RegionNeighbour::Up);
             }
 
             per_row(BiomeRow {
@@ -164,6 +162,28 @@ impl<const SIZE: usize> BiomeRow<SIZE> {
     }
 }
 
+impl RegionNeighbour {
+    pub fn offset<const SIZE: usize>(self) -> (i32, i32) {
+        use RegionNeighbour::*;
+        match self {
+            Up => (0, 1),
+            Down => (0, -1),
+            Left => (-1, 0),
+            Right => (1, 0),
+        }
+    }
+
+    pub fn opposite(self) -> Self {
+        use RegionNeighbour::*;
+        match self {
+            Up => Down,
+            Down => Up,
+            Left => Right,
+            Right => Left,
+        }
+    }
+}
+
 #[cfg(test)]
 impl<const SIZE: usize> PartialEq for BiomeRow<SIZE> {
     fn eq(&self, other: &Self) -> bool {
@@ -212,9 +232,13 @@ mod tests {
         setup(&mut region_chunks);
 
         let mut rows = vec![];
-        let mut overflow = scan(&region_chunks, BiomeType::Forest, |nice| {
-            rows.push(nice);
-        });
+        let mut overflow = scan(
+            RegionChunksBlockRows::with_chunks(&region_chunks),
+            BiomeType::Forest,
+            |nice| {
+                rows.push(nice);
+            },
+        );
 
         overflow.sort(); // for equality check
         (rows, overflow.to_vec())
@@ -226,10 +250,10 @@ mod tests {
 
     #[test]
     fn scan_self_contained() {
-        let row_start = row(1);
+        let idx = (2 * CHUNK_SIZE.as_usize()) + 5;
         let (rows, overflow) = do_scan(|chunks| {
-            // 2nd row, 1-5
-            (**chunks[0].biomes_mut())[row_start + 1..row_start + 6]
+            // a few in a row
+            (**chunks[0].biomes_mut())[idx..idx + 4]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
@@ -237,15 +261,14 @@ mod tests {
         assert_eq!(
             rows,
             vec![BiomeRow {
-                col: 1,
-                start: RowIndex::Index(1),
-                end: RowIndex::Index(5),
+                col: 2,
+                start: RowIndex::Index(5),
+                end: RowIndex::Index(8),
                 z_range: FeatureZRange::null()
             }]
         );
         assert!(overflow.is_empty());
 
-        let y_offset = 1; // 2nd row
         assert_eq!(
             rows[0]
                 .clone()
@@ -254,41 +277,85 @@ mod tests {
                 .map(|point| point.into_block(0.into()))
                 .map(|pos| (pos.0 as u32, pos.1 as u32))
                 .collect_vec(),
-            vec![(1, y_offset), (5, y_offset)]
+            vec![(5, 2), (8, 2)]
         );
     }
 
     #[test]
-    fn scan_single_block() {
-        let idx = row(4) + 5; // arbitrary
+    fn scan_over_chest_boundary() {
+        let row = 2 * CHUNK_SIZE.as_usize(); // start on 3rd row
         let (rows, overflow) = do_scan(|chunks| {
-            // single block
-            (**chunks[0].biomes_mut())[idx].set_biome(BiomeType::Forest);
+            // fill up row 4 to end
+            (**chunks[0].biomes_mut())[row + 4..row + CHUNK_SIZE.as_usize()]
+                .iter_mut()
+                .for_each(|b| b.set_biome(BiomeType::Forest));
+
+            // continue row into next chunk
+            (**chunks[1].biomes_mut())[row..row + 4]
+                .iter_mut()
+                .for_each(|b| b.set_biome(BiomeType::Forest));
         });
 
         assert_eq!(
             rows,
             vec![BiomeRow {
-                col: 4,
-                start: RowIndex::Index(5),
-                end: RowIndex::Index(5),
+                col: 2,
+                start: RowIndex::Index(4),
+                end: RowIndex::Index(CHUNK_SIZE.as_usize() + 3),
                 z_range: FeatureZRange::null()
             }]
         );
         assert!(overflow.is_empty());
+    }
+    #[test]
+    fn scan_single_block() {
+        // just (3,6) in a few region chunks
+        let idx = (6 * CHUNK_SIZE.as_usize()) + 3;
 
-        // only 1 point
+        let (rows, overflow) = do_scan(|chunks| {
+            (**chunks[0].biomes_mut())[idx].set_biome(BiomeType::Forest);
+            (**chunks[1].biomes_mut())[idx].set_biome(BiomeType::Forest);
+            (**chunks[2].biomes_mut())[idx].set_biome(BiomeType::Forest);
+        });
+
         assert_eq!(
-            rows[0]
-                .clone()
-                .into_points(SmolRegionLocation::new(3, 4))
-                .len(),
-            1
+            rows,
+            vec![
+                // in region chunk 0 (BL)
+                BiomeRow {
+                    col: 6,
+                    start: RowIndex::Index(3),
+                    end: RowIndex::Index(3),
+                    z_range: FeatureZRange::null()
+                },
+                // in region chunk 1 (BR), so offset a chunk width to the right
+                BiomeRow {
+                    col: 6,
+                    start: RowIndex::Index(3 + CHUNK_SIZE.as_usize()),
+                    end: RowIndex::Index(3 + CHUNK_SIZE.as_usize()),
+                    z_range: FeatureZRange::null()
+                },
+                // in region chunk 2 (TL), so offset a chunk height upwards
+                BiomeRow {
+                    col: 6 + CHUNK_SIZE.as_usize(),
+                    start: RowIndex::Index(3),
+                    end: RowIndex::Index(3),
+                    z_range: FeatureZRange::null()
+                },
+            ]
+        );
+        assert!(overflow.is_empty());
+
+        assert_eq!(
+            rows.iter()
+                .flat_map(|p| p.clone().into_points(SmolRegionLocation::new(3, 4)))
+                .count(),
+            3
         );
     }
 
     #[test]
-    fn scan_first_row_overflow_up() {
+    fn scan_first_row_overflow_down() {
         let (rows, overflow) = do_scan(|chunks| {
             // 1st row, 4-9
             (**chunks[0].biomes_mut())[4..10]
@@ -305,14 +372,18 @@ mod tests {
                 z_range: FeatureZRange::null()
             }]
         );
-        assert_eq!(overflow, vec![RegionNeighbour::Up]);
+        assert_eq!(overflow, vec![RegionNeighbour::Down]);
     }
 
     #[test]
-    fn scan_first_row_overflow_up_and_left() {
+    fn scan_overflow_up_and_right() {
+        // fill top row of region
+        let idx = (CHUNK_SIZE.as_usize().pow(2)) - CHUNK_SIZE.as_usize();
         let (rows, overflow) = do_scan(|chunks| {
-            // 1st row full
-            (**chunks[0].biomes_mut())[0..SIZE * CHUNK_SIZE.as_usize()]
+            (**chunks[2].biomes_mut())[idx..idx + CHUNK_SIZE.as_usize()]
+                .iter_mut()
+                .for_each(|b| b.set_biome(BiomeType::Forest));
+            (**chunks[3].biomes_mut())[idx..idx + CHUNK_SIZE.as_usize()]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
@@ -320,7 +391,7 @@ mod tests {
         assert_eq!(
             rows,
             vec![BiomeRow {
-                col: 0,
+                col: 2 * CHUNK_SIZE.as_usize() - 1, // top row
                 start: RowIndex::Continued,
                 end: RowIndex::Continued,
                 z_range: FeatureZRange::null()
@@ -338,14 +409,15 @@ mod tests {
 
     #[test]
     fn scan_multiple_on_same_row() {
-        let row = row(2);
+        let start = 2 * CHUNK_SIZE.as_usize(); // 3rd row
+
         let (rows, overflow) = do_scan(|chunks| {
             // 3rd row has 2 separate
-            (**chunks[0].biomes_mut())[row + 1..row + 4]
+            (**chunks[0].biomes_mut())[start + 1..start + 4]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
 
-            (**chunks[0].biomes_mut())[row + 10..row + 12]
+            (**chunks[0].biomes_mut())[start + 10..start + 12]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
