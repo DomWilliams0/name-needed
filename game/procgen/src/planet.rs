@@ -4,8 +4,8 @@ use tokio::sync::RwLock;
 
 use common::*;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition,
-    SliceIndex, WorldPosition, CHUNK_SIZE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, SlabPosition, SliceIndex,
+    WorldPosition, CHUNK_SIZE,
 };
 
 use crate::biome::BlockQueryResult;
@@ -14,6 +14,7 @@ use crate::params::PlanetParams;
 use crate::rasterize::SlabGrid;
 use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation};
 use crate::region::{Region, Regions};
+
 use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads
@@ -296,5 +297,35 @@ mod tests {
             PlanetPoint::PER_BLOCK * CHUNK_SIZE.as_f64()
         );
         assert_eq!(bounds.height(), bounds.width());
+    }
+
+    #[test]
+    fn slab_bounds_vary() {
+        let region = RegionLocation::new(5, 6);
+        let chunk = region.chunk_bounds().0;
+
+        // differ horizontally
+        let a = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+        let b = {
+            let chunk: ChunkLocation = chunk + (3, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+
+        assert_ne!(a, b);
+
+        // differ vertically
+        let a = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+        let b = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(9))
+        };
+
+        assert_eq!(a, b);
     }
 }

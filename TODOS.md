@@ -1,4 +1,4 @@
-# TODOs (295)
+# TODOs (296)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -50,15 +50,16 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (3)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (4)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
    * `// TODO ensure these are optimised out`
+   * `// TODO give each feature a guid instead`
    * `// TODO faster hash`
  * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
    * `// TODO this does SO many temporary allocations`
-   * `return; // TODO*/`
+   * `// TODO this is broken for now`
    * `// TODO unchecked unwrap, can never be None`
    * `// TODO generate tree locations with poisson disk sampling`
    * `// TODO attempt to place tree model at location in this slab`
@@ -68,8 +69,8 @@
    * `// TODO consider rtree params`
  * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
-   * `// TODO can probably remove the newtype`
    * `// TODO rename me`
+   * `// TODO is there a race condition where a region that's supposed to replace a feature`
    * `// TODO offset to centre of each block?`
    * `// TODO expand polygon out to ensure it covers the entire biome area?`
    * `// TODO will need to filter on feature type when there are multiple`

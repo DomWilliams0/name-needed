@@ -207,7 +207,7 @@ impl RowIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::region::region::{ChunkHeightMap, Region, RegionChunk, Regions};
+    use crate::region::region::{Region, RegionChunk, Regions};
     use crate::region::unit::RegionLocation;
     use grid::GridImpl;
     use unit::world::ChunkLocation;

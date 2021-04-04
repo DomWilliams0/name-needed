@@ -1,29 +1,38 @@
 use std::sync::Arc;
 
 use geo::prelude::*;
-use geo::{Polygon, Rect};
-use rstar::RTree;
+use geo::{MultiPolygon, Rect};
+
 use tokio::sync::Mutex;
 
 use common::*;
-use unit::world::{GlobalSliceIndex, SlabLocation, SliceBlock, CHUNK_SIZE};
+use unit::world::{GlobalSliceIndex, SlabLocation};
 
-use crate::region::region::{ChunkDescription, ChunkLocation};
-use crate::{BiomeType, BlockType, SlabGrid};
+use crate::region::region::ChunkDescription;
+use crate::SlabGrid;
+use geo::coords_iter::CoordsIter;
+use geo_booleanop::boolean::BooleanOp;
+use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 
 /// Feature discovered at region initialization. Belongs in an Arc
-#[derive(Debug)] // TODO custom debug to not print full bounding polygon
 pub struct RegionalFeature {
-    /// 2d bounds around feature, only applies to slabs within this polygon
-    bounding: Polygon<f64>,
-
-    /// Inclusive bounds in the z direction for this feature
-    z_range: FeatureZRange,
+    /// NON ASYNC MUTEX, do not hold this across .awaits!!
+    inner: parking_lot::RwLock<RegionalFeatureInner>,
 
     // TODO make this struct a dst and store trait object inline without extra indirection
     feature: Mutex<Box<dyn Feature>>,
+
+    typeid: TypeId,
+}
+
+struct RegionalFeatureInner {
+    /// 2d bounds around feature, only applies to slabs within this polygon
+    bounding: MultiPolygon<f64>,
+
+    /// Inclusive bounds in the z direction for this feature
+    z_range: FeatureZRange,
 }
 
 /// Inclusive bounds in the z direction for a feature
@@ -42,8 +51,15 @@ pub trait Feature: Send + Sync + Debug {
         &mut self,
         loc: SlabLocation,
         ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &Polygon<f64>,
+        bounding: &MultiPolygon<f64>,
     );
+
+    /// Gut the other and absorb into this one.
+    ///
+    /// Must downcast other to Self and return false if mismatched
+    fn merge_with(&mut self, other: &mut dyn Feature) -> bool;
+
+    fn any_mut(&mut self) -> &mut dyn Any;
 }
 
 /// Context for applying a feature to a slab
@@ -56,27 +72,38 @@ pub struct ApplyFeatureContext<'a> {
 
 impl RegionalFeature {
     pub fn new<F: Feature + 'static>(
-        bounding: Polygon<f64>,
+        bounding: MultiPolygon<f64>,
         z_range: FeatureZRange,
         feature: F,
     ) -> SharedRegionalFeature {
         debug_assert!(!bounding.is_empty());
-        debug!("creating new regional feature"; "centroid" => ?bounding.centroid(), "area" => bounding.unsigned_area(), "feature" => feature.name());
+        debug_assert!(bounding.iter().all(|p| !p.is_empty()));
 
         let extended_z_range = feature.extend_z_range(z_range);
-        debug!("extended feature z range"; "original" => ?z_range, "extended" => ?extended_z_range, "feature" => feature.name());
 
-        Arc::new(RegionalFeature {
-            bounding,
-            z_range,
+        // TODO ensure these are optimised out
+        let centroid = bounding.centroid();
+        let area = bounding.unsigned_area();
+        let name = feature.name();
+
+        let arc = Arc::new(RegionalFeature {
+            inner: parking_lot::RwLock::new(RegionalFeatureInner { bounding, z_range }),
             feature: Mutex::new(Box::new(feature)),
-        })
+            typeid: TypeId::of::<F>(),
+        });
+
+        debug!("creating new regional feature"; "centroid" => ?centroid, "area" => ?area, "type" => name,
+        "feature" => ?arc.ptr_debug(), "original range" => ?z_range, "extended range" => ?extended_z_range);
+
+        arc
     }
 
     pub fn applies_to(&self, slab: SlabLocation, slab_bounds: &Rect<f64>) -> bool {
+        let inner = self.inner.read();
+
         // cheap z range check first
         let (slab_bottom, slab_top) = slab.slab.slice_range();
-        let FeatureZRange(feature_bottom, feature_top) = self.z_range;
+        let FeatureZRange(feature_bottom, feature_top) = inner.z_range;
 
         if !(slab_bottom <= feature_top && feature_bottom <= slab_top) {
             // does not overlap
@@ -84,12 +111,66 @@ impl RegionalFeature {
         }
 
         // more expensive polygon check
-        self.bounding.intersects(slab_bounds)
+        inner.bounding.intersects(slab_bounds)
     }
 
     pub async fn apply_to_slab(&self, loc: SlabLocation, ctx: &mut ApplyFeatureContext<'_>) {
         let mut feature = self.feature.lock().await;
-        feature.apply(loc, ctx, &self.bounding);
+        let inner = self.inner.read();
+        feature.apply(loc, ctx, &inner.bounding);
+    }
+
+    pub fn merge_with_bounds(
+        &self,
+        other_bounding: &MultiPolygon<f64>,
+        other_z_range: FeatureZRange,
+    ) {
+        let mut inner = self.inner.write();
+
+        inner.bounding = inner.bounding.union(other_bounding);
+        inner.z_range = inner.z_range.max_of(other_z_range);
+    }
+
+    pub async fn merge_with_other(
+        &self,
+        other: SharedRegionalFeature,
+    ) -> Result<(), (TypeId, TypeId)> {
+        // debug_assert_eq!(
+        //     self.typeid, other.typeid,
+        //     "can't merge {:?} with {:?}",
+        //     self.typeid, other.typeid
+        // );
+
+        let merged;
+        {
+            // try to merge features
+            let mut other_feature = other.feature.lock().await;
+            let mut this_feature = self.feature.lock().await;
+            merged = this_feature.merge_with(&mut **other_feature);
+        }
+
+        if !merged {
+            return Err((self.typeid, other.typeid));
+        }
+
+        {
+            // now merge bounding polygons
+            let other_inner = other.inner.read();
+            self.merge_with_bounds(&other_inner.bounding, other_inner.z_range);
+        }
+
+        Ok(())
+    }
+
+    /// Dirty way to compare distinct instances by pointer value
+    pub fn ptr_debug(self: &Arc<Self>) -> impl Debug {
+        // TODO give each feature a guid instead
+        let ptr = Arc::as_ptr(self);
+
+        #[derive(Debug)]
+        struct RegionalFeature(*const u8);
+
+        RegionalFeature(ptr as *const _)
     }
 }
 
@@ -132,5 +213,37 @@ impl<'a> ApplyFeatureContext<'a> {
         };
 
         SmallRng::seed_from_u64(seed)
+    }
+}
+
+impl Debug for RegionalFeature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let inner = self.inner.try_read();
+        let feature = self.feature.try_lock().ok();
+        let mut dbg = f.debug_struct("RegionalFeature");
+        match inner {
+            Some(inner) => {
+                dbg.field(
+                    "bounding point count",
+                    &inner.bounding.coords_iter().count(),
+                );
+                dbg.field("z range", &inner.z_range);
+            }
+            None => {
+                dbg.field("inner", &"<locked>");
+            }
+        }
+
+        match feature {
+            Some(feature) => {
+                dbg.field("name", &feature.name());
+                dbg.field("feature", &*feature);
+            }
+            None => {
+                dbg.field("feature", &"<locked>");
+            }
+        }
+
+        dbg.finish()
     }
 }

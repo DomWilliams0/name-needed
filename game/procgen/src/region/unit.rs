@@ -51,6 +51,22 @@ impl<const SIZE: usize> RegionLocation<SIZE> {
         }
     }
 
+    /// None if (self+offset) is negative or greater than planet size
+    pub fn try_add_offset_with_params(
+        &self,
+        offset: (i32, i32),
+        params: &PlanetParams,
+    ) -> Option<Self> {
+        let (x, y) = (self.0 as i32 + offset.0, self.1 as i32 + offset.1);
+
+        let limit = 0..params.planet_size as i32;
+        if x >= 0 && y >= 0 && limit.contains(&x) && limit.contains(&y) {
+            Some(RegionLocation(x as u32, y as u32))
+        } else {
+            None
+        }
+    }
+
     /// Inclusive bounds
     pub fn chunk_bounds(&self) -> (ChunkLocation, ChunkLocation) {
         let x = self.0 as i32;

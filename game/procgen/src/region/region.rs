@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use geo::concave_hull::ConcaveHull;
-use geo::{MultiPoint, Point, Rect};
-use tokio::sync::Mutex;
+use geo::{coords_iter::CoordsIter, MultiPoint, MultiPolygon, Point, Rect};
+use tokio::sync::{Mutex, RwLock};
 
 pub use ::unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
@@ -19,16 +19,17 @@ use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
 use crate::region::feature::{FeatureZRange, SharedRegionalFeature};
 use crate::region::features::ForestFeature;
+use crate::region::row_scanning::RegionNeighbour;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
-use geo::prelude::Simplify;
+use geo::prelude::HasDimensions;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParams,
-    // TODO helper struct for a sorted Vec as a key value lookup, instead of repeating boilerplate
     regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
 
+    loaded_regions: LoadedRegions<SIZE>,
     continuations: RegionContinuations<SIZE>,
 }
 
@@ -66,14 +67,25 @@ pub struct ChunkDescription {
     ground_height: ChunkHeightMap,
 }
 
+type LoadedRegions<const SIZE: usize> = Arc<RwLock<HashSet<RegionLocation<SIZE>>>>;
+type RegionContinuations<const SIZE: usize> =
+    Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>>;
+
 /// Info about features/generation from neighbouring regions that is to be carried over the
 /// boundary
-struct RegionContinuation {}
+#[derive(Default, Debug)]
+struct RegionContinuation<const SIZE: usize> {
+    /// (direction of neighbour from this region, feature)
+    features: Vec<(RegionNeighbour, SharedRegionalFeature)>,
+}
 
-#[derive(Clone)]
-struct RegionContinuations<const SIZE: usize>(
-    Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation>>>,
-);
+struct RegionalFeatureReplacement<const SIZE: usize> {
+    region: RegionLocation<SIZE>,
+    current: SharedRegionalFeature,
+    new: SharedRegionalFeature,
+}
+type RegionalFeatureReplacements<const SIZE: usize> =
+    SmallVec<[RegionalFeatureReplacement<SIZE>; 4]>;
 
 pub struct RegionChunksBlockRows<'a, const SIZE: usize>(&'a [RegionChunk<SIZE>]);
 
@@ -105,7 +117,8 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         Regions {
             params: params.clone(),
             regions: Vec::with_capacity(64),
-            continuations: RegionContinuations::default(),
+            continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
+            loaded_regions: Arc::new(RwLock::new(HashSet::with_capacity(128))),
         }
     }
 
@@ -114,22 +127,55 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         location: RegionLocation<SIZE>,
         continents: &ContinentMap,
     ) -> Option<&Region<SIZE, SIZE_2>> {
-        Some(match self.region_index(location)? {
+        let ret = Some(match self.region_index(location)? {
             Ok(idx) => &self.regions[idx].1,
             Err(idx) => {
                 debug!("creating new region"; "region" => ?location);
 
-                let region = Region::create(
+                let (region, feature_updates) = Region::create(
                     location,
                     continents,
                     self.continuations.clone(), // wrapper around Arc
+                    self.loaded_regions.clone(),
                     &self.params,
                 )
                 .await;
+
+                // apply feature replacements
+                // TODO is there a race condition where a region that's supposed to replace a feature
+                //  swaps it with another before it can be replaced here?
+                for RegionalFeatureReplacement {
+                    region,
+                    current,
+                    new,
+                } in feature_updates
+                {
+                    debug!("applying feature replacement"; "region" => ?region, "current" => ?current.ptr_debug(), "new" => ?new.ptr_debug());
+                    let idx = match self.region_index(region) {
+                        Some(Ok(idx)) => idx,
+                        _ => unreachable!("invalid neighbour {:?} returned", region),
+                    };
+
+                    let (_, region) = &mut self.regions[idx];
+
+                    if let Some(feature) = region
+                        .features
+                        .iter_mut()
+                        .find(|f| Arc::ptr_eq(&current, *f))
+                    {
+                        // swapadoodledoo
+                        *feature = new;
+                    }
+                }
+
                 self.regions.insert(idx, (location, region));
+                self.loaded_regions.write().await.insert(location);
+
                 &self.regions[idx].1
             }
-        })
+        });
+
+        ret
     }
 
     pub fn get_existing(&self, region: RegionLocation<SIZE>) -> Option<&Region<SIZE, SIZE_2>> {
@@ -152,8 +198,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         loc: RegionLocation<SIZE>,
         continents: &ContinentMap,
         continuations: RegionContinuations<SIZE>,
-        _params: &PlanetParams,
-    ) -> Self {
+        loaded_regions: LoadedRegions<SIZE>,
+        params: &PlanetParams,
+    ) -> (Self, RegionalFeatureReplacements<SIZE>) {
         debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
 
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
@@ -169,9 +216,11 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         };
 
         // regional feature discovery
-        region.discover_regional_features(loc, continuations).await;
+        let updates = region
+            .discover_regional_features(loc, continuations, loaded_regions, params)
+            .await;
 
-        region
+        (region, updates)
     }
 
     async fn init_region_chunks(
@@ -223,10 +272,12 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         &mut self,
         region: RegionLocation<SIZE>,
         continuations: RegionContinuations<SIZE>,
-    ) {
+        loaded_regions: LoadedRegions<SIZE>,
+        params: &PlanetParams,
+    ) -> RegionalFeatureReplacements<SIZE> {
         let mut points = Vec::new();
         let mut feature_range = FeatureZRange::null();
-        let overflows =
+        let mut overflows =
             super::row_scanning::scan(self.block_rows(), BiomeType::Forest, |forest_row| {
                 feature_range = feature_range.max_of(forest_row.z_range);
                 points.extend(forest_row.into_points(region).into_iter().map(|point| {
@@ -235,30 +286,136 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 }));
             });
 
+        let mut feature_updates = SmallVec::new();
+
         if points.is_empty() {
             // no feature, yippee
-            return;
+            return feature_updates;
         }
 
         debug_assert_ne!(feature_range, FeatureZRange::null());
 
-        let bounding = {
+        let mut bounding = {
             let points = MultiPoint(points);
             let polygon = points.concave_hull(2.0);
             // TODO expand polygon out to ensure it covers the entire biome area?
             // polygon.simplify(&1.0);
-            polygon
+            MultiPolygon(vec![polygon])
         };
 
+        trace!("regional feature discovery"; "region" => ?region,
+            "points" => bounding.coords_iter().count(),
+            "overflows" => ?overflows);
+
+        // must only be called once, result is cached in this_feature
+        let mut this_feature: Option<SharedRegionalFeature> = None;
+        fn create_new_feature(
+            bounding: &mut MultiPolygon<f64>,
+            feature_range: FeatureZRange,
+        ) -> SharedRegionalFeature {
+            let bounding = {
+                let stolen = std::mem::replace(bounding, MultiPolygon(vec![]));
+                assert!(!stolen.is_empty()); // is only called once
+                stolen
+            };
+
+            RegionalFeature::new(bounding, feature_range, ForestFeature::default())
+        }
+
+        // take continuations mutex now and don't release until self and all neighbours are updated,
+        // to avoid a TOCTOU where a region pops its empty continuation here, and is allocated a new
+        // populated one just after, which it never checks
+        let mut continuations_guard = continuations.lock().await;
+
         // pop continuations for this region
-        let continuation = continuations.pop(region).await;
+        let mut continuation = continuations_guard.remove(&region).unwrap_or_default();
+        trace!("continuations"; "region" => ?region, "continuation" => ?continuation);
 
-        // TODO check continuations to see if this is the extension of an existing feature
-        // TODO pass onto the overflow regions for continuation
+        // sort neighbours with confirmed continuations to the front, so we hit them first and copy
+        // a reference to their preexisting feature, instead of creating a new feature here
+        // then having to merge
+        overflows.sort_unstable_by_key(|o| !continuation.contains(o));
 
-        let feature = RegionalFeature::new(bounding, feature_range, ForestFeature::default());
+        for overflow in overflows.into_iter() {
+            let neighbour =
+                match region.try_add_offset_with_params(overflow.offset::<SIZE>(), params) {
+                    Some(n) => n,
+                    None => continue, // out of bounds, nvm
+                };
+
+            // TODO will need to filter on feature type when there are multiple
+            if let Some(other_feature) = continuation.pop(overflow) {
+                // neighbour already has a feature
+                match this_feature.as_ref() {
+                    None => {
+                        // use theirs as we don't have one yet
+                        trace!("using neighbour's feature instance"; "region" => ?region,
+                            "neighbour" => ?neighbour, "feature" => ?other_feature.ptr_debug());
+
+                        other_feature.merge_with_bounds(&bounding, feature_range);
+                        this_feature = Some(other_feature);
+                    }
+                    Some(f) => {
+                        // replace theirs with ours (after return)
+                        trace!("replacing neighbour's feature instance with ours";
+                            "region" => ?region, "neighbour" => ?neighbour,
+                            "theirs" => ?other_feature.ptr_debug(), "ours" => ?f.ptr_debug());
+
+                        feature_updates.push(RegionalFeatureReplacement {
+                            region: neighbour,
+                            current: other_feature.clone(),
+                            new: f.clone(),
+                        });
+
+                        f.merge_with_other(other_feature)
+                            .await
+                            .expect("regional feature type mismatch");
+                    }
+                };
+            } else {
+                // neighbour does not have a feature continuation, use own feature
+                let feature = match this_feature {
+                    Some(ref f) => {
+                        // already created one, reuse it
+                        trace!("reusing own feature"; "region" => ?region,
+                            "neighbour" => ?neighbour, "feature" => ?f.ptr_debug());
+                        f.clone()
+                    }
+                    None => {
+                        let feature = create_new_feature(&mut bounding, feature_range);
+                        trace!("created new feature"; "region" => ?region,
+                            "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
+                        this_feature = Some(feature.clone());
+                        feature
+                    }
+                };
+
+                // add feature to neighbour's continuations if it hasn't already been loaded. if it's
+                // already loaded and didn't register a continuation then this is a false positive
+                // where e.g. the feature ends exactly at the region edge
+                if !loaded_regions.read().await.contains(&neighbour) {
+                    let neighbour_continuations = continuations_guard
+                        .entry(neighbour)
+                        .or_insert_with(RegionContinuation::default);
+
+                    neighbour_continuations
+                        .features
+                        .push((overflow.opposite(), feature))
+                }
+            }
+        }
+
+        drop(continuations_guard);
+
+        // add the new feature to this region
+        let feature = this_feature
+            .take()
+            .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range));
         self.features.push(feature);
+
+        feature_updates
     }
+
     #[cfg(any(test, feature = "benchmarking"))]
     #[inline]
     pub async fn create_for_benchmark(
@@ -266,8 +423,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         continents: &ContinentMap,
         params: &PlanetParams,
     ) -> Self {
-        // TODO null continuations for benchmark
-        Self::create(region, continents, todo!(), params).await
+        // TODO null params for benchmark
+        Self::create(region, continents, todo!(), todo!(), params)
+            .await
+            .0
     }
 
     pub(crate) fn chunk_index(chunk: ChunkLocation) -> usize {
@@ -329,16 +488,14 @@ impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
     }
 }
 
-impl<const SIZE: usize> Default for RegionContinuations<SIZE> {
-    fn default() -> Self {
-        Self(Arc::new(Mutex::new(HashMap::with_capacity(32))))
+impl<const SIZE: usize> RegionContinuation<SIZE> {
+    fn pop(&mut self, neighbour: RegionNeighbour) -> Option<SharedRegionalFeature> {
+        let idx = self.features.iter().position(|(n, _)| *n == neighbour)?;
+        Some(self.features.swap_remove(idx).1)
     }
-}
 
-impl<const SIZE: usize> RegionContinuations<SIZE> {
-    async fn pop(&self, region: RegionLocation<SIZE>) -> Option<RegionContinuation> {
-        let mut guard = self.0.lock().await;
-        guard.remove(&region)
+    fn contains(&self, neighbour: &RegionNeighbour) -> bool {
+        self.features.iter().any(|(n, _)| n == neighbour)
     }
 }
 

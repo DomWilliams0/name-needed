@@ -1,20 +1,20 @@
-use rstar::{Envelope, RTree, RTreeObject, AABB};
+use rstar::{RTree, AABB};
 
-use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock, CHUNK_SIZE};
+use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 
 use crate::region::feature::{ApplyFeatureContext, FeatureZRange};
-use crate::region::region::{ChunkDescription, ChunkHeightMap};
-use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
-use crate::{BiomeType, BlockType, SlabGrid};
-use common::{InnerSpace, IteratorRandom, Rng, SliceRandom, SmallRng, Vector2};
-use geo::coords_iter::CoordsIter;
+use crate::region::region::ChunkHeightMap;
+use crate::region::{Feature, PlanetPoint};
+use crate::{BiomeType, BlockType};
+use common::Rng;
+
 use geo::prelude::Contains;
-use geo::Polygon;
+use geo::MultiPolygon;
 use geo_booleanop::boolean::BooleanOp;
 use rand_distr::{Distribution, Normal};
 use rstar::primitives::PointWithData;
+use std::any::Any;
 use std::fmt::{Debug, Formatter};
-use std::process::exit;
 
 pub struct ForestFeature {
     trees: RTree<PointWithData<(), [f64; 2]>>,
@@ -23,9 +23,6 @@ pub struct ForestFeature {
 const POISSON_DISK_RADIUS: f64 = PlanetPoint::PER_BLOCK * 3.0;
 
 const POISSON_DISK_MAX_ATTEMPTS: usize = 20;
-
-#[deprecated]
-static mut DONEZO: bool = false;
 
 impl Feature for ForestFeature {
     fn name(&self) -> &'static str {
@@ -48,7 +45,7 @@ impl Feature for ForestFeature {
         &mut self,
         loc: SlabLocation,
         ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &Polygon<f64>,
+        bounding: &MultiPolygon<f64>,
     ) {
         let mut rando = ctx.slab_rando(loc);
 
@@ -86,7 +83,6 @@ impl Feature for ForestFeature {
                             return;
                         }
                     }
-                    // .expect("alleged forest has no forest")
                 }
             };
 
@@ -159,18 +155,33 @@ impl Feature for ForestFeature {
             }
         }
 
-        // // dummy block replacement
-        // for (i, block) in chunk_description.blocks().enumerate() {
-        //     if block.biome() == BiomeType::Forest {
-        //         let z = block.ground() + 1;
-        //         let [x, y, _] = SlabGrid::unflatten(i);
-        //         slab[&[x, y, z.slice()]].ty = BlockType::SolidWater;
-        //     }
-        // }
-
         // TODO generate tree locations with poisson disk sampling
         // TODO attempt to place tree model at location in this slab
         // TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab
+    }
+
+    fn merge_with(&mut self, other: &mut dyn Feature) -> bool {
+        if let Some(other) = other.any_mut().downcast_mut::<Self>() {
+            // steal other's trees
+            // TODO replace this rtree with a new bulk loaded one?
+            // TODO PR to move nodes out of the tree instead of copy
+            let n = other.trees.size();
+            let stolen_trees = std::mem::replace(&mut other.trees, RTree::new());
+            for tree in stolen_trees.iter() {
+                self.trees.insert(*tree);
+            }
+
+            common::debug!("merged {trees} trees from other forest", trees = n; "total" => self.trees.size());
+
+            true
+        } else {
+            // type mismatch
+            false
+        }
+    }
+
+    fn any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -179,17 +190,18 @@ impl ForestFeature {
         self.trees
             .insert(PointWithData::new((), planet_point.get_array()));
 
-        // let tree_base = {
-        //     // find xy
-        //     let mut block = planet_point.into_block(GlobalSliceIndex::new(0));
-        //
-        //     // use xy to find z ground level
-        //     let ground = ctx.chunk_desc.ground_level(block);
-        //
-        //     block.to_block_position(ground+1)
-        // };
-        //
-        // ctx.terrain[&tree_base.xyz()].ty = BlockType::SolidWater;
+        let tree_base = {
+            // find xy
+            let pos = planet_point.into_block(GlobalSliceIndex::new(0));
+            let block = SliceBlock::from(BlockPosition::from(pos));
+
+            // use xy to find z ground level
+            let ground = ctx.chunk_desc.ground_level(block);
+
+            block.to_block_position(ground + 1)
+        };
+
+        ctx.terrain[&tree_base.xyz()].ty = BlockType::SolidWater;
     }
 }
 

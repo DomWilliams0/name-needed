@@ -22,7 +22,7 @@ parse-display = "0.4"
 ordered-float = "2.0"
 thiserror = "1.0"
 bumpalo = { version = "3.4", features = ["collections"] }
-smallvec = "1.4"
+smallvec = {version = "1.6", features = ["union"]}
 arrayvec = "0.6"
 boolinator = "2.4"
 parking_lot = "0.11"
