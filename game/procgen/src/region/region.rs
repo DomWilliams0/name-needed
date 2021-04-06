@@ -355,7 +355,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         other_feature.merge_with_bounds(&bounding, feature_range);
                         this_feature = Some(other_feature);
                     }
-                    Some(f) => {
+                    Some(f) if !SharedRegionalFeature::ptr_eq(f, &other_feature) => {
                         // replace theirs with ours (after return)
                         trace!("replacing neighbour's feature instance with ours";
                             "region" => ?region, "neighbour" => ?neighbour,
@@ -370,6 +370,11 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         f.merge_with_other(other_feature)
                             .await
                             .expect("regional feature type mismatch");
+                    }
+                    Some(_) => {
+                        trace!("neighbour already has the same feature as us";
+                            "region" => ?region, "neighbour" => ?neighbour,
+                            "feature" => ?other_feature.ptr_debug());
                     }
                 };
             } else {

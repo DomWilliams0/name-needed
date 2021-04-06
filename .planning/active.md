@@ -11,4 +11,4 @@
 * [X] remove redundant matches dependency
 * [X] bug: procgen world is vertically flipped ingame
 * [ ] remove unwraps in grid coord (un)flattening and handle properly
-* [ ] bug: deadlock loading terrain
+* [X] bug: deadlock loading terrain
