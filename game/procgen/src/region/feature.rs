@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
 use geo::prelude::*;
-use geo::{MultiPolygon, Rect};
+use geo::{Coordinate, MultiPolygon, Rect};
 
 use tokio::sync::Mutex;
 
 use common::*;
-use unit::world::{GlobalSliceIndex, SlabLocation};
+use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::region::region::ChunkDescription;
+use crate::region::PlanetPoint;
 use crate::SlabGrid;
 use geo::coords_iter::CoordsIter;
 use geo_booleanop::boolean::BooleanOp;
@@ -172,6 +173,33 @@ impl RegionalFeature {
         struct RegionalFeature(*const u8);
 
         RegionalFeature(ptr as *const _)
+    }
+
+    pub fn display<'a>(self: &'a Arc<Self>) -> impl Display + 'a {
+        let ptr = Arc::as_ptr(self);
+
+        struct RegionalFeature<'a>(*const u8, &'a Arc<super::RegionalFeature>);
+
+        impl Display for RegionalFeature<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{:?}: ", self.0)?;
+                if let Ok(feature) = self.1.feature.try_lock() {
+                    write!(f, "{:?}", &feature)
+                } else {
+                    write!(f, "<locked>")
+                }
+            }
+        }
+
+        RegionalFeature(ptr as *const _, self)
+    }
+
+    /// Assumes [applies_to] has already been checked for slab. Pretty expensive, and panics
+    /// if in invalid region
+    pub fn applies_to_block(&self, block: WorldPosition) -> bool {
+        let pos = PlanetPoint::from_block(block).unwrap(); // cheeky panic
+        let inner = self.inner.read();
+        inner.bounding.contains(&Coordinate::from(pos.get_array()))
     }
 }
 

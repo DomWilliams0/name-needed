@@ -1,5 +1,5 @@
 use crate::continent::ContinentMap;
-use crate::{map_range, PlanetParams};
+use crate::{map_range, PlanetParams, RegionLocation};
 use common::*;
 use noise::{Fbm, NoiseFn, Seedable};
 
@@ -113,6 +113,11 @@ pub struct BlockQueryResult {
     pub base_elevation: f64,
     pub moisture: f64,
     pub temperature: f64,
+
+    /// None if invalid region
+    /// (region loc, display repr of each feature applying to this block)
+    // TODO dont use a String here, return useful info
+    pub region: Option<(RegionLocation, SmallVec<[String; 4]>)>,
 }
 
 /// Noise generator with its rough limits

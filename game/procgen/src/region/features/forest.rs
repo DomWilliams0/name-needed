@@ -5,7 +5,7 @@ use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 use crate::region::feature::{ApplyFeatureContext, FeatureZRange};
 use crate::region::region::{BlockHeight, ChunkHeightMap};
 use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
-use crate::{BlockType};
+use crate::BlockType;
 use common::*;
 
 use geo::prelude::{Contains, Intersects};

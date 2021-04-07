@@ -4,8 +4,8 @@ use tokio::sync::RwLock;
 
 use common::*;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, SlabPosition, SliceIndex,
-    WorldPosition, CHUNK_SIZE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SlabPosition,
+    SliceIndex, WorldPosition, CHUNK_SIZE,
 };
 
 use crate::biome::BlockQueryResult;
@@ -237,12 +237,35 @@ impl Planet {
         let biomes =
             sampler.choose_biomes(coastline_proximity, base_elevation, temperature, moisture);
 
+        let region = {
+            let chunk = ChunkLocation::from(block);
+            let region = RegionLocation::try_from_chunk(chunk);
+            region
+                .and_then(|loc| inner.regions.get_existing(loc).map(|r| (loc, r)))
+                .map(|(loc, region)| {
+                    let slab = SlabLocation::new(SlabIndex::from(block.slice()), chunk);
+                    let slab_bounds = slab_bounds(slab);
+                    let features = region
+                        .features_for_slab(slab, &slab_bounds)
+                        .filter_map(move |feature| {
+                            if feature.applies_to_block(block) {
+                                Some(format!("{}", feature.display()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    (loc, features)
+                })
+        };
+
         Some(BlockQueryResult {
             biome_choices: biomes,
             coastal_proximity: coastline_proximity,
             base_elevation,
             moisture,
             temperature,
+            region,
         })
     }
 }

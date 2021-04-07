@@ -40,6 +40,8 @@ pub struct BlockDetails {
     pub base_elevation: f64,
     pub moisture: f64,
     pub temperature: f64,
+    /// (region location, dirty string representation of features affecting this block)
+    pub region: Option<(RegionLocation, SmallVec<[String; 4]>)>,
 }
 
 impl From<MemoryTerrainSource> for TerrainSource {
@@ -100,6 +102,7 @@ impl TerrainSource {
                         base_elevation: result.base_elevation,
                         moisture: result.moisture,
                         temperature: result.temperature,
+                        region: result.region,
                     })
             }
         }
@@ -113,7 +116,7 @@ use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
-use procgen::BiomeType;
+use procgen::{BiomeType, RegionLocation};
 use std::sync::Arc;
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-# TODOs (296)
+# TODOs (297)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -14,7 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (2)
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
+   * `// TODO dont use a String here, return useful info`
    * `// TODO make poles more moist`
    * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
  * [game/procgen/src/cache.rs](game/procgen/src/cache.rs) (1)

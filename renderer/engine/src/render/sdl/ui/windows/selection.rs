@@ -312,6 +312,20 @@ impl SelectionWindow {
                         None,
                         COLOR_GREEN,
                     );
+
+                    if let Some((region, features)) = details.region.as_ref() {
+                        ui.key_value(
+                            im_str!("Region:   "),
+                            || Value::Some(ui_str!(in strings, "{:?}", region)),
+                            None,
+                            COLOR_BLUE,
+                        );
+
+                        ui.text(ui_str!(in strings, "{} regional feature(s)", features.len()));
+                        for feature in features {
+                            ui.text_wrapped(ui_str!(in strings, " - {}", feature));
+                        }
+                    }
                 });
 
             ui.separator();
