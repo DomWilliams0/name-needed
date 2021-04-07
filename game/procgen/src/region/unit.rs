@@ -165,6 +165,7 @@ impl<const SIZE: usize> PlanetPoint<SIZE> {
         self.1
     }
 
+    /// Ensure scale is right!
     pub const fn new(x: f64, y: f64) -> Self {
         Self(x, y)
     }

@@ -633,12 +633,14 @@ impl ChunkDescription {
     /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
     /// a chunk size of 4:
     ///
+    /// ```none
     /// 12  13  14  15
     /// 8   9   10  11
     /// 4   5   6   7
     /// 0   1   2   3
-    pub(crate) fn blocks(&self) -> impl Iterator<Item = &BlockHeight> + '_ {
-        self.ground_height.array().iter()
+    /// ```
+    pub(crate) fn blocks(&self) -> &[BlockHeight] {
+        &self.ground_height.array()
     }
 }
 

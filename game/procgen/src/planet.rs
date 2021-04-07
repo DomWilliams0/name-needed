@@ -258,7 +258,7 @@ impl PlanetInner {
 /// Expensive, result should be cached
 ///
 /// Panics if slab location is invalid
-fn slab_bounds(slab: SlabLocation) -> Rect<f64> {
+pub(crate) fn slab_bounds(slab: SlabLocation) -> Rect<f64> {
     let min = SlabPosition::new(0, 0, SliceIndex::bottom()).to_world_position(slab);
     let min_point = PlanetPoint::from_block(min).unwrap(); // slab location assumed to be fine
 

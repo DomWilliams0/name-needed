@@ -29,6 +29,7 @@ pub struct RegionalFeature {
 
 struct RegionalFeatureInner {
     /// 2d bounds around feature, only applies to slabs within this polygon
+    // TODO can this be reduced to a single Polygon to reduce indirection?
     bounding: MultiPolygon<f64>,
 
     /// Inclusive bounds in the z direction for this feature
@@ -201,19 +202,19 @@ impl Debug for FeatureZRange {
 
 impl<'a> ApplyFeatureContext<'a> {
     pub fn slab_rando(&self, slab: SlabLocation) -> SmallRng {
-        let seed = {
-            // TODO faster hash
-            let mut hasher = DefaultHasher::new();
-
-            // hash unique slab location and planet seed
-            slab.hash(&mut hasher);
-            self.planet_seed.hash(&mut hasher);
-
-            hasher.finish()
-        };
-
-        SmallRng::seed_from_u64(seed)
+        SmallRng::seed_from_u64(slab_rando_seed(slab, self.planet_seed))
     }
+}
+
+fn slab_rando_seed(slab: SlabLocation, planet_seed: u64) -> u64 {
+    // TODO faster hash
+    let mut hasher = DefaultHasher::new();
+
+    // hash unique slab location and planet seed
+    slab.hash(&mut hasher);
+    planet_seed.hash(&mut hasher);
+
+    hasher.finish()
 }
 
 impl Debug for RegionalFeature {
@@ -245,5 +246,44 @@ impl Debug for RegionalFeature {
         }
 
         dbg.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slab_rando_differs() {
+        let a = SlabLocation::new(7, (2, 3));
+        let b = SlabLocation::new(7, (3, 3));
+        let c = SlabLocation::new(8, (2, 3));
+
+        let planet1 = 1238123;
+        let planet2 = 9182391;
+
+        let inputs = vec![a, b, c]
+            .into_iter()
+            .cartesian_product(vec![planet1, planet2].into_iter())
+            .collect_vec();
+
+        let mut seeds1 = inputs
+            .iter()
+            .copied()
+            .map(|(slab, planet)| slab_rando_seed(slab, planet))
+            .collect_vec();
+
+        let seeds2 = inputs
+            .iter()
+            .copied()
+            .map(|(slab, planet)| slab_rando_seed(slab, planet))
+            .collect_vec();
+
+        // reproducible
+        assert_eq!(seeds1, seeds2);
+
+        // no dups
+        seeds1.sort();
+        assert_eq!(seeds1.iter().copied().dedup().collect_vec(), seeds1);
     }
 }
