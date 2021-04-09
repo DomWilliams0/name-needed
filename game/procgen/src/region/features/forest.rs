@@ -134,13 +134,13 @@ impl PoissonDiskSampling {
 
         let initial_point = {
             let mut found = None;
-            for _attempt in 0..30 {
+            for _attempt in 0..Self::MAX_ATTEMPTS * 2 {
                 let random_point = [
                     slab_base.x + rando.gen_range(0.0, 1.0 / SIZE as f64),
                     slab_base.y + rando.gen_range(0.0, 1.0 / SIZE as f64),
                 ];
 
-                if is_in_bounds(random_point) {
+                if is_in_bounds(random_point) && self.is_valid_point(random_point) {
                     found = Some(random_point);
                     break;
                 }
@@ -184,17 +184,7 @@ impl PoissonDiskSampling {
                 };
 
                 // check candidate
-                if is_in_bounds(candidate)
-                    && self
-                        .points
-                        .locate_in_envelope_intersecting({
-                            let min = [candidate[0] - Self::RADIUS, candidate[1] - Self::RADIUS];
-                            let max = [candidate[0] + Self::RADIUS, candidate[1] + Self::RADIUS];
-                            &AABB::from_corners(min, max)
-                        })
-                        .next()
-                        .is_none()
-                {
+                if is_in_bounds(candidate) && self.is_valid_point(candidate) {
                     // valid point
                     active_points.push(candidate.into());
                     add_point(candidate.into());
@@ -221,6 +211,17 @@ impl PoissonDiskSampling {
         }
 
         n
+    }
+
+    fn is_valid_point(&self, candidate: [f64; 2]) -> bool {
+        self.points
+            .locate_in_envelope_intersecting({
+                let min = [candidate[0] - Self::RADIUS, candidate[1] - Self::RADIUS];
+                let max = [candidate[0] + Self::RADIUS, candidate[1] + Self::RADIUS];
+                &AABB::from_corners(min, max)
+            })
+            .next()
+            .is_none()
     }
 }
 

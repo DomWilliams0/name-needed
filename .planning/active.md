@@ -8,7 +8,8 @@
 	* [X] detect forest bounds
 		* [X] within a single region
 		* [X] across region boundaries
-* [X] individual tree placement via poisson disks
+* [o] individual tree placement via poisson disks
+	* [X] initial tree placement can be invalid
 	* [ ] doesn't work across some chunk boundaries - multiple forest instances?
 * [ ] tree sub feature block placement
 * [X] remove redundant matches dependency
