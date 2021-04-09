@@ -16,6 +16,7 @@ use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
 use crate::world::slab_loading::SlabProcessingFuture;
+use futures::FutureExt;
 use std::iter::repeat;
 
 pub struct WorldLoader<C: WorldContext> {
@@ -408,6 +409,19 @@ impl<C: WorldContext> WorldLoader<C> {
     pub fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
         let fut = self.source.query_block(block);
         self.pool.runtime().block_on(fut)
+    }
+
+    /// Nop if any mutexes cannot be taken immediately
+    pub fn feature_boundaries_in_range(
+        &self,
+        chunks: impl Iterator<Item = ChunkLocation>,
+        z_range: (GlobalSliceIndex, GlobalSliceIndex),
+        per_point: impl FnMut(u32, WorldPosition),
+    ) {
+        let fut = self
+            .source
+            .feature_boundaries_in_range(chunks, z_range, per_point);
+        let _ = fut.now_or_never();
     }
 }
 

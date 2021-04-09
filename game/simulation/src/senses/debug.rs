@@ -3,7 +3,7 @@ use crate::input::SelectedEntity;
 use crate::render::DebugRenderer;
 
 use crate::senses::SensesComponent;
-use crate::{InnerWorldRef, Renderer, TransformComponent, WorldViewer};
+use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
 use color::ColorRgb;
 use common::cgmath::Rotation;
 use common::*;
@@ -23,6 +23,7 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
         &mut self,
         renderer: &mut R,
         _: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
         ecs_world: &EcsWorld,
         viewer: &WorldViewer,
     ) {

@@ -30,6 +30,7 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
@@ -381,10 +382,17 @@ impl<R: Renderer> Simulation<R> {
             renderer.debug_start();
             let ecs_world = &self.ecs_world;
             let voxel_world = self.voxel_world.borrow();
+            let world_loader = &self.world_loader;
 
-            self.debug_renderers
-                .iter_enabled()
-                .for_each(|r| r.render(renderer, &voxel_world, ecs_world, world_viewer));
+            self.debug_renderers.iter_enabled().for_each(|r| {
+                r.render(
+                    renderer,
+                    &voxel_world,
+                    world_loader,
+                    ecs_world,
+                    world_viewer,
+                )
+            });
 
             if let Err(e) = renderer.debug_finish() {
                 warn!("render debug_finish() failed"; "error" => %e);
@@ -487,5 +495,6 @@ fn register_debug_renderers<R: Renderer>(
     )?;
     r.register(NavigationAreaDebugRenderer::default(), false)?;
     r.register(SensesDebugRenderer::default(), false)?;
+    r.register(FeatureBoundaryDebugRenderer::default(), false)?;
     Ok(())
 }

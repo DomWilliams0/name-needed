@@ -2,7 +2,7 @@ use color::ColorRgb;
 
 use crate::ecs::*;
 use crate::render::DebugRenderer;
-use crate::{InnerWorldRef, Renderer, TransformComponent, WorldViewer};
+use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
 
 pub struct SteeringDebugRenderer;
 
@@ -15,6 +15,7 @@ impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
         &mut self,
         renderer: &mut R,
         _: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
         ecs_world: &EcsWorld,
         viewer: &WorldViewer,
     ) {

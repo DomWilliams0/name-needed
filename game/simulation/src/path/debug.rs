@@ -3,7 +3,9 @@ use world::BaseTerrain;
 use crate::ecs::*;
 use crate::path::FollowPathComponent;
 use crate::render::DebugRenderer;
-use crate::{InnerWorldRef, RenderComponent, Renderer, TransformComponent, WorldViewer};
+use crate::{
+    InnerWorldRef, RenderComponent, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer,
+};
 use color::ColorRgb;
 
 use std::hash::Hasher;
@@ -26,6 +28,7 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
         &mut self,
         renderer: &mut R,
         _: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
         ecs_world: &EcsWorld,
         viewer: &WorldViewer,
     ) {
@@ -69,6 +72,7 @@ impl<R: Renderer> DebugRenderer<R> for NavigationAreaDebugRenderer {
         &mut self,
         renderer: &mut R,
         world: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
         _: &EcsWorld,
         viewer: &WorldViewer,
     ) {

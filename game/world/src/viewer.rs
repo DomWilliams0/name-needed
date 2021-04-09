@@ -101,6 +101,12 @@ impl Add<i32> for SliceRange {
     }
 }
 
+impl From<SliceRange> for (GlobalSliceIndex, GlobalSliceIndex) {
+    fn from(range: SliceRange) -> Self {
+        (range.0, range.1)
+    }
+}
+
 impl<C: WorldContext> WorldViewer<C> {
     pub fn with_world(
         world: WorldRef<C>,

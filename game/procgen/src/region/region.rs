@@ -458,6 +458,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             .filter(move |feature| feature.applies_to(slab, slab_bounds))
     }
 
+    pub fn all_features(&self) -> impl Iterator<Item = &SharedRegionalFeature> + '_ {
+        self.features.iter()
+    }
+
     /// Iterator that yields rows of blocks across the entire region. Fiddly because of the memory
     /// layout of each region chunk
     pub fn block_rows(&self) -> RegionChunksBlockRows<'_, SIZE> {

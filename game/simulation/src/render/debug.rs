@@ -1,5 +1,5 @@
 use crate::ecs::EcsWorld;
-use crate::{InnerWorldRef, Renderer, WorldViewer};
+use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, WorldViewer};
 use color::ColorRgb;
 use common::*;
 use std::collections::hash_map::Entry;
@@ -13,6 +13,7 @@ pub trait DebugRenderer<R: Renderer> {
         &mut self,
         renderer: &mut R,
         world: &InnerWorldRef,
+        world_loader: &ThreadedWorldLoader,
         ecs_world: &EcsWorld,
         viewer: &WorldViewer,
     );
@@ -100,7 +101,14 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         "axes"
     }
 
-    fn render(&mut self, renderer: &mut R, _: &InnerWorldRef, _: &EcsWorld, _: &WorldViewer) {
+    fn render(
+        &mut self,
+        renderer: &mut R,
+        _: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
+        _: &EcsWorld,
+        _: &WorldViewer,
+    ) {
         renderer.debug_add_line(
             WorldPoint(0.0, 0.0, 1.0),
             WorldPoint(1.0, 0.0, 1.0),

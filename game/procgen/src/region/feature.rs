@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use geo::prelude::*;
-use geo::{Coordinate, MultiPolygon, Rect};
+use geo::{Coordinate, MultiPolygon, Point, Rect};
 
 use tokio::sync::Mutex;
 
@@ -105,9 +105,9 @@ impl RegionalFeature {
 
         // cheap z range check first
         let (slab_bottom, slab_top) = slab.slab.slice_range();
-        let FeatureZRange(feature_bottom, feature_top) = inner.z_range;
+        let slab_range = FeatureZRange::new(slab_bottom, slab_top);
 
-        if !(slab_bottom <= feature_top && feature_bottom <= slab_top) {
+        if !inner.z_range.overlaps_with(slab_range) {
             // does not overlap
             return false;
         }
@@ -201,6 +201,27 @@ impl RegionalFeature {
         let inner = self.inner.read();
         inner.bounding.contains(&Coordinate::from(pos.get_array()))
     }
+
+    /// Nop if feature mutex is not immediately available, i.e. does not block
+    pub fn bounding_points(
+        &self,
+        z_range: (GlobalSliceIndex, GlobalSliceIndex),
+        per_point: impl FnMut(PlanetPoint),
+    ) {
+        if let Some(inner) = self.inner.try_read() {
+            if inner
+                .z_range
+                .overlaps_with(FeatureZRange::new(z_range.0, z_range.1))
+            {
+                inner
+                    .bounding
+                    .iter()
+                    .flat_map(|poly| poly.exterior().points_iter())
+                    .map(|Point(Coordinate { x, y })| PlanetPoint::new(x, y))
+                    .for_each(per_point);
+            }
+        }
+    }
 }
 
 impl FeatureZRange {
@@ -211,6 +232,10 @@ impl FeatureZRange {
 
     pub fn max_of(self, other: Self) -> Self {
         Self(self.0.min(other.0), self.1.max(other.1))
+    }
+
+    pub fn overlaps_with(self, other: Self) -> bool {
+        other.0 <= self.1 && self.0 <= other.1
     }
 
     pub fn null() -> Self {

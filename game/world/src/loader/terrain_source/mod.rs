@@ -107,6 +107,23 @@ impl TerrainSource {
             }
         }
     }
+
+    pub async fn feature_boundaries_in_range(
+        &self,
+        chunks: impl Iterator<Item = ChunkLocation>,
+        z_range: (GlobalSliceIndex, GlobalSliceIndex),
+        per_point: impl FnMut(u32, WorldPosition),
+    ) {
+        match self {
+            TerrainSource::Memory(_) => {}
+            TerrainSource::Generated(planet) => {
+                planet
+                    .planet()
+                    .feature_boundaries_in_range(chunks, z_range, per_point)
+                    .await
+            }
+        }
+    }
 }
 
 mod generate;
