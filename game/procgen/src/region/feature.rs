@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use geo::prelude::*;
-use geo::{Coordinate, MultiPolygon, Point, Rect};
+use geo::{Coordinate, Geometry, MultiPolygon, Point, Polygon, Rect};
 
 use tokio::sync::Mutex;
 
@@ -12,10 +12,12 @@ use crate::region::region::ChunkDescription;
 use crate::region::PlanetPoint;
 use crate::SlabGrid;
 use geo::coords_iter::CoordsIter;
-use geo_booleanop::boolean::BooleanOp;
+use geo_booleanop::boolean::{BooleanOp, Operation};
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
+use std::hint::unreachable_unchecked;
+use std::ops::Deref;
 
 /// Feature discovered at region initialization. Belongs in an Arc
 pub struct RegionalFeature {
@@ -30,13 +32,14 @@ pub struct RegionalFeature {
 
 struct RegionalFeatureInner {
     /// 2d bounds around feature, only applies to slabs within this polygon
-    // TODO in most cases this is a single polygon, and so the multipolygon vec indirection is unnecessary
-    //  wrap in an enum?
-    bounding: MultiPolygon<f64>,
+    bounding: RegionalFeatureBoundary,
 
     /// Inclusive bounds in the z direction for this feature
     z_range: FeatureZRange,
 }
+
+/// Either Polygon or MultiPolygon
+pub struct RegionalFeatureBoundary(Geometry<f64>);
 
 /// Inclusive bounds in the z direction for a feature
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -54,7 +57,7 @@ pub trait Feature: Send + Sync + Debug {
         &mut self,
         loc: SlabLocation,
         ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &MultiPolygon<f64>,
+        bounding: &RegionalFeatureBoundary,
     );
 
     /// Gut the other and absorb into this one.
@@ -75,12 +78,11 @@ pub struct ApplyFeatureContext<'a> {
 
 impl RegionalFeature {
     pub fn new<F: Feature + 'static>(
-        bounding: MultiPolygon<f64>,
+        bounding: RegionalFeatureBoundary,
         z_range: FeatureZRange,
         feature: F,
     ) -> SharedRegionalFeature {
         debug_assert!(!bounding.is_empty());
-        debug_assert!(bounding.iter().all(|p| !p.is_empty()));
 
         let extended_z_range = feature.extend_z_range(z_range);
 
@@ -125,12 +127,12 @@ impl RegionalFeature {
 
     pub fn merge_with_bounds(
         &self,
-        other_bounding: &MultiPolygon<f64>,
+        other_bounding: &RegionalFeatureBoundary,
         other_z_range: FeatureZRange,
     ) {
         let mut inner = self.inner.write();
 
-        inner.bounding = inner.bounding.union(other_bounding);
+        inner.bounding = RegionalFeatureBoundary::with_multi(inner.bounding.union(other_bounding));
         inner.z_range = inner.z_range.max_of(other_z_range);
     }
 
@@ -216,9 +218,8 @@ impl RegionalFeature {
             {
                 inner
                     .bounding
-                    .iter()
-                    .flat_map(|poly| poly.exterior().points_iter())
-                    .map(|Point(Coordinate { x, y })| PlanetPoint::new(x, y))
+                    .coords_iter()
+                    .map(|Coordinate { x, y }| PlanetPoint::new(x, y))
                     .for_each(per_point);
             }
         }
@@ -300,6 +301,91 @@ impl Debug for RegionalFeature {
         }
 
         dbg.finish()
+    }
+}
+
+impl RegionalFeatureBoundary {
+    pub fn with_multi(mut polygon: MultiPolygon<f64>) -> Self {
+        if polygon.0.len() == 1 {
+            // indirection removed B-)
+            Self(Geometry::Polygon(polygon.0.remove(0)))
+        } else {
+            Self(Geometry::MultiPolygon(polygon))
+        }
+    }
+
+    pub fn with_single(polygon: Polygon<f64>) -> Self {
+        Self(Geometry::Polygon(polygon))
+    }
+
+    #[inline]
+    pub fn empty() -> Self {
+        Self::with_multi(MultiPolygon(vec![]))
+    }
+
+    #[inline]
+    pub fn geometry(&self) -> &Geometry<f64> {
+        &self.0
+    }
+}
+
+unsafe fn unreachable_debug() -> ! {
+    if cfg!(debug_assertions) {
+        unreachable!()
+    } else {
+        unreachable_unchecked()
+    }
+}
+
+impl Deref for RegionalFeatureBoundary {
+    type Target = Geometry<f64>;
+
+    fn deref(&self) -> &Self::Target {
+        self.geometry()
+    }
+}
+
+impl Centroid for RegionalFeatureBoundary {
+    type Output = Option<Point<f64>>;
+
+    fn centroid(&self) -> Self::Output {
+        match &self.0 {
+            Geometry::Polygon(p) => p.centroid(),
+            Geometry::MultiPolygon(p) => p.centroid(),
+            _ => {
+                // safety: struct cant be created with another type
+                unsafe { unreachable_debug() }
+            }
+        }
+    }
+}
+
+impl BooleanOp<f64> for RegionalFeatureBoundary {
+    fn boolean(&self, rhs: &Self, operation: Operation) -> MultiPolygon<f64> {
+        use Geometry::*;
+        match (&self.0, &rhs.0) {
+            (Polygon(a), Polygon(b)) => a.boolean(b, operation),
+            (Polygon(a), MultiPolygon(b)) => a.boolean(b, operation),
+            (MultiPolygon(a), Polygon(b)) => a.boolean(b, operation),
+            (MultiPolygon(a), MultiPolygon(b)) => a.boolean(b, operation),
+            _ => {
+                // safety: struct cant be created with another type
+                unsafe { unreachable_debug() }
+            }
+        }
+    }
+}
+impl BooleanOp<f64, Polygon<f64>> for RegionalFeatureBoundary {
+    fn boolean(&self, rhs: &Polygon<f64>, operation: Operation) -> MultiPolygon<f64> {
+        use Geometry::*;
+        match &self.0 {
+            Polygon(a) => a.boolean(rhs, operation),
+            MultiPolygon(a) => a.boolean(rhs, operation),
+            _ => {
+                // safety: struct cant be created with another type
+                unsafe { unreachable_debug() }
+            }
+        }
     }
 }
 

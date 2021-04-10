@@ -2,14 +2,14 @@ use rstar::{RTree, AABB};
 
 use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 
-use crate::region::feature::{ApplyFeatureContext, FeatureZRange};
+use crate::region::feature::{ApplyFeatureContext, FeatureZRange, RegionalFeatureBoundary};
 use crate::region::region::{BlockHeight, ChunkHeightMap};
 use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
 use crate::BlockType;
 use common::*;
 
 use geo::prelude::{Contains, Intersects};
-use geo::{MultiPolygon, Rect};
+use geo::Rect;
 use geo_booleanop::boolean::BooleanOp;
 use rand_distr::{Distribution, Normal};
 use rstar::primitives::PointWithData;
@@ -46,7 +46,7 @@ impl Feature for ForestFeature {
         &mut self,
         loc: SlabLocation,
         ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &MultiPolygon<f64>,
+        bounding: &RegionalFeatureBoundary,
     ) {
         let mut rando = ctx.slab_rando(loc);
         self.trees.spread(
@@ -115,7 +115,7 @@ impl PoissonDiskSampling {
         mut rando: &mut SmallRng,
         slab: SlabLocation,
         slab_bounds: &Rect<f64>,
-        full_bounds: &MultiPolygon<f64>,
+        full_bounds: &RegionalFeatureBoundary,
         chunk_blocks: &[BlockHeight],
         mut add_point: impl FnMut(PlanetPoint),
     ) {
@@ -247,7 +247,7 @@ mod tests {
         let forest_bounds = {
             let size = 50.0;
             let rect = Rect::new((-size, -size), (size, size));
-            MultiPolygon(vec![rect.to_polygon()])
+            RegionalFeatureBoundary::with_single(rect.to_polygon())
         };
 
         let chunk_blocks = vec![

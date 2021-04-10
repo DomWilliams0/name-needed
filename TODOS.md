@@ -1,4 +1,4 @@
-# TODOs (299)
+# TODOs (298)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -51,9 +51,8 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (4)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
-   * `// TODO in most cases this is a single polygon, and so the multipolygon vec indirection is unnecessary`
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
    * `// TODO faster hash`

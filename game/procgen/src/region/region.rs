@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use geo::concave_hull::ConcaveHull;
-use geo::{coords_iter::CoordsIter, MultiPoint, MultiPolygon, Point, Rect};
+use geo::{coords_iter::CoordsIter, MultiPoint, Point, Rect};
 use tokio::sync::{Mutex, RwLock};
 
 pub use ::unit::world::{
@@ -17,7 +17,7 @@ use unit::world::{BlockPosition, SlabLocation};
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::rasterize::BlockType;
-use crate::region::feature::{FeatureZRange, SharedRegionalFeature};
+use crate::region::feature::{FeatureZRange, RegionalFeatureBoundary, SharedRegionalFeature};
 use crate::region::features::ForestFeature;
 use crate::region::row_scanning::RegionNeighbour;
 use crate::region::unit::PlanetPoint;
@@ -337,21 +337,21 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 (x, y)
             });
 
-            MultiPolygon(vec![polygon])
-        };
-
-        trace!("regional feature discovery"; "region" => ?region,
-            "points" => bounding.coords_iter().count(),
+            trace!("regional feature discovery"; "region" => ?region,
+            "points" => polygon.coords_iter().count(),
             "overflows" => ?overflows);
+
+            RegionalFeatureBoundary::with_single(polygon)
+        };
 
         // must only be called once, result is cached in this_feature
         let mut this_feature: Option<SharedRegionalFeature> = None;
         fn create_new_feature(
-            bounding: &mut MultiPolygon<f64>,
+            bounding: &mut RegionalFeatureBoundary,
             feature_range: FeatureZRange,
         ) -> SharedRegionalFeature {
             let bounding = {
-                let stolen = std::mem::replace(bounding, MultiPolygon(vec![]));
+                let stolen = std::mem::replace(bounding, RegionalFeatureBoundary::empty());
                 assert!(!stolen.is_empty()); // is only called once
                 stolen
             };
