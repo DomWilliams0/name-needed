@@ -3,9 +3,9 @@ use rstar::{RTree, AABB};
 use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 
 use crate::region::feature::{ApplyFeatureContext, FeatureZRange, RegionalFeatureBoundary};
-use crate::region::region::{BlockHeight, ChunkHeightMap};
+
 use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
-use crate::BlockType;
+use crate::{BiomeType, BlockType};
 use common::*;
 
 use geo::prelude::{Contains, Intersects};
@@ -49,28 +49,27 @@ impl Feature for ForestFeature {
         bounding: &RegionalFeatureBoundary,
     ) {
         let mut rando = ctx.slab_rando(loc);
-        self.trees.spread(
-            &mut rando,
-            loc,
-            ctx.slab_bounds,
-            bounding,
-            ctx.chunk_desc.blocks(),
-            // TODO pass filter closure to check the biome of the tree block too, because feature hull is not perfect
-            |point| {
+        self.trees
+            .spread(&mut rando, loc, ctx.slab_bounds, bounding, |point| {
                 let tree_base = {
                     // find xy
                     let pos = point.into_block(GlobalSliceIndex::new(0));
                     let block = SliceBlock::from(BlockPosition::from(pos));
 
                     // use xy to find z ground level
-                    let ground = ctx.chunk_desc.ground_level(block);
+                    let block_desc = ctx.chunk_desc.block(block);
 
-                    block.to_block_position(ground + 1)
+                    // validate biome
+                    if block_desc.biome() != BiomeType::Forest {
+                        return false;
+                    }
+
+                    block.to_block_position(block_desc.ground() + 1)
                 };
 
                 ctx.terrain[&tree_base.xyz()].ty = BlockType::SolidWater;
-            },
-        );
+                true
+            });
 
         // TODO attempt to place tree model at location in this slab
         // TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab
@@ -116,8 +115,7 @@ impl PoissonDiskSampling {
         slab: SlabLocation,
         slab_bounds: &Rect<f64>,
         full_bounds: &RegionalFeatureBoundary,
-        chunk_blocks: &[BlockHeight],
-        mut add_point: impl FnMut(PlanetPoint),
+        mut add_point: impl FnMut(PlanetPoint) -> bool,
     ) {
         let slab_base = slab_bounds.min();
 
@@ -129,7 +127,6 @@ impl PoissonDiskSampling {
 
         debug_assert!(full_bounds.intersects(&slab_bounds));
         debug_assert!(bounding.intersects(&slab_bounds));
-        debug_assert_eq!(chunk_blocks.len(), ChunkHeightMap::FULL_SIZE);
 
         const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic
 
@@ -141,7 +138,10 @@ impl PoissonDiskSampling {
                     slab_base.y + rando.gen_range(0.0, 1.0 / SIZE as f64),
                 ];
 
-                if is_in_bounds(random_point) && self.is_valid_point(random_point) {
+                if is_in_bounds(random_point)
+                    && self.is_valid_point(random_point)
+                    && add_point(random_point.into())
+                {
                     found = Some(random_point);
                     break;
                 }
@@ -159,10 +159,12 @@ impl PoissonDiskSampling {
         let mut active_points = Vec::with_capacity(128);
         active_points.push(initial_point);
 
-        add_point(initial_point);
-        self.points
-            .insert(PointWithData::new((), initial_point.get_array()));
-        debug_assert!(is_in_bounds(initial_point.get_array()));
+        // add_point() already returned true for us to get this far, dont add again
+
+        let initial_point = initial_point.get_array();
+        self.points.insert(PointWithData::new((), initial_point));
+
+        debug_assert!(is_in_bounds(initial_point));
 
         let distr = Normal::new(0.0, 1.0).unwrap();
         while !active_points.is_empty() {
@@ -184,11 +186,15 @@ impl PoissonDiskSampling {
                     [point[0] + (dx * rando_mag), point[1] + (dy * rando_mag)]
                 };
 
+                let candidate_point = PlanetPoint::from(candidate);
+
                 // check candidate
-                if is_in_bounds(candidate) && self.is_valid_point(candidate) {
+                if is_in_bounds(candidate)
+                    && self.is_valid_point(candidate)
+                    && add_point(candidate_point)
+                {
                     // valid point
-                    active_points.push(candidate.into());
-                    add_point(candidate.into());
+                    active_points.push(candidate_point);
                     self.points.insert(PointWithData::new((), candidate));
                 } else {
                     // invalid point, ignore candidate
@@ -235,7 +241,6 @@ impl Debug for ForestFeature {
 mod tests {
     use super::*;
     use crate::planet::slab_bounds;
-    use crate::BiomeType;
 
     #[test]
     fn poisson_disk_sampling() {
@@ -250,26 +255,11 @@ mod tests {
             RegionalFeatureBoundary::with_single(rect.to_polygon())
         };
 
-        let chunk_blocks = vec![
-            {
-                let mut b = BlockHeight::default();
-                b.set_biome(BiomeType::Forest);
-                b
-            };
-            ChunkHeightMap::FULL_SIZE
-        ];
-
         let mut points = vec![];
-        poisson.spread(
-            &mut rando,
-            slab,
-            &slab_bounds,
-            &forest_bounds,
-            &chunk_blocks,
-            |p| {
-                points.push(p);
-            },
-        );
+        poisson.spread(&mut rando, slab, &slab_bounds, &forest_bounds, |p| {
+            points.push(p);
+            true
+        });
 
         // main test is debug asserts within spread()
         assert!(!points.is_empty());

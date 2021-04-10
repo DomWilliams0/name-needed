@@ -672,8 +672,12 @@ impl ChunkDescription {
     }
 
     pub fn ground_level(&self, block: SliceBlock) -> GlobalSliceIndex {
+        self.block(block).ground
+    }
+
+    pub fn block(&self, block: SliceBlock) -> &BlockHeight {
         let SliceBlock(x, y) = block;
-        self.ground_height[&[x as i32, y as i32, 0]].ground
+        &self.ground_height[&[x as i32, y as i32, 0]]
     }
 
     /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for

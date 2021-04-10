@@ -181,6 +181,7 @@ impl PlanetPointPrecalculated {
 }
 
 impl<const SIZE: usize> From<[f64; 2]> for PlanetPoint<SIZE> {
+    #[inline]
     fn from([x, y]: [f64; 2]) -> Self {
         Self(x, y)
     }

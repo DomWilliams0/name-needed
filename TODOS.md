@@ -1,4 +1,4 @@
-# TODOs (298)
+# TODOs (297)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -56,10 +56,9 @@
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
    * `// TODO faster hash`
- * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
-   * `// TODO pass filter closure to check the biome of the tree block too, because feature hull is not perfect`
    * `// TODO attempt to place tree model at location in this slab`
    * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
    * `// TODO consider rtree params`

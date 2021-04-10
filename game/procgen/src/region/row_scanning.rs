@@ -308,10 +308,6 @@ mod tests {
         (rows, overflow.to_vec())
     }
 
-    fn row(col: usize) -> usize {
-        (SIZE * CHUNK_SIZE.as_usize()) * col
-    }
-
     #[test]
     fn scan_self_contained() {
         let idx = (2 * CHUNK_SIZE.as_usize()) + 5;
