@@ -91,6 +91,10 @@ pub struct PlanetParams {
     /// Set manually to "biomes.ron" as sibling to this file during loading
     #[structopt(skip)]
     pub biomes_cfg: BiomesConfig,
+
+    /// The higher >1 the more relaxed the boundary
+    #[structopt(long, default_value = "8.0")]
+    pub feature_concavity: f64,
 }
 
 #[derive(Debug, Clone)]

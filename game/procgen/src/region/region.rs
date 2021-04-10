@@ -23,6 +23,8 @@ use crate::region::row_scanning::RegionNeighbour;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
+
+use geo::map_coords::MapCoordsInplace;
 use geo::prelude::HasDimensions;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
@@ -275,15 +277,26 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         loaded_regions: LoadedRegions<SIZE>,
         params: &PlanetParams,
     ) -> RegionalFeatureReplacements<SIZE> {
+        // expand each row outwards a tad for slightly relaxed boundary
+        let expansion = 2.0 * PlanetPoint::<SIZE>::PER_BLOCK;
+
         let mut points = Vec::new();
         let mut feature_range = FeatureZRange::null();
+        let mut y_range = (f64::MAX, f64::MIN);
         let mut overflows =
             super::row_scanning::scan(self.block_rows(), BiomeType::Forest, |forest_row| {
                 feature_range = feature_range.max_of(forest_row.z_range);
-                points.extend(forest_row.into_points(region).into_iter().map(|point| {
-                    // TODO offset to centre of each block?
-                    Point::from(point.get_array())
-                }));
+
+                points.extend(
+                    forest_row
+                        .into_points_with_expansion(region, expansion)
+                        .into_iter()
+                        .map(|point| Point::from(point.get_array()))
+                        .inspect(|point| {
+                            let (min, max) = y_range;
+                            y_range = (min.min(point.y()), max.max(point.y()));
+                        }),
+                );
             });
 
         let mut feature_updates = SmallVec::new();
@@ -294,12 +307,36 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         }
 
         debug_assert_ne!(feature_range, FeatureZRange::null());
+        debug_assert_ne!(y_range, (f64::MAX, f64::MIN));
 
         let mut bounding = {
             let points = MultiPoint(points);
-            let polygon = points.concave_hull(2.0);
-            // TODO expand polygon out to ensure it covers the entire biome area?
-            // polygon.simplify(&1.0);
+
+            // TODO simplify polygon by removing repeated vertices in straight line
+
+            let mut polygon = points.concave_hull(params.feature_concavity);
+
+            // expand top and bottom X% points
+            let (bottom_y, top_y) = {
+                let threshold = 0.15; // %
+                let (min, max) = y_range;
+                let diff = (max - min) * threshold;
+                debug_assert!(diff > 0.0);
+                (min + diff, max - diff)
+            };
+
+            polygon.map_coords_inplace(|&(x, mut y)| {
+                if y < bottom_y {
+                    // expand downwards
+                    y -= expansion * 1.0;
+                } else if y > top_y {
+                    // expand upwards
+                    y += expansion * 1.0;
+                }
+
+                (x, y)
+            });
+
             MultiPolygon(vec![polygon])
         };
 

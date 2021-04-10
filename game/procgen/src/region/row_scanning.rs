@@ -163,9 +163,19 @@ fn calculate_regional_diagonals(
 }
 
 impl<const SIZE: usize> BiomeRow<SIZE> {
+    #[inline]
     pub fn into_points(
         self,
         region: RegionLocationUnspecialized<SIZE>,
+    ) -> ArrayVec<PlanetPoint<SIZE>, 2> {
+        self.into_points_with_expansion(region, 0.0)
+    }
+
+    /// Expansion is subtracted from start point and added to end point (if any)
+    pub fn into_points_with_expansion(
+        self,
+        region: RegionLocationUnspecialized<SIZE>,
+        expansion: f64,
     ) -> ArrayVec<PlanetPoint<SIZE>, 2> {
         let mut points = ArrayVec::new();
 
@@ -181,22 +191,22 @@ impl<const SIZE: usize> BiomeRow<SIZE> {
             )
         };
 
-        let mut add_point = |block: (u32, u32)| {
+        let mut add_point = |block: (u32, u32), expansion: f64| {
             points.push(PlanetPoint::new(
-                block.0 as f64 / region_block_grid_size as f64,
-                block.1 as f64 / region_block_grid_size as f64,
+                (block.0 as f64 / region_block_grid_size as f64) + expansion,
+                (block.1 as f64 / region_block_grid_size as f64) + expansion,
             ))
         };
 
         let start_idx = self.start.into_option().unwrap_or(0);
         let start = (row_x + start_idx as u32, row_y);
-        add_point(start);
+        add_point(start, -expansion);
 
         let end_idx = self.end.into_option().unwrap_or(region_block_grid_size - 1);
         if end_idx == start_idx {
             // single block, only yield 1 point
         } else {
-            add_point((row_x + end_idx as u32, row_y))
+            add_point((row_x + end_idx as u32, row_y), expansion)
         };
 
         points

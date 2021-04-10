@@ -1,4 +1,4 @@
-# TODOs (300)
+# TODOs (299)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -69,14 +69,13 @@
    * `const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic`
    * `// TODO replace this rtree with a new bulk loaded one?`
    * `// TODO PR to move nodes out of the tree instead of copy`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (10)
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (9)
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
    * `// TODO rename me`
    * `// TODO is there a race condition where a region that's supposed to replace a feature`
-   * `// TODO offset to centre of each block?`
+   * `// TODO simplify polygon by removing repeated vertices in straight line`
    * `// TODO will need to filter on feature type when there are multiple`
    * `// TODO null params for benchmark`
-   * `// TODO only seems to affect left side, not all points. centroid set too late? maybe do expansion by 1 block`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`

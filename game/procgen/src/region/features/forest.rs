@@ -55,6 +55,7 @@ impl Feature for ForestFeature {
             ctx.slab_bounds,
             bounding,
             ctx.chunk_desc.blocks(),
+            // TODO pass filter closure to check the biome of the tree block too, because feature hull is not perfect
             |point| {
                 let tree_base = {
                     // find xy
