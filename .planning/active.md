@@ -16,3 +16,5 @@
 * [X] bug: procgen world is vertically flipped ingame
 * [ ] remove unwraps in grid coord (un)flattening and handle properly
 * [X] bug: deadlock loading terrain
+* [ ] bug: crashes on assert that feature boundary intersects with a slab boundary on panning upwards on test seed
+* [ ] consider caching region/features in planet cache

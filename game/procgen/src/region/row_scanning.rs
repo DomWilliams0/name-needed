@@ -5,19 +5,25 @@ use crate::region::RegionLocationUnspecialized;
 use crate::BiomeType;
 use common::{ArrayVec, Itertools};
 
+use std::array::IntoIter;
+use std::convert::identity;
 use unit::world::CHUNK_SIZE;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(test, derive(Ord, PartialOrd))]
 pub enum RegionNeighbour {
     /// y+1
-    Up = 1,
+    Up = 0,
     /// y-1
     Down,
     /// x-1
     Left,
     /// x+1
     Right,
+    UpLeft,
+    UpRight,
+    DownRight,
+    DownLeft,
 }
 
 #[derive(Clone, Debug)]
@@ -45,19 +51,22 @@ pub enum RowIndex {
 
 /// Scans rows of blocks within the region to collect points that form a concave hull around blocks
 /// of the same biome
+///
+/// (region neighbours, diagonal region neighbours derived from aligned neighbours)
 pub fn scan<const SIZE: usize>(
     chunks: RegionChunksBlockRows<SIZE>,
     biome: BiomeType,
     mut per_row: impl FnMut(BiomeRow<SIZE>),
-) -> ArrayVec<RegionNeighbour, 4> {
+) -> ArrayVec<RegionNeighbour, 8> {
     let region_side_length = SIZE * CHUNK_SIZE.as_usize();
 
     let rows = chunks.blocks().chunks(region_side_length);
 
-    // indexed by RegionNeighbour idx - 1
+    // indexed by RegionNeighbour idx, aligned directions only
     let mut overflows = [None; 4];
     let mut add_overflow = |rn: RegionNeighbour| {
-        overflows[rn as usize - 1] = Some(rn);
+        debug_assert!(rn.aligned());
+        overflows[rn as usize] = Some(rn);
     };
 
     for (col, row) in (&rows).into_iter().enumerate() {
@@ -118,7 +127,39 @@ pub fn scan<const SIZE: usize>(
         }
     }
 
-    overflows.iter().filter_map(|opt| *opt).collect()
+    let mut neighbours = IntoIter::new(overflows)
+        .filter_map(identity)
+        .collect::<ArrayVec<RegionNeighbour, 8>>();
+
+    // append diagonals
+    calculate_regional_diagonals(&overflows, |diag| neighbours.push(diag));
+    neighbours
+}
+
+/// Input should be in enum declaration order
+fn calculate_regional_diagonals(
+    neighbours: &[Option<RegionNeighbour>; 4],
+    mut per_diag: impl FnMut(RegionNeighbour),
+) {
+    let slice = &neighbours[0..4];
+
+    macro_rules! diag {
+        ($indices:expr, $diag:expr) => {
+            let (a, b) = $indices;
+            // TODO ensure no bounds checking here
+            if slice[a].is_some() && slice[b].is_some() {
+                per_diag($diag);
+            }
+        };
+    }
+    use RegionNeighbour::*;
+
+    // [up, down, left, right]
+    //  0   1     2     3
+    diag!((0, 2), UpLeft);
+    diag!((0, 3), UpRight);
+    diag!((1, 2), DownLeft);
+    diag!((1, 3), DownRight);
 }
 
 impl<const SIZE: usize> BiomeRow<SIZE> {
@@ -170,6 +211,10 @@ impl RegionNeighbour {
             Down => (0, -1),
             Left => (-1, 0),
             Right => (1, 0),
+            UpLeft => (-1, 1),
+            UpRight => (1, 1),
+            DownRight => (1, -1),
+            DownLeft => (-1, -1),
         }
     }
 
@@ -180,7 +225,16 @@ impl RegionNeighbour {
             Down => Up,
             Left => Right,
             Right => Left,
+            UpLeft => DownRight,
+            UpRight => DownLeft,
+            DownRight => UpLeft,
+            DownLeft => UpRight,
         }
+    }
+
+    fn aligned(self) -> bool {
+        use RegionNeighbour::*;
+        matches!(self, Up | Down | Left | Right)
     }
 }
 
@@ -397,14 +451,8 @@ mod tests {
                 z_range: FeatureZRange::null()
             }]
         );
-        assert_eq!(
-            overflow,
-            vec![
-                RegionNeighbour::Up,
-                RegionNeighbour::Left,
-                RegionNeighbour::Right
-            ]
-        );
+        use RegionNeighbour::*;
+        assert_eq!(overflow, vec![Up, Left, Right, UpLeft, UpRight,]);
     }
 
     #[test]
@@ -465,14 +513,11 @@ mod tests {
             .collect();
 
         assert_eq!(rows, expected_rows);
+
+        use RegionNeighbour::*;
         assert_eq!(
             overflow,
-            vec![
-                RegionNeighbour::Up,
-                RegionNeighbour::Down,
-                RegionNeighbour::Left,
-                RegionNeighbour::Right
-            ]
+            vec![Up, Down, Left, Right, UpLeft, UpRight, DownRight, DownLeft,]
         );
 
         // ensure all planet points when converted back to WorldPositions are within the region
@@ -485,5 +530,33 @@ mod tests {
                 let this_reg = RegionLocation::try_from_chunk(chunk).expect("should be good");
                 assert_eq!(reg, this_reg);
             });
+    }
+
+    #[test]
+    fn diagonal_region_neighbours() {
+        fn diagonals(neighbours: Vec<RegionNeighbour>, mut expected: Vec<RegionNeighbour>) {
+            let mut arr = [None; 4];
+            for n in neighbours {
+                arr[n as usize] = Some(n);
+            }
+
+            let mut diags = vec![];
+            calculate_regional_diagonals(&arr, |diag| diags.push(diag));
+
+            diags.retain(|n| !n.aligned()); // keep diags only
+            diags.sort();
+            expected.sort();
+
+            assert_eq!(diags, expected);
+        }
+
+        use RegionNeighbour::*;
+
+        diagonals(vec![], vec![]);
+        diagonals(vec![Up, Down], vec![]);
+        diagonals(vec![Left, Right], vec![]);
+        diagonals(vec![Up, Left], vec![UpLeft]);
+        diagonals(vec![Up, Down, Left], vec![UpLeft, DownLeft]);
+        diagonals(vec![Down, Right, Left], vec![DownRight, DownLeft]);
     }
 }

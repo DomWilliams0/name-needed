@@ -1,4 +1,4 @@
-# TODOs (298)
+# TODOs (300)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -53,13 +53,14 @@
    * `// TODO custom block types for procgen that are translated to game blocks`
  * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
-   * `// TODO can this be reduced to a single Polygon to reduce indirection?`
+   * `// TODO in most cases this is a single polygon, and so the multipolygon vec indirection is unnecessary`
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
    * `// TODO faster hash`
- * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
+   * `// TODO pass filter closure to check the biome of the tree block too, because feature hull is not perfect`
    * `// TODO attempt to place tree model at location in this slab`
    * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
    * `// TODO consider rtree params`
@@ -73,12 +74,14 @@
    * `// TODO rename me`
    * `// TODO is there a race condition where a region that's supposed to replace a feature`
    * `// TODO offset to centre of each block?`
-   * `// TODO expand polygon out to ensure it covers the entire biome area?`
    * `// TODO will need to filter on feature type when there are multiple`
    * `// TODO null params for benchmark`
+   * `// TODO only seems to affect left side, not all points. centroid set too late? maybe do expansion by 1 block`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
+ * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
+   * `// TODO ensure no bounds checking here`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`

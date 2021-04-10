@@ -30,7 +30,8 @@ pub struct RegionalFeature {
 
 struct RegionalFeatureInner {
     /// 2d bounds around feature, only applies to slabs within this polygon
-    // TODO can this be reduced to a single Polygon to reduce indirection?
+    // TODO in most cases this is a single polygon, and so the multipolygon vec indirection is unnecessary
+    //  wrap in an enum?
     bounding: MultiPolygon<f64>,
 
     /// Inclusive bounds in the z direction for this feature

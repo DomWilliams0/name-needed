@@ -399,6 +399,8 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 // already loaded and didn't register a continuation then this is a false positive
                 // where e.g. the feature ends exactly at the region edge
                 if !loaded_regions.read().await.contains(&neighbour) {
+                    trace!("adding feature to unloaded neighbour's continuations"; "region" => ?region,
+                            "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
                     let neighbour_continuations = continuations_guard
                         .entry(neighbour)
                         .or_insert_with(RegionContinuation::default);
@@ -406,6 +408,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                     neighbour_continuations
                         .features
                         .push((overflow.opposite(), feature))
+                } else {
+                    trace!("neighbour is already loaded, skipping continuation"; "region" => ?region,
+                            "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
                 }
             }
         }
