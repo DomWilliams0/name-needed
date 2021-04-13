@@ -197,6 +197,11 @@ impl RegionalFeature {
         RegionalFeature(ptr as *const _, self)
     }
 
+    /// Unique opaque value per feature
+    pub fn unique_id(self: &Arc<Self>) -> u64 {
+        Arc::as_ptr(self) as u64
+    }
+
     /// Assumes [applies_to] has already been checked for slab. Pretty expensive, and panics
     /// if in invalid region
     pub fn applies_to_block(&self, block: WorldPosition) -> bool {

@@ -416,7 +416,7 @@ impl<C: WorldContext> WorldLoader<C> {
         &self,
         chunks: impl Iterator<Item = ChunkLocation>,
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        per_point: impl FnMut(u32, WorldPosition),
+        per_point: impl FnMut(u64, WorldPosition),
     ) {
         let fut = self
             .source

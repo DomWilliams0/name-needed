@@ -277,10 +277,9 @@ impl Planet {
         &self,
         chunks: impl Iterator<Item = ChunkLocation>,
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        mut per_point: impl FnMut(u32, WorldPosition),
+        mut per_point: impl FnMut(u64, WorldPosition),
     ) {
         let inner = self.0.read().await;
-        let mut i = 0;
         for region in chunks
             .filter_map(|c| RegionLocation::try_from_chunk_with_params(c, &inner.params))
             .sorted_unstable() // allocation, gross
@@ -288,10 +287,10 @@ impl Planet {
         {
             if let Some(region) = inner.regions.get_existing(region) {
                 for feature in region.all_features() {
+                    let unique = feature.unique_id();
                     feature.bounding_points(z_range, |point| {
-                        per_point(i, point.into_block(z_range.1))
+                        per_point(unique, point.into_block(z_range.1))
                     });
-                    i += 1;
                 }
             }
         }
