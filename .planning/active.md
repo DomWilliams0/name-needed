@@ -18,3 +18,5 @@
 * [X] bug: deadlock loading terrain
 * [ ] bug: crashes on assert that feature boundary intersects with a slab boundary on panning upwards on test seed
 * [ ] consider caching region/features in planet cache
+* [ ] feature polygon debug renderer should cache outlines when mutex can not be taken
+* [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?

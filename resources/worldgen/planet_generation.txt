@@ -9,3 +9,8 @@
 --height-noise 15,1.4,0.78,1.5
 --moisture-noise 8,6,0.4,2.4
 --temp-noise 7,8,0.1,1.0
+
+--forest-pds-radius 10
+
+# fewer random jumps when lower, but more expensive with more vertices
+--feature-concavity 2.0

@@ -5,7 +5,7 @@ use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 use crate::region::feature::{ApplyFeatureContext, FeatureZRange, RegionalFeatureBoundary};
 
 use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
-use crate::{BiomeType, BlockType};
+use crate::{BiomeType, BlockType, PlanetParams};
 use common::*;
 
 use geo::prelude::{Contains, Intersects};
@@ -16,13 +16,14 @@ use rstar::primitives::PointWithData;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 
-#[derive(Default)]
 pub struct ForestFeature {
     trees: PoissonDiskSampling,
 }
 
 struct PoissonDiskSampling {
     points: RTree<PointWithData<(), [f64; 2]>>,
+    radius: f64,
+    attempts: u32,
 }
 
 impl Feature for ForestFeature {
@@ -92,22 +93,27 @@ impl Feature for ForestFeature {
     }
 }
 
-impl Default for PoissonDiskSampling {
-    fn default() -> Self {
-        Self {
-            // TODO consider rtree params
-            points: RTree::new(),
+impl ForestFeature {
+    pub fn new(params: &PlanetParams) -> Self {
+        ForestFeature {
+            trees: PoissonDiskSampling::new(params.forest_pds_radius, params.forest_pds_attempts),
         }
     }
 }
 
 impl PoissonDiskSampling {
-    /// Number of blocks between each tree
-    /// TODO put this in planet params
-    const BLOCK_DISTANCE: u32 = 8;
-    const MAX_ATTEMPTS: usize = 20;
+    pub fn new(block_spacing: u32, attempts: u32) -> Self {
+        // TODO actual validation
+        assert!(block_spacing > 0);
 
-    const RADIUS: f64 = PlanetPoint::PER_BLOCK * Self::BLOCK_DISTANCE as f64;
+        Self {
+            // TODO consider rtree params
+            points: RTree::new(),
+            // TODO const generic size param
+            radius: PlanetPoint::PER_BLOCK * block_spacing as f64,
+            attempts,
+        }
+    }
 
     fn spread(
         &mut self,
@@ -128,11 +134,12 @@ impl PoissonDiskSampling {
         debug_assert!(full_bounds.intersects(&slab_bounds));
         debug_assert!(bounding.intersects(&slab_bounds));
 
-        const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic
+        const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic (and use the unspecialised PlanetPoint)
 
         let initial_point = {
             let mut found = None;
-            for _attempt in 0..Self::MAX_ATTEMPTS * 2 {
+            // try twice as hard to place an initial point
+            for _attempt in 0..self.attempts * 2 {
                 let random_point = [
                     slab_base.x + rando.gen_range(0.0, 1.0 / SIZE as f64),
                     slab_base.y + rando.gen_range(0.0, 1.0 / SIZE as f64),
@@ -172,7 +179,7 @@ impl PoissonDiskSampling {
             let point = unsafe { *active_points.get_unchecked(point_idx) }.get_array();
 
             let len_before = self.points.size();
-            for _ in 0..Self::MAX_ATTEMPTS {
+            for _ in 0..self.attempts {
                 let candidate = {
                     // generates a random unit vector
                     // ty https://stackoverflow.com/a/8453514
@@ -181,7 +188,7 @@ impl PoissonDiskSampling {
                     let unit_mag = (x * x + y * y).sqrt();
                     let [dx, dy] = [x / unit_mag, y / unit_mag];
 
-                    let rando_mag = rando.gen_range(Self::RADIUS, Self::RADIUS * 2.0);
+                    let rando_mag = rando.gen_range(self.radius, self.radius * 2.0);
 
                     [point[0] + (dx * rando_mag), point[1] + (dy * rando_mag)]
                 };
@@ -223,8 +230,8 @@ impl PoissonDiskSampling {
     fn is_valid_point(&self, candidate: [f64; 2]) -> bool {
         self.points
             .locate_in_envelope_intersecting({
-                let min = [candidate[0] - Self::RADIUS, candidate[1] - Self::RADIUS];
-                let max = [candidate[0] + Self::RADIUS, candidate[1] + Self::RADIUS];
+                let min = [candidate[0] - self.radius, candidate[1] - self.radius];
+                let max = [candidate[0] + self.radius, candidate[1] + self.radius];
                 &AABB::from_corners(min, max)
             })
             .next()
@@ -245,7 +252,7 @@ mod tests {
     #[test]
     fn poisson_disk_sampling() {
         let mut rando = SmallRng::seed_from_u64(515151515);
-        let mut poisson = PoissonDiskSampling::default();
+        let mut poisson = PoissonDiskSampling::new(8, 20);
 
         let slab = SlabLocation::new(0, (50, 200));
         let slab_bounds = slab_bounds(slab);

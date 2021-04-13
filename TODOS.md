@@ -1,4 +1,4 @@
-# TODOs (297)
+# TODOs (298)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -56,15 +56,16 @@
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
    * `// TODO faster hash`
- * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
    * `// TODO attempt to place tree model at location in this slab`
    * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
+   * `// TODO actual validation`
    * `// TODO consider rtree params`
-   * `/// TODO put this in planet params`
+   * `// TODO const generic size param`
    * `// TODO this does SO many temporary allocations`
-   * `const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic`
+   * `const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic (and use the unspecialised PlanetPoint)`
    * `// TODO replace this rtree with a new bulk loaded one?`
    * `// TODO PR to move nodes out of the tree instead of copy`
  * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (9)

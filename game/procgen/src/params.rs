@@ -98,6 +98,14 @@ pub struct PlanetParams {
     /// The higher >1 the more relaxed the boundary
     #[structopt(long, default_value = "8.0")]
     pub feature_concavity: f64,
+
+    /// Block radius for forest poisson disk sampling
+    #[structopt(long, default_value = "8")]
+    pub forest_pds_radius: u32,
+
+    /// Max attempts to place a tree in forest poisson disk sampling
+    #[structopt(long, default_value = "15")]
+    pub forest_pds_attempts: u32,
 }
 
 #[derive(Debug, Clone)]

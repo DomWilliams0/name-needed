@@ -220,7 +220,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
         // regional feature discovery
         let updates = region
-            .discover_regional_features(loc, continuations, loaded_regions, params)
+            .discover_regional_features(loc, continuations, loaded_regions, &params)
             .await;
 
         (region, updates)
@@ -276,7 +276,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         region: RegionLocation<SIZE>,
         continuations: RegionContinuations<SIZE>,
         loaded_regions: LoadedRegions<SIZE>,
-        params: PlanetParamsRef,
+        params: &PlanetParamsRef,
     ) -> RegionalFeatureReplacements<SIZE> {
         // expand each row outwards a tad for slightly relaxed boundary
         let expansion = 2.0 * PlanetPoint::<SIZE>::PER_BLOCK;
@@ -350,6 +350,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         fn create_new_feature(
             bounding: &mut RegionalFeatureBoundary,
             feature_range: FeatureZRange,
+            params: &PlanetParamsRef,
         ) -> SharedRegionalFeature {
             let bounding = {
                 let stolen = std::mem::replace(bounding, RegionalFeatureBoundary::empty());
@@ -357,7 +358,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 stolen
             };
 
-            RegionalFeature::new(bounding, feature_range, ForestFeature::default())
+            RegionalFeature::new(bounding, feature_range, ForestFeature::new(params))
         }
 
         // take continuations mutex now and don't release until self and all neighbours are updated,
@@ -425,7 +426,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         f.clone()
                     }
                     None => {
-                        let feature = create_new_feature(&mut bounding, feature_range);
+                        let feature = create_new_feature(&mut bounding, feature_range, params);
                         trace!("created new feature"; "region" => ?region,
                             "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
                         this_feature = Some(feature.clone());
@@ -458,7 +459,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         // add the new feature to this region
         let feature = this_feature
             .take()
-            .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range));
+            .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range, params));
         self.features.push(feature);
 
         feature_updates
