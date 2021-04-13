@@ -10,7 +10,7 @@ use unit::world::{
 
 use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
-use crate::params::PlanetParams;
+use crate::params::PlanetParamsRef;
 use crate::rasterize::SlabGrid;
 use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation};
 use crate::region::{Region, Regions};
@@ -25,7 +25,7 @@ unsafe impl Send for Planet {}
 unsafe impl Sync for Planet {}
 
 pub struct PlanetInner {
-    pub(crate) params: PlanetParams,
+    pub(crate) params: PlanetParamsRef,
     pub(crate) continents: ContinentMap,
     pub(crate) regions: Regions,
 
@@ -38,7 +38,7 @@ pub struct PlanetInner {
 
 impl Planet {
     // TODO actual error type
-    pub fn new(params: PlanetParams) -> BoxedResult<Planet> {
+    pub fn new(params: PlanetParamsRef) -> BoxedResult<Planet> {
         debug!("creating planet with params {:?}", params);
 
         let mut continents = None;
@@ -61,9 +61,9 @@ impl Planet {
 
         #[cfg(feature = "cache")]
         let was_loaded = continents.is_some();
-        let continents = continents.unwrap_or_else(|| ContinentMap::new(&params));
+        let continents = continents.unwrap_or_else(|| ContinentMap::new(params.clone()));
 
-        let regions = Regions::new(&params);
+        let regions = Regions::new(params.clone());
         let inner = Arc::new(RwLock::new(PlanetInner {
             params,
             continents,

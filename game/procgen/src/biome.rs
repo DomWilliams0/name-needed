@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn deterministic() {
         let params = PlanetParams::dummy();
-        let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+        let continents = ContinentMap::new_with_rng(params.clone(), &mut thread_rng());
 
         let a = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();
         let b = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();

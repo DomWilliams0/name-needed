@@ -21,7 +21,7 @@ mod climate;
 mod cache;
 
 pub use biome::BiomeType;
-pub use params::PlanetParams;
+pub use params::{PlanetParams, PlanetParamsRef};
 pub use planet::Planet;
 pub use rasterize::{BlockType, GeneratedBlock, SlabGrid};
 pub use region::RegionLocation;

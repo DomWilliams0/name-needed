@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::imageops::{flip_vertical, FilterType};
 use image::{GenericImage, ImageBuffer, Rgba, RgbaImage};
-use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut};
+use imageproc::drawing::{draw_filled_rect_mut, draw_line_segment_mut};
 use imageproc::rect::Rect;
 use tokio::time::Duration;
 

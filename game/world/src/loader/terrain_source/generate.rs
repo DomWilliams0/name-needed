@@ -5,7 +5,7 @@ use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
 
-use procgen::{GeneratedBlock, Planet, PlanetParams};
+use procgen::{GeneratedBlock, Planet, PlanetParamsRef};
 
 use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
@@ -16,7 +16,7 @@ pub struct GeneratedTerrainSource {
 }
 
 impl GeneratedTerrainSource {
-    pub async fn new(params: PlanetParams) -> BoxedResult<Self> {
+    pub async fn new(params: PlanetParamsRef) -> BoxedResult<Self> {
         let mut planet = Planet::new(params)?;
 
         planet.initial_generation().await?;

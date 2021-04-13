@@ -1,4 +1,4 @@
-use crate::params::PlanetParams;
+use crate::params::PlanetParamsRef;
 use crate::region::{PlanetPoint, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 pub struct ContinentMap {
-    params: PlanetParams,
+    params: PlanetParamsRef,
 
     continent_polygons: Vec<(ContinentIdx, Polygon<f64>)>,
 
@@ -42,21 +42,20 @@ pub struct RegionTile {
 unsafe impl Sync for RegionTile {}
 
 impl ContinentMap {
-    pub fn new(params: &PlanetParams) -> Self {
+    pub fn new(params: PlanetParamsRef) -> Self {
         // TODO validate values with result type
         assert!(params.planet_size > 0);
 
+        let grid = DynamicGrid::<RegionTile>::new([
+            params.planet_size as usize,
+            params.planet_size as usize,
+            1,
+        ]);
+
         Self {
-            params: params.clone(),
-
+            params,
             continent_polygons: Vec::new(),
-
-            grid: DynamicGrid::<RegionTile>::new([
-                params.planet_size as usize,
-                params.planet_size as usize,
-                1,
-            ]),
-
+            grid,
             biomes: None,
         }
     }
@@ -68,7 +67,7 @@ impl ContinentMap {
     }
 
     #[cfg(any(test, feature = "benchmarking"))]
-    pub fn new_with_rng(params: &PlanetParams, rando: &mut dyn RngCore) -> Self {
+    pub fn new_with_rng(params: PlanetParamsRef, rando: &mut dyn RngCore) -> Self {
         let mut this = Self::new(params);
 
         // skip expensive generation with single dummy continent placement
@@ -80,7 +79,7 @@ impl ContinentMap {
     pub fn generate(&mut self, rando: &mut dyn RngCore) {
         // place continents as a load of circle blobs
         // TODO reject if continent or land blob count is too low
-        let mut blobby = mr_blobby::BlobPlacement::new(&self.params);
+        let mut blobby = mr_blobby::BlobPlacement::new(self.params.clone());
         let (continents, total_blobs) = blobby.place_blobs(rando);
         info!(
             "placed {count} continents with {blobs} land blobs",
@@ -417,9 +416,10 @@ fn apply_gaussian_filter<T: Default>(
 
 mod mr_blobby {
     use super::ContinentIdx;
-    use crate::PlanetParams;
+
     use common::*;
 
+    use crate::params::PlanetParamsRef;
     use std::f32::consts::PI;
     use std::num::NonZeroUsize;
 
@@ -430,8 +430,8 @@ mod mr_blobby {
         pub radius: i32,
     }
 
-    pub struct BlobPlacement<'a> {
-        params: &'a PlanetParams,
+    pub struct BlobPlacement {
+        params: PlanetParamsRef,
 
         /// Consecutive blobs belong to the same continent, partitioned by continent_range
         land_blobs: Vec<LandBlob>,
@@ -440,8 +440,8 @@ mod mr_blobby {
         continent_range: Vec<(ContinentIdx, usize, usize)>,
     }
 
-    impl<'a> BlobPlacement<'a> {
-        pub fn new(params: &'a PlanetParams) -> Self {
+    impl BlobPlacement {
+        pub fn new(params: PlanetParamsRef) -> Self {
             BlobPlacement {
                 params,
                 land_blobs: Vec::with_capacity(512),

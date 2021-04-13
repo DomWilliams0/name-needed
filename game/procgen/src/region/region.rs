@@ -22,13 +22,14 @@ use crate::region::features::ForestFeature;
 use crate::region::row_scanning::RegionNeighbour;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
-use crate::{map_range, region::unit::RegionLocation, PlanetParams, SlabGrid};
+use crate::{map_range, region::unit::RegionLocation, SlabGrid};
 
+use crate::params::PlanetParamsRef;
 use geo::map_coords::MapCoordsInplace;
 use geo::prelude::HasDimensions;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
-    params: PlanetParams,
+    params: PlanetParamsRef,
     regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
 
     loaded_regions: LoadedRegions<SIZE>,
@@ -115,9 +116,9 @@ impl Default for BlockHeight {
 }
 
 impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
-    pub fn new(params: &PlanetParams) -> Self {
+    pub fn new(params: PlanetParamsRef) -> Self {
         Regions {
-            params: params.clone(),
+            params,
             regions: Vec::with_capacity(64),
             continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
             loaded_regions: Arc::new(RwLock::new(HashSet::with_capacity(128))),
@@ -139,7 +140,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
                     continents,
                     self.continuations.clone(), // wrapper around Arc
                     self.loaded_regions.clone(),
-                    &self.params,
+                    self.params.clone(),
                 )
                 .await;
 
@@ -201,7 +202,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         continents: &ContinentMap,
         continuations: RegionContinuations<SIZE>,
         loaded_regions: LoadedRegions<SIZE>,
-        params: &PlanetParams,
+        params: PlanetParamsRef,
     ) -> (Self, RegionalFeatureReplacements<SIZE>) {
         debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
 
@@ -275,7 +276,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         region: RegionLocation<SIZE>,
         continuations: RegionContinuations<SIZE>,
         loaded_regions: LoadedRegions<SIZE>,
-        params: &PlanetParams,
+        params: PlanetParamsRef,
     ) -> RegionalFeatureReplacements<SIZE> {
         // expand each row outwards a tad for slightly relaxed boundary
         let expansion = 2.0 * PlanetPoint::<SIZE>::PER_BLOCK;
@@ -375,7 +376,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
         for overflow in overflows.into_iter() {
             let neighbour =
-                match region.try_add_offset_with_params(overflow.offset::<SIZE>(), params) {
+                match region.try_add_offset_with_params(overflow.offset::<SIZE>(), &params) {
                     Some(n) => n,
                     None => continue, // out of bounds, nvm
                 };
@@ -468,7 +469,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     pub async fn create_for_benchmark(
         region: RegionLocation<SIZE>,
         continents: &ContinentMap,
-        params: &PlanetParams,
+        params: PlanetParamsRef,
     ) -> Self {
         // TODO null params for benchmark
         Self::create(region, continents, todo!(), todo!(), params)
@@ -718,6 +719,7 @@ mod tests {
     use unit::world::ChunkLocation;
 
     use crate::continent::ContinentMap;
+    use crate::params::PlanetParamsRef;
     use crate::region::region::{Region, Regions};
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;
@@ -764,12 +766,13 @@ mod tests {
     async fn get_existing_region() {
         let params = {
             let mut params = PlanetParams::dummy();
-            params.planet_size = 32;
-            params.max_continents = 1;
+            let mut params_mut = PlanetParamsRef::get_mut(&mut params).unwrap();
+            params_mut.planet_size = 32;
+            params_mut.max_continents = 1;
             params
         };
-        let mut regions = SmolRegions::new(&params);
-        let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+        let mut regions = SmolRegions::new(params.clone());
+        let continents = ContinentMap::new_with_rng(params.clone(), &mut thread_rng());
 
         let loc = SmolRegionLocation::new(10, 20);
         let bad_loc = SmolRegionLocation::new(10, 200);
