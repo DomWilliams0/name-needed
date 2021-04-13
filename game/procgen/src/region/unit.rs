@@ -94,6 +94,10 @@ impl<const SIZE: usize> RegionLocation<SIZE> {
     pub const fn xy_f(self) -> (f64, f64) {
         (self.0 as f64, self.1 as f64)
     }
+
+    pub const fn chunks_per_side() -> usize {
+        SIZE
+    }
 }
 
 impl<const SIZE: usize> PlanetPoint<SIZE> {

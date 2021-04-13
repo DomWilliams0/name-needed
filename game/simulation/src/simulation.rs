@@ -23,7 +23,9 @@ use crate::needs::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
-use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
+use crate::render::{
+    AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
+};
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
@@ -488,6 +490,7 @@ fn register_debug_renderers<R: Renderer>(
     r: &mut DebugRenderers<R>,
 ) -> Result<(), DebugRendererError> {
     r.register(AxesDebugRenderer, true)?;
+    r.register(ChunkBoundariesDebugRenderer, false)?;
     r.register(SteeringDebugRenderer, true)?;
     r.register(
         PathDebugRenderer::default(),

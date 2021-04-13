@@ -12,7 +12,7 @@ pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, Wor
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::{helpers, World, WorldChangeEvent, WorldContext};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
-pub use procgen::BiomeType;
+pub use procgen::{BiomeType, RegionLocation};
 
 pub mod block;
 mod chunk;
