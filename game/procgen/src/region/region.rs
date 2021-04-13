@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use geo::concave_hull::ConcaveHull;
-use geo::{coords_iter::CoordsIter, MultiPoint, Point, Rect};
+use geo::{coords_iter::CoordsIter, Coordinate, LineString, MultiPoint, Point, Polygon, Rect};
 use tokio::sync::{Mutex, RwLock};
 
 pub use ::unit::world::{
@@ -313,9 +313,21 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         let mut bounding = {
             let points = MultiPoint(points);
 
-            // TODO simplify polygon by removing repeated vertices in straight line
-
+            // trace boundary
             let mut polygon = points.concave_hull(params.feature_concavity);
+
+            // simplify boundary
+            polygon = {
+                let (exterior, interior) = polygon.into_inner();
+                let orig_len = exterior.0.len();
+                let simplified = simplify_boundary(exterior.0);
+                debug!(
+                    "simplified feature boundary from {before} to {after}",
+                    before = orig_len,
+                    after = simplified.len()
+                );
+                Polygon::new(LineString(simplified), interior)
+            };
 
             // expand top and bottom X% points
             let (bottom_y, top_y) = {
@@ -511,6 +523,40 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     pub fn block_rows(&self) -> RegionChunksBlockRows<'_, SIZE> {
         RegionChunksBlockRows(&self.chunks)
     }
+}
+
+fn simplify_boundary(points: Vec<Coordinate<f64>>) -> Vec<Coordinate<f64>> {
+    use common::cgmath::Vector2;
+    let mut new_points = Vec::with_capacity(points.len()); // worst case no simplification
+    let orig_last = points.last().copied();
+
+    let mut last_delta = Vector2::zero();
+    for (a, b) in points.into_iter().tuple_windows() {
+        let this_delta = Vector2::from((b - a).x_y());
+
+        // ok to compare to f64 vectors exactly for equality, because all points have been created
+        // on block boundaries
+        if this_delta != last_delta {
+            // new direction!
+
+            // add start point for new line
+            new_points.push(a);
+
+            // track delta
+            last_delta = this_delta;
+        }
+
+        // otherwise continue in direction, skipping redundant points
+    }
+
+    // add last point untouched if necessary
+    if let Some((orig_last, new_last)) = orig_last.zip(new_points.last()) {
+        if orig_last != *new_last {
+            new_points.push(orig_last);
+        }
+    }
+
+    new_points
 }
 
 impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
@@ -721,7 +767,7 @@ mod tests {
 
     use crate::continent::ContinentMap;
     use crate::params::PlanetParamsRef;
-    use crate::region::region::{Region, Regions};
+    use crate::region::region::{simplify_boundary, Region, Regions};
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;
 
@@ -789,5 +835,39 @@ mod tests {
 
         assert!(regions.get_existing(loc).is_some());
         assert!(regions.get_existing(bad_loc).is_none());
+    }
+
+    #[test]
+    fn simplify_polygon() {
+        let p = |x, y| geo::Coordinate::<f64> { x, y };
+        let points = vec![
+            // start at origin
+            p(0.0, 0.0),
+            // straight line to the right
+            p(1.0, 0.0), // redundant
+            p(2.0, 0.0), // redundant
+            p(3.0, 0.0), // last point in this line, keep it
+            // up
+            p(3.0, 1.0),
+            p(3.0, 2.0),
+            p(3.0, 3.0),
+            // rando
+            p(-5.0, 6.0),
+            // back to start
+            p(0.0, 0.0),
+        ];
+
+        let simplified = simplify_boundary(points);
+        eprintln!("{:#?}", simplified);
+        assert_eq!(
+            simplified,
+            vec![
+                p(0.0, 0.0),
+                p(3.0, 0.0),
+                p(3.0, 3.0),
+                p(-5.0, 6.0),
+                p(0.0, 0.0)
+            ]
+        );
     }
 }
