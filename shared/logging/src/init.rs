@@ -81,11 +81,15 @@ impl LoggerBuilder {
             #[cfg(not(feature = "to-file"))]
             terminal_drain
         };
+        let chan_size = match self.level {
+            Level::Debug | Level::Trace => 65535,
+            _ => 16384,
+        };
 
         let drain = drain.filter_level(self.level).fuse();
         let drain = slog_async::Async::new(drain)
             .thread_name("logging".to_owned())
-            .chan_size(8192)
+            .chan_size(chan_size)
             .build_no_guard()
             .fuse();
         let logger = slog::Logger::root(drain, slog::o!());
