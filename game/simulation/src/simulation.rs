@@ -90,6 +90,9 @@ impl<R: Renderer> Simulation<R> {
         let mut debug_renderers = DebugRenderers::new();
         register_debug_renderers(&mut debug_renderers)?;
 
+        // ensure tick is reset
+        reset_tick();
+
         Ok(Self {
             ecs_world,
             voxel_world,
@@ -444,6 +447,12 @@ impl<R: Renderer> Simulation<R> {
 fn increment_tick() {
     unsafe {
         TICK.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+fn reset_tick() {
+    unsafe {
+        TICK.store(0, Ordering::Relaxed);
     }
 }
 
