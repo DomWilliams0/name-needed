@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
-use geo::concave_hull::ConcaveHull;
-use geo::{coords_iter::CoordsIter, Coordinate, LineString, MultiPoint, Point, Polygon, Rect};
+use geo::{Point, Rect};
 use tokio::sync::{Mutex, RwLock};
 
 pub use ::unit::world::{
@@ -25,7 +24,7 @@ use crate::region::RegionalFeature;
 use crate::{map_range, region::unit::RegionLocation, SlabGrid};
 
 use crate::params::PlanetParamsRef;
-use geo::map_coords::MapCoordsInplace;
+
 use geo::prelude::HasDimensions;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
@@ -219,6 +218,17 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         };
 
         // regional feature discovery
+        // TODO region chunk load order affects feature generations -
+        //  if multiple unconnected regions covering the same feature (e.g. big forest) are loaded,
+        //  they'll spawn distinct forest instances and spread them around until they meet, then
+        //  1 will take over a few regions but not all. if features will randomly generate some
+        //  characteristics e.g. tree type, the merging will combine them with an obvious mismatch
+        //  along region boundaries!
+        //
+        //  maybe a loading region could somehow query for nearby forests in a radius to seed itself
+        //  with, or only discover regional features in a flood-fill pattern, i.e. keep yielding until
+        //  a region neighbour is loaded, or trigger neighbour loading up to the other one? this
+        //  would disallow/ruin random slab loading..
         let updates = region
             .discover_regional_features(loc, continuations, loaded_regions, &params)
             .await;
@@ -279,7 +289,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         params: &PlanetParamsRef,
     ) -> RegionalFeatureReplacements<SIZE> {
         // expand each row outwards a tad for slightly relaxed boundary
-        let expansion = 2.0 * PlanetPoint::<SIZE>::PER_BLOCK;
+        let expansion = params.region_feature_expansion as f64 * PlanetPoint::<SIZE>::PER_BLOCK;
 
         let mut points = Vec::new();
         let mut feature_range = FeatureZRange::null();
@@ -310,52 +320,8 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         debug_assert_ne!(feature_range, FeatureZRange::null());
         debug_assert_ne!(y_range, (f64::MAX, f64::MIN));
 
-        let mut bounding = {
-            let points = MultiPoint(points);
-
-            // trace boundary
-            let mut polygon = points.concave_hull(params.feature_concavity);
-
-            // simplify boundary
-            polygon = {
-                let (exterior, interior) = polygon.into_inner();
-                let orig_len = exterior.0.len();
-                let simplified = simplify_boundary(exterior.0);
-                debug!(
-                    "simplified feature boundary from {before} to {after}",
-                    before = orig_len,
-                    after = simplified.len()
-                );
-                Polygon::new(LineString(simplified), interior)
-            };
-
-            // expand top and bottom X% points
-            let (bottom_y, top_y) = {
-                let threshold = 0.15; // %
-                let (min, max) = y_range;
-                let diff = (max - min) * threshold;
-                debug_assert!(diff > 0.0);
-                (min + diff, max - diff)
-            };
-
-            polygon.map_coords_inplace(|&(x, mut y)| {
-                if y < bottom_y {
-                    // expand downwards
-                    y -= expansion * 1.0;
-                } else if y > top_y {
-                    // expand upwards
-                    y += expansion * 1.0;
-                }
-
-                (x, y)
-            });
-
-            trace!("regional feature discovery"; "region" => ?region,
-            "points" => polygon.coords_iter().count(),
-            "overflows" => ?overflows);
-
-            RegionalFeatureBoundary::with_single(polygon)
-        };
+        let (mut bounding, n) = RegionalFeatureBoundary::new::<SIZE>(points, y_range, params);
+        trace!("regional feature discovery"; "region" => ?region, "points" => n, "overflows" => ?overflows);
 
         // must only be called once, result is cached in this_feature
         let mut this_feature: Option<SharedRegionalFeature> = None;
@@ -365,7 +331,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             params: &PlanetParamsRef,
         ) -> SharedRegionalFeature {
             let bounding = {
-                let stolen = std::mem::replace(bounding, RegionalFeatureBoundary::empty());
+                let stolen = std::mem::take(bounding);
                 assert!(!stolen.is_empty()); // is only called once
                 stolen
             };
@@ -403,7 +369,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         trace!("using neighbour's feature instance"; "region" => ?region,
                             "neighbour" => ?neighbour, "feature" => ?other_feature.ptr_debug());
 
-                        other_feature.merge_with_bounds(&bounding, feature_range);
+                        let bounding = std::mem::take(&mut bounding);
+                        debug_assert!(!bounding.is_empty()); // consumed only once
+                        other_feature.merge_with_bounds(bounding, feature_range);
                         this_feature = Some(other_feature);
                     }
                     Some(f) if !SharedRegionalFeature::ptr_eq(f, &other_feature) => {
@@ -523,40 +491,6 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     pub fn block_rows(&self) -> RegionChunksBlockRows<'_, SIZE> {
         RegionChunksBlockRows(&self.chunks)
     }
-}
-
-fn simplify_boundary(points: Vec<Coordinate<f64>>) -> Vec<Coordinate<f64>> {
-    use common::cgmath::Vector2;
-    let mut new_points = Vec::with_capacity(points.len()); // worst case no simplification
-    let orig_last = points.last().copied();
-
-    let mut last_delta = Vector2::zero();
-    for (a, b) in points.into_iter().tuple_windows() {
-        let this_delta = Vector2::from((b - a).x_y());
-
-        // ok to compare to f64 vectors exactly for equality, because all points have been created
-        // on block boundaries
-        if this_delta != last_delta {
-            // new direction!
-
-            // add start point for new line
-            new_points.push(a);
-
-            // track delta
-            last_delta = this_delta;
-        }
-
-        // otherwise continue in direction, skipping redundant points
-    }
-
-    // add last point untouched if necessary
-    if let Some((orig_last, new_last)) = orig_last.zip(new_points.last()) {
-        if orig_last != *new_last {
-            new_points.push(orig_last);
-        }
-    }
-
-    new_points
 }
 
 impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
@@ -767,7 +701,8 @@ mod tests {
 
     use crate::continent::ContinentMap;
     use crate::params::PlanetParamsRef;
-    use crate::region::region::{simplify_boundary, Region, Regions};
+    use crate::region::feature::RegionalFeatureBoundary;
+    use crate::region::region::{Region, Regions};
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;
 
@@ -835,39 +770,5 @@ mod tests {
 
         assert!(regions.get_existing(loc).is_some());
         assert!(regions.get_existing(bad_loc).is_none());
-    }
-
-    #[test]
-    fn simplify_polygon() {
-        let p = |x, y| geo::Coordinate::<f64> { x, y };
-        let points = vec![
-            // start at origin
-            p(0.0, 0.0),
-            // straight line to the right
-            p(1.0, 0.0), // redundant
-            p(2.0, 0.0), // redundant
-            p(3.0, 0.0), // last point in this line, keep it
-            // up
-            p(3.0, 1.0),
-            p(3.0, 2.0),
-            p(3.0, 3.0),
-            // rando
-            p(-5.0, 6.0),
-            // back to start
-            p(0.0, 0.0),
-        ];
-
-        let simplified = simplify_boundary(points);
-        eprintln!("{:#?}", simplified);
-        assert_eq!(
-            simplified,
-            vec![
-                p(0.0, 0.0),
-                p(3.0, 0.0),
-                p(3.0, 3.0),
-                p(-5.0, 6.0),
-                p(0.0, 0.0)
-            ]
-        );
     }
 }

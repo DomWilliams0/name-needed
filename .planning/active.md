@@ -21,3 +21,4 @@
 * [ ] consider caching region/features in planet cache
 * [X] feature polygon debug renderer should cache outlines when mutex can not be taken
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
+* [ ] bug: panic "chunk should be present" when zoom=10.0

@@ -106,6 +106,13 @@ pub struct PlanetParams {
     /// Max attempts to place a tree in forest poisson disk sampling
     #[structopt(long, default_value = "15")]
     pub forest_pds_attempts: u32,
+
+    /// Blocks to expand regional feature boundary
+    #[structopt(long, default_value = "2")]
+    pub region_feature_expansion: u32,
+
+    #[structopt(long, default_value = "0.15")]
+    pub region_feature_vertical_expansion_threshold: f64,
 }
 
 #[derive(Debug, Clone)]

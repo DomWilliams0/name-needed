@@ -13,4 +13,7 @@
 --forest-pds-radius 10
 
 # fewer random jumps when lower, but more expensive with more vertices
---feature-concavity 2.0
+--feature-concavity 8
+
+--region-feature-expansion 5
+--region-feature-vertical-expansion-threshold 0.5

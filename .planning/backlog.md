@@ -92,6 +92,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
 * grass colour and flora depends on biome/moisture
 * different continents could have different variations
+* non-deterministic region chunk load order leads to non-deterministic feature discovery, which could lead to obvious differences along region chunk boundaries e.g. tree types
 
 ## Voxel world mechanics
 * fluid blocks

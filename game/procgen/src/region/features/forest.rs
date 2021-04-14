@@ -259,7 +259,7 @@ mod tests {
         let forest_bounds = {
             let size = 50.0;
             let rect = Rect::new((-size, -size), (size, size));
-            RegionalFeatureBoundary::with_single(rect.to_polygon())
+            RegionalFeatureBoundary::new_as_is(rect.to_polygon())
         };
 
         let mut points = vec![];

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use geo::prelude::*;
-use geo::{Coordinate, Geometry, MultiPolygon, Point, Polygon, Rect};
+use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
 
 use tokio::sync::Mutex;
 
@@ -10,7 +10,9 @@ use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::region::region::ChunkDescription;
 use crate::region::PlanetPoint;
-use crate::SlabGrid;
+use crate::{PlanetParams, SlabGrid};
+use geo::algorithm::map_coords::MapCoordsInplace;
+use geo::concave_hull::ConcaveHull;
 use geo::coords_iter::CoordsIter;
 use geo_booleanop::boolean::{BooleanOp, Operation};
 use std::any::{Any, TypeId};
@@ -125,17 +127,19 @@ impl RegionalFeature {
         feature.apply(loc, ctx, &inner.bounding);
     }
 
+    /// Gut the other and absorb it into this's bounds
     pub fn merge_with_bounds(
         &self,
-        other_bounding: &RegionalFeatureBoundary,
+        other_bounding: RegionalFeatureBoundary,
         other_z_range: FeatureZRange,
     ) {
         let mut inner = self.inner.write();
 
-        inner.bounding = RegionalFeatureBoundary::with_multi(inner.bounding.union(other_bounding));
+        inner.bounding.merge(other_bounding);
         inner.z_range = inner.z_range.max_of(other_z_range);
     }
 
+    /// self and other must not be the same feature, because feature mutex is not reentrant
     pub async fn merge_with_other(
         &self,
         other: SharedRegionalFeature,
@@ -160,8 +164,9 @@ impl RegionalFeature {
 
         {
             // now merge bounding polygons
-            let other_inner = other.inner.read();
-            self.merge_with_bounds(&other_inner.bounding, other_inner.z_range);
+            let mut other_inner = other.inner.write();
+            let other_bounding = std::mem::take(&mut other_inner.bounding);
+            self.merge_with_bounds(other_bounding, other_inner.z_range);
         }
 
         Ok(())
@@ -310,7 +315,176 @@ impl Debug for RegionalFeature {
 }
 
 impl RegionalFeatureBoundary {
-    pub fn with_multi(mut polygon: MultiPolygon<f64>) -> Self {
+    /// Gut the other and merge into this via union
+    pub fn merge(&mut self, other: RegionalFeatureBoundary) {
+        let union = self.union(&other);
+        *self = Self::new_multi_as_is(union);
+
+        self.iter_polys_mut(|points| {
+            let new_points = Self::simplify_boundary(std::mem::take(points));
+            let old = std::mem::replace(points, new_points);
+            debug_assert!(old.is_empty());
+            std::mem::forget(old);
+        })
+    }
+
+    fn iter_polys_mut(&mut self, mut per_poly: impl FnMut(&mut Vec<Coordinate<f64>>)) {
+        match &mut self.0 {
+            Geometry::Polygon(p) => p.exterior_mut(|ext| per_poly(&mut ext.0)),
+            Geometry::MultiPolygon(p) => {
+                for poly in &mut p.0 {
+                    poly.exterior_mut(|ext| per_poly(&mut ext.0));
+                }
+            }
+            _ => unsafe { unreachable_debug() },
+        }
+    }
+
+    /// Collapse into point cloud
+    #[deprecated]
+    fn collapse(self, extend_me: Option<Vec<Coordinate<f64>>>) -> Vec<Coordinate<f64>> {
+        let extract_points = |p: Polygon<f64>| {
+            let (ext, int) = p.into_inner();
+            if !int.is_empty() {
+                warn!("interior is not empty"; "interiors" => int.len());
+            }
+            ext.0
+        };
+
+        match self.0 {
+            Geometry::Polygon(p) => {
+                let more_points = extract_points(p);
+                match extend_me {
+                    None => more_points,
+                    Some(mut p) => {
+                        p.extend(more_points);
+                        p
+                    }
+                }
+            }
+            Geometry::MultiPolygon(p) => {
+                let mut points = extend_me;
+                for poly in p.0 {
+                    match points.as_mut() {
+                        None => points = Some(extract_points(poly)),
+                        Some(p) => p.extend(extract_points(poly)),
+                    }
+                }
+
+                debug_assert!(points.is_some(), "no polygons?");
+                points.unwrap_or_default()
+            }
+            _ => unsafe { unreachable_debug() },
+        }
+    }
+
+    /// Points should be from row scanning, and pre-expanded horizontally.
+    ///
+    /// * traces boundary as convex hull
+    /// * simplifies boundary
+    /// * expands polygon vertically
+    ///
+    /// Returns (boundary, number of points in polygon)
+    pub fn new<const SIZE: usize>(
+        points: Vec<Point<f64>>,
+        y_range: (f64, f64),
+        params: &PlanetParams,
+    ) -> (Self, usize) {
+        let points = MultiPoint(points);
+        let mut polygon;
+
+        // trace boundary
+        polygon = points.concave_hull(params.feature_concavity);
+
+        // simplify boundary
+        polygon = {
+            let (exterior, interior) = polygon.into_inner();
+            let orig_len = exterior.0.len();
+            let simplified = Self::simplify_boundary(exterior.0);
+            debug!(
+                "simplified feature boundary from {before} to {after}",
+                before = orig_len,
+                after = simplified.len()
+            );
+            Polygon::new(LineString(simplified), interior)
+        };
+
+        // run polygon simplification after basic simplification to ensure points are still aligned
+        // from row scanning
+        // polygon = polygon.simplify(&(PlanetPoint::PER_BLOCK * 4.0));
+
+        // expand top and bottom X% points
+        let (bottom_y, top_y) = {
+            let threshold = params.region_feature_vertical_expansion_threshold; // %
+            let (min, max) = y_range;
+            let diff = (max - min) * threshold;
+            debug_assert!(diff > 0.0);
+            (min + diff, max - diff)
+        };
+
+        let expansion = params.region_feature_expansion as f64
+            * crate::region::unit::PlanetPoint::<SIZE>::PER_BLOCK;
+        polygon.map_coords_inplace(|&(x, mut y)| {
+            if y < bottom_y {
+                // expand downwards
+                y -= expansion * 1.0;
+            } else if y > top_y {
+                // expand upwards
+                y += expansion * 1.0;
+            }
+
+            (x, y)
+        });
+
+        let n = polygon.exterior().0.len();
+        (Self(Geometry::Polygon(polygon)), n)
+    }
+
+    fn simplify_boundary(points: Vec<Coordinate<f64>>) -> Vec<Coordinate<f64>> {
+        use common::cgmath::Vector2;
+        let mut new_points = Vec::with_capacity(points.len()); // worst case no simplification
+        let orig_last = points.last().copied();
+
+        let mut last_delta = Vector2::zero();
+        for (a, b) in points.into_iter().tuple_windows() {
+            let this_delta = Vector2::from((b - a).x_y()).normalize();
+
+            // ok to compare to f64 vectors exactly for equality, because all points have been created
+            // on block boundaries
+            if this_delta != last_delta {
+                // new direction!
+
+                // add start point for new line
+                new_points.push(a);
+
+                // track delta
+                last_delta = this_delta;
+            }
+
+            // otherwise continue in direction, skipping redundant points
+        }
+
+        // add last point untouched if necessary
+        if let Some((orig_last, new_last)) = orig_last.zip(new_points.last()) {
+            if orig_last != *new_last {
+                new_points.push(orig_last);
+            }
+        }
+
+        new_points
+    }
+
+    #[inline]
+    pub fn empty() -> Self {
+        Self(Geometry::MultiPolygon(MultiPolygon(vec![])))
+    }
+
+    #[inline]
+    pub fn geometry(&self) -> &Geometry<f64> {
+        &self.0
+    }
+
+    fn new_multi_as_is(mut polygon: MultiPolygon<f64>) -> Self {
         if polygon.0.len() == 1 {
             // indirection removed B-)
             Self(Geometry::Polygon(polygon.0.remove(0)))
@@ -319,21 +493,19 @@ impl RegionalFeatureBoundary {
         }
     }
 
-    pub fn with_single(polygon: Polygon<f64>) -> Self {
+    #[cfg(test)]
+    pub fn new_as_is(polygon: Polygon<f64>) -> Self {
         Self(Geometry::Polygon(polygon))
-    }
-
-    #[inline]
-    pub fn empty() -> Self {
-        Self::with_multi(MultiPolygon(vec![]))
-    }
-
-    #[inline]
-    pub fn geometry(&self) -> &Geometry<f64> {
-        &self.0
     }
 }
 
+impl Default for RegionalFeatureBoundary {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
+#[inline]
 unsafe fn unreachable_debug() -> ! {
     if cfg!(debug_assertions) {
         unreachable!()
@@ -430,5 +602,39 @@ mod tests {
         // no dups
         seeds1.sort();
         assert_eq!(seeds1.iter().copied().dedup().collect_vec(), seeds1);
+    }
+
+    #[test]
+    fn simplify_polygon() {
+        let p = |x, y| geo::Coordinate::<f64> { x, y };
+        let points = vec![
+            // start at origin
+            p(0.0, 0.0),
+            // straight line to the right
+            p(1.0, 0.0), // redundant
+            p(2.0, 0.0), // redundant
+            p(3.0, 0.0), // last point in this line, keep it
+            // up
+            p(3.0, 1.0),
+            p(3.0, 2.0),
+            p(3.0, 3.0),
+            // rando
+            p(-5.0, 6.0),
+            // back to start
+            p(0.0, 0.0),
+        ];
+
+        let simplified = RegionalFeatureBoundary::simplify_boundary(points);
+        eprintln!("{:#?}", simplified);
+        assert_eq!(
+            simplified,
+            vec![
+                p(0.0, 0.0),
+                p(3.0, 0.0),
+                p(3.0, 3.0),
+                p(-5.0, 6.0),
+                p(0.0, 0.0)
+            ]
+        );
     }
 }
