@@ -744,6 +744,7 @@ dependencies = [
  "imgui-sdl2",
  "resources",
  "sdl2",
+ "sdl2-sys",
  "simulation",
  "unit",
 ]
@@ -2406,9 +2407,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "sdl2"
-version = "0.34.3"
+version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcbb85f4211627a7291c83434d6bbfa723e28dcaa53c7606087e3c61929e4b9c"
+checksum = "29fb006600d16da4f1f1e5c7b398f44af2f1b476ff5f2e555651bd78cf4c18d8"
 dependencies = [
  "bitflags",
  "lazy_static",
@@ -2418,9 +2419,9 @@ dependencies = [
 
 [[package]]
 name = "sdl2-sys"
-version = "0.34.3"
+version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d81feded049b9c14eceb4a4f6d596a98cebbd59abdba949c5552a015466d33"
+checksum = "3ed17d6d46b62b7df12134513bcc4f071268963e8c9bc8bf7ad983fbfb2bc3cc"
 dependencies = [
  "cfg-if 0.1.10",
  "cmake",
