@@ -159,6 +159,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * stress test
 * code coverage in CI
 * smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
+* tag pre-alpha commits in develop, and generate changelog in release notes
 
 ## Code quality
 * track down unwraps/expects and replace with results

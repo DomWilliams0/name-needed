@@ -1,0 +1,126 @@
+name: Build, test, prerelease
+
+on: [ push, pull_request ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # keep testing other platforms if one fails
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+
+    name: Build and test on ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v3.x
+
+      - name: Ensure .planning is correct
+        run: ./.build/check-planning.sh "$GITHUB_REF_SLUG"
+        shell: bash
+
+      - uses: actions-rs/toolchain@v1
+        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Setup Rust cache
+        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
+        uses: Swatinem/rust-cache@v1
+
+      - name: Build and run unit tests
+        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
+        run: ./.build/run-tests.sh
+        shell: bash
+
+      - name: Build and run headless game
+        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
+        run: ./.build/run-headless.sh
+        shell: bash
+
+  build_release:
+    name: Building pre-alpha release for ${{ matrix.platform }}
+    needs: create_release
+    # TODO change branch to develop
+    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/feature/prerelease-builds'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # keep testing other platforms if one fails
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        include:
+          - os: ubuntu-latest
+            suffix: ""
+            platform: "linux"
+          - os: windows-latest
+            suffix: ".exe"
+            platform: "windows"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Build release
+        run: |
+          ./.build/build-release.sh "${{ matrix.suffix }}"
+        shell: bash
+
+      - name: Package release
+        uses: papeloto/action-zip@v1
+        with:
+          files: name-needed/name-needed
+          dest: nn-${{ matrix.platform }}.zip
+          recursive: false
+
+      - name: Upload release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: nn-${{ matrix.platform }}.zip
+          asset_name: nn-pre-alpha-${{ github.run_number}}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip
+
+  create_release:
+    name: Create pre-alpha release
+    needs: build_and_test
+    # TODO change branch to develop
+    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/feature/prerelease-builds'
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.do_create_release.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Create pre-alpha release
+        id: do_create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "pre-alpha-${{ github.run_number }}"
+          release_name: "Pre-alpha #${{ github.run_number }}"
+          prerelease: true
+          draft: true
+          body: |
+            *This pre-alpha "release" is really just the latest build of the develop branch. Stability, playability, functionality and enjoyment are not guaranteed in the slightest!*
+
+            See the top of the [README](https://github.com/DomWilliams0/name-needed/blob/develop/README.md) for screenshots of the latest changes. Maybe the commits in this release will be published here eventually.
+
+            Thank you for checking out the project!
