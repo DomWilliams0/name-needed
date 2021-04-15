@@ -9,7 +9,7 @@ jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: false # keep testing other platforms if one fails
       matrix:
         os: [ubuntu-latest, windows-latest] # TODO macos too
 

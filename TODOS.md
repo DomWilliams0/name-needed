@@ -1,6 +1,9 @@
-# TODOs (270)
+# TODOs (272)
  * [.github/workflows/build-and-test.yml](.github/workflows/build-and-test.yml) (1)
    * `os: [ubuntu-latest, windows-latest] # TODO macos too`
+ * [.github/workflows/prerelease.yml](.github/workflows/prerelease.yml) (2)
+   * `# TODO change branch to develop`
+   * `draft: true # TODO temporary`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
