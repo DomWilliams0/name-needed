@@ -1,7 +1,4 @@
-# TODOs (271)
- * [.github/workflows/build-test-release.yml](.github/workflows/build-test-release.yml) (2)
-   * `# TODO change branch to develop`
-   * `# TODO change branch to develop`
+# TODOs (269)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)

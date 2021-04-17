@@ -1,4 +1,4 @@
-name: Build, test, prerelease
+name: Build, test, release pre-alpha
 
 on: [ push, pull_request ]
 
@@ -48,8 +48,7 @@ jobs:
   build_release:
     name: Building pre-alpha release for ${{ matrix.platform }}
     needs: create_release
-    # TODO change branch to develop
-    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/feature/prerelease-builds'
+    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/develop'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # keep testing other platforms if one fails
@@ -99,8 +98,7 @@ jobs:
   create_release:
     name: Create pre-alpha release
     needs: build_and_test
-    # TODO change branch to develop
-    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/feature/prerelease-builds'
+    if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.do_create_release.outputs.upload_url }}
@@ -117,7 +115,7 @@ jobs:
           tag_name: "pre-alpha-${{ github.run_number }}"
           release_name: "Pre-alpha #${{ github.run_number }}"
           prerelease: true
-          draft: true
+          draft: false
           body: |
             *This pre-alpha "release" is really just the latest build of the develop branch. Stability, playability, functionality and enjoyment are not guaranteed in the slightest!*
 
