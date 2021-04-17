@@ -113,9 +113,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: "pre-alpha-${{ github.run_number }}"
-          release_name: "Pre-alpha #${{ github.run_number }}"
+          release_name: "Pre-alpha (build ${{ github.run_number }})"
           prerelease: true
-          draft: false
+          draft: true # draft by default to be manually published if it's exciting
           body: |
             *This pre-alpha "release" is really just the latest build of the develop branch. Stability, playability, functionality and enjoyment are not guaranteed in the slightest!*
 
