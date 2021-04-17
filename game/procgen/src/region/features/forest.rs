@@ -132,7 +132,11 @@ impl PoissonDiskSampling {
         let is_in_bounds = |p: [f64; 2]| bounding.contains(&geo::Point::from(p));
 
         debug_assert!(full_bounds.intersects(&slab_bounds));
-        debug_assert!(bounding.intersects(&slab_bounds));
+
+        if !bounding.intersects(&slab_bounds) {
+            // boundary grazes this slab but doesn't have any blocks in it, nevermind
+            return;
+        }
 
         const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic (and use the unspecialised PlanetPoint)
 
@@ -157,7 +161,7 @@ impl PoissonDiskSampling {
             match found {
                 Some([x, y]) => PlanetPoint::new(x, y),
                 None => {
-                    warn!("failed to place random initial tree in alleged forest"; slab);
+                    debug!("failed to place random initial tree in alleged forest"; slab);
                     return;
                 }
             }
