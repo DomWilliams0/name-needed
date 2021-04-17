@@ -1,9 +1,9 @@
 #!/bin/bash
 
-BRANCH="$GITHUB_REF_SLUG"
+BRANCH="$1"
 
 if [[ -z "$BRANCH" ]]; then
-	echo Branch var not set
+	echo Branch not passed
 	exit 1
 fi
 
