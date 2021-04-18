@@ -2,6 +2,8 @@ mod feature;
 mod features;
 mod region;
 mod row_scanning;
+mod subfeature;
+mod subfeatures;
 mod unit;
 
 pub use feature::{ApplyFeatureContext, Feature, RegionalFeature};

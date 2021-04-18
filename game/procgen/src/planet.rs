@@ -171,6 +171,7 @@ impl Planet {
     pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
         let mut inner = self.0.write().await;
         let planet_seed = inner.params.seed();
+        let slab_continuations = inner.regions.slab_continuations();
 
         let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &inner.params)?;
         let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
@@ -184,15 +185,17 @@ impl Planet {
         // rasterize features onto slab
         let slab_bounds = slab_bounds(slab);
         let mut ctx = ApplyFeatureContext {
+            slab,
             chunk_desc,
             terrain: &mut terrain,
             planet_seed,
             slab_bounds: &slab_bounds,
+            slab_continuations,
         };
 
         for feature in region.features_for_slab(slab, &slab_bounds) {
             debug!("applying feature to slab"; "feature" => ?feature, slab);
-            feature.apply_to_slab(slab, &mut ctx).await;
+            feature.apply_to_slab(&mut ctx).await;
         }
 
         Some(terrain)

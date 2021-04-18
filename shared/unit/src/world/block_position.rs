@@ -40,7 +40,7 @@ impl BlockPosition {
         self.into()
     }
 
-    pub fn try_add(self, (dx, dy): (i16, i16)) -> Option<Self> {
+    pub fn try_add_xy(self, (dx, dy): (i16, i16)) -> Option<Self> {
         let x = (self.0 as i16) + dx;
         let y = (self.1 as i16) + dy;
 
@@ -49,6 +49,13 @@ impl BlockPosition {
         } else {
             None
         }
+    }
+
+    pub fn try_add_xyz(mut self, (dx, dy, dz): (i16, i16, i32)) -> Option<Self> {
+        GlobalSliceIndex::try_from(self.2.slice() + dz).and_then(|z| {
+            self.2 = z;
+            self.try_add_xy((dx, dy))
+        })
     }
 
     pub const fn x(self) -> BlockCoord {

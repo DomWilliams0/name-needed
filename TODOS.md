@@ -1,4 +1,4 @@
-# TODOs (297)
+# TODOs (302)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -49,10 +49,11 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (4)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
+   * `// TODO queue up blocks for other slabs`
    * `// TODO faster hash`
  * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
@@ -78,6 +79,12 @@
    * `// TODO calculate these better, and store them in data`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (2)
+   * `// TODO reuse borrowed vec allocations instead`
+   * `/// TODO handle case where block is multiple slabs over from root slab`
+ * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
+   * `// TODO actual tree shape`
+   * `// TODO tree configuration based on its planet location - branch count, leaf spread, etc`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`

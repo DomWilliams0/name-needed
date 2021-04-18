@@ -67,6 +67,10 @@ impl<S: SliceIndexScale> SliceIndex<S> {
     pub fn range() -> impl Iterator<Item = Self> {
         (S::MIN..=S::MAX).map(Self::new)
     }
+
+    pub fn try_from(slice: i32) -> Option<Self> {
+        (S::MIN..=S::MAX).contains(&slice).as_some(Self::new(slice))
+    }
 }
 
 impl SliceIndex<Chunk> {

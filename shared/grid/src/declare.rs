@@ -66,6 +66,15 @@ macro_rules! grid_declare {
             }
         }
 
+        impl std::ops::Index<$crate::CoordType> for $implname {
+            type Output = $t;
+
+            fn index(&self, index: $crate::CoordType) -> &Self::Output {
+                let index = Self::flatten(&index);
+                &self.array()[index]
+            }
+        }
+
         impl std::ops::Index<usize> for $implname {
             type Output = $t;
 
@@ -77,6 +86,13 @@ macro_rules! grid_declare {
         impl std::ops::IndexMut<&$crate::CoordType> for $implname {
             fn index_mut(&mut self, index: &$crate::CoordType) -> &mut Self::Output {
                 let index = Self::flatten(index);
+                &mut self.array_mut()[index]
+            }
+        }
+
+        impl std::ops::IndexMut<$crate::CoordType> for $implname {
+            fn index_mut(&mut self, index: $crate::CoordType) -> &mut Self::Output {
+                let index = Self::flatten(&index);
                 &mut self.array_mut()[index]
             }
         }

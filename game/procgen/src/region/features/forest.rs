@@ -5,9 +5,10 @@ use unit::world::{BlockPosition, GlobalSliceIndex, SlabLocation, SliceBlock};
 use crate::region::feature::{ApplyFeatureContext, FeatureZRange, RegionalFeatureBoundary};
 
 use crate::region::{Feature, PlanetPoint, CHUNKS_PER_REGION_SIDE};
-use crate::{BiomeType, BlockType, PlanetParams};
+use crate::{BiomeType, PlanetParams};
 use common::*;
 
+use crate::region::subfeatures::Tree;
 use geo::prelude::{Contains, Intersects};
 use geo::Rect;
 use geo_booleanop::boolean::BooleanOp;
@@ -22,7 +23,11 @@ pub struct ForestFeature {
 
 struct PoissonDiskSampling {
     points: RTree<PointWithData<(), [f64; 2]>>,
+
+    /// From config
     radius: f64,
+
+    /// From config
     attempts: u32,
 }
 
@@ -43,18 +48,22 @@ impl Feature for ForestFeature {
 
     /// Chooses tree positions using Bridson poisson disk sampling
     /// https://www.cct.lsu.edu/~fharhad/ganbatte/siggraph2007/CD2/content/sketches/0250.pdf
-    fn apply(
-        &mut self,
-        loc: SlabLocation,
-        ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &RegionalFeatureBoundary,
-    ) {
-        let mut rando = ctx.slab_rando(loc);
-        self.trees
-            .spread(&mut rando, loc, ctx.slab_bounds, bounding, |point| {
+    fn apply(&mut self, ctx: &mut ApplyFeatureContext<'_>, bounding: &RegionalFeatureBoundary) {
+        // deterministic tree placement
+        let mut rando_placement = ctx.slab_rando();
+
+        // non deterministic tree characteristics
+        let mut tree_rando = SmallRng::from_entropy();
+
+        self.trees.spread(
+            &mut rando_placement,
+            ctx.slab,
+            ctx.slab_bounds,
+            bounding,
+            |point| {
                 let tree_base = {
                     // find xy
-                    let pos = point.into_block(GlobalSliceIndex::new(0));
+                    let mut pos = point.into_block(GlobalSliceIndex::new(0)); // dummy z
                     let block = SliceBlock::from(BlockPosition::from(pos));
 
                     // use xy to find z ground level
@@ -65,12 +74,20 @@ impl Feature for ForestFeature {
                         return false;
                     }
 
-                    block.to_block_position(block_desc.ground() + 1)
+                    let z = block_desc.ground() + 1;
+                    pos.2 = z;
+                    pos
                 };
 
-                ctx.terrain[&tree_base.xyz()].ty = BlockType::SolidWater;
+                // attempt to place tree
+                let tree = {
+                    let height = tree_rando.gen_range(5, 8);
+                    Tree::new(height)
+                };
+                ctx.place_subfeature(tree, tree_base);
                 true
-            });
+            },
+        );
 
         // TODO attempt to place tree model at location in this slab
         // TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab

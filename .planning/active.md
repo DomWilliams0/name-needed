@@ -8,10 +8,10 @@
 	* [X] detect forest bounds
 		* [X] within a single region
 		* [X] across region boundaries
-* [o] individual tree placement via poisson disks
+* [X] individual tree placement via poisson disks
 	* [X] initial tree placement can be invalid
-	* [ ] doesn't work across some chunk boundaries - multiple forest instances?
-	* [ ] remove bad trees across region boundaries
+	* [~] doesn't work across some chunk boundaries - multiple forest instances?
+		* region loading must be adjacent
 * [ ] tree sub feature block placement
 * [X] remove redundant matches dependency
 * [X] bug: procgen world is vertically flipped ingame
@@ -22,3 +22,7 @@
 * [X] feature polygon debug renderer should cache outlines when mutex can not be taken
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
 * [ ] bug: panic "chunk should be present" when zoom=10.0
+* [ ] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
+	* [ ] load regions adjacent to already loaded regions only (except initial)
+	* [ ] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
+	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?

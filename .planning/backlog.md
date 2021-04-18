@@ -76,6 +76,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		* varying river flow speed
 	* magma very low down, or it just gets too hot
 	* volcano affects world gen in past
+	* forests
+		* vary tree height, structure and species
 * finite pregenerated world in xy (planet), infinite in z
 	* wrapping x,y coordinates is a beefy task, for something that doesnt happen very often
 		world loader wraps coords so it never requests slabs out of bounds of the planet

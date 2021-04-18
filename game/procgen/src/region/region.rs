@@ -25,6 +25,7 @@ use crate::{map_range, region::unit::RegionLocation, SlabGrid};
 
 use crate::params::PlanetParamsRef;
 
+use crate::region::subfeature::SlabContinuation;
 use geo::prelude::HasDimensions;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
@@ -32,7 +33,8 @@ pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
 
     loaded_regions: LoadedRegions<SIZE>,
-    continuations: RegionContinuations<SIZE>,
+    region_continuations: RegionContinuations<SIZE>,
+    slab_continuations: SlabContinuations,
 }
 
 /// Each pixel in the continent map is a region. Each region is a 2d grid of chunks.
@@ -72,6 +74,7 @@ pub struct ChunkDescription {
 type LoadedRegions<const SIZE: usize> = Arc<RwLock<HashSet<RegionLocation<SIZE>>>>;
 type RegionContinuations<const SIZE: usize> =
     Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>>;
+pub(super) type SlabContinuations = Arc<Mutex<HashMap<SlabLocation, SlabContinuation>>>;
 
 /// Info about features/generation from neighbouring regions that is to be carried over the
 /// boundary
@@ -119,8 +122,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         Regions {
             params,
             regions: Vec::with_capacity(64),
-            continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
+            region_continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
             loaded_regions: Arc::new(RwLock::new(HashSet::with_capacity(128))),
+            slab_continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
         }
     }
 
@@ -137,7 +141,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
                 let (region, feature_updates) = Region::create(
                     location,
                     continents,
-                    self.continuations.clone(), // wrapper around Arc
+                    self.region_continuations.clone(), // wrapper around Arc
                     self.loaded_regions.clone(),
                     self.params.clone(),
                 )
@@ -192,6 +196,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         self.params
             .is_region_in_range(region)
             .as_some_from(|| self.regions.binary_search_by_key(&region, |(pos, _)| *pos))
+    }
+
+    pub fn slab_continuations(&self) -> SlabContinuations {
+        Arc::clone(&self.slab_continuations)
     }
 }
 

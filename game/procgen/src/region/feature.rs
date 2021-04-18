@@ -6,9 +6,10 @@ use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Pol
 use tokio::sync::Mutex;
 
 use common::*;
-use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{GlobalSliceIndex, RangePosition, SlabLocation, WorldPosition};
 
-use crate::region::region::ChunkDescription;
+use crate::region::region::{ChunkDescription, SlabContinuations};
+use crate::region::subfeature::{Rasterizer, Subfeature};
 use crate::region::PlanetPoint;
 use crate::{PlanetParams, SlabGrid};
 use geo::algorithm::map_coords::MapCoordsInplace;
@@ -16,6 +17,7 @@ use geo::concave_hull::ConcaveHull;
 use geo::coords_iter::CoordsIter;
 use geo_booleanop::boolean::{BooleanOp, Operation};
 use std::any::{Any, TypeId};
+
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::hint::unreachable_unchecked;
@@ -55,12 +57,7 @@ pub trait Feature: Send + Sync + Debug {
     /// Increase z range based on this feature e.g. tree height
     fn extend_z_range(&self, range: FeatureZRange) -> FeatureZRange;
 
-    fn apply(
-        &mut self,
-        loc: SlabLocation,
-        ctx: &mut ApplyFeatureContext<'_>,
-        bounding: &RegionalFeatureBoundary,
-    );
+    fn apply(&mut self, ctx: &mut ApplyFeatureContext<'_>, bounding: &RegionalFeatureBoundary);
 
     /// Gut the other and absorb into this one.
     ///
@@ -72,10 +69,12 @@ pub trait Feature: Send + Sync + Debug {
 
 /// Context for applying a feature to a slab
 pub struct ApplyFeatureContext<'a> {
+    pub slab: SlabLocation,
     pub chunk_desc: &'a ChunkDescription,
     pub terrain: &'a mut SlabGrid,
     pub planet_seed: u64,
     pub slab_bounds: &'a Rect<f64>,
+    pub slab_continuations: SlabContinuations,
 }
 
 impl RegionalFeature {
@@ -121,10 +120,10 @@ impl RegionalFeature {
         inner.bounding.intersects(slab_bounds)
     }
 
-    pub async fn apply_to_slab(&self, loc: SlabLocation, ctx: &mut ApplyFeatureContext<'_>) {
+    pub async fn apply_to_slab(&self, ctx: &mut ApplyFeatureContext<'_>) {
         let mut feature = self.feature.lock().await;
         let inner = self.inner.read();
-        feature.apply(loc, ctx, &inner.bounding);
+        feature.apply(ctx, &inner.bounding);
     }
 
     /// Gut the other and absorb it into this's bounds
@@ -266,8 +265,37 @@ impl Debug for FeatureZRange {
 }
 
 impl<'a> ApplyFeatureContext<'a> {
-    pub fn slab_rando(&self, slab: SlabLocation) -> SmallRng {
-        SmallRng::seed_from_u64(slab_rando_seed(slab, self.planet_seed))
+    pub fn slab_rando(&self) -> SmallRng {
+        SmallRng::seed_from_u64(slab_rando_seed(self.slab, self.planet_seed))
+    }
+
+    /// root assumed to be within this slab
+    pub fn place_subfeature<F: Subfeature>(&mut self, mut subfeature: F, root: WorldPosition) {
+        let mut rasterizer = Rasterizer::new(self.slab);
+
+        // collect blocks from subfeature
+        subfeature.rasterize(root, &mut rasterizer);
+
+        // apply blocks within this slab
+        let mut count = 0;
+        for (pos, block) in rasterizer.internal_blocks() {
+            let (x, y, z) = pos.xyz();
+            let coord = [x as i32, y as i32, z];
+            self.terrain[coord] = block;
+
+            count += 1;
+            trace!("placing block within slab"; self.slab, "pos" => ?pos.xyz(), "block" => ?block)
+        }
+
+        debug!("placed {count} blocks within slab", count = count);
+
+        // TODO queue up blocks for other slabs
+        let mut external_blocks = rasterizer.external_blocks();
+        debug!("{count} external blocks", count = external_blocks.len());
+
+        // sort and group by slab neighbour offset
+        // external_blocks.sort_unstable_by_key(|(n, _, _)| *n);
+        // let groups = self.external_blocks.group_by(|(n, _, _)| *n);
     }
 }
 

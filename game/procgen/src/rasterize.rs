@@ -54,3 +54,9 @@ impl BlockType {
         }
     }
 }
+
+impl From<BlockType> for GeneratedBlock {
+    fn from(ty: BlockType) -> Self {
+        Self { ty }
+    }
+}
