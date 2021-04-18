@@ -21,7 +21,7 @@ pub fn save(planet: &PlanetInner) -> BoxedResult<()> {
 
 pub fn try_load(params: &PlanetParams) -> BoxedResult<Option<ContinentMap>> {
     let path = cache_file(params);
-    debug!("checking for cache in {file}", file = path.display());
+    debug!("checking for cache"; "file" => path.display());
 
     if !path.is_file() {
         // not cached
