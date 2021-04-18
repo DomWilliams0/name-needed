@@ -85,7 +85,7 @@ impl SliceIndex<Chunk> {
     }
 
     pub fn slab_index(self) -> SlabIndex {
-        SlabIndex::floored(self.slice() as f32 / SLAB_SIZE.as_f32())
+        SlabIndex(self.slice().div_euclid(SLAB_SIZE.as_i32()))
     }
 }
 

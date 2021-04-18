@@ -32,10 +32,6 @@ impl SlabIndex {
         self.0
     }
 
-    pub fn floored(float: f32) -> Self {
-        Self(float.floor() as i32)
-    }
-
     /// Bottom block of slab as global slice
     pub fn as_slice(self) -> GlobalSliceIndex {
         GlobalSliceIndex::new(self.0 * SLAB_SIZE.as_i32())
