@@ -43,6 +43,10 @@ impl SlabIndex {
         let top = bottom + SLAB_SIZE.as_i32();
         (bottom, top)
     }
+
+    pub fn try_add(self, dz: i32) -> Option<Self> {
+        self.0.checked_add(dz).map(Self)
+    }
 }
 
 NewtypeAdd! {(i32) pub struct SlabIndex(i32);}

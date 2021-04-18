@@ -7,6 +7,7 @@ mod subfeatures;
 mod unit;
 
 pub use feature::{ApplyFeatureContext, Feature, RegionalFeature};
+pub(crate) use subfeature::SlabContinuation;
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
 pub const CHUNKS_PER_REGION_SIDE: usize = 8;

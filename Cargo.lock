@@ -709,12 +709,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dynstack"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "307cf0305dfa87416ee23b8a328bbb7e1028da0b806a0bccd70435bbe0316d12"
-
-[[package]]
 name = "ecs-derive"
 version = "0.1.0"
 dependencies = [
@@ -2048,7 +2042,6 @@ dependencies = [
  "common",
  "criterion",
  "crossbeam",
- "dynstack",
  "futures",
  "geo",
  "geo-booleanop",

@@ -12,7 +12,7 @@ use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParamsRef;
 use crate::rasterize::SlabGrid;
-use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation};
+use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation, SlabContinuation};
 use crate::region::{Region, Regions};
 
 use geo::{Coordinate, Rect};
@@ -170,10 +170,10 @@ impl Planet {
     /// Generates now and does not cache. Returns None if slab is out of range
     pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
         let mut inner = self.0.write().await;
-        let planet_seed = inner.params.seed();
+        let params = inner.params.clone();
         let slab_continuations = inner.regions.slab_continuations();
 
-        let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &inner.params)?;
+        let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &params)?;
         let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
         let chunk_desc = region.chunk(slab.chunk).description();
 
@@ -182,20 +182,57 @@ impl Planet {
         let mut terrain = SlabGrid::default();
         chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 
-        // rasterize features onto slab
+        // apply features to slab and collect subfeatures
         let slab_bounds = slab_bounds(slab);
+        let (subfeatures_tx, mut subfeatures_rx) = tokio::sync::mpsc::unbounded_channel();
         let mut ctx = ApplyFeatureContext {
             slab,
             chunk_desc,
-            terrain: &mut terrain,
-            planet_seed,
+            params: params.clone(),
             slab_bounds: &slab_bounds,
-            slab_continuations,
+            subfeatures_tx,
         };
 
+        // spawn a task to apply subfeatures to the terrain as they're produced
+        let mut slab_continuations_for_task = slab_continuations.clone();
+        let task = tokio::spawn(async move {
+            while let Some(subfeature) = subfeatures_rx.recv().await {
+                subfeature
+                    .apply(
+                        slab,
+                        &mut terrain,
+                        Some(&mut slab_continuations_for_task),
+                        &params,
+                    )
+                    .await;
+            }
+
+            terrain
+        });
+
         for feature in region.features_for_slab(slab, &slab_bounds) {
-            debug!("applying feature to slab"; "feature" => ?feature, slab);
             feature.apply_to_slab(&mut ctx).await;
+        }
+
+        // mark slab as completed
+        let old_continuations = slab_continuations
+            .lock()
+            .await
+            .insert(slab, SlabContinuation::Loaded);
+
+        // ensure subfeature tx is dropped
+        let params = ctx.params.clone();
+        drop(ctx);
+
+        // wait for all subfeatures to be rasterized
+        let mut terrain = task.await.expect("future panicked");
+
+        // add any extra leaked subfeatures to this slab
+        if let Some(SlabContinuation::Unloaded(extra)) = old_continuations {
+            debug!("applying {count} leaked subfeatures to slab", count = extra.len(); slab);
+            for subfeature in extra.into_iter() {
+                subfeature.apply(slab, &mut terrain, None, &params).await;
+            }
         }
 
         Some(terrain)

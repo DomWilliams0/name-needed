@@ -20,7 +20,6 @@ futures = { version = "0.3", default-features = false, features = ["std", "alloc
 geo = "0.16"
 geo-booleanop = "0.3"
 rstar = "0.8"
-dynstack = "0.4"
 
 line_drawing = { version = "0.8", optional = true }
 crossbeam = { version = "0.8", optional = true }

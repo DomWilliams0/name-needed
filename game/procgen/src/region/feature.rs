@@ -6,12 +6,12 @@ use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Pol
 use tokio::sync::Mutex;
 
 use common::*;
-use unit::world::{GlobalSliceIndex, RangePosition, SlabLocation, WorldPosition};
+use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
-use crate::region::region::{ChunkDescription, SlabContinuations};
-use crate::region::subfeature::{Rasterizer, Subfeature};
+use crate::region::region::ChunkDescription;
+use crate::region::subfeature::{SharedSubfeature, Subfeature};
 use crate::region::PlanetPoint;
-use crate::{PlanetParams, SlabGrid};
+use crate::{PlanetParams, PlanetParamsRef};
 use geo::algorithm::map_coords::MapCoordsInplace;
 use geo::concave_hull::ConcaveHull;
 use geo::coords_iter::CoordsIter;
@@ -71,10 +71,9 @@ pub trait Feature: Send + Sync + Debug {
 pub struct ApplyFeatureContext<'a> {
     pub slab: SlabLocation,
     pub chunk_desc: &'a ChunkDescription,
-    pub terrain: &'a mut SlabGrid,
-    pub planet_seed: u64,
+    pub params: PlanetParamsRef,
     pub slab_bounds: &'a Rect<f64>,
-    pub slab_continuations: SlabContinuations,
+    pub subfeatures_tx: tokio::sync::mpsc::UnboundedSender<SharedSubfeature>,
 }
 
 impl RegionalFeature {
@@ -266,41 +265,25 @@ impl Debug for FeatureZRange {
 
 impl<'a> ApplyFeatureContext<'a> {
     pub fn slab_rando(&self) -> SmallRng {
-        SmallRng::seed_from_u64(slab_rando_seed(self.slab, self.planet_seed))
+        SmallRng::seed_from_u64(slab_rando_seed(self.slab, self.params.seed()))
     }
 
+    /// To be called by [Feature]s during application to a slab
+    ///
     /// root assumed to be within this slab
-    pub fn place_subfeature<F: Subfeature>(&mut self, mut subfeature: F, root: WorldPosition) {
-        let mut rasterizer = Rasterizer::new(self.slab);
-
-        // collect blocks from subfeature
-        subfeature.rasterize(root, &mut rasterizer);
-
-        // apply blocks within this slab
-        let mut count = 0;
-        for (pos, block) in rasterizer.internal_blocks() {
-            let (x, y, z) = pos.xyz();
-            let coord = [x as i32, y as i32, z];
-            self.terrain[coord] = block;
-
-            count += 1;
-            trace!("placing block within slab"; self.slab, "pos" => ?pos.xyz(), "block" => ?block)
-        }
-
-        debug!("placed {count} blocks within slab", count = count);
-
-        // TODO queue up blocks for other slabs
-        let mut external_blocks = rasterizer.external_blocks();
-        debug!("{count} external blocks", count = external_blocks.len());
-
-        // sort and group by slab neighbour offset
-        // external_blocks.sort_unstable_by_key(|(n, _, _)| *n);
-        // let groups = self.external_blocks.group_by(|(n, _, _)| *n);
+    pub fn queue_subfeature<F: Subfeature + 'static>(
+        &mut self,
+        subfeature: F,
+        root: WorldPosition,
+    ) {
+        let _ = self
+            .subfeatures_tx
+            .send(SharedSubfeature::new(subfeature, root));
     }
 }
 
 fn slab_rando_seed(slab: SlabLocation, planet_seed: u64) -> u64 {
-    // TODO faster hash
+    // TODO faster and non-random hash
     let mut hasher = DefaultHasher::new();
 
     // hash unique slab location and planet seed

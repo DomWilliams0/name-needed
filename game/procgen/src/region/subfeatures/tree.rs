@@ -4,6 +4,7 @@ use unit::world::WorldPosition;
 use crate::BlockType;
 use common::Itertools;
 
+#[derive(Debug)]
 pub struct Tree {
     height: u8,
 }

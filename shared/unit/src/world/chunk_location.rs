@@ -51,6 +51,13 @@ impl ChunkLocation {
         )
     }
 
+    pub fn try_add(self, (dx, dy): (i32, i32)) -> Option<Self> {
+        match (self.0.checked_add(dx), self.1.checked_add(dy)) {
+            (Some(x), Some(y)) => Some(Self(x, y)),
+            _ => None,
+        }
+    }
+
     pub const MIN: Self = ChunkLocation(i32::MIN, i32::MIN);
     pub const MAX: Self = ChunkLocation(i32::MAX, i32::MAX);
 }

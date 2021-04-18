@@ -12,6 +12,7 @@ use noise::MultiFractal;
 #[cfg(feature = "cache")]
 use serde::Serialize;
 use std::sync::Arc;
+use unit::world::ChunkLocation;
 
 pub type PlanetParamsRef = Arc<PlanetParams>;
 
@@ -303,6 +304,10 @@ impl PlanetParams {
     ) -> bool {
         let (x, y) = region.xy();
         x < self.planet_size && y < self.planet_size
+    }
+
+    pub fn is_chunk_in_range(&self, chunk: ChunkLocation) -> bool {
+        crate::region::RegionLocation::try_from_chunk_with_params(chunk, self).is_some()
     }
 }
 

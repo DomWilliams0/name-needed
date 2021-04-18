@@ -12,7 +12,10 @@
 	* [X] initial tree placement can be invalid
 	* [~] doesn't work across some chunk boundaries - multiple forest instances?
 		* region loading must be adjacent
-* [ ] tree sub feature block placement
+* [o] tree sub feature block placement
+	* [X] place blocks within root slab
+	* [X] place blocks across slab boundaries for unloaded neighbours
+	* [ ] place blocks across slab boundaries for already loaded neighbours
 * [X] remove redundant matches dependency
 * [X] bug: procgen world is vertically flipped ingame
 * [ ] remove unwraps in grid coord (un)flattening and handle properly

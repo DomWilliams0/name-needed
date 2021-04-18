@@ -1,4 +1,4 @@
-# TODOs (302)
+# TODOs (309)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -49,12 +49,11 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (4)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
-   * `// TODO queue up blocks for other slabs`
-   * `// TODO faster hash`
+   * `// TODO faster and non-random hash`
  * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
@@ -79,9 +78,17 @@
    * `// TODO calculate these better, and store them in data`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
- * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (2)
-   * `// TODO reuse borrowed vec allocations instead`
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (10)
+   * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
+   * `// TODO inline dyn subfeature or use pooled allocation`
+   * `// TODO use dynstack here`
+   * `// TODO reuse borrowed vec allocation`
    * `/// TODO handle case where block is multiple slabs over from root slab`
+   * `// TODO if continuations is None, set a flag to ignore boundary leaks`
+   * `// TODO neighbour slab should wrap around the planet`
+   * `// TODO this is never hit?`
+   * `// TODO handle this by queueing block updates to the already loaded chunk`
+   * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
  * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
    * `// TODO actual tree shape`
    * `// TODO tree configuration based on its planet location - branch count, leaf spread, etc`
