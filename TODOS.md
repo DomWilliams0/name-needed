@@ -1,4 +1,4 @@
-# TODOs (309)
+# TODOs (306)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -78,7 +78,7 @@
    * `// TODO calculate these better, and store them in data`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
- * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (10)
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
    * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
    * `// TODO inline dyn subfeature or use pooled allocation`
    * `// TODO use dynstack here`
@@ -86,8 +86,6 @@
    * `/// TODO handle case where block is multiple slabs over from root slab`
    * `// TODO if continuations is None, set a flag to ignore boundary leaks`
    * `// TODO neighbour slab should wrap around the planet`
-   * `// TODO this is never hit?`
-   * `// TODO handle this by queueing block updates to the already loaded chunk`
    * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
  * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
    * `// TODO actual tree shape`
@@ -260,11 +258,10 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
-   * `// TODO per tick alloc/reuse buf`
    * `r.register(FeatureBoundaryDebugRenderer::default(), true)?; // TODO TEMPORARY TRUE`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`

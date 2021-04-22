@@ -1,5 +1,7 @@
 use common::*;
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{
+    ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
+};
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -124,6 +126,33 @@ impl TerrainSource {
             }
         }
     }
+
+    pub async fn steal_queued_block_updates(&self, out: &mut Vec<WorldTerrainUpdate>) {
+        match self {
+            TerrainSource::Memory(_) => {}
+            TerrainSource::Generated(planet) => {
+                let len_before = out.len();
+                planet
+                    .planet()
+                    .steal_world_updates(|updates| {
+                        out.extend(updates.map(|(pos, block)| {
+                            WorldTerrainUpdate::new(
+                                WorldPositionRange::with_single(pos),
+                                (&block).into(),
+                            )
+                        }));
+                    })
+                    .await;
+                let n = out.len() - len_before;
+                if n > 0 {
+                    debug!(
+                        "collected {count} block updates from planet generation",
+                        count = n
+                    );
+                }
+            }
+        }
+    }
 }
 
 mod generate;
@@ -133,6 +162,8 @@ use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
+use crate::block::BlockType;
+use crate::loader::WorldTerrainUpdate;
 use procgen::{BiomeType, RegionLocation};
 use std::sync::Arc;
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use common::*;
 use unit::world::{
@@ -15,6 +15,7 @@ use crate::rasterize::SlabGrid;
 use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation, SlabContinuation};
 use crate::region::{Region, Regions};
 
+use crate::{BlockType, GeneratedBlock};
 use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads
@@ -28,6 +29,11 @@ pub struct PlanetInner {
     pub(crate) params: PlanetParamsRef,
     pub(crate) continents: ContinentMap,
     pub(crate) regions: Regions,
+
+    /// Reused allocation for block updates, queried by the game each tick. These come from
+    /// rasterizing subfeatures that protrude into _already loaded_ slabs, and so need to be applied
+    /// to the slab post-load
+    world_updates: Arc<Mutex<Vec<(WorldPosition, GeneratedBlock)>>>,
 
     #[cfg(feature = "climate")]
     climate: Option<crate::climate::Climate>,
@@ -68,6 +74,7 @@ impl Planet {
             params,
             continents,
             regions,
+            world_updates: Arc::new(Mutex::new(Vec::with_capacity(256))),
 
             #[cfg(feature = "climate")]
             climate: None,
@@ -172,6 +179,7 @@ impl Planet {
         let mut inner = self.0.write().await;
         let params = inner.params.clone();
         let slab_continuations = inner.regions.slab_continuations();
+        let world_updates = inner.world_updates.clone();
 
         let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &params)?;
         let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
@@ -195,6 +203,8 @@ impl Planet {
 
         // spawn a task to apply subfeatures to the terrain as they're produced
         let mut slab_continuations_for_task = slab_continuations.clone();
+
+        let world_updates_task = world_updates.clone();
         let task = tokio::spawn(async move {
             while let Some(subfeature) = subfeatures_rx.recv().await {
                 subfeature
@@ -203,6 +213,7 @@ impl Planet {
                         &mut terrain,
                         Some(&mut slab_continuations_for_task),
                         &params,
+                        &world_updates_task,
                     )
                     .await;
             }
@@ -231,7 +242,9 @@ impl Planet {
         if let Some(SlabContinuation::Unloaded(extra)) = old_continuations {
             debug!("applying {count} leaked subfeatures to slab", count = extra.len(); slab);
             for subfeature in extra.into_iter() {
-                subfeature.apply(slab, &mut terrain, None, &params).await;
+                subfeature
+                    .apply(slab, &mut terrain, None, &params, &world_updates)
+                    .await;
             }
         }
 
@@ -334,6 +347,15 @@ impl Planet {
                 }
             }
         }
+    }
+
+    pub async fn steal_world_updates(
+        &self,
+        with_updates: impl FnOnce(std::vec::Drain<(WorldPosition, GeneratedBlock)>),
+    ) {
+        let inner = self.0.write().await;
+        let mut updates = inner.world_updates.lock().await;
+        with_updates(updates.drain(..));
     }
 }
 

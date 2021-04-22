@@ -1,11 +1,12 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid};
+use crate::{BlockType, GeneratedBlock, PlanetParams, SlabGrid};
 use common::*;
 
 use crate::region::region::SlabContinuations;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use unit::world::{ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition};
 
 /// Rasterizable object that places blocks within a slab, possibly leaking over the edge into other
@@ -46,7 +47,12 @@ pub struct SlabNeighbour([i8; 3]);
 pub struct Rasterizer {
     // TODO reuse borrowed vec allocation
     this_slab: Vec<(SlabPosition, GeneratedBlock)>,
+
+    /// Set of neighbours touched by protruding blocks
     neighbours: ArrayVec<SlabNeighbour, 9>,
+
+    /// Blocks that protrude into other ALREADY LOADED neighbour slabs
+    other_blocks: Vec<(SlabNeighbour, WorldPosition, GeneratedBlock)>,
 
     slab: SlabLocation,
 }
@@ -57,18 +63,27 @@ impl Rasterizer {
             slab,
             this_slab: Vec::with_capacity(16),
             neighbours: ArrayVec::new(),
+            other_blocks: Vec::new(),
         }
     }
 
     pub fn place_block(&mut self, pos: WorldPosition, block: impl Into<GeneratedBlock>) {
+        let block = block.into();
         match resolve_slab(self.slab, pos) {
-            None => self.this_slab.push((SlabPosition::from(pos), block.into())),
+            None => self.this_slab.push((SlabPosition::from(pos), block)),
             Some(n) => {
                 if !self.neighbours.contains(&n) {
                     self.neighbours.push(n);
                 }
+                self.other_blocks.push((n, pos, block));
             }
         }
+    }
+
+    /// Don't expect any more calls to place_block
+    pub fn finish(&mut self) {
+        // sort by slab neighbour for efficient removal later
+        self.other_blocks.sort_unstable_by_key(|(n, _, _)| *n);
     }
 
     /// Call once
@@ -76,7 +91,20 @@ impl Rasterizer {
         std::mem::take(&mut self.this_slab).into_iter()
     }
 
-    pub fn touched_neighbours(&mut self) -> &[SlabNeighbour] {
+    /// Blocks are not removed from the underlying vec, to avoid reshuffling
+    pub fn protruding_blocks(
+        &self,
+        neighbour: SlabNeighbour,
+    ) -> impl Iterator<Item = (WorldPosition, GeneratedBlock)> + '_ {
+        // other_blocks expected to be sorted by slab neighbour
+        self.other_blocks
+            .iter()
+            .skip_while(move |(n, _, _)| *n != neighbour) // skip until start of contiguous region
+            .take_while(move |(n, _, _)| *n == neighbour) // take until end of region
+            .map(|(_, pos, block)| (*pos, *block))
+    }
+
+    pub fn touched_neighbours(&self) -> &[SlabNeighbour] {
         &self.neighbours
     }
 }
@@ -168,6 +196,7 @@ impl SharedSubfeature {
         terrain: &mut SlabGrid,
         continuations: Option<&mut SlabContinuations>,
         params: &PlanetParams,
+        protruding_blocks: &Arc<Mutex<Vec<(WorldPosition, GeneratedBlock)>>>,
     ) {
         debug!("rasterizing subfeature {}", if continuations.is_some() {"with propagation"} else {"in isolation"}; slab, &self);
         // TODO if continuations is None, set a flag to ignore boundary leaks
@@ -175,6 +204,7 @@ impl SharedSubfeature {
 
         // collect blocks from subfeature
         self.lock().await.rasterize(&mut rasterizer);
+        rasterizer.finish();
 
         // apply blocks within this slab
         let mut count = 0usize;
@@ -187,8 +217,7 @@ impl SharedSubfeature {
             trace!("placing block within slab"; slab, "pos" => ?pos.xyz(), "block" => ?block, &self);
         }
 
-        let mut self_guard = self.lock().await;
-        self_guard.register_applied_slab(slab);
+        self.lock().await.register_applied_slab(slab);
         debug!("placed {count} blocks within slab", count = count; &self);
 
         if let Some(continuations) = continuations {
@@ -201,23 +230,23 @@ impl SharedSubfeature {
 
             debug!("subfeature leaks into {count} neighbours", count = neighbours.len(); &self, "neighbours" => ?neighbours);
 
-            for neighbour in neighbours.iter() {
-                debug_assert_ne!(neighbour.0, [0, 0, 0]); // sanity check
+            for neighbour_offset in neighbours.iter() {
+                debug_assert_ne!(neighbour_offset.0, [0, 0, 0]); // sanity check
 
                 // find neighbour slab location
-                let neighbour = match neighbour.offset(slab) {
+                let neighbour = match neighbour_offset.offset(slab) {
                     Some(n) if params.is_chunk_in_range(n.chunk) => n,
                     _ => {
                         // TODO neighbour slab should wrap around the planet
-                        debug!("neighbour slab is out of range"; slab, "offset" => ?neighbour, &self);
+                        debug!("neighbour slab is out of range"; slab, "offset" => ?neighbour_offset, &self);
                         continue;
                     }
                 };
 
-                if self_guard.has_already_applied_to(neighbour) {
-                    // TODO this is never hit?
-                    debug!("skipping neighbour because subfeature has already been applied"; neighbour, &self);
-                    continue;
+                if cfg!(debug_assertions) {
+                    // shouldn't happen
+                    let self_guard = self.lock().await;
+                    assert!(!self_guard.has_already_applied_to(neighbour));
                 }
 
                 // add to neighbour's continuations
@@ -236,12 +265,16 @@ impl SharedSubfeature {
                         subfeatures.push(self.clone());
                     }
                     Loaded => {
-                        // TODO handle this by queueing block updates to the already loaded chunk
-                        warn!(
-                            "neighbour slab is already loaded when applying subfeature";
-                             "neighbour" => neighbour, &self,
+                        // push block updates to apply to already-loaded neighbour slab
+                        let block_updates = rasterizer.protruding_blocks(*neighbour_offset);
+                        let mut protruding_blocks = protruding_blocks.lock().await;
+                        let len_before = protruding_blocks.len();
+                        protruding_blocks.extend(block_updates);
+
+                        debug!(
+                            "neighbour slab is already loaded when applying subfeature, queueing {count} block updates",
+                            count = protruding_blocks.len() - len_before; "neighbour" => neighbour, &self,
                         );
-                        continue;
                     }
                 };
             }
@@ -270,12 +303,6 @@ impl Debug for SubfeatureInner {
             "Subfeature({:?}, completed={:?}, root={:?})",
             self.subfeature, self.completed, self.root
         )
-    }
-}
-
-impl Drop for SubfeatureInner {
-    fn drop(&mut self) {
-        debug!("goodbye from {:?}", self);
     }
 }
 

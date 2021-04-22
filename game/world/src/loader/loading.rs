@@ -235,7 +235,6 @@ impl<C: WorldContext> WorldLoader<C> {
 
     /// Note changes are made immediately to the terrain but are not immediate to the player,
     /// because navigation/occlusion/finalization is queued to the loader thread pool.
-    // noinspection RsUnresolvedReference - itertools' GroupBy confuses CLion
     pub fn apply_terrain_updates(
         &mut self,
         terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
@@ -270,7 +269,7 @@ impl<C: WorldContext> WorldLoader<C> {
             return;
         }
 
-        // group per slab to each slab is fetched and modified only once
+        // group per slab so each slab is fetched and modified only once
         let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
         let grouped_updates = grouped_updates
             .into_iter()
@@ -422,6 +421,11 @@ impl<C: WorldContext> WorldLoader<C> {
             .source
             .feature_boundaries_in_range(chunks, z_range, per_point);
         let _ = fut.now_or_never();
+    }
+
+    pub fn steal_queued_block_updates(&self, out: &mut Vec<WorldTerrainUpdate>) {
+        let fut = self.source.steal_queued_block_updates(out);
+        self.pool.runtime().block_on(fut)
     }
 }
 

@@ -215,8 +215,9 @@ impl<R: Renderer> Simulation<R> {
         world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
         drop(world);
 
-        // apply terrain changes
-        // TODO per tick alloc/reuse buf
+        // aggregate all terrain changes for this tick and apply them
+        self.world_loader
+            .steal_queued_block_updates(&mut self.terrain_changes);
         let terrain_updates = self
             .terrain_changes
             .drain(..)
