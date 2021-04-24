@@ -3,9 +3,10 @@ use common::num_traits::*;
 use crate::world::{
     BlockCoord, BlockPosition, LocalSliceIndex, SlabPosition, WorldPoint, WorldPosition,
 };
+use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
 
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, PartialOrd)]
 pub enum WorldRange<P: RangePosition> {
     /// Single block
     Single(P),
@@ -204,6 +205,30 @@ impl RangeNum for f32 {
     fn range_step() -> Self {
         // no difference between inclusive and exclusive ranges
         0.0
+    }
+}
+
+impl<P: RangePosition + Eq> Eq for WorldRange<P> {}
+impl<P: RangePosition + Hash> Hash for WorldRange<P> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            WorldRange::Single(a) => a.hash(state),
+            WorldRange::Range(a, b) => {
+                a.hash(state);
+                b.hash(state);
+            }
+        }
+    }
+}
+
+impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (WorldRange::Single(a0), WorldRange::Single(b0)) => a0 == b0,
+            (WorldRange::Range(a0, a1), WorldRange::Range(b0, b1)) => a0 == b0 && a1 == b1,
+            _ => false,
+        }
     }
 }
 

@@ -22,6 +22,7 @@ tokio = { version = "1.0", default-features = false, features = ["time", "rt", "
 
 [dev-dependencies]
 criterion = "0.3"
+num_cpus = "1.13"
 
 [[bench]]
 name = "terrain"

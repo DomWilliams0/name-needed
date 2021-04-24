@@ -1,6 +1,6 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{BlockType, GeneratedBlock, PlanetParams, SlabGrid};
+use crate::{GeneratedBlock, PlanetParams, SlabGrid};
 use common::*;
 
 use crate::region::region::SlabContinuations;

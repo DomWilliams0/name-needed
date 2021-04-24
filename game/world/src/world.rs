@@ -1080,7 +1080,7 @@ pub mod helpers {
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
-    fn timeout() -> Duration {
+    pub fn test_world_timeout() -> Duration {
         let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
             .ok()
             .and_then(|val| val.parse().ok())
@@ -1096,9 +1096,10 @@ pub mod helpers {
         let world = loader.world();
 
         let mut _updates = Vec::new();
-        loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
+        let mut updates = updates.iter().cloned().collect();
+        loader.apply_terrain_updates(&mut updates, &mut _updates);
 
-        loader.block_for_last_batch(timeout()).unwrap();
+        loader.block_for_last_batch(test_world_timeout()).unwrap();
 
         // apply occlusion updates
         let mut world = world.borrow_mut();
@@ -1123,7 +1124,7 @@ pub mod helpers {
 
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs(slabs_to_load.into_iter());
-        loader.block_for_last_batch(timeout()).unwrap();
+        loader.block_for_last_batch(test_world_timeout()).unwrap();
 
         // apply occlusion updates
         let world = loader.world();

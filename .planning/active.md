@@ -16,7 +16,7 @@
 	* [X] place blocks within root slab
 	* [X] place blocks across slab boundaries for unloaded neighbours
 	* [o] place blocks across slab boundaries for already loaded neighbours
-		* [ ] race condition - subfeature world updates are queued and applied, but a finalized LoadedSlab is prepared in the background and plops right over the top. applying updates should wait for a slab if its currently being finalized
+		* [X] race condition - subfeature world updates are queued and applied, but a finalized LoadedSlab is prepared in the background and plops right over the top. applying updates should wait for a slab if its currently being finalized
 * [X] remove redundant matches dependency
 * [X] bug: procgen world is vertically flipped ingame
 * [ ] remove unwraps in grid coord (un)flattening and handle properly
@@ -31,3 +31,4 @@
 	* [ ] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
 	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
 * [ ] update readme to suggest downloading release instead of building from scratch
+* [ ] investigate perf issue of thousands of occlusion updates for empty all-air chunks

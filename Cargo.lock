@@ -3084,6 +3084,7 @@ dependencies = [
  "futures",
  "grid",
  "nd_iter",
+ "num_cpus",
  "petgraph",
  "procgen",
  "tokio",

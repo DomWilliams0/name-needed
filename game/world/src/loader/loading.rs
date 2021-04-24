@@ -8,7 +8,7 @@ use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
 
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::worker_pool::LoadTerrainResult;
-use crate::world::WorldChangeEvent;
+use crate::world::{ContiguousChunkIterator, WorldChangeEvent};
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use crate::loader::terrain_source::BlockDetails;
@@ -17,6 +17,7 @@ use crate::loader::{
 };
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::FutureExt;
+use std::collections::HashSet;
 use std::iter::repeat;
 
 pub struct WorldLoader<C: WorldContext> {
@@ -237,31 +238,98 @@ impl<C: WorldContext> WorldLoader<C> {
     /// because navigation/occlusion/finalization is queued to the loader thread pool.
     pub fn apply_terrain_updates(
         &mut self,
-        terrain_updates: impl Iterator<Item = WorldTerrainUpdate>,
+        terrain_updates: &mut HashSet<WorldTerrainUpdate>,
         changes_out: &mut Vec<WorldChangeEvent>,
     ) {
         let world_ref = self.world.clone();
 
         let (slab_updates, upper_slab_limit) = {
-            // translate world -> slab updates
-            // TODO reuse vec alloc
+            // translate world -> slab updates, preserving original mapping
+            // TODO reuse vec allocs
             let mut slab_updates = terrain_updates
-                .flat_map(|world_update| world_update.into_slab_updates())
+                .iter()
+                .cloned()
+                .flat_map(|world_update| {
+                    world_update
+                        .clone()
+                        .into_slab_updates()
+                        .map(move |update| (world_update.clone(), update))
+                })
                 .collect_vec();
+            let mut slab_updates_to_keep = Vec::with_capacity(slab_updates.len());
 
             // sort then group by chunk and slab, so each slab is touched only once
-            slab_updates.sort_unstable_by(|(a, _), (b, _)| {
+            slab_updates.sort_unstable_by(|(_, (a, _)), (_, (b, _))| {
                 a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab))
             });
 
+            let world = world_ref.borrow();
+            let mut chunks_iter = ContiguousChunkIterator::new(&*world);
+            for (slab, updates) in &slab_updates.into_iter().group_by(|(_, (slab, _))| *slab) {
+                enum UpdateApplication {
+                    /// Pop updates from set and apply now
+                    Apply,
+                    /// Don't apply now, defer until another tick
+                    Defer,
+                    /// Don't apply ever, remove from set
+                    Drop,
+                }
+
+                let application = match chunks_iter.next(slab.chunk) {
+                    Some(chunk) => {
+                        if chunk.is_slab_loaded(slab.slab) {
+                            UpdateApplication::Apply
+                        } else {
+                            UpdateApplication::Defer
+                        }
+                    }
+                    None => UpdateApplication::Drop,
+                };
+
+                match application {
+                    UpdateApplication::Apply => {
+                        // updates to be applied now
+                        slab_updates_to_keep.extend(updates.into_iter().map(
+                            |(original, update)| {
+                                // remove from update set
+                                terrain_updates.remove(&original);
+
+                                // remove now unnecessary original mapping from update
+                                update
+                            },
+                        ));
+                    }
+
+                    UpdateApplication::Defer => {
+                        if cfg!(debug_assertions) {
+                            let count = updates.count();
+                            trace!("deferring {count} terrain updates for slab because it's currently loading", count = count; slab.chunk);
+                        } else {
+                            // avoid consuming expensive iterator when not logging
+                            trace!("deferring terrain updates for slab because it's currently loading"; slab.chunk);
+                        };
+                    }
+                    UpdateApplication::Drop => {
+                        // remove from update set
+                        let mut count = 0;
+                        for (orig, _) in updates.dedup_by(|(a, _), (b, _)| *a == *b) {
+                            terrain_updates.remove(&orig);
+                            count += 1;
+                        }
+
+                        debug!("dropping {count} terrain updates for chunk because it's not loaded", count = count; slab.chunk);
+                    }
+                };
+            }
+
             // count slabs for vec allocation, upper limit because some might be filtered out.
             // no allocations in dedup because vec is sorted
-            let upper_slab_limit = slab_updates
+            let upper_slab_limit = slab_updates_to_keep
                 .iter()
                 .dedup_by(|(a, _), (b, _)| a == b)
                 .count();
 
-            (slab_updates, upper_slab_limit)
+            (slab_updates_to_keep, upper_slab_limit)
         };
 
         if upper_slab_limit == 0 {
@@ -423,7 +491,7 @@ impl<C: WorldContext> WorldLoader<C> {
         let _ = fut.now_or_never();
     }
 
-    pub fn steal_queued_block_updates(&self, out: &mut Vec<WorldTerrainUpdate>) {
+    pub fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
         let fut = self.source.steal_queued_block_updates(out);
         self.pool.runtime().block_on(fut)
     }
@@ -434,14 +502,21 @@ mod tests {
 
     use std::time::Duration;
 
-    use unit::world::CHUNK_SIZE;
+    use unit::world::{
+        all_slabs_in_range, ChunkLocation, RangePosition, SlabPosition, WorldPosition,
+        WorldPositionRange, CHUNK_SIZE,
+    };
 
     use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
+    use crate::helpers::test_world_timeout;
     use crate::loader::loading::WorldLoader;
     use crate::loader::terrain_source::MemoryTerrainSource;
-    use crate::loader::AsyncWorkerPool;
+    use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
     use crate::world::helpers::DummyWorldContext;
+    use crate::BaseTerrain;
+    use common::{Itertools, Rng, SeedableRng, SliceRandom, SmallRng};
+    use std::collections::{HashMap, HashSet};
     use unit::world::SlabLocation;
 
     #[test]
@@ -465,5 +540,189 @@ mod tests {
         assert_eq!(finalized.unwrap().unwrap(), SlabLocation::new(1, (0, 0)));
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);
+    }
+
+    #[test]
+    #[ignore]
+    /// Ensure block updates are applied as expected when stressed. Came out of debugging a race
+    /// condition when applying terrain updates while a chunk is being finalized, but didn't actually
+    /// help to reproduce it! Keeping it around as a regression test anyway
+    fn block_updates_sanity_check() {
+        const WORLD_SIZE: i32 = 8;
+        const UPDATE_COUNT: usize = 1000;
+        const BATCH_SIZE_RANGE: (usize, usize) = (5, 200);
+        const Z_RANGE: i32 = 8;
+
+        // common::logging::for_tests();
+        let source = {
+            let chunks = (-WORLD_SIZE..WORLD_SIZE)
+                .cartesian_product(-WORLD_SIZE..WORLD_SIZE)
+                .map(|pos| (pos, ChunkBuilder::new().into_inner()));
+            MemoryTerrainSource::from_chunks(chunks).unwrap()
+        };
+
+        let slabs_to_load = all_slabs_in_range(
+            SlabLocation::new(-Z_RANGE, (-WORLD_SIZE, -WORLD_SIZE)),
+            SlabLocation::new(Z_RANGE, (WORLD_SIZE, WORLD_SIZE)),
+        ).0.collect_vec();
+
+        let mut loader =
+            WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new(num_cpus::get()).unwrap());
+
+        // create block updates before requesting slabs so there's no wait
+        let mut rando = SmallRng::from_entropy();
+        let blocks_to_set = {
+            let block_types = vec![BlockType::Stone, BlockType::Dirt];
+
+            // set each block once only
+            (0..UPDATE_COUNT)
+                .map(|_| {
+                    const XY_RANGE: i32 = WORLD_SIZE * CHUNK_SIZE.as_i32();
+                    let x = rando.gen_range(-XY_RANGE, XY_RANGE);
+                    let y = rando.gen_range(-XY_RANGE, XY_RANGE);
+                    let z = rando.gen_range(-Z_RANGE, Z_RANGE);
+                    let pos = WorldPosition::new((x, y, z));
+                    let block_type = block_types.choose(&mut rando).unwrap().to_owned();
+
+                    (pos, block_type)
+                })
+                .collect::<HashMap<_, _>>()
+        };
+        // prepare update batches
+        let mut update_batches = {
+            let mut all = blocks_to_set
+                .iter()
+                .map(|(pos, block)| {
+                    WorldTerrainUpdate::new(WorldPositionRange::with_single(*pos), *block)
+                })
+                .collect_vec();
+            // could do this without so many allocs but it doesn't matter
+
+            let mut batches = vec![];
+            while !all.is_empty() {
+                let (min, max) = BATCH_SIZE_RANGE;
+                let n = rando.gen_range(min, max).min(all.len());
+                let batch = all.drain(0..n).collect::<HashSet<_>>();
+                batches.push(batch);
+            }
+
+            batches
+        };
+        let mut _changes = Vec::with_capacity(blocks_to_set.len());
+
+        // TODO WRONG
+        // kick off world loading asynchronously - request slabs but dont wait for them to load. then
+        // request tons of updates in batches at the same time
+
+        loader.request_slabs(slabs_to_load.into_iter());
+        assert!(
+            loader.block_for_last_batch(test_world_timeout()).is_ok(),
+            "timed out waiting for initial world finalization"
+        );
+
+        while !update_batches.is_empty() {
+            let mut batch = update_batches.pop().unwrap(); // not empty
+            let log_str = batch.iter().map(|x| format!("{:?}", x)).join("\n"); // gross
+            common::trace!(
+                "test: requesting batch of {} updates {}",
+                batch.len(),
+                log_str
+            );
+            loader.apply_terrain_updates(&mut batch, &mut _changes);
+            if !batch.is_empty() {
+                // push to back of "queue"
+                update_batches.insert(0, batch);
+            }
+
+        }
+
+        // wait for everything to settle down
+        let timeout = test_world_timeout();
+        loop {
+            common::info!(
+                "test: waiting {:?} for world to settle down",
+                timeout.min(Duration::from_secs(10))
+            );
+            let _ = loader.block_for_last_batch(timeout); // idk block longer
+            if loader
+                .block_on_next_finalization(timeout, &|| false)
+                .is_none()
+            {
+                // timed out
+                break;
+            }
+
+            // consume updates to keep memory down
+            loader.iter_occlusion_updates(|_| {});
+        }
+
+        let world = loader.world();
+        let world = world.borrow();
+
+        // collect all non air blocks in the world
+        let set_blocks = {
+            let mut actual_blocks = vec![];
+            let mut chunk_blocks = vec![];
+            for chunk in world.all_chunks() {
+                let blocks = chunk.blocks(&mut chunk_blocks);
+                for (block_pos, block) in blocks.drain(..) {
+                    let block_type = block.block_type();
+
+                    if !matches!(block_type, BlockType::Air) {
+                        let world_pos = block_pos.to_world_position(chunk.pos());
+                        actual_blocks.push((world_pos, block_type));
+                    }
+                }
+            }
+
+            actual_blocks
+        };
+
+        fn log_block(pos: WorldPosition) {
+            let slab = SlabLocation::new(pos.slice(), ChunkLocation::from(pos));
+            let block = SlabPosition::from(pos);
+            eprintln!("test: btw {} is {:?} in slab {}", pos, block, slab);
+        }
+
+        // ensure the only non-air blocks are the ones we set
+        for (pos, ty) in set_blocks {
+            log_block(pos);
+            match blocks_to_set.get(&pos) {
+                None => panic!(
+                    "unexpected block set at {:?}, should be air but is {:?}",
+                    pos, ty
+                ),
+                Some(expected_ty) => {
+                    assert_eq!(
+                        *expected_ty, ty,
+                        "block at {:?} should be {:?} but is actually {:?}",
+                        pos, expected_ty, ty
+                    );
+                }
+            }
+        }
+
+        // ensure all the blocks we set are non-air
+        for (pos, expected_ty) in blocks_to_set.iter() {
+            log_block(*pos);
+            match world.block(*pos) {
+                None => panic!("expected block {:?} does not exist", pos),
+                Some(b) => {
+                    let ty = b.block_type();
+                    if let BlockType::Air = ty {
+                        panic!(
+                            "block at {:?} is unset but should been set to {:?}",
+                            pos, ty
+                        );
+                    } else {
+                        assert_eq!(
+                            *expected_ty, ty,
+                            "block at {:?} should have been set to {:?} but is actually {:?}",
+                            pos, expected_ty, ty
+                        );
+                    }
+                }
+            }
+        }
     }
 }

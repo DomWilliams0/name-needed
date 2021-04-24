@@ -15,7 +15,7 @@ use crate::rasterize::SlabGrid;
 use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation, SlabContinuation};
 use crate::region::{Region, Regions};
 
-use crate::{BlockType, GeneratedBlock};
+use crate::GeneratedBlock;
 use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads

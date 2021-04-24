@@ -127,7 +127,7 @@ impl TerrainSource {
         }
     }
 
-    pub async fn steal_queued_block_updates(&self, out: &mut Vec<WorldTerrainUpdate>) {
+    pub async fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
         match self {
             TerrainSource::Memory(_) => {}
             TerrainSource::Generated(planet) => {
@@ -162,9 +162,9 @@ use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
-use crate::block::BlockType;
 use crate::loader::WorldTerrainUpdate;
 use procgen::{BiomeType, RegionLocation};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(test)]
