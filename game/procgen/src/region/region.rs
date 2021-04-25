@@ -11,7 +11,7 @@ pub use ::unit::world::{
 };
 use common::*;
 use grid::{grid_declare, GridImpl};
-use unit::world::{BlockPosition, SlabLocation};
+use unit::world::{BlockPosition, SlabLocation, SlabPosition};
 
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
@@ -21,7 +21,9 @@ use crate::region::features::ForestFeature;
 use crate::region::row_scanning::RegionNeighbour;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
-use crate::{map_range, region::unit::RegionLocation, SlabGrid};
+use crate::{
+    map_range, region::unit::RegionLocation, SlabGrid, SlabPositionAsCoord, SliceBlockAsCoord,
+};
 
 use crate::params::PlanetParamsRef;
 
@@ -518,7 +520,7 @@ impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
                         let chunk = unsafe { row_of_chunks.get_unchecked(cx) };
 
                         let i = (by * CHUNK_SIZE.as_usize()) + bx;
-                        &chunk.desc.ground_height[i]
+                        chunk.desc.ground_height.index(i).unwrap() // index is definitely valid
                     })
             })
     }
@@ -578,7 +580,8 @@ impl<const SIZE: usize> RegionChunk<SIZE> {
                     map_range((0.0, 1.0), height_range, base_elevation as f32) as i32
                 );
 
-            height_map[i] = BlockHeight {
+            let block = height_map.index_mut(i).unwrap(); // index is certainly valid
+            *block = BlockHeight {
                 ground,
                 biome: biome.ty(),
             };
@@ -630,11 +633,13 @@ impl ChunkDescription {
                 &mut slab.array_mut()[from..to]
             };
 
-            for (i, (y, x)) in (0..CHUNK_SIZE.as_i32())
-                .cartesian_product(0..CHUNK_SIZE.as_i32())
+            for (i, (y, x)) in (0..CHUNK_SIZE.as_u8())
+                .cartesian_product(0..CHUNK_SIZE.as_u8())
                 .enumerate()
             {
-                let BlockHeight { ground, biome } = self.ground_height[&[x, y, 0]];
+                let pos = SlabPosition::new_unchecked(x, y, 0.into());
+                let BlockHeight { ground, biome } =
+                    *self.ground_height.get_unchecked(SlabPositionAsCoord(pos));
 
                 // TODO calculate these better, and store them in data
                 use BlockType::*;
@@ -666,8 +671,7 @@ impl ChunkDescription {
     }
 
     pub fn block(&self, block: SliceBlock) -> &BlockHeight {
-        let SliceBlock(x, y) = block;
-        &self.ground_height[&[x as i32, y as i32, 0]]
+        self.ground_height.get_unchecked(SliceBlockAsCoord(block))
     }
 
     /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
@@ -709,7 +713,6 @@ mod tests {
 
     use crate::continent::ContinentMap;
     use crate::params::PlanetParamsRef;
-    use crate::region::feature::RegionalFeatureBoundary;
     use crate::region::region::{Region, Regions};
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;

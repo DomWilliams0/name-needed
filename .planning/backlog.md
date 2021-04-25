@@ -166,7 +166,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * tag pre-alpha commits in develop, and generate changelog in release notes
 
 ## Code quality
-* track down unwraps/expects and replace with results
+* track down unwraps/expects/`as` casts and replace with results
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
 * error context chaining would be VERY useful for fatal errors

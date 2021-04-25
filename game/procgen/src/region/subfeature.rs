@@ -1,9 +1,10 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid};
+use crate::{GeneratedBlock, PlanetParams, SlabGrid, SlabPositionAsCoord};
 use common::*;
 
 use crate::region::region::SlabContinuations;
+use grid::GridImpl;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -209,9 +210,7 @@ impl SharedSubfeature {
         // apply blocks within this slab
         let mut count = 0usize;
         for (pos, block) in rasterizer.internal_blocks() {
-            let (x, y, z) = pos.xyz();
-            let coord = [x as i32, y as i32, z];
-            terrain[coord] = block;
+            *terrain.get_unchecked_mut(SlabPositionAsCoord(pos)) = block;
 
             count += 1;
             trace!("placing block within slab"; slab, "pos" => ?pos.xyz(), "block" => ?block, &self);

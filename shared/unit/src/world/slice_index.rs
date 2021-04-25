@@ -50,8 +50,9 @@ impl<S: SliceIndexScale> SliceIndex<S> {
     }
 
     pub fn new(slice: i32) -> Self {
-        debug_assert!(slice >= S::MIN, "slice {} is invalid for its scale", slice);
-        debug_assert!(slice <= S::MAX, "slice {} is invalid for its scale", slice);
+        // TODO return option and have unchecked version
+        assert!(slice >= S::MIN, "slice {} is invalid for its scale", slice);
+        assert!(slice <= S::MAX, "slice {} is invalid for its scale", slice);
 
         Self(slice, PhantomData)
     }

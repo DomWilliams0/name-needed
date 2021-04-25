@@ -9,12 +9,14 @@ use tokio::time::Duration;
 use color::ColorRgb;
 use common::num_traits::clamp;
 use common::*;
-use grid::DynamicGrid;
-use unit::world::{ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
+use grid::{DynamicGrid, GridImpl};
+use unit::world::{
+    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, SliceBlock, CHUNK_SIZE, SLAB_SIZE,
+};
 
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
 use crate::region::{PlanetPoint, RegionLocation, CHUNKS_PER_REGION_SIDE};
-use crate::{map_range, Planet};
+use crate::{map_range, Planet, SlabPositionAsCoord};
 
 #[derive(Clone)]
 pub struct Render {
@@ -311,10 +313,11 @@ impl Render {
                 let generated = self.planet.generate_slab(slab).await.ok_or(slab)?;
 
                 // copy highest non-air blocks to image
-                for y in 0..CHUNK_SIZE.as_usize() {
-                    for x in 0..CHUNK_SIZE.as_usize() {
-                        for z in (0..SLAB_SIZE.as_usize()).rev() {
-                            let block = generated[&[x as i32, y as i32, z as i32]];
+                for y in 0..CHUNK_SIZE.as_block_coord() {
+                    for x in 0..CHUNK_SIZE.as_block_coord() {
+                        for z in (0..SLAB_SIZE.as_i32()).rev() {
+                            let pos = SlabPosition::new(x, y, LocalSliceIndex::new(z));
+                            let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;
                             }
@@ -322,7 +325,7 @@ impl Render {
                             // aha, solid block. store global z (possibly negative) to scale to
                             // range later and make positive
                             let z = (slab_z * SLAB_SIZE.as_i32()) + z as i32;
-                            visible_blocks[[x, y, 0]] = Some((z, block.ty));
+                            visible_blocks[[x as usize, y as usize, 0]] = Some((z, block.ty));
                             max_height = max_height.max(z);
                             min_height = min_height.min(z);
                             break;

@@ -12,17 +12,19 @@
 	* [X] initial tree placement can be invalid
 	* [~] doesn't work across some chunk boundaries - multiple forest instances?
 		* region loading must be adjacent
-* [o] tree sub feature block placement
+* [X] tree sub feature block placement
 	* [X] place blocks within root slab
 	* [X] place blocks across slab boundaries for unloaded neighbours
-	* [o] place blocks across slab boundaries for already loaded neighbours
+	* [X] place blocks across slab boundaries for already loaded neighbours
 		* [X] race condition - subfeature world updates are queued and applied, but a finalized LoadedSlab is prepared in the background and plops right over the top. applying updates should wait for a slab if its currently being finalized
 * [X] remove redundant matches dependency
 * [X] bug: procgen world is vertically flipped ingame
-* [ ] remove unwraps in grid coord (un)flattening and handle properly
+* [X] remove unwraps in grid coord (un)flattening and handle properly
+* [ ] overhaul world unit types to hide internals, have a constructor that returns option, and an unchecked version
 * [X] bug: deadlock loading terrain
 * [X] bug: crashes on assert that feature boundary intersects with a slab boundary on panning upwards on test seed
-* [ ] consider caching region/features in planet cache
+* [~] consider caching region/features in planet cache
+	* no - features depend on the order of discovered region chunks
 * [X] feature polygon debug renderer should cache outlines when mutex can not be taken
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
 * [ ] bug: panic "chunk should be present" when zoom=10.0

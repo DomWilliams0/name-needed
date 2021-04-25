@@ -313,7 +313,7 @@ mod tests {
         let idx = (2 * CHUNK_SIZE.as_usize()) + 5;
         let (rows, overflow) = do_scan(|chunks| {
             // a few in a row
-            (**chunks[0].biomes_mut())[idx..idx + 4]
+            (*chunks[0].biomes_mut())[idx..idx + 4]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
