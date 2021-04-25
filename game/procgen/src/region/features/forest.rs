@@ -82,7 +82,9 @@ impl Feature for ForestFeature {
                 // attempt to place tree
                 let tree = {
                     let height = tree_rando.gen_range(5, 8);
-                    Tree::new(height)
+                    let w = tree_rando.gen_range(2, 4);
+                    let h = tree_rando.gen_range(2, 4);
+                    Tree::new(height, (w, h))
                 };
                 ctx.queue_subfeature(tree, tree_base);
                 true

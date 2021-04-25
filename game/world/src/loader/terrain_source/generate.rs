@@ -67,6 +67,8 @@ impl From<&procgen::GeneratedBlock> for BlockType {
             A::LightGrass => B::LightGrass,
             A::Sand => B::Sand,
             A::SolidWater => B::SolidWater,
+            A::Leaves => B::Leaves,
+            A::TreeTrunk => B::TreeTrunk,
         }
     }
 }

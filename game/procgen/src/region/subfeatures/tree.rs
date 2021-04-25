@@ -7,6 +7,7 @@ use common::Itertools;
 #[derive(Debug)]
 pub struct Tree {
     height: u8,
+    canopy_size: (u8, u8),
 }
 
 impl Subfeature for Tree {
@@ -16,20 +17,25 @@ impl Subfeature for Tree {
         for y in 0..self.height as i32 {
             let mut trunk = root;
             trunk.2 += y; // ignore z overflow
-            rasterizer.place_block(trunk, BlockType::SolidWater);
+            rasterizer.place_block(trunk, BlockType::TreeTrunk);
         }
 
         // "canopy"
-        for (x, y) in (-2..3).cartesian_product(-2..3) {
+        let (w, h) = self.canopy_size;
+        let (w, h) = (w as i32, h as i32);
+        for (x, y) in (-w..w).cartesian_product(-h..h) {
             let pos = root + (x, y, self.height as i32);
-            rasterizer.place_block(pos, BlockType::LightGrass);
+            rasterizer.place_block(pos, BlockType::Leaves);
         }
     }
 }
 
 impl Tree {
-    pub fn new(height: u8) -> Self {
+    pub fn new(height: u8, canopy_size: (u8, u8)) -> Self {
         // TODO tree configuration based on its planet location - branch count, leaf spread, etc
-        Self { height }
+        Self {
+            height,
+            canopy_size,
+        }
     }
 }

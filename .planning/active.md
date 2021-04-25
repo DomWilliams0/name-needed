@@ -32,3 +32,6 @@
 	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
 * [ ] update readme to suggest downloading release instead of building from scratch
 * [ ] investigate perf issue of thousands of occlusion updates for empty all-air chunks
+* [ ] bug: if there's no path to a society job, they get stuck for ages constantly trying to nagivate
+* [ ] bug: entities glitch up through tree trunks and get stuck at the top when wandering past
+* [ ] bug: occlusion shadows cast by blocks above current viewing slice look weird

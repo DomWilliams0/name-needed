@@ -1,4 +1,4 @@
-# TODOs (308)
+# TODOs (310)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -286,10 +286,12 @@
    * `// TODO cache allocation in system`
  * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (1)
    * `// TODO use newtype units for ingame non-SI units`
- * [game/world/src/block.rs](game/world/src/block.rs) (3)
+ * [game/world/src/block.rs](game/world/src/block.rs) (5)
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
+   * `// TODO define these in data`
+   * `/// TODO very temporary "walkability" for block types`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)

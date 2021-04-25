@@ -33,6 +33,9 @@ pub enum BlockType {
     Grass,
     #[display(fmt = "Light grass")]
     LightGrass,
+    Leaves,
+    #[display(fmt = "Tree trunk")]
+    TreeTrunk,
     Stone,
     Sand,
     #[display(fmt = "Solid water")]
@@ -141,6 +144,7 @@ impl Default for Block {
     }
 }
 
+// TODO define these in data
 impl BlockType {
     pub fn color(self) -> ColorRgb {
         match self {
@@ -148,6 +152,8 @@ impl BlockType {
             BlockType::Dirt => ColorRgb::new(86, 38, 23),
             BlockType::Grass => ColorRgb::new(49, 152, 56),
             BlockType::LightGrass => ColorRgb::new(91, 152, 51),
+            BlockType::Leaves => ColorRgb::new(49, 132, 2),
+            BlockType::TreeTrunk => ColorRgb::new(79, 52, 16),
             BlockType::Stone => ColorRgb::new(106, 106, 117),
             BlockType::Sand => 0xBCA748FF.into(),
             BlockType::SolidWater => 0x3374BCFF.into(),
@@ -167,8 +173,10 @@ impl BlockType {
         use BlockType::*;
         let max = match self {
             Air => 0,
+            Leaves => 10,
             Sand => 30,
             Dirt | Grass | LightGrass => 40,
+            TreeTrunk => 70,
             Stone => 90,
             Chest => 60,
             SolidWater => u8::MAX,
