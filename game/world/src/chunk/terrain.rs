@@ -631,11 +631,17 @@ impl RawChunkTerrain {
     ) -> Option<BlockPosition> {
         let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
         let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
+
+        // -1 because iterating in windows of 2
+        let end_at = GlobalSliceIndex::new(end_at.slice().saturating_sub(1));
         self.slices_from_top_offset()
             .skip_while(|(s, _)| *s > start_from)
             .take_while(|(s, _)| *s >= end_at)
-            .find(|(_, slice)| slice[pos].walkable())
-            .map(|(z, _)| pos.to_block_position(z))
+            .tuple_windows()
+            .find(|((_, above), (_, below))| {
+                above[pos].walkable() && below[pos].block_type().can_be_walked_on()
+            })
+            .map(|((z, _), _)| pos.to_block_position(z))
     }
 
     // TODO set_block trait to reuse in ChunkBuilder (#46)

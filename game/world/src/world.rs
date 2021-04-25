@@ -1233,6 +1233,26 @@ mod tests {
     }
 
     #[test]
+    fn accessible_block_unwalkable_types() {
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_slice(6, BlockType::Leaves) // full of unwalkable block
+            .set_block((4, 4, 6), BlockType::Grass) // single block of sanctuary
+            .build((0, 0))])
+        .into_inner();
+
+        //
+        assert_eq!(
+            w.find_accessible_block_in_column(4, 4),
+            Some((4, 4, 7).into())
+        );
+
+        // all leaves
+        assert!(w.find_accessible_block_in_column(3, 3).is_none());
+        assert!(w.find_accessible_block_in_column(4, 3).is_none());
+        assert!(w.find_accessible_block_in_column(0, 0).is_none());
+    }
+
+    #[test]
     fn world_path_within_area() {
         let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_slice(2, BlockType::Stone)

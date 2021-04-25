@@ -184,6 +184,12 @@ impl BlockType {
 
         Proportion::with_value(max, max)
     }
+
+    /// TODO very temporary "walkability" for block types
+    pub fn can_be_walked_on(self) -> bool {
+        use BlockType::*;
+        !matches!(self, Leaves | SolidWater)
+    }
 }
 
 /// Helper

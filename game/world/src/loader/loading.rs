@@ -564,10 +564,14 @@ mod tests {
         let slabs_to_load = all_slabs_in_range(
             SlabLocation::new(-Z_RANGE, (-WORLD_SIZE, -WORLD_SIZE)),
             SlabLocation::new(Z_RANGE, (WORLD_SIZE, WORLD_SIZE)),
-        ).0.collect_vec();
+        )
+        .0
+        .collect_vec();
 
-        let mut loader =
-            WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new(num_cpus::get()).unwrap());
+        let mut loader = WorldLoader::<DummyWorldContext>::new(
+            source,
+            AsyncWorkerPool::new(num_cpus::get()).unwrap(),
+        );
 
         // create block updates before requesting slabs so there's no wait
         let mut rando = SmallRng::from_entropy();
@@ -633,7 +637,6 @@ mod tests {
                 // push to back of "queue"
                 update_batches.insert(0, batch);
             }
-
         }
 
         // wait for everything to settle down
