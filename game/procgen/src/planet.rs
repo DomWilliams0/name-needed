@@ -12,8 +12,10 @@ use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParamsRef;
 use crate::rasterize::SlabGrid;
-use crate::region::{ApplyFeatureContext, PlanetPoint, RegionLocation, SlabContinuation};
-use crate::region::{Region, Regions};
+use crate::region::Regions;
+use crate::region::{
+    ApplyFeatureContext, LoadedRegionRef, PlanetPoint, RegionLocation, SlabContinuation,
+};
 
 use crate::GeneratedBlock;
 use geo::{Coordinate, Rect};
@@ -158,7 +160,7 @@ impl Planet {
     }
 
     pub async fn realize_region(&self, region: RegionLocation) {
-        let mut inner = self.0.write().await;
+        let inner = self.0.read().await;
         inner.get_or_create_region(region).await;
     }
 
@@ -176,7 +178,7 @@ impl Planet {
 
     /// Generates now and does not cache. Returns None if slab is out of range
     pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
-        let mut inner = self.0.write().await;
+        let inner = self.0.read().await;
         let params = inner.params.clone();
         let slab_continuations = inner.regions.slab_continuations();
         let world_updates = inner.world_updates.clone();
@@ -235,6 +237,10 @@ impl Planet {
         let params = ctx.params.clone();
         drop(ctx);
 
+        // release lock on regions
+        drop(region);
+        drop(inner);
+
         // wait for all subfeatures to be rasterized
         let mut terrain = task.await.expect("future panicked");
 
@@ -252,7 +258,7 @@ impl Planet {
     }
 
     pub async fn find_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
-        let mut inner = self.0.write().await;
+        let inner = self.0.read().await;
 
         let chunk_loc = ChunkLocation::from(block);
         let region_loc = RegionLocation::try_from_chunk_with_params(chunk_loc, &inner.params)?;
@@ -293,23 +299,25 @@ impl Planet {
         let region = {
             let chunk = ChunkLocation::from(block);
             let region = RegionLocation::try_from_chunk(chunk);
-            region
-                .and_then(|loc| inner.regions.get_existing(loc).map(|r| (loc, r)))
-                .map(|(loc, region)| {
-                    let slab = SlabLocation::new(SlabIndex::from(block.slice()), chunk);
-                    let slab_bounds = slab_bounds(slab);
-                    let features = region
-                        .features_for_slab(slab, &slab_bounds)
-                        .filter_map(move |feature| {
-                            if feature.applies_to_block(block) {
-                                Some(format!("{}", feature.display()))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    (loc, features)
-                })
+            let region = match region {
+                Some(loc) => inner.regions.get_existing(loc).await.map(|r| (loc, r)),
+                None => None,
+            };
+            region.map(|(loc, region)| {
+                let slab = SlabLocation::new(SlabIndex::from(block.slice()), chunk);
+                let slab_bounds = slab_bounds(slab);
+                let features = region
+                    .features_for_slab(slab, &slab_bounds)
+                    .filter_map(move |feature| {
+                        if feature.applies_to_block(block) {
+                            Some(format!("{}", feature.display()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                (loc, features)
+            })
         };
 
         Some(BlockQueryResult {
@@ -338,7 +346,7 @@ impl Planet {
             .sorted_unstable() // allocation, gross
             .dedup()
         {
-            if let Some(region) = inner.regions.get_existing(region) {
+            if let Some(region) = inner.regions.get_existing(region).await {
                 for feature in region.all_features() {
                     let unique = feature.unique_id();
                     feature.bounding_points(z_range, |point| {
@@ -360,10 +368,8 @@ impl Planet {
 }
 
 impl PlanetInner {
-    async fn get_or_create_region(&mut self, region: RegionLocation) -> Option<&Region> {
-        // safety: regions and continents fields don't alias or reference each other
-        let continents: &ContinentMap = unsafe { std::mem::transmute(&self.continents) };
-        self.regions.get_or_create(region, continents).await
+    async fn get_or_create_region(&self, region: RegionLocation) -> Option<LoadedRegionRef<'_>> {
+        self.regions.get_or_create(region, &self.continents).await
     }
 }
 

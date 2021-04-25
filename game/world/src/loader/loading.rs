@@ -614,10 +614,7 @@ mod tests {
         };
         let mut _changes = Vec::with_capacity(blocks_to_set.len());
 
-        // TODO WRONG
-        // kick off world loading asynchronously - request slabs but dont wait for them to load. then
-        // request tons of updates in batches at the same time
-
+        // load all slabs and wait for them to be present, otherwise the terrain updates are dropped
         loader.request_slabs(slabs_to_load.into_iter());
         assert!(
             loader.block_for_last_batch(test_world_timeout()).is_ok(),

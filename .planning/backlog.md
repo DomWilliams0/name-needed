@@ -129,6 +129,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * investigate invalidating a slab queued for finalization if terrain updates are applied to it, to avoid doing tons of extra work for nothing. some degree of redundant work is ok though, so the terrain never noticably lags behind player updates and catches up suddenly when all changes are applied together
+* could use multiple finalizer tasks/threads
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged
 * biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage

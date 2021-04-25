@@ -16,7 +16,7 @@ rand_distr = { version = "0.3" }
 strum = "0.19"
 strum_macros = "0.19"
 tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
-futures = { version = "0.3", default-features = false, features = ["std", "alloc"] }
+futures = { version = "0.3", default-features = false, features = ["std", "alloc", "async-await"] }
 geo = "0.16"
 geo-booleanop = "0.3"
 rstar = "0.8"

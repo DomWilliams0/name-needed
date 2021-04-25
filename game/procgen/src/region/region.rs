@@ -1,9 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
+use geo::prelude::HasDimensions;
 use geo::{Point, Rect};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 
 pub use ::unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex,
@@ -15,29 +16,18 @@ use unit::world::{BlockPosition, SlabLocation, SlabPosition};
 
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
+use crate::params::PlanetParamsRef;
 use crate::rasterize::BlockType;
 use crate::region::feature::{FeatureZRange, RegionalFeatureBoundary, SharedRegionalFeature};
 use crate::region::features::ForestFeature;
+use crate::region::regions::Regions;
 use crate::region::row_scanning::RegionNeighbour;
+use crate::region::subfeature::SlabContinuation;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
 use crate::{
     map_range, region::unit::RegionLocation, SlabGrid, SlabPositionAsCoord, SliceBlockAsCoord,
 };
-
-use crate::params::PlanetParamsRef;
-
-use crate::region::subfeature::SlabContinuation;
-use geo::prelude::HasDimensions;
-
-pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
-    params: PlanetParamsRef,
-    regions: Vec<(RegionLocation<SIZE>, Region<SIZE, SIZE_2>)>,
-
-    loaded_regions: LoadedRegions<SIZE>,
-    region_continuations: RegionContinuations<SIZE>,
-    slab_continuations: SlabContinuations,
-}
 
 /// Each pixel in the continent map is a region. Each region is a 2d grid of chunks.
 ///
@@ -73,23 +63,23 @@ pub struct ChunkDescription {
     ground_height: ChunkHeightMap,
 }
 
-type LoadedRegions<const SIZE: usize> = Arc<RwLock<HashSet<RegionLocation<SIZE>>>>;
-type RegionContinuations<const SIZE: usize> =
-    Arc<Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>>;
 pub(super) type SlabContinuations = Arc<Mutex<HashMap<SlabLocation, SlabContinuation>>>;
 
 /// Info about features/generation from neighbouring regions that is to be carried over the
 /// boundary
 #[derive(Default, Debug)]
-struct RegionContinuation<const SIZE: usize> {
+pub(in crate::region) struct RegionContinuation<const SIZE: usize> {
     /// (direction of neighbour from this region, feature)
     features: Vec<(RegionNeighbour, SharedRegionalFeature)>,
 }
 
-struct RegionalFeatureReplacement<const SIZE: usize> {
-    region: RegionLocation<SIZE>,
-    current: SharedRegionalFeature,
-    new: SharedRegionalFeature,
+pub(in crate::region) type RegionContinuations<const SIZE: usize> =
+    Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>;
+
+pub(in crate::region) struct RegionalFeatureReplacement<const SIZE: usize> {
+    pub region: RegionLocation<SIZE>,
+    pub current: SharedRegionalFeature,
+    pub new: SharedRegionalFeature,
 }
 type RegionalFeatureReplacements<const SIZE: usize> =
     SmallVec<[RegionalFeatureReplacement<SIZE>; 4]>;
@@ -119,99 +109,12 @@ impl Default for BlockHeight {
     }
 }
 
-impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
-    pub fn new(params: PlanetParamsRef) -> Self {
-        Regions {
-            params,
-            regions: Vec::with_capacity(64),
-            region_continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
-            loaded_regions: Arc::new(RwLock::new(HashSet::with_capacity(128))),
-            slab_continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
-        }
-    }
-
-    pub async fn get_or_create(
-        &mut self,
-        location: RegionLocation<SIZE>,
-        continents: &ContinentMap,
-    ) -> Option<&Region<SIZE, SIZE_2>> {
-        let ret = Some(match self.region_index(location)? {
-            Ok(idx) => &self.regions[idx].1,
-            Err(idx) => {
-                debug!("creating new region"; "region" => ?location);
-
-                let (region, feature_updates) = Region::create(
-                    location,
-                    continents,
-                    self.region_continuations.clone(), // wrapper around Arc
-                    self.loaded_regions.clone(),
-                    self.params.clone(),
-                )
-                .await;
-
-                // apply feature replacements
-                // TODO is there a race condition where a region that's supposed to replace a feature
-                //  swaps it with another before it can be replaced here?
-                for RegionalFeatureReplacement {
-                    region,
-                    current,
-                    new,
-                } in feature_updates
-                {
-                    debug!("applying feature replacement"; "region" => ?region, "current" => ?current.ptr_debug(), "new" => ?new.ptr_debug());
-                    let idx = match self.region_index(region) {
-                        Some(Ok(idx)) => idx,
-                        _ => unreachable!("invalid neighbour {:?} returned", region),
-                    };
-
-                    let (_, region) = &mut self.regions[idx];
-
-                    if let Some(feature) = region
-                        .features
-                        .iter_mut()
-                        .find(|f| Arc::ptr_eq(&current, *f))
-                    {
-                        // swapadoodledoo
-                        *feature = new;
-                    }
-                }
-
-                self.regions.insert(idx, (location, region));
-                self.loaded_regions.write().await.insert(location);
-
-                &self.regions[idx].1
-            }
-        });
-
-        ret
-    }
-
-    pub fn get_existing(&self, region: RegionLocation<SIZE>) -> Option<&Region<SIZE, SIZE_2>> {
-        self.region_index(region)
-            .and_then(|idx| idx.ok())
-            .map(|idx| &self.regions[idx].1)
-    }
-
-    /// None if out of range of the planet, otherwise Ok(idx) if present or Err(idx) if in range but
-    /// not present
-    fn region_index(&self, region: RegionLocation<SIZE>) -> Option<Result<usize, usize>> {
-        self.params
-            .is_region_in_range(region)
-            .as_some_from(|| self.regions.binary_search_by_key(&region, |(pos, _)| *pos))
-    }
-
-    pub fn slab_continuations(&self) -> SlabContinuations {
-        Arc::clone(&self.slab_continuations)
-    }
-}
-
 impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
-    async fn create<'c>(
+    /// Create new region unconditionally now, should only be called from [regions] module
+    pub(in crate::region) async fn create<'c>(
         loc: RegionLocation<SIZE>,
         continents: &ContinentMap,
-        continuations: RegionContinuations<SIZE>,
-        loaded_regions: LoadedRegions<SIZE>,
-        params: PlanetParamsRef,
+        regions: &Regions<SIZE, SIZE_2>,
     ) -> (Self, RegionalFeatureReplacements<SIZE>) {
         debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
 
@@ -228,21 +131,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         };
 
         // regional feature discovery
-        // TODO region chunk load order affects feature generations -
-        //  if multiple unconnected regions covering the same feature (e.g. big forest) are loaded,
-        //  they'll spawn distinct forest instances and spread them around until they meet, then
-        //  1 will take over a few regions but not all. if features will randomly generate some
-        //  characteristics e.g. tree type, the merging will combine them with an obvious mismatch
-        //  along region boundaries!
-        //
-        //  maybe a loading region could somehow query for nearby forests in a radius to seed itself
-        //  with, or only discover regional features in a flood-fill pattern, i.e. keep yielding until
-        //  a region neighbour is loaded, or trigger neighbour loading up to the other one? this
-        //  would disallow/ruin random slab loading..
-        let updates = region
-            .discover_regional_features(loc, continuations, loaded_regions, &params)
-            .await;
+        let updates = region.discover_regional_features(loc, regions).await;
 
+        trace!("finished creating region"; "region" => ?loc);
         (region, updates)
     }
 
@@ -294,10 +185,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     async fn discover_regional_features(
         &mut self,
         region: RegionLocation<SIZE>,
-        continuations: RegionContinuations<SIZE>,
-        loaded_regions: LoadedRegions<SIZE>,
-        params: &PlanetParamsRef,
+        regions: &Regions<SIZE, SIZE_2>,
     ) -> RegionalFeatureReplacements<SIZE> {
+        let params = regions.params();
+
         // expand each row outwards a tad for slightly relaxed boundary
         let expansion = params.region_feature_expansion as f64 * PlanetPoint::<SIZE>::PER_BLOCK;
 
@@ -352,7 +243,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         // take continuations mutex now and don't release until self and all neighbours are updated,
         // to avoid a TOCTOU where a region pops its empty continuation here, and is allocated a new
         // populated one just after, which it never checks
-        let mut continuations_guard = continuations.lock().await;
+        let mut continuations_guard = regions.region_continuations().lock().await;
 
         // pop continuations for this region
         let mut continuation = continuations_guard.remove(&region).unwrap_or_default();
@@ -427,7 +318,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 // add feature to neighbour's continuations if it hasn't already been loaded. if it's
                 // already loaded and didn't register a continuation then this is a false positive
                 // where e.g. the feature ends exactly at the region edge
-                if !loaded_regions.read().await.contains(&neighbour) {
+                if !regions.is_region_loaded(neighbour).await {
                     trace!("adding feature to unloaded neighbour's continuations"; "region" => ?region,
                             "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
                     let neighbour_continuations = continuations_guard
@@ -463,9 +354,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         params: PlanetParamsRef,
     ) -> Self {
         // TODO null params for benchmark
-        Self::create(region, continents, todo!(), todo!(), params)
-            .await
-            .0
+        todo!()
+        // Self::create(region, continents, todo!(), todo!(), params)
+        //     .await
+        //     .0
     }
 
     pub(crate) fn chunk_index(chunk: ChunkLocation) -> usize {
@@ -494,6 +386,21 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
     pub fn all_features(&self) -> impl Iterator<Item = &SharedRegionalFeature> + '_ {
         self.features.iter()
+    }
+
+    /// True on success
+    pub fn replace_feature(
+        &mut self,
+        current: &SharedRegionalFeature,
+        replacement: SharedRegionalFeature,
+    ) -> bool {
+        if let Some(feature) = self.features.iter_mut().find(|f| Arc::ptr_eq(&current, *f)) {
+            // swapadoodledoo
+            *feature = replacement;
+            true
+        } else {
+            false
+        }
     }
 
     /// Iterator that yields rows of blocks across the entire region. Fiddly because of the memory
@@ -713,7 +620,8 @@ mod tests {
 
     use crate::continent::ContinentMap;
     use crate::params::PlanetParamsRef;
-    use crate::region::region::{Region, Regions};
+    use crate::region::region::Region;
+    use crate::region::regions::Regions;
     use crate::region::unit::RegionLocation;
     use crate::PlanetParams;
 
@@ -770,8 +678,8 @@ mod tests {
         let loc = SmolRegionLocation::new(10, 20);
         let bad_loc = SmolRegionLocation::new(10, 200);
 
-        assert!(regions.get_existing(loc).is_none());
-        assert!(regions.get_existing(bad_loc).is_none());
+        assert!(regions.get_existing(loc).await.is_none());
+        assert!(regions.get_existing(bad_loc).await.is_none());
 
         assert!(params.is_region_in_range(loc));
         assert!(!params.is_region_in_range(bad_loc));
@@ -779,7 +687,7 @@ mod tests {
         assert!(regions.get_or_create(loc, &continents).await.is_some());
         assert!(regions.get_or_create(bad_loc, &continents).await.is_none());
 
-        assert!(regions.get_existing(loc).is_some());
-        assert!(regions.get_existing(bad_loc).is_none());
+        assert!(regions.get_existing(loc).await.is_some());
+        assert!(regions.get_existing(bad_loc).await.is_none());
     }
 }

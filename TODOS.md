@@ -54,11 +54,10 @@
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
    * `// TODO faster and non-random hash`
- * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (11)
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
    * `// TODO remove magic value, use real max tree height`
    * `// TODO tree roots`
    * `// TODO attempt to place tree model at location in this slab`
-   * `// TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab`
    * `// TODO actual validation`
    * `// TODO consider rtree params`
    * `// TODO const generic size param`
@@ -66,16 +65,17 @@
    * `const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic (and use the unspecialised PlanetPoint)`
    * `// TODO replace this rtree with a new bulk loaded one?`
    * `// TODO PR to move nodes out of the tree instead of copy`
- * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (9)
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (7)
    * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
    * `// TODO rename me`
-   * `// TODO is there a race condition where a region that's supposed to replace a feature`
-   * `// TODO region chunk load order affects feature generations -`
    * `// TODO will need to filter on feature type when there are multiple`
    * `// TODO null params for benchmark`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
+ * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (2)
+   * `// TODO is there a race condition where a region that's supposed to replace a feature`
+   * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
  * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
@@ -258,11 +258,12 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `r.register(FeatureBoundaryDebugRenderer::default(), true)?; // TODO TEMPORARY TRUE`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
@@ -319,12 +320,11 @@
    * `// TODO reuse/pool bufs, and initialize with proper expected size`
    * `// TODO is it worth attempting to filter out updates that have no effect during the loop, or keep filtering them during consumption instead`
    * `// TODO prevent mesh being rendered if there are queued occlusion changes?`
- * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (5)
+ * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (4)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
    * `// TODO reuse vec allocs`
    * `// TODO reuse buf`
-   * `// TODO WRONG`
  * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
    * `// TODO handle wrapping of slabs around planet boundaries`
  * [game/world/src/loader/update.rs](game/world/src/loader/update.rs) (1)

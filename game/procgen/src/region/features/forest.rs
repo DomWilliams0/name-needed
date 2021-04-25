@@ -92,7 +92,6 @@ impl Feature for ForestFeature {
         );
 
         // TODO attempt to place tree model at location in this slab
-        // TODO if a tree/subfeature is cut off, keep track of it as a continuation for the neighbouring slab
     }
 
     fn merge_with(&mut self, other: &mut dyn Feature) -> bool {
@@ -100,6 +99,7 @@ impl Feature for ForestFeature {
             // steal other's trees
             let n = self.trees.absorb_other(&mut other.trees);
             debug!("merged {trees} trees from other forest", trees = n; "total" => self.trees.points.size());
+            // assert_eq!(n, 0);
             true
         } else {
             // type mismatch

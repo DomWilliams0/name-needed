@@ -1,13 +1,14 @@
+use std::array::IntoIter;
+use std::convert::identity;
+
+use common::{ArrayVec, Itertools};
+use unit::world::CHUNK_SIZE;
+
 use crate::region::feature::FeatureZRange;
 use crate::region::region::RegionChunksBlockRows;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionLocationUnspecialized;
 use crate::BiomeType;
-use common::{ArrayVec, Itertools};
-
-use std::array::IntoIter;
-use std::convert::identity;
-use unit::world::CHUNK_SIZE;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(test, derive(Ord, PartialOrd))]
@@ -270,11 +271,14 @@ impl RowIndex {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::region::region::{Region, RegionChunk, Regions};
-    use crate::region::unit::RegionLocation;
     use grid::GridImpl;
     use unit::world::ChunkLocation;
+
+    use crate::region::region::{Region, RegionChunk};
+    use crate::region::regions::Regions;
+    use crate::region::unit::RegionLocation;
+
+    use super::*;
 
     const SIZE: usize = 2;
     const SIZE_2: usize = SIZE * SIZE;

@@ -9,6 +9,7 @@ use common::{ArrayVec, Boolinator, Itertools};
 #[derive(Serialize, Deserialize)]
 pub struct DynamicGrid<T> {
     dims: [usize; 3],
+    /// Pinned and never moved
     data: Box<[T]>,
 }
 
