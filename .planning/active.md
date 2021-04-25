@@ -39,4 +39,4 @@
 * [ ] bug: if there's no path to a society job, they get stuck for ages constantly trying to nagivate
 * [ ] bug: entities glitch up through tree trunks and get stuck at the top when wandering past
 * [ ] bug: occlusion shadows cast by blocks above current viewing slice look weird
-* [ ] more worker threads for world than #cpus/2
+* [X] more worker threads for world than #cpus/2
