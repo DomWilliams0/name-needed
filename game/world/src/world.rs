@@ -43,6 +43,14 @@ pub struct LoadNotifier {
     waiters: Arc<AtomicUsize>,
 }
 
+pub enum WaitResult {
+    Success,
+    /// Channel is disconnected
+    Disconnected,
+    /// Channel is lagging, check slab state again and wait again if necessary
+    Retry,
+}
+
 #[derive(Constructor)]
 pub struct WorldChangeEvent {
     pub pos: WorldPosition,
@@ -708,18 +716,21 @@ impl LoadNotifier {
         }
     }
 
-    /// Returns false on recv error
-    async fn wait_for_slab(&mut self, slab: SlabLocation) -> bool {
+    async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
         // increment waiter count
         self.waiters.fetch_add(1, Ordering::SeqCst);
 
         let ret = loop {
             match self.recv.recv().await {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("slab notifications are lagging"; "skipped" => n);
+                    break WaitResult::Retry;
+                }
                 Err(e) => {
                     error!("error waiting for slab notification: {}", e);
-                    break false;
+                    break WaitResult::Disconnected;
                 }
-                Ok(recvd) if recvd == slab => break true,
+                Ok(recvd) if recvd == slab => break WaitResult::Success,
                 Ok(_) => { /* keep waiting */ }
             }
         };
@@ -732,6 +743,7 @@ impl LoadNotifier {
 
 pub mod slab_loading {
     use crate::chunk::slab::{Slab, SlabInternalNavigability};
+    use crate::world::WaitResult;
     use crate::{BaseTerrain, WorldContext, WorldRef};
     use common::*;
     use futures::task::{Context, Poll};
@@ -797,7 +809,9 @@ pub mod slab_loading {
                                     }
 
                                     // still not available, wait for mandatory slab below to load
-                                    if !notifier.wait_for_slab(slab.below()).await {
+                                    if let WaitResult::Disconnected =
+                                        notifier.wait_for_slab(slab.below()).await
+                                    {
                                         // failure, guess we're shutting down
                                         break None;
                                     }
@@ -887,7 +901,9 @@ pub mod slab_loading {
                                         }
 
                                         // still not available, wait for mandatory slab below to load
-                                        if !notifier.wait_for_slab(slab.below()).await {
+                                        if let WaitResult::Disconnected =
+                                            notifier.wait_for_slab(slab.below()).await
+                                        {
                                             // failure, guess we're shutting down
                                             break None;
                                         }

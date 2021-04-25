@@ -27,12 +27,14 @@
 	* no - features depend on the order of discovered region chunks
 * [X] feature polygon debug renderer should cache outlines when mutex can not be taken
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
-* [ ] bug: panic "chunk should be present" when zoom=10.0
+* [X] bug: panic "chunk should be present" when zoom=10.0 or initial slab batch is too big
+	* caused by LoadNotifier broadcast overflowing
 * [ ] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
 	* [ ] load regions adjacent to already loaded regions only (except initial)
 	* [ ] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
 	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
 * [ ] update readme to suggest downloading release instead of building from scratch
+	* [ ] also provide build with debug logging enabled?
 * [ ] investigate perf issue of thousands of occlusion updates for empty all-air chunks
 * [ ] bug: if there's no path to a society job, they get stuck for ages constantly trying to nagivate
 * [ ] bug: entities glitch up through tree trunks and get stuck at the top when wandering past
