@@ -116,6 +116,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dabe5a181f83789739c194cbe5a897dde195078fac08568d09221fd6137a7ba8"
 
 [[package]]
+name = "arc-swap"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4d7d63395147b81a9e570bcc6243aaf71c017bd666d4909cfef0085bdda8d73"
+
+[[package]]
 name = "argh"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -744,6 +750,7 @@ dependencies = [
  "imgui",
  "imgui-opengl-renderer",
  "imgui-sdl2",
+ "panik",
  "resources",
  "sdl2",
  "sdl2-sys",
@@ -1472,7 +1479,7 @@ dependencies = [
  "once_cell",
  "slog",
  "slog-async",
- "slog-scope",
+ "slog-scope 4.3.1",
  "slog-term",
 ]
 
@@ -1488,6 +1495,7 @@ dependencies = [
  "engine",
  "inventory",
  "num_cpus",
+ "panik",
  "resources",
  "simulation",
 ]
@@ -1837,6 +1845,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "panik"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c09ae3be8790658c0d05c946832d9c1be91042fafd558403db063f5b17cab02"
+dependencies = [
+ "backtrace",
+ "lazy_static",
+ "parking_lot",
+ "slog",
+ "slog-stdlog",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,6 +2077,7 @@ dependencies = [
  "imageproc",
  "line_drawing",
  "noise",
+ "panik",
  "rand_distr 0.3.0",
  "ron",
  "rstar",
@@ -2572,9 +2594,31 @@ name = "slog-scope"
 version = "4.3.1"
 source = "git+https://github.com/DomWilliams0/scope#26bbd94db004626d483cb0c74ba1ebc8da9e3457"
 dependencies = [
- "arc-swap",
+ "arc-swap 0.4.8",
  "lazy_static",
  "slog",
+]
+
+[[package]]
+name = "slog-scope"
+version = "4.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f95a4b4c3274cd2869549da82b57ccc930859bdbf5bcea0424bc5f140b3c786"
+dependencies = [
+ "arc-swap 1.2.0",
+ "lazy_static",
+ "slog",
+]
+
+[[package]]
+name = "slog-stdlog"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8228ab7302adbf4fcb37e66f3cda78003feb521e7fd9e3847ec117a7784d0f5a"
+dependencies = [
+ "log",
+ "slog",
+ "slog-scope 4.4.0",
 ]
 
 [[package]]

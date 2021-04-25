@@ -90,7 +90,7 @@ pub trait GamePreset<R: Renderer> {
 
         world.request_slabs_with_count(slabs_to_request, slab_count);
         let timeout = Duration::from_secs(config::get().world.load_timeout as u64);
-        world.block_for_last_batch_with_bail(timeout, panic::has_panicked)?;
+        world.block_for_last_batch_with_bail(timeout, panik::has_panicked)?;
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;
@@ -104,7 +104,6 @@ mod empty;
 
 use crate::scenarios::Scenario;
 pub use ci::ContinuousIntegrationGamePreset;
-use common::panic;
 use config::WorldSource;
 pub use dev::DevGamePreset;
 pub use empty::EmptyGamePreset;

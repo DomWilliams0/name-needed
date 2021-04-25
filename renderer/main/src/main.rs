@@ -161,26 +161,26 @@ fn main() {
 
     info!("initialized logging"; "level" => ?logger_guard.level());
 
-    common::panic::init_panic_detection();
+    let result = panik::Builder::new()
+        .slogger(logger_guard.logger())
+        .run_and_handle_panics(|| {
+            #[cfg(feature = "count-allocs")]
+            {
+                use alloc_counter::count_alloc;
+                let (counts, result) = count_alloc(|| do_main());
+                // TODO more granular - n for engine setup, n for sim setup, n for each frame?
+                info!(
+                    "{allocs} allocations, {reallocs} reallocs, {frees} frees",
+                    allocs = counts.0,
+                    reallocs = counts.1,
+                    frees = counts.2
+                );
+                result
+            }
 
-    let result = common::panic::run_and_handle_panics(|| {
-        #[cfg(feature = "count-allocs")]
-        {
-            use alloc_counter::count_alloc;
-            let (counts, result) = count_alloc(|| do_main());
-            // TODO more granular - n for engine setup, n for sim setup, n for each frame?
-            info!(
-                "{allocs} allocations, {reallocs} reallocs, {frees} frees",
-                allocs = counts.0,
-                reallocs = counts.1,
-                frees = counts.2
-            );
-            result
-        }
-
-        #[cfg(not(feature = "count-allocs"))]
-        do_main()
-    });
+            #[cfg(not(feature = "count-allocs"))]
+            do_main()
+        });
 
     let exit = match result {
         None => {

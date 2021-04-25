@@ -109,6 +109,10 @@ impl Logger {
     pub fn level(&self) -> Level {
         self.0
     }
+
+    pub fn logger(&self) -> slog::Logger {
+        slog_scope::logger()
+    }
 }
 
 impl Display for LogError {

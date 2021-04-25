@@ -1,4 +1,4 @@
-# TODOs (313)
+# TODOs (312)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -407,8 +407,6 @@
    * `# TODO feature for cgmath`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
- * [shared/common/src/panic.rs](shared/common/src/panic.rs) (1)
-   * `// TODO use panic.message() when it stabilises`
  * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)

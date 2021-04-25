@@ -18,6 +18,7 @@ unit = { path = "../../shared/unit" }
 common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 
+panik = { version = "0.2", default-features = false, features = ["use-parking-lot", "use-slog"] }
 gameloop = "0.2"
 sdl2 = { version = "0.34", optional = true, features = ["bundled"] }
 sdl2-sys = { version = "=0.34.2", optional = true} # fix windows release build https://github.com/Rust-SDL2/rust-sdl2/issues/1029

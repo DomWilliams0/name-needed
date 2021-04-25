@@ -78,7 +78,6 @@ pub fn truncate<F: cgmath::BaseFloat, V: cgmath::InnerSpace<Scalar = F>>(vec: V,
 
 pub mod input;
 pub mod newtype;
-pub mod panic;
 pub mod random;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
