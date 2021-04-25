@@ -11,6 +11,7 @@ Config(
     world: (
         // source: Preset(Stairs),
         source: Generate("planet_generation.txt"),
+        load_timeout: 30,
         worker_threads: None,
         initial_chunk: (33, 512), // near a forest
 

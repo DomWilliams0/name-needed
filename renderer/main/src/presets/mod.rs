@@ -89,7 +89,8 @@ pub trait GamePreset<R: Renderer> {
         );
 
         world.request_slabs_with_count(slabs_to_request, slab_count);
-        world.block_for_last_batch_with_bail(Duration::from_secs(30), panic::has_panicked)?;
+        let timeout = Duration::from_secs(config::get().world.load_timeout as u64);
+        world.block_for_last_batch_with_bail(timeout, panic::has_panicked)?;
 
         let mut sim = Simulation::new(world, resources)?;
         self.init(&mut sim, scenario)?;
