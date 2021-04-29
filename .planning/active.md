@@ -29,9 +29,9 @@
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
 * [X] bug: panic "chunk should be present" when zoom=10.0 or initial slab batch is too big
 	* caused by LoadNotifier broadcast overflowing
-* [.] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
-	* [ ] load regions adjacent to already loaded regions only (except initial)
-	* [o] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
+* [o] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
+	* [X] load regions adjacent to already loaded regions only (except initial)
+	* [X] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
 	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
 * [ ] update readme to suggest downloading release instead of building from scratch
 	* [ ] also provide build with debug logging enabled?

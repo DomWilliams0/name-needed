@@ -95,6 +95,10 @@ impl<const SIZE: usize> RegionLocation<SIZE> {
         (self.0 as f64, self.1 as f64)
     }
 
+    pub const fn xy_i(self) -> (i32, i32) {
+        (self.0 as i32, self.1 as i32)
+    }
+
     pub const fn chunks_per_side() -> usize {
         SIZE
     }

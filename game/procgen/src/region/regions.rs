@@ -16,8 +16,10 @@ use crate::region::unit::RegionLocation;
 use crate::{PlanetParams, PlanetParamsRef};
 use futures::prelude::stream::FuturesUnordered;
 use futures::{Future, StreamExt};
+use line_drawing::Bresenham;
 use std::hint::unreachable_unchecked;
 use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering};
 use strum_macros::EnumDiscriminants;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
@@ -28,8 +30,10 @@ pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
 
     region_continuations: RegionContinuations<SIZE>,
     slab_continuations: SlabContinuations,
+    is_initial_region: AtomicBool,
 
     /// Keep track of all regions created in tests
+    /// TODO use a global vec/channel instead (in tests only)
     #[cfg(test)]
     created_regions: Mutex<Vec<RegionLocation<SIZE>>>,
 }
@@ -77,6 +81,19 @@ pub struct LoadedRegionRef<'a, const SIZE: usize, const SIZE_2: usize> {
 #[derive(Default, Deref)]
 struct RegionEntry<const SIZE: usize, const SIZE_2: usize>(RwLock<RegionLoadState<SIZE, SIZE_2>>);
 
+/// Ensures that region loading occurs in an outward pattern from the initial set. This prevents
+/// random access to regions on the planet (after the initial load), but ensures regional features
+/// always spread out and merge properly, instead of multiple distinct features having to merge late
+/// after generation.
+#[derive(Debug, Clone, Copy)]
+enum LoadSource<const SIZE: usize> {
+    /// No extra loading needed for initial region
+    Initial,
+
+    /// Load regions in a straight line from the given nearest region to the one being loaded
+    Nearest(RegionLocation<SIZE>),
+}
+
 impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
     pub fn new(params: PlanetParamsRef) -> Self {
         let planet_size = params.planet_size as usize;
@@ -85,6 +102,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
             region_grid: DynamicGrid::new([planet_size, planet_size, 1]),
             region_continuations: Mutex::new(HashMap::with_capacity(64)),
             slab_continuations: Arc::new(Mutex::new(HashMap::with_capacity(64))),
+            is_initial_region: AtomicBool::new(true),
             #[cfg(test)]
             created_regions: Default::default(),
         }
@@ -96,34 +114,70 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         location: RegionLocation<SIZE>,
         continents: &ContinentMap,
     ) -> Option<LoadedRegionRef<'_, SIZE, SIZE_2>> {
-        /*
-           lookup existing region
-               already exists: fully loaded, done
-               already exists: partially loaded:
-                   request partial loads of 8 neighbours, join, done
-               requested as neighbour:
-                    request all neighbours
-               requested as central:
-                    just wait
-               does not exist:
-                   find nearest partially/fully loaded
-                   if none i.e. this is the first
-                       request self load and partial loads of 8 neighbours, join, done
-                   if some (most likely):
-                       calculate 2d vector from nearest->this
-                       foreach region from nearest:
-                           skip first and last
-                           request load of just X (no neighbours) in parallel, features will be linked
-                       request self load and partial loads of 8 neighbours, join, done
-        */
-
         // lookup existing state with exclusive lock
         let entry = self.entry_checked(location)?;
         let entry_rw = entry.0.write().await;
 
         match &*entry_rw {
             RegionLoadState::Unloaded => {
-                // load self and all neighbours
+                let source = self.find_load_source(location);
+                trace!("load source for region"; "region" => ?location, "source" => ?source);
+
+                if let LoadSource::Nearest(nearest) = source {
+                    let (this_x, this_y) = location.xy_i();
+                    let (nearest_x, nearest_y) = nearest.xy_i();
+                    let (dx, dy) = (this_x - nearest_x, this_y - nearest_y);
+
+                    if dx.abs() <= 2 && dy.abs() <= 2 {
+                        trace!("unloaded region is a direct neighbour of an existing region"; "region" => ?location);
+                    } else {
+                        trace!("loading regions in a line between this region and nearest loaded"; "region" => ?location, "nearest" => ?nearest, "distance" => ?(dx,dy));
+
+                        let line = {
+                            let mut line = Bresenham::new((nearest_x, nearest_y), (this_x, this_y));
+
+                            // skip repeat of nearest region
+                            let _skipped = line.next();
+                            debug_assert_eq!(_skipped, Some((nearest_x, nearest_y)));
+
+                            // skip last end point too, via a painful temporary allocation
+                            let full_line = line.collect::<SmallVec<[(i32, i32); 8]>>();
+
+                            let len = full_line.len();
+                            full_line.into_iter().take(len - 1)
+                        };
+
+                        // load all regions along the line concurrently, blocking until they're complete
+                        join_on(line.map(|(rx, ry)| {
+
+                            // safety: both live longer than local scope, as we are joining on these tasks
+                            let self_local;
+                            let continents_local;
+                            unsafe {
+                                self_local = &*(self as *const Self);
+                                continents_local = &*(continents as *const ContinentMap)
+                            }
+
+                            let region = RegionLocation::new(rx as u32, ry as u32);
+                                let entry = self.entry_unchecked(region);
+
+                                if let Ok(mut w) = entry.0.try_write() {
+                                    // don't overwrite more advanced states
+                                    if let RegionLoadState::Unloaded = *w {
+                                        trace!("marking nearby region as requested"; "region" => ?region);
+                                        *w = RegionLoadState::Requested(RequestedType::Neighbour);
+                                    }
+                                } else {
+                                    trace!("can't mark nearby region as requested, it must be currently being requested already"; "region" => ?region);
+                                }
+
+                            self_local.request_region(region, continents_local)
+
+                        })).await;
+                    }
+                }
+
+                // load self and all neighbours now that adjacent regions are definitely loaded
                 trace!("region is unloaded, loading self and all neighbours"; "region" => ?location);
                 self.request_all_neighbours(
                     continents,
@@ -228,8 +282,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
                 .map(|region| {
                     let self_local: &Self;
                     let continents_local: &ContinentMap;
-                    // safety: both live longer than local scope, as we are joining on these tasks.
-                    // note that a panic in tests causes a segfault but not during gameplay..
+                    // safety: both live longer than local scope, as we are joining on these tasks
                     unsafe {
                         self_local = &*(self as *const Self);
                         continents_local = &*(continents as *const ContinentMap)
@@ -272,8 +325,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         // do actual loading
         let self_local: &Self;
         let continents_local: &ContinentMap;
-        // safety: both live longer than local scope, as we are joining on these tasks.
-        // note that a panic in tests causes a segfault but not during gameplay..
+        // safety: both live longer than local scope, as we are joining on these tasks
         unsafe {
             self_local = &*(self as *const Self);
             continents_local = &*(continents as *const ContinentMap)
@@ -387,6 +439,47 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
 
         let (rx, ry) = region.xy();
         &self.region_grid[[rx as usize, ry as usize, 0]]
+    }
+
+    fn find_load_source(&self, region: RegionLocation<SIZE>) -> LoadSource<SIZE> {
+        if self.is_initial_region.swap(false, Ordering::Relaxed) {
+            LoadSource::Initial
+        } else {
+            // find nearest loaded region
+            let (rx, ry) = region.xy();
+            let bounds = 0..self.params.planet_size as i32;
+            let nearby = spiral::ManhattanIterator::new(
+                rx as i32,
+                ry as i32,
+                self.params.planet_size as u16,
+            )
+            .skip(1) // skip self
+            .filter_map(|(x, y)| {
+                if bounds.contains(&x) && bounds.contains(&y) {
+                    Some(RegionLocation::new(x as u32, y as u32))
+                } else {
+                    None
+                }
+            })
+            .find(|region| {
+                let entry = self.entry_unchecked(*region);
+                match entry.0.try_read() {
+                    Err(_) => {
+                        // if the lock is already taken it must be in progress
+                        true
+                    }
+                    Ok(guard) => !matches!(*guard, RegionLoadState::Unloaded),
+                }
+            });
+
+            match nearby {
+                Some(nearby) if nearby != region => LoadSource::Nearest(nearby),
+                _ => unreachable!(
+                    "should have found a nearby region already loaded that isn't itself: {:?}",
+                    nearby
+                ),
+            }
+        }
     }
 
     fn neighbouring_regions(
@@ -560,10 +653,7 @@ mod tests {
     type SmolRegion = Region<2, 4>;
     type SmolRegions = Regions<2, 4>;
 
-    /// (partial, full)
-    async fn load_regions(
-        regions_to_request: impl Iterator<Item = (u32, u32)>,
-    ) -> (Vec<(u32, u32)>, Vec<(u32, u32)>) {
+    async fn load_regions(regions_to_request: impl Iterator<Item = (u32, u32)>) -> SmolRegions {
         let params = {
             let mut params = PlanetParams::dummy();
             let mut params_mut = PlanetParamsRef::get_mut(&mut params).unwrap();
@@ -571,13 +661,22 @@ mod tests {
             params_mut.max_continents = 4;
             params
         };
-        let regions = SmolRegions::new(params.clone());
-        let continents = ContinentMap::new_with_rng(params.clone(), &mut thread_rng());
+        let (regions, continents) = {
+            let regions = Box::new(SmolRegions::new(params.clone()));
+            let continents = Box::new(ContinentMap::new_with_rng(
+                params.clone(),
+                &mut thread_rng(),
+            ));
+
+            // by boxing and leaking these, they are not destroyed prematurely during a panic and
+            // therefore don't cause other non-panicked worker threads to segfault
+            (Box::leak(regions), Box::leak(continents))
+        };
 
         let mut regions_to_request = regions_to_request.sorted().collect_vec();
         join_on(regions_to_request.iter().copied().map(|(x, y)| {
-            let regions_local = unsafe { &*(&regions as *const SmolRegions) };
-            let continents_local = unsafe { &*(&continents as *const ContinentMap) };
+            let regions_local = unsafe { &*(regions as *const SmolRegions) };
+            let continents_local = unsafe { &*(continents as *const ContinentMap) };
             regions_local.get_or_create(SmolRegionLocation::new(x, y), continents_local)
         }))
         .await;
@@ -615,14 +714,17 @@ mod tests {
             "incorrect partially loaded regions"
         );
 
-        // no dupe loading
+        // ensure no dupe loading
         let mut all_creations = regions.created_regions.lock().await;
         let len_before = all_creations.len();
         all_creations.sort();
         all_creations.dedup();
         assert_eq!(len_before, all_creations.len(), "duplicate slab creation");
 
-        (partial, full)
+        drop(all_creations);
+
+        // safety: came from a leaked box
+        unsafe { *Box::from_raw(regions) }
     }
 
     fn sorted_neighbours(centre: (u32, u32)) -> Vec<(u32, u32)> {
@@ -687,6 +789,16 @@ mod tests {
         let regions_to_request = vec![
             (5, 5), // arbitrary region
             (7, 5), // a further region that share neighbours
+        ];
+
+        load_regions(regions_to_request.iter().copied()).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn region_requesting_separate_directions() {
+        let regions_to_request = vec![
+            (5, 5), // arbitrary region
+            (8, 5), // multiple regions away with no shared neighbours
         ];
 
         load_regions(regions_to_request.iter().copied()).await;

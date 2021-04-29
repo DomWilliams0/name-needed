@@ -2083,6 +2083,7 @@ dependencies = [
  "rstar",
  "serde",
  "sha2",
+ "spiral",
  "structopt",
  "strum",
  "strum_macros",
@@ -2671,6 +2672,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "spiral"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe3068700d36b5bc091494a9283587cf2442eb0f0c030295665f26f835cd2e1"
 
 [[package]]
 name = "stable_deref_trait"
