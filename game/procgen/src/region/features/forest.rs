@@ -99,7 +99,6 @@ impl Feature for ForestFeature {
             // steal other's trees
             let n = self.trees.absorb_other(&mut other.trees);
             debug!("merged {trees} trees from other forest", trees = n; "total" => self.trees.points.size());
-            // assert_eq!(n, 0);
             true
         } else {
             // type mismatch

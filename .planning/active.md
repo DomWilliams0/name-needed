@@ -29,10 +29,11 @@
 * [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
 * [X] bug: panic "chunk should be present" when zoom=10.0 or initial slab batch is too big
 	* caused by LoadNotifier broadcast overflowing
-* [o] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
+* [X] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
 	* [X] load regions adjacent to already loaded regions only (except initial)
 	* [X] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
-	* [ ] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
+	* [X] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
+		* no, merging of not-yet-realised forests still occurs
 * [ ] update readme to suggest downloading release instead of building from scratch
 	* [ ] also provide build with debug logging enabled?
 * [ ] investigate perf issue of thousands of occlusion updates for empty all-air chunks
@@ -40,3 +41,4 @@
 * [ ] bug: entities glitch up through tree trunks and get stuck at the top when wandering past
 * [ ] bug: occlusion shadows cast by blocks above current viewing slice look weird
 * [X] more worker threads for world than #cpus/2
+* [ ] bug: hit a deadlock in region loading while scrolling around

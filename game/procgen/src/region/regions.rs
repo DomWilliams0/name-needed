@@ -13,6 +13,7 @@ use crate::region::region::{
     Region, RegionContinuations, RegionalFeatureReplacement, SlabContinuations,
 };
 use crate::region::unit::RegionLocation;
+use crate::region::SlabContinuation;
 use crate::{PlanetParams, PlanetParamsRef};
 use futures::prelude::stream::FuturesUnordered;
 use futures::{Future, StreamExt};
@@ -21,6 +22,7 @@ use std::hint::unreachable_unchecked;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use strum_macros::EnumDiscriminants;
+use unit::world::SlabLocation;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParamsRef,
@@ -360,6 +362,47 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         // init region chunks and discover regional features
         let (region, feature_updates) =
             Region::<SIZE, SIZE_2>::create(location, continents, self).await;
+
+        // ensure regions that are being modified have not yet generated any terrain
+        if cfg!(debug_assertions) {
+            for update in &feature_updates {
+                let region_chunk_bounds = {
+                    let (min, max) = update.region.chunk_bounds();
+                    (min.0..max.0, min.1..max.1)
+                };
+
+                let is_in_region = {
+                    |slab: &SlabLocation| {
+                        let (xs, ys) = &region_chunk_bounds;
+                        let (x, y) = slab.chunk.xy();
+                        xs.contains(&x) && ys.contains(&y)
+                    }
+                };
+
+                let bad_slabs = self
+                    .slab_continuations
+                    .lock()
+                    .await
+                    .iter()
+                    .filter(|(slab, _)| is_in_region(slab))
+                    .filter_map(|(slab, state)| {
+                        if let SlabContinuation::Loaded = state {
+                            Some(*slab)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect_vec();
+
+                assert_eq!(
+                    bad_slabs,
+                    vec![],
+                    "some slabs have already been generated in region {:?} where feature {:?} is being replaced",
+                    update.region,
+                    update.current.ptr_debug()
+                );
+            }
+        }
 
         // apply feature replacements to neighbours
         // TODO is there a race condition where a region that's supposed to replace a feature
