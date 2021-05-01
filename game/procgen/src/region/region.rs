@@ -205,6 +205,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
         if points.is_empty() {
             // no feature, yippee
+            trace!("no forest feature"; "region" => ?region);
+
+            // pop unused continuations
+            let mut continuations_guard = regions.region_continuations().lock().await;
+            if let Some(continuations) = continuations_guard.remove(&region) {
+                trace!("dropping {} continuations", continuations.features.len(); "continuations" => ?continuations);
+            }
+
             return;
         }
 
@@ -262,7 +270,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
                         let bounding = std::mem::take(&mut bounding);
                         debug_assert!(!bounding.is_empty()); // consumed only once
-                        other_feature.merge_with_bounds(bounding, feature_range);
+                        other_feature.merge_with_bounds(&bounding, feature_range);
                         this_feature = Some(other_feature);
                     }
                     Some(f) if !SharedRegionalFeature::ptr_eq(f, &other_feature) => {
@@ -330,6 +338,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             .take()
             .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range, params));
         self.features.push(feature);
+        trace!("added feature to finished region"; "region" => ?region, "features" => ?self.features);
     }
 
     #[cfg(any(test, feature = "benchmarking"))]

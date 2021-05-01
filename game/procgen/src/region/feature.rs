@@ -43,6 +43,7 @@ struct RegionalFeatureInner {
 }
 
 /// Either Polygon or MultiPolygon
+#[derive(Clone)]
 pub struct RegionalFeatureBoundary(Geometry<f64>);
 
 /// Inclusive bounds in the z direction for a feature
@@ -128,7 +129,7 @@ impl RegionalFeature {
     /// Gut the other and absorb it into this's bounds
     pub fn merge_with_bounds(
         &self,
-        other_bounding: RegionalFeatureBoundary,
+        other_bounding: &RegionalFeatureBoundary,
         other_z_range: FeatureZRange,
     ) {
         let mut inner = self.inner.write();
@@ -161,10 +162,9 @@ impl RegionalFeature {
         }
 
         {
-            // now merge bounding polygons
-            let mut other_inner = other.inner.write();
-            let other_bounding = std::mem::take(&mut other_inner.bounding);
-            self.merge_with_bounds(other_bounding, other_inner.z_range);
+            // now merge bounding polygons, but leaving the other as-is
+            let other_inner = other.inner.read();
+            self.merge_with_bounds(&other_inner.bounding, other_inner.z_range);
         }
 
         Ok(())
@@ -231,6 +231,11 @@ impl RegionalFeature {
                     .for_each(per_point);
             }
         }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn is_boundary_empty(&self) -> bool {
+        self.inner.read().bounding.is_empty()
     }
 }
 
@@ -326,17 +331,39 @@ impl Debug for RegionalFeature {
 }
 
 impl RegionalFeatureBoundary {
-    /// Gut the other and merge into this via union
-    pub fn merge(&mut self, other: RegionalFeatureBoundary) {
-        let union = self.union(&other);
-        *self = Self::new_multi_as_is(union);
+    /// Merges the other into this via union - the other is not modified
+    pub fn merge(&mut self, other: &RegionalFeatureBoundary) {
+        // check for empty polygons
+        match (self.0.is_empty(), other.0.is_empty()) {
+            (true, false) => {
+                trace!("this boundary is empty but other isn't, just take the other");
+                *self = other.clone();
+            }
+            (false, true) => {
+                trace!("other boundary is empty but this isn't, merge is nop");
+            }
+            (false, false) => {
+                // neither is empty, actually merge (normal case)
+                *self = Self::new_multi_as_is(self.union(other));
+                debug_assert!(!self.is_empty(), "union of 2 non-empty boundaries is empty");
+            }
+            (true, true) => {
+                // both are empty, oh god
+                unreachable!("can't merge 2 empty boundaries")
+            }
+        };
 
         self.iter_polys_mut(|points| {
             let new_points = Self::simplify_boundary(std::mem::take(points));
             let old = std::mem::replace(points, new_points);
             debug_assert!(old.is_empty());
             std::mem::forget(old);
-        })
+        });
+
+        debug_assert!(
+            self.geometry().coords_iter().count() > 0,
+            "simplified merged boundary is empty"
+        );
     }
 
     fn iter_polys_mut(&mut self, mut per_poly: impl FnMut(&mut Vec<Coordinate<f64>>)) {
@@ -345,6 +372,18 @@ impl RegionalFeatureBoundary {
             Geometry::MultiPolygon(p) => {
                 for poly in &mut p.0 {
                     poly.exterior_mut(|ext| per_poly(&mut ext.0));
+                }
+            }
+            _ => unsafe { unreachable_debug() },
+        }
+    }
+
+    fn iter_polys(&self, mut per_poly: impl FnMut(&Vec<Coordinate<f64>>)) {
+        match &self.0 {
+            Geometry::Polygon(p) => per_poly(&p.exterior().0),
+            Geometry::MultiPolygon(p) => {
+                for poly in &p.0 {
+                    per_poly(&poly.exterior().0);
                 }
             }
             _ => unsafe { unreachable_debug() },

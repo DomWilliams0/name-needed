@@ -117,19 +117,49 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
     ) -> Option<LoadedRegionRef<'_, SIZE, SIZE_2>> {
         let entry = self.entry_checked(location)?;
 
-        // fast path for when the region is already fully loaded, take ro lock only
-        let entry_ro = entry.0.read().await;
-        if let RegionLoadState::Fully(region) = &*entry_ro {
-            // already fully loaded, nothing to do
-            // safety: in fully loaded branch
-            let region_ref = unsafe { entry.region_ref_with_guard(entry_ro).await };
-            trace!("region is already fully loaded (fast path)"; "region" => ?location);
-            return Some(region_ref);
+        // safety: MUST be fully loaded
+        macro_rules! fully_loaded {
+            ($entry_ro:expr, $extra_log:literal) => {
+                {
+                    let region_ref = entry.region_ref_with_guard($entry_ro).await;
+                    trace!(concat!("region is already fully loaded", $extra_log); "region" => ?location);
+
+                    // ensure no dangling continuations for this completed region
+                    if cfg!(debug_assertions) {
+                        let continuations_guard = self.region_continuations().lock().await;
+                        let continuations = continuations_guard.get(&location);
+                        assert!(continuations.is_none(), "dangling region continuations for {:?}: {:?}", location, continuations.unwrap());
+                    }
+
+                    Some(region_ref)
+                }
+            };
         }
-        drop(entry_ro);
+
+        // fast path for when the region is already fully loaded, take ro lock only
+        {
+            let entry_ro = entry.0.read().await;
+            if let RegionLoadState::Fully(region) = &*entry_ro {
+                #[cfg(debug_assertions)]
+                {
+                    // ensure that no gutted features remain
+                    assert!(
+                        region.all_features().all(|f| !f.is_boundary_empty()),
+                        "empty boundary on feature in {:?}: {:#?}",
+                        location,
+                        region.all_features().collect_vec()
+                    );
+                }
+
+                // already fully loaded, nothing to do
+                // safety: in fully loaded branch
+                return unsafe { fully_loaded!(entry_ro, " (fast path)") };
+            }
+        }
 
         // lookup existing state with rw lock
         let entry_rw = entry.0.write().await;
+
         match &*entry_rw {
             RegionLoadState::Unloaded => {
                 let source = self.find_load_source(location);
@@ -236,9 +266,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
             RegionLoadState::Fully(_) => {
                 // already fully loaded, nothing to do
                 // safety: in fully loaded branch
-                let region_ref = unsafe { entry.region_ref_with_guard(entry_rw.downgrade()).await };
-                trace!("region is already fully loaded"; "region" => ?location);
-                return Some(region_ref);
+                return unsafe { fully_loaded!(entry_rw.downgrade(), "") };
             }
         }
 

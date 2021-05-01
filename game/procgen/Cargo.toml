@@ -22,7 +22,7 @@ geo-booleanop = "0.3"
 rstar = "0.8"
 spiral = "0.1"
 
-line_drawing =  "0.8"
+line_drawing = "0.8"
 crossbeam = { version = "0.8", optional = true }
 async-trait = { version = "0.1", optional = true }
 async-scoped = { version = "0.6", features = ["use-tokio"], optional = true }
