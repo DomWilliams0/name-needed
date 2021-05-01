@@ -9,9 +9,8 @@ use core::array::IntoIter;
 use grid::DynamicGrid;
 
 use crate::continent::ContinentMap;
-use crate::region::region::{
-    Region, RegionContinuations, RegionalFeatureReplacement, SlabContinuations,
-};
+use crate::region::feature::SharedRegionalFeature;
+use crate::region::region::{Region, RegionContinuations, SlabContinuations};
 use crate::region::unit::RegionLocation;
 use crate::region::SlabContinuation;
 use crate::{PlanetParams, PlanetParamsRef};
@@ -117,6 +116,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         continents: &ContinentMap,
     ) -> Option<LoadedRegionRef<'_, SIZE, SIZE_2>> {
         // lookup existing state with exclusive lock
+        // TODO take read lock then upgrade if necessary
         let entry = self.entry_checked(location)?;
         let entry_rw = entry.0.write().await;
 
@@ -360,66 +360,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         }
 
         // init region chunks and discover regional features
-        let (region, feature_updates) =
-            Region::<SIZE, SIZE_2>::create(location, continents, self).await;
-
-        // ensure regions that are being modified have not yet generated any terrain
-        if cfg!(debug_assertions) {
-            for update in &feature_updates {
-                let region_chunk_bounds = {
-                    let (min, max) = update.region.chunk_bounds();
-                    (min.0..max.0, min.1..max.1)
-                };
-
-                let is_in_region = {
-                    |slab: &SlabLocation| {
-                        let (xs, ys) = &region_chunk_bounds;
-                        let (x, y) = slab.chunk.xy();
-                        xs.contains(&x) && ys.contains(&y)
-                    }
-                };
-
-                let bad_slabs = self
-                    .slab_continuations
-                    .lock()
-                    .await
-                    .iter()
-                    .filter(|(slab, _)| is_in_region(slab))
-                    .filter_map(|(slab, state)| {
-                        if let SlabContinuation::Loaded = state {
-                            Some(*slab)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect_vec();
-
-                assert_eq!(
-                    bad_slabs,
-                    vec![],
-                    "some slabs have already been generated in region {:?} where feature {:?} is being replaced",
-                    update.region,
-                    update.current.ptr_debug()
-                );
-            }
-        }
-
-        // apply feature replacements to neighbours
-        // TODO is there a race condition where a region that's supposed to replace a feature
-        //  swaps it with another before it can be replaced here?
-        for RegionalFeatureReplacement {
-            region,
-            current,
-            new,
-        } in feature_updates
-        {
-            debug!("applying feature replacement"; "region" => ?region, "current" => ?current.ptr_debug(), "new" => ?new.ptr_debug());
-            self.with_loaded_region_mut(region, |r| {
-                if !r.replace_feature(&current, new) {
-                    warn!("feature not found for replacement"; "region" => ?region, "feature" => ?current.ptr_debug());
-                }
-            }).await;
-        }
+        let region = Region::<SIZE, SIZE_2>::create(location, continents, self).await;
 
         // update state to partial
         let entry = self.entry_unchecked(location);
@@ -538,6 +479,60 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         let ro = entry.0.read().await;
         matches!(&*ro, RegionLoadState::Partially(_) | RegionLoadState::Fully(_))
     }
+
+    pub async fn try_replace_feature(
+        &self,
+        region: RegionLocation<SIZE>,
+        current: &SharedRegionalFeature,
+        new: SharedRegionalFeature,
+    ) {
+        // ensure modified region has not yet generated any terrain
+        if cfg!(debug_assertions) {
+            let region_chunk_bounds = {
+                let (min, max) = region.chunk_bounds();
+                (min.0..max.0, min.1..max.1)
+            };
+
+            let is_in_region = {
+                |slab: &SlabLocation| {
+                    let (xs, ys) = &region_chunk_bounds;
+                    let (x, y) = slab.chunk.xy();
+                    xs.contains(&x) && ys.contains(&y)
+                }
+            };
+
+            let bad_slabs = self
+                .slab_continuations
+                .lock()
+                .await
+                .iter()
+                .filter(|(slab, _)| is_in_region(slab))
+                .filter_map(|(slab, state)| {
+                    if let SlabContinuation::Loaded = state {
+                        Some(*slab)
+                    } else {
+                        None
+                    }
+                })
+                .collect_vec();
+
+            assert_eq!(
+                bad_slabs,
+                vec![],
+                "some slabs have already been generated in region {:?} where feature {:?} is being replaced",
+                region,
+                current.ptr_debug()
+            );
+        }
+
+        debug!("applying feature replacement"; "region" => ?region, "current" => ?current.ptr_debug(), "new" => ?new.ptr_debug());
+        self.with_loaded_region_mut(region, |r| {
+            if !r.replace_feature(current, new) {
+                warn!("feature not found for replacement"; "region" => ?region, "feature" => ?current.ptr_debug());
+            }
+        }).await;
+    }
+
     /// Partially or fully loaded. Region assumed to be valid
     pub async fn with_loaded_region_mut(
         &self,

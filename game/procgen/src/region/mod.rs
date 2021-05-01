@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 mod feature;
 mod features;
 mod region;

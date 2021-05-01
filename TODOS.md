@@ -75,7 +75,7 @@
    * `// TODO calculate these better, and store them in data`
  * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (3)
    * `/// TODO use a global vec/channel instead (in tests only)`
-   * `// TODO is there a race condition where a region that's supposed to replace a feature`
+   * `// TODO take read lock then upgrade if necessary`
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`

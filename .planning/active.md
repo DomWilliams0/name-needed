@@ -42,3 +42,4 @@
 * [ ] bug: occlusion shadows cast by blocks above current viewing slice look weird
 * [X] more worker threads for world than #cpus/2
 * [ ] bug: hit a deadlock in region loading while scrolling around
+* [ ] async std upgradeable rwlock

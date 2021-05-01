@@ -76,14 +76,6 @@ pub(in crate::region) struct RegionContinuation<const SIZE: usize> {
 pub(in crate::region) type RegionContinuations<const SIZE: usize> =
     Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>;
 
-pub(in crate::region) struct RegionalFeatureReplacement<const SIZE: usize> {
-    pub region: RegionLocation<SIZE>,
-    pub current: SharedRegionalFeature,
-    pub new: SharedRegionalFeature,
-}
-type RegionalFeatureReplacements<const SIZE: usize> =
-    SmallVec<[RegionalFeatureReplacement<SIZE>; 4]>;
-
 pub struct RegionChunksBlockRows<'a, const SIZE: usize>(&'a [RegionChunk<SIZE>]);
 
 // TODO rename me
@@ -115,7 +107,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         loc: RegionLocation<SIZE>,
         continents: &ContinentMap,
         regions: &Regions<SIZE, SIZE_2>,
-    ) -> (Self, RegionalFeatureReplacements<SIZE>) {
+    ) -> Self {
         debug_assert_eq!(SIZE * SIZE, SIZE_2); // gross but temporary as long as we need SIZE_2
 
         // using a log_scope here causes a nested panic, possibly due to dropping the scope multiple
@@ -131,10 +123,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         };
 
         // regional feature discovery
-        let updates = region.discover_regional_features(loc, regions).await;
+        region.discover_regional_features(loc, regions).await;
 
         trace!("finished creating region"; "region" => ?loc);
-        (region, updates)
+        region
     }
 
     async fn init_region_chunks(
@@ -186,7 +178,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         &mut self,
         region: RegionLocation<SIZE>,
         regions: &Regions<SIZE, SIZE_2>,
-    ) -> RegionalFeatureReplacements<SIZE> {
+    ) {
         let params = regions.params();
 
         // expand each row outwards a tad for slightly relaxed boundary
@@ -211,11 +203,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 );
             });
 
-        let mut feature_updates = SmallVec::new();
-
         if points.is_empty() {
             // no feature, yippee
-            return feature_updates;
+            return;
         }
 
         debug_assert_ne!(feature_range, FeatureZRange::null());
@@ -276,16 +266,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         this_feature = Some(other_feature);
                     }
                     Some(f) if !SharedRegionalFeature::ptr_eq(f, &other_feature) => {
-                        // replace theirs with ours (after return)
+                        // replace theirs with ours
                         trace!("replacing neighbour's feature instance with ours";
                             "region" => ?region, "neighbour" => ?neighbour,
                             "theirs" => ?other_feature.ptr_debug(), "ours" => ?f.ptr_debug());
 
-                        feature_updates.push(RegionalFeatureReplacement {
-                            region: neighbour,
-                            current: other_feature.clone(),
-                            new: f.clone(),
-                        });
+                        regions
+                            .try_replace_feature(neighbour, &other_feature, f.clone())
+                            .await;
 
                         f.merge_with_other(other_feature)
                             .await
@@ -342,8 +330,6 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
             .take()
             .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range, params));
         self.features.push(feature);
-
-        feature_updates
     }
 
     #[cfg(any(test, feature = "benchmarking"))]
