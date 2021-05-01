@@ -683,6 +683,7 @@ mod tests {
     use crate::PlanetParams;
 
     use super::*;
+    use std::time::Duration;
     use unit::dim::SmallUnsignedConstant;
 
     const SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(2);
@@ -691,7 +692,7 @@ mod tests {
     type SmolRegion = Region<2, 4>;
     type SmolRegions = Regions<2, 4>;
 
-    async fn load_regions(regions_to_request: impl Iterator<Item = (u32, u32)>) -> SmolRegions {
+    fn init() -> (&'static mut SmolRegions, &'static mut ContinentMap) {
         let params = {
             let mut params = PlanetParams::dummy();
             let mut params_mut = PlanetParamsRef::get_mut(&mut params).unwrap();
@@ -699,17 +700,19 @@ mod tests {
             params_mut.max_continents = 4;
             params
         };
-        let (regions, continents) = {
-            let regions = Box::new(SmolRegions::new(params.clone()));
-            let continents = Box::new(ContinentMap::new_with_rng(
-                params.clone(),
-                &mut thread_rng(),
-            ));
+        let regions = Box::new(SmolRegions::new(params.clone()));
+        let continents = Box::new(ContinentMap::new_with_rng(
+            params.clone(),
+            &mut thread_rng(),
+        ));
 
-            // by boxing and leaking these, they are not destroyed prematurely during a panic and
-            // therefore don't cause other non-panicked worker threads to segfault
-            (Box::leak(regions), Box::leak(continents))
-        };
+        // by boxing and leaking these, they are not destroyed prematurely during a panic and
+        // therefore don't cause other non-panicked worker threads to segfault
+        (Box::leak(regions), Box::leak(continents))
+    }
+
+    async fn load_regions(regions_to_request: impl Iterator<Item = (u32, u32)>) -> SmolRegions {
+        let (regions, continents) = init();
 
         let mut regions_to_request = regions_to_request.sorted().collect_vec();
         join_on(regions_to_request.iter().copied().map(|(x, y)| {
@@ -840,5 +843,93 @@ mod tests {
         ];
 
         load_regions(regions_to_request.iter().copied()).await;
+    }
+
+    fn test_world_timeout() -> Duration {
+        let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(5);
+
+        Duration::from_secs(seconds)
+    }
+
+    /// Try to find deadlocks
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore]
+    async fn region_requesting_random_stress_test() {
+        const COUNT: usize = 200;
+
+        let (regions, continents) = init();
+
+        common::logging::for_tests();
+        let timeout_task = tokio::task::spawn(async {
+            let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
+                .ok()
+                .and_then(|val| val.parse().ok())
+                .unwrap_or(60);
+
+            tokio::time::sleep(Duration::from_secs(seconds)).await;
+            panic!("TIMEOUT!!!");
+        });
+
+        let mut tasks = vec![];
+        let mut rando = SmallRng::from_entropy();
+
+        macro_rules! queue {
+            ($region:expr) => {
+                let (rx, ry) = $region;
+                let region = RegionLocation::new(rx, ry);
+                let fut = regions.get_or_create(region, continents);
+                let task = tokio::task::spawn(fut);
+                tasks.push(task);
+            };
+        };
+
+        for _ in 0..COUNT {
+            let rx = rando.gen_range(0, PLANET_SIZE);
+            let ry = rando.gen_range(0, PLANET_SIZE);
+            queue!((rx, ry));
+
+            if rando.gen_bool(0.6) {
+                queue!((rx + 1, ry));
+            }
+            if rando.gen_bool(0.6) {
+                queue!((rx.saturating_sub(1), ry));
+            }
+            if rando.gen_bool(0.6) {
+                queue!((rx, ry + 1));
+            }
+            if rando.gen_bool(0.6) {
+                queue!((rx, ry.saturating_sub(1)));
+            }
+        }
+
+        join_on(tasks.into_iter()).await;
+
+        // cancel timeout
+        timeout_task.abort();
+
+        // generic checks
+        for ([x, y, _], entry) in regions.region_grid.iter_coords() {
+            let guard = entry
+                .0
+                .try_read()
+                .expect("should be able to lock immediately");
+            let loc = (x as u32, y as u32);
+            match &*guard {
+                RegionLoadState::InProgress(ty, _, _) | RegionLoadState::Requested(ty) => {
+                    panic!("region is still requested as {:?}", ty)
+                }
+                _ => {}
+            }
+        }
+
+        // ensure no dupe loading
+        let mut all_creations = regions.created_regions.lock().await;
+        let len_before = all_creations.len();
+        all_creations.sort();
+        all_creations.dedup();
+        assert_eq!(len_before, all_creations.len(), "duplicate slab creation");
     }
 }
