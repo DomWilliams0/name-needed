@@ -115,11 +115,21 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         location: RegionLocation<SIZE>,
         continents: &ContinentMap,
     ) -> Option<LoadedRegionRef<'_, SIZE, SIZE_2>> {
-        // lookup existing state with exclusive lock
-        // TODO take read lock then upgrade if necessary
         let entry = self.entry_checked(location)?;
-        let entry_rw = entry.0.write().await;
 
+        // fast path for when the region is already fully loaded, take ro lock only
+        let entry_ro = entry.0.read().await;
+        if let RegionLoadState::Fully(region) = &*entry_ro {
+            // already fully loaded, nothing to do
+            // safety: in fully loaded branch
+            let region_ref = unsafe { entry.region_ref_with_guard(entry_ro).await };
+            trace!("region is already fully loaded (fast path)"; "region" => ?location);
+            return Some(region_ref);
+        }
+        drop(entry_ro);
+
+        // lookup existing state with rw lock
+        let entry_rw = entry.0.write().await;
         match &*entry_rw {
             RegionLoadState::Unloaded => {
                 let source = self.find_load_source(location);

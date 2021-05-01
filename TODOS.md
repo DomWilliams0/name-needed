@@ -1,4 +1,4 @@
-# TODOs (313)
+# TODOs (312)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -73,9 +73,8 @@
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
- * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (3)
+ * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (2)
    * `/// TODO use a global vec/channel instead (in tests only)`
-   * `// TODO take read lock then upgrade if necessary`
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
