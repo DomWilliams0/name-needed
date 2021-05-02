@@ -12,6 +12,15 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 02 May 2021: <em>Tree placement in forests. Trees are **very** simplistic for now, more like large mushrooms. There's a
+  lot of progress behind the scenes in
+  [parallel regional feature discovery](https://github.com/DomWilliams0/name-needed/blob/7c504ff0d26ecb68e0f3fae2a023e925eb0ecf04/game/procgen/src/region/regions.rs#L137)
+  ,which will be documented in a future devlog.
+  </em>
+<p style="margin: auto">
+    <img src=".screenshots/procgen-forest.png" width="400"/>
+</p>
+
 * 29 Mar 2021: <em>Basic planet-scale biome selection based on temperature/latitude/moisture/elevation. Pictured is a 
   smooth transition between a plains and beach biome.</em>
 <p style="margin: auto">
@@ -26,11 +35,13 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 *[Continued here](PROGRESS.md)*
 
-## Building and running
+## Building/downloading
 
 The engine uses SDL2 and OpenGL, and is developed primarily on Linux, although it seems to work fine on Windows too.
 
-If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) feature of SDL can download and compile it for you (requires a C compiler).
+See the [releases](https://github.com/DomWilliams0/name-needed/releases) page for prebuilt binaries - occasionally the main `develop` branch is built and published there. Simply download, unzip and run the binary in that directory.
+
+Otherwise you can build it with `cargo build --release` (debug builds are *really* slow). If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) feature of SDL can download and compile it for you (requires a C compiler).
 
 I use the latest stable Rust toolchain and the newest fanciest language features, so no promises for a Minimal Supported Rust Version.
 
@@ -41,7 +52,7 @@ $ cd name-needed/
 
 $ # optionally modify game config, see below
 
-$ cargo run
+$ cargo run --release
 ```
 
 ### Configuration
