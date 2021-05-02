@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use geo::prelude::*;
 use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
@@ -18,15 +18,16 @@ use geo::coords_iter::CoordsIter;
 use geo_booleanop::boolean::{BooleanOp, Operation};
 use std::any::{Any, TypeId};
 
+use crate::region::unit::RegionLocation;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::hint::unreachable_unchecked;
 use std::ops::Deref;
 
-/// Feature discovered at region initialization. Belongs in an Arc
-pub struct RegionalFeature {
+/// Feature discovered during region initialization
+pub struct RegionalFeature<const SIZE: usize> {
     /// NON ASYNC MUTEX, do not hold this across .awaits!!
-    inner: parking_lot::RwLock<RegionalFeatureInner>,
+    inner: parking_lot::RwLock<RegionalFeatureInner<SIZE>>,
 
     // TODO make this struct a dst and store trait object inline without extra indirection
     feature: Mutex<Box<dyn Feature>>,
@@ -34,23 +35,26 @@ pub struct RegionalFeature {
     typeid: TypeId,
 }
 
-struct RegionalFeatureInner {
+struct RegionalFeatureInner<const SIZE: usize> {
     /// 2d bounds around feature, only applies to slabs within this polygon
     bounding: RegionalFeatureBoundary,
 
     /// Inclusive bounds in the z direction for this feature
     z_range: FeatureZRange,
+
+    /// The regions that reference this feature
+    regions: Vec<RegionLocation<SIZE>>,
 }
 
 /// Either Polygon or MultiPolygon
-#[derive(Clone)]
 pub struct RegionalFeatureBoundary(Geometry<f64>);
 
 /// Inclusive bounds in the z direction for a feature
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct FeatureZRange(GlobalSliceIndex, GlobalSliceIndex);
 
-pub type SharedRegionalFeature = Arc<RegionalFeature>;
+pub type SharedRegionalFeature<const SIZE: usize> = Arc<RegionalFeature<SIZE>>;
+pub type WeakRegionalFeatureRef<const SIZE: usize> = Weak<RegionalFeature<SIZE>>;
 
 pub trait Feature: Send + Sync + Debug {
     fn name(&self) -> &'static str;
@@ -77,12 +81,12 @@ pub struct ApplyFeatureContext<'a> {
     pub subfeatures_tx: tokio::sync::mpsc::UnboundedSender<SharedSubfeature>,
 }
 
-impl RegionalFeature {
+impl<const SIZE: usize> RegionalFeature<SIZE> {
     pub fn new<F: Feature + 'static>(
         bounding: RegionalFeatureBoundary,
         z_range: FeatureZRange,
         feature: F,
-    ) -> SharedRegionalFeature {
+    ) -> SharedRegionalFeature<SIZE> {
         debug_assert!(!bounding.is_empty());
 
         let extended_z_range = feature.extend_z_range(z_range);
@@ -93,7 +97,11 @@ impl RegionalFeature {
         let name = feature.name();
 
         let arc = Arc::new(RegionalFeature {
-            inner: parking_lot::RwLock::new(RegionalFeatureInner { bounding, z_range }),
+            inner: parking_lot::RwLock::new(RegionalFeatureInner {
+                bounding,
+                z_range,
+                regions: Vec::new(),
+            }),
             feature: Mutex::new(Box::new(feature)),
             typeid: TypeId::of::<F>(),
         });
@@ -129,20 +137,37 @@ impl RegionalFeature {
     /// Gut the other and absorb it into this's bounds
     pub fn merge_with_bounds(
         &self,
-        other_bounding: &RegionalFeatureBoundary,
+        other_bounding: RegionalFeatureBoundary,
         other_z_range: FeatureZRange,
     ) {
         let mut inner = self.inner.write();
 
+        let (n_before, area_before);
+        #[cfg(debug_assertions)]
+        {
+            n_before = inner.bounding.coords_iter().count();
+            area_before = inner.bounding.unsigned_area();
+        }
+
         inner.bounding.merge(other_bounding);
+
+        #[cfg(debug_assertions)]
+        {
+            let n_after = inner.bounding.coords_iter().count();
+            let area_after = inner.bounding.unsigned_area();
+            trace!("feature polygon merge"; "after" => ?(n_after, area_after), "before" => ?(n_before, area_before));
+        }
+
         inner.z_range = inner.z_range.max_of(other_z_range);
     }
 
-    /// self and other must not be the same feature, because feature mutex is not reentrant
+    /// `self` and `other` must not be the same feature, because feature mutex is not reentrant.
+    /// Guts `other`.
+    /// Returns vec of regions that reference the `other` feature
     pub async fn merge_with_other(
-        &self,
-        other: SharedRegionalFeature,
-    ) -> Result<(), (TypeId, TypeId)> {
+        self: &Arc<Self>,
+        other: &SharedRegionalFeature<SIZE>,
+    ) -> Result<Vec<RegionLocation<SIZE>>, (TypeId, TypeId)> {
         // debug_assert_eq!(
         //     self.typeid, other.typeid,
         //     "can't merge {:?} with {:?}",
@@ -161,13 +186,18 @@ impl RegionalFeature {
             return Err((self.typeid, other.typeid));
         }
 
+        let regions;
         {
-            // now merge bounding polygons, but leaving the other as-is
-            let other_inner = other.inner.read();
-            self.merge_with_bounds(&other_inner.bounding, other_inner.z_range);
+            // now merge bounding polygons, gutting the other
+            let mut other_inner = other.inner.write();
+            let other_bounding = std::mem::take(&mut other_inner.bounding);
+            self.merge_with_bounds(other_bounding, other_inner.z_range);
+
+            // steal regions
+            regions = std::mem::take(&mut other_inner.regions);
         }
 
-        Ok(())
+        Ok(regions)
     }
 
     /// Dirty way to compare distinct instances by pointer value
@@ -184,9 +214,12 @@ impl RegionalFeature {
     pub fn display<'a>(self: &'a Arc<Self>) -> impl Display + 'a {
         let ptr = Arc::as_ptr(self);
 
-        struct RegionalFeature<'a>(*const u8, &'a Arc<super::RegionalFeature>);
+        struct RegionalFeature<'a, const SIZE: usize>(
+            *const u8,
+            &'a Arc<super::RegionalFeature<SIZE>>,
+        );
 
-        impl Display for RegionalFeature<'_> {
+        impl<const SIZE: usize> Display for RegionalFeature<'_, SIZE> {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{:?}: ", self.0)?;
                 if let Ok(feature) = self.1.feature.try_lock() {
@@ -233,9 +266,42 @@ impl RegionalFeature {
         }
     }
 
-    #[cfg(debug_assertions)]
     pub fn is_boundary_empty(&self) -> bool {
         self.inner.read().bounding.is_empty()
+    }
+
+    pub fn add_region(&self, region: RegionLocation<SIZE>) {
+        self.add_regions(once(region));
+    }
+
+    pub fn add_regions(&self, regions: impl Iterator<Item = RegionLocation<SIZE>> + Clone) {
+        let mut inner = self.inner.write();
+
+        if cfg!(debug_assertions) {
+            let regions = regions.clone();
+            for region in regions {
+                assert!(
+                    !inner.regions.contains(&region),
+                    "duplicate region {:?} in feature {:?}",
+                    region,
+                    self
+                );
+            }
+        }
+        inner.regions.extend(regions);
+    }
+
+    // TODO create guard struct/owned ref to avoid needing to clone the vec temporarily
+    pub fn regions(&self) -> Vec<RegionLocation<SIZE>> {
+        let inner = self.inner.read();
+        inner.regions.clone()
+    }
+}
+
+impl<const SIZE: usize> Drop for RegionalFeature<SIZE> {
+    fn drop(&mut self) {
+        let ptr = self as *mut _;
+        trace!("dropping feature {:?} @ {:?}", self, ptr);
     }
 }
 
@@ -298,7 +364,7 @@ fn slab_rando_seed(slab: SlabLocation, planet_seed: u64) -> u64 {
     hasher.finish()
 }
 
-impl Debug for RegionalFeature {
+impl<const SIZE: usize> Debug for RegionalFeature<SIZE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let inner = self.inner.try_read();
         let feature = self.feature.try_lock().ok();
@@ -331,20 +397,20 @@ impl Debug for RegionalFeature {
 }
 
 impl RegionalFeatureBoundary {
-    /// Merges the other into this via union - the other is not modified
-    pub fn merge(&mut self, other: &RegionalFeatureBoundary) {
+    /// Merges the other into this via union
+    pub fn merge(&mut self, other: RegionalFeatureBoundary) {
         // check for empty polygons
         match (self.0.is_empty(), other.0.is_empty()) {
             (true, false) => {
                 trace!("this boundary is empty but other isn't, just take the other");
-                *self = other.clone();
+                *self = other;
             }
             (false, true) => {
                 trace!("other boundary is empty but this isn't, merge is nop");
             }
             (false, false) => {
                 // neither is empty, actually merge (normal case)
-                *self = Self::new_multi_as_is(self.union(other));
+                *self = Self::new_multi_as_is(self.union(&other));
                 debug_assert!(!self.is_empty(), "union of 2 non-empty boundaries is empty");
             }
             (true, true) => {

@@ -1,4 +1,4 @@
-# TODOs (311)
+# TODOs (316)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -49,10 +49,11 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (4)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
    * `// TODO ensure these are optimised out`
    * `// TODO give each feature a guid instead`
+   * `// TODO create guard struct/owned ref to avoid needing to clone the vec temporarily`
    * `// TODO faster and non-random hash`
  * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
    * `// TODO remove magic value, use real max tree height`
@@ -73,8 +74,11 @@
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
- * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (2)
+ * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (5)
+   * `// TODO watch out for monotonic increase in memory usage storing Loaded state for every slab ever...`
+   * `/// TODO replace silly bool if we ever start keeping track of all loaded regions`
    * `/// TODO use a global vec/channel instead (in tests only)`
+   * `/// TODO use a Notify instead of unused channel`
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
@@ -258,11 +262,12 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `r.register(FeatureBoundaryDebugRenderer::default(), true)?; // TODO TEMPORARY TRUE`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)

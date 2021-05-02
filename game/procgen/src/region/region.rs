@@ -18,9 +18,11 @@ use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParamsRef;
 use crate::rasterize::BlockType;
-use crate::region::feature::{FeatureZRange, RegionalFeatureBoundary, SharedRegionalFeature};
+use crate::region::feature::{
+    FeatureZRange, RegionalFeatureBoundary, SharedRegionalFeature, WeakRegionalFeatureRef,
+};
 use crate::region::features::ForestFeature;
-use crate::region::regions::Regions;
+use crate::region::regions::{FeatureReplacement, Regions};
 use crate::region::row_scanning::RegionNeighbour;
 use crate::region::subfeature::SlabContinuation;
 use crate::region::unit::PlanetPoint;
@@ -52,7 +54,7 @@ use crate::{
 // TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)
 pub struct Region<const SIZE: usize, const SIZE_2: usize> {
     chunks: [RegionChunk<SIZE>; SIZE_2],
-    features: Vec<SharedRegionalFeature>,
+    features: Vec<SharedRegionalFeature<SIZE>>,
 }
 
 pub struct RegionChunk<const SIZE: usize> {
@@ -67,14 +69,16 @@ pub(super) type SlabContinuations = Arc<Mutex<HashMap<SlabLocation, SlabContinua
 
 /// Info about features/generation from neighbouring regions that is to be carried over the
 /// boundary
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub(in crate::region) struct RegionContinuation<const SIZE: usize> {
     /// (direction of neighbour from this region, feature)
-    features: Vec<(RegionNeighbour, SharedRegionalFeature)>,
+    features: Vec<(RegionNeighbour, WeakRegionalFeatureRef<SIZE>)>,
 }
 
+pub(in crate::region) type RegionContinuationsInner<const SIZE: usize> =
+    HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>;
 pub(in crate::region) type RegionContinuations<const SIZE: usize> =
-    Mutex<HashMap<RegionLocation<SIZE>, RegionContinuation<SIZE>>>;
+    Mutex<RegionContinuationsInner<SIZE>>;
 
 pub struct RegionChunksBlockRows<'a, const SIZE: usize>(&'a [RegionChunk<SIZE>]);
 
@@ -233,12 +237,12 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         trace!("regional feature discovery"; "region" => ?region, "points" => n, "overflows" => ?overflows);
 
         // must only be called once, result is cached in this_feature
-        let mut this_feature: Option<SharedRegionalFeature> = None;
-        fn create_new_feature(
+        let mut this_feature: Option<SharedRegionalFeature<SIZE>> = None;
+        fn create_new_feature<const SIZE: usize>(
             bounding: &mut RegionalFeatureBoundary,
             feature_range: FeatureZRange,
             params: &PlanetParamsRef,
-        ) -> SharedRegionalFeature {
+        ) -> SharedRegionalFeature<SIZE> {
             let bounding = {
                 let stolen = std::mem::take(bounding);
                 assert!(!stolen.is_empty()); // is only called once
@@ -280,22 +284,37 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
                         let bounding = std::mem::take(&mut bounding);
                         debug_assert!(!bounding.is_empty()); // consumed only once
-                        other_feature.merge_with_bounds(&bounding, feature_range);
+                        other_feature.merge_with_bounds(bounding, feature_range);
                         this_feature = Some(other_feature);
                     }
                     Some(f) if !SharedRegionalFeature::ptr_eq(f, &other_feature) => {
-                        // replace theirs with ours
-                        trace!("replacing neighbour's feature instance with ours";
-                            "region" => ?region, "neighbour" => ?neighbour,
-                            "theirs" => ?other_feature.ptr_debug(), "ours" => ?f.ptr_debug());
+                        debug_assert!(!f.is_boundary_empty());
+                        if !other_feature.is_boundary_empty() {
+                            // replacement needed
+                            match regions
+                                .resolve_feature_replacement(
+                                    f,
+                                    &other_feature,
+                                    &mut *continuations_guard,
+                                )
+                                .await
+                            {
+                                FeatureReplacement::KeepLeft => {
+                                    // replaced neighbour's with ours
+                                    trace!("replacing neighbour's feature instance with ours";
+                                    "region" => ?region, "neighbour" => ?neighbour,
+                                    "theirs" => ?other_feature.ptr_debug(), "ours" => ?f.ptr_debug());
+                                }
+                                FeatureReplacement::KeepRight => {
+                                    // replace ours with neighbour's
+                                    trace!("replacing our feature instance with neighbour's";
+                                    "region" => ?region, "neighbour" => ?neighbour,
+                                    "theirs" => ?other_feature.ptr_debug(), "ours" => ?f.ptr_debug());
 
-                        regions
-                            .try_replace_feature(neighbour, &other_feature, f.clone())
-                            .await;
-
-                        f.merge_with_other(other_feature)
-                            .await
-                            .expect("regional feature type mismatch");
+                                    this_feature = Some(other_feature);
+                                }
+                            }
+                        }
                     }
                     Some(_) => {
                         trace!("neighbour already has the same feature as us";
@@ -310,14 +329,16 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         // already created one, reuse it
                         trace!("reusing own feature"; "region" => ?region,
                             "neighbour" => ?neighbour, "feature" => ?f.ptr_debug());
-                        f.clone()
+                        Arc::downgrade(f)
                     }
                     None => {
                         let feature = create_new_feature(&mut bounding, feature_range, params);
                         trace!("created new feature"; "region" => ?region,
                             "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
-                        this_feature = Some(feature.clone());
-                        feature
+
+                        let weak = Arc::downgrade(&feature);
+                        this_feature = Some(feature);
+                        weak
                     }
                 };
 
@@ -326,7 +347,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                 // where e.g. the feature ends exactly at the region edge
                 if !regions.is_region_loaded(neighbour).await {
                     trace!("adding feature to unloaded neighbour's continuations"; "region" => ?region,
-                            "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
+                            "neighbour" => ?neighbour, "feature" => ?feature.as_ptr());
                     let neighbour_continuations = continuations_guard
                         .entry(neighbour)
                         .or_insert_with(RegionContinuation::default);
@@ -336,7 +357,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
                         .push((overflow.opposite(), feature))
                 } else {
                     trace!("neighbour is already loaded, skipping continuation"; "region" => ?region,
-                            "neighbour" => ?neighbour, "feature" => ?feature.ptr_debug());
+                            "neighbour" => ?neighbour, "feature" => ?feature.as_ptr());
                 }
             }
         }
@@ -347,8 +368,13 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         let feature = this_feature
             .take()
             .unwrap_or_else(|| create_new_feature(&mut bounding, feature_range, params));
+        feature.add_region(region);
+
+        let dbg = feature.ptr_debug();
         self.features.push(feature);
-        trace!("added feature to finished region"; "region" => ?region, "features" => ?self.features);
+        trace!("added feature to finished region"; "region" => ?region,
+            "feature" => ?dbg, "features" => ?self.features
+        );
     }
 
     #[cfg(any(test, feature = "benchmarking"))]
@@ -383,25 +409,25 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         &'a self,
         slab: SlabLocation,
         slab_bounds: &'a Rect<f64>,
-    ) -> impl Iterator<Item = &SharedRegionalFeature> + 'a {
+    ) -> impl Iterator<Item = &SharedRegionalFeature<SIZE>> + 'a {
         self.features
             .iter()
             .filter(move |feature| feature.applies_to(slab, slab_bounds))
     }
 
-    pub fn all_features(&self) -> impl Iterator<Item = &SharedRegionalFeature> + '_ {
+    pub fn all_features(&self) -> impl Iterator<Item = &SharedRegionalFeature<SIZE>> + '_ {
         self.features.iter()
     }
 
     /// True on success
     pub fn replace_feature(
         &mut self,
-        current: &SharedRegionalFeature,
-        replacement: SharedRegionalFeature,
+        current: &SharedRegionalFeature<SIZE>,
+        replacement: &SharedRegionalFeature<SIZE>,
     ) -> bool {
         if let Some(feature) = self.features.iter_mut().find(|f| Arc::ptr_eq(&current, *f)) {
             // swapadoodledoo
-            *feature = replacement;
+            *feature = replacement.clone();
             true
         } else {
             false
@@ -444,13 +470,40 @@ impl<'a, const SIZE: usize> RegionChunksBlockRows<'a, SIZE> {
 }
 
 impl<const SIZE: usize> RegionContinuation<SIZE> {
-    fn pop(&mut self, neighbour: RegionNeighbour) -> Option<SharedRegionalFeature> {
+    fn pop(&mut self, neighbour: RegionNeighbour) -> Option<SharedRegionalFeature<SIZE>> {
         let idx = self.features.iter().position(|(n, _)| *n == neighbour)?;
-        Some(self.features.swap_remove(idx).1)
+        let weak = self.features.swap_remove(idx).1;
+        weak.upgrade().and_then(|strong| {
+            if !strong.is_boundary_empty() {
+                Some(strong)
+            } else {
+                // probably doesn't happen
+                trace!("neighbour's feature is gutted, ignoring continuation";
+                       "neighbour" => ?neighbour, "feature" => ?strong.ptr_debug());
+                None
+            }
+        })
     }
 
     fn contains(&self, neighbour: &RegionNeighbour) -> bool {
         self.features.iter().any(|(n, _)| n == neighbour)
+    }
+
+    pub fn try_replace_feature(
+        &mut self,
+        current: &SharedRegionalFeature<SIZE>,
+        replacement: &SharedRegionalFeature<SIZE>,
+    ) -> usize {
+        let current_ptr = Arc::as_ptr(current);
+        let mut n = 0;
+        for (_, weak) in &mut self.features {
+            if std::ptr::eq(current_ptr, weak.as_ptr()) {
+                *weak = Arc::downgrade(replacement);
+                n += 1;
+            }
+        }
+
+        n
     }
 }
 
@@ -617,6 +670,28 @@ impl BlockHeight {
 
 // slog_value_debug!(RegionLocation);
 
+impl<const SIZE: usize> Debug for RegionContinuation<SIZE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RegionContinuations([")?;
+
+        for (offset, weak) in &self.features {
+            let mut tup = f.debug_list();
+            tup.entry(offset);
+
+            if let Some(nice) = weak.upgrade() {
+                tup.entry(&nice.ptr_debug());
+            } else {
+                tup.entry(&"<gutted>");
+            }
+
+            tup.finish()?;
+            write!(f, ", ")?;
+        }
+
+        write!(f, "])")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use common::thread_rng;
@@ -677,7 +752,7 @@ mod tests {
             params_mut.max_continents = 1;
             params
         };
-        let mut regions = SmolRegions::new(params.clone());
+        let regions = SmolRegions::new(params.clone());
         let continents = ContinentMap::new_with_rng(params.clone(), &mut thread_rng());
 
         let loc = SmolRegionLocation::new(10, 20);

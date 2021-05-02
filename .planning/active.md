@@ -26,7 +26,7 @@
 * [~] consider caching region/features in planet cache
 	* no - features depend on the order of discovered region chunks
 * [X] feature polygon debug renderer should cache outlines when mutex can not be taken
-* [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - detect restarting?
+* [ ] restarting the game while terrain is loading triggers a panic "chunk finalization error threshold passed" - shutdown worker threadpool first
 * [X] bug: panic "chunk should be present" when zoom=10.0 or initial slab batch is too big
 	* caused by LoadNotifier broadcast overflowing
 * [X] enforce loading all of a region's neighbours before generating slabs (to ensure features are generated and merged fully before placing blocks)
@@ -41,4 +41,6 @@
 * [ ] bug: entities glitch up through tree trunks and get stuck at the top when wandering past
 * [ ] bug: occlusion shadows cast by blocks above current viewing slice look weird
 * [X] more worker threads for world than #cpus/2
-* [ ] bug: hit a deadlock in region loading while scrolling around
+* [ ] add tokio tracing feature to help debug deadlocks
+	* restarting the game causes them often
+* [ ] ensure no bunching up of trees along region boundaries

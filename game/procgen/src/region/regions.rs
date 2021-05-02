@@ -10,15 +10,21 @@ use grid::DynamicGrid;
 
 use crate::continent::ContinentMap;
 use crate::region::feature::SharedRegionalFeature;
-use crate::region::region::{Region, RegionContinuations, SlabContinuations};
+use crate::region::region::{
+    Region, RegionContinuations, RegionContinuationsInner, SlabContinuations,
+};
+
 use crate::region::unit::RegionLocation;
 use crate::region::SlabContinuation;
 use crate::{PlanetParams, PlanetParamsRef};
 use futures::prelude::stream::FuturesUnordered;
+
 use futures::{Future, StreamExt};
 use line_drawing::Bresenham;
+
 use std::hint::unreachable_unchecked;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use strum_macros::EnumDiscriminants;
 use unit::world::SlabLocation;
@@ -30,13 +36,23 @@ pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     region_grid: DynamicGrid<RegionEntry<SIZE, SIZE_2>>,
 
     region_continuations: RegionContinuations<SIZE>,
+    // TODO watch out for monotonic increase in memory usage storing Loaded state for every slab ever...
+    //  - could use a cheaper bitset-like structure in each Region instead of storing global slab locs
     slab_continuations: SlabContinuations,
+
+    /// TODO replace silly bool if we ever start keeping track of all loaded regions
     is_initial_region: AtomicBool,
 
     /// Keep track of all regions created in tests
     /// TODO use a global vec/channel instead (in tests only)
     #[cfg(test)]
     created_regions: Mutex<Vec<RegionLocation<SIZE>>>,
+}
+
+#[derive(Copy, Clone)]
+pub enum FeatureReplacement {
+    KeepLeft,
+    KeepRight,
 }
 
 #[derive(EnumDiscriminants)]
@@ -47,6 +63,7 @@ pub(crate) enum RegionLoadState<const SIZE: usize, const SIZE_2: usize> {
     Requested(RequestedType),
     /// Is currently loading. The channel is not actually used to send anything, its closure when
     /// upgrading the state signals to the receivers
+    /// TODO use a Notify instead of unused channel
     InProgress(RequestedType, watch::Sender<()>, watch::Receiver<()>),
     /// Is loaded and has some neighbours partially/fully loaded, cannot yet generate slabs
     Partially(Region<SIZE, SIZE_2>),
@@ -77,6 +94,13 @@ pub struct LoadedRegionRef<'a, const SIZE: usize, const SIZE_2: usize> {
     /// Ensures the state can't change while this reference exists
     _guard: RwLockReadGuard<'a, RegionLoadState<SIZE, SIZE_2>>,
     region: &'a Region<SIZE, SIZE_2>,
+}
+
+/// A mutable reference to a Region within its Partially or Loaded state
+pub struct LoadedRegionRefMut<'a, const SIZE: usize, const SIZE_2: usize> {
+    /// Ensures the state can't change while this reference exists
+    _guard: RwLockWriteGuard<'a, RegionLoadState<SIZE, SIZE_2>>,
+    region: &'a mut Region<SIZE, SIZE_2>,
 }
 
 #[derive(Default, Deref)]
@@ -124,8 +148,17 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
                     let region_ref = entry.region_ref_with_guard($entry_ro).await;
                     trace!(concat!("region is already fully loaded", $extra_log); "region" => ?location);
 
-                    // ensure no dangling continuations for this completed region
-                    if cfg!(debug_assertions) {
+                    #[cfg(debug_assertions)]
+                    {
+                        // ensure that no gutted features remain
+                        assert!(
+                            region_ref.all_features().all(|f| !f.is_boundary_empty()),
+                            "empty boundary on feature in {:?}: {:#?}",
+                            location,
+                            region_ref.all_features().map(|f| f.ptr_debug()).collect_vec()
+                        );
+
+                        // ensure no dangling continuations for this completed region
                         let continuations_guard = self.region_continuations().lock().await;
                         let continuations = continuations_guard.get(&location);
                         assert!(continuations.is_none(), "dangling region continuations for {:?}: {:?}", location, continuations.unwrap());
@@ -139,18 +172,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         // fast path for when the region is already fully loaded, take ro lock only
         {
             let entry_ro = entry.0.read().await;
-            if let RegionLoadState::Fully(region) = &*entry_ro {
-                #[cfg(debug_assertions)]
-                {
-                    // ensure that no gutted features remain
-                    assert!(
-                        region.all_features().all(|f| !f.is_boundary_empty()),
-                        "empty boundary on feature in {:?}: {:#?}",
-                        location,
-                        region.all_features().collect_vec()
-                    );
-                }
-
+            if let RegionLoadState::Fully(_) = &*entry_ro {
                 // already fully loaded, nothing to do
                 // safety: in fully loaded branch
                 return unsafe { fully_loaded!(entry_ro, " (fast path)") };
@@ -273,7 +295,14 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         // now self state can be updated to fully loaded
         trace!("upgrading from partially to fully loaded"; "region" => ?location);
         match entry.upgrade_from_partially_to_fully().await {
-            Ok(region) => Some(region),
+            Ok(region_mut) => {
+                trace!("congrats on your features"; "region" => ?location, "features" =>
+                    ?region_mut.all_features()
+                    .map(|f| format!("{:?}", f.ptr_debug())).collect_vec()
+                );
+
+                Some(region_mut)
+            }
             Err(_) => panic!("expected region to be partially loaded by now"),
         }
     }
@@ -362,17 +391,12 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
             }
         };
 
+        let this = self;
+        tokio::pin!(this);
+        tokio::pin!(continents);
+
         // do actual loading
-        let self_local: &Self;
-        let continents_local: &ContinentMap;
-        // safety: both live longer than local scope, as we are joining on these tasks
-        unsafe {
-            self_local = &*(self as *const Self);
-            continents_local = &*(continents as *const ContinentMap)
-        }
-        self_local
-            .create_single_region(region, continents_local)
-            .await;
+        this.create_single_region(region, &continents).await;
     }
 
     /// Loads the given region only, no neighbours. Assumes already unloaded and state is already
@@ -518,57 +542,154 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         matches!(&*ro, RegionLoadState::Partially(_) | RegionLoadState::Fully(_))
     }
 
-    pub async fn try_replace_feature(
+    #[cfg(debug_assertions)]
+    async fn assert_no_generated_slabs_for_region(
         &self,
         region: RegionLocation<SIZE>,
-        current: &SharedRegionalFeature,
-        new: SharedRegionalFeature,
+        replacing_feature: &SharedRegionalFeature<SIZE>,
     ) {
-        // ensure modified region has not yet generated any terrain
-        if cfg!(debug_assertions) {
-            let region_chunk_bounds = {
-                let (min, max) = region.chunk_bounds();
-                (min.0..max.0, min.1..max.1)
-            };
+        let region_chunk_bounds = {
+            let (min, max) = region.chunk_bounds();
+            (min.0..max.0, min.1..max.1)
+        };
 
-            let is_in_region = {
-                |slab: &SlabLocation| {
-                    let (xs, ys) = &region_chunk_bounds;
-                    let (x, y) = slab.chunk.xy();
-                    xs.contains(&x) && ys.contains(&y)
+        let is_in_region = {
+            |slab: &SlabLocation| {
+                let (xs, ys) = &region_chunk_bounds;
+                let (x, y) = slab.chunk.xy();
+                xs.contains(&x) && ys.contains(&y)
+            }
+        };
+
+        let bad_slabs = self
+            .slab_continuations
+            .lock()
+            .await
+            .iter()
+            .filter(|(slab, _)| is_in_region(slab))
+            .filter_map(|(slab, state)| {
+                if let SlabContinuation::Loaded = state {
+                    Some(*slab)
+                } else {
+                    None
                 }
-            };
+            })
+            .collect_vec();
 
-            let bad_slabs = self
-                .slab_continuations
-                .lock()
-                .await
-                .iter()
-                .filter(|(slab, _)| is_in_region(slab))
-                .filter_map(|(slab, state)| {
-                    if let SlabContinuation::Loaded = state {
-                        Some(*slab)
-                    } else {
-                        None
-                    }
-                })
-                .collect_vec();
-
-            assert_eq!(
+        assert_eq!(
                 bad_slabs,
                 vec![],
                 "some slabs have already been generated in region {:?} where feature {:?} is being replaced",
                 region,
-                current.ptr_debug()
+                replacing_feature.ptr_debug()
+            );
+    }
+
+    async fn is_region_fully_loaded(&self, region: RegionLocation<SIZE>) -> bool {
+        let entry = self.entry_unchecked(region);
+        let ro = entry.0.read().await;
+        matches!(&*ro, RegionLoadState::Fully(_))
+    }
+
+    async fn has_feature_generated_terrain(&self, feature: &SharedRegionalFeature<SIZE>) -> bool {
+        if feature.is_boundary_empty() {
+            return false;
+        }
+
+        let regions = feature.regions();
+        for region in regions {
+            if self.is_region_fully_loaded(region).await {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Chooses which feature should absorb the other (depending on if either has been rasterised to
+    /// terrain yet), then does the merge, gutting `b`.
+    /// Returns an indication of which feature to keep around (a=left, b=right)
+    pub(in crate::region) async fn resolve_feature_replacement(
+        &self,
+        a: &SharedRegionalFeature<SIZE>,
+        b: &SharedRegionalFeature<SIZE>,
+        mut continuations: impl DerefMut<Target = RegionContinuationsInner<SIZE>>,
+    ) -> FeatureReplacement {
+        let (a_has_generated, b_has_generated) = futures::join!(
+            self.has_feature_generated_terrain(a),
+            self.has_feature_generated_terrain(b)
+        );
+
+        let ret = match (a_has_generated, b_has_generated) {
+            (true, false) | (false, false) /* arbitrary choice */ => FeatureReplacement::KeepLeft,
+            (false, true) => FeatureReplacement::KeepRight,
+            (true, true) => {
+                unreachable!("can't decide between 2 features that have already generated terrain ({:?} and {:?})",
+                a.ptr_debug(), b.ptr_debug())
+            }
+        };
+
+        let (keep, replace) = match ret {
+            FeatureReplacement::KeepLeft => (a, b),
+            FeatureReplacement::KeepRight => (b, a),
+        };
+
+        trace!("merging features"; "keeping" => ?keep.ptr_debug(), "replacing" => ?replace.ptr_debug());
+
+        let outdated_regions = keep
+            .merge_with_other(replace)
+            .await
+            .expect("feature type mismatch");
+
+        // point regions at new feature
+        for &region in &outdated_regions {
+            #[cfg(debug_assertions)]
+            self.assert_no_generated_slabs_for_region(region, replace)
+                .await;
+
+            let entry = self.entry_unchecked(region);
+            let mut entry_rw = entry.0.write().await;
+            match &mut *entry_rw {
+                RegionLoadState::Unloaded
+                | RegionLoadState::Requested(_)
+                | RegionLoadState::InProgress(_, _, _) => unreachable!(
+                    "unexpected region state {:?}",
+                    RegionLoadStateDiscriminants::from(&*entry_rw)
+                ),
+                RegionLoadState::Partially(r) | RegionLoadState::Fully(r) => {
+                    // replace feature in region
+                    let success = r.replace_feature(replace, keep);
+                    debug_assert!(
+                        success,
+                        "could not replace feature {:?} in {:?}",
+                        replace.ptr_debug(),
+                        region
+                    );
+
+                    trace!("replaced feature"; "old" => ?replace.ptr_debug(), "new" => ?keep.ptr_debug(),
+                        "region" => ?region, "refs left" => Arc::strong_count(replace));
+                }
+            }
+        }
+
+        // replace feature in all continuations
+        let continuations_n = continuations
+            .deref_mut()
+            .iter_mut()
+            .fold(0, |acc, (_, continuations)| {
+                acc + continuations.try_replace_feature(replace, keep)
+            });
+
+        if continuations_n > 0 {
+            trace!("replaced feature in continuations";
+                "old" => ?replace.ptr_debug(), "new" => ?keep.ptr_debug()
             );
         }
 
-        debug!("applying feature replacement"; "region" => ?region, "current" => ?current.ptr_debug(), "new" => ?new.ptr_debug());
-        self.with_loaded_region_mut(region, |r| {
-            if !r.replace_feature(current, new) {
-                warn!("feature not found for replacement"; "region" => ?region, "feature" => ?current.ptr_debug());
-            }
-        }).await;
+        // update replacing feature's regions
+        keep.add_regions(outdated_regions.into_iter());
+
+        ret
     }
 
     /// Partially or fully loaded. Region assumed to be valid
@@ -648,6 +769,30 @@ impl<const SIZE: usize, const SIZE_2: usize> RegionEntry<SIZE, SIZE_2> {
         }
     }
 
+    /// # Safety
+    /// Must be in the Partially or Fully loaded state
+    async unsafe fn region_ref_with_guard_mut<'a>(
+        &self,
+        mut guard: RwLockWriteGuard<'a, RegionLoadState<SIZE, SIZE_2>>,
+    ) -> LoadedRegionRefMut<'a, SIZE, SIZE_2> {
+        use RegionLoadState::*;
+
+        let region = match &mut *guard {
+            Fully(region) | Partially(region) => &mut *(region as *mut Region<SIZE, SIZE_2>),
+            _ => {
+                if cfg!(debug_assertions) {
+                    panic!("region must be partially or fully loaded to get a reference");
+                }
+                unreachable_unchecked()
+            }
+        };
+
+        LoadedRegionRefMut {
+            _guard: guard,
+            region,
+        }
+    }
+
     async fn upgrade_from_partially_to_fully(
         &self,
     ) -> Result<LoadedRegionRef<'_, SIZE, SIZE_2>, ()> {
@@ -692,6 +837,31 @@ impl<const SIZE: usize, const SIZE_2: usize> Deref for LoadedRegionRef<'_, SIZE,
 
     fn deref(&self) -> &Self::Target {
         self.region
+    }
+}
+
+impl<const SIZE: usize, const SIZE_2: usize> Deref for LoadedRegionRefMut<'_, SIZE, SIZE_2> {
+    type Target = Region<SIZE, SIZE_2>;
+
+    fn deref(&self) -> &Self::Target {
+        self.region
+    }
+}
+
+impl<const SIZE: usize, const SIZE_2: usize> DerefMut for LoadedRegionRefMut<'_, SIZE, SIZE_2> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.region
+    }
+}
+
+impl<'a, const SIZE: usize, const SIZE_2: usize> LoadedRegionRefMut<'a, SIZE, SIZE_2> {
+    pub fn downgrade(self) -> LoadedRegionRef<'a, SIZE, SIZE_2> {
+        let LoadedRegionRefMut { _guard, region } = self;
+
+        LoadedRegionRef {
+            _guard: _guard.downgrade(),
+            region,
+        }
     }
 }
 
@@ -933,7 +1103,7 @@ mod tests {
                 let task = tokio::task::spawn(fut);
                 tasks.push(task);
             };
-        };
+        }
 
         for _ in 0..COUNT {
             let rx = rando.gen_range(0, PLANET_SIZE);
@@ -965,7 +1135,6 @@ mod tests {
                 .0
                 .try_read()
                 .expect("should be able to lock immediately");
-            let loc = (x as u32, y as u32);
             match &*guard {
                 RegionLoadState::InProgress(ty, _, _) | RegionLoadState::Requested(ty) => {
                     panic!("region is still requested as {:?}", ty)
