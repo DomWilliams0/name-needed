@@ -91,7 +91,7 @@ impl<'a> Frame<'a> {
             renderer.debug_add_line(from, to, color);
 
             // individual vertices
-            renderer.debug_add_circle(from, 0.5, color);
+            renderer.debug_add_square_around(from, 0.5, color);
         }
     }
 }
