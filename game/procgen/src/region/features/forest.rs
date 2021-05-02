@@ -98,7 +98,11 @@ impl Feature for ForestFeature {
         if let Some(other) = other.any_mut().downcast_mut::<Self>() {
             // steal other's trees
             let n = self.trees.absorb_other(&mut other.trees);
-            debug!("merged {trees} trees from other forest", trees = n; "total" => self.trees.points.size());
+            assert_eq!(
+                n, 0,
+                "there should be no trees in the forest being gutted!!"
+            );
+            // debug!("merged {trees} trees from other forest", trees = n; "total" => self.trees.points.size());
             true
         } else {
             // type mismatch

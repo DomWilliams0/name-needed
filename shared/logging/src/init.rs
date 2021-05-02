@@ -46,6 +46,7 @@ impl LoggerBuilder {
             slog_term::CompactFormat::new(decorator)
                 .use_custom_timestamp(timestamp_fn)
                 .build()
+                .filter_level(self.level.min(Level::Debug)) // dont spam terminal with trace
                 .fuse()
         };
 
@@ -82,8 +83,8 @@ impl LoggerBuilder {
             terminal_drain
         };
         let chan_size = match self.level {
-            Level::Debug | Level::Trace => 65535,
-            _ => 16384,
+            Level::Debug | Level::Trace => 0x20000,
+            _ => 0x4000,
         };
 
         let drain = drain.filter_level(self.level).fuse();

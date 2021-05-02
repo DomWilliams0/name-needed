@@ -33,7 +33,7 @@
 	* [X] load regions adjacent to already loaded regions only (except initial)
 	* [X] region load status can be unloaded, fully (can have slabs generated), partially (as a neighbour to a fully loaded region)
 	* [X] does this make any tree merging across boundaries pointless, because trees are only placed during slab generation?
-		* no, merging of not-yet-realised forests still occurs
+		* yes! added an assert and todo for now
 * [ ] update readme to suggest downloading release instead of building from scratch
 	* [ ] also provide build with debug logging enabled?
 * [ ] investigate perf issue of thousands of occlusion updates for empty all-air chunks
@@ -43,4 +43,3 @@
 * [X] more worker threads for world than #cpus/2
 * [ ] add tokio tracing feature to help debug deadlocks
 	* restarting the game causes them often
-* [ ] ensure no bunching up of trees along region boundaries

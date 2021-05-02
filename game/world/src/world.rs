@@ -723,7 +723,7 @@ impl LoadNotifier {
         let ret = loop {
             match self.recv.recv().await {
                 Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("slab notifications are lagging"; "skipped" => n);
+                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
                     break WaitResult::Retry;
                 }
                 Err(e) => {

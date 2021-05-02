@@ -1,4 +1,4 @@
-# TODOs (316)
+# TODOs (317)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -49,9 +49,10 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (6)
    * `// TODO make this struct a dst and store trait object inline without extra indirection`
    * `// TODO ensure these are optimised out`
+   * `// TODO this only serves as an assert - revisit the need to merge non-rasterised features`
    * `// TODO give each feature a guid instead`
    * `// TODO create guard struct/owned ref to avoid needing to clone the vec temporarily`
    * `// TODO faster and non-random hash`
@@ -262,12 +263,11 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
-   * `r.register(FeatureBoundaryDebugRenderer::default(), true)?; // TODO TEMPORARY TRUE`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
@@ -411,7 +411,8 @@
    * `# TODO feature for cgmath`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
- * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
+ * [shared/config/src/load.rs](shared/config/src/load.rs) (2)
+   * `// TODO use arc-swap to avoid the need to lock the config`
    * `// TODO add a variant that returns a default instead of panicking`
  * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)
    * `// TODO use same CoordType for DynamicGrid`

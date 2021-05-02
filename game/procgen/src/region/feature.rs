@@ -142,7 +142,7 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
     ) {
         let mut inner = self.inner.write();
 
-        let (n_before, area_before);
+        let (n_before, area_before): (usize, f64);
         #[cfg(debug_assertions)]
         {
             n_before = inner.bounding.coords_iter().count();
@@ -168,6 +168,8 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
         self: &Arc<Self>,
         other: &SharedRegionalFeature<SIZE>,
     ) -> Result<Vec<RegionLocation<SIZE>>, (TypeId, TypeId)> {
+        debug_assert!(!Arc::ptr_eq(self, other));
+
         // debug_assert_eq!(
         //     self.typeid, other.typeid,
         //     "can't merge {:?} with {:?}",
@@ -176,7 +178,7 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
 
         let merged;
         {
-            // try to merge features
+            // TODO this only serves as an assert - revisit the need to merge non-rasterised features
             let mut other_feature = other.feature.lock().await;
             let mut this_feature = self.feature.lock().await;
             merged = this_feature.merge_with(&mut **other_feature);
