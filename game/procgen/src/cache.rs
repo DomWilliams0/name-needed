@@ -13,6 +13,7 @@ pub fn save(planet: &PlanetInner) -> BoxedResult<()> {
 
     let mut file = OpenOptions::new().write(true).create(true).open(&path)?;
 
+    // TODO cache global features too
     bincode::serialize_into(&mut file, &planet.continents)?;
 
     Ok(())
@@ -20,7 +21,7 @@ pub fn save(planet: &PlanetInner) -> BoxedResult<()> {
 
 pub fn try_load(params: &PlanetParams) -> BoxedResult<Option<ContinentMap>> {
     let path = cache_file(params);
-    debug!("checking for cache in {file}", file = path.display());
+    debug!("checking for cache"; "file" => path.display());
 
     if !path.is_file() {
         // not cached

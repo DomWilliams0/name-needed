@@ -12,8 +12,9 @@ pub struct BlockPosition(BlockCoord, BlockCoord, GlobalSliceIndex);
 
 impl BlockPosition {
     pub fn new(x: BlockCoord, y: BlockCoord, z: GlobalSliceIndex) -> Self {
-        debug_assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
-        debug_assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
+        // TODO return Option/implement TryFrom for all coord types instead of asserts
+        assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
+        assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
         Self(x, y, z)
     }
 
@@ -40,7 +41,7 @@ impl BlockPosition {
         self.into()
     }
 
-    pub fn try_add(self, (dx, dy): (i16, i16)) -> Option<Self> {
+    pub fn try_add_xy(self, (dx, dy): (i16, i16)) -> Option<Self> {
         let x = (self.0 as i16) + dx;
         let y = (self.1 as i16) + dy;
 
@@ -51,6 +52,13 @@ impl BlockPosition {
         }
     }
 
+    pub fn try_add_xyz(mut self, (dx, dy, dz): (i16, i16, i32)) -> Option<Self> {
+        GlobalSliceIndex::try_from(self.2.slice() + dz).and_then(|z| {
+            self.2 = z;
+            self.try_add_xy((dx, dy))
+        })
+    }
+
     pub const fn x(self) -> BlockCoord {
         self.0
     }
@@ -59,6 +67,10 @@ impl BlockPosition {
     }
     pub const fn z(self) -> GlobalSliceIndex {
         self.2
+    }
+
+    pub fn xyz(self) -> [i32; 3] {
+        [self.0 as i32, self.1 as i32, self.2.slice()]
     }
 }
 

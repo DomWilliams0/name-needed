@@ -1,10 +1,11 @@
 use crate::continent::ContinentMap;
-use crate::{map_range, PlanetParams};
+use crate::{map_range, PlanetParams, RegionLocation};
 use common::*;
 use noise::{Fbm, NoiseFn, Seedable};
 
 use crate::biome::deserialize::BiomeConfig;
 use crate::params::BiomesConfig;
+use crate::region::PlanetPoint;
 use rstar::{Envelope, Point, RTree, AABB};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -31,7 +32,6 @@ pub enum BiomeType {
     Beach,
     Plains,
     Forest,
-    RainForest,
     Desert,
     Tundra,
 }
@@ -113,6 +113,11 @@ pub struct BlockQueryResult {
     pub base_elevation: f64,
     pub moisture: f64,
     pub temperature: f64,
+
+    /// None if invalid region
+    /// (region loc, display repr of each feature applying to this block)
+    // TODO dont use a String here, return useful info
+    pub region: Option<(RegionLocation, SmallVec<[String; 4]>)>,
 }
 
 /// Noise generator with its rough limits
@@ -158,7 +163,7 @@ impl BiomeSampler {
                 let reader = BufReader::new(File::open(path)?);
                 ron::de::from_reader(reader)?
             }
-            #[cfg(test)]
+            #[cfg(any(test, feature = "benchmarking"))]
             BiomesConfig::Hardcoded(str) => ron::de::from_str(str)?,
         };
 
@@ -177,7 +182,7 @@ impl BiomeSampler {
     }
 
     /// (coastline_proximity, base elevation, moisture, temperature)
-    pub fn sample(&self, pos: (f64, f64), continents: &ContinentMap) -> (f64, f64, f64, f64) {
+    pub fn sample(&self, pos: PlanetPoint, continents: &ContinentMap) -> (f64, f64, f64, f64) {
         let coastline_proximity = continents.coastline_proximity(pos);
         let elevation = self.base_elevation(pos, coastline_proximity);
         let moisture = self.moisture(pos, coastline_proximity);
@@ -214,7 +219,7 @@ impl BiomeSampler {
     }
 
     #[cfg(feature = "bin")]
-    pub fn sample_biome(&self, pos: (f64, f64), continents: &ContinentMap) -> BiomeChoices {
+    pub fn sample_biome(&self, pos: PlanetPoint, continents: &ContinentMap) -> BiomeChoices {
         let (coastline_proximity, elevation, moisture, temperature) = self.sample(pos, continents);
         self.choose_biomes(coastline_proximity, elevation, temperature, moisture)
     }
@@ -236,7 +241,7 @@ impl BiomeSampler {
 
     // -------
 
-    fn moisture(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
+    fn moisture(&self, pos: PlanetPoint, coastline_proximity: f64) -> f64 {
         let raw_moisture = self.moisture.sample_wrapped_normalized(pos);
 
         if coastline_proximity < 0.0 {
@@ -248,14 +253,15 @@ impl BiomeSampler {
         let mul = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - coastline_proximity);
 
         // less moist at equator from the heat, but dont increase moisture at poles any more
-        let latitude = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - self.latitude_mul(pos.1)).min(1.0);
+        // TODO make poles more moist
+        let latitude = map_range((0.0, 1.0), (0.8, 1.2), 1.0 - self.latitude_mul(pos.y())).min(1.0);
 
         raw_moisture * mul * latitude
     }
 
-    fn temperature(&self, (x, y): (f64, f64), elevation: f64) -> f64 {
-        let latitude = self.latitude_mul(y);
-        let raw_temp = self.temperature.sample_wrapped_normalized((x, y));
+    fn temperature(&self, pos: PlanetPoint, elevation: f64) -> f64 {
+        let latitude = self.latitude_mul(pos.y());
+        let raw_temp = self.temperature.sample_wrapped_normalized(pos);
 
         // TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).
         //  need to decide on moderate range, tropical range and icy range
@@ -268,7 +274,7 @@ impl BiomeSampler {
     }
 
     /// Base elevation for determining biomes
-    fn base_elevation(&self, pos: (f64, f64), coastline_proximity: f64) -> f64 {
+    fn base_elevation(&self, pos: PlanetPoint, coastline_proximity: f64) -> f64 {
         // sample height map in normalized range
         let raw_height = self.height.sample_wrapped_normalized(pos);
 
@@ -303,7 +309,7 @@ impl<N: NoiseFn<[f64; 4]>> Noise<N> {
             trace!("finding generator limits"; "iterations" => iterations, "generator" => what);
 
             for _ in 0..iterations {
-                let f = this.sample_wrapped((
+                let f = this.sample_wrapped(PlanetPoint::new(
                     limit_rando.gen_range(-this.planet_size, this.planet_size),
                     limit_rando.gen_range(-this.planet_size, this.planet_size),
                 ));
@@ -326,7 +332,7 @@ impl<N: NoiseFn<[f64; 4]>> Noise<N> {
     }
 
     /// Produces seamlessly wrapping noise
-    fn sample_wrapped(&self, (x, y): (f64, f64)) -> f64 {
+    fn sample_wrapped(&self, pos: PlanetPoint) -> f64 {
         // thanks https://www.gamasutra.com/blogs/JonGallant/20160201/264587/Procedurally_Generating_Wrapping_World_Maps_in_Unity_C__Part_2.php
 
         // noise range
@@ -338,6 +344,7 @@ impl<N: NoiseFn<[f64; 4]>> Noise<N> {
         let dy = y2 - y1;
 
         // sample at smaller intervals
+        let (x, y) = pos.get();
         let s = x / self.planet_size;
         let t = y / self.planet_size;
 
@@ -358,7 +365,7 @@ impl<N: NoiseFn<[f64; 4]>> Noise<N> {
     }
 
     /// Produces seamlessly wrapping noise scaled from 0-1 by limits of this generator
-    fn sample_wrapped_normalized(&self, pos: (f64, f64)) -> f64 {
+    fn sample_wrapped_normalized(&self, pos: PlanetPoint) -> f64 {
         let value = self.sample_wrapped(pos);
         map_range(self.limits, (0.0, 1.0), value)
     }
@@ -681,12 +688,12 @@ mod tests {
     #[test]
     fn deterministic() {
         let params = PlanetParams::dummy();
-        let continents = ContinentMap::new_with_rng(&params, &mut thread_rng());
+        let continents = ContinentMap::new_with_rng(params.clone(), &mut thread_rng());
 
         let a = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();
         let b = BiomeSampler::new(&mut StdRng::seed_from_u64(1234), &params).unwrap();
 
-        let pos = (9.41234, 4.98899);
+        let pos = PlanetPoint::new(9.41234, 4.98899);
         assert_eq!(a.sample(pos, &continents), b.sample(pos, &continents));
     }
 

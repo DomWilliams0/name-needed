@@ -1,4 +1,4 @@
-# TODOs (269)
+# TODOs (317)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -12,8 +12,12 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
- * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (1)
+ * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
+   * `// TODO dont use a String here, return useful info`
+   * `// TODO make poles more moist`
    * `// TODO elevation needs refining, and shouldn't be so smooth/uniform across the full range (0-1).`
+ * [game/procgen/src/cache.rs](game/procgen/src/cache.rs) (1)
+   * `// TODO cache global features too`
  * [game/procgen/src/climate.rs](game/procgen/src/climate.rs) (9)
    * `// TODO moisture and temperature carried by wind`
    * `// TODO wind movingbrings air to level out pressure`
@@ -31,24 +35,66 @@
    * `let mut vertices = [(0.0, 0.0); CIRCLE_VERTICES]; // TODO could be uninitialized`
    * `// TODO intersecting polygons!!`
    * `// TODO reimplement or add back density if needed`
- * [game/procgen/src/params.rs](game/procgen/src/params.rs) (2)
+ * [game/procgen/src/params.rs](game/procgen/src/params.rs) (3)
+   * `// TODO remove overhead of option and default to 0`
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (6)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
    * `// TODO actual error type`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
-   * `// TODO rasterize features onto slab`
    * `// TODO wrap chunks rather than ignoring those out of range`
    * `.filter_map(|(cx, cy)| RegionLocation::try_from_chunk(ChunkLocation(cx, cy))) // TODO`
  * [game/procgen/src/progress.rs](game/procgen/src/progress.rs) (1)
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region.rs](game/procgen/src/region.rs) (3)
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (6)
+   * `// TODO make this struct a dst and store trait object inline without extra indirection`
+   * `// TODO ensure these are optimised out`
+   * `// TODO this only serves as an assert - revisit the need to merge non-rasterised features`
+   * `// TODO give each feature a guid instead`
+   * `// TODO create guard struct/owned ref to avoid needing to clone the vec temporarily`
+   * `// TODO faster and non-random hash`
+ * [game/procgen/src/region/features/forest.rs](game/procgen/src/region/features/forest.rs) (10)
+   * `// TODO remove magic value, use real max tree height`
+   * `// TODO tree roots`
+   * `// TODO attempt to place tree model at location in this slab`
+   * `// TODO actual validation`
+   * `// TODO consider rtree params`
+   * `// TODO const generic size param`
+   * `// TODO this does SO many temporary allocations`
+   * `const SIZE: usize = CHUNKS_PER_REGION_SIDE; // TODO add const generic (and use the unspecialised PlanetPoint)`
+   * `// TODO replace this rtree with a new bulk loaded one?`
+   * `// TODO PR to move nodes out of the tree instead of copy`
+ * [game/procgen/src/region/region.rs](game/procgen/src/region/region.rs) (7)
+   * `// TODO when const generics can be used in evaluations, remove stupid SIZE_2 type param (SIZE * SIZE)`
+   * `// TODO rename me`
+   * `// TODO will need to filter on feature type when there are multiple`
+   * `// TODO null params for benchmark`
    * `// TODO depends on many local parameters e.g. biome, humidity`
    * `// TODO could do this multiple slices at a time`
    * `// TODO calculate these better, and store them in data`
+ * [game/procgen/src/region/regions.rs](game/procgen/src/region/regions.rs) (5)
+   * `// TODO watch out for monotonic increase in memory usage storing Loaded state for every slab ever...`
+   * `/// TODO replace silly bool if we ever start keeping track of all loaded regions`
+   * `/// TODO use a global vec/channel instead (in tests only)`
+   * `/// TODO use a Notify instead of unused channel`
+   * `// TODO move directly with pointer magic instead`
+ * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
+   * `// TODO ensure no bounds checking here`
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
+   * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
+   * `// TODO inline dyn subfeature or use pooled allocation`
+   * `// TODO use dynstack here`
+   * `// TODO reuse borrowed vec allocation`
+   * `/// TODO handle case where block is multiple slabs over from root slab`
+   * `// TODO if continuations is None, set a flag to ignore boundary leaks`
+   * `// TODO neighbour slab should wrap around the planet`
+   * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
+ * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
+   * `// TODO actual tree shape`
+   * `// TODO tree configuration based on its planet location - branch count, leaf spread, etc`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`
@@ -218,10 +264,10 @@
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
  * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+   * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
-   * `// TODO per tick alloc/reuse buf`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
@@ -244,10 +290,12 @@
    * `// TODO cache allocation in system`
  * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (1)
    * `// TODO use newtype units for ingame non-SI units`
- * [game/world/src/block.rs](game/world/src/block.rs) (3)
+ * [game/world/src/block.rs](game/world/src/block.rs) (5)
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
+   * `// TODO define these in data`
+   * `/// TODO very temporary "walkability" for block types`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
@@ -279,7 +327,7 @@
  * [game/world/src/loader/loading.rs](game/world/src/loader/loading.rs) (4)
    * `// TODO add more efficient version that takes chunk+multiple slabs`
    * `// TODO shared instance of CoW for empty slab`
-   * `// TODO reuse vec alloc`
+   * `// TODO reuse vec allocs`
    * `// TODO reuse buf`
  * [game/world/src/loader/terrain_source/generate.rs](game/world/src/loader/terrain_source/generate.rs) (1)
    * `// TODO handle wrapping of slabs around planet boundaries`
@@ -306,8 +354,10 @@
    * `// TODO reuse vec allocation`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
- * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (1)
+ * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (3)
    * `/// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs`
+   * `// indices are certainly valid - TODO unchecked unwrap`
+   * `// TODO use unchecked unwrap here`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
@@ -361,27 +411,34 @@
    * `# TODO feature for cgmath`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
- * [shared/common/src/panic.rs](shared/common/src/panic.rs) (1)
-   * `// TODO use panic.message() when it stabilises`
- * [shared/config/src/load.rs](shared/config/src/load.rs) (1)
+ * [shared/config/src/load.rs](shared/config/src/load.rs) (2)
+   * `// TODO use arc-swap to avoid the need to lock the config`
    * `// TODO add a variant that returns a default instead of panicking`
- * [shared/grid/src/declare.rs](shared/grid/src/declare.rs) (1)
-   * `// TODO call usize::from() on dims for nicer use with smallunsignedconstant`
- * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (3)
-   * `// TODO allow smaller datatypes for dims`
+ * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)
+   * `// TODO use same CoordType for DynamicGrid`
    * `// TODO profile and improve coord wrapping`
    * `// TODO return <C: GridCoord>`
+ * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
+   * `// TODO can still panic`
  * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
    * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
    * `// TODO return error to caller`
- * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (1)
+ * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)
+   * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
  * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
    * `// TODO pub mod hunger;`
+ * [shared/unit/src/world/block_position.rs](shared/unit/src/world/block_position.rs) (1)
+   * `// TODO return Option/implement TryFrom for all coord types instead of asserts`
  * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)
    * `// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos`
- * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
+ * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (2)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
+   * `// TODO return option instead of asserting`
+ * [shared/unit/src/world/slice_block.rs](shared/unit/src/world/slice_block.rs) (1)
+   * `// TODO try_new constructor that returns option, with unchecked version. make fields non pub`
+ * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
+   * `// TODO return option and have unchecked version`
  * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)
    * `// TODO assert fields are not NaN in points`

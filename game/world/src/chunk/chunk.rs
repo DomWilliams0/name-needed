@@ -222,7 +222,7 @@ impl<C: WorldContext> Chunk<C> {
             do_update(slab, state.clone());
         }
 
-        // use original for last
+        // use original for first
         if let Some(slab) = first {
             do_update(slab, state);
         }
@@ -337,6 +337,11 @@ impl<C: WorldContext> Chunk<C> {
                 slab.is_placeholder()
             }
         }
+    }
+
+    pub fn is_slab_loaded(&self, slab: SlabIndex) -> bool {
+        let progress = self.slab_progress(slab);
+        matches!(progress, SlabLoadingStatus::Done)
     }
 
     pub fn has_slab(&self, slab: SlabIndex) -> bool {

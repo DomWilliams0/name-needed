@@ -1,5 +1,7 @@
 use common::*;
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{
+    ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
+};
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -40,6 +42,8 @@ pub struct BlockDetails {
     pub base_elevation: f64,
     pub moisture: f64,
     pub temperature: f64,
+    /// (region location, dirty string representation of features affecting this block)
+    pub region: Option<(RegionLocation, SmallVec<[String; 4]>)>,
 }
 
 impl From<MemoryTerrainSource> for TerrainSource {
@@ -100,7 +104,52 @@ impl TerrainSource {
                         base_elevation: result.base_elevation,
                         moisture: result.moisture,
                         temperature: result.temperature,
+                        region: result.region,
                     })
+            }
+        }
+    }
+
+    pub async fn feature_boundaries_in_range(
+        &self,
+        chunks: impl Iterator<Item = ChunkLocation>,
+        z_range: (GlobalSliceIndex, GlobalSliceIndex),
+        per_point: impl FnMut(u64, WorldPosition),
+    ) {
+        match self {
+            TerrainSource::Memory(_) => {}
+            TerrainSource::Generated(planet) => {
+                planet
+                    .planet()
+                    .feature_boundaries_in_range(chunks, z_range, per_point)
+                    .await
+            }
+        }
+    }
+
+    pub async fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
+        match self {
+            TerrainSource::Memory(_) => {}
+            TerrainSource::Generated(planet) => {
+                let len_before = out.len();
+                planet
+                    .planet()
+                    .steal_world_updates(|updates| {
+                        out.extend(updates.map(|(pos, block)| {
+                            WorldTerrainUpdate::new(
+                                WorldPositionRange::with_single(pos),
+                                (&block).into(),
+                            )
+                        }));
+                    })
+                    .await;
+                let n = out.len() - len_before;
+                if n > 0 {
+                    debug!(
+                        "collected {count} block updates from planet generation",
+                        count = n
+                    );
+                }
             }
         }
     }
@@ -113,7 +162,9 @@ use common::parking_lot::RwLock;
 pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 
-use procgen::BiomeType;
+use crate::loader::WorldTerrainUpdate;
+use procgen::{BiomeType, RegionLocation};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -121,20 +172,19 @@ mod tests {
     use super::*;
     use crate::chunk::RawChunkTerrain;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
-    use matches::assert_matches;
     use std::iter::once;
 
     #[test]
     fn invalid() {
         let no_chunks: Vec<(ChunkLocation, RawChunkTerrain)> = vec![];
         let empty = MemoryTerrainSource::from_chunks(no_chunks.into_iter());
-        assert_matches!(empty.err().unwrap(), TerrainSourceError::NoChunks);
+        assert!(matches!(empty.err().unwrap(), TerrainSourceError::NoChunks));
 
         let random = MemoryTerrainSource::from_chunks(once(((5, 5), RawChunkTerrain::default())));
-        assert_matches!(
+        assert!(matches!(
             random.err().unwrap(),
             TerrainSourceError::MissingCentreChunk
-        );
+        ));
     }
 
     #[test]

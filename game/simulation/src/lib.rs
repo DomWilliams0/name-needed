@@ -58,3 +58,4 @@ mod society;
 mod spatial;
 mod steer;
 mod transform;
+mod world_debug;

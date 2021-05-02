@@ -10,6 +10,12 @@ pub type BlockCoord = u8;
 pub struct SliceBlock(pub BlockCoord, pub BlockCoord);
 
 impl SliceBlock {
+    // TODO try_new constructor that returns option, with unchecked version. make fields non pub
+    pub fn new(x: BlockCoord, y: BlockCoord) -> Self {
+        assert!(x < CHUNK_SIZE.as_u8(), "invalid coordinate: {}", x);
+        assert!(y < CHUNK_SIZE.as_u8(), "invalid coordinate: {}", y);
+        Self(x, y)
+    }
     pub fn to_block_position(self, slice: GlobalSliceIndex) -> BlockPosition {
         BlockPosition::new(self.0, self.1, slice)
     }

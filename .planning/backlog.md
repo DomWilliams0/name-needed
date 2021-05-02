@@ -10,6 +10,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* humans can jump 1m
 * lazy path evaluation (area at a time)
 * path optimisation (line of sight)
+	* avoid brushing too close to obstacles too - they're prone to whizzing up tree trunks if they wander close enough
 * wandering should choose a close location instead of random in the world
 	* new SearchGoal to cut short path to N blocks
 	* wander should not take them up into stupid places like atop chests
@@ -58,7 +59,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
 * if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
 * bug: society job is not notified if a subtask fails, causing it to be infinitely attempted
-	* e.g. haul things into a container but it's full
+	* e.g. haul things into a container but it's full, navigating to an inacessible position
 	* a set of completed tasks should be maintained per job
 
 ## World generation
@@ -69,13 +70,18 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* dont treat as a fixed width border around continents
 	* merge continents that intersect, instead of forcing a coastline through them
 * continent blobs should wrap across planet boundaries
-* features e.g. trees, hills
-	* trees are entities, not (only) blocks
+* features e.g. trees, caves, mountain ranges
 	* accurate-ish rivers, caves
 		* varying river width from streams to large uncrossable rivers
 		* varying river flow speed
 	* magma very low down, or it just gets too hot
 	* volcano affects world gen in past
+	* trees
+		* vary tree height, structure and species
+		* grow from saplings into full trees
+		* individual branches
+		* falling sticks/leaves
+		* trees are entities, not (only) blocks
 * finite pregenerated world in xy (planet), infinite in z
 	* wrapping x,y coordinates is a beefy task, for something that doesnt happen very often
 		world loader wraps coords so it never requests slabs out of bounds of the planet
@@ -100,9 +106,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* entities building/placing blocks
 	* block damage e.g. from explosion
 	* side effect of interacting with a block
+* varying dimensions
+	* e.g. visually tree trunks are not cubic metres. physically they could still be treated like that though
 * puddles/spills/splatters on the ground
 	* picked up and spread by entities
-* blocks that technically solid but possible to pass through
+* blocks that technically solid but possible (and slow) to pass through
 	* hedges, bushes
 * map chunks to torus and make the world wrap-around
 
@@ -125,6 +133,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * replace all hashmaps with faster non crypto hashes
 * perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
+* investigate invalidating a slab queued for finalization if terrain updates are applied to it, to avoid doing tons of extra work for nothing. some degree of redundant work is ok though, so the terrain never noticably lags behind player updates and catches up suddenly when all changes are applied together
+* move finalizer to thread pool and spawn multiple tasks
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged
 * biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage
@@ -133,6 +143,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
 * physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed
 * when submitting slab changes to the worker pool, cancel any other tasks queued for the same slab as they're now outdated
+* investigate thousands of occlusion updates for empty all-air slabs
+	* completely solid slabs (air, stone, etc) should be treated as a special case
 
 ### Memory usage
 * CoW terrain slabs
@@ -152,19 +164,25 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * very simple oval shadows beneath entities to show height
 * bug: occlusion flickers after world changes, updates are probably being queued for too long
 * bug: occlusion shadows above a 9 block drop
+* bug: occlusion shadows cast by blocks above current viewing slice (like treetops) look very weird
 
 ## Building and testing
 * separate config and preset for tests
 * fuzzing
-* stress test
+* stress test(s)
 * code coverage in CI
 * smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
 * tag pre-alpha commits in develop, and generate changelog in release notes
+* add tokio tracing feature to help debug deadlocks
+* miri-compatible runner (i.e. no file io)
+* provide debug logging release builds
 
 ## Code quality
-* track down unwraps/expects and replace with results
+* track down unwraps/expects/`as` casts and replace with results
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
+* add more types for procgen region units instead of arbitrary (f64, f64)
+*  overhaul world unit types to hide internals, have a constructor that returns option, and an unchecked version
 * error context chaining would be VERY useful for fatal errors
 * consider using `bugsalot` macros to replace .unwrap()/.expect() with logging and make them continuable
 
@@ -173,7 +191,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
 * separate binary for definition file validation
 * instead of sleeping to wait for world to load, check if panicked every second
-* consider replacing 1:1 world threadpool with async threadpool
+* add a bg async task that checks for panics, and aborts runtime - currently panics can randomly cause deadlocks
+* restarting should take better care of async thread pool, panics if restart occurs while still loading terrain
+* use an arc-swap for config reloading instead of a mutex
 
 ## Entity diversity
 * animal species
@@ -215,6 +235,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* woven plant materials
 	* milk
 	* fur
+* seasons that affect weather/events depending on biomes
+	* savanna dry season
+	* trees lose leaves as a reaction to prolonged cold
 
 ### Physical wellbeing
 * distinct body parts

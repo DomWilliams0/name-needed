@@ -27,10 +27,12 @@ impl DebugWindow {
 
                 bundle.ui.separator();
 
-                    bundle.checkbox(im_str!("Navigation paths"), "navigation path");
-                    bundle.checkbox(im_str!("Navigation areas"), "navigation areas");
-                    bundle.checkbox(im_str!("Steering direction"), "steering");
-                    bundle.checkbox(im_str!("Senses"), "senses");
+                bundle.checkbox(im_str!("Navigation paths"), "navigation path");
+                bundle.checkbox(im_str!("Navigation areas"), "navigation areas");
+                bundle.checkbox(im_str!("Steering direction"), "steering");
+                bundle.checkbox(im_str!("Senses"), "senses");
+                bundle.checkbox(im_str!("Feature boundaries"), "feature boundaries");
+                bundle.checkbox(im_str!("Chunk boundaries"), "chunk boundaries");
 
             });
     }

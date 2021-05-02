@@ -5,17 +5,19 @@ Config(
         camera_speed: 1.0,
         debug_physics: false,
         zoom: 1.0,
-        initial_view_range: 5,
+        initial_view_range: 8,
         nav_paths_by_default: false,
     ),
     world: (
         // source: Preset(Stairs),
         source: Generate("planet_generation.txt"),
+        load_timeout: 30,
         worker_threads: None,
-        generation_height_scale: 15.0,
-        initial_chunk: (12, 205), // on a beach
+        initial_chunk: (33, 512), // near a forest
+
+        /// keep these low <=8
         initial_slab_depth: 2,
-        initial_chunk_radius: 2,
+        initial_chunk_radius: 4,
     ),
     simulation: (
         random_seed: Some(67853852415423),

@@ -1,11 +1,14 @@
+use std::ops::{AddAssign, DivAssign};
+
+use common::num_traits::real::Real;
+use common::*;
+use grid::dynamic::CoordRange;
+use grid::DynamicGrid;
+
 pub use crate::climate::iteration::ClimateIteration;
 use crate::continent::ContinentMap;
 use crate::params::AirLayer;
 use crate::PlanetParams;
-use common::num_traits::real::Real;
-use common::*;
-use grid::{CoordRange, DynamicGrid};
-use std::ops::{AddAssign, DivAssign};
 
 pub struct Climate {}
 
@@ -131,18 +134,21 @@ impl From<AirLayer> for CoordRange {
 }
 
 mod iteration {
+    use std::f64::consts::{PI, TAU};
+
+    use line_drawing::Bresenham3d;
+    use rand_distr::Uniform;
+
+    use common::cgmath::prelude::*;
+    use common::cgmath::{Point3, Vector3};
+    use common::*;
+    use grid::DynamicGrid;
+    use grid::NEIGHBOURS_COUNT;
+
     use crate::climate::{PlanetGrid, LAND_DIVISIONS};
     use crate::continent::ContinentMap;
     use crate::params::AirLayer;
     use crate::{map_range, PlanetParams};
-    use common::cgmath::prelude::*;
-    use common::cgmath::{Point3, Vector3};
-    use common::*;
-    use grid::{DynamicGrid, NEIGHBOURS_COUNT};
-    use rand_distr::Uniform;
-
-    use line_drawing::Bresenham3d;
-    use std::f64::consts::{PI, TAU};
 
     pub struct ClimateIteration<'a> {
         params: PlanetParams,
@@ -540,8 +546,9 @@ mod iteration {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::f64::EPSILON;
+
+    use super::*;
 
     fn grid<T: Default>(size: u32) -> PlanetGrid<T> {
         let mut params = PlanetParams::dummy();

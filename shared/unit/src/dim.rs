@@ -3,6 +3,7 @@ use crate::world::BlockCoord;
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct SmallUnsignedConstant(u32);
 
+// TODO unsafe unchecked casts with no panicking code
 impl SmallUnsignedConstant {
     pub const fn as_f32(self) -> f32 {
         self.0 as f32
@@ -45,3 +46,28 @@ impl SmallUnsignedConstant {
         Self(u)
     }
 }
+
+macro_rules! impl_from {
+    ($ty:ty) => {
+        paste::paste! {
+            impl_from!($ty, [< as_ $ty >]);
+        }
+    };
+
+    ($ty:ty, $name:ident) => {
+        impl From<SmallUnsignedConstant> for $ty {
+            fn from(constant: SmallUnsignedConstant) -> Self {
+                constant.$name()
+            }
+        }
+    };
+}
+
+impl_from!(f32);
+impl_from!(i32);
+impl_from!(u32);
+impl_from!(u16);
+impl_from!(i16);
+impl_from!(u8);
+impl_from!(usize);
+impl_from!(f64);

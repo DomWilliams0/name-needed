@@ -25,10 +25,10 @@ fn main() {
     // parse config and args first
     let params = PlanetParams::load_with_args("procgen.txt");
 
-    let _logging = logging::LoggerBuilder::with_env()
+    let logger = logging::LoggerBuilder::with_env()
         .and_then(|builder| builder.init(log_time))
         .expect("logging failed");
-    info!("initialized logging"; "level" => ?_logging.level());
+    info!("initialized logging"; "level" => ?logger.level());
 
     let exit = match params {
         Err(err) => {
@@ -42,7 +42,6 @@ fn main() {
         }
         Ok(params) => {
             info!("config: {:#?}", params);
-            common::panic::init_panic_detection();
 
             let dew_it = || {
                 use tokio::runtime as rt;
@@ -64,9 +63,9 @@ fn main() {
                     render.draw_continents().await;
                     render.save("procgen.png").expect("failed to write image");
 
-                    for y in 5..6 {
-                        for x in 20..=21 {
-                            let region = RegionLocation(x, y);
+                    for y in 64..65 {
+                        for x in 4..5 {
+                            let region = RegionLocation::new(x, y);
 
                             let mut render = Render::with_planet(planet.clone()).await;
                             if let Err(err) = render.draw_region(region).await {
@@ -80,8 +79,10 @@ fn main() {
                     }
                 })
             };
-
-            match common::panic::run_and_handle_panics(dew_it) {
+            match panik::Builder::new()
+                .slogger(logger.logger())
+                .run_and_handle_panics(dew_it)
+            {
                 Some(_) => 0,
                 None => 1,
             }
@@ -90,7 +91,7 @@ fn main() {
 
     // let logging end gracefully
     info!("all done");
-    drop(_logging);
+    drop(logger);
     std::thread::sleep(std::time::Duration::from_secs(1));
 
     std::process::exit(exit);

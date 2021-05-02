@@ -19,6 +19,9 @@ pub enum BlockType {
     Air,
     Stone,
     Dirt,
+    LightGrass,
+    Leaves,
+    TreeTrunk,
     Grass,
     Sand,
 
@@ -47,8 +50,17 @@ impl BlockType {
             BlockType::Stone => (0.66, 0.005),
             BlockType::Dirt => (0.06, 0.4),
             BlockType::Grass => (0.26, 0.16),
+            BlockType::LightGrass => (0.26, 0.10),
+            BlockType::Leaves => (0.24, 0.50),
+            BlockType::TreeTrunk => (0.1, 0.3),
             BlockType::Sand => (0.14, 0.19),
             BlockType::SolidWater => (0.22, 0.22),
         }
+    }
+}
+
+impl From<BlockType> for GeneratedBlock {
+    fn from(ty: BlockType) -> Self {
+        Self { ty }
     }
 }

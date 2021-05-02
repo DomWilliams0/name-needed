@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use common::panic;
 use common::*;
 use simulation::input::UiCommand;
 use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
@@ -39,7 +38,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         let mut exit = None;
 
         loop {
-            if panic::has_panicked() {
+            if panik::has_panicked() {
                 debug!("breaking out of loop due to panics");
                 break Exit::Stop;
             }

@@ -44,13 +44,15 @@ impl<S: SliceIndexScale> SliceIndex<S> {
         self
     }
 
+    #[inline]
     pub fn slice(self) -> i32 {
         self.0
     }
 
     pub fn new(slice: i32) -> Self {
-        debug_assert!(slice >= S::MIN, "slice {} is invalid for its scale", slice);
-        debug_assert!(slice <= S::MAX, "slice {} is invalid for its scale", slice);
+        // TODO return option and have unchecked version
+        assert!(slice >= S::MIN, "slice {} is invalid for its scale", slice);
+        assert!(slice <= S::MAX, "slice {} is invalid for its scale", slice);
 
         Self(slice, PhantomData)
     }
@@ -66,6 +68,10 @@ impl<S: SliceIndexScale> SliceIndex<S> {
     pub fn range() -> impl Iterator<Item = Self> {
         (S::MIN..=S::MAX).map(Self::new)
     }
+
+    pub fn try_from(slice: i32) -> Option<Self> {
+        (S::MIN..=S::MAX).contains(&slice).as_some(Self::new(slice))
+    }
 }
 
 impl SliceIndex<Chunk> {
@@ -80,7 +86,7 @@ impl SliceIndex<Chunk> {
     }
 
     pub fn slab_index(self) -> SlabIndex {
-        SlabIndex::floored(self.slice() as f32 / SLAB_SIZE.as_f32())
+        SlabIndex(self.slice().div_euclid(SLAB_SIZE.as_i32()))
     }
 }
 

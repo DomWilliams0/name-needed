@@ -23,8 +23,9 @@ pub struct Display {
 #[derive(Deserialize)]
 pub struct World {
     pub source: WorldSource,
+    /// Seconds
+    pub load_timeout: u32,
     pub worker_threads: Option<usize>,
-    pub generation_height_scale: f64,
     pub initial_chunk: (i32, i32),
     pub initial_slab_depth: u32,
     pub initial_chunk_radius: u32,

@@ -14,6 +14,13 @@ pub struct SlabPosition(BlockCoord, BlockCoord, LocalSliceIndex);
 
 impl SlabPosition {
     pub fn new(x: BlockCoord, y: BlockCoord, z: LocalSliceIndex) -> Self {
+        assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
+        assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
+        // TODO return option instead of asserting
+        Self(x, y, z)
+    }
+
+    pub fn new_unchecked(x: BlockCoord, y: BlockCoord, z: LocalSliceIndex) -> Self {
         debug_assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
         debug_assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
         Self(x, y, z)
@@ -46,9 +53,9 @@ impl From<(i32, i32, i32)> for SlabPosition {
     }
 }
 
-impl From<&[i32; 3]> for SlabPosition {
-    fn from(pos: &[i32; 3]) -> Self {
-        let &[x, y, z] = pos;
+impl From<[i32; 3]> for SlabPosition {
+    fn from(pos: [i32; 3]) -> Self {
+        let [x, y, z] = pos;
         Self::new(x as BlockCoord, y as BlockCoord, SliceIndex::new(z))
     }
 }

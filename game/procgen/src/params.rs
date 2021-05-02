@@ -6,20 +6,24 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
-use crate::RegionLocation;
+use crate::region::RegionLocationUnspecialized;
 use common::alloc::str::FromStr;
 use noise::MultiFractal;
 #[cfg(feature = "cache")]
 use serde::Serialize;
+use std::sync::Arc;
+use unit::world::ChunkLocation;
 
-#[derive(Debug, Clone, StructOpt)]
+pub type PlanetParamsRef = Arc<PlanetParams>;
+
+#[derive(Debug, StructOpt)]
 #[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 #[structopt(rename_all = "kebab-case")]
 pub struct PlanetParams {
     /// Random if not specified
     #[structopt(long)]
     seed: Option<u64>,
-
+    // TODO remove overhead of option and default to 0
     /// Height and width of surface in some unit
     #[structopt(long, default_value = "128")]
     pub planet_size: u32,
@@ -91,6 +95,25 @@ pub struct PlanetParams {
     /// Set manually to "biomes.ron" as sibling to this file during loading
     #[structopt(skip)]
     pub biomes_cfg: BiomesConfig,
+
+    /// The higher >1 the more relaxed the boundary
+    #[structopt(long, default_value = "8.0")]
+    pub feature_concavity: f64,
+
+    /// Block radius for forest poisson disk sampling
+    #[structopt(long, default_value = "8")]
+    pub forest_pds_radius: u32,
+
+    /// Max attempts to place a tree in forest poisson disk sampling
+    #[structopt(long, default_value = "15")]
+    pub forest_pds_attempts: u32,
+
+    /// Blocks to expand regional feature boundary
+    #[structopt(long, default_value = "2")]
+    pub region_feature_expansion: u32,
+
+    #[structopt(long, default_value = "0.15")]
+    pub region_feature_vertical_expansion_threshold: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -100,7 +123,7 @@ pub enum BiomesConfig {
     // annotation have the same layout as the variant field."
     File(PathBuf),
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmarking"))]
     Hardcoded(String),
 }
 
@@ -196,18 +219,21 @@ pub struct RenderParams {
 }
 
 impl PlanetParams {
-    pub fn load_with_args(file_path: impl AsRef<Path>) -> BoxedResult<Self> {
+    pub fn load_with_args(file_path: impl AsRef<Path>) -> BoxedResult<PlanetParamsRef> {
         Self::load(file_path.as_ref(), std::env::args())
     }
 
-    pub fn load_with_only_file(file_path: impl AsRef<Path>) -> BoxedResult<Self> {
+    pub fn load_with_only_file(file_path: impl AsRef<Path>) -> BoxedResult<PlanetParamsRef> {
         let fake_args = once(env!("CARGO_PKG_NAME").to_owned());
         Self::load(file_path.as_ref(), fake_args)
     }
 
     // TODO return a result instead of panicking
     /// Must be at least len 1, where first elem is binary name
-    fn load(file_path: &Path, mut args: impl Iterator<Item = String>) -> BoxedResult<Self> {
+    fn load(
+        file_path: &Path,
+        mut args: impl Iterator<Item = String>,
+    ) -> BoxedResult<PlanetParamsRef> {
         let mut params = {
             let binary_name = args.next().expect("no 0th arg");
             let mut config_params = vec![binary_name];
@@ -247,18 +273,18 @@ impl PlanetParams {
             BiomesConfig::File(path.join("biomes.ron"))
         };
 
-        Ok(params)
+        Ok(PlanetParamsRef::new(params))
     }
 
-    #[cfg(test)]
-    pub fn dummy_with_biomes(biomes: String) -> Self {
+    #[cfg(any(test, feature = "benchmarking"))]
+    pub fn dummy_with_biomes(biomes: String) -> PlanetParamsRef {
         let mut params = Self::from_iter_safe(once("dummy")).expect("failed");
         params.biomes_cfg = BiomesConfig::Hardcoded(biomes);
-        params
+        PlanetParamsRef::new(params)
     }
 
-    #[cfg(test)]
-    pub fn dummy() -> Self {
+    #[cfg(any(test, feature = "benchmarking"))]
+    pub fn dummy() -> PlanetParamsRef {
         Self::dummy_with_biomes(
             r#"[ (biome: Plains, color: 0x84e065, elevation: (10, 18), sampling: ()) ]"#.to_owned(),
         )
@@ -272,8 +298,16 @@ impl PlanetParams {
         [self.planet_size as usize, self.planet_size as usize, height]
     }
 
-    pub fn is_region_in_range(&self, region: RegionLocation) -> bool {
-        region.0 < self.planet_size && region.1 < self.planet_size
+    pub fn is_region_in_range<const SIZE: usize>(
+        &self,
+        region: RegionLocationUnspecialized<SIZE>,
+    ) -> bool {
+        let (x, y) = region.xy();
+        x < self.planet_size && y < self.planet_size
+    }
+
+    pub fn is_chunk_in_range(&self, chunk: ChunkLocation) -> bool {
+        crate::region::RegionLocation::try_from_chunk_with_params(chunk, self).is_some()
     }
 }
 

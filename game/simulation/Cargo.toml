@@ -36,10 +36,6 @@ ron = "0.6"
 serde = "1.0"
 hex-serde = "0.1"
 
-
-[dev-dependencies]
-matches = "0.1"
-
 [features]
 default = []
 metrics = ["ai/logging"]

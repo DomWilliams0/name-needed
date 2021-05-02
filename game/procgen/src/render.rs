@@ -1,23 +1,22 @@
 use std::path::Path;
 
-use image::imageops::FilterType;
-use image::{GenericImage, ImageBuffer, Rgb, Rgba, RgbaImage};
-use imageproc::drawing::{
-    draw_filled_circle_mut, draw_filled_rect_mut, draw_hollow_circle_mut, draw_line_segment_mut,
-};
+use image::imageops::{flip_vertical, FilterType};
+use image::{GenericImage, ImageBuffer, Rgba, RgbaImage};
+use imageproc::drawing::{draw_filled_rect_mut, draw_line_segment_mut};
 use imageproc::rect::Rect;
+use tokio::time::Duration;
 
 use color::ColorRgb;
+use common::num_traits::clamp;
 use common::*;
 use grid::{DynamicGrid, GridImpl};
-use unit::world::{all_slabs_in_range, ChunkLocation, SlabLocation, CHUNK_SIZE, SLAB_SIZE};
+use unit::world::{
+    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, SliceBlock, CHUNK_SIZE, SLAB_SIZE,
+};
 
-use crate::biome::BiomeType;
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
-use crate::region::CHUNKS_PER_REGION_SIDE;
-use crate::{map_range, Planet, RegionLocation, SlabGrid};
-use common::num_traits::clamp;
-use tokio::time::Duration;
+use crate::region::{PlanetPoint, RegionLocation, CHUNKS_PER_REGION_SIDE};
+use crate::{map_range, Planet, SlabPositionAsCoord};
 
 #[derive(Clone)]
 pub struct Render {
@@ -74,7 +73,7 @@ impl Render {
             if params.draw_biomes {
                 // sample biome at every pixel
                 image = put_pixels_par(image, &|x, y| {
-                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let point = PlanetPoint::new(x as f64 / zoom, y as f64 / zoom);
                     let biome = biomes.sample_biome(point, &planet.continents).primary();
 
                     let colour = biome.map_color();
@@ -142,7 +141,7 @@ impl Render {
                 let biomes = planet.continents.biome_sampler();
                 let alpha = planet.params.render.overlay_alpha;
                 overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
-                    let point = (x as f64 / zoom, y as f64 / zoom);
+                    let point = PlanetPoint::new(x as f64 / zoom, y as f64 / zoom);
                     let (coastline_proximity, elevation, moisture, temperature) =
                         biomes.sample(point, &planet.continents);
 
@@ -266,7 +265,7 @@ impl Render {
     }
 
     pub async fn draw_region(&mut self, region_loc: RegionLocation) -> Result<(), SlabLocation> {
-        debug!("drawing region"; "region" => region_loc);
+        debug!("drawing region"; "region" => ?region_loc);
 
         // params
         let inner = self.planet.inner().await;
@@ -278,22 +277,19 @@ impl Render {
 
         // create 1:1 image for region, zoom is equivalent to scale here
         let mut image = {
-            let region_size = CHUNKS_PER_REGION_SIDE.as_u32() * CHUNK_SIZE.as_u32();
+            let region_size = CHUNKS_PER_REGION_SIDE as u32 * CHUNK_SIZE.as_u32();
             ImageBuffer::new(region_size, region_size)
         };
 
         let (mut min_height, mut max_height) = (i32::MAX, i32::MIN);
-        let mut processed_chunks = DynamicGrid::new([
-            CHUNKS_PER_REGION_SIDE.as_usize(),
-            CHUNKS_PER_REGION_SIDE.as_usize(),
-            1,
-        ]);
+        let mut processed_chunks =
+            DynamicGrid::new([CHUNKS_PER_REGION_SIDE, CHUNKS_PER_REGION_SIDE, 1]);
 
         let (from_chunk_local, to_chunk_local) = (
             ChunkLocation(0, 0),
             ChunkLocation(
-                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
-                CHUNKS_PER_REGION_SIDE.as_i32() - 1,
+                CHUNKS_PER_REGION_SIDE as i32 - 1,
+                CHUNKS_PER_REGION_SIDE as i32 - 1,
             ),
         );
 
@@ -317,10 +313,11 @@ impl Render {
                 let generated = self.planet.generate_slab(slab).await.ok_or(slab)?;
 
                 // copy highest non-air blocks to image
-                for y in 0..CHUNK_SIZE.as_usize() {
-                    for x in 0..CHUNK_SIZE.as_usize() {
-                        for z in (0..SLAB_SIZE.as_usize()).rev() {
-                            let block = generated[&[x as i32, y as i32, z as i32]];
+                for y in 0..CHUNK_SIZE.as_block_coord() {
+                    for x in 0..CHUNK_SIZE.as_block_coord() {
+                        for z in (0..SLAB_SIZE.as_i32()).rev() {
+                            let pos = SlabPosition::new(x, y, LocalSliceIndex::new(z));
+                            let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;
                             }
@@ -328,7 +325,7 @@ impl Render {
                             // aha, solid block. store global z (possibly negative) to scale to
                             // range later and make positive
                             let z = (slab_z * SLAB_SIZE.as_i32()) + z as i32;
-                            visible_blocks[[x, y, 0]] = Some((z, block.ty));
+                            visible_blocks[[x as usize, y as usize, 0]] = Some((z, block.ty));
                             max_height = max_height.max(z);
                             min_height = min_height.min(z);
                             break;
@@ -368,7 +365,7 @@ impl Render {
             max = max_height
         );
         if min_height == max_height {
-            warn!("region might be filled with solid blocks, try tweaking start slab")
+            warn!("region might be filled with solid blocks (or entirely flat), try tweaking start slab?")
         }
 
         // render chunks to image
@@ -408,6 +405,9 @@ impl Render {
 
     pub fn save(&self, path: impl AsRef<Path>) -> BoxedResult<()> {
         let image = self.image.as_ref().expect("image has not been created");
+
+        // origin is at bottom left rather than top left
+        let image = flip_vertical(image);
 
         let path = path.as_ref();
         image.save(path)?;

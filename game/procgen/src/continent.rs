@@ -1,8 +1,9 @@
-use crate::params::PlanetParams;
-use crate::RegionLocation;
+use crate::params::PlanetParamsRef;
+use crate::region::{PlanetPoint, RegionLocation};
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
+use std::array::IntoIter;
 use std::cell::Cell;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
 pub struct ContinentMap {
-    params: PlanetParams,
+    params: PlanetParamsRef,
 
     continent_polygons: Vec<(ContinentIdx, Polygon<f64>)>,
 
@@ -41,21 +42,20 @@ pub struct RegionTile {
 unsafe impl Sync for RegionTile {}
 
 impl ContinentMap {
-    pub fn new(params: &PlanetParams) -> Self {
+    pub fn new(params: PlanetParamsRef) -> Self {
         // TODO validate values with result type
         assert!(params.planet_size > 0);
 
+        let grid = DynamicGrid::<RegionTile>::new([
+            params.planet_size as usize,
+            params.planet_size as usize,
+            1,
+        ]);
+
         Self {
-            params: params.clone(),
-
+            params,
             continent_polygons: Vec::new(),
-
-            grid: DynamicGrid::<RegionTile>::new([
-                params.planet_size as usize,
-                params.planet_size as usize,
-                1,
-            ]),
-
+            grid,
             biomes: None,
         }
     }
@@ -66,8 +66,8 @@ impl ContinentMap {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn new_with_rng(params: &PlanetParams, rando: &mut dyn RngCore) -> Self {
+    #[cfg(any(test, feature = "benchmarking"))]
+    pub fn new_with_rng(params: PlanetParamsRef, rando: &mut dyn RngCore) -> Self {
         let mut this = Self::new(params);
 
         // skip expensive generation with single dummy continent placement
@@ -79,7 +79,7 @@ impl ContinentMap {
     pub fn generate(&mut self, rando: &mut dyn RngCore) {
         // place continents as a load of circle blobs
         // TODO reject if continent or land blob count is too low
-        let mut blobby = mr_blobby::BlobPlacement::new(&self.params);
+        let mut blobby = mr_blobby::BlobPlacement::new(self.params.clone());
         let (continents, total_blobs) = blobby.place_blobs(rando);
         info!(
             "placed {count} continents with {blobs} land blobs",
@@ -138,7 +138,7 @@ impl ContinentMap {
 
             let mut polygons = blobs.map(|(_, blob): (_, &mr_blobby::LandBlob)| {
                 let vertices = polygon_from_blob(blob);
-                let exterior = vertices.iter().copied().collect::<LineString<f64>>();
+                let exterior = IntoIter::new(vertices).collect::<LineString<f64>>();
                 debug_assert!(exterior.is_closed());
                 Polygon::new(exterior, vec![])
             });
@@ -184,11 +184,11 @@ impl ContinentMap {
     /// +0.2: land close to coastline
     /// +1.0: land far away from coastline
     ///
-    pub fn coastline_proximity(&self, pos: (f64, f64)) -> f64 {
+    pub fn coastline_proximity(&self, pos: PlanetPoint) -> f64 {
         use geo::contains::Contains;
         use geo::euclidean_distance::EuclideanDistance;
 
-        let point = Point::from(pos);
+        let point = Point::from(pos.get());
 
         let (inland, polygons_to_check) = match self
             .continent_polygons()
@@ -315,7 +315,7 @@ impl ContinentMap {
     }
 
     pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
-        let RegionLocation(x, y) = region;
+        let (x, y) = region.xy();
         &self.grid[[x as usize, y as usize, 0]]
     }
 }
@@ -415,10 +415,11 @@ fn apply_gaussian_filter<T: Default>(
 }
 
 mod mr_blobby {
-    use super::{ContinentIdx, RegionTile};
-    use crate::PlanetParams;
+    use super::ContinentIdx;
+
     use common::*;
-    use grid::DynamicGrid;
+
+    use crate::params::PlanetParamsRef;
     use std::f32::consts::PI;
     use std::num::NonZeroUsize;
 
@@ -429,8 +430,8 @@ mod mr_blobby {
         pub radius: i32,
     }
 
-    pub struct BlobPlacement<'a> {
-        params: &'a PlanetParams,
+    pub struct BlobPlacement {
+        params: PlanetParamsRef,
 
         /// Consecutive blobs belong to the same continent, partitioned by continent_range
         land_blobs: Vec<LandBlob>,
@@ -439,8 +440,8 @@ mod mr_blobby {
         continent_range: Vec<(ContinentIdx, usize, usize)>,
     }
 
-    impl<'a> BlobPlacement<'a> {
-        pub fn new(params: &'a PlanetParams) -> Self {
+    impl BlobPlacement {
+        pub fn new(params: PlanetParamsRef) -> Self {
             BlobPlacement {
                 params,
                 land_blobs: Vec::with_capacity(512),
@@ -642,58 +643,10 @@ mod mr_blobby {
         pub fn continent_count(&self) -> usize {
             self.continent_range.len()
         }
-
-        #[deprecated]
-        fn rasterize_land_blobs(&self, grid: &mut DynamicGrid<RegionTile>) {
-            for &(continent, start, end) in self.continent_range.iter() {
-                macro_rules! set {
-                    ($pos:expr) => {
-                        let (x, y) = $pos;
-                        let coord = [x as isize, y as isize, 0];
-                        let wrapped_coord = grid.wrap_coord(coord);
-                        grid[wrapped_coord].continent = Some(continent);
-                    };
-                }
-
-                for blob in &self.land_blobs[start..end] {
-                    // draw filled in circle
-                    // https://stackoverflow.com/a/14976268
-                    let mut x = blob.radius;
-                    let mut y = 0;
-                    let mut x_change = 1 - (blob.radius << 1);
-                    let mut y_change = 0;
-                    let mut radius_error = 0;
-
-                    let x0 = blob.pos.0;
-                    let y0 = blob.pos.1;
-                    while x >= y {
-                        for _x in (x0 - x)..=(x0 + x) {
-                            set!((_x, y0 + y));
-                            set!((_x, y0 - y));
-                        }
-
-                        for _x in (x0 - y)..=(x0 + y) {
-                            set!((_x, y0 + x));
-                            set!((_x, y0 - x));
-                        }
-
-                        y += 1;
-                        radius_error += y_change;
-                        y_change += 2;
-
-                        if ((radius_error << 1) + x_change) > 0 {
-                            x -= 1;
-                            radius_error += x_change;
-                            x_change += 2;
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmarking"))]
 fn dummy_continent_polygons() -> Vec<(ContinentIdx, Polygon<f64>)> {
     let c = |x, y| geo::Coordinate { x, y };
     vec![(

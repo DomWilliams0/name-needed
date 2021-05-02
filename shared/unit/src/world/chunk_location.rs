@@ -25,6 +25,10 @@ impl ChunkLocation {
         self.1
     }
 
+    pub const fn xy(&self) -> (i32, i32) {
+        (self.0, self.1)
+    }
+
     /// Inclusive
     pub fn iter_until(self, other: Self) -> impl Iterator<Item = ChunkLocation> {
         let ChunkLocation(x0, y0) = self;
@@ -45,6 +49,13 @@ impl ChunkLocation {
             self.1 * CHUNK_SIZE.as_i32(),
             z.into(),
         )
+    }
+
+    pub fn try_add(self, (dx, dy): (i32, i32)) -> Option<Self> {
+        match (self.0.checked_add(dx), self.1.checked_add(dy)) {
+            (Some(x), Some(y)) => Some(Self(x, y)),
+            _ => None,
+        }
     }
 
     pub const MIN: Self = ChunkLocation(i32::MIN, i32::MIN);

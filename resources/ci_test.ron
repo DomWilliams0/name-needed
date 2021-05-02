@@ -13,7 +13,7 @@ Config(
         // big random world
         source: Generate("planet_generation.txt"),
         worker_threads: None,
-        generation_height_scale: 15.0,
+        load_timeout: 30,
         initial_chunk: (2, 2),
         initial_slab_depth: 2,
         initial_chunk_radius: 3,

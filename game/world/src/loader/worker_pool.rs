@@ -10,8 +10,10 @@ use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 use crate::loader::loading::LoadedSlab;
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
+
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 

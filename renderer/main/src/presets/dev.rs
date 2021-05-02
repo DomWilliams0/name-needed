@@ -24,7 +24,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         let thread_count = config::get()
             .world
             .worker_threads
-            .unwrap_or_else(|| (num_cpus::get() / 2).max(1));
+            .unwrap_or_else(|| (num_cpus::get() - 2).max(1));
         debug!(
             "using {threads} threads for world loader",
             threads = thread_count

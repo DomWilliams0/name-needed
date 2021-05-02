@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
+use unit::world::{LocalSliceIndex, RangePosition, SlabPosition, CHUNK_SIZE};
 
 use crate::block::Block;
 use crate::chunk::slab::SlabGridImpl;
@@ -10,7 +10,8 @@ use crate::chunk::slice::Slice;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
-use grid::{grid_declare, CoordType, GridImpl};
+use grid::{grid_declare, GridImpl};
+use procgen::SlabPositionAsCoord;
 use std::ops::Deref;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,
@@ -31,7 +32,7 @@ pub(crate) struct AreaDiscovery<'a> {
     grid: AreaDiscoveryGrid,
 
     /// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs
-    queue: Vec<(CoordType, Option<(CoordType, EdgeCost)>)>,
+    queue: Vec<(SlabPosition, Option<(SlabPosition, EdgeCost)>)>,
 
     /// current area index to flood fill with
     current: SlabAreaIndex,
@@ -71,8 +72,9 @@ impl<'a> AreaDiscovery<'a> {
         let mut grid = AreaDiscoveryGrid::default();
 
         for i in grid.indices() {
-            let b: &Block = &slab[i];
-            grid[i] = b.into();
+            // indices are certainly valid - TODO unchecked unwrap
+            let b = slab.index(i).unwrap();
+            *(grid.index_mut(i).unwrap()) = b.into();
         }
 
         Self {
@@ -96,8 +98,10 @@ impl<'a> AreaDiscovery<'a> {
         };
 
         for idx in range {
-            if !self.grid[idx].area.initialized() {
-                self.do_flood_fill(idx);
+            let block = self.grid.index(idx).unwrap(); // certainly valid
+            if !block.area.initialized() {
+                let coord = AreaDiscoveryGrid::unflatten_panic(idx);
+                self.do_flood_fill(coord);
             }
         }
 
@@ -105,15 +109,20 @@ impl<'a> AreaDiscovery<'a> {
         area - 1
     }
 
-    fn do_flood_fill(&mut self, start: usize) {
+    fn do_flood_fill(&mut self, start: SlabPositionAsCoord) {
         let mut count = 0;
 
         self.queue.clear();
-        self.queue.push((self.grid.unflatten(start), None));
+        self.queue.push((*start, None));
         let mut graph = BlockGraph::new();
 
         while let Some((current, src)) = self.queue.pop() {
-            let check_neighbours = match self.grid[&current].area.ok() {
+            let check_neighbours = match self
+                .grid
+                .get_unchecked(SlabPositionAsCoord(current))
+                .area
+                .ok()
+            {
                 None => {
                     // not seen before, check for walkability
                     if !self.is_walkable(current) {
@@ -135,7 +144,7 @@ impl<'a> AreaDiscovery<'a> {
 
             // create edges
             if let Some((src, src_cost)) = src {
-                graph.add_edge(&src, &current, src_cost, self.slab_index);
+                graph.add_edge(src, current, src_cost, self.slab_index);
             }
 
             if !check_neighbours {
@@ -144,7 +153,9 @@ impl<'a> AreaDiscovery<'a> {
             }
 
             // assign area
-            self.grid[&current].area = self.current;
+            self.grid
+                .get_unchecked_mut(SlabPositionAsCoord(current))
+                .area = self.current;
             count += 1;
 
             // add horizontal neighbours
@@ -157,15 +168,15 @@ impl<'a> AreaDiscovery<'a> {
             // check vertical neighbours for jump access
 
             // don't queue the slab above's neighbours if we're at the top of the slab
-            if current[2] < SLAB_SIZE.as_i32() - 1 {
+            if current.z().slice() < SLAB_SIZE.as_i32() - 1 {
                 // only check for jump ups if the block directly above is not solid
                 if self
                     .get_vertical_offset(current, VerticalOffset::Above)
                     .opacity
                     .transparent()
                 {
-                    let [x, y, z] = current;
-                    let above = [x, y, z + 1];
+                    let (x, y, z) = current.xyz();
+                    let above = SlabPosition::new_unchecked(x, y, LocalSliceIndex::new(z + 1));
 
                     for n in SlabNeighbours::new(above) {
                         self.queue.push((n, Some((current, EdgeCost::JumpUp))));
@@ -174,15 +185,16 @@ impl<'a> AreaDiscovery<'a> {
             }
 
             // don't queue the slab below's neighbours if we're at the bottom of the slab
-            if current[2] > 0 {
+            if current.z().slice() > 0 {
                 for n_adjacent in SlabNeighbours::new(current) {
                     // only check for jump downs if the block directly above that is not solid
                     // (mirrored check for jump ups above)
 
-                    if self.grid[&n_adjacent].opacity.transparent() {
-                        let [x, y, z] = n_adjacent;
-                        let n_below = [x, y, z - 1]; // the check above ensures we stay in this slab
-
+                    let adjacent = self.grid.get_unchecked_mut(SlabPositionAsCoord(n_adjacent));
+                    if adjacent.opacity.transparent() {
+                        let (x, y, z) = n_adjacent.xyz();
+                        // the check above ensures we stay in this slab
+                        let n_below = SlabPosition::new_unchecked(x, y, (z - 1).into());
                         self.queue
                             .push((n_below, Some((current, EdgeCost::JumpDown))));
                     }
@@ -206,8 +218,8 @@ impl<'a> AreaDiscovery<'a> {
         }
     }
 
-    fn is_walkable(&self, pos: CoordType) -> bool {
-        let marker = &self.grid[&pos];
+    fn is_walkable(&self, pos: SlabPosition) -> bool {
+        let marker = self.grid.get_unchecked(SlabPositionAsCoord(pos));
 
         if marker.opacity.solid() {
             return false;
@@ -227,10 +239,10 @@ impl<'a> AreaDiscovery<'a> {
     /// Can check below into slab below, but not above into slab above
     fn get_vertical_offset(
         &self,
-        block: CoordType,
+        block: SlabPosition,
         offset: VerticalOffset,
     ) -> AreaDiscoveryGridBlock {
-        let [x, y, z] = block;
+        let (x, y, z) = block.xyz();
         const TOP: i32 = SLAB_SIZE.as_i32() - 1;
 
         match z {
@@ -258,7 +270,8 @@ impl<'a> AreaDiscovery<'a> {
                     VerticalOffset::Below => z - 1,
                 };
 
-                self.grid[&[x, y, offset_z]]
+                let pos = SlabPosition::new_unchecked(x, y, offset_z.into());
+                *self.grid.get_unchecked(SlabPositionAsCoord(pos))
             }
         }
     }
@@ -272,7 +285,11 @@ impl<'a> AreaDiscovery<'a> {
     /// Assign areas to the blocks in the slab
     pub fn apply(self, slab: &mut SlabGridImpl) {
         for i in slab.indices() {
-            *slab[i].area_mut() = self.grid[i].area;
+            // indices are valid
+            // TODO use unchecked unwrap here
+            let src = self.grid.index(i).unwrap();
+            let dst = slab.index_mut(i).unwrap();
+            *dst.area_mut() = src.area;
         }
     }
 }

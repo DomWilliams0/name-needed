@@ -1,13 +1,24 @@
-use crate::continent::ContinentMap;
-use crate::rasterize::SlabGrid;
+use std::sync::Arc;
+
+use tokio::sync::{Mutex, RwLock};
+
 use common::*;
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SlabPosition,
+    SliceIndex, WorldPosition, CHUNK_SIZE,
+};
 
 use crate::biome::BlockQueryResult;
-use crate::params::PlanetParams;
-use crate::region::{noise_pos_for_block, Region, RegionLocation, Regions};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use crate::continent::ContinentMap;
+use crate::params::PlanetParamsRef;
+use crate::rasterize::SlabGrid;
+use crate::region::Regions;
+use crate::region::{
+    ApplyFeatureContext, LoadedRegionRef, PlanetPoint, RegionLocation, SlabContinuation,
+};
+
+use crate::GeneratedBlock;
+use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -17,9 +28,14 @@ unsafe impl Send for Planet {}
 unsafe impl Sync for Planet {}
 
 pub struct PlanetInner {
-    pub(crate) params: PlanetParams,
+    pub(crate) params: PlanetParamsRef,
     pub(crate) continents: ContinentMap,
     pub(crate) regions: Regions,
+
+    /// Reused allocation for block updates, queried by the game each tick. These come from
+    /// rasterizing subfeatures that protrude into _already loaded_ slabs, and so need to be applied
+    /// to the slab post-load
+    world_updates: Arc<Mutex<Vec<(WorldPosition, GeneratedBlock)>>>,
 
     #[cfg(feature = "climate")]
     climate: Option<crate::climate::Climate>,
@@ -30,7 +46,7 @@ pub struct PlanetInner {
 
 impl Planet {
     // TODO actual error type
-    pub fn new(params: PlanetParams) -> BoxedResult<Planet> {
+    pub fn new(params: PlanetParamsRef) -> BoxedResult<Planet> {
         debug!("creating planet with params {:?}", params);
 
         let mut continents = None;
@@ -53,13 +69,14 @@ impl Planet {
 
         #[cfg(feature = "cache")]
         let was_loaded = continents.is_some();
-        let continents = continents.unwrap_or_else(|| ContinentMap::new(&params));
+        let continents = continents.unwrap_or_else(|| ContinentMap::new(params.clone()));
 
-        let regions = Regions::new(&params);
+        let regions = Regions::new(params.clone());
         let inner = Arc::new(RwLock::new(PlanetInner {
             params,
             continents,
             regions,
+            world_updates: Arc::new(Mutex::new(Vec::with_capacity(256))),
 
             #[cfg(feature = "climate")]
             climate: None,
@@ -89,7 +106,9 @@ impl Planet {
         info!("generating planet");
         let params = planet.params.clone();
 
+        // place continents and seed temp/moisture etc
         planet.continents.generate(&mut planet_rando);
+
         drop(planet);
 
         #[cfg(feature = "climate")]
@@ -141,7 +160,7 @@ impl Planet {
     }
 
     pub async fn realize_region(&self, region: RegionLocation) {
-        let mut inner = self.0.write().await;
+        let inner = self.0.read().await;
         inner.get_or_create_region(region).await;
     }
 
@@ -159,8 +178,12 @@ impl Planet {
 
     /// Generates now and does not cache. Returns None if slab is out of range
     pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
-        let mut inner = self.0.write().await;
-        let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &inner.params)?;
+        let inner = self.0.read().await;
+        let params = inner.params.clone();
+        let slab_continuations = inner.regions.slab_continuations();
+        let world_updates = inner.world_updates.clone();
+
+        let region_loc = RegionLocation::try_from_chunk_with_params(slab.chunk, &params)?;
         let region = inner.get_or_create_region(region_loc).await.unwrap(); // region loc checked above
         let chunk_desc = region.chunk(slab.chunk).description();
 
@@ -169,13 +192,73 @@ impl Planet {
         let mut terrain = SlabGrid::default();
         chunk_desc.apply_to_slab(slab.slab, &mut terrain);
 
-        // TODO rasterize features onto slab
+        // apply features to slab and collect subfeatures
+        let slab_bounds = slab_bounds(slab);
+        let (subfeatures_tx, mut subfeatures_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut ctx = ApplyFeatureContext {
+            slab,
+            chunk_desc,
+            params: params.clone(),
+            slab_bounds: &slab_bounds,
+            subfeatures_tx,
+        };
+
+        // spawn a task to apply subfeatures to the terrain as they're produced
+        let mut slab_continuations_for_task = slab_continuations.clone();
+
+        let world_updates_task = world_updates.clone();
+        let task = tokio::spawn(async move {
+            while let Some(subfeature) = subfeatures_rx.recv().await {
+                subfeature
+                    .apply(
+                        slab,
+                        &mut terrain,
+                        Some(&mut slab_continuations_for_task),
+                        &params,
+                        &world_updates_task,
+                    )
+                    .await;
+            }
+
+            terrain
+        });
+
+        for feature in region.features_for_slab(slab, &slab_bounds) {
+            feature.apply_to_slab(&mut ctx).await;
+        }
+
+        // mark slab as completed
+        let old_continuations = slab_continuations
+            .lock()
+            .await
+            .insert(slab, SlabContinuation::Loaded);
+
+        // ensure subfeature tx is dropped
+        let params = ctx.params.clone();
+        drop(ctx);
+
+        // release lock on regions
+        drop(region);
+        drop(inner);
+
+        // wait for all subfeatures to be rasterized
+        let mut terrain = task.await.expect("future panicked");
+
+        // add any extra leaked subfeatures to this slab
+        if let Some(SlabContinuation::Unloaded(extra)) = old_continuations {
+            debug!("applying {count} leaked subfeatures to slab", count = extra.len(); slab);
+            for subfeature in extra.into_iter() {
+                subfeature
+                    .apply(slab, &mut terrain, None, &params, &world_updates)
+                    .await;
+            }
+        }
 
         Some(terrain)
     }
 
     pub async fn find_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
-        let mut inner = self.0.write().await;
+        let inner = self.0.read().await;
 
         let chunk_loc = ChunkLocation::from(block);
         let region_loc = RegionLocation::try_from_chunk_with_params(chunk_loc, &inner.params)?;
@@ -207,11 +290,35 @@ impl Planet {
     pub async fn query_block(&self, block: WorldPosition) -> Option<BlockQueryResult> {
         let inner = self.0.read().await;
         let sampler = inner.continents.biome_sampler();
-        let pos = noise_pos_for_block(block)?;
+        let pos = PlanetPoint::from_block(block)?;
         let (coastline_proximity, base_elevation, moisture, temperature) =
             sampler.sample(pos, &inner.continents);
         let biomes =
             sampler.choose_biomes(coastline_proximity, base_elevation, temperature, moisture);
+
+        let region = {
+            let chunk = ChunkLocation::from(block);
+            let region = RegionLocation::try_from_chunk(chunk);
+            let region = match region {
+                Some(loc) => inner.regions.get_existing(loc).await.map(|r| (loc, r)),
+                None => None,
+            };
+            region.map(|(loc, region)| {
+                let slab = SlabLocation::new(SlabIndex::from(block.slice()), chunk);
+                let slab_bounds = slab_bounds(slab);
+                let features = region
+                    .features_for_slab(slab, &slab_bounds)
+                    .filter_map(move |feature| {
+                        if feature.applies_to_block(block) {
+                            Some(format!("{}", feature.display()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                (loc, features)
+            })
+        };
 
         Some(BlockQueryResult {
             biome_choices: biomes,
@@ -219,14 +326,124 @@ impl Planet {
             base_elevation,
             moisture,
             temperature,
+            region,
         })
+    }
+
+    /// Sorts and dedups the given chunk stream into regions, gets all regional features in the
+    /// given z range, calls given closure on each point of the boundary.
+    ///
+    /// Nop if feature mutex is not immediately available, i.e. does not block
+    pub async fn feature_boundaries_in_range(
+        &self,
+        chunks: impl Iterator<Item = ChunkLocation>,
+        z_range: (GlobalSliceIndex, GlobalSliceIndex),
+        mut per_point: impl FnMut(u64, WorldPosition),
+    ) {
+        let inner = self.0.read().await;
+        for region in chunks
+            .filter_map(|c| RegionLocation::try_from_chunk_with_params(c, &inner.params))
+            .sorted_unstable() // allocation, gross
+            .dedup()
+        {
+            if let Some(region) = inner.regions.get_existing(region).await {
+                for feature in region.all_features() {
+                    let unique = feature.unique_id();
+                    feature.bounding_points(z_range, |point| {
+                        per_point(unique, point.into_block(z_range.1))
+                    });
+                }
+            }
+        }
+    }
+
+    pub async fn steal_world_updates(
+        &self,
+        with_updates: impl FnOnce(std::vec::Drain<(WorldPosition, GeneratedBlock)>),
+    ) {
+        let inner = self.0.write().await;
+        let mut updates = inner.world_updates.lock().await;
+        with_updates(updates.drain(..));
     }
 }
 
 impl PlanetInner {
-    async fn get_or_create_region(&mut self, region: RegionLocation) -> Option<&Region> {
-        // safety: regions and continents fields don't alias or reference each other
-        let continents: &ContinentMap = unsafe { std::mem::transmute(&self.continents) };
-        self.regions.get_or_create(region, continents).await
+    async fn get_or_create_region(&self, region: RegionLocation) -> Option<LoadedRegionRef<'_>> {
+        self.regions.get_or_create(region, &self.continents).await
+    }
+}
+
+/// Expensive, result should be cached
+///
+/// Panics if slab location is invalid
+pub(crate) fn slab_bounds(slab: SlabLocation) -> Rect<f64> {
+    let min = SlabPosition::new(0, 0, SliceIndex::bottom()).to_world_position(slab);
+    let min_point = PlanetPoint::from_block(min).unwrap(); // slab location assumed to be fine
+
+    let min_coord = Coordinate::from(min_point.get_array());
+    let max_coord = {
+        let offset = PlanetPoint::PER_BLOCK * CHUNK_SIZE.as_f64();
+        min_coord + Coordinate::from([offset, offset])
+    };
+
+    Rect::new(min_coord, max_coord)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RegionLocation;
+    use geo::coords_iter::CoordsIter;
+
+    #[test]
+    fn slab_bounds_in_region() {
+        let region = RegionLocation::new(5, 6);
+        let slab = region.chunk_bounds().0.get_slab(8);
+
+        let bounds = slab_bounds(slab);
+        for coord in bounds.coords_iter() {
+            let (x, y) = coord.x_y();
+            let (rx, ry) = region.xy();
+
+            assert_eq!(rx, x.floor() as u32);
+            assert_eq!(ry, y.floor() as u32);
+        }
+
+        // square and 1 chunk in size
+        assert_eq!(
+            bounds.height(),
+            PlanetPoint::PER_BLOCK * CHUNK_SIZE.as_f64()
+        );
+        assert_eq!(bounds.height(), bounds.width());
+    }
+
+    #[test]
+    fn slab_bounds_vary() {
+        let region = RegionLocation::new(5, 6);
+        let chunk = region.chunk_bounds().0;
+
+        // differ horizontally
+        let a = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+        let b = {
+            let chunk: ChunkLocation = chunk + (3, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+
+        assert_ne!(a, b);
+
+        // differ vertically
+        let a = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(4))
+        };
+        let b = {
+            let chunk: ChunkLocation = chunk + (2, 2);
+            slab_bounds(chunk.get_slab(9))
+        };
+
+        assert_eq!(a, b);
     }
 }

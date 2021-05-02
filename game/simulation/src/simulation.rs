@@ -23,15 +23,19 @@ use crate::needs::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
-use crate::render::{AxesDebugRenderer, DebugRendererError, DebugRenderers};
+use crate::render::{
+    AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
+};
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub enum AssociatedBlockData {
@@ -55,7 +59,8 @@ pub struct Simulation<R: Renderer> {
     world_loader: ThreadedWorldLoader,
 
     /// Terrain updates, queued and applied per tick
-    terrain_changes: Vec<WorldTerrainUpdate>,
+    /// TODO if order matters, use an IndexSet instead
+    terrain_changes: HashSet<WorldTerrainUpdate>,
 
     /// World change events populated during terrain updates, consumed every tick
     change_events: Vec<WorldChangeEvent>,
@@ -87,12 +92,15 @@ impl<R: Renderer> Simulation<R> {
         let mut debug_renderers = DebugRenderers::new();
         register_debug_renderers(&mut debug_renderers)?;
 
+        // ensure tick is reset
+        reset_tick();
+
         Ok(Self {
             ecs_world,
             voxel_world,
             world_loader,
             debug_renderers,
-            terrain_changes: Vec::with_capacity(1024),
+            terrain_changes: HashSet::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
         })
     }
@@ -209,15 +217,27 @@ impl<R: Renderer> Simulation<R> {
         world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
         drop(world);
 
-        // apply terrain changes
-        // TODO per tick alloc/reuse buf
-        let terrain_updates = self
-            .terrain_changes
-            .drain(..)
-            .chain(self.ecs_world.resource_mut::<TerrainUpdatesRes>().drain(..));
+        // aggregate all terrain changes for this tick
+        let updates = &mut self.terrain_changes;
+        self.world_loader.steal_queued_block_updates(updates);
+        updates.extend(self.ecs_world.resource_mut::<TerrainUpdatesRes>().drain(..));
 
-        self.world_loader
-            .apply_terrain_updates(terrain_updates, &mut self.change_events);
+        // apply all applicable terrain changes
+        {
+            let n_before = updates.len();
+            self.world_loader
+                .apply_terrain_updates(updates, &mut self.change_events);
+            let n_after = updates.len();
+
+            debug_assert!(n_after <= n_before);
+            if n_before > 0 {
+                debug!(
+                    "applied {applied} terrain updates, deferring {deferred}",
+                    applied = n_before - n_after,
+                    deferred = n_after
+                );
+            }
+        }
 
         // consume change events
         let mut events = std::mem::take(&mut self.change_events);
@@ -254,7 +274,7 @@ impl<R: Renderer> Simulation<R> {
                         debug!("filling in block range"; "range" => ?range, "block_type" => ?block_type);
 
                         self.terrain_changes
-                            .push(WorldTerrainUpdate::new(range, block_type));
+                            .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
                 UiCommand::IssueDivineCommand(ref divine_command) => {
@@ -381,10 +401,17 @@ impl<R: Renderer> Simulation<R> {
             renderer.debug_start();
             let ecs_world = &self.ecs_world;
             let voxel_world = self.voxel_world.borrow();
+            let world_loader = &self.world_loader;
 
-            self.debug_renderers
-                .iter_enabled()
-                .for_each(|r| r.render(renderer, &voxel_world, ecs_world, world_viewer));
+            self.debug_renderers.iter_enabled().for_each(|r| {
+                r.render(
+                    renderer,
+                    &voxel_world,
+                    world_loader,
+                    ecs_world,
+                    world_viewer,
+                )
+            });
 
             if let Err(e) = renderer.debug_finish() {
                 warn!("render debug_finish() failed"; "error" => %e);
@@ -437,6 +464,12 @@ fn increment_tick() {
     }
 }
 
+fn reset_tick() {
+    unsafe {
+        TICK.store(0, Ordering::Relaxed);
+    }
+}
+
 pub fn current_tick() -> u32 {
     unsafe { TICK.load(Ordering::SeqCst) }
 }
@@ -480,6 +513,7 @@ fn register_debug_renderers<R: Renderer>(
     r: &mut DebugRenderers<R>,
 ) -> Result<(), DebugRendererError> {
     r.register(AxesDebugRenderer, true)?;
+    r.register(ChunkBoundariesDebugRenderer, false)?;
     r.register(SteeringDebugRenderer, true)?;
     r.register(
         PathDebugRenderer::default(),
@@ -487,5 +521,6 @@ fn register_debug_renderers<R: Renderer>(
     )?;
     r.register(NavigationAreaDebugRenderer::default(), false)?;
     r.register(SensesDebugRenderer::default(), false)?;
+    r.register(FeatureBoundaryDebugRenderer::default(), false)?;
     Ok(())
 }

@@ -43,6 +43,14 @@ pub struct LoadNotifier {
     waiters: Arc<AtomicUsize>,
 }
 
+pub enum WaitResult {
+    Success,
+    /// Channel is disconnected
+    Disconnected,
+    /// Channel is lagging, check slab state again and wait again if necessary
+    Retry,
+}
+
 #[derive(Constructor)]
 pub struct WorldChangeEvent {
     pub pos: WorldPosition,
@@ -708,18 +716,21 @@ impl LoadNotifier {
         }
     }
 
-    /// Returns false on recv error
-    async fn wait_for_slab(&mut self, slab: SlabLocation) -> bool {
+    async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
         // increment waiter count
         self.waiters.fetch_add(1, Ordering::SeqCst);
 
         let ret = loop {
             match self.recv.recv().await {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
+                    break WaitResult::Retry;
+                }
                 Err(e) => {
                     error!("error waiting for slab notification: {}", e);
-                    break false;
+                    break WaitResult::Disconnected;
                 }
-                Ok(recvd) if recvd == slab => break true,
+                Ok(recvd) if recvd == slab => break WaitResult::Success,
                 Ok(_) => { /* keep waiting */ }
             }
         };
@@ -732,6 +743,7 @@ impl LoadNotifier {
 
 pub mod slab_loading {
     use crate::chunk::slab::{Slab, SlabInternalNavigability};
+    use crate::world::WaitResult;
     use crate::{BaseTerrain, WorldContext, WorldRef};
     use common::*;
     use futures::task::{Context, Poll};
@@ -797,7 +809,9 @@ pub mod slab_loading {
                                     }
 
                                     // still not available, wait for mandatory slab below to load
-                                    if !notifier.wait_for_slab(slab.below()).await {
+                                    if let WaitResult::Disconnected =
+                                        notifier.wait_for_slab(slab.below()).await
+                                    {
                                         // failure, guess we're shutting down
                                         break None;
                                     }
@@ -887,7 +901,9 @@ pub mod slab_loading {
                                         }
 
                                         // still not available, wait for mandatory slab below to load
-                                        if !notifier.wait_for_slab(slab.below()).await {
+                                        if let WaitResult::Disconnected =
+                                            notifier.wait_for_slab(slab.below()).await
+                                        {
                                             // failure, guess we're shutting down
                                             break None;
                                         }
@@ -1080,7 +1096,7 @@ pub mod helpers {
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
-    fn timeout() -> Duration {
+    pub fn test_world_timeout() -> Duration {
         let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
             .ok()
             .and_then(|val| val.parse().ok())
@@ -1096,9 +1112,10 @@ pub mod helpers {
         let world = loader.world();
 
         let mut _updates = Vec::new();
-        loader.apply_terrain_updates(updates.iter().cloned(), &mut _updates);
+        let mut updates = updates.iter().cloned().collect();
+        loader.apply_terrain_updates(&mut updates, &mut _updates);
 
-        loader.block_for_last_batch(timeout()).unwrap();
+        loader.block_for_last_batch(test_world_timeout()).unwrap();
 
         // apply occlusion updates
         let mut world = world.borrow_mut();
@@ -1123,7 +1140,7 @@ pub mod helpers {
 
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs(slabs_to_load.into_iter());
-        loader.block_for_last_batch(timeout()).unwrap();
+        loader.block_for_last_batch(test_world_timeout()).unwrap();
 
         // apply occlusion updates
         let world = loader.world();
@@ -1229,6 +1246,26 @@ mod tests {
 
         // non existent
         assert!(w.find_accessible_block_in_column(-5, 30).is_none());
+    }
+
+    #[test]
+    fn accessible_block_unwalkable_types() {
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_slice(6, BlockType::Leaves) // full of unwalkable block
+            .set_block((4, 4, 6), BlockType::Grass) // single block of sanctuary
+            .build((0, 0))])
+        .into_inner();
+
+        //
+        assert_eq!(
+            w.find_accessible_block_in_column(4, 4),
+            Some((4, 4, 7).into())
+        );
+
+        // all leaves
+        assert!(w.find_accessible_block_in_column(3, 3).is_none());
+        assert!(w.find_accessible_block_in_column(4, 3).is_none());
+        assert!(w.find_accessible_block_in_column(0, 0).is_none());
     }
 
     #[test]

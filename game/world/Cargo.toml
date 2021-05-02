@@ -21,8 +21,8 @@ futures = { version = "0.3", default-features = false, features = ["std", "execu
 tokio = { version = "1.0", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
-matches = "0.1"
 criterion = "0.3"
+num_cpus = "1.13"
 
 [[bench]]
 name = "terrain"

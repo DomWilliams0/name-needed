@@ -15,5 +15,6 @@ slog-async = { version = "2.5", optional = true }
 once_cell = "1.4"
 
 [features]
-default = ["binary"]
+default = ["binary", "to-file"]
 binary = ["slog-term", "slog-async"]
+to-file = []

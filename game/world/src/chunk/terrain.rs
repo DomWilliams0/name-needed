@@ -631,11 +631,17 @@ impl RawChunkTerrain {
     ) -> Option<BlockPosition> {
         let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
         let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
+
+        // -1 because iterating in windows of 2
+        let end_at = GlobalSliceIndex::new(end_at.slice().saturating_sub(1));
         self.slices_from_top_offset()
             .skip_while(|(s, _)| *s > start_from)
             .take_while(|(s, _)| *s >= end_at)
-            .find(|(_, slice)| slice[pos].walkable())
-            .map(|(z, _)| pos.to_block_position(z))
+            .tuple_windows()
+            .find(|((_, above), (_, below))| {
+                above[pos].walkable() && below[pos].block_type().can_be_walked_on()
+            })
+            .map(|((z, _), _)| pos.to_block_position(z))
     }
 
     // TODO set_block trait to reuse in ChunkBuilder (#46)
@@ -826,8 +832,6 @@ impl Default for RawChunkTerrain {
 
 #[cfg(test)]
 mod tests {
-    use matches::assert_matches;
-
     use unit::world::CHUNK_SIZE;
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
@@ -1267,7 +1271,7 @@ mod tests {
         // 0,0,0 occluded by 2 chunk neighbours
         assert!(world.block((-1, 0, 1)).unwrap().opacity().solid());
         assert!(world.block((0, -1, 1)).unwrap().opacity().solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, 0)),
             [
                 VertexOcclusion::Full,
@@ -1275,7 +1279,7 @@ mod tests {
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly
             ]
-        );
+        ));
     }
 
     #[test]
@@ -1307,7 +1311,7 @@ mod tests {
         assert!(world.block((0, 0, -1)).unwrap().opacity().solid());
         assert!(world.block((-1, 0, 0)).unwrap().opacity().solid());
         assert!(world.block((0, 0, 0)).unwrap().opacity().transparent());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::Mildly,
@@ -1315,14 +1319,14 @@ mod tests {
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly
             ]
-        );
+        ));
 
         // ... but when (0,0,0) is solid, (0,0,-1) is hidden so it shouldnt be updated
         let world_ref = mk_chunks(true);
         let world = world_ref.borrow();
 
         assert!(world.block((0, 0, 0)).unwrap().opacity().solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
             [
                 VertexOcclusion::NotAtAll,
@@ -1330,7 +1334,7 @@ mod tests {
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll
             ]
-        );
+        ));
     }
 
     #[test]
@@ -1368,7 +1372,7 @@ mod tests {
             .unwrap()
             .opacity()
             .solid());
-        assert_matches!(
+        assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, CHUNK_SIZE.as_i32() - 1, 0)),
             [
                 VertexOcclusion::NotAtAll,
@@ -1376,7 +1380,7 @@ mod tests {
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mostly,
             ]
-        );
+        ));
     }
 
     #[test]

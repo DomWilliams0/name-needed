@@ -7,6 +7,7 @@ use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::{BaseTerrain, WorldContext};
+use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
@@ -185,7 +186,7 @@ pub(crate) fn make_collision_mesh(
 ) {
     let is_solid = |coord: &[i32; 3]| {
         let coord = [coord[0] as i32, coord[1] as i32, coord[2] as i32];
-        slab[&coord].opacity().solid()
+        slab.get_unchecked(coord).opacity().solid()
     };
 
     let mut add_vertex = |x: i32, y: i32, z: i32| {

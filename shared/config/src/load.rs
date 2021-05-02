@@ -65,6 +65,7 @@ impl RawConfig {
     }
 }
 
+// TODO use arc-swap to avoid the need to lock the config
 pub struct ConfigRef<'a> {
     config: MutexGuard<'a, RawConfig>,
 }

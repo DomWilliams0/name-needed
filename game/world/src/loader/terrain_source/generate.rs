@@ -1,11 +1,11 @@
 use crate::loader::terrain_source::TerrainSourceError;
 
-use crate::block::Block;
+use crate::block::{Block, BlockType};
 use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
 
-use procgen::{GeneratedBlock, Planet, PlanetParams};
+use procgen::{GeneratedBlock, Planet, PlanetParamsRef};
 
 use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
 
@@ -16,7 +16,7 @@ pub struct GeneratedTerrainSource {
 }
 
 impl GeneratedTerrainSource {
-    pub async fn new(params: PlanetParams) -> BoxedResult<Self> {
+    pub async fn new(params: PlanetParamsRef) -> BoxedResult<Self> {
         let mut planet = Planet::new(params)?;
 
         planet.initial_generation().await?;
@@ -51,17 +51,24 @@ impl From<procgen::SlabGrid> for Slab {
 
 impl From<&procgen::GeneratedBlock> for Block {
     fn from(block: &GeneratedBlock) -> Self {
+        Block::with_block_type(block.into())
+    }
+}
+
+impl From<&procgen::GeneratedBlock> for BlockType {
+    fn from(block: &GeneratedBlock) -> Self {
         use crate::block::BlockType as B;
         use procgen::BlockType as A;
-        let ty = match block.ty {
+        match block.ty {
             A::Air => B::Air,
             A::Stone => B::Stone,
             A::Dirt => B::Dirt,
             A::Grass => B::Grass,
+            A::LightGrass => B::LightGrass,
             A::Sand => B::Sand,
             A::SolidWater => B::SolidWater,
-        };
-
-        Block::with_block_type(ty)
+            A::Leaves => B::Leaves,
+            A::TreeTrunk => B::TreeTrunk,
+        }
     }
 }
