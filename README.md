@@ -14,8 +14,8 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 * 02 May 2021: <em>Tree placement in forests. Trees are **very** simplistic for now, more like large mushrooms. There's a
   lot of progress behind the scenes in
-  [parallel regional feature discovery](https://github.com/DomWilliams0/name-needed/blob/7c504ff0d26ecb68e0f3fae2a023e925eb0ecf04/game/procgen/src/region/regions.rs#L137)
-  ,which will be documented in a future devlog.
+  [parallel regional feature discovery](https://github.com/DomWilliams0/name-needed/blob/7c504ff0d26ecb68e0f3fae2a023e925eb0ecf04/game/procgen/src/region/regions.rs#L137),
+  which will be documented in a future devlog.
   </em>
 <p style="margin: auto">
     <img src=".screenshots/procgen-forest.png" width="400"/>
