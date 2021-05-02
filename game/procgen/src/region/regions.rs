@@ -709,10 +709,21 @@ async fn join_on<F: Future<Output = O> + Send + 'static, O: Send + 'static>(
         .map(tokio::task::spawn)
         .collect::<FuturesUnordered<_>>();
 
+    let mut panics = Vec::new();
     while let Some(res) = futures.next().await {
         if let Err(err) = res {
-            panic!("region loading task panicked: {}", err)
+            if let Ok(panic) = err.try_into_panic() {
+                panics.push(panic);
+            }
         }
+    }
+
+    if !panics.is_empty() {
+        crit!("{n} region loading task(s) panicked", n = panics.len());
+
+        // panic with the first only
+        let panic = panics.swap_remove(0);
+        std::panic::panic_any(panic);
     }
 }
 

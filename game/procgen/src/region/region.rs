@@ -157,10 +157,20 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         }))
         .await;
 
+        let mut panics = Vec::new();
         for result in results {
             if let Err(err) = result {
-                panic!("panic occurred in future: {}", err);
+                if let Ok(panic) = err.try_into_panic() {
+                    panics.push(panic);
+                }
             }
+        }
+        if !panics.is_empty() {
+            crit!("{n} region chunk task(s) panicked", n = panics.len());
+
+            // panic with the first only
+            let panic = panics.swap_remove(0);
+            std::panic::panic_any(panic);
         }
 
         // safety: all chunks have been initialized and any panics have been propagated
