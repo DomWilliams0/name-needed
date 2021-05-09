@@ -32,7 +32,7 @@ impl DebugWindow {
                 // scripting
                 bundle.ui.separator();
 
-                bundle.ui.input_text(im_str!(""), &mut self.script_input).build();
+                bundle.ui.input_text(im_str!("##scriptpath"), &mut self.script_input).build();
                 if bundle.ui.button(im_str!("Execute script"), [0.0, 0.0]) {
                     bundle.commands.push(UiCommand::ExecuteScript(self.script_input.to_str().to_owned().into()))
                 }
