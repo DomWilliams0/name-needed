@@ -22,7 +22,8 @@ pub use lazy_static::lazy_static;
 pub use logging::{
     self, prelude::*, slog_kv_debug, slog_kv_display, slog_value_debug, slog_value_display,
 };
-pub use metrics::{self, declare_entity_metric, entity_metric};
+#[cfg(feature = "metrics")]
+pub use metrics::{self, declare_entity_metric, entity_metric}; // nop macro declared below for disabled feature
 pub use newtype::{NormalizedFloat, Proportion};
 
 // common imports that annoyingly get resolved to other pub exports of std/core
@@ -85,4 +86,10 @@ pub fn seeded_rng(seed: Option<u64>) -> StdRng {
         Some(seed) => StdRng::seed_from_u64(seed),
         None => StdRng::from_entropy(),
     }
+}
+
+#[cfg(not(feature = "metrics"))]
+#[macro_export]
+macro_rules! declare_entity_metric {
+    ($($arg:tt)*) => {};
 }
