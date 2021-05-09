@@ -1,10 +1,10 @@
 use rlua::prelude::*;
+use rlua::{Context, StdLib, UserData};
 
 use crate::ecs::EntityWrapper;
 use crate::input::SelectedEntity;
 use crate::scripting::context::{parse_entity_id, Scripting, ScriptingError, ScriptingResult};
 use crate::{ComponentWorld, EcsWorld, WorldRef};
-use rlua::{Context, StdLib, UserData};
 
 pub struct LuaScripting {
     runtime: rlua::Lua,
@@ -66,27 +66,27 @@ impl Scripting for LuaScripting {
 fn populate_globals(ctx: Context) -> ScriptingResult<()> {
     let globals = ctx.globals();
 
+    macro_rules! define {
+        (fn $name:ident $func:expr) => {
+            globals.set(stringify!($name), ctx.create_function($func)?)?
+        };
+    }
+
     // remove print, use logging levels instead
     globals.set("print", LuaNil)?;
-    globals.set(
-        "info",
-        ctx.create_function(|_, msg: String| {
-            common::info!("lua: {}", msg);
-            Ok(())
-        })?,
-    )?;
 
-    globals.set(
-        "debug",
-        ctx.create_function(|_, msg: String| {
-            common::debug!("lua: {}", msg);
-            Ok(())
-        })?,
-    )?;
+    define!(fn info |_, msg: String| {
+        common::info!("lua: {}", msg);
+        Ok(())
+    });
 
-    globals.set(
-        "GetEntityById",
-        ctx.create_function(|ctx: Context, eid: String| {
+    define!(fn debug |_, msg: String| {
+        common::debug!("lua: {}", msg);
+        Ok(())
+    });
+
+    define!(
+        fn GetEntityById |ctx: Context, eid: String| {
             let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
 
             // parse and check entity is alive
@@ -95,37 +95,32 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
                 .and_then(|e| state.ensure_alive(e))
                 .map_err(rlua::Error::external)?;
             Ok(entity)
-        })?,
-    )?;
+        }
+    );
 
-    globals.set(
-        "SelectEntity",
-        ctx.create_function(|ctx: Context, eid: EntityWrapper| {
-            let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
+    define!(fn SelectEntity |ctx: Context, eid: EntityWrapper| {
+        let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
 
-            state
-                .ensure_alive(eid)
-                .map(|e| {
-                    let selected = state.ecs.resource_mut::<SelectedEntity>();
-                    selected.select(state.ecs, e.into());
-                })
-                .map_err(rlua::Error::external)?;
+        state
+            .ensure_alive(eid)
+            .map(|e| {
+                let selected = state.ecs.resource_mut::<SelectedEntity>();
+                selected.select(state.ecs, e.into());
+            })
+            .map_err(rlua::Error::external)?;
 
-            Ok(())
-        })?,
-    )?;
+        Ok(())
+    });
 
-    globals.set(
-        "UnselectEntity",
-        ctx.create_function(|ctx: Context, _: ()| {
-            let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
+    define!(fn UnselectEntity |ctx: Context, _: ()| {
+        let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
 
-            let selected = state.ecs.resource_mut::<SelectedEntity>();
-            selected.unselect(state.ecs);
+        let selected = state.ecs.resource_mut::<SelectedEntity>();
+        selected.unselect(state.ecs);
 
-            Ok(())
-        })?,
-    )?;
+        Ok(())
+    });
+
     Ok(())
 }
 
