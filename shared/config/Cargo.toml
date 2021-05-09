@@ -12,3 +12,4 @@ common = { path = "../common" }
 ron = "0.6"
 serde = "1.0"
 notify = "4.0"
+arc-swap = "1.2"

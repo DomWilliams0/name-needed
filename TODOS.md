@@ -1,4 +1,4 @@
-# TODOs (317)
+# TODOs (315)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -411,9 +411,6 @@
    * `# TODO feature for cgmath`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
- * [shared/config/src/load.rs](shared/config/src/load.rs) (2)
-   * `// TODO use arc-swap to avoid the need to lock the config`
-   * `// TODO add a variant that returns a default instead of panicking`
  * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)
    * `// TODO use same CoordType for DynamicGrid`
    * `// TODO profile and improve coord wrapping`

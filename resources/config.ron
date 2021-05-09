@@ -3,7 +3,6 @@ Config(
         resolution: (1280, 720),
         resizable: false,
         camera_speed: 1.0,
-        debug_physics: false,
         zoom: 1.0,
         initial_view_range: 8,
         nav_paths_by_default: false,
@@ -16,8 +15,8 @@ Config(
         initial_chunk: (33, 512), // near a forest
 
         /// keep these low <=8
-        initial_slab_depth: 2,
-        initial_chunk_radius: 4,
+        initial_slab_depth: 1,
+        initial_chunk_radius: 2,
     ),
     simulation: (
         random_seed: Some(67853852415423),

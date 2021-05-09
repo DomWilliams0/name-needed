@@ -4,7 +4,6 @@ Config(
         resolution: (250, 250),
         resizable: false,
         camera_speed: 0.0,
-        debug_physics: false,
         zoom: 1.0,
         initial_view_range: 5,
         nav_paths_by_default: false,

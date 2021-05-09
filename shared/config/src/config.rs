@@ -14,7 +14,6 @@ pub struct Display {
     pub resolution: (u32, u32),
     pub resizable: bool,
     pub camera_speed: f32,
-    pub debug_physics: bool,
     pub zoom: f32,
     pub initial_view_range: u16,
     pub nav_paths_by_default: bool,

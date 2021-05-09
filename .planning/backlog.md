@@ -35,6 +35,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * better entity selection
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
+	* list of society members in UI to click instead
 * persist ui state over restarts (open treenodes, toggled debug renderers etc)
 * interactive terminal to replace/extend dev ui
 	* custom log! handler to show warnings and errors
@@ -115,6 +116,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * map chunks to torus and make the world wrap-around
 
 ## Optimizations
+* integrate tracy for per-frame profiling
 ### Performance
 * allocation reuse
 	* cap cached alloc size so memory usage doesnt only go upwards
@@ -131,6 +133,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
 * mesh generation on worker thread
 * replace all hashmaps with faster non crypto hashes
+* replace Arcs that don't need weak refs with `triomphe`
 * perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * investigate invalidating a slab queued for finalization if terrain updates are applied to it, to avoid doing tons of extra work for nothing. some degree of redundant work is ok though, so the terrain never noticably lags behind player updates and catches up suddenly when all changes are applied together
@@ -158,7 +161,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * config with watcher
 
 ## Rendering
-* debug renderer to show chunk boundaries
 * textures/sprites/animations
 * improved terrain colour palette
 * very simple oval shadows beneath entities to show height
@@ -190,10 +192,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * explicit namespacing for entity definitions e.g. "core:food_apple"
 * detect if debugger is present/breakpoint is hit and pause the gameloop, to avoid the insane catch up after continuing
 * separate binary for definition file validation
+	* or a single debug binary with different args to do things and print progress (e.g. path finding, world modification) instead of either visually checking in the game or unit tests
 * instead of sleeping to wait for world to load, check if panicked every second
 * add a bg async task that checks for panics, and aborts runtime - currently panics can randomly cause deadlocks
 * restarting should take better care of async thread pool, panics if restart occurs while still loading terrain
-* use an arc-swap for config reloading instead of a mutex
 
 ## Entity diversity
 * animal species

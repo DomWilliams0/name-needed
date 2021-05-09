@@ -450,6 +450,7 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "arc-swap 1.2.0",
  "common",
  "notify",
  "ron",
