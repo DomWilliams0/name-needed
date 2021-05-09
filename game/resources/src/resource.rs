@@ -1,37 +1,9 @@
+//! Resource filesystem structure declaration for the game
+
 use crate::container::ResourceContainer;
 use crate::error::{ResourceError, ResourceErrorKind};
+use crate::{child, resources};
 use std::path::{Path, PathBuf};
-
-macro_rules! resources {
-    ($name:ident, $dir:expr) => {
-        #[derive(Clone)]
-        pub struct $name(PathBuf);
-
-        impl AsRef<Path> for $name {
-            fn as_ref(&self) -> &Path {
-                &*self.0
-            }
-        }
-
-        impl From<PathBuf> for $name {
-            fn from(path: PathBuf) -> Self {
-                Self(path)
-            }
-        }
-
-        impl ResourceContainer for $name {
-            const DIR: &'static str = $dir;
-        }
-    };
-}
-
-macro_rules! child {
-    ($name:ident, $child:ident) => {
-        pub fn $name(&self) -> Result<$child, ResourceError> {
-            get_dir(&self.0, <$child as ResourceContainer>::DIR).map($child)
-        }
-    };
-}
 
 resources!(Resources, "resources");
 
@@ -40,8 +12,14 @@ resources!(WorldGen, "worldgen");
 resources!(Shaders, "shaders");
 
 impl Resources {
-    pub fn new<P: AsRef<Path>>(game_dir: P) -> Result<Self, ResourceError> {
-        get_dir(game_dir, "resources").map(Self)
+    pub fn new(game_dir: impl AsRef<Path>) -> Result<Self, ResourceError> {
+        let game_dir = game_dir.as_ref();
+        let path = get_dir(game_dir, "resources")?;
+        let component_offset = path.components().count();
+        Ok(Self {
+            path,
+            component_offset,
+        })
     }
 
     child!(definitions, Definitions);
@@ -59,11 +37,7 @@ fn get_dir<R: AsRef<Path>, D: AsRef<Path>>(root: R, dir: D) -> Result<PathBuf, R
     } else {
         Err(ResourceError(
             root.to_owned(),
-            ResourceErrorKind::MissingDirectory(
-                dir.to_str()
-                    .expect("expected path to be unicode")
-                    .to_owned(),
-            ),
+            ResourceErrorKind::MissingDirectory(dir.to_owned()),
         ))
     }
 }

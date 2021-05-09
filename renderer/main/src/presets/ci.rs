@@ -3,7 +3,6 @@ use crate::scenarios::Scenario;
 use crate::GamePreset;
 use common::BoxedResult;
 use simulation::{AsyncWorkerPool, Renderer, Simulation, ThreadedWorldLoader};
-use std::path::Path;
 
 #[derive(Default)]
 pub struct ContinuousIntegrationGamePreset;
@@ -13,8 +12,8 @@ impl<R: Renderer> GamePreset<R> for ContinuousIntegrationGamePreset {
         "ci"
     }
 
-    fn config(&self) -> Option<&Path> {
-        Some(Path::new("ci_test.ron"))
+    fn config_filename(&self) -> Option<&str> {
+        Some("ci_test.ron")
     }
 
     fn world(&self, resources: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader> {

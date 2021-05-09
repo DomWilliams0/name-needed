@@ -23,7 +23,7 @@ fn main() {
     use procgen::*;
 
     // parse config and args first
-    let params = PlanetParams::load_with_args("procgen.txt");
+    let params = PlanetParams::load_file_with_args("procgen.txt");
 
     let logger = logging::LoggerBuilder::with_env()
         .and_then(|builder| builder.init(log_time))

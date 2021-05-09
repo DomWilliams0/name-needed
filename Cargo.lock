@@ -2080,6 +2080,7 @@ dependencies = [
  "noise",
  "panik",
  "rand_distr 0.3.0",
+ "resources",
  "ron",
  "rstar",
  "serde",

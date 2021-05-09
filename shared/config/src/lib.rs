@@ -1,4 +1,4 @@
-pub use load::{get, init};
+pub use load::{get, init, ConfigType};
 
 pub use self::config::*;
 

@@ -1,14 +1,16 @@
 use common::*;
 use serde::Deserialize;
-use std::fs::File;
-use std::io::{BufRead, BufReader, ErrorKind};
-use std::path::{Path, PathBuf};
+
+use std::io::BufRead;
+
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 
+use crate::biome::BiomeConfig;
 use crate::region::RegionLocationUnspecialized;
 use common::alloc::str::FromStr;
 use noise::MultiFractal;
+use resources::{ReadResource, ResourceContainer, ResourceError, ResourceErrorKind, ResourceFile};
 #[cfg(feature = "cache")]
 use serde::Serialize;
 use std::sync::Arc;
@@ -92,9 +94,9 @@ pub struct PlanetParams {
     #[structopt(long, parse(try_from_str), default_value)]
     pub no_cache: bool,
 
-    /// Set manually to "biomes.ron" as sibling to this file during loading
+    /// Manually set after parsing arguments by reading a sibling file
     #[structopt(skip)]
-    pub biomes_cfg: BiomesConfig,
+    pub(crate) biomes_cfg: Vec<BiomeConfig>,
 
     /// The higher >1 the more relaxed the boundary
     #[structopt(long, default_value = "8.0")]
@@ -114,17 +116,6 @@ pub struct PlanetParams {
 
     #[structopt(long, default_value = "0.15")]
     pub region_feature_vertical_expansion_threshold: f64,
-}
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "cache", derive(Serialize, Deserialize))]
-pub enum BiomesConfig {
-    // No overhead in non-test builds: "Data-carrying enums with a single variant without a repr()
-    // annotation have the same layout as the variant field."
-    File(PathBuf),
-
-    #[cfg(any(test, feature = "benchmarking"))]
-    Hardcoded(String),
 }
 
 #[derive(Debug, Clone, Default, StructOpt)]
@@ -219,44 +210,78 @@ pub struct RenderParams {
 }
 
 impl PlanetParams {
-    pub fn load_with_args(file_path: impl AsRef<Path>) -> BoxedResult<PlanetParamsRef> {
-        Self::load(file_path.as_ref(), std::env::args())
+    /// File path on disk
+    #[cfg(feature = "bin")]
+    pub fn load_file_with_args(config_path: impl AsRef<std::path::Path>) -> BoxedResult<PlanetParamsRef> {
+        use std::path::Path;
+        use std::io::ErrorKind;
+
+        let read_file = |path: &Path| -> std::io::Result<String> {
+            match std::fs::read_to_string(path) {
+                Err(e) if e.kind() == ErrorKind::NotFound => {
+                    // no file, no problem
+                    warn!(
+                        "couldn't find config file '{}', continuing with defaults",
+                        path.display()
+                    );
+
+                    Ok(String::new())
+                }
+                other => other,
+            }
+        };
+
+        let cfg = read_file(config_path.as_ref())?;
+        let biomes = read_file("biomes.ron".as_ref())?;
+
+        Self::load(&cfg, &biomes, std::env::args())
     }
 
-    pub fn load_with_only_file(file_path: impl AsRef<Path>) -> BoxedResult<PlanetParamsRef> {
+    /// path is relative to resource container. Expects "biomes.ron" in same directory
+    pub fn load_with_only_file(
+        resources: &impl ResourceContainer,
+        path: impl AsRef<ResourceFile>,
+    ) -> BoxedResult<PlanetParamsRef> {
+        let read_resource = |path: &ResourceFile| -> BoxedResult<String> {
+            match resources.get_file(path) {
+                Ok(path) => String::read_resource(path).map_err(Into::into),
+                Err(ResourceError(_, ResourceErrorKind::FileNotFound)) => {
+                    // no file, no problem
+                    warn!(
+                        "couldn't find config file {:?}, continuing with defaults",
+                        path
+                    );
+
+                    Ok(String::new())
+                }
+                Err(err) => Err(err.into()),
+            }
+        };
+
+        let cfg = read_resource(path.as_ref())?;
+        let biomes = read_resource("biomes.ron".as_ref())?;
+
         let fake_args = once(env!("CARGO_PKG_NAME").to_owned());
-        Self::load(file_path.as_ref(), fake_args)
+        Self::load(&cfg, &biomes, fake_args)
     }
 
     // TODO return a result instead of panicking
-    /// Must be at least len 1, where first elem is binary name
+    /// Args must be at least len 1, where first elem is binary name
     fn load(
-        file_path: &Path,
+        cfg: &str,
+        biomes_cfg: &str,
         mut args: impl Iterator<Item = String>,
     ) -> BoxedResult<PlanetParamsRef> {
         let mut params = {
             let binary_name = args.next().expect("no 0th arg");
             let mut config_params = vec![binary_name];
 
-            match File::open(file_path) {
-                Err(e) if e.kind() == ErrorKind::NotFound => {
-                    // no file, no problem
-                    warn!(
-                        "couldn't find config file at '{}', continuing with defaults",
-                        file_path.display()
-                    );
-                }
-                Err(e) => panic!("failed to read config file: {}", e),
-                Ok(file) => {
-                    let lines = BufReader::new(file);
-                    for line in lines.lines().filter_map(|line| line.ok()).filter(|line| {
-                        let trimmed = line.trim();
-                        !trimmed.is_empty() && !trimmed.starts_with('#')
-                    }) {
-                        config_params.extend(line.split(' ').map(str::to_owned));
-                    }
-                }
-            };
+            for line in cfg.lines().filter(|line| {
+                let trimmed = line.trim();
+                !trimmed.is_empty() && !trimmed.starts_with('#')
+            }) {
+                config_params.extend(line.split(' ').map(str::to_owned));
+            }
 
             // binary name || args from file || args from cmdline
             // TODO clap AppSettings::AllArgsOverrideSelf
@@ -268,10 +293,8 @@ impl PlanetParams {
             params.seed = Some(thread_rng().gen())
         }
 
-        params.biomes_cfg = {
-            let path = file_path.parent().unwrap(); // definitely a file by this point
-            BiomesConfig::File(path.join("biomes.ron"))
-        };
+        // parse biomes file
+        params.biomes_cfg = ron::de::from_str(biomes_cfg)?;
 
         Ok(PlanetParamsRef::new(params))
     }
@@ -279,7 +302,7 @@ impl PlanetParams {
     #[cfg(any(test, feature = "benchmarking"))]
     pub fn dummy_with_biomes(biomes: String) -> PlanetParamsRef {
         let mut params = Self::from_iter_safe(once("dummy")).expect("failed");
-        params.biomes_cfg = BiomesConfig::Hardcoded(biomes);
+        params.biomes_cfg = ron::de::from_str(&biomes).expect("bad biomes");
         PlanetParamsRef::new(params)
     }
 
@@ -361,11 +384,5 @@ impl NoiseParams {
         }
 
         noise
-    }
-}
-
-impl Default for BiomesConfig {
-    fn default() -> Self {
-        Self::File(Default::default())
     }
 }

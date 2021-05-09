@@ -33,7 +33,7 @@ pub struct World {
 #[derive(Deserialize, Clone)]
 pub enum WorldSource {
     Preset(WorldPreset),
-    /// Generate world using the given filename in worldgen resources for options
+    /// Generate world using the given resource file in worldgen resources for options
     Generate(PathBuf),
 }
 
