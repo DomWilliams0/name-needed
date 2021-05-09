@@ -52,6 +52,7 @@ mod perf;
 mod physics;
 mod queued_update;
 mod render;
+mod scripting;
 mod senses;
 mod simulation;
 mod society;

@@ -33,6 +33,9 @@ ron = "0.6"
 serde = "1.0"
 hex-serde = "0.1"
 
+rlua = { version = "0.17", optional = true }
+
 [features]
-default = []
+default = ["scripting"]
 metrics = ["ai/logging", "common/metrics"]
+scripting = ["rlua"]

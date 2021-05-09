@@ -29,6 +29,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
@@ -66,6 +67,7 @@ pub struct Simulation<R: Renderer> {
     change_events: Vec<WorldChangeEvent>,
 
     debug_renderers: DebugRenderers<R>,
+    scripting: ScriptingContext,
 }
 
 impl world::WorldContext for WorldContext {
@@ -102,6 +104,7 @@ impl<R: Renderer> Simulation<R> {
             debug_renderers,
             terrain_changes: HashSet::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
+            scripting: ScriptingContext::new()?,
         })
     }
 
