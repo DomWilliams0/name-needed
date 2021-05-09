@@ -1,6 +1,6 @@
-use rlua::{Lua, StdLib};
+use rlua::{Lua, StdLib, Variadic};
 
-use crate::scripting::context::{Scripting, ScriptingError};
+use crate::scripting::context::{Scripting, ScriptingError, ScriptingResult};
 
 pub struct LuaScripting {
     runtime: rlua::Lua,
@@ -8,13 +8,30 @@ pub struct LuaScripting {
 
 impl Scripting for LuaScripting {
     fn new() -> Result<Self, ScriptingError> {
-        let std = StdLib::empty();
+        let std = {
+            let mut std = StdLib::ALL_NO_DEBUG;
+            std.remove(StdLib::COROUTINE);
+            std
+        };
         let runtime = Lua::new_with(std);
         runtime.set_memory_limit(Some(10 * 1024 * 1024));
+        // TODO configure lua GC
+
+        runtime.context(|ctx| {
+            let log_print = ctx.create_function(|_, msg: String| {
+                common::info!("lua: {}", msg);
+                Ok(())
+            })?;
+
+            ctx.globals().set("print", log_print)?;
+
+            ScriptingResult::Ok(())
+        })?;
+
         Ok(Self { runtime })
     }
 
-    fn run(&mut self, script: &str) -> Result<(), ScriptingError> {
+    fn run(&mut self, script: &[u8]) -> Result<(), ScriptingError> {
         self.runtime
             .context(|ctx| ctx.load(script).exec())
             .map_err(Into::into)
@@ -28,7 +45,7 @@ mod tests {
     #[test]
     fn lua() {
         let mut lua = LuaScripting::new().expect("failed");
-        lua.run("myglobal = 5;").expect("failed");
+        lua.run("myglobal = 5;".as_ref()).expect("failed");
 
         let value: i32 = lua
             .runtime

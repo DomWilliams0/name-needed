@@ -4,6 +4,7 @@ use world::block::BlockType;
 use crate::ecs::Entity;
 use crate::society::job::SocietyCommand;
 use crate::{Exit, SocietyHandle};
+use std::path::PathBuf;
 
 /// Command from the player through the UI
 pub enum UiCommand {
@@ -25,6 +26,8 @@ pub enum UiCommand {
         owner: Option<Option<Entity>>,
         communal: Option<Option<SocietyHandle>>,
     },
+
+    ExecuteScript(PathBuf),
 }
 
 #[derive(Debug)]

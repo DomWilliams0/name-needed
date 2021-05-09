@@ -59,7 +59,7 @@ impl Ui {
             perf: PerformanceWindow,
             selection: SelectionWindow::default(),
             society: SocietyWindow,
-            debug: DebugWindow,
+            debug: DebugWindow::default(),
         };
 
         Self {

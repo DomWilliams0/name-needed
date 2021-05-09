@@ -1,4 +1,4 @@
-# TODOs (315)
+# TODOs (317)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -255,6 +255,8 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
    * `// TODO physical shape wastes so much space`
+ * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
+   * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
    * `// TODO this is really expensive`
  * [game/simulation/src/senses/system.rs](game/simulation/src/senses/system.rs) (5)
@@ -394,8 +396,9 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
+ * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (2)
    * `// TODO helpers in Bundle`
+   * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)

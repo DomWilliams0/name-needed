@@ -361,6 +361,12 @@ impl<R: Renderer> Simulation<R> {
                     }
                 }
                 UiCommand::ExitGame(ex) => exit = Some(ex),
+                UiCommand::ExecuteScript(path) => {
+                    info!("executing script"; "path" => %path.display());
+                    if let Err(err) = self.scripting.eval_path(&path) {
+                        warn!("script errored"; "error" => %err);
+                    }
+                }
             }
         }
 

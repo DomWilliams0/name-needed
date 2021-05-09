@@ -36,6 +36,6 @@ hex-serde = "0.1"
 rlua = { version = "0.17", optional = true }
 
 [features]
-default = ["scripting"]
+default = []
 metrics = ["ai/logging", "common/metrics"]
 scripting = ["rlua"]
