@@ -363,7 +363,10 @@ impl<R: Renderer> Simulation<R> {
                 UiCommand::ExitGame(ex) => exit = Some(ex),
                 UiCommand::ExecuteScript(path) => {
                     info!("executing script"; "path" => %path.display());
-                    if let Err(err) = self.scripting.eval_path(&path) {
+                    if let Err(err) =
+                        self.scripting
+                            .eval_path(&path, &self.ecs_world, &self.voxel_world)
+                    {
                         warn!("script errored"; "error" => %err);
                     }
                 }

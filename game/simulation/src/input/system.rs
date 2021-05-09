@@ -64,14 +64,12 @@ impl<'a> System<'a> for InputSystem<'a> {
         for e in self.events {
             match e {
                 InputEvent::Click(SelectType::Left, pos) => {
-                    // unselect current entity
-                    unselect_current(&mut selected, &mut selecteds);
+                    // unselect current entity regardless of click location
+                    selected.unselect_with_comps(&mut selecteds);
 
                     // find newly selected entity
                     if let Some(to_select) = resolve_entity(pos) {
-                        debug!("selected entity"; E(to_select));
-                        let _ = selecteds.insert(to_select, SelectedComponent);
-                        selected.0 = Some(to_select);
+                        selected.select_with_comps(&mut selecteds, to_select);
                     }
                 }
 
@@ -129,13 +127,6 @@ impl<'a> System<'a> for InputSystem<'a> {
     }
 }
 
-fn unselect_current(res: &mut Write<SelectedEntity>, comp: &mut WriteStorage<SelectedComponent>) {
-    if let Some(old) = res.0.take() {
-        debug!("unselected entity"; E(old));
-        comp.remove(old);
-    }
-}
-
 impl SelectedEntity {
     pub fn get<W: ComponentWorld>(&mut self, world: &W) -> Option<Entity> {
         match self.0 {
@@ -153,7 +144,34 @@ impl SelectedEntity {
     pub fn get_unchecked(&self) -> Option<Entity> {
         self.0
     }
+
+    pub fn select(&mut self, world: &EcsWorld, e: Entity) {
+        let mut selecteds = world.write_storage();
+        self.select_with_comps(&mut selecteds, e)
+    }
+
+    fn select_with_comps(&mut self, selecteds: &mut WriteStorage<SelectedComponent>, e: Entity) {
+        // unselect current entity
+        self.unselect_with_comps(selecteds);
+
+        debug!("selected entity"; E(e));
+        let _ = selecteds.insert(e, SelectedComponent);
+        self.0 = Some(e);
+    }
+
+    pub fn unselect(&mut self, world: &EcsWorld) {
+        let mut selecteds = world.write_storage();
+        self.unselect_with_comps(&mut selecteds)
+    }
+
+    fn unselect_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
+        if let Some(old) = self.0.take() {
+            debug!("unselected entity"; E(old));
+            comp.remove(old);
+        }
+    }
 }
+
 impl SelectedTiles {
     pub fn range(&self) -> Option<WorldPositionRange> {
         self.0.as_ref().cloned()

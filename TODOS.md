@@ -1,4 +1,4 @@
-# TODOs (317)
+# TODOs (318)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -179,7 +179,8 @@
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
+   * `/// TODO it's technically undefined to convert to spec's entity type like this`
    * `// TODO perfect hashing`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`

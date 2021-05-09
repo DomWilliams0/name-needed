@@ -1,2 +1,8 @@
 -- very temporary script for dev
-for k,v in pairs(_G) do print(string.format("%s => %s", k, v)) end
+
+local e = GetEntityById("E1:3");
+SelectEntity(e);
+--UnselectEntity();
+info("lmao i am a script");
+
+for k,v in pairs(_G) do debug(string.format("%s => %s", k, v)) end

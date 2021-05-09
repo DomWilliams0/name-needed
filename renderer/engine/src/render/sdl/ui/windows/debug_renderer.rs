@@ -1,4 +1,4 @@
-use imgui::{im_str, ImStr, ImString, InputText, TabItem};
+use imgui::{im_str, ImStr, ImString, TabItem};
 
 use simulation::input::UiCommand;
 

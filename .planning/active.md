@@ -6,6 +6,7 @@
 	* [X] abstract away specific language
 * bindings
 	* [X] print -> use logging macros
-	* [ ] get entity by id
-	* [ ] select entity
-* [ ] convert a scenario into a resource script that's automatically run on startup
+	* [X] get entity by id
+	* [X] select entity
+* [ ] configure resource scripts that are automatically run on startup
+* [ ] convert a scenario into a script

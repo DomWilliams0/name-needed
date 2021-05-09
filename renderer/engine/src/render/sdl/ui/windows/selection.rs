@@ -32,7 +32,7 @@ impl SelectionWindow {
                 Some(selection) => {
                     ui.key_value(
                         im_str!("Entity:"),
-                        || Value::Some(ui_str!(in strings, "{:?}", selection.entity)),
+                        || Value::Some(ui_str!(in strings, "{}", E(selection.entity))),
                         None,
                         COLOR_GREEN,
                     );

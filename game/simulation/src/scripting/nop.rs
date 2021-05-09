@@ -1,4 +1,5 @@
-use crate::scripting::context::{Scripting, ScriptingError};
+use crate::scripting::context::{Scripting, ScriptingError, ScriptingResult};
+use crate::{EcsWorld, WorldRef};
 
 pub struct NopScripting;
 
@@ -7,7 +8,7 @@ impl Scripting for NopScripting {
         Ok(NopScripting)
     }
 
-    fn run(&mut self, _: &str) -> Result<(), ScriptingError> {
+    fn run(&mut self, script: &[u8], ecs: &EcsWorld, world: &WorldRef) -> ScriptingResult<()> {
         Ok(())
     }
 }
