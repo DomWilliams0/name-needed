@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use common::*;
 
 use crate::presets::world_from_source;
@@ -16,8 +14,8 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         "dev"
     }
 
-    fn config(&self) -> Option<&Path> {
-        Some(Path::new("config.ron"))
+    fn config_filename(&self) -> Option<&str> {
+        Some("config.ron")
     }
 
     fn world(&self, resources: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader> {

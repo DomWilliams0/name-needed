@@ -1,4 +1,4 @@
-# TODOs (315)
+# TODOs (317)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -98,6 +98,9 @@
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
    * `// TODO fix log_scope crashing with async`
+ * [game/resources/src/container.rs](game/resources/src/container.rs) (2)
+   * `// TODO depends on feature gate`
+   * `// TODO add feature gate info e.g. from disk, from archive`
  * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
    * `// TODO sanity check equipper is this entity`
  * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
@@ -398,7 +401,8 @@
    * `// TODO helpers in Bundle`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (2)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
+   * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
@@ -417,8 +421,6 @@
    * `// TODO return <C: GridCoord>`
  * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
    * `// TODO can still panic`
- * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
-   * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
    * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)

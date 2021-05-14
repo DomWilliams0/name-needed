@@ -3,15 +3,13 @@ use crate::{map_range, PlanetParams, RegionLocation};
 use common::*;
 use noise::{Fbm, NoiseFn, Seedable};
 
-use crate::biome::deserialize::BiomeConfig;
-use crate::params::BiomesConfig;
 use crate::region::PlanetPoint;
 use rstar::{Envelope, Point, RTree, AABB};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::f64::consts::{PI, TAU};
-use std::fs::File;
-use std::io::BufReader;
+
+pub(crate) use deserialize::BiomeConfig;
 
 pub struct BiomeSampler {
     latitude_coefficient: f64,
@@ -25,6 +23,7 @@ pub struct BiomeSampler {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[cfg_attr(feature = "cache", derive(serde::Serialize))]
 pub enum BiomeType {
     Ocean,
     IcyOcean,
@@ -57,6 +56,7 @@ pub enum BiomeConfigError {
 }
 
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "cache", derive(serde::Serialize))]
 struct Range<L: RangeLimit>(L::Primitive, L::Primitive);
 
 #[derive(Copy, Clone)]
@@ -158,18 +158,10 @@ impl BiomeSampler {
             "moisture",
         );
 
-        let cfg: Vec<BiomeConfig> = match &params.biomes_cfg {
-            BiomesConfig::File(path) => {
-                let reader = BufReader::new(File::open(path)?);
-                ron::de::from_reader(reader)?
-            }
-            #[cfg(any(test, feature = "benchmarking"))]
-            BiomesConfig::Hardcoded(str) => ron::de::from_str(str)?,
-        };
-
-        let biomes = cfg.iter().map(BiomeParams::from).collect();
-        let biome_lookup = RTree::bulk_load(cfg.into_iter().map(BiomeNode::from).collect());
-        debug_assert_ne!(biome_lookup.iter().count(), 0, "no biomes registered");
+        let biomes = params.biomes_cfg.iter().map(BiomeParams::from).collect();
+        let biome_lookup =
+            RTree::bulk_load(params.biomes_cfg.iter().map(BiomeNode::from).collect());
+        assert_ne!(biome_lookup.iter().count(), 0, "no biomes registered");
 
         Ok(Self {
             latitude_coefficient,
@@ -581,8 +573,8 @@ impl<L: RangeLimit> Debug for Range<L> {
     }
 }
 
-impl From<BiomeConfig> for BiomeNode {
-    fn from(cfg: BiomeConfig) -> Self {
+impl From<&BiomeConfig> for BiomeNode {
+    fn from(cfg: &BiomeConfig) -> Self {
         BiomeNode {
             biome: cfg.biome,
             coastline_proximity: cfg.sampling.coastline_proximity,
@@ -613,15 +605,18 @@ mod deserialize {
     use std::fmt::Formatter;
     use std::marker::PhantomData;
 
-    #[derive(Deserialize)]
-    pub(super) struct BiomeConfig {
+    /// Serialized biome config
+    #[derive(Deserialize, Debug)]
+    #[cfg_attr(feature = "cache", derive(serde::Serialize))]
+    pub(crate) struct BiomeConfig {
         pub(super) biome: BiomeType,
         pub(super) color: u32,
         pub(super) elevation: Range<ElevationLimit>,
         pub(super) sampling: BiomeSampling,
     }
 
-    #[derive(Clone, Deserialize)]
+    #[derive(Clone, Deserialize, Debug)]
+    #[cfg_attr(feature = "cache", derive(serde::Serialize))]
     pub(super) struct BiomeSampling {
         #[serde(rename = "coastal", default = "full_range")]
         pub coastline_proximity: Range<CoastlineLimit>,
