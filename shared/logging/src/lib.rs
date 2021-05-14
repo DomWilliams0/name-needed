@@ -1,7 +1,12 @@
+#[cfg(feature = "binary")]
 mod init;
-mod tests;
 
+#[cfg(feature = "binary")]
 pub use init::LoggerBuilder;
+
+// can't be cfg(test) because this is used as a dependency in tested crates, and so isn't compiled
+// with cfg(test)
+mod tests;
 pub use tests::for_tests;
 
 pub mod prelude {

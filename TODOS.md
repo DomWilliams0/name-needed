@@ -1,4 +1,4 @@
-# TODOs (318)
+# TODOs (317)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -421,8 +421,6 @@
    * `// TODO return <C: GridCoord>`
  * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
    * `// TODO can still panic`
- * [shared/logging/src/init.rs](shared/logging/src/init.rs) (1)
-   * `// TODO configure to write to file as text`
  * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
    * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)

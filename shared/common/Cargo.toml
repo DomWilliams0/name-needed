@@ -33,3 +33,4 @@ backtrace = "0.3"
 default = ["library"]
 binary = ["logging/binary"]
 library = []
+log-to-file = ["logging/to-file"]
