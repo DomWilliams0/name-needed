@@ -116,7 +116,6 @@ fn do_main() -> BoxedResult<()> {
             .file_path()
             .expect("non file config not yet supported"); // TODO
 
-
         config::init(ConfigType::WatchedFile(file_path))?;
     }
 

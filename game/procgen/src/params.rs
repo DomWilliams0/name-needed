@@ -212,9 +212,11 @@ pub struct RenderParams {
 impl PlanetParams {
     /// File path on disk
     #[cfg(feature = "bin")]
-    pub fn load_file_with_args(config_path: impl AsRef<std::path::Path>) -> BoxedResult<PlanetParamsRef> {
-        use std::path::Path;
+    pub fn load_file_with_args(
+        config_path: impl AsRef<std::path::Path>,
+    ) -> BoxedResult<PlanetParamsRef> {
         use std::io::ErrorKind;
+        use std::path::Path;
 
         let read_file = |path: &Path| -> std::io::Result<String> {
             match std::fs::read_to_string(path) {
