@@ -1,7 +1,6 @@
 use common::*;
-use std::path::Path;
 
-use resources::{ResourceContainer, Resources};
+use resources::{ResourcePath, Resources};
 use simulation::{
     all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
     PlanetParams, Renderer, Simulation, SlabLocation, TerrainSourceError, ThreadedWorldLoader,
@@ -11,7 +10,7 @@ use std::time::Duration;
 
 pub trait GamePreset<R: Renderer> {
     fn name(&self) -> &str;
-    fn config(&self) -> Option<&Path> {
+    fn config_filename(&self) -> Option<&str> {
         None
     }
     fn world(&self, resources: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader>;
@@ -119,11 +118,10 @@ fn world_from_source(
             let source = presets::from_preset(preset);
             WorldLoader::new(source, pool)
         }
-        config::WorldSource::Generate(file_path) => {
-            let config_res = resources.get_file(file_path)?;
-            debug!("generating world from config"; "path" => %config_res.display());
+        config::WorldSource::Generate(file) => {
+            debug!("generating world from config"; "path" => %file.display());
 
-            let params = PlanetParams::load_with_only_file(config_res);
+            let params = PlanetParams::load_with_only_file(resources, file.as_os_str());
             let source = params.and_then(|params| {
                 pool.runtime()
                     .block_on(async { GeneratedTerrainSource::new(params).await })

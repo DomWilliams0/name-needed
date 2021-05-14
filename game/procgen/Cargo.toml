@@ -11,6 +11,7 @@ common = { path = "../../shared/common" }
 unit = { path = "../../shared/unit" }
 grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
 color = { path = "../../shared/color", optional = true }
+resources = { path = "../resources" }
 noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
 rand_distr = { version = "0.3" }
 strum = "0.19"

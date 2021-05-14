@@ -8,23 +8,23 @@ Config(
         nav_paths_by_default: false,
     ),
     world: (
-        // source: Preset(Stairs),
+        // source: Preset(OneChunkWonder),
         source: Generate("planet_generation.txt"),
         load_timeout: 30,
         worker_threads: None,
         initial_chunk: (33, 512), // near a forest
 
         /// keep these low <=8
-        initial_slab_depth: 1,
-        initial_chunk_radius: 2,
+        initial_slab_depth: 0,
+        initial_chunk_radius: 1,
     ),
     simulation: (
         random_seed: Some(67853852415423),
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 5,
-            "dogs": 3,
+            "humans": 0,
+            "dogs": 0,
             "food": 10,
             "bricks": 20,
         },

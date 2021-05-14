@@ -176,8 +176,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
 * tag pre-alpha commits in develop, and generate changelog in release notes
 * add tokio tracing feature to help debug deadlocks
-* miri-compatible runner (i.e. no file io)
+* revisit possible miri-compatibility
+	* no file IO, no slog logging, no `inventory` ctor collection...
 * provide debug logging release builds
+* run procgen bin in CI
+* replace all fs access with resource abstraction, to be able to read from packed archive/miri-compatible runner binary with no IO
 
 ## Code quality
 * track down unwraps/expects/`as` casts and replace with results

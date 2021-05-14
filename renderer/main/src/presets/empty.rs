@@ -4,7 +4,6 @@ use common::BoxedResult;
 use simulation::{
     presets, AsyncWorkerPool, Renderer, Simulation, ThreadedWorldLoader, WorldLoader,
 };
-use std::path::Path;
 
 #[derive(Default)]
 pub struct EmptyGamePreset;
@@ -14,8 +13,8 @@ impl<R: Renderer> GamePreset<R> for EmptyGamePreset {
         "empty"
     }
 
-    fn config(&self) -> Option<&Path> {
-        Some(Path::new("config.ron"))
+    fn config_filename(&self) -> Option<&str> {
+        Some("config.ron")
     }
 
     fn world(&self, _: &resources::WorldGen) -> BoxedResult<ThreadedWorldLoader> {

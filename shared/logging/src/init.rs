@@ -35,8 +35,6 @@ impl LoggerBuilder {
         self
     }
 
-    // TODO configure to write to file as text
-
     pub fn init(self, timestamp_fn: impl ThreadSafeTimestampFn + Copy) -> Result<Logger, LogError> {
         let terminal_drain = {
             let decorator = slog_term::TermDecorator::new()

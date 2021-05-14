@@ -7,9 +7,10 @@ use simulation::{
 
 use crate::presets::ContinuousIntegrationGamePreset;
 
+use config::ConfigType;
 use engine::Engine;
-use resources::ResourceContainer;
 use resources::Resources;
+use resources::{ResourceContainer, ResourcePath};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -104,14 +105,18 @@ fn do_main() -> BoxedResult<()> {
     metrics::start_serving();
 
     // init resources root
-    let resources = Resources::new(args.directory)?;
+    let resources = Resources::new(args.directory.canonicalize()?)?;
 
     // load config
-    if let Some(config_file_name) = preset.config() {
-        let config_path = resources.get_file(config_file_name)?;
+    if let Some(config_file_name) = preset.config_filename() {
+        info!("loading config"; "file" => ?config_file_name);
 
-        info!("loading config"; "path" => ?config_path);
-        config::init(config_path)?;
+        let resource_path = resources.get_file(config_file_name)?;
+        let file_path = resource_path
+            .file_path()
+            .expect("non file config not yet supported"); // TODO
+
+        config::init(ConfigType::WatchedFile(file_path))?;
     }
 
     // initialize persistent backend
