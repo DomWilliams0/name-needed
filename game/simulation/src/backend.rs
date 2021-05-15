@@ -23,7 +23,7 @@ pub trait InitializedSimulationBackend: Sized {
         &mut self,
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
-        perf: &PerfAvg,
+        perf: PerfAvg,
         commands: &mut Vec<UiCommand>,
     );
 

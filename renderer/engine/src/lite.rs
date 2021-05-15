@@ -56,7 +56,7 @@ impl InitializedSimulationBackend for DummyBackendInit {
         &mut self,
         _: &mut Simulation<Self::Renderer>,
         _: f64,
-        _: &PerfAvg,
+        _: PerfAvg,
         _: &mut Vec<UiCommand>,
     ) {
     }

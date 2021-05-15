@@ -1,7 +1,3 @@
-use crate::render::sdl::ui::memory::PerFrameStrings;
-use crate::render::sdl::ui::windows::{
-    DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow, UiBundle,
-};
 use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style, TabBar};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
@@ -9,8 +5,16 @@ use sdl2::event::Event;
 use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
+
 use simulation::input::{UiBlackboard, UiCommand};
 use simulation::PerfAvg;
+
+use crate::render::sdl::ui::context::UiContext;
+use crate::render::sdl::ui::memory::PerFrameStrings;
+use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow};
+// use crate::render::sdl::ui::windows::{
+//     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
+// };
 
 pub struct Ui {
     imgui: Context,
@@ -26,12 +30,11 @@ pub enum EventConsumed {
     NotConsumed,
 }
 
-/// Holds window state, but there may not actually be any
-pub struct State {
+struct State {
     max_window_width: f32,
     perf: PerformanceWindow,
-    selection: SelectionWindow,
-    society: SocietyWindow,
+    // selection: SelectionWindow,
+    // society: SocietyWindow,
     debug: DebugWindow,
 }
 
@@ -54,13 +57,7 @@ impl Ui {
 
         let imgui_sdl2 = ImguiSdl2::new(&mut imgui, window);
         let renderer = Renderer::new(&mut imgui, |s| video.gl_get_proc_address(s) as _);
-        let state = State {
-            max_window_width: 0.0,
-            perf: PerformanceWindow,
-            selection: SelectionWindow::default(),
-            society: SocietyWindow,
-            debug: DebugWindow::default(),
-        };
+        let state = State::default();
 
         Self {
             imgui,
@@ -80,11 +77,12 @@ impl Ui {
         }
     }
 
+    /// Prepares imgui frame and calls [State::render]
     pub fn render(
         &mut self,
         window: &Window,
         mouse_state: &MouseState,
-        perf: &PerfAvg,
+        perf: PerfAvg,
         blackboard: UiBlackboard,
         commands: &mut Vec<UiCommand>,
     ) {
@@ -92,45 +90,53 @@ impl Ui {
             .prepare_frame(self.imgui.io_mut(), window, mouse_state);
         let ui = self.imgui.frame();
 
-        let bundle = UiBundle {
-            ui: &ui,
-            strings: &self.strings_arena,
-            perf,
-            blackboard: &blackboard,
-            commands,
-        };
+        // generate windows
+        let context = UiContext::new(&ui, &self.strings_arena, commands, perf);
+        self.state.render(context);
 
-        self.state.render(bundle);
-
+        // render windows
         self.imgui_sdl2.prepare_render(&ui, window);
         self.renderer.render(ui);
 
+        // cleanup
         self.strings_arena.reset();
     }
 }
 
 impl State {
-    fn render(&mut self, mut bundle: UiBundle) {
+    /// Renders ui windows
+    fn render(&mut self, mut context: UiContext) {
         let window = imgui::Window::new(im_str!("Debug"))
             .size([self.max_window_width, 0.0], Condition::Always)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
             .always_use_window_padding(true);
 
-        if let Some(token) = window.begin(bundle.ui) {
-            // Perf fixed at the top
-            self.perf.render(&bundle);
+        if let Some(token) = window.begin(&*context) {
+            // perf fixed at the top
+            self.perf.render(&context);
 
-            TabBar::new(im_str!("Debug Tabs")).build(bundle.ui, || {
-                self.selection.render(&mut bundle);
-                self.society.render(&mut bundle);
-                self.debug.render(&mut bundle);
+            TabBar::new(im_str!("Debug Tabs")).build(context.ui(), || {
+                // self.selection.render(&mut context);
+                // self.society.render(&mut context);
+                self.debug.render(&mut context);
             });
 
-            token.end(bundle.ui);
+            token.end(&*context);
 
-            let window_size = bundle.ui.window_content_region_width();
+            // ensure window doesn't resize itself all the time
+            let window_size = context.window_content_region_width();
             self.max_window_width = self.max_window_width.max(window_size);
+        }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            max_window_width: 0.0,
+            perf: PerformanceWindow,
+            debug: DebugWindow::default(),
         }
     }
 }

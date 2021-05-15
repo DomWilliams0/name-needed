@@ -19,6 +19,7 @@ use world::loader::BlockDetails;
 
 /// Dump of game info for the UI to render
 /// TODO this can probably just hold the world and have some helper functions
+#[deprecated]
 pub struct UiBlackboard<'a> {
     pub selected_entity: Option<SelectedEntityDetails<'a>>,
     pub selected_tiles: &'a SelectedTiles,

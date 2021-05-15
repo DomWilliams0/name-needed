@@ -46,6 +46,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * resolve an entity to its displayable name including state in the UI layer only
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
 * ui button to skip up/down to next surface
+* ring buffer of per-entity events in a Log ui tab, e.g. decided to do X, picked up X, ate X
 
 ## Entity behaviour
 * more society level jobs
@@ -199,6 +200,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * instead of sleeping to wait for world to load, check if panicked every second
 * add a bg async task that checks for panics, and aborts runtime - currently panics can randomly cause deadlocks
 * restarting should take better care of async thread pool, panics if restart occurs while still loading terrain
+* disable planet cache to /tmp for release/non dev builds
+* save games
+	* specific dir for saved data
+	* common API for saving to that dir
+	* move existing random file dumps to there, e.g. log file, ui state, worldgen cache
 
 ## Entity diversity
 * animal species

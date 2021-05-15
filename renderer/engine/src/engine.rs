@@ -91,7 +91,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         self.backend.render(
             &mut self.simulation,
             interpolation,
-            &perf,
+            perf,
             &mut self.sim_ui_commands,
         );
     }

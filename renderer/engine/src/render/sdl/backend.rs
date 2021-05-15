@@ -266,7 +266,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         &mut self,
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
-        perf: &PerfAvg,
+        perf: PerfAvg,
         commands: &mut Vec<UiCommand>,
     ) {
         // clear window

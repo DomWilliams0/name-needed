@@ -1,3 +1,4 @@
+mod context;
 mod memory;
 mod render;
 

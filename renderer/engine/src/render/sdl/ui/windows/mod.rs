@@ -7,21 +7,13 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 
 mod debug_renderer;
 mod perf;
-mod selection;
-mod society;
+// mod selection;
+// mod society;
 
 pub(crate) use debug_renderer::DebugWindow;
 pub(crate) use perf::PerformanceWindow;
-pub(crate) use selection::SelectionWindow;
-pub(crate) use society::SocietyWindow;
-
-pub struct UiBundle<'a> {
-    pub ui: &'a imgui::Ui<'a>,
-    pub strings: &'a PerFrameStrings,
-    pub perf: &'a PerfAvg,
-    pub blackboard: &'a UiBlackboard<'a>,
-    pub commands: &'a mut Vec<UiCommand>,
-}
+// pub(crate) use selection::SelectionWindow;
+// pub(crate) use society::SocietyWindow;
 
 enum Value<'a> {
     Hide,

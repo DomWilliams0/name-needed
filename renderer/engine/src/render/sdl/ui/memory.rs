@@ -1,5 +1,6 @@
 use common::{bumpalo::Bump, trace};
 
+/// Arena allocator
 pub struct PerFrameStrings {
     arena: Bump,
 }
@@ -26,9 +27,9 @@ impl PerFrameStrings {
 
 #[macro_export]
 macro_rules! ui_str {
-    ( in $bump:expr, $fmt:expr, $($args:expr),* ) => {{
+    ( in $ctx:expr, $fmt:expr, $($args:expr),* ) => {{
         use core::fmt::Write;
-        let bump = $bump.arena();
+        let bump = $ctx.strings().arena();
         let mut s = ::common::bumpalo::collections::String::new_in(bump);
         let _ = write!(&mut s, concat!($fmt, "\0"), $($args),*);
         // safety: s is nul terminated utf8
