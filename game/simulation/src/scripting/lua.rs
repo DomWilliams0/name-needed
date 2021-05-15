@@ -1,10 +1,11 @@
 use rlua::prelude::*;
-use rlua::{Context, StdLib, UserData};
+use rlua::{Context, MetaMethod, StdLib, UserData, UserDataMethods, Variadic};
 
 use crate::ecs::EntityWrapper;
 use crate::input::SelectedEntity;
 use crate::scripting::context::{parse_entity_id, Scripting, ScriptingError, ScriptingResult};
-use crate::{ComponentWorld, EcsWorld, WorldRef};
+use crate::{ComponentWorld, EcsWorld, PlayerSociety, SocietyHandle, WorldRef};
+use common::*;
 
 pub struct LuaScripting {
     runtime: rlua::Lua,
@@ -32,6 +33,13 @@ impl UserData for LuaGameState<'_> {}
 unsafe impl Send for LuaGameState<'static> {}
 
 impl UserData for EntityWrapper {}
+impl UserData for SocietyHandle {
+    fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(_methods: &mut T) {
+        _methods.add_meta_function(MetaMethod::ToString, |_, this: Self| {
+            Ok(format!("{:?}", this))
+        });
+    }
+}
 
 impl Scripting for LuaScripting {
     fn new() -> Result<Self, ScriptingError> {
@@ -75,13 +83,13 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
     // remove print, use logging levels instead
     globals.set("print", LuaNil)?;
 
-    define!(fn info |_, msg: String| {
-        common::info!("lua: {}", msg);
+    define!(fn info |_, msg: Variadic<String>| {
+        common::info!("lua: {}", msg.into_iter().join(", "));
         Ok(())
     });
 
-    define!(fn debug |_, msg: String| {
-        common::debug!("lua: {}", msg);
+    define!(fn debug |_, msg: Variadic<String>| {
+        common::debug!("lua: {}", msg.into_iter().join(", "));
         Ok(())
     });
 
@@ -119,6 +127,13 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
         selected.unselect(state.ecs);
 
         Ok(())
+    });
+
+    define!(fn GetPlayerSociety |ctx, _: ()| {
+        let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
+
+        let society = state.ecs.resource::<PlayerSociety>();
+        Ok(society.0)
     });
 
     Ok(())

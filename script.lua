@@ -1,8 +1,11 @@
 -- very temporary script for dev
 
-local e = GetEntityById("E1:3");
-SelectEntity(e);
+-- local e = GetEntityById("E1:3");
+-- SelectEntity(e);
 --UnselectEntity();
-info("lmao i am a script");
+-- info("lmao i am a script");
 
-for k,v in pairs(_G) do debug(string.format("%s => %s", k, v)) end
+local society = GetPlayerSociety();
+info(string.format("society is %s", society))
+
+-- for k,v in pairs(_G) do debug(string.format("%s => %s", k, v)) end
