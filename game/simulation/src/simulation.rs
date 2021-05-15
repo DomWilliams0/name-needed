@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use common::*;
 use resources::Resources;
+use strum_macros::EnumDiscriminants;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -38,7 +39,9 @@ use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(name(AssociatedBlockDataType))]
+#[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
 }

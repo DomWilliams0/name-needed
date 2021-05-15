@@ -45,6 +45,9 @@ impl UiExt for Ui<'_> {
             return;
         }
 
+        let group = self.begin_group();
+
+        // label
         self.text_colored(color, key);
 
         if !matches!(value, Value::MultilineReadonly {..}) {
@@ -78,6 +81,9 @@ impl UiExt for Ui<'_> {
             Value::Hide => unreachable!(),
         };
 
+        group.end(self);
+
+        // add tooltip to group
         if let Some(tooltip) = tooltip {
             if self.is_item_hovered() {
                 self.tooltip_text(tooltip);
@@ -101,6 +107,12 @@ impl<'a> Into<Value<'a>> for Result<&'a ImStr, &'static str> {
             Ok(s) => Value::Some(s),
             Err(err) => Value::None(err),
         }
+    }
+}
+
+impl<'a> Into<Value<'a>> for &'a ImStr {
+    fn into(self) -> Value<'a> {
+        Value::Some(self)
     }
 }
 

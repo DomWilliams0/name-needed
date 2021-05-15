@@ -478,6 +478,10 @@ impl<C: WorldContext> WorldLoader<C> {
         self.pool.runtime().block_on(fut)
     }
 
+    pub fn is_generated(&self) -> bool {
+        matches!(self.source, TerrainSource::Generated(_))
+    }
+
     /// Nop if any mutexes cannot be taken immediately
     pub fn feature_boundaries_in_range(
         &self,
