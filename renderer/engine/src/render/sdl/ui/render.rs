@@ -7,7 +7,7 @@ use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 
 use simulation::input::{UiBlackboard, UiCommands};
-use simulation::PerfAvg;
+use simulation::{PerfAvg, Simulation, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::memory::PerFrameStrings;
@@ -83,7 +83,7 @@ impl Ui {
         window: &Window,
         mouse_state: &MouseState,
         perf: PerfAvg,
-        _blackboard: UiBlackboard,
+        simulation: SimulationRef,
         commands: &mut UiCommands,
     ) {
         self.imgui_sdl2
@@ -91,7 +91,7 @@ impl Ui {
         let ui = self.imgui.frame();
 
         // generate windows
-        let context = UiContext::new(&ui, &self.strings_arena, commands, perf);
+        let context = UiContext::new(&ui, &self.strings_arena, simulation, commands, perf);
         self.state.render(context);
 
         // render windows

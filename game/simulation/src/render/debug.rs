@@ -87,6 +87,7 @@ impl<R: Renderer> DebugRenderers<R> {
         })
     }
 
+    #[deprecated]
     pub fn summarise(&mut self) -> &HashSet<&'static str> {
         self.summary.clear();
         self.summary

@@ -1,5 +1,5 @@
 use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
-use simulation::PerfAvg;
+use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use std::ops::Deref;
@@ -9,7 +9,7 @@ pub struct UiContext<'a> {
     ui: &'a imgui::Ui<'a>,
     strings: &'a PerFrameStrings,
     perf: PerfAvg,
-    // blackboard: &'a UiBlackboard<'a>,
+    simulation: SimulationRef<'a>,
     commands: &'a mut UiCommands,
 }
 
@@ -17,6 +17,7 @@ impl<'a> UiContext<'a> {
     pub fn new(
         ui: &'a imgui::Ui<'a>,
         strings: &'a PerFrameStrings,
+        simulation: SimulationRef<'a>,
         commands: &'a mut UiCommands,
         perf: PerfAvg,
     ) -> Self {
@@ -24,6 +25,7 @@ impl<'a> UiContext<'a> {
             ui,
             strings,
             perf,
+            simulation,
             commands,
         }
     }
@@ -38,6 +40,10 @@ impl<'a> UiContext<'a> {
 
     pub fn perf(&self) -> &PerfAvg {
         &self.perf
+    }
+
+    pub fn simulation(&self) -> &SimulationRef {
+        &self.simulation
     }
 
     pub fn issue_request(&mut self, req: UiRequest) -> UiResponse {

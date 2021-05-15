@@ -1,3 +1,4 @@
+use crate::ui_str;
 use imgui::{im_str, ImString, TabItem};
 
 use simulation::input::{UiRequest, UiResponse};
@@ -32,9 +33,11 @@ const MAX_PATH_INPUT: usize = 256;
 impl DebugWindow {
     pub fn render(&mut self, context: &mut UiContext) {
         TabItem::new(im_str!("Debug")).build(context.ui(), || {
-            // TODO view range
-            // let view_range = context.blackboard.world_view.expect("blackboard world view range not populated");
-            // context.ui.text(ui_str!(in context.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
+            let view_range = context.simulation().viewer.terrain_range();
+            context.text(ui_str!(in context, "World range: {} => {} ({})",
+                view_range.bottom().slice(),
+                view_range.top().slice(),
+                view_range.size()));
 
             if cfg!(feature = "scripting") {
                 context.separator();
@@ -42,6 +45,7 @@ impl DebugWindow {
                 context
                     .input_text(im_str!("##scriptpath"), &mut self.script_input)
                     .build();
+
                 if context.button(im_str!("Execute script##script"), [0.0, 0.0]) {
                     let response = context.issue_request(UiRequest::ExecuteScript(
                         self.script_input.to_str().to_owned().into(),

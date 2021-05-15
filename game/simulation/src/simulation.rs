@@ -70,6 +70,14 @@ pub struct Simulation<R: Renderer> {
     scripting: ScriptingContext,
 }
 
+/// A little bundle of references to the game state without the generic [Renderer] param on [Simulation]
+pub struct SimulationRef<'s> {
+    pub ecs: &'s EcsWorld,
+    pub world: &'s WorldRef,
+    pub loader: &'s ThreadedWorldLoader,
+    pub viewer: &'s WorldViewer,
+}
+
 impl world::WorldContext for WorldContext {
     type AssociatedBlockData = AssociatedBlockData;
 }
@@ -381,7 +389,7 @@ impl<R: Renderer> Simulation<R> {
         exit
     }
 
-    // target is for this frame only
+    /// Target is for this frame only
     pub fn render(
         &mut self,
         world_viewer: &WorldViewer,
@@ -389,7 +397,7 @@ impl<R: Renderer> Simulation<R> {
         renderer: &mut R,
         interpolation: f64,
         input: &[InputEvent],
-    ) -> (R::Target, UiBlackboard) {
+    ) -> R::Target {
         // process input before rendering
         InputSystem { events: input }.run_now(&self.ecs_world);
 
@@ -436,16 +444,7 @@ impl<R: Renderer> Simulation<R> {
         }
 
         // end frame
-        let target = renderer.deinit();
-
-        // gather blackboard for ui
-        let blackboard = UiBlackboard::fetch(
-            &self.ecs_world,
-            &self.world_loader,
-            &self.debug_renderers.summarise(),
-        );
-
-        (target, blackboard)
+        renderer.deinit()
     }
 
     fn on_world_change(&mut self, WorldChangeEvent { pos, prev, new }: WorldChangeEvent) {
@@ -471,6 +470,15 @@ impl<R: Renderer> Simulation<R> {
             }
 
             _ => {}
+        }
+    }
+
+    pub fn as_ref<'a>(&'a self, viewer: &'a WorldViewer) -> SimulationRef<'a> {
+        SimulationRef {
+            ecs: &self.ecs_world,
+            world: &self.voxel_world,
+            loader: &self.world_loader,
+            viewer,
         }
     }
 }

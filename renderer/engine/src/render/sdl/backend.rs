@@ -294,8 +294,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
             view: view.as_ptr(),
             z_offset: lower_limit,
         };
-
-        let (_, mut blackboard) = simulation.render(
+        let _ = simulation.render(
             &self.world_viewer,
             frame_target,
             &mut self.backend.renderer,
@@ -306,15 +305,15 @@ impl InitializedSimulationBackend for SdlBackendInit {
         // input events were for this frame only
         self.sim_input_events.clear();
 
-        // populate blackboard with backend info
-        blackboard.world_view = Some(terrain_range);
-
         // render ui and collect input commands
-        let backend = &mut self.backend;
-        let mouse_state = backend.mouse_state();
-        backend
-            .ui
-            .render(&backend.window, &mouse_state, perf, blackboard, commands);
+        let mouse_state = self.backend.mouse_state();
+        self.backend.ui.render(
+            &mut self.backend.window,
+            &mouse_state,
+            perf,
+            simulation.as_ref(&self.world_viewer),
+            commands,
+        );
 
         self.window.gl_swap_window();
     }
