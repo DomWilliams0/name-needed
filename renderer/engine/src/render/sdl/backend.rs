@@ -308,7 +308,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         // render ui and collect input commands
         let mouse_state = self.backend.mouse_state();
         self.backend.ui.render(
-            &mut self.backend.window,
+            &self.backend.window,
             &mouse_state,
             perf,
             simulation.as_ref(&self.world_viewer),

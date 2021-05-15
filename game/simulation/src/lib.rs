@@ -24,9 +24,13 @@ pub use crate::simulation::{AssociatedBlockData, Simulation, SimulationRef, Worl
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
 pub use definitions::EntityPosition;
-pub use ecs::{ComponentWorld, EcsWorld, Entity, E};
-pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent};
+pub use ecs::{Component, ComponentWorld, EcsWorld, Entity, E};
+pub use item::{
+    ConditionComponent, Container, EdibleItemComponent, InventoryComponent, ItemCondition,
+    NameComponent,
+};
 pub use needs::HungerComponent;
+pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{

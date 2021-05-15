@@ -1,4 +1,4 @@
-use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style, TabBar};
+use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -6,15 +6,12 @@ use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 
-use simulation::input::{UiBlackboard, UiCommands};
-use simulation::{PerfAvg, Simulation, SimulationRef};
+use simulation::input::UiCommands;
+use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::memory::PerFrameStrings;
-use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow};
-// use crate::render::sdl::ui::windows::{
-//     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
-// };
+use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow, SelectionWindow};
 
 pub struct Ui {
     imgui: Context,
@@ -30,10 +27,11 @@ pub enum EventConsumed {
     NotConsumed,
 }
 
+#[derive(Default)]
 struct State {
     max_window_width: f32,
     perf: PerformanceWindow,
-    // selection: SelectionWindow,
+    selection: SelectionWindow,
     // society: SocietyWindow,
     debug: DebugWindow,
 }
@@ -105,38 +103,28 @@ impl Ui {
 
 impl State {
     /// Renders ui windows
-    fn render(&mut self, mut context: UiContext) {
-        let window = imgui::Window::new(im_str!("Debug"))
+    fn render(&mut self, context: UiContext) {
+        imgui::Window::new(im_str!("Debug"))
             .size([self.max_window_width, 0.0], Condition::Always)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
-            .always_use_window_padding(true);
+            .always_use_window_padding(true)
+            .build(context.ui(), || {
+                // perf fixed at the top
+                self.perf.render(&context);
 
-        if let Some(token) = window.begin(&*context) {
-            // perf fixed at the top
-            self.perf.render(&context);
+                let tabbar = context.new_tab_bar(im_str!("Debug Tabs"));
+                if !tabbar.is_open() {
+                    return;
+                }
 
-            TabBar::new(im_str!("Debug Tabs")).build(context.ui(), || {
-                // self.selection.render(&mut context);
+                self.selection.render(&context);
                 // self.society.render(&mut context);
-                self.debug.render(&mut context);
+                self.debug.render(&context);
             });
 
-            token.end(&*context);
-
-            // ensure window doesn't resize itself all the time
-            let window_size = context.window_content_region_width();
-            self.max_window_width = self.max_window_width.max(window_size);
-        }
-    }
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            max_window_width: 0.0,
-            perf: PerformanceWindow,
-            debug: DebugWindow::default(),
-        }
+        // ensure window doesn't resize itself all the time
+        let window_size = context.window_content_region_width();
+        self.max_window_width = self.max_window_width.max(window_size);
     }
 }

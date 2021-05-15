@@ -5,15 +5,15 @@ use world::SliceRange;
 
 use crate::activity::ActivityComponent;
 use crate::ecs::{EcsWorld, Entity};
-use crate::input::{SelectedEntity, SelectedTiles};
+use crate::input::SelectedTiles;
 use crate::item::{ContainerComponent, EdibleItemComponent, ItemCondition};
 use crate::needs::HungerComponent;
-use crate::path::FollowPathComponent;
+
 use crate::simulation::AssociatedBlockData;
-use crate::society::{PlayerSociety, SocietyComponent};
+use crate::society::PlayerSociety;
 use crate::{
-    ComponentWorld, ConditionComponent, InventoryComponent, NameComponent, PhysicalComponent,
-    Societies, SocietyHandle, ThreadedWorldLoader, TransformComponent,
+    ComponentWorld, InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyHandle,
+    ThreadedWorldLoader, TransformComponent,
 };
 use world::loader::BlockDetails;
 
@@ -34,6 +34,7 @@ pub struct UiBlackboard<'a> {
     pub world_view: Option<SliceRange>,
 }
 
+#[deprecated]
 pub struct SelectedEntityDetails<'a> {
     pub entity: Entity,
     pub name: Option<&'a NameComponent>,
@@ -42,6 +43,7 @@ pub struct SelectedEntityDetails<'a> {
     pub details: EntityDetails<'a>,
 }
 
+#[deprecated]
 pub enum EntityDetails<'a> {
     Living {
         activity: Option<&'a ActivityComponent>,
@@ -57,42 +59,13 @@ pub enum EntityDetails<'a> {
 }
 
 impl<'a> UiBlackboard<'a> {
+    #[deprecated]
     pub fn fetch(
         world: &'a EcsWorld,
         world_loader: &ThreadedWorldLoader,
         debug_renderers: &'a HashSet<&'static str>,
     ) -> Self {
-        let selected_entity = world.resource_mut::<SelectedEntity>().get(world).map(|e| {
-            let transform = world.component::<TransformComponent>(e).unwrap(); // definitely ok because selected.get() just verified
-            let name = world.component::<NameComponent>(e).ok();
-            let details = match world.component::<ConditionComponent>(e) {
-                Ok(condition) => EntityDetails::Item {
-                    condition: &condition.0,
-                    edible: world.component(e).ok(),
-                },
-                _ => EntityDetails::Living {
-                    activity: world.component::<ActivityComponent>(e).ok(),
-                    hunger: world.component(e).ok(),
-                    inventory: world.component(e).ok(),
-                    path_target: world
-                        .component::<FollowPathComponent>(e)
-                        .ok()
-                        .and_then(|follow| follow.target()),
-                    society: world
-                        .component::<SocietyComponent>(e)
-                        .map(|s| s.handle)
-                        .ok(),
-                },
-            };
-
-            SelectedEntityDetails {
-                entity: e,
-                name,
-                transform,
-                physical: world.component(e).ok(),
-                details,
-            }
-        });
+        let selected_entity = todo!();
 
         let selected_tiles = world.resource::<SelectedTiles>();
         let selected_tile_biome = selected_tiles

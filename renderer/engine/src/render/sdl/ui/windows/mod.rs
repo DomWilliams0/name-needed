@@ -2,12 +2,12 @@ use imgui::{ImStr, ImString, Ui};
 
 mod debug_renderer;
 mod perf;
-// mod selection;
+mod selection;
 // mod society;
 
 pub(crate) use debug_renderer::DebugWindow;
 pub(crate) use perf::PerformanceWindow;
-// pub(crate) use selection::SelectionWindow;
+pub(crate) use selection::SelectionWindow;
 // pub(crate) use society::SocietyWindow;
 
 enum Value<'a> {
@@ -23,24 +23,24 @@ enum Value<'a> {
 }
 
 trait UiExt {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(
+    fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: F,
+        value: impl FnOnce() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     );
 }
 
 impl UiExt for Ui<'_> {
-    fn key_value<'a, F: FnOnce() -> Value<'a>>(
+    fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: F,
+        value: impl FnOnce() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     ) {
-        let value = value();
+        let value = value().into();
         if let Value::Hide = value {
             return;
         }
@@ -86,6 +86,24 @@ impl UiExt for Ui<'_> {
     }
 }
 
+impl<'a> Into<Value<'a>> for Option<&'a ImStr> {
+    fn into(self) -> Value<'a> {
+        match self {
+            Some(s) => Value::Some(s),
+            None => Value::Hide,
+        }
+    }
+}
+
+impl<'a> Into<Value<'a>> for Result<&'a ImStr, &'static str> {
+    fn into(self) -> Value<'a> {
+        match self {
+            Ok(s) => Value::Some(s),
+            Err(err) => Value::None(err),
+        }
+    }
+}
+
 const COLOR_GREEN: [f32; 4] = [0.4, 0.77, 0.33, 1.0];
 const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
 const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
@@ -95,7 +113,7 @@ const COLOR_RED: [f32; 4] = [0.9, 0.3, 0.2, 1.0];
 /// Do not modify the "mutable" ImString!
 unsafe fn with_fake_owned_imstr(imstr: &ImStr, f: impl FnOnce(&mut ImString)) {
     let str = imstr.to_str();
-    let mut buf = unsafe {
+    let mut buf = {
         // fake an owned string around the immutable buffer
         let mut string = String::from_raw_parts(str.as_ptr() as *mut _, str.len(), str.len());
 
