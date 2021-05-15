@@ -1,4 +1,4 @@
-# TODOs (324)
+# TODOs (323)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -261,8 +261,7 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
    * `// TODO physical shape wastes so much space`
- * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (2)
-   * `// TODO debug assert no concurrent readers`
+ * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
    * `// TODO this is really expensive`

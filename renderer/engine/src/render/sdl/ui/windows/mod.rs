@@ -64,37 +64,16 @@ impl UiExt for Ui<'_> {
                 buffer,
                 width,
             } => {
-                let buffer = buffer.to_str();
                 // safety: faking a mutable ImString from this immutable ImStr in a READONLY
                 // multiline. fake allocations are forgotten
-                let mut buf = unsafe {
-                    // fake an owned string around the immutable buffer
-                    let mut string = String::from_raw_parts(
-                        buffer.as_ptr() as *mut _,
-                        buffer.len(),
-                        buffer.len(),
-                    );
-
-                    // fake vec reference to inner vec
-                    let vec_ref = string.as_mut_vec();
-
-                    // fake owned inner vec
-                    let vec_copy: Vec<u8> = std::mem::transmute_copy(vec_ref);
-
-                    // forget fake owned string
-                    std::mem::forget(string);
-
-                    // fake ImString thinks it owns its vec
-                    ImString::from_utf8_with_nul_unchecked(vec_copy)
-                };
-
-                let _ = self
-                    .input_text_multiline(label, &mut buf, [width, 0.0])
-                    .read_only(true)
-                    .build();
-
-                // forget fake owned string
-                std::mem::forget(buf);
+                unsafe {
+                    with_fake_owned_imstr(buffer, |fake_buf| {
+                        let _ = self
+                            .input_text_multiline(label, fake_buf, [width, 0.0])
+                            .read_only(true)
+                            .build();
+                    })
+                }
             }
             Value::Hide => unreachable!(),
         };
@@ -111,3 +90,47 @@ const COLOR_GREEN: [f32; 4] = [0.4, 0.77, 0.33, 1.0];
 const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
 const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
 const COLOR_RED: [f32; 4] = [0.9, 0.3, 0.2, 1.0];
+
+/// # Safety
+/// Do not modify the "mutable" ImString!
+unsafe fn with_fake_owned_imstr(imstr: &ImStr, f: impl FnOnce(&mut ImString)) {
+    let str = imstr.to_str();
+    let mut buf = unsafe {
+        // fake an owned string around the immutable buffer
+        let mut string = String::from_raw_parts(str.as_ptr() as *mut _, str.len(), str.len());
+
+        // fake vec reference to inner vec
+        let vec_ref = string.as_mut_vec();
+
+        // fake owned inner vec
+        let vec_copy: Vec<u8> = std::mem::transmute_copy(vec_ref);
+
+        // forget fake owned string
+        std::mem::forget(string);
+
+        // fake ImString thinks it owns its vec
+        ImString::from_utf8_with_nul_unchecked(vec_copy)
+    };
+
+    f(&mut buf);
+
+    // forget fake owned string
+    std::mem::forget(buf);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// miri shows this is safe :^)
+    #[test]
+    fn fake_owned_imstring_safety() {
+        let buf = imgui::im_str!("hello i am a string");
+        unsafe {
+            with_fake_owned_imstr(buf, |fake| {
+                let str = fake.to_str();
+                eprintln!("nice: {}, {:?}", str.len(), str);
+            });
+        }
+    }
+}

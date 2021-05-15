@@ -23,7 +23,9 @@ struct LuaGameState<'a> {
     world: &'a WorldRef,
     /// Output specific to the running script only. Ptr to allow this struct to be cloneable
     output: *mut ScriptingOutput,
-    // TODO debug assert no concurrent readers
+
+    #[cfg(debug_assertions)]
+    safety_guard: std::cell::RefCell<()>,
 }
 
 /// Guard that removes the temporary references from the lua registry on drop
@@ -73,6 +75,8 @@ impl Scripting for LuaScripting {
             ecs,
             world,
             output: &mut output as *mut _,
+            #[cfg(debug_assertions)]
+            safety_guard: Default::default(),
         };
 
         self.runtime.context(|ctx| {
@@ -98,6 +102,14 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
     define!(fn print |ctx, msg: Variadic<String>| {
         let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
         let msg = msg.into_iter().join(", ");
+
+        // mini sanity check
+        let _guard: std::cell::RefMut<()>;
+        #[cfg(debug_assertions)]
+        {
+            _guard = state.safety_guard.borrow_mut();
+        }
+
         // safety: a single script is running at a time, and the state is cleared when the
         // script returns
         let output = unsafe { &mut *state.output };
