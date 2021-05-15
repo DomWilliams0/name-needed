@@ -29,12 +29,13 @@ impl DebugWindow {
                 // TODO helpers in Bundle
                 bundle.ui.text(ui_str!(in bundle.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
 
-                // scripting
-                bundle.ui.separator();
+                if cfg!(feature = "scripting") {
+                    bundle.ui.separator();
 
-                bundle.ui.input_text(im_str!("##scriptpath"), &mut self.script_input).build();
-                if bundle.ui.button(im_str!("Execute script"), [0.0, 0.0]) {
-                    bundle.commands.push(UiCommand::ExecuteScript(self.script_input.to_str().to_owned().into()))
+                    bundle.ui.input_text(im_str!("##scriptpath"), &mut self.script_input).build();
+                    if bundle.ui.button(im_str!("Execute script"), [0.0, 0.0]) {
+                        bundle.commands.push(UiCommand::ExecuteScript(self.script_input.to_str().to_owned().into()))
+                    }
                 }
 
                 // debug renderers

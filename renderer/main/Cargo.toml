@@ -24,8 +24,9 @@ inventory = "0.1"
 argh = "0.1"
 
 [features]
-default = ["use-sdl", "common/log-to-file", "panik/use-slog", "common/binary", "simulation/scripting"]
+default = ["use-sdl", "common/log-to-file", "panik/use-slog", "common/binary"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 count-allocs = ["alloc_counter"]
 metrics = ["simulation/metrics"]
+scripting = ["simulation/scripting", "engine/scripting"]
