@@ -33,7 +33,7 @@ impl DebugWindow {
     pub fn render(&mut self, context: &mut UiContext) {
         TabItem::new(im_str!("Debug")).build(context.ui(), || {
             // TODO view range
-            //  let view_range = context.blackboard.world_view.expect("blackboard world view range not populated");
+            // let view_range = context.blackboard.world_view.expect("blackboard world view range not populated");
             // context.ui.text(ui_str!(in context.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
 
             if cfg!(feature = "scripting") {
@@ -42,11 +42,18 @@ impl DebugWindow {
                 context
                     .input_text(im_str!("##scriptpath"), &mut self.script_input)
                     .build();
-                if context.button(im_str!("Execute script"), [0.0, 0.0]) {
+                if context.button(im_str!("Execute script##script"), [0.0, 0.0]) {
                     let response = context.issue_request(UiRequest::ExecuteScript(
                         self.script_input.to_str().to_owned().into(),
                     ));
                     self.script_output = ScriptOutput::Waiting(response);
+                }
+
+                if matches!(self.script_output, ScriptOutput::Done(_)) {
+                    context.same_line(0.0);
+                    if context.button(im_str!("Clear output##script"), [0.0, 0.0]) {
+                        self.script_output = ScriptOutput::NoScript;
+                    }
                 }
 
                 if let ScriptOutput::Waiting(resp) = &self.script_output {
@@ -63,16 +70,21 @@ impl DebugWindow {
                 };
 
                 if let Some(output) = str {
+                    let width = context.window_content_region_width();
                     context.key_value(
                         im_str!("Output:"),
-                        || Value::Wrapped(output),
+                        || Value::MultilineReadonly {
+                            label: im_str!("##scriptoutput"),
+                            buffer: output,
+                            width,
+                        },
                         None,
                         COLOR_BLUE,
                     );
                 }
             }
 
-            // TODO query world instead
+            // TODO query world for debug renderers
             // debug renderers
             /*            context.ui.separator();
                         context.checkbox(im_str!("Navigation paths"), "navigation path");

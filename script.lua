@@ -3,9 +3,10 @@
 -- local e = GetEntityById("E1:3");
 -- SelectEntity(e);
 --UnselectEntity();
--- info("lmao i am a script");
+-- debug("lmao i am a script");
 
 local society = GetPlayerSociety();
-info(string.format("society is %s", society))
+print(string.format("player society is %s", society))
+print("wow this is incredible")
 
--- for k,v in pairs(_G) do debug(string.format("%s => %s", k, v)) end
+-- for k,v in pairs(_G) do print(string.format("%s => %s", k, v)) end

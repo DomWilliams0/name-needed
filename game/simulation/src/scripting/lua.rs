@@ -3,7 +3,9 @@ use rlua::{Context, MetaMethod, StdLib, UserData, UserDataMethods, Variadic};
 
 use crate::ecs::EntityWrapper;
 use crate::input::SelectedEntity;
-use crate::scripting::context::{parse_entity_id, Scripting, ScriptingError, ScriptingResult};
+use crate::scripting::context::{
+    parse_entity_id, Scripting, ScriptingError, ScriptingOutput, ScriptingResult,
+};
 use crate::{ComponentWorld, EcsWorld, PlayerSociety, SocietyHandle, WorldRef};
 use common::*;
 
@@ -14,11 +16,14 @@ pub struct LuaScripting {
 /// Key used in lua registry
 const GAME_STATE_KEY: &str = "game-state";
 
-/// Temporary references to game state for use in scripts
-#[derive(Copy, Clone)]
+/// Temporary references to game state for use in scripts. Only one script runs at a time
+#[derive(Clone)]
 struct LuaGameState<'a> {
     ecs: &'a EcsWorld,
     world: &'a WorldRef,
+    /// Output specific to the running script only. Ptr to allow this struct to be cloneable
+    output: *mut ScriptingOutput,
+    // TODO debug assert no concurrent readers
 }
 
 /// Guard that removes the temporary references from the lua registry on drop
@@ -34,8 +39,8 @@ unsafe impl Send for LuaGameState<'static> {}
 
 impl UserData for EntityWrapper {}
 impl UserData for SocietyHandle {
-    fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(_methods: &mut T) {
-        _methods.add_meta_function(MetaMethod::ToString, |_, this: Self| {
+    fn add_methods<'lua, T: UserDataMethods<'lua, Self>>(methods: &mut T) {
+        methods.add_meta_function(MetaMethod::ToString, |_, this: Self| {
             Ok(format!("{:?}", this))
         });
     }
@@ -57,17 +62,27 @@ impl Scripting for LuaScripting {
         Ok(Self { runtime })
     }
 
-    fn run(&mut self, script: &[u8], ecs: &EcsWorld, world: &WorldRef) -> ScriptingResult<()> {
-        let state = LuaGameState { ecs, world };
+    fn run(
+        &mut self,
+        script: &[u8],
+        ecs: &EcsWorld,
+        world: &WorldRef,
+    ) -> ScriptingResult<ScriptingOutput> {
+        let mut output = ScriptingOutput::default();
+        let state = LuaGameState {
+            ecs,
+            world,
+            output: &mut output as *mut _,
+        };
 
-        self.runtime
-            .context(|ctx| {
-                let guard = state.install(ctx)?;
-                let result = ctx.load(script).exec();
-                guard.uninstall(ctx)?;
-                result
-            })
-            .map_err(Into::into)
+        self.runtime.context(|ctx| {
+            let guard = state.install(ctx)?;
+            let result = ctx.load(script).exec();
+            guard.uninstall(ctx)?;
+            result
+        })?;
+
+        Ok(output)
     }
 }
 
@@ -80,11 +95,13 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
         };
     }
 
-    // remove print, use logging levels instead
-    globals.set("print", LuaNil)?;
-
-    define!(fn info |_, msg: Variadic<String>| {
-        common::info!("lua: {}", msg.into_iter().join(", "));
+    define!(fn print |ctx, msg: Variadic<String>| {
+        let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
+        let msg = msg.into_iter().join(", ");
+        // safety: a single script is running at a time, and the state is cleared when the
+        // script returns
+        let output = unsafe { &mut *state.output };
+        output.add_line(format_args!("{}", msg));
         Ok(())
     });
 

@@ -1,6 +1,7 @@
 use crate::ecs::EntityWrapper;
 use crate::{EcsWorld, WorldRef};
 use common::*;
+use std::fmt::Write;
 use std::path::Path;
 
 #[derive(Error, Debug)]
@@ -19,12 +20,20 @@ pub enum ScriptingError {
     DeadEntity(EntityWrapper),
 }
 
+#[derive(Default)]
+pub struct ScriptingOutput(String);
+
 pub type ScriptingResult<T> = Result<T, ScriptingError>;
 
 pub trait Scripting: Sized {
     fn new() -> ScriptingResult<Self>;
 
-    fn run(&mut self, script: &[u8], ecs: &EcsWorld, world: &WorldRef) -> ScriptingResult<()>;
+    fn run(
+        &mut self,
+        script: &[u8],
+        ecs: &EcsWorld,
+        world: &WorldRef,
+    ) -> ScriptingResult<ScriptingOutput>;
 }
 
 pub struct ScriptingContext<S: Scripting> {
@@ -42,7 +51,7 @@ impl<S: Scripting> ScriptingContext<S> {
         path: &Path,
         ecs: &EcsWorld,
         world: &WorldRef,
-    ) -> ScriptingResult<()> {
+    ) -> ScriptingResult<ScriptingOutput> {
         let bytes = std::fs::read(path)?;
         self.eval_bytes(&bytes, ecs, world)
     }
@@ -52,7 +61,7 @@ impl<S: Scripting> ScriptingContext<S> {
         bytes: &[u8],
         ecs: &EcsWorld,
         world: &WorldRef,
-    ) -> ScriptingResult<()> {
+    ) -> ScriptingResult<ScriptingOutput> {
         self.inner.run(bytes, ecs, world)
     }
 }
@@ -73,6 +82,17 @@ pub fn parse_entity_id(e: &str) -> Option<EntityWrapper> {
     let index = index_str.parse().ok()?;
 
     Some(EntityWrapper(index, gen))
+}
+
+impl ScriptingOutput {
+    pub fn add_line(&mut self, line: std::fmt::Arguments) {
+        self.0.write_fmt(line).expect("string writing failed");
+        self.0.push('\n');
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
 }
 
 #[cfg(test)]

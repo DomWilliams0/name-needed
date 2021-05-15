@@ -1,4 +1,4 @@
-use imgui::{ImStr, Ui};
+use imgui::{ImStr, ImString, Ui};
 
 mod debug_renderer;
 mod perf;
@@ -15,6 +15,11 @@ enum Value<'a> {
     None(&'static str),
     Some(&'a ImStr),
     Wrapped(&'a ImStr),
+    MultilineReadonly {
+        label: &'a ImStr,
+        buffer: &'a ImStr,
+        width: f32,
+    },
 }
 
 trait UiExt {
@@ -41,7 +46,11 @@ impl UiExt for Ui<'_> {
         }
 
         self.text_colored(color, key);
-        self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 10.0);
+
+        if !matches!(value, Value::MultilineReadonly {..}) {
+            self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 10.0);
+        }
+
         match value {
             Value::Some(val) => {
                 self.text(val);
@@ -50,7 +59,44 @@ impl UiExt for Ui<'_> {
                 self.text_wrapped(&val);
             }
             Value::None(val) => self.text_disabled(val),
-            _ => unreachable!(),
+            Value::MultilineReadonly {
+                label,
+                buffer,
+                width,
+            } => {
+                let buffer = buffer.to_str();
+                // safety: faking a mutable ImString from this immutable ImStr in a READONLY
+                // multiline. fake allocations are forgotten
+                let mut buf = unsafe {
+                    // fake an owned string around the immutable buffer
+                    let mut string = String::from_raw_parts(
+                        buffer.as_ptr() as *mut _,
+                        buffer.len(),
+                        buffer.len(),
+                    );
+
+                    // fake vec reference to inner vec
+                    let vec_ref = string.as_mut_vec();
+
+                    // fake owned inner vec
+                    let vec_copy: Vec<u8> = std::mem::transmute_copy(vec_ref);
+
+                    // forget fake owned string
+                    std::mem::forget(string);
+
+                    // fake ImString thinks it owns its vec
+                    ImString::from_utf8_with_nul_unchecked(vec_copy)
+                };
+
+                let _ = self
+                    .input_text_multiline(label, &mut buf, [width, 0.0])
+                    .read_only(true)
+                    .build();
+
+                // forget fake owned string
+                std::mem::forget(buf);
+            }
+            Value::Hide => unreachable!(),
         };
 
         if let Some(tooltip) = tooltip {

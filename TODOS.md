@@ -261,7 +261,8 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
    * `// TODO physical shape wastes so much space`
- * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
+ * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (2)
+   * `// TODO debug assert no concurrent readers`
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
    * `// TODO this is really expensive`
@@ -271,12 +272,11 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
-   * `.map(|_| "(nothing)".to_owned()); // TODO actual script eval output`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
@@ -406,7 +406,7 @@
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (4)
    * `// TODO free function instead of method`
    * `// TODO view range`
-   * `// TODO query world instead`
+   * `// TODO query world for debug renderers`
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
