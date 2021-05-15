@@ -6,7 +6,7 @@ use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 
-use simulation::input::{UiBlackboard, UiCommand};
+use simulation::input::{UiBlackboard, UiCommands};
 use simulation::PerfAvg;
 
 use crate::render::sdl::ui::context::UiContext;
@@ -83,8 +83,8 @@ impl Ui {
         window: &Window,
         mouse_state: &MouseState,
         perf: PerfAvg,
-        blackboard: UiBlackboard,
-        commands: &mut Vec<UiCommand>,
+        _blackboard: UiBlackboard,
+        commands: &mut UiCommands,
     ) {
         self.imgui_sdl2
             .prepare_frame(self.imgui.io_mut(), window, mouse_state);

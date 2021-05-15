@@ -1,12 +1,19 @@
-use imgui::{im_str, ImStr, ImString, TabItem};
+use imgui::{im_str, ImString, TabItem};
 
-use simulation::input::UiCommand;
+use simulation::input::{UiRequest, UiResponse};
 
 use crate::render::sdl::ui::context::UiContext;
-use crate::ui_str;
+use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE};
 
 pub struct DebugWindow {
     script_input: ImString,
+    script_output: ScriptOutput,
+}
+
+enum ScriptOutput {
+    NoScript,
+    Waiting(UiResponse),
+    Done(ImString),
 }
 
 const MAX_PATH_INPUT: usize = 256;
@@ -25,27 +32,56 @@ const MAX_PATH_INPUT: usize = 256;
 impl DebugWindow {
     pub fn render(&mut self, context: &mut UiContext) {
         TabItem::new(im_str!("Debug")).build(context.ui(), || {
-            /* let view_range = context.blackboard.world_view.expect("blackboard world view range not populated");
-            context.ui.text(ui_str!(in context.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
+            // TODO view range
+            //  let view_range = context.blackboard.world_view.expect("blackboard world view range not populated");
+            // context.ui.text(ui_str!(in context.strings, "World range: {} => {} ({})", view_range.bottom().slice(), view_range.top().slice(), view_range.size()));
 
             if cfg!(feature = "scripting") {
-                context.ui.separator();
+                context.separator();
 
-                context.ui.input_text(im_str!("##scriptpath"), &mut self.script_input).build();
-                if context.ui.button(im_str!("Execute script"), [0.0, 0.0]) {
-                    context.commands.push(UiCommand::ExecuteScript(self.script_input.to_str().to_owned().into()))
+                context
+                    .input_text(im_str!("##scriptpath"), &mut self.script_input)
+                    .build();
+                if context.button(im_str!("Execute script"), [0.0, 0.0]) {
+                    let response = context.issue_request(UiRequest::ExecuteScript(
+                        self.script_input.to_str().to_owned().into(),
+                    ));
+                    self.script_output = ScriptOutput::Waiting(response);
+                }
+
+                if let ScriptOutput::Waiting(resp) = &self.script_output {
+                    if let Some(resp) = resp.take_response() {
+                        self.script_output =
+                            ScriptOutput::Done(ImString::from(format!("{}", resp)));
+                    };
+                }
+
+                let str = match &self.script_output {
+                    ScriptOutput::NoScript => None,
+                    ScriptOutput::Waiting(_) => Some(im_str!("Executing...")),
+                    ScriptOutput::Done(s) => Some(s.as_ref()),
+                };
+
+                if let Some(output) = str {
+                    context.key_value(
+                        im_str!("Output:"),
+                        || Value::Wrapped(output),
+                        None,
+                        COLOR_BLUE,
+                    );
                 }
             }
 
             // TODO query world instead
             // debug renderers
-            context.ui.separator();
-            context.checkbox(im_str!("Navigation paths"), "navigation path");
-            context.checkbox(im_str!("Navigation areas"), "navigation areas");
-            context.checkbox(im_str!("Steering direction"), "steering");
-            context.checkbox(im_str!("Senses"), "senses");
-            context.checkbox(im_str!("Feature boundaries"), "feature boundaries");
-            context.checkbox(im_str!("Chunk boundaries"), "chunk boundaries");*/
+            /*            context.ui.separator();
+                        context.checkbox(im_str!("Navigation paths"), "navigation path");
+                        context.checkbox(im_str!("Navigation areas"), "navigation areas");
+                        context.checkbox(im_str!("Steering direction"), "steering");
+                        context.checkbox(im_str!("Senses"), "senses");
+                        context.checkbox(im_str!("Feature boundaries"), "feature boundaries");
+                        context.checkbox(im_str!("Chunk boundaries"), "chunk boundaries");
+            */
         });
     }
 }
@@ -57,6 +93,9 @@ impl Default for DebugWindow {
         // TODO proper default script path
         script_input.push_str("script.lua");
 
-        DebugWindow { script_input }
+        DebugWindow {
+            script_input,
+            script_output: ScriptOutput::NoScript,
+        }
     }
 }

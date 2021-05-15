@@ -1,11 +1,11 @@
-use crate::input::UiCommand;
+use crate::input::UiCommands;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation, WorldViewer};
 use common::Error;
 use resources::Resources;
 use unit::world::WorldPosition;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Exit {
     Stop,
     Restart,
@@ -15,7 +15,7 @@ pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
 
-    fn consume_events(&mut self, commands: &mut Vec<UiCommand>);
+    fn consume_events(&mut self, commands: &mut UiCommands);
 
     fn tick(&mut self);
 
@@ -24,7 +24,7 @@ pub trait InitializedSimulationBackend: Sized {
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
         perf: PerfAvg,
-        commands: &mut Vec<UiCommand>,
+        commands: &mut UiCommands,
     );
 
     fn world_viewer(&mut self) -> &mut WorldViewer;

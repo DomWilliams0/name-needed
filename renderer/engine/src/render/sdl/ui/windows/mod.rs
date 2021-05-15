@@ -1,10 +1,5 @@
 use imgui::{ImStr, Ui};
 
-use simulation::input::{UiBlackboard, UiCommand};
-use simulation::PerfAvg;
-
-use crate::render::sdl::ui::memory::PerFrameStrings;
-
 mod debug_renderer;
 mod perf;
 // mod selection;

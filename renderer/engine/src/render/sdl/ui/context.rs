@@ -1,4 +1,4 @@
-use simulation::input::{UiBlackboard, UiCommand};
+use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
 use simulation::PerfAvg;
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
@@ -10,14 +10,14 @@ pub struct UiContext<'a> {
     strings: &'a PerFrameStrings,
     perf: PerfAvg,
     // blackboard: &'a UiBlackboard<'a>,
-    commands: &'a mut Vec<UiCommand>,
+    commands: &'a mut UiCommands,
 }
 
 impl<'a> UiContext<'a> {
     pub fn new(
         ui: &'a imgui::Ui<'a>,
         strings: &'a PerFrameStrings,
-        commands: &'a mut Vec<UiCommand>,
+        commands: &'a mut UiCommands,
         perf: PerfAvg,
     ) -> Self {
         Self {
@@ -38,6 +38,13 @@ impl<'a> UiContext<'a> {
 
     pub fn perf(&self) -> &PerfAvg {
         &self.perf
+    }
+
+    pub fn issue_request(&mut self, req: UiRequest) -> UiResponse {
+        let command = UiCommand::new(req);
+        let response = command.response();
+        self.commands.push(command);
+        response
     }
 }
 

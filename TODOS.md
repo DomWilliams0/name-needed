@@ -1,4 +1,4 @@
-# TODOs (321)
+# TODOs (324)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -193,6 +193,8 @@
    * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
    * `/// TODO this can probably just hold the world and have some helper functions`
+ * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
+   * `// TODO use a dyn trait instead`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
@@ -269,11 +271,12 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `.map(|_| "(nothing)".to_owned()); // TODO actual script eval output`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
@@ -400,8 +403,9 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (3)
+ * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (4)
    * `// TODO free function instead of method`
+   * `// TODO view range`
    * `// TODO query world instead`
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)

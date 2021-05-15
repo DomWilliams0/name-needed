@@ -15,7 +15,7 @@ use crate::ecs::*;
 use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    UiBlackboard, UiCommand,
+    UiBlackboard, UiCommand, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -258,14 +258,15 @@ impl<R: Renderer> Simulation<R> {
     fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
         let mut exit = None;
         for cmd in commands {
-            match cmd {
-                UiCommand::ToggleDebugRenderer { ident, enabled } => {
+            let (req, resp) = cmd.consume();
+            match req {
+                UiRequest::ToggleDebugRenderer { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
                         warn!("failed to toggle debug renderer"; "renderer" => ident, "error" => %e);
                     }
                 }
 
-                UiCommand::FillSelectedTiles(placement, block_type) => {
+                UiRequest::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
                     if let Some((mut from, mut to)) = selection.bounds() {
                         if let BlockPlacement::PlaceAbove = placement {
@@ -280,7 +281,7 @@ impl<R: Renderer> Simulation<R> {
                             .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
-                UiCommand::IssueDivineCommand(ref divine_command) => {
+                UiRequest::IssueDivineCommand(ref divine_command) => {
                     let entity = match self
                         .ecs_world
                         .resource_mut::<SelectedEntity>()
@@ -309,7 +310,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiCommand::IssueSocietyCommand(society, command) => {
+                UiRequest::IssueSocietyCommand(society, command) => {
                     let job = match command.into_job(&self.ecs_world) {
                         Ok(job) => job,
                         Err(cmd) => {
@@ -329,7 +330,7 @@ impl<R: Renderer> Simulation<R> {
                     debug!("submitting job to society"; "society" => ?society, "job" => %job);
                     society.jobs_mut().submit(job);
                 }
-                UiCommand::SetContainerOwnership {
+                UiRequest::SetContainerOwnership {
                     container,
                     owner,
                     communal,
@@ -360,15 +361,19 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiCommand::ExitGame(ex) => exit = Some(ex),
-                UiCommand::ExecuteScript(path) => {
+                UiRequest::ExitGame(ex) => exit = Some(ex),
+                UiRequest::ExecuteScript(path) => {
                     info!("executing script"; "path" => %path.display());
-                    if let Err(err) =
-                        self.scripting
-                            .eval_path(&path, &self.ecs_world, &self.voxel_world)
-                    {
+                    let result = self
+                        .scripting
+                        .eval_path(&path, &self.ecs_world, &self.voxel_world)
+                        .map(|_| "(nothing)".to_owned()); // TODO actual script eval output
+
+                    if let Err(err) = result.as_ref() {
                         warn!("script errored"; "error" => %err);
                     }
+
+                    resp.set_response(UiResponsePayload::ScriptOutput(result));
                 }
             }
         }

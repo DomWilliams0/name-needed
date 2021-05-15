@@ -22,7 +22,7 @@ use crate::render::sdl::GlRenderer;
 use resources::ResourceError;
 use resources::Resources;
 use sdl2::mouse::{MouseButton, MouseState};
-use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
+use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
 use std::hint::unreachable_unchecked;
 use unit::world::{WorldPoint, WorldPosition};
 
@@ -154,7 +154,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
     type Renderer = GlRenderer;
     type Persistent = SdlBackendPersistent;
 
-    fn consume_events(&mut self, commands: &mut Vec<UiCommand>) {
+    fn consume_events(&mut self, commands: &mut UiCommands) {
         // take event pump out of self, to be replaced at the end of the tick
         let mut events = match self.sdl_events.take() {
             Some(e) => e,
@@ -171,7 +171,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             match event {
                 Event::Quit { .. } => {
-                    commands.push(UiCommand::ExitGame(Exit::Stop));
+                    commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
                     break;
                 }
                 Event::Window {
@@ -189,8 +189,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     ..
                 } => match map_sdl_keycode(key) {
                     Some(action) => {
-                        let ui_command = self.handle_key(action, keymod, true);
-                        commands.extend(ui_command.into_iter());
+                        let ui_req = self.handle_key(action, keymod, true);
+                        commands.extend(ui_req.map(UiCommand::new).into_iter());
                     }
 
                     None => debug!("ignoring unknown key"; "key" => %key),
@@ -201,8 +201,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     ..
                 } => {
                     if let Some(action) = map_sdl_keycode(key) {
-                        let ui_command = self.handle_key(action, keymod, false);
-                        commands.extend(ui_command.into_iter());
+                        let ui_req = self.handle_key(action, keymod, false);
+                        commands.extend(ui_req.map(UiCommand::new).into_iter());
                     }
                 }
 
@@ -267,7 +267,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
         perf: PerfAvg,
-        commands: &mut Vec<UiCommand>,
+        commands: &mut UiCommands,
     ) {
         // clear window
         Gl::clear();
@@ -352,7 +352,7 @@ impl SdlBackendInit {
         action: KeyAction,
         modifiers: Mod,
         is_down: bool,
-    ) -> Option<UiCommand> {
+    ) -> Option<UiRequest> {
         use RendererKey::*;
 
         match action {
@@ -389,8 +389,8 @@ impl SdlBackendInit {
             KeyAction::Game(key) => {
                 if is_down {
                     let cmd = match key {
-                        GameKey::Exit => UiCommand::ExitGame(Exit::Stop),
-                        GameKey::Restart => UiCommand::ExitGame(Exit::Restart),
+                        GameKey::Exit => UiRequest::ExitGame(Exit::Stop),
+                        GameKey::Restart => UiRequest::ExitGame(Exit::Restart),
                     };
 
                     Some(cmd)
