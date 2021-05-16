@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use common::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
+use crate::block::BlockType;
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
@@ -23,6 +24,22 @@ impl MemoryTerrainSource {
         for it in chunks {
             let (chunk, terrain) = it.into();
             let chunk = chunk.into();
+
+            // assert placeholder slabs are really placeholders
+            if cfg!(debug_assertions) {
+                for (slab, idx) in terrain.slabs_from_bottom() {
+                    if slab.is_placeholder() {
+                        for (_, slice) in slab.slices_from_bottom() {
+                            assert!(
+                                slice.all_blocks_are(BlockType::Air),
+                                "non air blocks in \"placeholder\" slab {:?}",
+                                SlabLocation::new(idx, chunk)
+                            );
+                        }
+                    }
+                }
+            }
+
             if chunk_map.insert(chunk, terrain).is_some() {
                 return Err(TerrainSourceError::Duplicate(chunk));
             }

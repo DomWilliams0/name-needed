@@ -9,5 +9,5 @@
 	* [X] persist ui internal state
 	* [ ] persist selected tabs
 	* [X] persist debug renderer state and issue requests to set that state on startup
-* [ ] bug: moving around in preset world resets all block changes
+* [X] bug: moving around in preset world resets all block changes
 * [ ] mention sdl dependency in readme
