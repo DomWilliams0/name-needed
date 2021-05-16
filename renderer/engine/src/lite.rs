@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use common::*;
 use resources::Resources;
-use simulation::input::UiRequest;
+use simulation::input::{UiCommand, UiCommands, UiRequest};
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,
     RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
@@ -46,7 +46,7 @@ impl InitializedSimulationBackend for DummyBackendInit {
 
     fn consume_events(&mut self, commands: &mut UiCommands) {
         if Instant::now() > self.end_time {
-            commands.push(UiRequest::ExitGame(Exit::Stop));
+            commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
         }
     }
 
