@@ -1,4 +1,4 @@
-# TODOs (317)
+# TODOs (323)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -182,7 +182,8 @@
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
+   * `/// TODO it's technically undefined to convert to spec's entity type like this`
    * `// TODO perfect hashing`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
@@ -190,8 +191,6 @@
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
-   * `/// TODO this can probably just hold the world and have some helper functions`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
@@ -258,6 +257,8 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
    * `// TODO physical shape wastes so much space`
+ * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
+   * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
    * `// TODO this is really expensive`
  * [game/simulation/src/senses/system.rs](game/simulation/src/senses/system.rs) (5)
@@ -385,6 +386,8 @@
    * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
+ * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
+   * `// TODO per-world save directory abstraction`
  * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
    * `// TODO zoom`
    * `// TODO cache`
@@ -398,9 +401,14 @@
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
-   * `// TODO helpers in Bundle`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (1)
+   * `// TODO proper default script path`
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (4)
+   * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
+   * `.unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere`
+   * `// TODO proper way of checking if an entity is living`
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (1)
+   * `.unwrap_or("unnamed"); // TODO another manual name component access`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`

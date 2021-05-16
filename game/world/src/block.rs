@@ -132,6 +132,10 @@ impl Block {
         &mut self.durability
     }
 
+    pub fn durability(&self) -> Proportion<BlockDurability> {
+        self.durability
+    }
+
     /// True if air or durability == 0
     pub fn is_destroyed(&self) -> bool {
         self.durability.value() == 0 || self.block_type == BlockType::Air

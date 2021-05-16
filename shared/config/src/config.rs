@@ -16,7 +16,7 @@ pub struct Display {
     pub camera_speed: f32,
     pub zoom: f32,
     pub initial_view_range: u16,
-    pub nav_paths_by_default: bool,
+    pub persist_ui: bool,
 }
 
 #[derive(Deserialize)]

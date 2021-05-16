@@ -17,10 +17,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		* consider different edge costs for climbing ontop of stupid things, not considered for wandering/walking
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
-* bug: area path finding seems to needlessly poke into other areas
+* improve path finding
 	* add higher weight difference for inter-area edges
-	* an inappropriate block in an area port is chosen
-	* very indirect paths within areas too, edge costs need adjusting
+	* very indirect paths within areas, edge costs need adjusting
 * tweak arrival threshold for path waypoints, it's a bit jerky
 * bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
 * apply gravity to item entities too, for when block beneath them is mined
@@ -36,7 +35,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
 	* list of society members in UI to click instead
-* persist ui state over restarts (open treenodes, toggled debug renderers etc)
 * interactive terminal to replace/extend dev ui
 	* custom log! handler to show warnings and errors
 	* in-game OR pop out OR out of process [ncurses] terminal console that persists over restarts
@@ -46,6 +44,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * resolve an entity to its displayable name including state in the UI layer only
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
 * ui button to skip up/down to next surface
+* ring buffer of per-entity events in a Log ui tab, e.g. decided to do X, picked up X, ate X
 
 ## Entity behaviour
 * more society level jobs
@@ -199,6 +198,16 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * instead of sleeping to wait for world to load, check if panicked every second
 * add a bg async task that checks for panics, and aborts runtime - currently panics can randomly cause deadlocks
 * restarting should take better care of async thread pool, panics if restart occurs while still loading terrain
+* disable planet cache to /tmp for release/non dev builds
+* save games
+	* specific dir for saved data
+	* common API for saving to that dir
+	* move existing random file dumps to there, e.g. log file, ui state, worldgen cache
+* improve lua scripting API
+	* component access
+	* voxel world access
+	* autorun scripts in a dir on startup
+	* port scenarios from rust to scripts
 
 ## Entity diversity
 * animal species

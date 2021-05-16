@@ -76,7 +76,13 @@ impl Slab {
     }
 
     pub fn expect_mut(&mut self) -> &mut SlabGridImpl {
-        Arc::get_mut(&mut self.0).expect("expected to be the only slab reference")
+        let grid = Arc::get_mut(&mut self.0).expect("expected to be the only slab reference");
+
+        if let SlabType::Placeholder = std::mem::replace(&mut self.1, SlabType::Normal) {
+            trace!("promoting placeholder slab to normal due to mutable reference");
+        }
+
+        grid
     }
 
     pub fn expect_mut_self(&mut self) -> &mut Slab {

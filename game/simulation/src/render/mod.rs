@@ -5,7 +5,7 @@ mod system;
 
 pub use debug::{
     AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRenderer, DebugRendererError,
-    DebugRenderers,
+    DebugRenderers, DebugRenderersState,
 };
 pub use renderer::Renderer;
 pub use shape::Shape2d;

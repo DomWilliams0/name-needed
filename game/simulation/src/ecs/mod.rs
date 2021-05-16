@@ -24,6 +24,12 @@ mod world_ext;
 
 pub struct E(pub Entity);
 
+/// TODO it's technically undefined to convert to spec's entity type like this
+///  but we will eventually reimplement the ECS ourselves so this won't be an issue
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub struct EntityWrapper(pub specs::world::Index, pub std::num::NonZeroI32);
+
 mod entity_fmt {
     use common::*;
 
@@ -107,6 +113,41 @@ impl ComponentRegistry {
                 }
                 false
             }
+        }
+    }
+}
+
+impl From<EntityWrapper> for Entity {
+    fn from(e: EntityWrapper) -> Self {
+        // safety: see doc comment on EntityProxy (and unit test below)
+        unsafe { std::mem::transmute(e) }
+    }
+}
+
+impl Display for EntityWrapper {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", E(Entity::from(*self)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::num::NonZeroI32;
+
+    #[test]
+    fn entity_id_conversion() {
+        let mut world = specs::World::new();
+
+        for _ in 0..10 {
+            let e = world.create_entity().build();
+
+            let index = e.id();
+            let gen = e.gen();
+
+            let my_e = EntityWrapper(index, NonZeroI32::new(gen.id()).unwrap());
+            let my_e = specs::Entity::from(my_e);
+            assert_eq!(e, my_e, "specs entity layout has changed")
         }
     }
 }

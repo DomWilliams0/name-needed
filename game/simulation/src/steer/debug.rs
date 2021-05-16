@@ -4,11 +4,16 @@ use crate::ecs::*;
 use crate::render::DebugRenderer;
 use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
 
+#[derive(Default)]
 pub struct SteeringDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
     fn identifier(&self) -> &'static str {
         "steering"
+    }
+
+    fn name(&self) -> &'static str {
+        "Steering\0"
     }
 
     fn render(

@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use common::*;
 use resources::Resources;
+use strum_macros::EnumDiscriminants;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -15,7 +16,7 @@ use crate::ecs::*;
 use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    UiBlackboard, UiCommand,
+    UiCommand, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -25,10 +26,12 @@ use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{
     AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
+    DebugRenderersState,
 };
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
@@ -37,7 +40,9 @@ use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug, EnumDiscriminants)]
+#[strum_discriminants(name(AssociatedBlockDataType))]
+#[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
 }
@@ -66,6 +71,16 @@ pub struct Simulation<R: Renderer> {
     change_events: Vec<WorldChangeEvent>,
 
     debug_renderers: DebugRenderers<R>,
+    scripting: ScriptingContext,
+}
+
+/// A little bundle of references to the game state without the generic [Renderer] param on [Simulation]
+pub struct SimulationRef<'s> {
+    pub ecs: &'s EcsWorld,
+    pub world: &'s WorldRef,
+    pub loader: &'s ThreadedWorldLoader,
+    pub viewer: &'s WorldViewer,
+    pub debug_renderers: &'s DebugRenderersState,
 }
 
 impl world::WorldContext for WorldContext {
@@ -89,8 +104,7 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
-        let mut debug_renderers = DebugRenderers::new();
-        register_debug_renderers(&mut debug_renderers)?;
+        let debug_renderers = register_debug_renderers()?;
 
         // ensure tick is reset
         reset_tick();
@@ -102,6 +116,7 @@ impl<R: Renderer> Simulation<R> {
             debug_renderers,
             terrain_changes: HashSet::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
+            scripting: ScriptingContext::new()?,
         })
     }
 
@@ -255,14 +270,19 @@ impl<R: Renderer> Simulation<R> {
     fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
         let mut exit = None;
         for cmd in commands {
-            match cmd {
-                UiCommand::ToggleDebugRenderer { ident, enabled } => {
+            let (req, resp) = cmd.consume();
+            match req {
+                UiRequest::DisableAllDebugRenderers => {
+                    self.debug_renderers.disable_all();
+                }
+
+                UiRequest::SetDebugRendererEnabled { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
-                        warn!("failed to toggle debug renderer"; "renderer" => ident, "error" => %e);
+                        warn!("failed to set debug renderer state"; "error" => %e);
                     }
                 }
 
-                UiCommand::FillSelectedTiles(placement, block_type) => {
+                UiRequest::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
                     if let Some((mut from, mut to)) = selection.bounds() {
                         if let BlockPlacement::PlaceAbove = placement {
@@ -277,7 +297,7 @@ impl<R: Renderer> Simulation<R> {
                             .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
-                UiCommand::IssueDivineCommand(ref divine_command) => {
+                UiRequest::IssueDivineCommand(ref divine_command) => {
                     let entity = match self
                         .ecs_world
                         .resource_mut::<SelectedEntity>()
@@ -306,7 +326,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiCommand::IssueSocietyCommand(society, command) => {
+                UiRequest::IssueSocietyCommand(society, command) => {
                     let job = match command.into_job(&self.ecs_world) {
                         Ok(job) => job,
                         Err(cmd) => {
@@ -326,7 +346,7 @@ impl<R: Renderer> Simulation<R> {
                     debug!("submitting job to society"; "society" => ?society, "job" => %job);
                     society.jobs_mut().submit(job);
                 }
-                UiCommand::SetContainerOwnership {
+                UiRequest::SetContainerOwnership {
                     container,
                     owner,
                     communal,
@@ -357,14 +377,27 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiCommand::ExitGame(ex) => exit = Some(ex),
+                UiRequest::ExitGame(ex) => exit = Some(ex),
+                UiRequest::ExecuteScript(path) => {
+                    info!("executing script"; "path" => %path.display());
+                    let result = self
+                        .scripting
+                        .eval_path(&path, &self.ecs_world, &self.voxel_world)
+                        .map(|output| output.into_string());
+
+                    if let Err(err) = result.as_ref() {
+                        warn!("script errored"; "error" => %err);
+                    }
+
+                    resp.set_response(UiResponsePayload::ScriptOutput(result));
+                }
             }
         }
 
         exit
     }
 
-    // target is for this frame only
+    /// Target is for this frame only
     pub fn render(
         &mut self,
         world_viewer: &WorldViewer,
@@ -372,7 +405,7 @@ impl<R: Renderer> Simulation<R> {
         renderer: &mut R,
         interpolation: f64,
         input: &[InputEvent],
-    ) -> (R::Target, UiBlackboard) {
+    ) -> R::Target {
         // process input before rendering
         InputSystem { events: input }.run_now(&self.ecs_world);
 
@@ -419,16 +452,7 @@ impl<R: Renderer> Simulation<R> {
         }
 
         // end frame
-        let target = renderer.deinit();
-
-        // gather blackboard for ui
-        let blackboard = UiBlackboard::fetch(
-            &self.ecs_world,
-            &self.world_loader,
-            &self.debug_renderers.summarise(),
-        );
-
-        (target, blackboard)
+        renderer.deinit()
     }
 
     fn on_world_change(&mut self, WorldChangeEvent { pos, prev, new }: WorldChangeEvent) {
@@ -454,6 +478,16 @@ impl<R: Renderer> Simulation<R> {
             }
 
             _ => {}
+        }
+    }
+
+    pub fn as_ref<'a>(&'a self, viewer: &'a WorldViewer) -> SimulationRef<'a> {
+        SimulationRef {
+            ecs: &self.ecs_world,
+            world: &self.voxel_world,
+            loader: &self.world_loader,
+            viewer,
+            debug_renderers: self.debug_renderers.state(),
         }
     }
 }
@@ -509,18 +543,17 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(EntityTimers::default());
 }
 
-fn register_debug_renderers<R: Renderer>(
-    r: &mut DebugRenderers<R>,
-) -> Result<(), DebugRendererError> {
-    r.register(AxesDebugRenderer, true)?;
-    r.register(ChunkBoundariesDebugRenderer, false)?;
-    r.register(SteeringDebugRenderer, true)?;
-    r.register(
-        PathDebugRenderer::default(),
-        config::get().display.nav_paths_by_default,
-    )?;
-    r.register(NavigationAreaDebugRenderer::default(), false)?;
-    r.register(SensesDebugRenderer::default(), false)?;
-    r.register(FeatureBoundaryDebugRenderer::default(), false)?;
-    Ok(())
+fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {
+    let mut builder = DebugRenderers::builder();
+
+    // order is preserved in ui
+    builder.register::<AxesDebugRenderer>()?;
+    builder.register::<ChunkBoundariesDebugRenderer>()?;
+    builder.register::<SteeringDebugRenderer>()?;
+    builder.register::<PathDebugRenderer>()?;
+    builder.register::<NavigationAreaDebugRenderer>()?;
+    builder.register::<SensesDebugRenderer>()?;
+    builder.register::<FeatureBoundaryDebugRenderer>()?;
+
+    Ok(builder.build())
 }

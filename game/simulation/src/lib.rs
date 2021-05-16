@@ -20,13 +20,19 @@ pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
-pub use crate::simulation::{AssociatedBlockData, Simulation, WorldContext};
+pub use crate::simulation::{
+    AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, WorldContext,
+};
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::ActivityComponent;
 pub use definitions::EntityPosition;
-pub use ecs::{ComponentWorld, EcsWorld, Entity, E};
-pub use item::{ConditionComponent, Container, InventoryComponent, NameComponent};
+pub use ecs::{Component, ComponentWorld, EcsWorld, Entity, E};
+pub use item::{
+    ConditionComponent, Container, ContainerComponent, EdibleItemComponent, InventoryComponent,
+    ItemCondition, NameComponent,
+};
 pub use needs::HungerComponent;
+pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
@@ -52,6 +58,7 @@ mod perf;
 mod physics;
 mod queued_update;
 mod render;
+mod scripting;
 mod senses;
 mod simulation;
 mod society;

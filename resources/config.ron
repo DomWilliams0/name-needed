@@ -5,7 +5,7 @@ Config(
         camera_speed: 1.0,
         zoom: 1.0,
         initial_view_range: 8,
-        nav_paths_by_default: false,
+        persist_ui: true,
     ),
     world: (
         // source: Preset(OneChunkWonder),
@@ -23,9 +23,9 @@ Config(
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 0,
+            "humans": 10,
             "dogs": 0,
-            "food": 10,
+            "food": 20,
             "bricks": 20,
         },
      ),

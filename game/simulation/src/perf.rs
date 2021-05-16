@@ -14,6 +14,7 @@ pub struct Perf {
     pub render: Render,
 }
 
+#[derive(Copy, Clone)]
 pub struct PerfAvg {
     pub tick: f64,
     pub render: f64,

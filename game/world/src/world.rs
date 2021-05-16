@@ -250,8 +250,8 @@ impl<C: WorldContext> World<C> {
 
         for (a, b) in area_path.0.iter().tuple_windows() {
             // unwrap ok because all except the first are Some
-            let b_entry = b.entry.unwrap();
-            let exit = b_entry.exit_middle();
+            let b_entry: AreaNavEdge = b.entry.unwrap();
+            let exit = b_entry.exit_closest(start);
 
             // block path from last point to exiting this area
             let block_path = self.find_block_path(a.area, start, exit, SearchGoal::Arrive)?;

@@ -743,6 +743,7 @@ dependencies = [
 name = "engine"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "color",
  "common",
  "config",
@@ -755,6 +756,7 @@ dependencies = [
  "resources",
  "sdl2",
  "sdl2-sys",
+ "serde",
  "simulation",
  "unit",
 ]
@@ -2314,6 +2316,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rlua"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25fa5b2c667bae0b6218361e96d365e414fe4a0fa80f476b9631aa2dea2c6881"
+dependencies = [
+ "bitflags",
+ "bstr",
+ "cc",
+ "libc",
+ "num-traits 0.2.14",
+]
+
+[[package]]
 name = "robust"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2556,6 +2571,7 @@ dependencies = [
  "hex-serde",
  "inventory",
  "resources",
+ "rlua",
  "ron",
  "serde",
  "sortedvec",

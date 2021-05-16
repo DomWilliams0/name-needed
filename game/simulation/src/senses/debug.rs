@@ -19,6 +19,10 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
         "senses"
     }
 
+    fn name(&self) -> &'static str {
+        "Senses\0"
+    }
+
     fn render(
         &mut self,
         renderer: &mut R,

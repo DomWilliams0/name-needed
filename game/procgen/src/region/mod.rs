@@ -2,6 +2,7 @@
 
 mod feature;
 mod features;
+#[allow(clippy::module_inception)]
 mod region;
 mod regions;
 mod row_scanning;

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use common::*;
-use simulation::input::UiCommand;
+use simulation::input::UiCommands;
 use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
 
 pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
@@ -9,7 +9,7 @@ pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>
     simulation: Simulation<R>,
     perf: Perf,
     /// Commands from UI -> game, accumulated over render frames and passed to sim on each tick
-    sim_ui_commands: Vec<UiCommand>,
+    sim_ui_commands: UiCommands,
 }
 
 impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, R, B> {
@@ -36,6 +36,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             .expect("game loop initialization failed");
 
         let mut exit = None;
+
+        self.backend.start(&mut self.sim_ui_commands);
 
         loop {
             if panik::has_panicked() {
@@ -91,7 +93,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         self.backend.render(
             &mut self.simulation,
             interpolation,
-            &perf,
+            perf,
             &mut self.sim_ui_commands,
         );
     }

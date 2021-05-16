@@ -22,7 +22,7 @@ use crate::render::sdl::GlRenderer;
 use resources::ResourceError;
 use resources::Resources;
 use sdl2::mouse::{MouseButton, MouseState};
-use simulation::input::{InputEvent, SelectType, UiCommand, WorldColumn};
+use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
 use std::hint::unreachable_unchecked;
 use unit::world::{WorldPoint, WorldPosition};
 
@@ -47,6 +47,9 @@ pub struct SdlBackendInit {
     backend: SdlBackendPersistent,
     world_viewer: WorldViewer,
 }
+
+// TODO per-world save directory abstraction
+const PERSISTED_UI_PATH: &str = "uistate.bin";
 
 /// Unused fields but need to be kept alive
 #[allow(dead_code)]
@@ -103,7 +106,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
         Gl::set_clear_color(ColorRgb::new(17, 17, 20));
 
-        let ui = Ui::new(&window, &video);
+        let ui = Ui::new(&window, &video, PERSISTED_UI_PATH.as_ref());
 
         // enable vsync
         video
@@ -154,7 +157,12 @@ impl InitializedSimulationBackend for SdlBackendInit {
     type Renderer = GlRenderer;
     type Persistent = SdlBackendPersistent;
 
-    fn consume_events(&mut self, commands: &mut Vec<UiCommand>) {
+    fn start(&mut self, commands_out: &mut UiCommands) {
+        // emit commands to game from persisted ui state
+        self.ui.on_start(commands_out);
+    }
+
+    fn consume_events(&mut self, commands: &mut UiCommands) {
         // take event pump out of self, to be replaced at the end of the tick
         let mut events = match self.sdl_events.take() {
             Some(e) => e,
@@ -171,7 +179,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             match event {
                 Event::Quit { .. } => {
-                    commands.push(UiCommand::ExitGame(Exit::Stop));
+                    commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
                     break;
                 }
                 Event::Window {
@@ -189,8 +197,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     ..
                 } => match map_sdl_keycode(key) {
                     Some(action) => {
-                        let ui_command = self.handle_key(action, keymod, true);
-                        commands.extend(ui_command.into_iter());
+                        let ui_req = self.handle_key(action, keymod, true);
+                        commands.extend(ui_req.map(UiCommand::new).into_iter());
                     }
 
                     None => debug!("ignoring unknown key"; "key" => %key),
@@ -201,8 +209,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     ..
                 } => {
                     if let Some(action) = map_sdl_keycode(key) {
-                        let ui_command = self.handle_key(action, keymod, false);
-                        commands.extend(ui_command.into_iter());
+                        let ui_req = self.handle_key(action, keymod, false);
+                        commands.extend(ui_req.map(UiCommand::new).into_iter());
                     }
                 }
 
@@ -266,8 +274,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
         &mut self,
         simulation: &mut Simulation<Self::Renderer>,
         interpolation: f64,
-        perf: &PerfAvg,
-        commands: &mut Vec<UiCommand>,
+        perf: PerfAvg,
+        commands: &mut UiCommands,
     ) {
         // clear window
         Gl::clear();
@@ -294,8 +302,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
             view: view.as_ptr(),
             z_offset: lower_limit,
         };
-
-        let (_, mut blackboard) = simulation.render(
+        let _ = simulation.render(
             &self.world_viewer,
             frame_target,
             &mut self.backend.renderer,
@@ -306,15 +313,15 @@ impl InitializedSimulationBackend for SdlBackendInit {
         // input events were for this frame only
         self.sim_input_events.clear();
 
-        // populate blackboard with backend info
-        blackboard.world_view = Some(terrain_range);
-
         // render ui and collect input commands
-        let backend = &mut self.backend;
-        let mouse_state = backend.mouse_state();
-        backend
-            .ui
-            .render(&backend.window, &mouse_state, perf, blackboard, commands);
+        let mouse_state = self.backend.mouse_state();
+        self.backend.ui.render(
+            &self.backend.window,
+            &mouse_state,
+            perf,
+            simulation.as_ref(&self.world_viewer),
+            commands,
+        );
 
         self.window.gl_swap_window();
     }
@@ -326,6 +333,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
     fn end(mut self) -> Self::Persistent {
         self.sim_input_events.clear();
         self.renderer.reset();
+
+        if let Err(err) = self.ui.on_exit(PERSISTED_UI_PATH.as_ref()) {
+            warn!("failed to persist ui to {}: {}", PERSISTED_UI_PATH, err);
+        }
         self.backend
     }
 }
@@ -352,7 +363,7 @@ impl SdlBackendInit {
         action: KeyAction,
         modifiers: Mod,
         is_down: bool,
-    ) -> Option<UiCommand> {
+    ) -> Option<UiRequest> {
         use RendererKey::*;
 
         match action {
@@ -389,8 +400,8 @@ impl SdlBackendInit {
             KeyAction::Game(key) => {
                 if is_down {
                     let cmd = match key {
-                        GameKey::Exit => UiCommand::ExitGame(Exit::Stop),
-                        GameKey::Restart => UiCommand::ExitGame(Exit::Restart),
+                        GameKey::Exit => UiRequest::ExitGame(Exit::Stop),
+                        GameKey::Restart => UiRequest::ExitGame(Exit::Restart),
                     };
 
                     Some(cmd)

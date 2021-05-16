@@ -1,8 +1,6 @@
 use common::*;
 use serde::Deserialize;
 
-use std::io::BufRead;
-
 use structopt::StructOpt;
 use strum_macros::{EnumIter, EnumString};
 

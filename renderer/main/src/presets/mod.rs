@@ -1,6 +1,6 @@
 use common::*;
 
-use resources::{ResourcePath, Resources};
+use resources::Resources;
 use simulation::{
     all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
     PlanetParams, Renderer, Simulation, SlabLocation, TerrainSourceError, ThreadedWorldLoader,

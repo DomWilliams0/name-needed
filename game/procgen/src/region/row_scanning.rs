@@ -1,5 +1,4 @@
 use std::array::IntoIter;
-use std::convert::identity;
 
 use common::{ArrayVec, Itertools};
 use unit::world::CHUNK_SIZE;
@@ -129,7 +128,7 @@ pub fn scan<const SIZE: usize>(
     }
 
     let mut neighbours = IntoIter::new(overflows)
-        .filter_map(identity)
+        .flatten()
         .collect::<ArrayVec<RegionNeighbour, 8>>();
 
     // append diagonals
