@@ -140,6 +140,7 @@ impl BlockGraph {
     }
 }
 
+//noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
     use unit::world::ChunkLocation;

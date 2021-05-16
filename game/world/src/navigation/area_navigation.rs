@@ -123,23 +123,36 @@ impl AreaNavEdge {
         }
     }
 
-    pub fn exit_middle(self) -> BlockPosition {
-        let width = ((self.width - 1) / 2).max(0) as i16;
-        let offset = if self.direction.is_vertical() {
-            (width, 0)
-        } else {
-            (0, width)
-        };
+    /// Finds the block along the full width of the port that is closest to the given source block.
+    pub fn exit_closest(self, source: BlockPosition) -> BlockPosition {
+        let source = (source.x() as i16, source.y() as i16);
 
-        match SliceBlock::from(self.exit).try_add(offset) {
-            None => {
-                panic!(
+        let first = SliceBlock::from(self.exit);
+        let mut closest = (first, i16::MAX);
+
+        let flip = self.direction.is_vertical();
+        for i in 0..self.width as i16 {
+            let offset = if flip { (i, 0) } else { (0, i) };
+
+            let candidate = first.try_add(offset).unwrap_or_else(|| {
+                unreachable!(
                     "exit width is too wide: {:?} with width {:?} and offset {:?}",
                     self.exit, self.width, offset
-                );
+                )
+            });
+
+            let distance = {
+                let dx = (candidate.0 as i16 - source.0).abs();
+                let dy = (candidate.1 as i16 - source.1).abs();
+                dx + dy
+            };
+
+            if distance < closest.1 {
+                closest = (candidate, distance);
             }
-            Some(slice_block) => slice_block.to_block_position(self.exit.z()),
         }
+
+        closest.0.to_block_position(self.exit.z())
     }
 }
 
@@ -830,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn port_exit_middle() {
+    fn port_exit_closest() {
         assert_eq!(
             AreaNavEdge {
                 direction: NeighbourOffset::South,
@@ -838,30 +851,19 @@ mod tests {
                 exit: (4, 4, 4).into(),
                 width: 1
             }
-            .exit_middle(),
+            .exit_closest((10, 10, 4).into()), // doesn't matter, there is only 1 candidate
             (4, 4, 4).into()
         );
 
-        assert_eq!(
-            AreaNavEdge {
-                direction: NeighbourOffset::South,
-                cost: EdgeCost::Walk,
-                exit: (4, 4, 4).into(),
-                width: 5
-            }
-            .exit_middle(),
-            (6, 4, 4).into()
-        );
+        let edge = AreaNavEdge {
+            direction: NeighbourOffset::South,
+            cost: EdgeCost::Walk,
+            exit: (4, 4, 4).into(), // [4, 8] in x axis
+            width: 5,
+        };
 
-        assert_eq!(
-            AreaNavEdge {
-                direction: NeighbourOffset::West,
-                cost: EdgeCost::Walk,
-                exit: (0, 0, 1).into(),
-                width: 5
-            }
-            .exit_middle(),
-            (0, 2, 1).into()
-        );
+        assert_eq!(edge.exit_closest((2, 0, 4).into()), (4, 4, 4).into());
+        assert_eq!(edge.exit_closest((6, 0, 4).into()), (6, 4, 4).into());
+        assert_eq!(edge.exit_closest((15, 0, 4).into()), (8, 4, 4).into());
     }
 }

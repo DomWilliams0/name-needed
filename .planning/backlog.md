@@ -17,10 +17,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		* consider different edge costs for climbing ontop of stupid things, not considered for wandering/walking
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
-* bug: area path finding seems to needlessly poke into other areas
+* improve path finding
 	* add higher weight difference for inter-area edges
-	* an inappropriate block in an area port is chosen
-	* very indirect paths within areas too, edge costs need adjusting
+	* very indirect paths within areas, edge costs need adjusting
 * tweak arrival threshold for path waypoints, it's a bit jerky
 * bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
 * apply gravity to item entities too, for when block beneath them is mined
