@@ -12,6 +12,11 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 16 May 2021: <em>Simple Lua scripting API.</em>
+<p style="margin: auto">
+    <img src=".screenshots/basic-scripting.gif" width="500"/>
+</p>
+
 * 02 May 2021: <em>Tree placement in forests. Trees are **very** simplistic for now, more like large mushrooms. There's a
   lot of progress behind the scenes in
   [parallel regional feature discovery](https://github.com/DomWilliams0/name-needed/blob/7c504ff0d26ecb68e0f3fae2a023e925eb0ecf04/game/procgen/src/region/regions.rs#L137),
@@ -24,13 +29,8 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 * 29 Mar 2021: <em>Basic planet-scale biome selection based on temperature/latitude/moisture/elevation. Pictured is a 
   smooth transition between a plains and beach biome.</em>
 <p style="margin: auto">
-    <img src=".screenshots/procgen-planet-biomes.png" width="256"/>
-    <img src=".screenshots/procgen-beach-plains.png" width="750"/>
-</p>
-
-* 21 Nov 2020: <em>Containers and the hauling of items.</em>
-<p style="margin: auto">
-    <img src=".screenshots/hauling-containers.gif"/>
+    <img src=".screenshots/procgen-planet-biomes.png" width="300"/>
+    <img src=".screenshots/procgen-beach-plains.png" width="500"/>
 </p>
 
 *[Continued here](PROGRESS.md)*

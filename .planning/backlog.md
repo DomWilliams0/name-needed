@@ -203,6 +203,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* specific dir for saved data
 	* common API for saving to that dir
 	* move existing random file dumps to there, e.g. log file, ui state, worldgen cache
+* improve lua scripting API
+	* component access
+	* voxel world access
+	* autorun scripts in a dir on startup
+	* port scenarios from rust to scripts
 
 ## Entity diversity
 * animal species

@@ -126,7 +126,7 @@ impl Default for DebugWindow {
         let mut script_input = ImString::with_capacity(MAX_PATH_INPUT);
 
         // TODO proper default script path
-        script_input.push_str("script.lua");
+        script_input.push_str("resources/script.lua");
 
         // default debug renderers
         let enabled_debug_renderers = {

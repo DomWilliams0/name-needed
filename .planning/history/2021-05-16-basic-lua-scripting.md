@@ -8,5 +8,5 @@
 	* [X] print -> use logging macros
 	* [X] get entity by id
 	* [X] select entity
-* [ ] configure resource scripts that are automatically run on startup
-* [ ] convert a scenario into a script
+* [~] configure resource scripts that are automatically run on startup
+* [~] convert a scenario into a script

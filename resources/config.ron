@@ -23,9 +23,9 @@ Config(
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 0,
+            "humans": 10,
             "dogs": 0,
-            "food": 10,
+            "food": 20,
             "bricks": 20,
         },
      ),
