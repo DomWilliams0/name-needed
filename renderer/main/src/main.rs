@@ -9,8 +9,8 @@ use crate::presets::ContinuousIntegrationGamePreset;
 
 use config::ConfigType;
 use engine::Engine;
+use resources::ResourceContainer;
 use resources::Resources;
-use resources::{ResourceContainer, ResourcePath};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;

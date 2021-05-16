@@ -92,27 +92,27 @@ impl UiExt for Ui<'_> {
     }
 }
 
-impl<'a> Into<Value<'a>> for Option<&'a ImStr> {
-    fn into(self) -> Value<'a> {
-        match self {
+impl<'a> From<Option<&'a ImStr>> for Value<'a> {
+    fn from(opt: Option<&'a ImStr>) -> Self {
+        match opt {
             Some(s) => Value::Some(s),
             None => Value::Hide,
         }
     }
 }
 
-impl<'a> Into<Value<'a>> for Result<&'a ImStr, &'static str> {
-    fn into(self) -> Value<'a> {
-        match self {
+impl<'a> From<Result<&'a ImStr, &'static str>> for Value<'a> {
+    fn from(res: Result<&'a ImStr, &'static str>) -> Self {
+        match res {
             Ok(s) => Value::Some(s),
             Err(err) => Value::None(err),
         }
     }
 }
 
-impl<'a> Into<Value<'a>> for &'a ImStr {
-    fn into(self) -> Value<'a> {
-        Value::Some(self)
+impl<'a> From<&'a ImStr> for Value<'a> {
+    fn from(str: &'a ImStr) -> Value<'a> {
+        Value::Some(str)
     }
 }
 

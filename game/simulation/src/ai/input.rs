@@ -140,10 +140,9 @@ fn search_inventory_with_cache<'a>(
     let cache_entry = blackboard.inventory_search_cache.entry(*filter);
 
     let result = match cache_entry {
-        Entry::Vacant(v) => match inventory.search(filter, blackboard.world) {
-            Some(item) => Some(*v.insert(item)),
-            None => None,
-        },
+        Entry::Vacant(v) => inventory
+            .search(filter, blackboard.world)
+            .map(|item| *v.insert(item)),
         Entry::Occupied(e) => Some(*e.get()),
     };
 

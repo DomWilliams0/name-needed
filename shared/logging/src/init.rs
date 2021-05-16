@@ -4,7 +4,6 @@ use std::fmt::{Display, Formatter};
 use slog::{Drain, Level};
 use slog_scope::GlobalLoggerGuard;
 use slog_term::ThreadSafeTimestampFn;
-use std::fs::OpenOptions;
 
 pub struct LoggerBuilder {
     level: Level,
@@ -51,6 +50,8 @@ impl LoggerBuilder {
         let drain = {
             #[cfg(feature = "to-file")]
             {
+                use std::fs::OpenOptions;
+
                 let file_drain = {
                     let log_file = std::env::temp_dir().join("nn-logs");
 

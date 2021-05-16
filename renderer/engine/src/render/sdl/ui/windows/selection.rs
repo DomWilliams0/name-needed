@@ -1,4 +1,4 @@
-use imgui::{im_str, ChildWindow, ImStr, Selectable, TabBar, TabItem, TreeNode, Ui};
+use imgui::{im_str, ChildWindow, Selectable};
 
 use common::InnerSpace;
 use simulation::input::{
@@ -7,9 +7,8 @@ use simulation::input::{
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
-    FollowPathComponent, HungerComponent, IntoEnumIterator, InventoryComponent, ItemCondition,
-    NameComponent, PhysicalComponent, Societies, SocietyComponent, SocietyHandle,
-    TransformComponent, WorldPosition, E,
+    FollowPathComponent, HungerComponent, IntoEnumIterator, InventoryComponent, NameComponent,
+    PhysicalComponent, Societies, SocietyComponent, TransformComponent, E,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -517,8 +516,8 @@ impl SelectionWindow {
 
     fn do_single_block_associated_data(&mut self, context: &UiContext, data: &AssociatedBlockData) {
         let ecs = context.simulation().ecs;
-        match data {
-            &AssociatedBlockData::Container(container_entity) => {
+        match *data {
+            AssociatedBlockData::Container(container_entity) => {
                 let name = ecs
                     .component::<NameComponent>(container_entity)
                     .ok()

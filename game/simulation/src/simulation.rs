@@ -16,7 +16,7 @@ use crate::ecs::*;
 use crate::event::{EntityEventQueue, EntityTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    UiBlackboard, UiCommand, UiRequest, UiResponsePayload,
+    UiCommand, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;

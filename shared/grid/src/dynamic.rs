@@ -194,7 +194,7 @@ impl<T: Default> DynamicGrid<T> {
             xs1.zip(ys1),
         ])
         .into_iter()
-        .filter_map(|xy| xy)
+        .flatten()
         .filter_map(move |(x, y)| {
             let coord = [x, y, 0];
             if self.is_coord_in_range(coord) {
