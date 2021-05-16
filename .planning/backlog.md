@@ -35,7 +35,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
 	* list of society members in UI to click instead
-* persist ui state over restarts (open treenodes, toggled debug renderers etc)
 * interactive terminal to replace/extend dev ui
 	* custom log! handler to show warnings and errors
 	* in-game OR pop out OR out of process [ncurses] terminal console that persists over restarts
