@@ -44,6 +44,8 @@ impl InitializedSimulationBackend for DummyBackendInit {
     type Renderer = DummyRenderer;
     type Persistent = DummyBackendPersistent;
 
+    fn start(&mut self, _commands_out: &mut UiCommands) {}
+
     fn consume_events(&mut self, commands: &mut UiCommands) {
         if Instant::now() > self.end_time {
             commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
