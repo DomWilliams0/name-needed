@@ -743,6 +743,7 @@ dependencies = [
 name = "engine"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "color",
  "common",
  "config",
@@ -755,6 +756,7 @@ dependencies = [
  "resources",
  "sdl2",
  "sdl2-sys",
+ "serde",
  "simulation",
  "unit",
 ]

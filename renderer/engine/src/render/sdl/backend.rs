@@ -48,6 +48,9 @@ pub struct SdlBackendInit {
     world_viewer: WorldViewer,
 }
 
+// TODO per-world save directory abstraction
+const PERSISTED_UI_PATH: &str = "uistate.bin";
+
 /// Unused fields but need to be kept alive
 #[allow(dead_code)]
 struct GraphicsKeepAlive {
@@ -103,7 +106,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
         Gl::set_clear_color(ColorRgb::new(17, 17, 20));
 
-        let ui = Ui::new(&window, &video);
+        let ui = Ui::new(&window, &video, PERSISTED_UI_PATH.as_ref());
 
         // enable vsync
         video
@@ -325,6 +328,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
     fn end(mut self) -> Self::Persistent {
         self.sim_input_events.clear();
         self.renderer.reset();
+
+        if let Err(err) = self.ui.on_exit(PERSISTED_UI_PATH.as_ref()) {
+            warn!("failed to persist ui to {}: {}", PERSISTED_UI_PATH, err);
+        }
         self.backend
     }
 }

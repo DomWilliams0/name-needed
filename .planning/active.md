@@ -6,6 +6,8 @@
 	* [ ] set blocks stats/generic confirmation?
 * [X] lua print output to be displayed in ui output
 * ui persistence
-	* [ ] persist active tab/expanded sections
+	* [X] persist ui internal state
+	* [ ] persist selected tabs
 	* [ ] persist debug renderer state and issue requests to set that state on startup
 * [ ] bug: moving around in preset world resets all block changes
+* [ ] mention sdl dependency in readme

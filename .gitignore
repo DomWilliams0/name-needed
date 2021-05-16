@@ -15,6 +15,7 @@ cmake-build-*
 *.so
 game/procgen/procgen*.png
 imgui.ini
+uistate.bin
 perf.data*
 progress.gif
 *.ron.bak

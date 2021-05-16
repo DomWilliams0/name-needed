@@ -1,10 +1,10 @@
-use crate::ui_str;
 use imgui::{im_str, ImString};
 
 use simulation::input::{UiRequest, UiResponse};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE};
+use crate::ui_str;
 
 pub struct DebugWindow {
     script_input: ImString,
@@ -114,6 +114,53 @@ impl Default for DebugWindow {
         DebugWindow {
             script_input,
             script_output: ScriptOutput::NoScript,
+        }
+    }
+}
+
+mod serialization {
+    use super::*;
+    use serde::de::Deserializer;
+    use serde::ser::Serializer;
+    use serde::{Deserialize, Serialize};
+    use std::borrow::Cow;
+
+    #[derive(Serialize, Deserialize)]
+    struct SerializedDebugWindow<'a> {
+        #[serde(borrow)]
+        script_input: Cow<'a, str>,
+    }
+
+    impl Serialize for DebugWindow {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let serialized = SerializedDebugWindow {
+                script_input: Cow::Borrowed(self.script_input.to_str()), // dont serialize null terminator
+            };
+
+            serialized.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for DebugWindow {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let deserialized = SerializedDebugWindow::deserialize(deserializer)?;
+            let script_input = {
+                // must preserve capacity
+                let mut str = String::with_capacity(MAX_PATH_INPUT);
+                str.push_str(&deserialized.script_input);
+                ImString::from(str)
+            };
+
+            Ok(DebugWindow {
+                script_input,
+                script_output: ScriptOutput::NoScript, // forget script output
+            })
         }
     }
 }

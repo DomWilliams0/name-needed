@@ -5,6 +5,7 @@ use sdl2::event::Event;
 use sdl2::mouse::MouseState;
 use sdl2::video::Window;
 use sdl2::VideoSubsystem;
+use serde::{Deserialize, Serialize};
 
 use simulation::input::UiCommands;
 use simulation::{PerfAvg, SimulationRef};
@@ -12,6 +13,10 @@ use simulation::{PerfAvg, SimulationRef};
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow, SelectionWindow};
+use common::BoxedResult;
+
+use std::io::{ErrorKind, Read, Write};
+use std::path::Path;
 
 pub struct Ui {
     imgui: Context,
@@ -27,9 +32,9 @@ pub enum EventConsumed {
     NotConsumed,
 }
 
-#[derive(Default)]
+/// Persisted across restarts
+#[derive(Default, Serialize, Deserialize)]
 struct State {
-    max_window_width: f32,
     perf: PerformanceWindow,
     selection: SelectionWindow,
     // society: SocietyWindow,
@@ -37,13 +42,24 @@ struct State {
 }
 
 impl Ui {
-    pub fn new(window: &Window, video: &VideoSubsystem) -> Self {
+    pub fn new(window: &Window, video: &VideoSubsystem, serialized_path: &Path) -> Self {
         let mut imgui = Context::create();
 
-        // load settings
-        if let Ok(settings) = std::fs::read_to_string(imgui.ini_filename().unwrap()) {
-            imgui.load_ini_settings(&settings);
-        }
+        // deserialize state and imgui settings
+        imgui.set_ini_filename(None); // serialized inline
+        let state = match Self::load_state(&mut imgui, serialized_path) {
+            Ok(Some(state)) => state,
+            Ok(None) => State::default(), // not an error
+            Err(err) => {
+                common::warn!(
+                    "failed to load ui state from {}: {}",
+                    serialized_path.display(),
+                    err
+                );
+
+                State::default()
+            }
+        };
 
         Style::use_dark_colors(imgui.style_mut());
         imgui.fonts().add_font(&[FontSource::DefaultFontData {
@@ -55,7 +71,6 @@ impl Ui {
 
         let imgui_sdl2 = ImguiSdl2::new(&mut imgui, window);
         let renderer = Renderer::new(&mut imgui, |s| video.gl_get_proc_address(s) as _);
-        let state = State::default();
 
         Self {
             imgui,
@@ -99,6 +114,73 @@ impl Ui {
         // cleanup
         self.strings_arena.reset();
     }
+
+    /// Persist to file. Any returned error is not treated as fatal
+    pub fn on_exit(&mut self, path: &Path) -> BoxedResult<()> {
+        if config::get().display.persist_ui {
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(path)?;
+
+            self.serialize_to(file)?;
+        }
+
+        Ok(())
+    }
+
+    /// Ok(None): no save file found
+    fn load_state(imgui_ctx: &mut Context, path: &Path) -> BoxedResult<Option<State>> {
+        if !config::get().display.persist_ui {
+            return Ok(None);
+        }
+
+        let file = match std::fs::File::open(path) {
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                // not an error
+                return Ok(None);
+            }
+            Err(err) => return Err(err.into()),
+            Ok(f) => f,
+        };
+
+        let state = Self::deserialize_from(imgui_ctx, file)?;
+        Ok(Some(state))
+    }
+
+    fn serialize_to(&mut self, writer: impl Write) -> Result<(), bincode::Error> {
+        #[derive(Serialize)]
+        struct SerializedState<'a> {
+            state: &'a State,
+            imgui: &'a str,
+        }
+
+        let mut imgui = String::new();
+        self.imgui.save_ini_settings(&mut imgui);
+
+        let serialized = SerializedState {
+            state: &self.state,
+            imgui: &imgui,
+        };
+
+        bincode::serialize_into(writer, &serialized)
+    }
+
+    fn deserialize_from(
+        imgui_ctx: &mut Context,
+        reader: impl Read,
+    ) -> Result<State, bincode::Error> {
+        #[derive(Deserialize)]
+        struct SerializedState {
+            state: State,
+            imgui: String,
+        }
+
+        let SerializedState { state, imgui } = bincode::deserialize_from(reader)?;
+
+        imgui_ctx.load_ini_settings(&imgui);
+        Ok(state)
+    }
 }
 
 impl State {
@@ -123,9 +205,5 @@ impl State {
                 // self.society.render(&mut context);
                 self.debug.render(&context);
             });
-
-        // ensure window doesn't resize itself all the time
-        let window_size = context.window_content_region_width();
-        self.max_window_width = self.max_window_width.max(window_size);
     }
 }

@@ -1,9 +1,10 @@
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::ui_str;
 use imgui::im_str;
+use serde::{Deserialize, Serialize};
 use simulation::TICKS_PER_SECOND;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct PerformanceWindow;
 
 fn mk_stat(context: &UiContext, what: &'static str, value: f64, danger_limit: f64) {

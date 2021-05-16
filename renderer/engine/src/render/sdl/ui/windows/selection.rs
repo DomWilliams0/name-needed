@@ -15,9 +15,11 @@ use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 
 use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE};
 use crate::ui_str;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct SelectionWindow {
-    /// Index in [BlockType::into_enum_iter]
+    /// Index into [BlockType::into_enum_iter]
     edit_selection: usize,
 }
 
@@ -435,7 +437,7 @@ impl SelectionWindow {
         {
             let tab = context.new_tab(im_str!("Edit"));
             if tab.is_open() {
-                self.do_edit(context, selection);
+                self.do_edit(context);
             }
         }
     }
@@ -702,7 +704,7 @@ impl SelectionWindow {
         }
     }
 
-    fn do_edit(&mut self, context: &UiContext, selection: &SelectedTiles) {
+    fn do_edit(&mut self, context: &UiContext) {
         context.group(|| {
             let mut placement = None;
             if context.button(im_str!(" Set "), [0.0, 0.0]) {
@@ -714,10 +716,13 @@ impl SelectionWindow {
             }
 
             if let Some(placement) = placement {
-                let bt = BlockType::into_enum_iter()
-                    .nth(self.edit_selection)
-                    .unwrap(); // index is valid
-                context.issue_request(UiRequest::FillSelectedTiles(placement, bt));
+                if let Some(bt) = BlockType::into_enum_iter().nth(self.edit_selection) {
+                    context.issue_request(UiRequest::FillSelectedTiles(placement, bt));
+                } else {
+                    // reset to a valid one
+                    debug_assert!(BlockType::into_enum_iter().count() > 0);
+                    self.edit_selection = 0;
+                }
             }
         });
         context.same_line(0.0);
