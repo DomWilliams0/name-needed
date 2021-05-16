@@ -1,4 +1,4 @@
-# TODOs (324)
+# TODOs (323)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -191,8 +191,6 @@
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/blackboard.rs](game/simulation/src/input/blackboard.rs) (1)
-   * `/// TODO this can probably just hold the world and have some helper functions`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
