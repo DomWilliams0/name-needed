@@ -105,10 +105,11 @@ impl State {
     /// Renders ui windows
     fn render(&mut self, context: UiContext) {
         imgui::Window::new(im_str!("Debug"))
-            .size([self.max_window_width, 0.0], Condition::Always)
+            .size([400.0, 500.0], Condition::FirstUseEver)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
             .always_use_window_padding(true)
+            .resizable(true)
             .build(context.ui(), || {
                 // perf fixed at the top
                 self.perf.render(&context);

@@ -35,7 +35,6 @@ pub enum UiRequest {
     ExecuteScript(PathBuf),
 }
 
-// TODO use a dyn trait instead
 pub enum UiResponsePayload {
     NoneExpected,
 

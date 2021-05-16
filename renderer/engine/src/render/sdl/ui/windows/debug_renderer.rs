@@ -1,5 +1,5 @@
 use crate::ui_str;
-use imgui::{im_str, ImString, TabItem};
+use imgui::{im_str, ImString};
 
 use simulation::input::{UiRequest, UiResponse};
 

@@ -2,7 +2,9 @@ use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
 use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
-use imgui::{ImStr, TabBar, TabBarToken, TabItem, TabItemToken, TreeNode, TreeNodeToken, Ui};
+use imgui::{
+    ImStr, TabBar, TabBarFlags, TabBarToken, TabItem, TabItemToken, TreeNode, TreeNodeToken, Ui,
+};
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::ptr::null;
@@ -79,7 +81,11 @@ impl<'a> UiContext<'a> {
     /// Helper to reduce insane nesting in [build] closures. Must check [UiGuard::is_open]!!
     /// Returned guard should be dropped before creating a new one (not ideal)
     pub fn new_tab_bar(&self, id: &ImStr) -> UiGuard<TabBarToken> {
-        UiGuard(TabBar::new(id).begin(self.ui))
+        UiGuard(
+            TabBar::new(id)
+                .flags(TabBarFlags::FITTING_POLICY_SCROLL)
+                .begin(self.ui),
+        )
     }
 
     /// Helper to reduce insane nesting in [build] closures. Must check [UiGuard::is_open]!!
