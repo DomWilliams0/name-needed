@@ -157,6 +157,11 @@ impl InitializedSimulationBackend for SdlBackendInit {
     type Renderer = GlRenderer;
     type Persistent = SdlBackendPersistent;
 
+    fn start(&mut self, commands_out: &mut UiCommands) {
+        // emit commands to game from persisted ui state
+        self.ui.on_start(commands_out);
+    }
+
     fn consume_events(&mut self, commands: &mut UiCommands) {
         // take event pump out of self, to be replaced at the end of the tick
         let mut events = match self.sdl_events.take() {

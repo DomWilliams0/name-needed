@@ -7,7 +7,7 @@ use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 use serde::{Deserialize, Serialize};
 
-use simulation::input::UiCommands;
+use simulation::input::{UiCommand, UiCommands, UiRequest};
 use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
@@ -42,6 +42,7 @@ struct State {
 }
 
 impl Ui {
+    /// Called once during initialization of persistent backend
     pub fn new(window: &Window, video: &VideoSubsystem, serialized_path: &Path) -> Self {
         let mut imgui = Context::create();
 
@@ -79,6 +80,21 @@ impl Ui {
             state,
             strings_arena: PerFrameStrings::new(),
         }
+    }
+
+    /// Called each time the game (re)starts
+    pub fn on_start(&mut self, commands: &mut UiCommands) {
+        // instruct game to enable debug renderers
+        let debug_renderers = self.state.debug.enabled_debug_renderers();
+        commands.reserve(debug_renderers.len() + 1);
+
+        commands.push(UiCommand::new(UiRequest::DisableAllDebugRenderers));
+        commands.extend(debug_renderers.map(|ident| {
+            UiCommand::new(UiRequest::SetDebugRendererEnabled {
+                ident: ident.clone(),
+                enabled: true,
+            })
+        }));
     }
 
     pub fn handle_event(&mut self, event: &Event) -> EventConsumed {

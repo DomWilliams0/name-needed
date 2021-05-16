@@ -7,6 +7,7 @@ use crate::society::job::SocietyCommand;
 use crate::{Exit, SocietyHandle};
 use common::*;
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -14,8 +15,10 @@ use std::rc::Rc;
 pub enum UiRequest {
     ExitGame(Exit),
 
-    ToggleDebugRenderer {
-        ident: &'static str,
+    DisableAllDebugRenderers,
+
+    SetDebugRendererEnabled {
+        ident: Cow<'static, str>,
         enabled: bool,
     },
 

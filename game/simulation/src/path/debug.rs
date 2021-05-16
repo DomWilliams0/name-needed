@@ -24,6 +24,10 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
         "navigation path"
     }
 
+    fn name(&self) -> &'static str {
+        "Navigation paths\0"
+    }
+
     fn render(
         &mut self,
         renderer: &mut R,
@@ -66,6 +70,10 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
 impl<R: Renderer> DebugRenderer<R> for NavigationAreaDebugRenderer {
     fn identifier(&self) -> &'static str {
         "navigation areas"
+    }
+
+    fn name(&self) -> &'static str {
+        "Navigation areas\0"
     }
 
     fn render(

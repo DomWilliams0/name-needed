@@ -15,6 +15,9 @@ pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
 
+    /// Called once per game (re)start. Outputs commands before the game properly starts
+    fn start(&mut self, commands_out: &mut UiCommands);
+
     fn consume_events(&mut self, commands: &mut UiCommands);
 
     fn tick(&mut self);

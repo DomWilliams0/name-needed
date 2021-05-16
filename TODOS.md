@@ -1,4 +1,4 @@
-# TODOs (325)
+# TODOs (323)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -402,9 +402,7 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (3)
-   * `// TODO free function instead of method`
-   * `// TODO query world for debug renderers`
+ * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (4)
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`

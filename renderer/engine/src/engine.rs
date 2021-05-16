@@ -37,6 +37,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
 
         let mut exit = None;
 
+        self.backend.start(&mut self.sim_ui_commands);
+
         loop {
             if panik::has_panicked() {
                 debug!("breaking out of loop due to panics");

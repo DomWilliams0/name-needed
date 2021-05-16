@@ -1,14 +1,17 @@
-use imgui::{im_str, ImString};
+use imgui::{im_str, ImStr, ImString};
 
 use simulation::input::{UiRequest, UiResponse};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE};
 use crate::ui_str;
+use std::array::IntoIter;
+use std::borrow::Cow;
 
 pub struct DebugWindow {
     script_input: ImString,
     script_output: ScriptOutput,
+    enabled_debug_renderers: Vec<Cow<'static, str>>,
 }
 
 enum ScriptOutput {
@@ -18,17 +21,6 @@ enum ScriptOutput {
 }
 
 const MAX_PATH_INPUT: usize = 256;
-
-// TODO free function instead of method
-// impl UiContext<'_> {
-//     fn checkbox(&mut self, title: &ImStr, ident: &'static str) {
-//         let mut enabled = self.blackboard.enabled_debug_renderers.contains(ident);
-//         if self.ui.checkbox(title, &mut enabled) {
-//             self.commands
-//                 .push(UiCommand::ToggleDebugRenderer { ident, enabled })
-//         }
-//     }
-// }
 
 impl DebugWindow {
     pub fn render(&mut self, context: &UiContext) {
@@ -91,16 +83,41 @@ impl DebugWindow {
             }
         }
 
-        // TODO query world for debug renderers
-        // debug renderers
-        /*            context.ui.separator();
-                    context.checkbox(im_str!("Navigation paths"), "navigation path");
-                    context.checkbox(im_str!("Navigation areas"), "navigation areas");
-                    context.checkbox(im_str!("Steering direction"), "steering");
-                    context.checkbox(im_str!("Senses"), "senses");
-                    context.checkbox(im_str!("Feature boundaries"), "feature boundaries");
-                    context.checkbox(im_str!("Chunk boundaries"), "chunk boundaries");
-        */
+        let debug_renderers = context.simulation().debug_renderers;
+        for descriptor in debug_renderers.iter_descriptors() {
+            let (mut enabled, idx) = match self
+                .enabled_debug_renderers
+                .iter()
+                .position(|s| s == descriptor.identifier)
+            {
+                Some(i) => (true, i),
+                None => (false, 0 /* unused */),
+            };
+
+            // safety: debug renderer was registered from a rust &str, so definitely utf8
+            let name = unsafe { ImStr::from_cstr_unchecked(descriptor.name) };
+
+            if context.checkbox(name, &mut enabled) {
+                context.issue_request(UiRequest::SetDebugRendererEnabled {
+                    ident: Cow::Borrowed(descriptor.identifier),
+                    enabled,
+                });
+
+                // update local state
+                if enabled {
+                    self.enabled_debug_renderers
+                        .push(Cow::Borrowed(descriptor.identifier));
+                } else {
+                    self.enabled_debug_renderers.swap_remove(idx);
+                }
+            }
+        }
+    }
+
+    pub fn enabled_debug_renderers(
+        &self,
+    ) -> impl Iterator<Item = &Cow<'static, str>> + ExactSizeIterator + '_ {
+        self.enabled_debug_renderers.iter()
     }
 }
 
@@ -111,9 +128,17 @@ impl Default for DebugWindow {
         // TODO proper default script path
         script_input.push_str("script.lua");
 
+        // default debug renderers
+        let enabled_debug_renderers = {
+            let mut vec = Vec::with_capacity(16);
+            vec.extend(IntoIter::new(["axes", "steering"]).map(Cow::Borrowed));
+            vec
+        };
+
         DebugWindow {
             script_input,
             script_output: ScriptOutput::NoScript,
+            enabled_debug_renderers,
         }
     }
 }
@@ -125,10 +150,20 @@ mod serialization {
     use serde::{Deserialize, Serialize};
     use std::borrow::Cow;
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize)]
     struct SerializedDebugWindow<'a> {
+        script_input: &'a str,
+
+        enabled_debug_renderers: &'a [Cow<'static, str>],
+    }
+
+    #[derive(Deserialize)]
+    struct DeserializedDebugWindow<'a> {
         #[serde(borrow)]
         script_input: Cow<'a, str>,
+
+        #[serde(borrow)]
+        enabled_debug_renderers: Cow<'a, [String]>,
     }
 
     impl Serialize for DebugWindow {
@@ -137,7 +172,8 @@ mod serialization {
             S: Serializer,
         {
             let serialized = SerializedDebugWindow {
-                script_input: Cow::Borrowed(self.script_input.to_str()), // dont serialize null terminator
+                script_input: self.script_input.to_str(), // dont serialize null terminator
+                enabled_debug_renderers: &self.enabled_debug_renderers,
             };
 
             serialized.serialize(serializer)
@@ -149,7 +185,7 @@ mod serialization {
         where
             D: Deserializer<'de>,
         {
-            let deserialized = SerializedDebugWindow::deserialize(deserializer)?;
+            let deserialized = DeserializedDebugWindow::deserialize(deserializer)?;
             let script_input = {
                 // must preserve capacity
                 let mut str = String::with_capacity(MAX_PATH_INPUT);
@@ -157,9 +193,17 @@ mod serialization {
                 ImString::from(str)
             };
 
+            let enabled_debug_renderers = deserialized
+                .enabled_debug_renderers
+                .into_owned()
+                .into_iter()
+                .map(Cow::Owned)
+                .collect();
+
             Ok(DebugWindow {
                 script_input,
                 script_output: ScriptOutput::NoScript, // forget script output
+                enabled_debug_renderers,
             })
         }
     }

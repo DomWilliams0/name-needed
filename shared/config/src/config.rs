@@ -16,8 +16,6 @@ pub struct Display {
     pub camera_speed: f32,
     pub zoom: f32,
     pub initial_view_range: u16,
-    #[deprecated]
-    pub nav_paths_by_default: bool,
     pub persist_ui: bool,
 }
 

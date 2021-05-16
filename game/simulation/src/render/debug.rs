@@ -4,14 +4,19 @@ use crate::{
 };
 use color::ColorRgb;
 use common::*;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+
+use std::borrow::Cow;
+use std::ffi::CStr;
 use std::ops::DerefMut;
 use unit::world::{WorldPoint, CHUNK_SIZE};
 use world::RegionLocation;
 
 pub trait DebugRenderer<R: Renderer> {
     fn identifier(&self) -> &'static str;
+
+    /// Must be null terminated, is checked during registration
+    fn name(&self) -> &'static str;
+
     fn render(
         &mut self,
         renderer: &mut R,
@@ -23,88 +28,142 @@ pub trait DebugRenderer<R: Renderer> {
 }
 
 pub struct DebugRenderers<R: Renderer> {
-    map: HashMap<&'static str, (bool, Box<dyn DebugRenderer<R>>)>,
-    summary: HashSet<&'static str>,
+    /// (identifier, (enabled, instance))
+    renderers: Vec<(&'static str, bool, Box<dyn DebugRenderer<R>>)>,
+    descriptors: Vec<DebugRendererDescriptor>,
 }
+
+#[derive(Copy, Clone)]
+pub struct DebugRendererDescriptor {
+    pub identifier: &'static str,
+    /// Must be valid utf8 and null terminated for UI to render
+    pub name: &'static CStr,
+}
+
+#[repr(transparent)]
+pub struct DebugRenderersState([DebugRendererDescriptor]);
+
+/// Collects registrations during setup. Can't use `inventory` crate due to generic param
+pub struct DebugRenderersBuilder<R: Renderer>(Vec<(&'static str, Box<dyn DebugRenderer<R>>)>);
 
 #[derive(Error, Debug)]
 pub enum DebugRendererError {
     #[error("'{0}' already registered")]
     AlreadyRegistered(&'static str),
+
     #[error("No such renderer '{0}'")]
-    NoSuchRenderer(&'static str),
+    NoSuchRenderer(Cow<'static, str>),
+
+    #[error("Renderer name is not null-terminated: '{0}'")]
+    BadName(&'static str),
 }
 
-/// Example renderer that draws lines at the origin along the X and Y axes
-pub struct AxesDebugRenderer;
+impl<R: Renderer> DebugRenderersBuilder<R> {
+    pub fn register<T: DebugRenderer<R> + Default + 'static>(
+        &mut self,
+    ) -> Result<(), DebugRendererError> {
+        let renderer = T::default();
 
-pub struct ChunkBoundariesDebugRenderer;
+        if CStr::from_bytes_with_nul(renderer.name().as_bytes()).is_err() {
+            return Err(DebugRendererError::BadName(renderer.name()));
+        }
 
-impl<R: Renderer> DebugRenderers<R> {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-            summary: HashSet::with_capacity(32),
+        let ident = renderer.identifier();
+        if self.0.iter().any(|(i, _)| *i == ident) {
+            Err(DebugRendererError::AlreadyRegistered(ident))
+        } else {
+            debug!("registered debug renderer"; "identifier" => renderer.identifier());
+            self.0.push((ident, Box::new(renderer)));
+            Ok(())
         }
     }
 
-    pub fn register<T: DebugRenderer<R> + 'static>(
-        &mut self,
-        renderer: T,
-        enabled: bool,
-    ) -> Result<(), DebugRendererError> {
-        match self.map.entry(renderer.identifier()) {
-            Entry::Occupied(_) => Err(DebugRendererError::AlreadyRegistered(renderer.identifier())),
-            Entry::Vacant(e) => {
-                debug!("registered debug renderer"; "renderer" => e.key(), "enabled" => enabled);
-                e.insert((enabled, Box::new(renderer)));
-                Ok(())
-            }
+    pub fn build(self) -> DebugRenderers<R> {
+        DebugRenderers {
+            descriptors: self
+                .0
+                .iter()
+                .map(|(ident, r)| DebugRendererDescriptor {
+                    identifier: *ident,
+                    // safety: checked during registration
+                    name: unsafe { CStr::from_bytes_with_nul_unchecked(r.name().as_bytes()) },
+                })
+                .collect(),
+            renderers: self
+                .0
+                .into_iter()
+                .map(|(ident, r)| (ident, false, r))
+                .collect(),
         }
+    }
+}
+
+impl<R: Renderer> DebugRenderers<R> {
+    pub fn builder() -> DebugRenderersBuilder<R> {
+        DebugRenderersBuilder(Vec::with_capacity(64))
+    }
+
+    pub fn disable_all(&mut self) {
+        self.renderers
+            .iter_mut()
+            .for_each(|(_, enabled, _)| *enabled = false);
     }
 
     pub fn set_enabled(
         &mut self,
-        identifier: &'static str,
+        identifier: Cow<'static, str>,
         enabled: bool,
     ) -> Result<(), DebugRendererError> {
-        self.map
-            .get_mut(identifier)
-            .map(|(e, _)| {
+        self.renderers
+            .iter_mut()
+            .find(|(i, _, _)| *i == identifier)
+            .map(|(_, e, _)| {
                 *e = enabled;
-                debug!("toggled debug renderer"; "renderer" => identifier, "enabled" => enabled);
+                debug!("toggled debug renderer"; "renderer" => %identifier, "enabled" => enabled);
             })
             .ok_or(DebugRendererError::NoSuchRenderer(identifier))
     }
 
     pub fn iter_enabled(&mut self) -> impl Iterator<Item = &mut dyn DebugRenderer<R>> {
-        self.map.values_mut().filter_map(|(enabled, renderer)| {
-            if *enabled {
-                Some(renderer.deref_mut() as &mut dyn DebugRenderer<R>)
-            } else {
-                None
-            }
-        })
-    }
-
-    #[deprecated]
-    pub fn summarise(&mut self) -> &HashSet<&'static str> {
-        self.summary.clear();
-        self.summary
-            .extend(self.map.values().filter_map(|(enabled, renderer)| {
+        self.renderers
+            .iter_mut()
+            .filter_map(|(_, enabled, renderer)| {
                 if *enabled {
-                    Some(renderer.identifier())
+                    Some(renderer.deref_mut() as &mut dyn DebugRenderer<R>)
                 } else {
                     None
                 }
-            }));
-        &self.summary
+            })
+    }
+
+    pub fn state(&self) -> &DebugRenderersState {
+        let slice: &[DebugRendererDescriptor] = &self.descriptors[..];
+        // safety: repr transparent
+        unsafe { &*(slice as *const _ as *const DebugRenderersState) }
     }
 }
+
+impl DebugRenderersState {
+    pub fn iter_descriptors(&self) -> impl Iterator<Item = DebugRendererDescriptor> + '_ {
+        self.0.iter().copied()
+    }
+}
+
+/// Example renderer that draws lines at the origin along the X and Y axes
+#[derive(Default)]
+pub struct AxesDebugRenderer;
+
+/// Draws lines along region and chunk boundaries
+#[derive(Default)]
+pub struct ChunkBoundariesDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
     fn identifier(&self) -> &'static str {
         "axes"
+    }
+
+    fn name(&self) -> &'static str {
+        "Axes\0"
     }
 
     fn render(
@@ -130,6 +189,10 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
 impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
     fn identifier(&self) -> &'static str {
         "chunk boundaries"
+    }
+
+    fn name(&self) -> &'static str {
+        "Chunk boundaries\0"
     }
 
     fn render(

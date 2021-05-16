@@ -26,6 +26,7 @@ use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{
     AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
+    DebugRenderersState,
 };
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
@@ -79,6 +80,7 @@ pub struct SimulationRef<'s> {
     pub world: &'s WorldRef,
     pub loader: &'s ThreadedWorldLoader,
     pub viewer: &'s WorldViewer,
+    pub debug_renderers: &'s DebugRenderersState,
 }
 
 impl world::WorldContext for WorldContext {
@@ -102,8 +104,7 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
-        let mut debug_renderers = DebugRenderers::new();
-        register_debug_renderers(&mut debug_renderers)?;
+        let debug_renderers = register_debug_renderers()?;
 
         // ensure tick is reset
         reset_tick();
@@ -271,9 +272,13 @@ impl<R: Renderer> Simulation<R> {
         for cmd in commands {
             let (req, resp) = cmd.consume();
             match req {
-                UiRequest::ToggleDebugRenderer { ident, enabled } => {
+                UiRequest::DisableAllDebugRenderers => {
+                    self.debug_renderers.disable_all();
+                }
+
+                UiRequest::SetDebugRendererEnabled { ident, enabled } => {
                     if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
-                        warn!("failed to toggle debug renderer"; "renderer" => ident, "error" => %e);
+                        warn!("failed to set debug renderer state"; "error" => %e);
                     }
                 }
 
@@ -482,6 +487,7 @@ impl<R: Renderer> Simulation<R> {
             world: &self.voxel_world,
             loader: &self.world_loader,
             viewer,
+            debug_renderers: self.debug_renderers.state(),
         }
     }
 }
@@ -537,18 +543,17 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(EntityTimers::default());
 }
 
-fn register_debug_renderers<R: Renderer>(
-    r: &mut DebugRenderers<R>,
-) -> Result<(), DebugRendererError> {
-    r.register(AxesDebugRenderer, true)?;
-    r.register(ChunkBoundariesDebugRenderer, false)?;
-    r.register(SteeringDebugRenderer, true)?;
-    r.register(
-        PathDebugRenderer::default(),
-        config::get().display.nav_paths_by_default,
-    )?;
-    r.register(NavigationAreaDebugRenderer::default(), false)?;
-    r.register(SensesDebugRenderer::default(), false)?;
-    r.register(FeatureBoundaryDebugRenderer::default(), false)?;
-    Ok(())
+fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {
+    let mut builder = DebugRenderers::builder();
+
+    // order is preserved in ui
+    builder.register::<AxesDebugRenderer>()?;
+    builder.register::<ChunkBoundariesDebugRenderer>()?;
+    builder.register::<SteeringDebugRenderer>()?;
+    builder.register::<PathDebugRenderer>()?;
+    builder.register::<NavigationAreaDebugRenderer>()?;
+    builder.register::<SensesDebugRenderer>()?;
+    builder.register::<FeatureBoundaryDebugRenderer>()?;
+
+    Ok(builder.build())
 }

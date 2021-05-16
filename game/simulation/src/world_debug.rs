@@ -17,6 +17,10 @@ impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
         "feature boundaries"
     }
 
+    fn name(&self) -> &'static str {
+        "Feature boundaries\0"
+    }
+
     fn render(
         &mut self,
         renderer: &mut R,
