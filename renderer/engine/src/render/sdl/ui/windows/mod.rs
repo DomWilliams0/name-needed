@@ -3,12 +3,12 @@ use imgui::{ImStr, ImString, Ui};
 mod debug_renderer;
 mod perf;
 mod selection;
-// mod society;
+mod society;
 
 pub(crate) use debug_renderer::DebugWindow;
 pub(crate) use perf::PerformanceWindow;
 pub(crate) use selection::SelectionWindow;
-// pub(crate) use society::SocietyWindow;
+pub(crate) use society::SocietyWindow;
 
 enum Value<'a> {
     Hide,

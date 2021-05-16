@@ -1,6 +1,6 @@
 # Active tasks
 
-* [O] replace UI data gathering bundle with queries instead
+* [X] replace UI data gathering bundle with queries instead
 * [o] show responses from ui commands
 	* [X] lua script output/error
 	* [ ] set blocks stats/generic confirmation?

@@ -345,7 +345,9 @@ impl SelectionWindow {
                 .map(|n| n.0.as_str())
                 .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
 
-            context.text_wrapped(ui_str!(in context, " - {} ({})", entity, name));
+            context.text_wrapped(
+                ui_str!(in context, " - {} ({}, vol {})", name, E(entity.entity), entity.volume),
+            );
         }
     }
 

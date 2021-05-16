@@ -1,4 +1,4 @@
-# TODOs (323)
+# TODOs (324)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -409,6 +409,8 @@
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
    * `.unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere`
    * `// TODO proper way of checking if an entity is living`
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (1)
+   * `.unwrap_or("unnamed"); // TODO another manual name component access`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`

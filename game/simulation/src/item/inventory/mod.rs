@@ -1,9 +1,7 @@
-use std::fmt::{Display, Formatter};
-
 use unit::length::Length3;
 use unit::volume::Volume;
 
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
 
 mod component;
 mod container;
@@ -17,10 +15,4 @@ pub struct HeldEntity {
     pub entity: Entity,
     pub volume: Volume,
     pub size: Length3,
-}
-
-impl Display for HeldEntity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} (size {})", E(self.entity), self.volume)
-    }
 }

@@ -12,7 +12,9 @@ use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::memory::PerFrameStrings;
-use crate::render::sdl::ui::windows::{DebugWindow, PerformanceWindow, SelectionWindow};
+use crate::render::sdl::ui::windows::{
+    DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
+};
 use common::BoxedResult;
 
 use std::io::{ErrorKind, Read, Write};
@@ -37,7 +39,7 @@ pub enum EventConsumed {
 struct State {
     perf: PerformanceWindow,
     selection: SelectionWindow,
-    // society: SocietyWindow,
+    society: SocietyWindow,
     debug: DebugWindow,
 }
 
@@ -218,7 +220,7 @@ impl State {
                 }
 
                 self.selection.render(&context);
-                // self.society.render(&mut context);
+                self.society.render(&context);
                 self.debug.render(&context);
             });
     }

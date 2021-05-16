@@ -1,114 +1,133 @@
-use imgui::{im_str, TabItem};
+use imgui::{im_str, StyleColor};
 
-use simulation::input::{SelectedEntityDetails, UiCommand};
+use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
 use simulation::job::SocietyCommand;
-use simulation::{AssociatedBlockData, ComponentWorld, NameComponent};
+use simulation::{
+    AssociatedBlockData, ComponentWorld, NameComponent, PlayerSociety, Societies, SocietyHandle,
+};
 
-use crate::render::sdl::ui::windows::{UiBundle, UiExt, Value, COLOR_BLUE, COLOR_RED};
+use crate::render::sdl::ui::context::UiContext;
+use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
 use crate::ui_str;
+use serde::{Deserialize, Serialize};
 
+#[derive(Default, Serialize, Deserialize)]
 pub struct SocietyWindow;
 
 impl SocietyWindow {
-    pub fn render(&mut self, bundle: &mut UiBundle) {
-        let ui = bundle.ui;
+    pub fn render(&mut self, context: &UiContext) {
+        let tab = context.new_tab(im_str!("Society"));
+        if !tab.is_open() {
+            return;
+        }
 
-        TabItem::new(im_str!("Society")).build(ui, || {
-            let society_handle = match bundle.blackboard.player_society.0 {
-                None => {
-                    ui.text_disabled("You don't control a society");
-                    return;
-                }
-                Some(s) => s,
-            };
+        let ecs = context.simulation().ecs;
+        let society_handle = match ecs.resource::<PlayerSociety>().0 {
+            None => {
+                context.text_disabled("You don't control a society");
+                return;
+            }
+            Some(h) => h,
+        };
 
-            let society = bundle
-                .blackboard
-                .societies
-                .society_by_handle(society_handle);
-            ui.key_value(
-                im_str!("Society:"),
-                || {
-                    if let Some(society) = society {
-                        Value::Some(ui_str!(in bundle.strings, "{}", society.name()))
-                    } else {
-                        Value::Some(im_str!("Invalid handle"))
-                    }
-                },
-                Some(ui_str!(in bundle.strings, "{:?}", society_handle)),
-                if society.is_none() {
-                    COLOR_RED
-                } else {
-                    COLOR_BLUE
-                },
-            );
+        let societies = ecs.resource::<Societies>();
 
-            if let Some(range) = bundle.blackboard.selected_tiles.range() {
-                if ui.button(im_str!("Break blocks"), [0.0, 0.0]) {
-                    bundle.commands.push(UiCommand::IssueSocietyCommand(
+        let society = societies.society_by_handle(society_handle);
+        context.key_value(
+            im_str!("Society:"),
+            || {
+                society
+                    .map(|s| ui_str!(in context, "{}", s.name()))
+                    .unwrap_or(im_str!("Error: invalid handle"))
+            },
+            Some(ui_str!(in context, "{:?}", society_handle)),
+            COLOR_BLUE,
+        );
+
+        let tabbar = context.new_tab_bar(im_str!("##societytabbar"));
+        if !tabbar.is_open() {
+            return;
+        }
+
+        self.do_control(context, society_handle);
+    }
+
+    fn do_control(&self, context: &UiContext, society_handle: SocietyHandle) {
+        let tab = context.new_tab(im_str!("Control"));
+        if tab.is_open() {
+            let mut any_buttons = false;
+
+            let ecs = context.simulation().ecs;
+            let block_selection = ecs.resource::<SelectedTiles>();
+
+            // break selected blocks
+            if let Some(range) = block_selection.range() {
+                any_buttons = true;
+                if context.button(im_str!("Break blocks"), [0.0, 0.0]) {
+                    context.issue_request(UiRequest::IssueSocietyCommand(
                         society_handle,
                         SocietyCommand::BreakBlocks(range),
                     ));
                 }
             }
 
-            if let Some((SelectedEntityDetails { entity, .. }, target)) = bundle
-                .blackboard
-                .selected_entity
-                .as_ref()
-                .zip(bundle.blackboard.selected_tiles.single_tile())
+            // entity selection and block selection
+            if let Some((entity, target)) = ecs
+                .resource::<SelectedEntity>()
+                .get_unchecked()
+                .zip(block_selection.single_tile())
             {
-                // ensure entity is haulable
-                if bundle
-                    .blackboard
-                    .world
-                    .has_component_by_name("haulable", *entity)
-                {
-                    let name = bundle
-                        .blackboard
-                        .world
-                        .component::<NameComponent>(*entity)
+                if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
+                    let name = ecs
+                        .component::<NameComponent>(entity)
                         .map(|n| n.0.as_str())
-                        .unwrap_or("thing");
+                        .unwrap_or("unnamed"); // TODO another manual name component access
 
-                    if ui.button(
-                        ui_str!(in bundle.strings, "Haul {} to {}", name, target),
+                    any_buttons = true;
+                    if context.button(
+                        ui_str!(in context, "Haul {} to {}", name, target),
                         [0.0, 0.0],
                     ) {
                         // hopefully this gets the accessible air above the block
                         let target = target.above();
 
-                        bundle.commands.push(UiCommand::IssueSocietyCommand(
+                        context.issue_request(UiRequest::IssueSocietyCommand(
                             society_handle,
-                            SocietyCommand::HaulToPosition(*entity, target),
+                            SocietyCommand::HaulToPosition(entity, target),
                         ));
                     }
 
                     // if target is a container, allow hauling into it too
-                    let w = bundle.blackboard.world.voxel_world();
-                    let w = w.borrow();
-                    if let Some(AssociatedBlockData::Container(container)) =
-                        w.associated_block_data(target)
-                    {
-                        let container_name = bundle
-                            .blackboard
-                            .world
+                    let w = context.simulation().world.borrow();
+
+                    let block_data = w.associated_block_data(target);
+                    if let Some(AssociatedBlockData::Container(container)) = block_data {
+                        let container_name = ecs
                             .component::<NameComponent>(*container)
                             .map(|n| n.0.as_str())
                             .unwrap_or("container");
 
-                        if ui.button(
-                            ui_str!(in bundle.strings, "Haul {} into {}", name, container_name),
+                        if context.button(
+                            ui_str!(in context, "Haul {} into {}", name, container_name),
                             [0.0, 0.0],
                         ) {
-                            bundle.commands.push(UiCommand::IssueSocietyCommand(
+                            context.issue_request(UiRequest::IssueSocietyCommand(
                                 society_handle,
-                                SocietyCommand::HaulIntoContainer(*entity, *container),
+                                SocietyCommand::HaulIntoContainer(entity, *container),
                             ));
                         }
                     }
                 }
             }
-        });
+
+            if !any_buttons {
+                let color = context.style_color(StyleColor::TextDisabled);
+                let style = context.push_style_color(StyleColor::Text, color);
+                context.text_wrapped(im_str!(
+                    "Try selecting an entity, a container and/or some blocks"
+                ));
+                style.pop(context);
+            }
+        }
     }
 }
