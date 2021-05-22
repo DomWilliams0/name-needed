@@ -3,10 +3,10 @@
 * [X] tee entity events during activity system processing
 * [X] add logging component with log ring buffer
 * [X] show logs in ui
-* [ ] change logs to be enums, convert to string in ui
+* [X] change logs to be enums, convert to string in ui
 * get logs from other sources
-	* [ ] ai decisions
-	* [ ] path finding
+	* [X] ai decisions
+	* [~] path finding
 * logging configuration per entity
 	* [ ] in global config
 	* [ ] in ui, per entity

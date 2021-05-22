@@ -1,9 +1,10 @@
-use crate::activity::{EquipItemError, HaulError, PickupItemError};
+use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent, PickupItemError};
 use crate::ecs::*;
 use crate::event::timer::TimerToken;
 
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
+use std::convert::TryInto;
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
 use world::NavigationError;
@@ -21,10 +22,16 @@ pub enum EntityEventPayload {
     Arrived(PathToken, Result<WorldPoint, NavigationError>),
 
     /// Item entity (subject) picked up by the given holder
-    PickedUp(Result<Entity, PickupItemError>),
+    BeenPickedUp(Result<Entity, PickupItemError>),
 
-    /// Food entity has been fully eaten
-    Eaten(Result<(), ()>),
+    /// Entity (subject) has picked up the given item entity
+    HasPickedUp(Entity),
+
+    /// Food entity (subject) has been fully eaten
+    BeenEaten(Result<(), ()>),
+
+    /// Hungry entity (subject) has finished eating the given food entity
+    HasEaten(Entity),
 
     /// Item entity (subject) has been equipped in an equip slot of this entity
     Equipped(Result<Entity, EquipItemError>),
@@ -80,6 +87,38 @@ impl EntityEventSubscription {
 
 impl EntityEventPayload {
     pub fn is_destructive(&self) -> bool {
-        matches!(self, Self::PickedUp(_) | Self::Eaten(_) | Self::Hauled(_) | Self::ExitedContainer(_) | Self::EnteredContainer(_))
+        use EntityEventPayload::*;
+        match self {
+            BeenPickedUp(_) | BeenEaten(_) | Hauled(_) | ExitedContainer(_)
+            | EnteredContainer(_) => true,
+            Arrived(_, _) | HasPickedUp(_) | HasEaten(_) | Equipped(_) | TimerElapsed(_) => false,
+            #[cfg(test)]
+            DummyA | DummyB => false,
+        }
+    }
+}
+
+impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
+    type Error = ();
+
+    fn try_into(self) -> Result<LoggedEntityEvent, Self::Error> {
+        use EntityEventPayload::*;
+        use LoggedEntityEvent as E;
+
+        match self {
+            Equipped(Ok(e)) => Ok(E::Equipped(*e)),
+            HasEaten(e) => Ok(E::Eaten(*e)),
+            HasPickedUp(e) => Ok(E::PickedUp(*e)),
+            BeenEaten(_)
+            | BeenPickedUp(_)
+            | Arrived(_, _)
+            | Equipped(Err(_))
+            | Hauled(_)
+            | ExitedContainer(_)
+            | EnteredContainer(_)
+            | TimerElapsed(_) => Err(()),
+            #[cfg(test)]
+            DummyA | DummyB => Err(()),
+        }
     }
 }

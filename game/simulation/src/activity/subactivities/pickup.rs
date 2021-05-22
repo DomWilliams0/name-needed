@@ -80,9 +80,16 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
             };
 
             let result = do_pickup();
+            if result.is_ok() {
+                world.post_event(EntityEvent {
+                    subject: holder,
+                    payload: EntityEventPayload::HasPickedUp(item),
+                });
+            }
+
             world.post_event(EntityEvent {
                 subject: item,
-                payload: EntityEventPayload::PickedUp(result),
+                payload: EntityEventPayload::BeenPickedUp(result),
             });
 
             Ok(())
@@ -91,7 +98,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         // subscribe to item pick up
         ctx.subscribe_to(
             self.0,
-            EventSubscription::Specific(EntityEventType::PickedUp),
+            EventSubscription::Specific(EntityEventType::BeenPickedUp),
         );
 
         ActivityResult::Blocked

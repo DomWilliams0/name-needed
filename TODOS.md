@@ -1,4 +1,4 @@
-# TODOs (330)
+# TODOs (331)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -156,8 +156,9 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
+   * `/// TODO reduce cost of cloning vec of items`
  * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (1)
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)

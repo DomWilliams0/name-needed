@@ -37,7 +37,7 @@ impl Dse<AiContext> for HaulDse {
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
-        let (src, tgt) = self.src_tgt.clone();
+        let (src, tgt) = self.src_tgt;
         AiAction::Haul(self.thing, src, tgt)
     }
 }

@@ -1,6 +1,13 @@
+use crate::activity::HaulTarget;
+
 use crate::ecs::*;
-use crate::event::EntityEvent;
+
+use crate::WorldPosition;
+use common::*;
+use std::borrow::Cow;
 use std::collections::VecDeque;
+use std::convert::TryInto;
+use unit::world::WorldPoint;
 
 struct RingBuffer<T>(VecDeque<T>, usize);
 
@@ -9,7 +16,35 @@ struct RingBuffer<T>(VecDeque<T>, usize);
 #[name("entity-logs")]
 pub struct EntityLoggingComponent {
     // TODO use enums instead of strings
-    logs: RingBuffer<String>,
+    logs: RingBuffer<LoggedEntityEvent>,
+}
+
+/// An event that relates to an entity and is displayed in the ui. All variants relate to THIS entity
+pub enum LoggedEntityEvent {
+    /// Equipped the given item
+    Equipped(Entity),
+    /// Ate the given item
+    Eaten(Entity),
+    /// Picked up the given item
+    PickedUp(Entity),
+    /// Made a decision to do something
+    AiDecision(LoggedEntityDecision),
+}
+
+pub enum LoggedEntityDecision {
+    GoPickup(Cow<'static, str>),
+    EatHeldItem(Entity),
+    Wander,
+    Goto {
+        target: WorldPoint,
+        reason: &'static str,
+    },
+    GoBreakBlock(WorldPosition),
+    Follow(Entity),
+    Haul {
+        item: Entity,
+        dest: HaulTarget,
+    },
 }
 
 impl<T> RingBuffer<T> {
@@ -40,15 +75,42 @@ impl Default for EntityLoggingComponent {
 }
 
 impl EntityLoggingComponent {
-    pub fn log_event(&mut self, event: &EntityEvent) {
+    pub fn log_event(&mut self, event: impl TryInto<LoggedEntityEvent>) {
         // TODO dont allocate string here
         // TODO pass in an impl LogEvent instead
         // TODO optimise for the multiple case
-        self.logs.push(format!("{:?}", event.payload));
+        if let Ok(e) = event.try_into() {
+            self.logs.push(e);
+        }
     }
 
-    pub fn iter_logs(&self) -> impl Iterator<Item = &str> + '_ {
-        self.logs.iter().map(|s| s.as_str())
+    pub fn iter_logs(&self) -> impl Iterator<Item = &dyn Display> + '_ {
+        self.logs.iter().map(|e| e as &dyn Display)
+    }
+}
+
+impl Display for LoggedEntityEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use LoggedEntityDecision::*;
+        use LoggedEntityEvent::*;
+        match self {
+            Equipped(e) => write!(f, "equipped {}", E(*e)),
+            Eaten(e) => write!(f, "ate {}", E(*e)),
+            PickedUp(e) => write!(f, "picked up {}", E(*e)),
+
+            AiDecision(decision) => {
+                write!(f, "decided to ")?;
+                match decision {
+                    GoPickup(what) => write!(f, "pickup nearby {}", what),
+                    EatHeldItem(e) => write!(f, "eat held {}", E(*e)),
+                    Wander => write!(f, "wander around"),
+                    Goto { target, reason } => write!(f, "go to {} because {}", target, *reason),
+                    GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
+                    Follow(e) => write!(f, "follow {}", E(*e)),
+                    Haul { item, dest } => write!(f, "haul {} to {}", E(*item), dest),
+                }
+            }
+        }
     }
 }
 

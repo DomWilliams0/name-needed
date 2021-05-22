@@ -27,7 +27,7 @@ impl Task {
                     .map(|comp| comp.extra_hands)?;
                 Some(Box::new(HaulDse {
                     thing: *e,
-                    src_tgt: (src.clone(), tgt.clone()),
+                    src_tgt: (*src, *tgt),
                     extra_hands_needed: extra_hands,
                     destination: pos,
                 }))

@@ -1,7 +1,7 @@
 pub use activities::*;
 pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 // TODO move subactivity errors somewhere else
-pub use event_logging::EntityLoggingComponent;
+pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use subactivities::{EquipItemError, HaulError, PickupItemError};
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,

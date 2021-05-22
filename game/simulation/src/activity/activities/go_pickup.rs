@@ -137,7 +137,7 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
                     ref e => unreachable!("should only receive arrival event while going to item, but is in state {:?}", e),
                 }
             }
-            EntityEventPayload::PickedUp(result) => {
+            EntityEventPayload::BeenPickedUp(result) => {
                 // our item has been picked up, who was it?
                 match (&self.state, result) {
                     (PickupItemsState::PickingUp(_), Ok(picker_upper))

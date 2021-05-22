@@ -94,11 +94,7 @@ impl Job for HaulJob {
             trace!("item is being hauled");
         }
 
-        out.push(Task::Haul(
-            self.entity,
-            self.source.clone(),
-            self.target.clone(),
-        ));
+        out.push(Task::Haul(self.entity, self.source, self.target));
         JobStatus::Ongoing
     }
 }

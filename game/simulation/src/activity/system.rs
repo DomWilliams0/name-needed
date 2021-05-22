@@ -200,7 +200,7 @@ impl<'a> System<'a> for ActivityEventSystem {
                 };
 
                 for event in events {
-                    logging.log_event(event);
+                    logging.log_event(&event.payload);
                 }
 
             }

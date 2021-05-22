@@ -97,7 +97,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
                     EventUnsubscribeResult::UnsubscribeAll,
                 )
             }
-            EntityEventPayload::Eaten(result) => {
+            EntityEventPayload::BeenEaten(result) => {
                 self.finished = Some(if result.is_ok() {
                     trace!("finished eating food successfully");
                     Ok(())
