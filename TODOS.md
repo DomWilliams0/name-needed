@@ -1,4 +1,4 @@
-# TODOs (329)
+# TODOs (330)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -408,10 +408,11 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (4)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (5)
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
    * `.unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere`
+   * `// TODO switch to table API when available`
    * `// TODO proper way of checking if an entity is living`
  * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (1)
    * `.unwrap_or("unnamed"); // TODO another manual name component access`

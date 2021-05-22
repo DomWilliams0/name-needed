@@ -228,7 +228,9 @@ mod helpers {
         }
 
         pub fn with_logging(self) -> Self {
-            self.0.add_now(self.1, EntityLoggingComponent::default());
+            self.0
+                .add_now(self.1, EntityLoggingComponent::default())
+                .expect("logging component");
             self
         }
 

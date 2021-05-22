@@ -1,19 +1,22 @@
-use imgui::{im_str, ChildWindow, Selectable};
+use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable};
 
-use common::InnerSpace;
+use common::*;
 use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
-    FollowPathComponent, HungerComponent, IntoEnumIterator, InventoryComponent, NameComponent,
-    PhysicalComponent, Societies, SocietyComponent, TransformComponent, E,
+    EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
+    InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
+    TransformComponent, E,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 
-use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE};
+use crate::render::sdl::ui::windows::{
+    with_fake_owned_imstr, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
+};
 use crate::ui_str;
 use serde::{Deserialize, Serialize};
 
@@ -156,6 +159,8 @@ impl SelectionWindow {
                 EntityType::Item(condition) => self.do_item(context, &details, condition),
             }
         }
+
+        self.do_logs(context, &details);
     }
 
     //noinspection DuplicatedCode
@@ -365,6 +370,49 @@ impl SelectionWindow {
             None,
             COLOR_ORANGE,
         );
+    }
+
+    fn do_logs(&mut self, context: &UiContext, details: &SelectedEntityDetails) {
+        let tab = context.new_tab(im_str!("Logs"));
+        if !tab.is_open() {
+            return;
+        }
+
+        let logs = match context
+            .simulation()
+            .ecs
+            .component::<EntityLoggingComponent>(details.entity)
+        {
+            Ok(comp) => comp,
+            _ => return,
+        };
+
+        struct EntityLogs<'a>(&'a EntityLoggingComponent);
+
+        impl<'a> Display for EntityLogs<'a> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+                for event in self.0.iter_logs() {
+                    writeln!(f, "{}", event)?;
+                }
+                Ok(())
+            }
+        }
+        // TODO switch to table API when available
+        let str = ui_str!(in context, "{}", EntityLogs(logs));
+        // safety: readonly textbox
+        unsafe {
+            with_fake_owned_imstr(str, |str| {
+                InputTextMultiline::new(
+                    context.ui(),
+                    im_str!("##entitylogs"),
+                    str,
+                    [context.window_content_region_width(), 0.0],
+                )
+                .no_horizontal_scroll(false)
+                .read_only(true)
+                .build();
+            });
+        }
     }
 
     fn world_selection(&mut self, context: &UiContext) {

@@ -2,7 +2,7 @@
 
 * [X] tee entity events during activity system processing
 * [X] add logging component with log ring buffer
-* [ ] show logs in ui
+* [X] show logs in ui
 * [ ] change logs to be enums, convert to string in ui
 * get logs from other sources
 	* [ ] ai decisions

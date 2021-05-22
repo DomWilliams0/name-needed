@@ -44,7 +44,11 @@ impl EntityLoggingComponent {
         // TODO dont allocate string here
         // TODO pass in an impl LogEvent instead
         // TODO optimise for the multiple case
-        self.logs.push(format!("{:?}", event));
+        self.logs.push(format!("{:?}", event.payload));
+    }
+
+    pub fn iter_logs(&self) -> impl Iterator<Item = &str> + '_ {
+        self.logs.iter().map(|s| s.as_str())
     }
 }
 
