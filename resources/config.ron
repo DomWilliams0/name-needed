@@ -28,5 +28,6 @@ Config(
             "food": 20,
             "bricks": 20,
         },
+        entity_logging_by_default: true,
      ),
 )

@@ -8,8 +8,8 @@
 	* [X] ai decisions
 	* [~] path finding
 * logging configuration per entity
-	* [ ] in global config
-	* [ ] in ui, per entity
+	* [X] in global config
+	* [X] in ui, per entity
 * [ ] allow ui filtering of events e.g. trace, debug
 * [ ] rich event log ui; colours, entity tooltips
 * [ ] include timestamp in logs

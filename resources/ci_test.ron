@@ -29,6 +29,6 @@ Config(
             "dogs": 10,
             "food": 400,
         },
-
+        entity_logging_by_default: true,
      ),
 )

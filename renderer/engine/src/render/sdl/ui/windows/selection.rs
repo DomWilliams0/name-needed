@@ -378,39 +378,60 @@ impl SelectionWindow {
             return;
         }
 
-        let logs = match context
+        // TODO persist logs after entity is dead
+        let render_logs = |logs: &EntityLoggingComponent| {
+            struct EntityLogs<'a>(&'a EntityLoggingComponent);
+
+            impl<'a> Display for EntityLogs<'a> {
+                fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+                    for event in self.0.iter_logs() {
+                        writeln!(f, "{}", event)?;
+                    }
+                    Ok(())
+                }
+            }
+            // TODO switch to table API when available
+            let str = ui_str!(in context, "{}", EntityLogs(logs));
+            // safety: readonly textbox
+            unsafe {
+                with_fake_owned_imstr(str, |str| {
+                    InputTextMultiline::new(
+                        context.ui(),
+                        im_str!("##entitylogs"),
+                        str,
+                        [context.window_content_region_width(), 0.0],
+                    )
+                    .no_horizontal_scroll(false)
+                    .read_only(true)
+                    .build();
+                });
+            }
+        };
+
+        let mut req = None;
+        match context
             .simulation()
             .ecs
             .component::<EntityLoggingComponent>(details.entity)
         {
-            Ok(comp) => comp,
-            _ => return,
+            Ok(comp) => {
+                if context.button(im_str!("Disable logs"), [0.0, 0.0]) {
+                    req = Some(false);
+                } else {
+                    render_logs(comp);
+                }
+            }
+            _ => {
+                if context.button(im_str!("Enable logs"), [0.0, 0.0]) {
+                    req = Some(true);
+                }
+            }
         };
 
-        struct EntityLogs<'a>(&'a EntityLoggingComponent);
-
-        impl<'a> Display for EntityLogs<'a> {
-            fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-                for event in self.0.iter_logs() {
-                    writeln!(f, "{}", event)?;
-                }
-                Ok(())
-            }
-        }
-        // TODO switch to table API when available
-        let str = ui_str!(in context, "{}", EntityLogs(logs));
-        // safety: readonly textbox
-        unsafe {
-            with_fake_owned_imstr(str, |str| {
-                InputTextMultiline::new(
-                    context.ui(),
-                    im_str!("##entitylogs"),
-                    str,
-                    [context.window_content_region_width(), 0.0],
-                )
-                .no_horizontal_scroll(false)
-                .read_only(true)
-                .build();
+        if let Some(req) = req {
+            context.issue_request(UiRequest::ToggleEntityLogging {
+                entity: details.entity,
+                enabled: req,
             });
         }
     }

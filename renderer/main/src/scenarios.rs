@@ -91,7 +91,6 @@ fn wander_and_eat(ecs: &mut EcsWorld) {
             .with_color(colors.next_please())
             .with_player_society()
             .with_satiety(satiety)
-            .with_logging() // TODO conditional
             .thanks()
     });
 
@@ -235,6 +234,11 @@ mod helpers {
         }
 
         pub fn thanks(self) -> Entity {
+            // add logging to all entities if configured
+            if config::get().simulation.entity_logging_by_default {
+                let _ = self.0.add_now(self.1, EntityLoggingComponent::default());
+            }
+
             self.1
         }
     }
