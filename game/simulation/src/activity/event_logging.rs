@@ -2,6 +2,7 @@ use crate::activity::HaulTarget;
 
 use crate::ecs::*;
 
+use crate::simulation::Tick;
 use crate::WorldPosition;
 use common::*;
 use std::borrow::Cow;
@@ -15,9 +16,10 @@ struct RingBuffer<T>(VecDeque<T>, usize);
 #[storage(HashMapStorage)]
 #[name("entity-logs")]
 pub struct EntityLoggingComponent {
-    // TODO use enums instead of strings
-    logs: RingBuffer<LoggedEntityEvent>,
+    logs: RingBuffer<TimedLoggedEntityEvent>,
 }
+
+struct TimedLoggedEntityEvent(Tick, LoggedEntityEvent);
 
 /// An event that relates to an entity and is displayed in the ui. All variants relate to THIS entity
 pub enum LoggedEntityEvent {
@@ -80,7 +82,7 @@ impl EntityLoggingComponent {
         // TODO pass in an impl LogEvent instead
         // TODO optimise for the multiple case
         if let Ok(e) = event.try_into() {
-            self.logs.push(e);
+            self.logs.push(TimedLoggedEntityEvent(Tick::fetch(), e));
         }
     }
 
@@ -111,6 +113,12 @@ impl Display for LoggedEntityEvent {
                 }
             }
         }
+    }
+}
+
+impl Display for TimedLoggedEntityEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "T{:06}: {}", self.0.value(), self.1)
     }
 }
 
