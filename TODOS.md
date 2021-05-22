@@ -1,4 +1,4 @@
-# TODOs (323)
+# TODOs (329)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -130,6 +130,12 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
+ * [game/simulation/src/activity/event_logging.rs](game/simulation/src/activity/event_logging.rs) (5)
+   * `// TODO use enums instead of strings`
+   * `// TODO get initial size from config`
+   * `// TODO dont allocate string here`
+   * `// TODO pass in an impl LogEvent instead`
+   * `// TODO optimise for the multiple case`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO move subactivity errors somewhere else`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
@@ -415,6 +421,8 @@
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
+   * `.with_logging() // TODO conditional`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

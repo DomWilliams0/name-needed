@@ -7,9 +7,10 @@ use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EntityTime
 use crate::queued_update::QueuedUpdates;
 use common::*;
 
-use crate::activity::EventUnblockResult;
+use crate::activity::{EventUnblockResult, EventUnsubscribeResult};
 
 use crate::activity::activities::NopActivity;
+use crate::activity::event_logging::EntityLoggingComponent;
 use crate::simulation::Tick;
 use crate::{Societies, SocietyComponent};
 
@@ -147,11 +148,15 @@ impl<'a> System<'a> for ActivityEventSystem {
     type SystemData = (
         Write<'a, EntityEventQueue>,
         Write<'a, EntityTimers>,
+        WriteStorage<'a, EntityLoggingComponent>,
         WriteStorage<'a, ActivityComponent>,
         Read<'a, LazyUpdate>,
     );
 
-    fn run(&mut self, (mut events, mut timers, mut activities, updates): Self::SystemData) {
+    fn run(
+        &mut self,
+        (mut events, mut timers, mut logging, mut activities, updates): Self::SystemData,
+    ) {
         // post events for elapsed timers
         for (token, subject) in timers.maintain(Tick::fetch()) {
             events.post(EntityEvent {
@@ -162,10 +167,15 @@ impl<'a> System<'a> for ActivityEventSystem {
             trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
         }
 
-        events.handle_events(|subscriber, event| {
-            let activity = activities
-                .get_mut(subscriber)
-                .expect("subscriber must have activity component");
+        events.consume_events(|subscriber, event| {
+            let activity = match activities
+                .get_mut(subscriber) {
+                Some(comp) => comp,
+                None => {
+                    warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
+                    return EventUnsubscribeResult::UnsubscribeAll;
+                }
+            };
 
             log_scope!(o!("subscriber" => E(subscriber)));
 
@@ -174,10 +184,26 @@ impl<'a> System<'a> for ActivityEventSystem {
             debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
 
             if let EventUnblockResult::Unblock = unblock {
+                // entity is now unblocked
                 updates.remove::<BlockingActivityComponent>(subscriber);
             }
 
             unsubscribe
+        }, |events| {
+
+            // log all events per subject
+            for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
+                let logging = match logging
+                    .get_mut(subject) {
+                    Some(comp) => comp,
+                    None => continue,
+                };
+
+                for event in events {
+                    logging.log_event(event);
+                }
+
+            }
         });
     }
 }

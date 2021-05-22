@@ -2262,6 +2262,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rbl_circular_buffer"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f15557a07abaf2eff47c8f6b50dbf7d78a7043d64a5720fe823687aab2d21aa0"
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2570,6 +2576,7 @@ dependencies = [
  "ecs-derive",
  "hex-serde",
  "inventory",
+ "rbl_circular_buffer",
  "resources",
  "rlua",
  "ron",

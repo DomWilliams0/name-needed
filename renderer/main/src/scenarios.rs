@@ -91,6 +91,7 @@ fn wander_and_eat(ecs: &mut EcsWorld) {
             .with_color(colors.next_please())
             .with_player_society()
             .with_satiety(satiety)
+            .with_logging() // TODO conditional
             .thanks()
     });
 
@@ -145,9 +146,10 @@ mod helpers {
     use color::{ColorRgb, UniqueRandomColors};
     use common::{random, NormalizedFloat};
     use simulation::{
-        BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityPosition,
-        HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent, SocietyComponent,
-        SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange, WorldTerrainUpdate,
+        BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
+        EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
+        SocietyComponent, SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange,
+        WorldTerrainUpdate,
     };
 
     pub fn get_config_count(wat: &str) -> usize {
@@ -223,6 +225,11 @@ mod helpers {
 
         pub fn with_nutrition(self, nutrition: NormalizedFloat) -> Self {
             self.with_condition(nutrition)
+        }
+
+        pub fn with_logging(self) -> Self {
+            self.0.add_now(self.1, EntityLoggingComponent::default());
+            self
         }
 
         pub fn thanks(self) -> Entity {
