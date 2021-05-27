@@ -13,7 +13,7 @@ use crate::needs::HungerComponent;
 use crate::simulation::Tick;
 use crate::society::job::Task;
 use crate::society::{Society, SocietyComponent};
-use crate::TransformComponent;
+use crate::{EntityLoggingComponent, TransformComponent};
 
 use crate::{dse, Societies};
 
@@ -22,7 +22,7 @@ use crate::{dse, Societies};
 #[name("ai")]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
-    current: Option<(DecisionSource<AiContext>, AiAction)>,
+    current: Option<DecisionSource<AiContext>>,
 }
 
 impl AiComponent {
@@ -57,7 +57,7 @@ impl AiComponent {
         this_entity: Entity,
         society_fn: impl FnOnce() -> &'a mut Society,
     ) {
-        if let Some((interrupted_source, _)) = self.current.take() {
+        if let Some(interrupted_source) = self.current.take() {
             match interrupted_source {
                 DecisionSource::Additional(AdditionalDse::DivineCommand, _) => {
                     // divine command interrupted, assume completed
@@ -92,6 +92,7 @@ impl<'a> System<'a> for AiSystem {
         WriteStorage<'a, AiComponent>,
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, SocietyComponent>,
+        WriteStorage<'a, EntityLoggingComponent>,
     );
 
     fn run(
@@ -106,6 +107,7 @@ impl<'a> System<'a> for AiSystem {
             mut ai,
             mut activity,
             society,
+            mut logging,
         ): Self::SystemData,
     ) {
         // TODO only run occasionally - FIXME TERRIBLE HACK
@@ -193,9 +195,6 @@ impl<'a> System<'a> for AiSystem {
                 debug!("new activity"; "dse" => dse.name(), "source" => ?src);
                 trace!("activity action"; "action" => ?action);
 
-                // pass on to activity system
-                activity.interrupt_with_new_activity(action.clone(), e, ecs_world);
-
                 // register interruption
                 let mut society = society_opt.and_then(|comp| comp.resolve(societies));
                 ai.interrupt_current_action(e, || {
@@ -213,7 +212,14 @@ impl<'a> System<'a> for AiSystem {
                     society.jobs_mut().reserve_task(e, task.clone());
                 }
 
-                ai.current = Some((src, action));
+                if let Some(logs) = logging.get_mut(e) {
+                    logs.log_event(&action);
+                }
+
+                ai.current = Some(src);
+
+                // pass on to activity system
+                activity.interrupt_with_new_activity(action, e, ecs_world);
             }
         }
     }

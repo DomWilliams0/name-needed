@@ -31,7 +31,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEatSubActivity {
                     debug!("cannot eat because food is not held"; "error" => ?other);
                     world.post_event(EntityEvent {
                         subject: item,
-                        payload: EntityEventPayload::Eaten(Err(())),
+                        payload: EntityEventPayload::BeenEaten(Err(())),
                     });
                     return Err(ItemEatError::NotInInventory.into());
                 }
@@ -42,7 +42,10 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEatSubActivity {
             Ok(())
         });
 
-        ctx.subscribe_to(item, EventSubscription::Specific(EntityEventType::Eaten));
+        ctx.subscribe_to(
+            item,
+            EventSubscription::Specific(EntityEventType::BeenEaten),
+        );
         ActivityResult::Blocked
     }
 

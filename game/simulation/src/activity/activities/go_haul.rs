@@ -19,7 +19,7 @@ use crate::{
 // TODO haul target should hold pos+item radius, assigned once on creation
 // TODO events for items entering/exiting containers
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum HaulTarget {
     /// Put in/take from an accessible position
     Position(WorldPosition),

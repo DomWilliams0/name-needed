@@ -36,6 +36,11 @@ pub enum UiRequest {
 
     /// Eval the script at the given path
     ExecuteScript(PathBuf),
+
+    ToggleEntityLogging {
+        entity: Entity,
+        enabled: bool,
+    },
 }
 
 pub enum UiResponsePayload {

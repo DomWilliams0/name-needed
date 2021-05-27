@@ -24,7 +24,7 @@ pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
-pub use activity::ActivityComponent;
+pub use activity::{ActivityComponent, EntityLoggingComponent};
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity, E};
 pub use item::{

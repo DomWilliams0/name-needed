@@ -36,7 +36,9 @@ use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
-use crate::{definitions, Exit, ThreadedWorldLoader, WorldRef, WorldViewer};
+use crate::{
+    definitions, EntityLoggingComponent, Exit, ThreadedWorldLoader, WorldRef, WorldViewer,
+};
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 
@@ -390,6 +392,15 @@ impl<R: Renderer> Simulation<R> {
                     }
 
                     resp.set_response(UiResponsePayload::ScriptOutput(result));
+                }
+                UiRequest::ToggleEntityLogging { entity, enabled } => {
+                    if enabled {
+                        let _ = self
+                            .ecs_world
+                            .add_now::<EntityLoggingComponent>(entity, Default::default());
+                    } else {
+                        let _ = self.ecs_world.remove_now::<EntityLoggingComponent>(entity);
+                    }
                 }
             }
         }

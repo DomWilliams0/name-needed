@@ -145,9 +145,10 @@ mod helpers {
     use color::{ColorRgb, UniqueRandomColors};
     use common::{random, NormalizedFloat};
     use simulation::{
-        BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityPosition,
-        HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent, SocietyComponent,
-        SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange, WorldTerrainUpdate,
+        BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
+        EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
+        SocietyComponent, SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange,
+        WorldTerrainUpdate,
     };
 
     pub fn get_config_count(wat: &str) -> usize {
@@ -225,7 +226,19 @@ mod helpers {
             self.with_condition(nutrition)
         }
 
+        pub fn with_logging(self) -> Self {
+            self.0
+                .add_now(self.1, EntityLoggingComponent::default())
+                .expect("logging component");
+            self
+        }
+
         pub fn thanks(self) -> Entity {
+            // add logging to all entities if configured
+            if config::get().simulation.entity_logging_by_default {
+                let _ = self.0.add_now(self.1, EntityLoggingComponent::default());
+            }
+
             self.1
         }
     }

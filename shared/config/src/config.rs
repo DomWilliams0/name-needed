@@ -53,6 +53,9 @@ pub struct Simulation {
     pub friction: f32,
     pub start_delay: u32,
     pub spawn_counts: HashMap<String, usize>,
+    pub entity_logging_by_default: bool,
+    /// Ring buffer size
+    pub entity_logging_capacity: usize,
 }
 
 impl WorldSource {

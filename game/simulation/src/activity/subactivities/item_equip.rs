@@ -85,16 +85,26 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
                     };
 
                     let result = do_equip();
+                    if result.is_ok() {
+                        world.post_event(EntityEvent {
+                            subject: holder,
+                            payload: EntityEventPayload::HasEquipped(item),
+                        });
+                    }
+
                     world.post_event(EntityEvent {
                         subject: item,
-                        payload: EntityEventPayload::Equipped(result),
+                        payload: EntityEventPayload::BeenEquipped(result),
                     });
 
                     Ok(())
                 });
 
                 // block on equip event
-                ctx.subscribe_to(item, EventSubscription::Specific(EntityEventType::Equipped));
+                ctx.subscribe_to(
+                    item,
+                    EventSubscription::Specific(EntityEventType::BeenEquipped),
+                );
                 Ok(ActivityResult::Blocked)
             }
         });

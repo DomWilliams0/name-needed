@@ -1,8 +1,9 @@
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::HaulTarget;
+use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
 use crate::item::ItemsToPickUp;
+use std::convert::TryInto;
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -20,7 +21,8 @@ pub enum AiAction {
         reason: &'static str,
     },
 
-    /// Go pickup the (1) best item
+    /// Go pickup the (1) best item.
+    /// TODO reduce cost of cloning vec of items
     GoPickUp(ItemsToPickUp),
 
     /// Equip and eat the given entity, assuming it's already in the inventory
@@ -39,5 +41,33 @@ pub enum AiAction {
 impl Default for AiAction {
     fn default() -> Self {
         AiAction::Nop
+    }
+}
+
+impl TryInto<LoggedEntityEvent> for &AiAction {
+    type Error = ();
+
+    fn try_into(self) -> Result<LoggedEntityEvent, Self::Error> {
+        use LoggedEntityDecision::*;
+        use LoggedEntityEvent::*;
+
+        Ok(AiDecision(match self {
+            AiAction::Nop => return Err(()),
+            AiAction::Wander => Wander,
+            AiAction::Goto { target, reason } => Goto {
+                target: *target,
+                reason,
+            },
+            AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => {
+                return Ok(AiDecision(GoPickup(wat.clone())))
+            }
+            AiAction::EatHeldItem(item) => EatHeldItem(*item),
+            AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
+            AiAction::Follow { target, .. } => Follow(*target),
+            AiAction::Haul(e, _, tgt) => Haul {
+                item: *e,
+                dest: *tgt,
+            },
+        }))
     }
 }

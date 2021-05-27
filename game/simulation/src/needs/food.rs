@@ -140,8 +140,15 @@ impl<'a> System<'a> for EatingSystem {
             if let Some(result) = do_eat() {
                 events.post(EntityEvent {
                     subject: item,
-                    payload: EntityEventPayload::Eaten(result),
+                    payload: EntityEventPayload::BeenEaten(result),
                 });
+
+                if result.is_ok() {
+                    events.post(EntityEvent {
+                        subject: being_eaten.eater,
+                        payload: EntityEventPayload::HasEaten(item),
+                    });
+                }
             }
         }
     }

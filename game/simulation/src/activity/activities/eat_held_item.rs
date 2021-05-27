@@ -80,7 +80,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
         debug_assert_eq!(event.subject, self.item);
 
         match &event.payload {
-            EntityEventPayload::Equipped(result) => {
+            EntityEventPayload::BeenEquipped(result) => {
                 match result {
                     Ok(_) => {
                         // TODO sanity check equipper is this entity
@@ -97,7 +97,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
                     EventUnsubscribeResult::UnsubscribeAll,
                 )
             }
-            EntityEventPayload::Eaten(result) => {
+            EntityEventPayload::BeenEaten(result) => {
                 self.finished = Some(if result.is_ok() {
                     trace!("finished eating food successfully");
                     Ok(())
