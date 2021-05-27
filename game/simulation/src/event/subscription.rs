@@ -34,7 +34,10 @@ pub enum EntityEventPayload {
     HasEaten(Entity),
 
     /// Item entity (subject) has been equipped in an equip slot of this entity
-    Equipped(Result<Entity, EquipItemError>),
+    BeenEquipped(Result<Entity, EquipItemError>),
+
+    /// Entity (subject) has equipped the given item entity
+    HasEquipped(Entity),
 
     /// Item entity (subject) has been picked up for hauling by a hauler
     Hauled(Result<Entity, HaulError>),
@@ -91,7 +94,12 @@ impl EntityEventPayload {
         match self {
             BeenPickedUp(_) | BeenEaten(_) | Hauled(_) | ExitedContainer(_)
             | EnteredContainer(_) => true,
-            Arrived(_, _) | HasPickedUp(_) | HasEaten(_) | Equipped(_) | TimerElapsed(_) => false,
+            Arrived(_, _)
+            | HasPickedUp(_)
+            | HasEaten(_)
+            | HasEquipped(_)
+            | BeenEquipped(_)
+            | TimerElapsed(_) => false,
             #[cfg(test)]
             DummyA | DummyB => false,
         }
@@ -106,13 +114,13 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
         use LoggedEntityEvent as E;
 
         match self {
-            Equipped(Ok(e)) => Ok(E::Equipped(*e)),
+            HasEquipped(e) => Ok(E::Equipped(*e)),
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
             BeenEaten(_)
             | BeenPickedUp(_)
             | Arrived(_, _)
-            | Equipped(Err(_))
+            | BeenEquipped(_)
             | Hauled(_)
             | ExitedContainer(_)
             | EnteredContainer(_)
