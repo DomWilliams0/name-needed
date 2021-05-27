@@ -87,7 +87,7 @@ impl Camera {
         // TODO cache
         let bottom_left = WorldPosition::from(ViewPoint::from(self.pos));
         let top_right = {
-            let mul = 4.0 * self.zoom * SCALE / SCREEN_SCALE;
+            let mul = self.zoom / SCREEN_SCALE / SCALE;
             let hor = (mul * self.window_size.x).ceil() as i32;
             let ver = (mul * self.window_size.y).ceil() as i32;
 
