@@ -30,5 +30,6 @@ Config(
             "food": 400,
         },
         entity_logging_by_default: true,
+        entity_logging_capacity: 8,
      ),
 )

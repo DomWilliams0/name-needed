@@ -62,16 +62,17 @@ impl<T> RingBuffer<T> {
         self.0.push_back(elem);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
+    #[cfg(test)]
+    fn iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.0.iter()
     }
 }
 
 impl Default for EntityLoggingComponent {
     fn default() -> Self {
+        let capacity = config::get().simulation.entity_logging_capacity;
         Self {
-            // TODO get initial size from config
-            logs: RingBuffer::with_capacity(64),
+            logs: RingBuffer::with_capacity(capacity),
         }
     }
 }
@@ -86,8 +87,8 @@ impl EntityLoggingComponent {
         }
     }
 
-    pub fn iter_logs(&self) -> impl Iterator<Item = &dyn Display> + '_ {
-        self.logs.iter().map(|e| e as &dyn Display)
+    pub fn iter_logs(&self) -> impl Iterator<Item = &dyn Display> + DoubleEndedIterator + '_ {
+        self.logs.0.iter().map(|e| e as &dyn Display)
     }
 }
 

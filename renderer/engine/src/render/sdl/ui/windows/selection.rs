@@ -384,7 +384,7 @@ impl SelectionWindow {
 
             impl<'a> Display for EntityLogs<'a> {
                 fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-                    for event in self.0.iter_logs() {
+                    for event in self.0.iter_logs().rev() {
                         writeln!(f, "{}", event)?;
                     }
                     Ok(())
