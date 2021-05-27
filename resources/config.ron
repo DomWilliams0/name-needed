@@ -29,6 +29,6 @@ Config(
             "bricks": 20,
         },
         entity_logging_by_default: true,
-        entity_logging_capacity: 8,
+        entity_logging_capacity: 64,
      ),
 )

@@ -1,4 +1,4 @@
-# TODOs (326)
+# TODOs (327)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -452,3 +452,5 @@
    * `// TODO return option and have unchecked version`
  * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)
    * `// TODO assert fields are not NaN in points`
+ * [shared/unit/src/world/world_position.rs](shared/unit/src/world/world_position.rs) (1)
+   * `// TODO unnecessary flooring`
