@@ -10,6 +10,6 @@
 * logging configuration per entity
 	* [X] in global config
 	* [X] in ui, per entity
-* [ ] allow ui filtering of events e.g. trace, debug
-* [ ] rich event log ui; colours, entity tooltips
+* [~] allow ui filtering of events e.g. trace, debug
+* [~] rich event log ui; colours, entity tooltips
 * [X] include timestamp in logs

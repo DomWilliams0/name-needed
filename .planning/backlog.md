@@ -43,8 +43,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* limit gameloop interpolation to 1.0: can be greater if ticks take too long
 * resolve an entity to its displayable name including state in the UI layer only
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
+	* expose via helper on NameComponent and replace all the current duplication with "unnamed"
 * ui button to skip up/down to next surface
 * ring buffer of per-entity events in a Log ui tab, e.g. decided to do X, picked up X, ate X
+* inventory window (separate from debug window) to show items in person's inventory/container in a nice way
+* common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
+* add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
 
 ## Entity behaviour
 * more society level jobs
@@ -113,6 +117,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * blocks that technically solid but possible (and slow) to pass through
 	* hedges, bushes
 * map chunks to torus and make the world wrap-around
+* chests/container are multiblock entities that can be hauled around and stored inside other containers, NOT voxels!
 
 ## Optimizations
 * integrate tracy for per-frame profiling
