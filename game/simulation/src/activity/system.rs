@@ -199,10 +199,7 @@ impl<'a> System<'a> for ActivityEventSystem {
                     None => continue,
                 };
 
-                for event in events {
-                    logging.log_event(&event.payload);
-                }
-
+                logging.log_events(events.map(|e| &e.payload));
             }
         });
     }

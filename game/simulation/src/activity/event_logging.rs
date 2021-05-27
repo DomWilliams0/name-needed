@@ -78,10 +78,17 @@ impl Default for EntityLoggingComponent {
 }
 
 impl EntityLoggingComponent {
+    /// Same as [log_event] but only fetches the current tick once
+    pub fn log_events(&mut self, events: impl Iterator<Item = impl TryInto<LoggedEntityEvent>>) {
+        let tick = Tick::fetch();
+        for event in events {
+            if let Ok(e) = event.try_into() {
+                self.logs.push(TimedLoggedEntityEvent(tick, e));
+            }
+        }
+    }
+
     pub fn log_event(&mut self, event: impl TryInto<LoggedEntityEvent>) {
-        // TODO dont allocate string here
-        // TODO pass in an impl LogEvent instead
-        // TODO optimise for the multiple case
         if let Ok(e) = event.try_into() {
             self.logs.push(TimedLoggedEntityEvent(Tick::fetch(), e));
         }
