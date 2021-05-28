@@ -94,7 +94,12 @@ impl Renderer for GlRenderer {
 
     fn sim_start(&mut self) {}
 
-    fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent) {
+    fn sim_entity(
+        &mut self,
+        transform: &TransformComponent,
+        render: &RenderComponent,
+        physical: &PhysicalComponent,
+    ) {
         let frame_target = self.frame_target.as_ref().unwrap();
         let mut position = transform.position;
 
@@ -110,8 +115,12 @@ impl Renderer for GlRenderer {
             z
         });
 
-        self.entity_pipeline
-            .add_entity((position, render.shape, render.color));
+        self.entity_pipeline.add_entity((
+            position,
+            render.shape,
+            render.color,
+            physical.size.into(),
+        ));
     }
 
     fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {

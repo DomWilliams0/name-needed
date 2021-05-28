@@ -192,7 +192,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * less repetition in chunk/terrain/chunkbuilder/chunkbuilderapply/slicemut
 * define rates, scales, units etc in unit crate e.g. metabolism, durabilities
 * add more types for procgen region units instead of arbitrary (f64, f64)
-*  overhaul world unit types to hide internals, have a constructor that returns option, and an unchecked version
 * error context chaining would be VERY useful for fatal errors
 * consider using `bugsalot` macros to replace .unwrap()/.expect() with logging and make them continuable
 
@@ -223,6 +222,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * birds/small animals swarm food crumbs left by someone eating
 
 ### Dogs
+* bug: dogs should not be able to be directly controlled like humans
 * dogs pick up sticks, move faster than humans, chase cats
 * breeds have different characteristics
 	* soft mouth vs hard mouth

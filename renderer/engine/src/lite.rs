@@ -29,7 +29,13 @@ impl Renderer for DummyRenderer {
 
     fn sim_start(&mut self) {}
 
-    fn sim_entity(&mut self, _transform: &TransformComponent, _render: &RenderComponent) {}
+    fn sim_entity(
+        &mut self,
+        _transform: &TransformComponent,
+        _render: &RenderComponent,
+        _physical: &PhysicalComponent,
+    ) {
+    }
 
     fn sim_selected(&mut self, _transform: &TransformComponent, _physical: &PhysicalComponent) {}
 

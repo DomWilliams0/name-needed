@@ -256,8 +256,8 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
-   * `// TODO physical shape wastes so much space`
+ * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
+   * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
@@ -291,6 +291,8 @@
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
+ * [game/simulation/src/steer/debug.rs](game/simulation/src/steer/debug.rs) (1)
+   * `// TODO show actual steering direction alongside velocity`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
  * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (1)
@@ -396,10 +398,9 @@
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO smallvec`
- * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (3)
+ * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
-   * `// TODO scale entity properly`
  * [renderer/engine/src/render/sdl/render/mod.rs](renderer/engine/src/render/sdl/render/mod.rs) (3)
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`

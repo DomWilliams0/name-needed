@@ -16,7 +16,12 @@ pub trait Renderer {
     fn sim_start(&mut self);
 
     /// `transform` is interpolated
-    fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent);
+    fn sim_entity(
+        &mut self,
+        transform: &TransformComponent,
+        render: &RenderComponent,
+        physical: &PhysicalComponent,
+    );
 
     /// The entity with the given transform is selected, highlight it
     /// Call in addition to `sim_entity`

@@ -1,4 +1,4 @@
-// #![allow(dead_code)]
+#![allow(dead_code)]
 #![deny(clippy::missing_safety_doc)]
 
 pub use petgraph::prelude::NodeIndex;

@@ -5,10 +5,10 @@
       {"name": (name: "Human")},
       {"render": (
         color: (r: 0.2, g: 0.5, b: 0.8),
-        shape: (radius: 0.4),
+        shape: "Circle",
       )},
       {"physical": (
-        size: [8, 8, 18],
+        size: [5, 5, 18],
         volume: 700,
       )},
       {"inventory": (

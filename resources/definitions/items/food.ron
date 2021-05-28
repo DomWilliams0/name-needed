@@ -16,7 +16,7 @@
       )},
       {"render": (
         color: "b0e359",
-        shape: (rx:0.2, ry:0.2),
+        shape: "Rect",
       )},
       {"physical": (
         size: (1, 1, 1),

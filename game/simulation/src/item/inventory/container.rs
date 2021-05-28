@@ -80,7 +80,7 @@ impl Container {
 
     /// Clones on successful add and returns Ok
     pub fn add(&mut self, entity: &HeldEntity) -> Result<(), ContainerError> {
-        if !self.size_limit.fits(&entity.size) {
+        if !self.size_limit.fits(entity.size) {
             return Err(ContainerError::TooBig);
         }
 

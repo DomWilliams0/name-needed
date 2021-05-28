@@ -14,7 +14,7 @@ use crate::ecs::ComponentBuildError;
 use common::*;
 
 #[derive(Debug, Error)]
-#[error("Error loading definition {0:?}: {1}")]
+#[error("Error loading definition {0}: {1}")]
 pub struct DefinitionError(pub DefinitionSource, pub DefinitionErrorKind);
 
 #[derive(Debug, Error)]
