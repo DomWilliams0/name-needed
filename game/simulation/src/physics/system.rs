@@ -98,7 +98,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 friction *= FALL_SLOWDOWN;
 
                 // plop down 1 block
-                transform.position.2 -= 1.0;
+                transform.position.modify_z(|z| z - 1.0);
                 physics.fallen += 1;
 
                 // forget about now-invalid last accessible position

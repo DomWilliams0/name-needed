@@ -31,14 +31,15 @@ impl Camera {
         cam.on_resize(width, height);
 
         // centre on the first chunk initially
-        let centre = WorldPoint(CHUNK_SIZE.as_f32() / 2.0, CHUNK_SIZE.as_f32() / 2.0, 0.0);
+        let centre =
+            WorldPoint::new_unchecked(CHUNK_SIZE.as_f32() / 2.0, CHUNK_SIZE.as_f32() / 2.0, 0.0);
         cam.set_centre(centre);
 
         cam
     }
 
     pub(crate) fn set_centre(&mut self, centre: impl Into<ViewPoint>) {
-        let ViewPoint(x, y, _) = centre.into();
+        let (x, y, _) = centre.into().xyz();
         self.pos = Point2::new(x, y) - (self.window_size / 2.0 / SCREEN_SCALE);
         self.last_extrapolated_pos = self.pos;
     }

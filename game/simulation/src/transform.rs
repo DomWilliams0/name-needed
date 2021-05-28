@@ -61,17 +61,17 @@ impl TransformComponent {
 
     pub const fn slice(&self) -> i32 {
         // cant use position.slice() because not const
-        self.position.2 as i32
+        self.position.z() as i32
     }
 
     pub const fn x(&self) -> f32 {
-        self.position.0
+        self.position.x()
     }
     pub const fn y(&self) -> f32 {
-        self.position.1
+        self.position.y()
     }
     pub const fn z(&self) -> f32 {
-        self.position.2
+        self.position.z()
     }
 
     pub fn bounds(&self, bounding_radius: f32) -> Bounds {

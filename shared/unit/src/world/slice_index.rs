@@ -26,8 +26,8 @@ pub struct Chunk;
 pub struct Slab;
 
 impl SliceIndexScale for Chunk {
-    const MIN: i32 = std::i32::MIN;
-    const MAX: i32 = std::i32::MAX;
+    const MIN: i32 = i32::MIN;
+    const MAX: i32 = i32::MAX;
 }
 impl SliceIndexScale for Slab {
     const MIN: i32 = 0;

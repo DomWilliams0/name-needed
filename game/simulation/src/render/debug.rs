@@ -175,13 +175,13 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         _: &WorldViewer,
     ) {
         renderer.debug_add_line(
-            WorldPoint(0.0, 0.0, 1.0),
-            WorldPoint(1.0, 0.0, 1.0),
+            WorldPoint::new_unchecked(0.0, 0.0, 1.0),
+            WorldPoint::new_unchecked(1.0, 0.0, 1.0),
             ColorRgb::new(255, 0, 0),
         );
         renderer.debug_add_line(
-            WorldPoint(0.0, 0.0, 1.0),
-            WorldPoint(0.0, 1.0, 1.0),
+            WorldPoint::new_unchecked(0.0, 0.0, 1.0),
+            WorldPoint::new_unchecked(0.0, 1.0, 1.0),
             ColorRgb::new(0, 255, 0),
         );
     }

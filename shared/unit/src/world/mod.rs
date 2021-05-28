@@ -1,6 +1,5 @@
 pub use block_position::*;
 pub use chunk_location::*;
-pub use chunk_point::*;
 pub use range::*;
 pub use slab_index::*;
 pub use slab_location::*;
@@ -20,7 +19,6 @@ pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
 
 mod block_position;
 mod chunk_location;
-mod chunk_point;
 mod range;
 mod slab_index;
 mod slab_location;
@@ -51,13 +49,13 @@ mod tests {
         let b = BlockPosition::new(1, 2, SliceIndex::new(3));
 
         // at origin
-        let WorldPoint(x, y, z) = b.to_world_point((0, 0));
+        let (x, y, z) = b.to_world_point((0, 0)).xyz();
         assert!(x.approx_eq(1.0, (EPSILON, 2)));
         assert!(y.approx_eq(2.0, (EPSILON, 2)));
         assert!(z.approx_eq(3.0, (EPSILON, 2)));
 
         // a few chunks over
-        let WorldPoint(x, y, z) = b.to_world_point((1, 2));
+        let (x, y, z) = b.to_world_point((1, 2)).xyz();
         let sz: f32 = CHUNK_SIZE.as_f32();
         assert!(x.approx_eq(1.0 + sz, (EPSILON, 2)));
         assert!(y.approx_eq(2.0 + sz + sz, (EPSILON, 2)));
@@ -71,7 +69,7 @@ mod tests {
         let wp = b.to_world_point((-1, -1));
         assert_eq!(
             wp,
-            WorldPoint(-CHUNK_SIZE.as_f32(), -CHUNK_SIZE.as_f32(), 0.0)
+            WorldPoint::new_unchecked(-CHUNK_SIZE.as_f32(), -CHUNK_SIZE.as_f32(), 0.0)
         );
     }
 

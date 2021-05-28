@@ -6,7 +6,7 @@ use crate::world::{
 };
 use std::ops::Add;
 
-/// A block in a chunk
+/// A block in a chunk. Only valid coords are represented by this type
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
 pub struct BlockPosition(BlockCoord, BlockCoord, GlobalSliceIndex);
 
@@ -29,12 +29,12 @@ impl BlockPosition {
     }
     pub fn to_world_point<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPoint {
         let WorldPosition(x, y, z) = self.to_world_position(chunk_pos);
-        WorldPoint(x as f32, y as f32, z.slice() as f32)
+        WorldPoint::new_unchecked(x as f32, y as f32, z.slice() as f32)
     }
 
     pub fn to_world_point_centered<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPoint {
-        let WorldPoint(x, y, z) = self.to_world_point(chunk_pos);
-        WorldPoint(x + 0.5, y + 0.5, z)
+        let (x, y, z) = self.to_world_point(chunk_pos).xyz();
+        WorldPoint::new_unchecked(x + 0.5, y + 0.5, z)
     }
 
     pub fn flatten(self) -> (BlockCoord, BlockCoord, GlobalSliceIndex) {
