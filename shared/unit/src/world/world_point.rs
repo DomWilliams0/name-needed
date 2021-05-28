@@ -5,7 +5,8 @@ use common::derive_more::*;
 
 use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
-use crate::world::{GlobalSliceIndex, WorldPosition};
+use crate::space::view::ViewPoint;
+use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
 #[derive(Debug, Copy, Clone, PartialEq, Default, Into, From, PartialOrd)]
@@ -207,6 +208,15 @@ impl Sub for WorldPoint {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0, self.1 - rhs.1, self.2 - rhs.2)
+    }
+}
+
+impl From<ViewPoint> for WorldPoint {
+    fn from(pos: ViewPoint) -> Self {
+        // guaranteed valid coords from viewpoint
+        let (x, y, z) = pos.xyz();
+        const SCALE: f32 = BLOCKS_PER_METRE as f32;
+        Self(x * SCALE, y * SCALE, z * SCALE)
     }
 }
 

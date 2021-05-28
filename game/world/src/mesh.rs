@@ -13,7 +13,7 @@ use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
-const X: f32 = unit::world::SCALE / 2.0;
+const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
 
 // 0, 1, 2 | 2, 3, 0
 const TILE_CORNERS: [(f32, f32); 4] = [(-X, -X), (X, -X), (X, X), (-X, X)];
@@ -116,9 +116,9 @@ fn make_corners_with_ao<V: BaseVertex>(
         let color = color * ao_lightness;
         block_corners[i] = MaybeUninit::new(V::new(
             (
-                fx + bx * unit::world::SCALE,
-                fy + by * unit::world::SCALE,
-                slice_index * unit::world::SCALE,
+                fx + bx * unit::world::BLOCKS_SCALE,
+                fy + by * unit::world::BLOCKS_SCALE,
+                slice_index * unit::world::BLOCKS_SCALE,
             ),
             color,
         ));
@@ -144,9 +144,9 @@ fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: ColorRgb, slice_ind
     for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
         block_corners[i] = MaybeUninit::new(V::new(
             (
-                fx + bx * unit::world::SCALE,
-                fy + by * unit::world::SCALE,
-                slice_index * unit::world::SCALE,
+                fx + bx * unit::world::BLOCKS_SCALE,
+                fy + by * unit::world::BLOCKS_SCALE,
+                slice_index * unit::world::BLOCKS_SCALE,
             ),
             color,
         ));

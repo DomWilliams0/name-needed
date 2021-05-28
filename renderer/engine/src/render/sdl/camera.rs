@@ -4,8 +4,8 @@ use common::input::CameraDirection;
 use common::*;
 use std::convert::TryFrom;
 use unit::space::view::ViewPoint;
-use unit::world::CHUNK_SIZE;
-use unit::world::{ChunkLocation, WorldPoint, WorldPosition, SCALE};
+use unit::world::{ChunkLocation, WorldPoint, WorldPosition};
+use unit::world::{BLOCKS_SCALE, CHUNK_SIZE};
 
 pub struct Camera {
     /// Camera pos in metres
@@ -102,10 +102,10 @@ impl Camera {
 
         // calculate visible chunk bounds
         // TODO cache
-        let bottom_left =
-            WorldPosition::from(ViewPoint::try_from(self.pos).expect("invalid camera position"));
+        let view_point = ViewPoint::try_from(self.pos).expect("invalid camera position");
+        let bottom_left = WorldPosition::from(view_point);
         let top_right = {
-            let mul = self.zoom / SCREEN_SCALE / SCALE;
+            let mul = self.zoom / SCREEN_SCALE / BLOCKS_SCALE;
             let hor = (mul * self.window_size.x).ceil() as i32;
             let ver = (mul * self.window_size.y).ceil() as i32;
 
@@ -147,6 +147,6 @@ impl Camera {
             let to_metres = self.zoom / SCREEN_SCALE;
             Vector2::new(xpixels * to_metres, ypixels * to_metres)
         };
-        ((self.pos + offset) / SCALE).into()
+        ((self.pos + offset) / BLOCKS_SCALE).into()
     }
 }

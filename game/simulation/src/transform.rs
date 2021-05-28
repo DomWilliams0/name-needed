@@ -143,6 +143,7 @@ pub struct PhysicalComponentTemplate {
     size: Length3,
     volume: Volume,
 }
+
 impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where

@@ -8,7 +8,7 @@ use common::*;
 use resources::Shaders;
 use simulation::Shape2d;
 use unit::space::view::ViewPoint;
-use unit::world::{WorldPoint, SCALE};
+use unit::world::WorldPoint;
 
 pub(crate) struct EntityPipeline {
     pipeline: InstancedPipeline,
@@ -144,13 +144,14 @@ impl EntityPipeline {
                 let pos = ViewPoint::from(*pos);
                 mapped[i].color = (*color).into();
 
-                let (scale_x, scale_y) = match shape {
+                let (scale_x, scale_y) = match *shape {
                     Shape2d::Circle { radius } => (radius, radius),
                     Shape2d::Rectangle { rx, ry } => (rx, ry),
                 };
 
+                // TODO scale entity properly
                 let model = Matrix4::from_translation(pos.into())
-                    * Matrix4::from_nonuniform_scale(scale_x * SCALE, scale_y * SCALE, 1.0);
+                    * Matrix4::from_nonuniform_scale(scale_x, scale_y, 1.0);
                 mapped[i].model = model.into();
             }
         }

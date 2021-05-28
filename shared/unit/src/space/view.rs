@@ -1,12 +1,11 @@
 use common::derive_more::*;
 
-use crate::world::WorldPoint;
-use crate::world::SCALE;
+use crate::world::{WorldPoint, BLOCKS_SCALE};
 use common::{Point2, Vector3};
 use std::convert::TryFrom;
 
 /// A point anywhere in the world, in meters
-#[derive(Debug, Copy, Clone, Default, Into, From)]
+#[derive(Debug, Copy, Clone, Default, Into, From, PartialEq)]
 pub struct ViewPoint(f32, f32, f32);
 
 //noinspection DuplicatedCode
@@ -42,7 +41,7 @@ impl From<WorldPoint> for ViewPoint {
     fn from(pos: WorldPoint) -> Self {
         // guaranteed valid coords from worldpoint
         let (x, y, z) = pos.xyz();
-        Self(x * SCALE, y * SCALE, z * SCALE)
+        Self(x * BLOCKS_SCALE, y * BLOCKS_SCALE, z * BLOCKS_SCALE)
     }
 }
 
@@ -55,5 +54,25 @@ impl From<ViewPoint> for Vector3 {
 impl From<ViewPoint> for [f32; 3] {
     fn from(v: ViewPoint) -> Self {
         [v.0, v.1, v.2]
+    }
+}
+
+/// No NaNs allowed (sorry grandma)
+impl Eq for ViewPoint {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn view_to_world() {
+        // 4 metres
+        let vp = ViewPoint::new_unchecked(4.0, 0.0, 0.0);
+
+        // 12 blocks
+        let wp = WorldPoint::new_unchecked(12.0, 0.0, 0.0);
+
+        assert_eq!(WorldPoint::from(vp), wp);
+        assert_eq!(ViewPoint::from(wp), vp);
     }
 }
