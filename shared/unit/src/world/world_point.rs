@@ -102,7 +102,7 @@ impl WorldPoint {
 
 impl From<WorldPoint> for Vector3 {
     fn from(p: WorldPoint) -> Self {
-        Self {
+        Vector3 {
             x: p.0,
             y: p.1,
             z: p.2,
@@ -112,13 +112,13 @@ impl From<WorldPoint> for Vector3 {
 
 impl From<WorldPoint> for Vector2 {
     fn from(p: WorldPoint) -> Self {
-        Self { x: p.0, y: p.1 }
+        Vector2 { x: p.0, y: p.1 }
     }
 }
 
 impl From<WorldPoint> for Point3 {
     fn from(p: WorldPoint) -> Self {
-        Self {
+        Point3 {
             x: p.0,
             y: p.1,
             z: p.2,
@@ -126,10 +126,11 @@ impl From<WorldPoint> for Point3 {
     }
 }
 
-impl From<Vector3> for WorldPoint {
-    fn from(v: Vector3) -> Self {
-        // TODO tryfrom
-        Self(v.x, v.y, v.z)
+impl TryFrom<Vector3> for WorldPoint {
+    type Error = ();
+
+    fn try_from(vec: Vector3) -> Result<Self, Self::Error> {
+        Self::new(vec.x, vec.y, vec.z).ok_or(())
     }
 }
 
@@ -148,7 +149,6 @@ impl AddAssign<Vector2> for WorldPoint {
 
 impl From<WorldPoint> for [f32; 3] {
     fn from(p: WorldPoint) -> Self {
-        // TODO tryfrom
         let WorldPoint(x, y, z) = p;
         [x, y, z]
     }
@@ -162,13 +162,6 @@ impl Add<Vector2> for WorldPoint {
     }
 }
 
-// TODO tryfrom
-impl From<[f32; 3]> for WorldPoint {
-    fn from([x, y, z]: [f32; 3]) -> Self {
-        WorldPoint(x, y, z)
-    }
-}
-
 impl TryFrom<&[f32]> for WorldPoint {
     type Error = ();
 
@@ -177,7 +170,7 @@ impl TryFrom<&[f32]> for WorldPoint {
             let x = slice[0];
             let y = slice[1];
             let z = slice[2];
-            Ok(WorldPoint(x, y, z))
+            WorldPoint::new(x, y, z).ok_or(())
         } else {
             Err(())
         }

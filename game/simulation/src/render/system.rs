@@ -6,6 +6,7 @@ use crate::transform::PhysicalComponent;
 use crate::{Shape2d, SliceRange, TransformComponent};
 use color::ColorRgb;
 use common::*;
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -45,7 +46,8 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 transform.position = {
                     let last_pos: Vector3 = transform.last_position.into();
                     let curr_pos: Vector3 = transform.position.into();
-                    last_pos.lerp(curr_pos, self.interpolation).into()
+                    let lerped = last_pos.lerp(curr_pos, self.interpolation);
+                    lerped.try_into().expect("invalid lerp")
                 };
 
                 self.renderer.sim_entity(&transform, render);

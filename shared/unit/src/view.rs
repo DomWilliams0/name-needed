@@ -3,6 +3,7 @@ use common::derive_more::*;
 use crate::world::WorldPoint;
 use crate::world::SCALE;
 use common::{Point2, Vector3};
+use std::convert::TryFrom;
 
 /// A point anywhere in the world, in meters
 #[derive(Debug, Copy, Clone, Default, Into, From)]
@@ -29,14 +30,17 @@ impl ViewPoint {
     }
 }
 
-impl From<Point2> for ViewPoint {
-    fn from(p: Point2) -> Self {
-        Self(p.x, p.y, 0.0)
+impl TryFrom<Point2> for ViewPoint {
+    type Error = ();
+
+    fn try_from(point: Point2) -> Result<Self, Self::Error> {
+        Self::new(point.x, point.y, 0.0).ok_or(())
     }
 }
 
 impl From<WorldPoint> for ViewPoint {
     fn from(pos: WorldPoint) -> Self {
+        // guaranteed valid coords from worldpoint
         let (x, y, z) = pos.xyz();
         Self(x * SCALE, y * SCALE, z * SCALE)
     }
