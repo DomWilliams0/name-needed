@@ -12,6 +12,10 @@ use crate::world::{GlobalSliceIndex, WorldPoint, SCALE};
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
+    pub fn new(x: i32, y: i32, z: GlobalSliceIndex) -> Self {
+        Self(x, y, z)
+    }
+
     pub const fn slice(self) -> GlobalSliceIndex {
         self.2
     }

@@ -5,7 +5,7 @@ use common::derive_more::*;
 
 use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
 
-use crate::world::{GlobalSliceIndex, SliceIndex, WorldPosition};
+use crate::world::{GlobalSliceIndex, WorldPosition};
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
 #[derive(Debug, Copy, Clone, PartialEq, Default, Into, From, PartialOrd)]
@@ -27,7 +27,7 @@ impl WorldPoint {
     }
 
     pub fn slice(&self) -> GlobalSliceIndex {
-        SliceIndex::new(self.2 as i32)
+        GlobalSliceIndex::new(self.2 as i32)
     }
 
     pub fn floored(&self) -> Self {
@@ -38,7 +38,7 @@ impl WorldPoint {
         WorldPosition(
             self.0.floor() as i32,
             self.1.floor() as i32,
-            SliceIndex::new(self.2.floor() as i32),
+            GlobalSliceIndex::new(self.2.floor() as i32),
         )
     }
 
@@ -46,7 +46,7 @@ impl WorldPoint {
         WorldPosition(
             self.0.ceil() as i32,
             self.1.ceil() as i32,
-            SliceIndex::new(self.2.ceil() as i32),
+            GlobalSliceIndex::new(self.2.ceil() as i32),
         )
     }
 
@@ -54,7 +54,7 @@ impl WorldPoint {
         WorldPosition(
             self.0.round() as i32,
             self.1.round() as i32,
-            SliceIndex::new(self.2.round() as i32),
+            GlobalSliceIndex::new(self.2.round() as i32),
         )
     }
 

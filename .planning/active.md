@@ -7,4 +7,4 @@
 * [ ] new unit type for distances between worldpoints, not just float
 * [ ] render entities at the proper scale for their PhysicalComponent size
 * [X] enforce no NaN or infinite in worldpoint and viewpoint
-* [ ] replace asserts with returning Options in units
+* [X] replace asserts with returning Options in units

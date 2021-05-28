@@ -8,6 +8,7 @@ use crate::chunk::slab::DeepClone;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
 use crate::chunk::BaseTerrain;
+use std::convert::TryFrom;
 
 pub struct ChunkBuilder(Option<RawChunkTerrain>);
 
@@ -32,14 +33,14 @@ impl ChunkBuilder {
         self.0.take().expect("builder is in an uninitialized state")
     }
 
-    /// Will create slabs as necessary
-    pub fn set_block<P, B>(mut self, pos: P, block: B) -> Self
-    where
-        P: Into<BlockPosition>,
-        B: Into<Block>,
-    {
-        self.terrain()
-            .set_block(pos, block, SlabCreationPolicy::CreateAll);
+    /// Panics if block position is invalid for the chunk. Will create slabs as necessary
+    pub fn set_block(mut self, pos: (i32, i32, i32), block: impl Into<Block>) -> Self {
+        self.terrain().set_block(
+            BlockPosition::try_from(pos)
+                .unwrap_or_else(|_| panic!("bad chunk coordinate {:?}", pos)),
+            block,
+            SlabCreationPolicy::CreateAll,
+        );
         self
     }
 
@@ -60,16 +61,17 @@ impl ChunkBuilder {
         self
     }
 
-    pub fn fill_range<F, T, B, C>(mut self, from: F, to: T, mut block: C) -> Self
+    /// Panics if invalid range for BlockPosition
+    pub fn fill_range<B, C>(
+        mut self,
+        (fx, fy, fz): (i32, i32, i32),
+        (tx, ty, tz): (i32, i32, i32),
+        mut block: C,
+    ) -> Self
     where
-        F: Into<BlockPosition>,
-        T: Into<BlockPosition>,
         B: Into<Block>,
         C: FnMut((i32, i32, i32)) -> B,
     {
-        let [fx, fy, fz]: [i32; 3] = from.into().into();
-        let [tx, ty, tz]: [i32; 3] = to.into().into();
-
         for pos in iter_3d(fx..=tx, fy..=ty, fz..=tz) {
             self = self.set_block(pos, block(pos));
         }
@@ -115,12 +117,13 @@ impl ChunkBuilder {
 impl ChunkBuilderApply {
     /// Needs to take self by reference instead of value like ChunkBuilder, so can't simply
     /// use DerefMut
-    pub fn set_block<P, B>(&mut self, pos: P, block: B) -> &mut Self
-    where
-        P: Into<BlockPosition>,
-        B: Into<Block>,
-    {
-        self.0.set_block(pos, block, SlabCreationPolicy::CreateAll);
+    pub fn set_block(&mut self, pos: (i32, i32, i32), block: impl Into<Block>) -> &mut Self {
+        self.0.set_block(
+            BlockPosition::try_from(pos)
+                .unwrap_or_else(|_| panic!("bad chunk coordinate {:?}", pos)),
+            block,
+            SlabCreationPolicy::CreateAll,
+        );
         self
     }
 }
@@ -190,12 +193,12 @@ mod tests {
             .into_inner();
 
         assert_eq!(
-            c.get_block((2, 2, 1)).unwrap().block_type(),
+            c.get_block_tup((2, 2, 1)).unwrap().block_type(),
             BlockType::Stone
         );
 
         assert_eq!(
-            c.get_block((3, 3, 3)).unwrap().block_type(),
+            c.get_block_tup((3, 3, 3)).unwrap().block_type(),
             BlockType::Grass
         );
     }
@@ -211,11 +214,11 @@ mod tests {
             .into_inner();
 
         assert_eq!(
-            c.get_block((1, 1, 1)).map(|b| b.block_type()),
+            c.get_block_tup((1, 1, 1)).map(|b| b.block_type()),
             Some(BlockType::Grass)
         );
         assert_eq!(
-            c.get_block((1, 2, 1)).map(|b| b.block_type()),
+            c.get_block_tup((1, 2, 1)).map(|b| b.block_type()),
             Some(BlockType::Grass)
         );
     }

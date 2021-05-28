@@ -91,7 +91,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
 }
 
 fn block_centre(block: SliceBlock) -> (f32, f32) {
-    let SliceBlock(x, y) = block;
+    let (x, y) = block.xy();
     (
         // +0.5 to render in the center of the block, which is the block mesh's origin
         f32::from(x) + 0.5,
@@ -341,7 +341,7 @@ mod tests {
     fn greedy_single_block() {
         let slab = {
             let mut slab = Slab::empty();
-            slab.slice_mut(LocalSliceIndex::new(0))
+            slab.slice_mut(LocalSliceIndex::new_unchecked(0))
                 .set_block((0, 0), BlockType::Stone);
             slab
         };
@@ -364,9 +364,9 @@ mod tests {
     fn greedy_column() {
         let slab = {
             let mut slab = Slab::empty();
-            slab.slice_mut(LocalSliceIndex::new(1))
+            slab.slice_mut(LocalSliceIndex::new_unchecked(1))
                 .set_block((1, 1), BlockType::Stone);
-            slab.slice_mut(LocalSliceIndex::new(2))
+            slab.slice_mut(LocalSliceIndex::new_unchecked(2))
                 .set_block((1, 1), BlockType::Stone);
             slab
         };
@@ -384,9 +384,9 @@ mod tests {
     fn greedy_plane() {
         let slab = {
             let mut slab = Slab::empty();
-            slab.slice_mut(LocalSliceIndex::new(0))
+            slab.slice_mut(LocalSliceIndex::new_unchecked(0))
                 .fill(BlockType::Stone);
-            slab.slice_mut(LocalSliceIndex::new(1))
+            slab.slice_mut(LocalSliceIndex::new_unchecked(1))
                 .set_block((1, 1), BlockType::Grass);
             slab
         };

@@ -2,20 +2,28 @@ use common::derive_more::*;
 use common::*;
 
 use crate::world::{
-    BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
 };
-use std::ops::Add;
+
+use std::convert::TryFrom;
 
 /// A block in a chunk. Only valid coords are represented by this type
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
 pub struct BlockPosition(BlockCoord, BlockCoord, GlobalSliceIndex);
 
 impl BlockPosition {
-    pub fn new(x: BlockCoord, y: BlockCoord, z: GlobalSliceIndex) -> Self {
-        // TODO return Option/implement TryFrom for all coord types instead of asserts
-        assert!(x < CHUNK_SIZE.as_block_coord(), "x={} is out of range", x);
-        assert!(y < CHUNK_SIZE.as_block_coord(), "y={} is out of range", y);
-        Self(x, y, z)
+    /// None if x/y are out of range
+    pub fn new(x: BlockCoord, y: BlockCoord, z: GlobalSliceIndex) -> Option<Self> {
+        if x < CHUNK_SIZE.as_block_coord() && y < CHUNK_SIZE.as_block_coord() {
+            Some(Self(x, y, z))
+        } else {
+            None
+        }
+    }
+
+    /// Panics if x/y are out of range
+    pub fn new_unchecked(x: BlockCoord, y: BlockCoord, z: GlobalSliceIndex) -> Self {
+        Self::new(x, y, z).unwrap_or_else(|| panic!("coords out of range: {:?}", (x, y, z)))
     }
 
     pub fn to_world_position<P: Into<ChunkLocation>>(self, chunk_pos: P) -> WorldPosition {
@@ -53,10 +61,8 @@ impl BlockPosition {
     }
 
     pub fn try_add_xyz(mut self, (dx, dy, dz): (i16, i16, i32)) -> Option<Self> {
-        GlobalSliceIndex::try_from(self.2.slice() + dz).and_then(|z| {
-            self.2 = z;
-            self.try_add_xy((dx, dy))
-        })
+        self.2 = GlobalSliceIndex::new(self.2.slice() + dz);
+        self.try_add_xy((dx, dy))
     }
 
     pub const fn x(self) -> BlockCoord {
@@ -69,8 +75,12 @@ impl BlockPosition {
         self.2
     }
 
-    pub fn xyz(self) -> [i32; 3] {
-        [self.0 as i32, self.1 as i32, self.2.slice()]
+    pub fn xyz(self) -> (BlockCoord, BlockCoord, GlobalSliceIndex) {
+        (self.0, self.1, self.2)
+    }
+
+    pub fn above_by(self, n: i32) -> Self {
+        Self(self.0, self.1, self.2 + n)
     }
 }
 
@@ -86,25 +96,14 @@ impl Display for BlockPosition {
     }
 }
 
-impl From<(BlockCoord, BlockCoord, i32)> for BlockPosition {
-    fn from(pos: (BlockCoord, BlockCoord, i32)) -> Self {
-        let (x, y, z) = pos;
-        Self::new(x, y, SliceIndex::new(z))
-    }
-}
+impl TryFrom<(i32, i32, i32)> for BlockPosition {
+    type Error = ();
 
-impl From<(i32, i32, i32)> for BlockPosition {
-    fn from(pos: (i32, i32, i32)) -> Self {
-        let (x, y, z) = pos;
-        Self::new(x as BlockCoord, y as BlockCoord, SliceIndex::new(z))
-    }
-}
-
-impl From<&[i32; 3]> for BlockPosition {
-    //noinspection DuplicatedCode
-    fn from(pos: &[i32; 3]) -> Self {
-        let &[x, y, z] = pos;
-        Self::new(x as BlockCoord, y as BlockCoord, SliceIndex::new(z))
+    fn try_from((x, y, z): (i32, i32, i32)) -> Result<Self, Self::Error> {
+        match (BlockCoord::try_from(x), BlockCoord::try_from(y)) {
+            (Ok(x), Ok(y)) => Self::new(x, y, GlobalSliceIndex::new(z)).ok_or(()),
+            _ => Err(()),
+        }
     }
 }
 
@@ -123,13 +122,5 @@ impl From<WorldPosition> for BlockPosition {
             y.rem_euclid(CHUNK_SIZE.as_i32()) as BlockCoord,
             z,
         )
-    }
-}
-
-impl Add<(BlockCoord, BlockCoord, i32)> for BlockPosition {
-    type Output = Self;
-
-    fn add(self, (x, y, z): (BlockCoord, BlockCoord, i32)) -> Self::Output {
-        Self::new(self.0 + x, self.1 + y, self.2 + z)
     }
 }

@@ -507,8 +507,8 @@ mod tests {
     use std::time::Duration;
 
     use unit::world::{
-        all_slabs_in_range, ChunkLocation, RangePosition, SlabPosition, WorldPosition,
-        WorldPositionRange, CHUNK_SIZE,
+        all_slabs_in_range, ChunkLocation, SlabPosition, WorldPosition, WorldPositionRange,
+        CHUNK_SIZE,
     };
 
     use crate::block::BlockType;
@@ -589,7 +589,7 @@ mod tests {
                     let x = rando.gen_range(-XY_RANGE, XY_RANGE);
                     let y = rando.gen_range(-XY_RANGE, XY_RANGE);
                     let z = rando.gen_range(-Z_RANGE, Z_RANGE);
-                    let pos = WorldPosition::new((x, y, z));
+                    let pos = WorldPosition::from((x, y, z));
                     let block_type = block_types.choose(&mut rando).unwrap().to_owned();
 
                     (pos, block_type)

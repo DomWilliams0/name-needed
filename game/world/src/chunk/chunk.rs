@@ -5,7 +5,6 @@ use unit::world::{
     WorldPosition,
 };
 
-use crate::block::BlockType;
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::terrain::RawChunkTerrain;
@@ -96,12 +95,8 @@ impl<C: WorldContext> Chunk<C> {
         (x as u64) << 32 | (y as u64)
     }
 
-    pub fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> Option<BlockType> {
-        self.get_block(pos).map(|b| b.block_type())
-    }
-
     pub(crate) fn area_for_block(&self, pos: WorldPosition) -> Option<WorldArea> {
-        self.get_block(pos).map(|b| {
+        self.get_block(pos.into()).map(|b| {
             let area_index = b.area_index();
             let block_pos: BlockPosition = pos.into();
             WorldArea {
@@ -383,7 +378,10 @@ mod tests {
             .into_inner();
 
         // slice 1 was filled
-        assert_eq!(chunk.get_block_type((2, 3, 1)), Some(BlockType::Dirt));
+        assert_eq!(
+            chunk.get_block_tup((2, 3, 1)).map(|b| b.block_type()),
+            Some(BlockType::Dirt)
+        );
 
         // collect slice
         let slice: Vec<BlockType> = chunk
@@ -396,9 +394,18 @@ mod tests {
         assert_eq!(slice.iter().filter(|b| **b != BlockType::Air).count(), 3); // ensure exact number of filled blocks
 
         // ensure each exact coord was filled
-        assert_eq!(chunk.get_block_type((0, 0, 0)), Some(BlockType::Dirt));
-        assert_eq!(chunk.get_block_type((1, 1, 0)), Some(BlockType::Dirt));
-        assert_eq!(chunk.get_block_type((2, 2, 0)), Some(BlockType::Dirt));
+        assert_eq!(
+            chunk.get_block_tup((0, 0, 0)).map(|b| b.block_type()),
+            Some(BlockType::Dirt)
+        );
+        assert_eq!(
+            chunk.get_block_tup((1, 1, 0)).map(|b| b.block_type()),
+            Some(BlockType::Dirt)
+        );
+        assert_eq!(
+            chunk.get_block_tup((2, 2, 0)).map(|b| b.block_type()),
+            Some(BlockType::Dirt)
+        );
     }
 
     #[test]
@@ -419,16 +426,16 @@ mod tests {
         c.blocks(&mut blocks);
         let mut b = blocks.into_iter();
         assert_eq!(
-            b.next().map(|(p, b)| (p, b.block_type())),
-            Some(((0, 0, 0).into(), BlockType::Air))
+            b.next().map(|(p, b)| (p.xyz(), b.block_type())),
+            Some(((0, 0, 0.into()), BlockType::Air))
         );
         assert_eq!(
-            b.next().map(|(p, b)| (p, b.block_type())),
-            Some(((1, 0, 0).into(), BlockType::Air))
+            b.next().map(|(p, b)| (p.xyz(), b.block_type())),
+            Some(((1, 0, 0.into()), BlockType::Air))
         );
         assert_eq!(
-            b.next().map(|(p, b)| (p, b.block_type())),
-            Some(((2, 0, 0).into(), BlockType::Air))
+            b.next().map(|(p, b)| (p.xyz(), b.block_type())),
+            Some(((2, 0, 0.into()), BlockType::Air))
         );
     }
 }

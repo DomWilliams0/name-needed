@@ -163,11 +163,11 @@ impl<C: WorldContext> World<C> {
         Ok(self.area_graph.find_area_path(from_area, to_area)?)
     }
 
-    fn find_block_path<F: Into<BlockPosition>, T: Into<BlockPosition>>(
+    fn find_block_path(
         &self,
         area: WorldArea,
-        from: F,
-        to: T,
+        from: BlockPosition,
+        to: BlockPosition,
         target: SearchGoal,
     ) -> Result<BlockPath, NavigationError> {
         let block_graph = self
@@ -266,13 +266,13 @@ impl<C: WorldContext> World<C> {
             // continue from the entry point in the next chunk
             start = {
                 let extended = b_entry.direction.extend_across_boundary(exit);
-                extended + (0, 0, b_entry.cost.z_offset())
+                extended.above_by(b_entry.cost.z_offset())
             };
         }
 
         // final block path from entry of final area to goal
         let final_area = area_path.0.last().unwrap();
-        let block_path = self.find_block_path(final_area.area, start, to, goal)?;
+        let block_path = self.find_block_path(final_area.area, start, to.into(), goal)?;
         let real_target = block_path.target.to_world_position(final_area.area.chunk);
         full_path.extend(convert_block_path(final_area.area, block_path));
 
@@ -493,7 +493,7 @@ impl<C: WorldContext> World<C> {
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
         let pos = pos.into();
         self.find_chunk_with_pos(ChunkLocation::from(pos))
-            .and_then(|chunk| chunk.get_block(pos))
+            .and_then(|chunk| chunk.get_block(pos.into()))
     }
 
     /// Mutates terrain silently to the loader, ensure the loader knows about this
@@ -533,7 +533,7 @@ impl<C: WorldContext> World<C> {
                     let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
                     chunk
                         .raw_terrain()
-                        .find_accessible_block(SliceBlock(x, y), None, None)
+                        .find_accessible_block(SliceBlock::new_unchecked(x, y), None, None)
                         .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                 }
 
@@ -594,7 +594,7 @@ impl<C: WorldContext> World<C> {
         let chunk_pos = ChunkLocation::from(block_pos);
         let block = self
             .find_chunk_with_pos(chunk_pos)
-            .and_then(|chunk| chunk.get_block(block_pos));
+            .and_then(|chunk| chunk.get_block(block_pos.into()));
 
         let area = match block {
             None => return AreaLookup::BadPosition,
@@ -1178,6 +1178,7 @@ mod tests {
     use crate::world::ContiguousChunkIterator;
     use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext};
     use config::WorldPreset;
+    use std::convert::TryFrom;
 
     #[test]
     fn world_path_single_block_in_y_direction() {
@@ -1311,8 +1312,8 @@ mod tests {
         ])
         .into_inner();
 
-        let from = BlockPosition::from((0, 2, 5)).to_world_position((3, 5));
-        let to = BlockPosition::from((5, 8, 7)).to_world_position((6, 3));
+        let from = BlockPosition::new_unchecked(0, 2, 5.into()).to_world_position((3, 5));
+        let to = BlockPosition::new_unchecked(5, 8, 7.into()).to_world_position((6, 3));
 
         let path = world.find_path(from, to).expect("path should succeed");
         assert_eq!(path.target(), to);
@@ -1341,8 +1342,10 @@ mod tests {
         // logging::for_tests();
         let world = world_from_chunks_blocking(presets::ring()).into_inner();
 
-        let src = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
-        let dst = BlockPosition::new(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
+        let src =
+            BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
+        let dst =
+            BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
 
         let _ = world.find_path(src, dst).expect("path should succeed");
     }
@@ -1492,7 +1495,10 @@ mod tests {
 
         w.apply_occlusion_update(OcclusionChunkUpdate(
             ChunkLocation(0, 0),
-            vec![(pos.into(), NeighbourOpacity::all_solid())],
+            vec![(
+                BlockPosition::try_from(pos).unwrap(),
+                NeighbourOpacity::all_solid(),
+            )],
         ));
 
         // use old slab reference to keep it alive until here
@@ -1535,7 +1541,7 @@ mod tests {
     #[ignore]
     #[test]
     fn random_terrain_updates_stresser() {
-        const CHUNK_RADIUS: i32 = 8;
+        // const CHUNK_RADIUS: i32 = 8;
         const TERRAIN_HEIGHT: f64 = 400.0;
 
         const UPDATE_SETS: usize = 100;

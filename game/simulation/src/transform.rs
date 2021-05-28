@@ -82,7 +82,11 @@ impl TransformComponent {
     }
 
     pub fn feelers_bounds(&self, bounding_radius: f32) -> Bounds {
-        let feelers = self.velocity + (self.velocity.normalize() * bounding_radius);
+        let feelers = if self.velocity.is_zero() {
+            self.velocity // avoid normalizing 0 to get NaN
+        } else {
+            self.velocity + (self.velocity.normalize() * bounding_radius)
+        };
         let centre = self.position + feelers;
 
         const EXTRA: f32 = 1.25;

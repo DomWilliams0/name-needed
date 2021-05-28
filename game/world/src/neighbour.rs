@@ -1,10 +1,11 @@
 use std::hint::unreachable_unchecked;
 use std::marker::PhantomData;
 
+use std::convert::{TryFrom, TryInto};
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation};
 
-pub struct Neighbours<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]>> {
+pub struct Neighbours<B, P> {
     block: P,
     current: u8,
     _phantom: PhantomData<B>,
@@ -45,7 +46,7 @@ impl NeighboursBehaviour for World {
     }
 }
 
-impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]>> Neighbours<B, P> {
+impl<B: NeighboursBehaviour, P> Neighbours<B, P> {
     const HORIZONTAL_OFFSETS: [(i32, i32); 4] = [(-1, 0), (0, -1), (0, 1), (1, 0)];
 
     pub fn new(block: P) -> Self {
@@ -57,7 +58,7 @@ impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]>> Neighbours<B, P
     }
 }
 
-impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]> + Clone> Iterator
+impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + TryFrom<[i32; 3]> + Clone> Iterator
     for Neighbours<B, P>
 {
     type Item = P;
@@ -82,7 +83,11 @@ impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + From<[i32; 3]> + Clone> Iterato
                 [nx, ny, z]
             };
 
-            return Some(n.into());
+            if let Ok(p) = n.try_into() {
+                return Some(p);
+            } else {
+                continue;
+            }
         }
 
         None
@@ -208,7 +213,7 @@ impl NeighbourOffset {
             }
         };
 
-        BlockPosition::new(x, y, z)
+        BlockPosition::new_unchecked(x, y, z)
     }
 
     pub fn position_on_boundary(self, other_coord: BlockCoord) -> (BlockCoord, BlockCoord) {

@@ -35,37 +35,36 @@ pub const SCALE: f32 = 0.5;
 
 #[cfg(test)]
 mod tests {
-    use std::f32::EPSILON;
 
     use common::*;
 
     use crate::world::{
-        BlockPosition, ChunkLocation, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+        BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
     };
 
     #[test]
     fn block_to_world() {
         // ensure block positions convert to the expected world position
-        let b = BlockPosition::new(1, 2, SliceIndex::new(3));
+        let b = BlockPosition::new_unchecked(1, 2, GlobalSliceIndex::new(3));
 
         // at origin
         let (x, y, z) = b.to_world_point((0, 0)).xyz();
-        assert!(x.approx_eq(1.0, (EPSILON, 2)));
-        assert!(y.approx_eq(2.0, (EPSILON, 2)));
-        assert!(z.approx_eq(3.0, (EPSILON, 2)));
+        assert!(x.approx_eq(1.0, (f32::EPSILON, 2)));
+        assert!(y.approx_eq(2.0, (f32::EPSILON, 2)));
+        assert!(z.approx_eq(3.0, (f32::EPSILON, 2)));
 
         // a few chunks over
         let (x, y, z) = b.to_world_point((1, 2)).xyz();
         let sz: f32 = CHUNK_SIZE.as_f32();
-        assert!(x.approx_eq(1.0 + sz, (EPSILON, 2)));
-        assert!(y.approx_eq(2.0 + sz + sz, (EPSILON, 2)));
-        assert!(z.approx_eq(3.0, (EPSILON, 2)));
+        assert!(x.approx_eq(1.0 + sz, (f32::EPSILON, 2)));
+        assert!(y.approx_eq(2.0 + sz + sz, (f32::EPSILON, 2)));
+        assert!(z.approx_eq(3.0, (f32::EPSILON, 2)));
     }
 
     #[test]
     fn negative_block_to_world() {
         // negative chunk coords should be handled fine
-        let b: BlockPosition = (0, 0, 0).into();
+        let b: BlockPosition = BlockPosition::new_unchecked(0, 0, GlobalSliceIndex::new(0));
         let wp = b.to_world_point((-1, -1));
         assert_eq!(
             wp,
@@ -76,16 +75,16 @@ mod tests {
     #[test]
     fn world_to_chunk() {
         assert_eq!(
-            ChunkLocation::from(WorldPosition(10, 20, SliceIndex::new(50))),
+            ChunkLocation::from(WorldPosition(10, 20, GlobalSliceIndex::new(50))),
             ChunkLocation(0, 1)
         );
         assert_eq!(
-            ChunkLocation::from(WorldPosition(-20, -40, SliceIndex::new(50))),
+            ChunkLocation::from(WorldPosition(-20, -40, GlobalSliceIndex::new(50))),
             ChunkLocation(-2, -3)
         );
 
         assert_eq!(
-            ChunkLocation::from(WorldPosition(-2, 2, SliceIndex::new(0))),
+            ChunkLocation::from(WorldPosition(-2, 2, GlobalSliceIndex::new(0))),
             ChunkLocation(-1, 0)
         );
     }
@@ -93,8 +92,8 @@ mod tests {
     #[test]
     fn negative_world_to_block() {
         assert_eq!(
-            BlockPosition::from(WorldPosition(-10, -10, SliceIndex::new(-10))),
-            BlockPosition::from((6, 6, SliceIndex::new(-10)))
+            BlockPosition::from(WorldPosition(-10, -10, GlobalSliceIndex::new(-10))),
+            BlockPosition::new_unchecked(6, 6, GlobalSliceIndex::new(-10))
         );
     }
 }
