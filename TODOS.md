@@ -1,4 +1,4 @@
-# TODOs (322)
+# TODOs (324)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -387,10 +387,12 @@
    * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
+ * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
-   * `// TODO zoom`
+   * `// TODO if mouse wheel is reused for anything else, add an input event for it`
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (3)
+   * `// TODO zoom into mouse position/screen centre`
+   * `// TODO interpolate zoom`
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO smallvec`

@@ -13,8 +13,9 @@ pub struct Config {
 pub struct Display {
     pub resolution: (u32, u32),
     pub resizable: bool,
-    pub camera_speed: f32,
-    pub zoom: f32,
+    pub camera_move_speed: f32,
+    pub camera_zoom_speed: f32,
+    pub initial_zoom: f32,
     pub initial_view_range: u16,
     pub persist_ui: bool,
 }

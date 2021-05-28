@@ -2,8 +2,9 @@ Config(
     display: (
         resolution: (1280, 720),
         resizable: false,
-        camera_speed: 1.0,
-        zoom: 1.0,
+        camera_move_speed: 1.0,
+        initial_zoom: 1.0,
+        camera_zoom_speed: 0.05,
         initial_view_range: 8,
         persist_ui: true,
     ),

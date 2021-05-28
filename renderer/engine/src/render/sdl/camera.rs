@@ -26,7 +26,7 @@ impl Camera {
             velocity: Vector2::zero(),
             pos: Point2::new(0.0, 0.0),
             last_extrapolated_pos: Point2::new(0.0, 0.0),
-            zoom: config::get().display.zoom,
+            zoom: config::get().display.initial_zoom,
             window_size: Vector2::zero(), // set in on_resize
         };
         cam.on_resize(width, height);
@@ -60,8 +60,23 @@ impl Camera {
     }
 
     pub fn handle_move(&mut self, direction: CameraDirection, is_down: bool) {
-        // TODO zoom
         self.input[direction as usize] = is_down;
+    }
+
+    pub fn handle_zoom(&mut self, mut delta: i32) {
+        if delta.abs() > 1 {
+            warn!(
+                "mouse wheel scrolled faster than expected, investigate me ({})",
+                delta
+            );
+            delta = delta.signum();
+        }
+
+        let speed = config::get().display.camera_zoom_speed;
+        self.zoom = (self.zoom - (speed * delta as f32)).clamp(0.1, 6.0);
+
+        // TODO zoom into mouse position/screen centre
+        // TODO interpolate zoom
     }
 
     pub fn tick(&mut self) -> (ChunkLocation, ChunkLocation) {
@@ -77,7 +92,7 @@ impl Camera {
         self.pos += self.velocity;
 
         if dx != 0 || dy != 0 {
-            let speed = config::get().display.camera_speed;
+            let speed = config::get().display.camera_move_speed;
             self.velocity.x = dx as f32 * speed;
             self.velocity.y = dy as f32 * speed;
         } else {
