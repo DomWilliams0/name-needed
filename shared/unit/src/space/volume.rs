@@ -19,7 +19,7 @@ use common::{derive_more::*, *};
 pub struct Volume(u16);
 
 impl Display for Volume {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(&self.0, f)
     }
 }

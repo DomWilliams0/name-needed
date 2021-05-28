@@ -7,8 +7,8 @@ use crate::physics::{Bounds, PhysicsComponent};
 
 use common::cgmath::Rotation;
 use serde::Deserialize;
-use unit::length::{Length, Length3};
-use unit::volume::Volume;
+use unit::space::length::{Length, Length3};
+use unit::space::volume::Volume;
 
 /// Position and rotation component
 #[derive(Debug, Clone, Component, EcsComponent)]

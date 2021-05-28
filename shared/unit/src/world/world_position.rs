@@ -4,7 +4,7 @@ use common::derive_more::*;
 
 use common::*;
 
-use crate::view::ViewPoint;
+use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPoint, SCALE};
 
 /// A block anywhere in the world. All possible values are valid

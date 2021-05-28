@@ -54,7 +54,7 @@ impl Display for Length3 {
 
 #[cfg(test)]
 mod tests {
-    use crate::length::Length3;
+    use crate::space::length::Length3;
 
     #[test]
     fn fits() {

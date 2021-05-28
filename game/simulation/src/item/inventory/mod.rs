@@ -1,5 +1,5 @@
-use unit::length::Length3;
-use unit::volume::Volume;
+use unit::space::length::Length3;
+use unit::space::volume::Volume;
 
 use crate::ecs::Entity;
 

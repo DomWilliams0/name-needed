@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use color::ColorRgb;
 use common::*;
 use simulation::{BaseVertex, WorldViewer};
-use unit::view::ViewPoint;
+use unit::space::view::ViewPoint;
 use unit::world::{ChunkLocation, WorldPoint};
 
 use crate::render::sdl::gl::{

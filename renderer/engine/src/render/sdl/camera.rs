@@ -3,7 +3,7 @@ use cgmath::ortho;
 use common::input::CameraDirection;
 use common::*;
 use std::convert::TryFrom;
-use unit::view::ViewPoint;
+use unit::space::view::ViewPoint;
 use unit::world::CHUNK_SIZE;
 use unit::world::{ChunkLocation, WorldPoint, WorldPosition, SCALE};
 

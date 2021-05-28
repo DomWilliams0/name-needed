@@ -1,4 +1,4 @@
-# TODOs (323)
+# TODOs (322)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -439,8 +439,6 @@
    * `// TODO helper for this-1`
  * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
    * `// TODO pub mod hunger;`
- * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)
-   * `// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_block.rs](shared/unit/src/world/slice_block.rs) (1)

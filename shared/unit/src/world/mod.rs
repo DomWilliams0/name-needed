@@ -28,8 +28,6 @@ mod slice_index;
 mod world_point;
 mod world_position;
 
-// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos
-
 /// 2 blocks per 1m
 pub const SCALE: f32 = 0.5;
 

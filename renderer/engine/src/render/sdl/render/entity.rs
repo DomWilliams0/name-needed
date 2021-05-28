@@ -7,7 +7,7 @@ use color::ColorRgb;
 use common::*;
 use resources::Shaders;
 use simulation::Shape2d;
-use unit::view::ViewPoint;
+use unit::space::view::ViewPoint;
 use unit::world::{WorldPoint, SCALE};
 
 pub(crate) struct EntityPipeline {
