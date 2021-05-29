@@ -179,7 +179,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: occlusion shadows cast by blocks above current viewing slice (like treetops) look very weird
 
 ## Building and testing
-* enable scripting in release builds
 * separate config and preset for tests
 * fuzzing
 * stress test(s)
