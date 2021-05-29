@@ -1,4 +1,4 @@
-# TODOs (325)
+# TODOs (324)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -445,7 +445,5 @@
    * `// TODO pub mod hunger;`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
- * [shared/unit/src/world/slice_block.rs](shared/unit/src/world/slice_block.rs) (1)
-   * `/// TODO newtype for BlockCoord with validation`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
    * `// TODO ideally handle global slice integer overflow, although unlikely`

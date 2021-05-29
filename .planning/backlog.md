@@ -6,15 +6,19 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ## Entity movement
 * navigation graph edges for larger step sizes
 	* can fall e.g. 2 or 3m
-	* cats can jump 2m
-	* humans can jump 1m
+	* cats can jump several voxels
+	* humans can jump 1 or 2 voxels
+* path finding should take physical size into account
+	* small rodents can take small 1x1x1 routes but people cannot
+	* area path does not guarantee the full block path will be wide enough
+		* consider multiple area path candidates during navigation?
 * lazy path evaluation (area at a time)
 * path optimisation (line of sight)
 	* avoid brushing too close to obstacles too - they're prone to whizzing up tree trunks if they wander close enough
 * wandering should choose a close location instead of random in the world
-	* new SearchGoal to cut short path to N blocks
 	* wander should not take them up into stupid places like atop chests
 		* consider different edge costs for climbing ontop of stupid things, not considered for wandering/walking
+* don't always take the most optimal route, change it slightly so everyone doesn't walk around on exactly the same rails
 * path invalidation on world change
 * walk speed enum scale (wander, dawdle, walk, sprint, etc)
 * improve path finding
@@ -45,10 +49,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
 	* expose via helper on NameComponent and replace all the current duplication with "unnamed"
 * ui button to skip up/down to next surface
-* ring buffer of per-entity events in a Log ui tab, e.g. decided to do X, picked up X, ate X
 * inventory window (separate from debug window) to show items in person's inventory/container in a nice way
 * common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
+* view list of components on selected entity
+	* reflection-like api to do actions per-component in ui?
 
 ## Entity behaviour
 * more society level jobs
@@ -93,6 +98,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 		entities must be aware of this! all distance checks must take this into account (https://blog.demofox.org/2017/10/01/calculating-the-distance-between-points-in-wrap-around-toroidal-space/)
 		use different base noise for biomes and blend (http://parzivail.com/procedural-terrain-generaion/)
 		* chunk and region resolution should wrap around explicitly/fail in generator. should the world loader wrap coords
+		* add newtype for unit-agnostic distances between worldpoints/viewpoints in voxels/metres
 * unique species and settlements with societies to discover in different environments
 	* underground species with no eyes, cave houses
 	* underwater people
@@ -222,7 +228,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * birds/small animals swarm food crumbs left by someone eating
 
 ### Dogs
-* bug: dogs should not be able to be directly controlled like humans
 * dogs pick up sticks, move faster than humans, chase cats
 * breeds have different characteristics
 	* soft mouth vs hard mouth
@@ -236,6 +241,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * people (who like dogs) see dogs and go over to pet for emotional support
 	* can also play fetch with a stick and other riveting games
 * dogs play together e.g. tag
+* bug: dogs can break blocks if ordered to
 
 
 ## Simulation depth

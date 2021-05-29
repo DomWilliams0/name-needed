@@ -3,7 +3,6 @@ use common::derive_more::*;
 use crate::world::{BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, CHUNK_SIZE};
 
 /// A block in a chunk x/y coordinate. Must be < chunk size
-/// TODO newtype for BlockCoord with validation
 pub type BlockCoord = u8;
 
 /// A block in a slice

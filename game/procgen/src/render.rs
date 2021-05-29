@@ -316,7 +316,11 @@ impl Render {
                 for y in 0..CHUNK_SIZE.as_block_coord() {
                     for x in 0..CHUNK_SIZE.as_block_coord() {
                         for z in (0..SLAB_SIZE.as_i32()).rev() {
-                            let pos = SlabPosition::new_unchecked(x, y, LocalSliceIndex::new_unchecked(z));
+                            let pos = SlabPosition::new_unchecked(
+                                x,
+                                y,
+                                LocalSliceIndex::new_unchecked(z),
+                            );
                             let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;
