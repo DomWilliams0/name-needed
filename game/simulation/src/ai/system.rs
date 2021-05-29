@@ -82,6 +82,7 @@ impl AiComponent {
 pub struct AiSystem;
 
 impl<'a> System<'a> for AiSystem {
+    // TODO optional components for ai: hunger, inventory
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
@@ -134,6 +135,7 @@ impl<'a> System<'a> for AiSystem {
             .join()
         {
             log_scope!(o!("system" => "ai", E(e)));
+            let society_opt: Option<&SocietyComponent> = society_opt; // for IDE
 
             // initialize blackboard
             // TODO use arena/bump allocator and share instance between entities
@@ -149,13 +151,13 @@ impl<'a> System<'a> for AiSystem {
                 shared: &mut shared_bb,
             };
 
-            // Safety: can't use true lifetime on Blackboard so using 'static and transmuting until
+            // safety: can't use true lifetime on Blackboard so using 'static and transmuting until
             // we get our GATs
-            let bb_ref: &mut AiBlackboard = unsafe { std::mem::transmute(&mut bb) };
+            let bb_ref: &'a mut AiBlackboard = unsafe { std::mem::transmute(&mut bb) };
 
             // collect extra actions from society job list, if any
             // TODO provide READ ONLY DSEs to ai intelligence
-            // TODO use dynstack to avoid so many small temporary allocations?
+            // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             let mut extra_dses = Vec::<(Task, Box<dyn Dse<AiContext>>)>::new();
             let society = society_opt.and_then(|comp| comp.resolve(societies));
 
@@ -188,10 +190,11 @@ impl<'a> System<'a> for AiSystem {
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_task, dse)| &**dse);
-            if let IntelligentDecision::New { dse, action, src } = ai
+            let decision = ai
                 .intelligence
-                .choose_with_stream_dses(bb_ref, streamed_dse)
-            {
+                .choose_with_stream_dses(bb_ref, streamed_dse);
+
+            if let IntelligentDecision::New { dse, action, src } = decision {
                 debug!("new activity"; "dse" => dse.name(), "source" => ?src);
                 trace!("activity action"; "action" => ?action);
 
@@ -212,6 +215,7 @@ impl<'a> System<'a> for AiSystem {
                     society.jobs_mut().reserve_task(e, task.clone());
                 }
 
+                // log decision
                 if let Some(logs) = logging.get_mut(e) {
                     logs.log_event(&action);
                 }

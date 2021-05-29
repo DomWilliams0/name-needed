@@ -82,9 +82,9 @@ fn do_main() -> BoxedResult<()> {
         match resolved {
             Some((name, s)) => {
                 info!(
-                    "resolved scenario '{scenario} to {function:#x}'",
+                    "resolved scenario '{scenario}' to {:#x}",
+                    s as usize,
                     scenario = name,
-                    function = s as usize
                 );
                 s
             }

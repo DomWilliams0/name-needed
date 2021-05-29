@@ -7,6 +7,7 @@ use crate::ComponentWorld;
 use ai::Dse;
 use unit::world::WorldPosition;
 
+/// Lightweight, atomic, reservable, agnostic of the owning job.
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Task {
     BreakBlock(WorldPosition),

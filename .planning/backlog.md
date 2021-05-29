@@ -27,6 +27,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * tweak arrival threshold for path waypoints, it's a bit jerky
 * bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
 * apply gravity to item entities too, for when block beneath them is mined
+* ensure velocity and acceleration is really m/s instead of voxels/s
 
 ## UI/input
 * graph for fps/tps history
@@ -70,6 +71,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: society job is not notified if a subtask fails, causing it to be infinitely attempted
 	* e.g. haul things into a container but it's full, navigating to an inacessible position
 	* a set of completed tasks should be maintained per job
+* revamp hauling to add different methods
+	* carrying (add a new TransformChild component)
+	* dragging/pushing
 
 ## World generation
 * better biome generation

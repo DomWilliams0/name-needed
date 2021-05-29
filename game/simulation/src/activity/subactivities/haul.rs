@@ -25,7 +25,7 @@ pub enum HaulError {
     #[error("Hauler doesn't have enough free hands")]
     NotEnoughFreeHands,
 
-    #[error("Item is not alive, haulable or physical")]
+    #[error("Item is not valid, haulable or physical")]
     BadItem,
 
     #[error("Invalid container entity for haul target")]

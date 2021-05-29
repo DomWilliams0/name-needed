@@ -14,6 +14,7 @@ type Entry = (&'static str, Box<Update>);
 
 pub struct QueuedUpdates {
     // TODO use dynstack for updates to avoid a separate box per entry
+    // TODO perfect use case for a per-tick arena allocator
     updates: RefCell<Vec<Entry>>,
 }
 

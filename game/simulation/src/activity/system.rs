@@ -88,7 +88,7 @@ impl<'a> System<'a> for ActivitySystem {
                 comp_updates.remove::<BlockingActivityComponent>(entity);
 
                 // replace current with new activity, dropping the old one
-                new_action.into_activity(&mut activity.current);
+                activity.current = new_action.into_activity();
             }
 
             // TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause

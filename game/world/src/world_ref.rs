@@ -4,9 +4,10 @@ use crate::{World, WorldContext};
 use std::sync::Arc;
 
 /// Reference counted reference to the world
+#[repr(transparent)]
 pub struct WorldRef<C: WorldContext>(Arc<RwLock<World<C>>>);
 
-// safety: contains an Arc and Mutex
+// safety: thin wrapper around an Arc and Mutex
 unsafe impl<C: WorldContext> Send for WorldRef<C> {}
 unsafe impl<C: WorldContext> Sync for WorldRef<C> {}
 
@@ -17,8 +18,6 @@ impl<C: WorldContext> WorldRef<C> {
     pub fn new(world: World<C>) -> Self {
         Self(Arc::new(RwLock::new(world)))
     }
-
-    // TODO don't unwrap()
 
     pub fn borrow(&self) -> InnerWorldRef<'_, C> {
         (*self.0).read()

@@ -110,13 +110,12 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (10)
+ * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
-   * `// TODO support hauling multiple things to multiple locations`
+   * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
-   * `// TODO events for items entering/exiting containers`
    * `// TODO arrival radius depends on the size of the item`
-   * `// TODO could the item ever move while we're going to it? only by gravity?`
+   * `// TODO destructive events on items should include moving`
    * `// TODO this should be in the/a subactivity`
    * `// TODO don't always drop item in centre`
    * `// TODO explicit access side for container, e.g. front of chest`
@@ -167,11 +166,12 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (6)
+   * `// TODO optional components for ai: hunger, inventory`
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
-   * `// TODO use dynstack to avoid so many small temporary allocations?`
+   * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
    * `// TODO fix (eventually) false assumption that all stream DSEs come from a society`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
    * `// TODO avoid box by resolving here and storing result`
@@ -183,9 +183,10 @@
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
-   * `/// TODO it's technically undefined to convert to spec's entity type like this`
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
    * `// TODO perfect hashing`
+ * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
+   * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
@@ -251,8 +252,9 @@
  * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (2)
    * `// TODO apply fall damage if applicable`
    * `// TODO lerp towards new rotation`
- * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (2)
+ * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (3)
    * `// TODO use dynstack for updates to avoid a separate box per entry`
+   * `// TODO perfect use case for a per-tick arena allocator`
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
@@ -387,8 +389,6 @@
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
- * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
-   * `// TODO don't unwrap()`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`

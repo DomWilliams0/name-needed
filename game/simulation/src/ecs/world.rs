@@ -188,6 +188,7 @@ impl ComponentWorld for EcsWorld {
         storage.remove(entity)
     }
 
+    // TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead
     fn add_lazy<T: Component>(&self, entity: Entity, component: T) {
         let lazy = self.read_resource::<LazyUpdate>();
         lazy.insert(entity, component);
