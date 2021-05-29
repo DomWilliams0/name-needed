@@ -48,6 +48,13 @@ pub struct ActivityEventContext {
     pub subscriber: Entity,
 }
 
+#[derive(Error, Debug)]
+#[error("Both activity and subactivity failed to finish. Activity: {activity}. Subactivity: {subactivity}")]
+pub struct ColossalActivityFailure {
+    activity: Box<dyn Error>,
+    subactivity: Box<dyn Error>,
+}
+
 #[macro_export]
 macro_rules! unexpected_event {
     ($event:expr) => {
@@ -90,11 +97,11 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
 
         match (a, b) {
             (err @ Err(_), Ok(_)) | (Ok(_), err @ Err(_)) => err,
-            (Err(a), Err(b)) => {
-                // pass through activity failure and log subactivity
-                error!("failed to finish subactivity as well as activity"; "error" => %a);
-                Err(b)
+            (Err(subactivity), Err(activity)) => Err(ColossalActivityFailure {
+                activity,
+                subactivity,
             }
+            .into()),
             _ => Ok(()), // both ok
         }
     }
