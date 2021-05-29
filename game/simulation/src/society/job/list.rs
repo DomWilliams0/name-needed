@@ -6,7 +6,7 @@ use crate::ecs::{EcsWorld, Entity};
 use crate::job::job::JobStatus;
 use crate::simulation::Tick;
 use crate::society::job::job::Job;
-use crate::society::job::task::Task;
+use crate::society::job::task::SocietyTask;
 use crate::society::job::TaskReservations;
 use crate::society::Society;
 
@@ -25,11 +25,11 @@ struct ActiveJobs {
     // TODO use dynstack instead of boxes for society jobs
     active_jobs: Vec<Box<dyn Job>>,
 
-    active_tasks: Vec<Task>,
+    active_tasks: Vec<SocietyTask>,
 }
 
 impl ActiveJobs {
-    fn collect_tasks(&mut self, world: &EcsWorld, society: &Society) -> &[Task] {
+    fn collect_tasks(&mut self, world: &EcsWorld, society: &Society) -> &[SocietyTask] {
         self.active_tasks.clear();
 
         // TODO reuse allocation
@@ -91,7 +91,7 @@ impl JobList {
         world: &EcsWorld,
         society: &Society,
         entity: Entity,
-    ) -> (bool, impl Iterator<Item = Task> + '_) {
+    ) -> (bool, impl Iterator<Item = SocietyTask> + '_) {
         let (cached, tasks) = if self.last_update == this_tick {
             // already updated this tick, return the same results
             (true, self.jobs.active_tasks.as_slice())
@@ -122,7 +122,7 @@ impl JobList {
         self.jobs.active_jobs.len()
     }
 
-    pub fn reserve_task(&mut self, entity: Entity, task: Task) {
+    pub fn reserve_task(&mut self, entity: Entity, task: SocietyTask) {
         let (prev_task, prev_reserver) = self.reserved.reserve(entity, task.clone());
         debug!("reserved task, unreserving previous";
             "task" => ?task, "prev_task" => ?prev_task,

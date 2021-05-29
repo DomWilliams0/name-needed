@@ -126,7 +126,7 @@ impl<'a> System<'a> for ActivitySystem {
                     event_queue.unsubscribe_all(entity);
                     comp_updates.remove::<BlockingActivityComponent>(entity);
 
-                    ai.interrupt_current_action(entity, || {
+                    ai.interrupt_current_action(entity, None, || {
                         society
                             .get(entity)
                             .and_then(|soc| societies.society_by_handle_mut(soc.handle))

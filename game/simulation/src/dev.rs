@@ -236,10 +236,8 @@ impl EcsExtDev<'_> {
             "queue society haul to container job",
             container_pos,
             move |world, container| {
-                let job = Box::new(
-                    HaulJob::with_target_container(haulee, container, world)
-                        .expect("cant create job"),
-                );
+                let job = HaulJob::with_target_container(haulee, container, world)
+                    .expect("cant create job");
 
                 world
                     .resource_mut::<Societies>()

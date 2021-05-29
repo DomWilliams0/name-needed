@@ -7,20 +7,20 @@ use crate::ComponentWorld;
 use ai::Dse;
 use unit::world::WorldPosition;
 
-/// Lightweight, atomic, reservable, agnostic of the owning job.
+/// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
-pub enum Task {
+pub enum SocietyTask {
     BreakBlock(WorldPosition),
     Haul(Entity, HaulTarget, HaulTarget),
     // TODO PlaceBlocks(block type, at position)
 }
 
-impl Task {
+impl SocietyTask {
     // TODO temporary box allocation is gross, use dynstack for dses
     pub fn as_dse(&self, world: &EcsWorld) -> Option<Box<dyn Dse<AiContext>>> {
         match self {
-            Task::BreakBlock(range) => Some(Box::new(BreakBlockDse(*range))),
-            Task::Haul(e, src, tgt) => {
+            SocietyTask::BreakBlock(range) => Some(Box::new(BreakBlockDse(*range))),
+            SocietyTask::Haul(e, src, tgt) => {
                 let pos = tgt.target_position(world)?;
                 let extra_hands = world
                     .component::<HaulableItemComponent>(*e)
@@ -33,6 +33,15 @@ impl Task {
                     destination: pos,
                 }))
             }
+        }
+    }
+
+    pub fn is_shareable(&self) -> bool {
+        use SocietyTask::*;
+        match self {
+            BreakBlock(_) => true,
+            // TODO some types of hauling will be shareable
+            Haul(_, _, _) => false,
         }
     }
 }

@@ -1,4 +1,4 @@
-# TODOs (324)
+# TODOs (334)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -166,13 +166,17 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (6)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (10)
    * `// TODO optional components for ai: hunger, inventory`
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
-   * `// TODO fix (eventually) false assumption that all stream DSEs come from a society`
+   * `// TODO fix eventually false assumption that all stream DSEs come from a society`
+   * `// TODO dont return a new vec`
+   * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
+   * `// TODO precalculate DSEs for tasks`
+   * `// TODO weight dse by number of existing reservations`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
    * `// TODO avoid box by resolving here and storing result`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
@@ -275,17 +279,25 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (2)
    * `// TODO return a dyn error in result`
- * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
+   * `BreakBlocks(range) => todo!(), // TODO break blocks`
+ * [game/simulation/src/society/job/job2.rs](game/simulation/src/society/job/job2.rs) (2)
+   * `// TODO remove box and make this type unsized, it's in an rc anyway`
+   * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (2)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
+   * `// TODO apply completions`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
    * `// TODO use dynstack instead of boxes for society jobs`
    * `// TODO reuse allocation`
    * `// TODO dont recalculate all unreserved tasks every tick for every entity`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (2)
+ * [game/simulation/src/society/job/list2.rs](game/simulation/src/society/job/list2.rs) (1)
+   * `// TODO filter jobs for entity`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross, use dynstack for dses`
+   * `// TODO some types of hauling will be shareable`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)

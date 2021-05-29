@@ -1,6 +1,6 @@
 use crate::ecs::EcsWorld;
 use crate::society::job::job::JobStatus;
-use crate::society::job::{Job, Task};
+use crate::society::job::{Job, SocietyTask};
 use crate::society::Society;
 use crate::{BlockType, ComponentWorld, WorldPositionRange};
 use common::derive_more::*;
@@ -14,7 +14,7 @@ impl Job for BreakBlocksJob {
         &mut self,
         world: &EcsWorld,
         _: &Society,
-        out: &mut Vec<Task>,
+        out: &mut Vec<SocietyTask>,
     ) -> JobStatus {
         let voxel_world = world.voxel_world();
         let voxel_world = voxel_world.borrow();
@@ -23,7 +23,7 @@ impl Job for BreakBlocksJob {
         out.extend(
             voxel_world
                 .filter_reachable_blocks_in_range(&self.0, |bt| bt != BlockType::Air)
-                .map(Task::BreakBlock),
+                .map(SocietyTask::BreakBlock),
         );
 
         JobStatus::TaskDependent

@@ -1,4 +1,5 @@
 pub use activities::*;
+pub(crate) use activity::ActivityFinish;
 pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 // TODO move subactivity errors somewhere else
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};

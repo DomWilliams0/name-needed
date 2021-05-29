@@ -1,7 +1,9 @@
 use common::*;
 
 use crate::ecs::{EcsWorld, Entity};
-use crate::society::job::task::Task;
+use crate::job::job2::SocietyJob;
+use crate::job::SocietyJobRef;
+use crate::society::job::task::SocietyTask;
 use crate::society::job::{BreakBlocksJob, HaulJob};
 use crate::society::Society;
 use crate::{ComponentWorld, WorldPositionRange};
@@ -13,7 +15,7 @@ pub trait Job: Display + Debug {
         &mut self,
         world: &EcsWorld,
         society: &Society,
-        out: &mut Vec<Task>,
+        out: &mut Vec<SocietyTask>,
     ) -> JobStatus;
 }
 
@@ -36,20 +38,18 @@ pub enum SocietyCommand {
 }
 
 impl SocietyCommand {
-    pub fn into_job(self, world: &impl ComponentWorld) -> Result<Box<dyn Job>, Self> {
+    pub fn into_job(self, world: &impl ComponentWorld) -> Result<SocietyJobRef, Self> {
         use self::SocietyCommand::*;
 
         // TODO return a dyn error in result
-        let job: Box<dyn Job> = match self {
-            BreakBlocks(range) => Box::new(BreakBlocksJob::new(range)),
+        Ok(match self {
+            BreakBlocks(range) => todo!(), // TODO break blocks
             HaulToPosition(e, pos) => {
-                Box::new(HaulJob::with_target_position(e, pos, world).ok_or(self)?)
+                SocietyJob::create(HaulJob::with_target_position(e, pos, world).ok_or(self)?)
             }
             HaulIntoContainer(e, container) => {
-                Box::new(HaulJob::with_target_container(e, container, world).ok_or(self)?)
+                SocietyJob::create(HaulJob::with_target_container(e, container, world).ok_or(self)?)
             }
-        };
-
-        Ok(job)
+        })
     }
 }

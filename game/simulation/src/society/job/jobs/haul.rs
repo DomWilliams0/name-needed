@@ -1,8 +1,9 @@
 use crate::activity::HaulTarget;
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
-use crate::society::job::job::JobStatus;
-use crate::society::job::{Job, Task};
+use crate::job::SocietyTaskResult;
+use crate::society::job::job2::SocietyJobImpl;
+use crate::society::job::SocietyTask;
 use crate::society::Society;
 use crate::TransformComponent;
 use common::*;
@@ -55,47 +56,53 @@ impl HaulJob {
     }
 }
 
-impl Job for HaulJob {
-    fn outstanding_tasks(
+impl SocietyJobImpl for HaulJob {
+    fn populate_initial_tasks(&self, out: &mut Vec<SocietyTask>) {
+        out.push(SocietyTask::Haul(self.entity, self.source, self.target));
+    }
+
+    fn refresh_tasks(
         &mut self,
         world: &EcsWorld,
-        _: &Society,
-        out: &mut Vec<Task>,
-    ) -> JobStatus {
-        if !world.has_component::<HauledItemComponent>(self.entity) {
-            // skip checks if item is currently being hauled
+        tasks: &mut Vec<SocietyTask>,
+        completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+    ) -> Option<SocietyTaskResult> {
+        // TODO apply completions
+        assert_eq!(completions.count(), 0, "todo");
 
+        if world.has_component::<HauledItemComponent>(self.entity) {
+            // skip checks if item is currently being hauled
+            trace!("item is being hauled");
+        } else {
             match self.target {
                 HaulTarget::Position(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => &t.position,
                         Err(_) => {
                             debug!("hauled item is missing transform"; "item" => E(self.entity));
-                            return JobStatus::Finished;
+                            return Some(SocietyTaskResult::Failure);
                         }
                     };
 
                     if WorldPoint::from(target_pos).is_almost(current_pos, 2.0) {
                         trace!("hauled item arrived at target");
-                        return JobStatus::Finished;
+                        return Some(SocietyTaskResult::Success);
                     }
                 }
                 HaulTarget::Container(target_container) => {
                     match world.component::<ContainedInComponent>(self.entity) {
                         Ok(ContainedInComponent::Container(c)) if *c == target_container => {
                             trace!("hauled item arrived in target container");
-                            return JobStatus::Finished;
+                            return Some(SocietyTaskResult::Success);
                         }
                         _ => {}
                     };
                 }
             };
-        } else {
-            trace!("item is being hauled");
         }
 
-        out.push(Task::Haul(self.entity, self.source, self.target));
-        JobStatus::Ongoing
+        // keep single haul task
+        None
     }
 }
 
