@@ -15,6 +15,7 @@ use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
 use crate::{EntityLoggingComponent, TransformComponent};
 
+use crate::job::JobIndex;
 use crate::{dse, Societies};
 
 #[derive(Component, EcsComponent)]
@@ -65,24 +66,19 @@ impl AiComponent {
                     debug!("removing interrupted divine command");
                     self.remove_divine_command();
                 }
-                DecisionSource::Stream(_)
-                    if !matches!(new_src, Some(DecisionSource::Stream(_))) =>
-                {
-                    // society task interrupted by a non-society task, so manual cancellation is needed
-                    let society = society_fn();
-                    society.jobs_mut().reservations_mut().cancel(this_entity);
-                }
-
                 DecisionSource::Stream(_) => {
-                    // interrupting society task with a new society task, no need to manually cancel
+                    if let Some(DecisionSource::Stream(_)) = new_src {
+                        // interrupting society task with a new society task, no need to manually cancel
+                    } else {
+                        // society task interrupted by a non-society task, so manual cancellation is needed
+                        let society = society_fn();
+                        society.jobs_mut().reservations_mut().cancel(this_entity);
+                    }
                 }
-                DecisionSource::Base(_) => {}
+                _ => {}
             }
         }
     }
-
-    // pub fn last_completed_action(&self) -> Option<&AiAction> {
-    //     self.last_completed_action.as_ref()
     // }
 }
 
@@ -166,10 +162,11 @@ impl<'a> System<'a> for AiSystem {
             // TODO provide READ ONLY DSEs to ai intelligence
             // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             // TODO fix eventually false assumption that all stream DSEs come from a society
-            let extra_dses = self.collect_society_tasks(e, tick, society_opt, societies, ecs_world);
+            let mut society = society_opt.and_then(|comp| comp.resolve(societies));
+            let extra_dses = self.collect_society_tasks(e, tick, society.as_mut(), ecs_world);
 
             // choose best action
-            let streamed_dse = extra_dses.iter().map(|(_task, dse)| &**dse);
+            let streamed_dse = extra_dses.iter().map(|(_, _, dse)| &**dse);
             let decision = ai
                 .intelligence
                 .choose_with_stream_dses(bb_ref, streamed_dse);
@@ -179,24 +176,32 @@ impl<'a> System<'a> for AiSystem {
                 trace!("activity action"; "action" => ?action);
 
                 // register interruption
-                let mut society = society_opt.and_then(|comp| comp.resolve(societies));
                 ai.interrupt_current_action(e, Some(&src), || {
                     society
                         .as_mut()
                         .expect("streamed DSEs expected to come from a society only")
                 });
 
-                if let DecisionSource::Stream(i) = src {
+                let society_task = if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve it
-                    let society =
-                        society.expect("streamed DSEs expected to come from a society only");
+                    let society = society
+                        .as_mut()
+                        .expect("streamed DSEs expected to come from a society only");
 
-                    let task = &extra_dses[i].0;
-                    society
-                        .jobs_mut()
-                        .reservations_mut()
-                        .reserve(task.clone(), e);
-                }
+                    let (task, job_idx, _) = &extra_dses[i];
+                    let mut jobs = society.jobs_mut();
+
+                    // reserve task
+                    jobs.reservations_mut().reserve(task.clone(), e);
+
+                    // get job reference from index (avoiding the need to clone all job refs even
+                    // when not chosen)
+                    let job = jobs
+                        .by_index(*job_idx)
+                        .expect("jobs should not have changed");
+
+                    Some((job, task.clone()))
+                } else {None};
 
                 // log decision
                 if let Some(logs) = logging.get_mut(e) {
@@ -206,7 +211,12 @@ impl<'a> System<'a> for AiSystem {
                 ai.current = Some(src);
 
                 // pass on to activity system
-                activity.interrupt_with_new_activity(action, e, ecs_world);
+                activity.interrupt_with_new_activity(action, society_task, e, ecs_world);
+            }
+
+            // job indices are finished with, allow modifications again
+            if let Some(society) = society {
+                society.jobs_mut().allow_jobs_again();
             }
         }
     }
@@ -214,16 +224,15 @@ impl<'a> System<'a> for AiSystem {
 
 impl AiSystem {
     // TODO dont return a new vec
+    /// Prevents further jobs being added to society until manually cleared
     fn collect_society_tasks(
         &self,
         entity: Entity,
         this_tick: Tick,
-        society: Option<&SocietyComponent>,
-        societies: &mut Societies,
+        society: Option<&mut &mut Society>,
         ecs_world: &EcsWorld,
-    ) -> Vec<(SocietyTask, Box<dyn Dse<AiContext>>)> {
+    ) -> Vec<(SocietyTask, JobIndex, Box<dyn Dse<AiContext>>)> {
         let mut extra_dses = Vec::new();
-        let society = society.and_then(|comp| comp.resolve(societies));
 
         if let Some(society) = society {
             trace!("considering tasks for society"; "society" => ?society);
@@ -239,17 +248,15 @@ impl AiSystem {
 
             // TODO precalculate DSEs for tasks
             // TODO weight dse by number of existing reservations
-            extra_dses.extend(
-                applicable_tasks
-                    .into_iter()
-                    .filter_map(|(task, _reservations)| match task.as_dse(ecs_world) {
-                        Some(dse) => Some((task, dse)),
-                        None => {
-                            warn!("task failed to conversion to DSE"; "task" => ?task);
-                            None
-                        }
-                    }),
-            );
+            extra_dses.extend(applicable_tasks.into_iter().filter_map(
+                |(task, job_idx, _reservations)| match task.as_dse(ecs_world) {
+                    Some(dse) => Some((task, job_idx, dse)),
+                    None => {
+                        warn!("task failed to conversion to DSE"; "task" => ?task);
+                        None
+                    }
+                },
+            ));
 
             trace!(
                 "there are {count} tasks available",

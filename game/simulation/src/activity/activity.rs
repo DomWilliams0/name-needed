@@ -83,7 +83,7 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
 
     fn on_finish(
         &mut self,
-        finish: ActivityFinish,
+        finish: &ActivityFinish,
         ctx: &mut ActivityContext<W>,
     ) -> BoxedResult<()>;
 
@@ -91,8 +91,8 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
     fn current_subactivity(&self) -> &dyn SubActivity<W>;
 
     /// Calls on_finish on both activity and sub activity
-    fn finish(&mut self, finish: ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
-        let a = self.current_subactivity().on_finish(&finish, ctx);
+    fn finish(&mut self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+        let a = self.current_subactivity().on_finish(finish, ctx);
         let b = self.on_finish(finish, ctx);
 
         match (a, b) {

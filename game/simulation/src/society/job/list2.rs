@@ -1,20 +1,24 @@
 use crate::ecs::E;
 use crate::job::job2::{SocietyJob, SocietyJobImpl};
-use crate::job::SocietyTask;
+use crate::job::{SocietyTask};
 use crate::simulation::Tick;
 use crate::society::job::job2::SocietyJobRef;
 use crate::{EcsWorld, Entity};
 use common::*;
 use std::collections::HashSet;
 
-#[derive(Debug)]
+#[derive(Debug)] // TODO implement manually
 pub struct SocietyJobList {
     jobs: Vec<SocietyJobRef>,
     reservations: SocietyTaskReservations,
     last_update: Tick,
+
+    /// Pretty hacky way to prevent Job indices changing
+    no_more_jobs_temporarily: bool,
 }
 
 pub type ReservationCount = u16;
+pub type JobIndex = usize;
 
 #[derive(Debug)]
 pub struct SocietyTaskReservations {
@@ -36,6 +40,7 @@ impl Default for SocietyJobList {
             jobs: Vec::with_capacity(64),
             reservations: SocietyTaskReservations::default(),
             last_update: Tick::default(),
+            no_more_jobs_temporarily: false,
         }
     }
 }
@@ -47,27 +52,48 @@ impl SocietyJobList {
 
     pub fn submit_job(&mut self, job: SocietyJobRef) {
         debug!("submitting society job"; "job" => ?job);
+        assert!(
+            !self.no_more_jobs_temporarily,
+            "job indices are still held, or allow_jobs_again wasn't called"
+        );
         self.jobs.push(job);
     }
 
+    /// Returned job index is valid until [allow_jobs_again] is called
     pub fn filter_applicable_tasks(
         &mut self,
         entity: Entity,
         this_tick: Tick,
         world: &EcsWorld,
-        tasks_out: &mut Vec<(SocietyTask, ReservationCount)>,
+        tasks_out: &mut Vec<(SocietyTask, JobIndex, ReservationCount)>,
     ) {
         // refresh jobs if necessary
         if self.last_update != this_tick {
             self.last_update = this_tick;
-            trace!("refreshing {} jobs", self.jobs.len());
-            for job in &self.jobs {
-                let mut job = job.write();
-                job.refresh_tasks(world);
+            let len_before = self.jobs.len();
+            trace!("refreshing {n} jobs", n = len_before);
+            self.jobs
+                .retain(|job| {
+                    let result = job.write().refresh_tasks(world);
+                    match result {
+                        None => true,
+                        Some(result) => {
+                            debug!("job finished"; "result" => ?result, "job" => ?job);
+                            false
+                        }
+                    }
+                });
+
+            let len_after = self.jobs.len();
+            if len_before != len_after {
+                trace!("pruned {n} finished jobs", n = len_before - len_after);
             }
         }
 
-        for job in &self.jobs {
+        // reset when finished with tasks
+        self.no_more_jobs_temporarily = true;
+
+        for (i, job) in self.jobs.iter().enumerate() {
             let job = job.read();
             // TODO filter jobs for entity
 
@@ -76,11 +102,11 @@ impl SocietyJobList {
                 match self.reservations.check_for(task, entity) {
                     Unreserved | ReservedBySelf => {
                         // wonderful, this task is fully available
-                        tasks_out.push((task.clone(), 0));
+                        tasks_out.push((task.clone(), i, 0));
                     }
                     ReservedButShareable(n) => {
                         // this task is available but already reserved by others
-                        tasks_out.push((task.clone(), n));
+                        tasks_out.push((task.clone(), i, n));
                     }
                     Unavailable => {
                         // not available
@@ -93,6 +119,14 @@ impl SocietyJobList {
     #[inline]
     pub fn reservations_mut(&mut self) -> &mut SocietyTaskReservations {
         &mut self.reservations
+    }
+
+    pub fn allow_jobs_again(&mut self) {
+        self.no_more_jobs_temporarily = false;
+    }
+
+    pub fn by_index(&self, idx: usize) -> Option<SocietyJobRef> {
+        self.jobs.get(idx).cloned()
     }
 }
 

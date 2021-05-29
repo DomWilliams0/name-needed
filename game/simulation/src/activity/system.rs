@@ -13,6 +13,8 @@ use crate::activity::activities::NopActivity;
 use crate::activity::event_logging::EntityLoggingComponent;
 use crate::simulation::Tick;
 use crate::{Societies, SocietyComponent};
+use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
+use std::convert::TryFrom;
 
 pub struct ActivitySystem;
 
@@ -23,7 +25,8 @@ pub struct ActivityEventSystem;
 #[name("activity")]
 pub struct ActivityComponent {
     pub current: Box<dyn Activity<EcsWorld>>,
-    new_activity: Option<AiAction>,
+    current_society_task: Option<(SocietyJobRef, SocietyTask)>,
+    new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
 }
 
 #[derive(Component, EcsComponent, Default)]
@@ -73,12 +76,12 @@ impl<'a> System<'a> for ActivitySystem {
                 subscriptions: &mut subscriptions,
             };
 
-            if let Some(new_action) = activity.new_activity.take() {
+            if let Some((new_action, new_society_task)) = activity.new_activity.take() {
                 debug!("interrupting activity with new"; "action" => ?new_action);
 
                 if let Err(e) = activity
                     .current
-                    .finish(ActivityFinish::Interrupted, &mut ctx)
+                    .finish(&ActivityFinish::Interrupted, &mut ctx)
                 {
                     error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
                 }
@@ -89,6 +92,9 @@ impl<'a> System<'a> for ActivitySystem {
 
                 // replace current with new activity, dropping the old one
                 activity.current = new_action.into_activity();
+                activity.current_society_task = new_society_task;
+
+                // TODO unreserve prev society task?
             }
 
             // TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause
@@ -115,17 +121,19 @@ impl<'a> System<'a> for ActivitySystem {
                 ActivityResult::Finished(finish) => {
                     debug!("finished activity, reverting to nop"; "activity" => &activity.current, "finish" => ?finish);
 
-                    // finish current and replace with nop
-                    if let Err(e) = activity.current.finish(finish, &mut ctx) {
+                    // finish current gracefully
+                    if let Err(e) = activity.current.finish(&finish, &mut ctx) {
                         error!("error finishing activity"; "activity" => &activity.current, "error" => %e);
                     }
 
+                    // revert to nop until a new activity is selected
                     activity.current = Box::new(NopActivity::default());
 
                     // ensure unblocked and unsubscribed
                     event_queue.unsubscribe_all(entity);
                     comp_updates.remove::<BlockingActivityComponent>(entity);
 
+                    // interrupt ai and unreserve society task
                     ai.interrupt_current_action(entity, None, || {
                         society
                             .get(entity)
@@ -136,6 +144,14 @@ impl<'a> System<'a> for ActivitySystem {
                     // next tick ai should return a new decision rather than unchanged to avoid
                     // infinite Nop loops
                     ai.clear_last_action();
+
+                    // notify society job of completion
+                    if let Some((job, task)) = activity.current_society_task.take() {
+                        if let Ok(result) = SocietyTaskResult::try_from(finish) {
+                            job.write().notify_completion(task, result);
+                        }
+                    }
+
                 }
             }
         }
@@ -213,10 +229,11 @@ impl ActivityComponent {
     pub fn interrupt_with_new_activity(
         &mut self,
         action: AiAction,
+        society_task: Option<(SocietyJobRef, SocietyTask)>,
         me: Entity,
         world: &impl ComponentWorld,
     ) {
-        self.new_activity = Some(action);
+        self.new_activity = Some((action, society_task));
 
         // ensure unblocked
         world.remove_lazy::<BlockingActivityComponent>(me);
@@ -228,6 +245,7 @@ impl Default for ActivityComponent {
         Self {
             current: Box::new(NopActivity::default()),
             new_activity: None,
+            current_society_task: None,
         }
     }
 }

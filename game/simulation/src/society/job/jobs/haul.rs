@@ -4,7 +4,7 @@ use crate::item::{ContainedInComponent, HauledItemComponent};
 use crate::job::SocietyTaskResult;
 use crate::society::job::job2::SocietyJobImpl;
 use crate::society::job::SocietyTask;
-use crate::society::Society;
+
 use crate::TransformComponent;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -65,10 +65,24 @@ impl SocietyJobImpl for HaulJob {
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        mut completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
     ) -> Option<SocietyTaskResult> {
-        // TODO apply completions
-        assert_eq!(completions.count(), 0, "todo");
+        debug_assert!(tasks.len() <= 1);
+
+        // apply completion
+        if let Some((task, result)) = completions.next() {
+            debug!("haul task completed"; "task" => ?task, "result" => ?result);
+            debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
+
+            // ensure no more
+            assert!(completions.next().is_none(), "single completion expected");
+
+            // end job regardless of success or failure
+            // TODO depends on error type?
+            return Some(result);
+        }
+
+        // TODO fail early if no space left in container
 
         if world.has_component::<HauledItemComponent>(self.entity) {
             // skip checks if item is currently being hauled
@@ -78,9 +92,9 @@ impl SocietyJobImpl for HaulJob {
                 HaulTarget::Position(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => &t.position,
-                        Err(_) => {
+                        Err(err) => {
                             debug!("hauled item is missing transform"; "item" => E(self.entity));
-                            return Some(SocietyTaskResult::Failure);
+                            return Some(SocietyTaskResult::Failure(err.into()));
                         }
                     };
 

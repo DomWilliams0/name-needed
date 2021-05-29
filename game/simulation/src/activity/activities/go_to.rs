@@ -46,7 +46,7 @@ impl<W: ComponentWorld> Activity<W> for GoToActivity {
         }
     }
 
-    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

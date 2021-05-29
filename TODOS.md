@@ -1,4 +1,4 @@
-# TODOs (334)
+# TODOs (338)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -146,8 +146,9 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
- * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (3)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
+   * `// TODO unreserve prev society task?`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
@@ -282,17 +283,20 @@
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (2)
    * `// TODO return a dyn error in result`
    * `BreakBlocks(range) => todo!(), // TODO break blocks`
- * [game/simulation/src/society/job/job2.rs](game/simulation/src/society/job/job2.rs) (2)
+ * [game/simulation/src/society/job/job2.rs](game/simulation/src/society/job/job2.rs) (3)
    * `// TODO remove box and make this type unsized, it's in an rc anyway`
+   * `// TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them`
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
- * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (2)
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
-   * `// TODO apply completions`
+   * `// TODO depends on error type?`
+   * `// TODO fail early if no space left in container`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
    * `// TODO use dynstack instead of boxes for society jobs`
    * `// TODO reuse allocation`
    * `// TODO dont recalculate all unreserved tasks every tick for every entity`
- * [game/simulation/src/society/job/list2.rs](game/simulation/src/society/job/list2.rs) (1)
+ * [game/simulation/src/society/job/list2.rs](game/simulation/src/society/job/list2.rs) (2)
+   * `#[derive(Debug)] // TODO implement manually`
    * `// TODO filter jobs for entity`
  * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
    * `// TODO PlaceBlocks(block type, at position)`

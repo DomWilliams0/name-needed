@@ -372,7 +372,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
 
     fn on_finish(
         &mut self,
-        finish: ActivityFinish,
+        finish: &ActivityFinish,
         ctx: &mut ActivityContext<W>,
     ) -> BoxedResult<()> {
         // cancel haul if it has been initialised, regardless of state

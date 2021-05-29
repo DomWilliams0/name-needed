@@ -115,7 +115,7 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
         }
     }
 
-    fn on_finish(&mut self, _: ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
         Ok(())
     }
 

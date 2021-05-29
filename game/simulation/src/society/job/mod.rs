@@ -5,7 +5,7 @@ pub use task::SocietyTask;
 
 pub use self::job::{Job, SocietyCommand};
 pub use self::job2::{SocietyJobRef, SocietyTaskResult};
-pub use list2::{Reservation, SocietyJobList};
+pub use list2::{Reservation, SocietyJobList, JobIndex};
 
 #[deprecated]
 mod job;
