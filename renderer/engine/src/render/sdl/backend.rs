@@ -21,7 +21,7 @@ use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
 use resources::ResourceError;
 use resources::Resources;
-use sdl2::mouse::{MouseButton, MouseState};
+use sdl2::mouse::{MouseButton, MouseState, MouseWheelDirection};
 use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
 use std::hint::unreachable_unchecked;
 use unit::world::{WorldPoint, WorldPosition};
@@ -242,6 +242,16 @@ impl InitializedSimulationBackend for SdlBackendInit {
                             self.selection.mouse_move(select, col);
                         }
                     }
+                }
+                Event::MouseWheel {
+                    mut y, direction, ..
+                } => {
+                    if let MouseWheelDirection::Flipped = direction {
+                        y *= -1;
+                    }
+
+                    // TODO if mouse wheel is reused for anything else, add an input event for it
+                    self.camera.handle_zoom(y);
                 }
 
                 _ => {}

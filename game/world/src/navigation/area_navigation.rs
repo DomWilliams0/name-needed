@@ -104,21 +104,27 @@ impl AreaNavEdge {
         let cost = self.cost.opposite();
         let direction = self.direction.opposite();
 
-        let [mut x, mut y, mut z]: [i32; 3] = self.exit.into();
+        let exit = {
+            let (mut x, mut y, mut z) = self.exit.xyz();
 
-        // move to other side of the chunk
-        match direction {
-            NeighbourOffset::North | NeighbourOffset::South => y = CHUNK_SIZE.as_i32() - 1 - y,
-            _ => x = CHUNK_SIZE.as_i32() - 1 - x,
+            // move to other side of the chunk
+            match direction {
+                NeighbourOffset::North | NeighbourOffset::South => {
+                    y = CHUNK_SIZE.as_block_coord() - 1 - y
+                }
+                _ => x = CHUNK_SIZE.as_block_coord() - 1 - x,
+            };
+
+            // a reversed jump up/down requires the exit point moving down or up
+            z -= cost.z_offset();
+
+            BlockPosition::new_unchecked(x, y, z)
         };
-
-        // a reversed jump up/down requires the exit point moving down or up
-        z -= cost.z_offset();
 
         Self {
             direction,
             cost,
-            exit: BlockPosition::from((x, y, z)),
+            exit,
             ..self
         }
     }
@@ -142,8 +148,9 @@ impl AreaNavEdge {
             });
 
             let distance = {
-                let dx = (candidate.0 as i16 - source.0).abs();
-                let dy = (candidate.1 as i16 - source.1).abs();
+                let (x, y) = candidate.xy();
+                let dx = (x as i16 - source.0).abs();
+                let dy = (y as i16 - source.1).abs();
                 dx + dy
             };
 
@@ -232,13 +239,13 @@ impl AreaGraph {
         }
     }
 
-    pub(crate) fn remove_node(&mut self, area: &WorldArea) {
-        if let Some(node) = self.node_lookup.remove(area) {
-            // invalidate node, which removes all its edges too
-            let old = self.graph.remove_node(node);
-            debug_assert!(old.is_some(), "node was not in both lookup and graph")
-        }
-    }
+    // pub(crate) fn remove_node(&mut self, area: &WorldArea) {
+    //     if let Some(node) = self.node_lookup.remove(area) {
+    //         // invalidate node, which removes all its edges too
+    //         let old = self.graph.remove_node(node);
+    //         debug_assert!(old.is_some(), "node was not in both lookup and graph")
+    //     }
+    // }
 
     /// Removes all where f(area) == false.
     /// Returns number removed
@@ -312,6 +319,7 @@ mod tests {
     use crate::neighbour::NeighbourOffset;
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkDescriptor, EdgeCost};
+    use std::convert::TryInto;
 
     fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
         // gross but allows for neater tests
@@ -511,37 +519,37 @@ mod tests {
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition::new(0, 0, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new_unchecked(0, 0, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::Walk,
                 width: 3,
-                exit: BlockPosition::new(0, 4, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new_unchecked(0, 4, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 2,
-                exit: BlockPosition::new(0, 7, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new_unchecked(0, 7, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition::new(0, 10, GlobalSliceIndex::new(0)),
+                exit: BlockPosition::new_unchecked(0, 10, GlobalSliceIndex::new(0)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpUp,
                 width: 1,
-                exit: BlockPosition::new(0, 11, GlobalSliceIndex::new(5)),
+                exit: BlockPosition::new_unchecked(0, 11, GlobalSliceIndex::new(5)),
                 direction,
             },
             AreaNavEdge {
                 cost: EdgeCost::JumpDown,
                 width: 1,
-                exit: BlockPosition::new(0, 12, GlobalSliceIndex::new(5)),
+                exit: BlockPosition::new_unchecked(0, 12, GlobalSliceIndex::new(5)),
                 direction,
             },
         ];
@@ -577,13 +585,13 @@ mod tests {
             AreaNavEdge {
                 direction: NeighbourOffset::East,
                 cost: EdgeCost::Walk,
-                exit: (15, 5, 4).into(),
+                exit: (15, 5, 4).try_into().unwrap(),
                 width: 3,
             },
             AreaNavEdge {
                 direction: NeighbourOffset::East,
                 cost: EdgeCost::JumpUp,
-                exit: (15, 10, 4).into(),
+                exit: (15, 10, 4).try_into().unwrap(),
                 width: 1,
             },
         ];
@@ -621,7 +629,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::South,
                         cost: EdgeCost::JumpUp,
-                        exit: (3, 0, 301).into(),
+                        exit: (3, 0, 301).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -631,7 +639,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::East,
                         cost: EdgeCost::JumpDown,
-                        exit: (CHUNK_SIZE.as_block_coord() - 1, 3, 302).into(),
+                        exit: (CHUNK_SIZE.as_i32() - 1, 3, 302).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -641,7 +649,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::North,
                         cost: EdgeCost::JumpUp,
-                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 301).into(),
+                        exit: (3, CHUNK_SIZE.as_i32() - 1, 301).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -668,7 +676,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::South,
                         cost: EdgeCost::JumpDown,
-                        exit: (3, 0, 302).into(),
+                        exit: (3, 0, 302).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -678,7 +686,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::West,
                         cost: EdgeCost::JumpUp,
-                        exit: (0, 3, 301).into(),
+                        exit: (0, 3, 301).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -688,7 +696,7 @@ mod tests {
                     AreaNavEdge {
                         direction: NeighbourOffset::North,
                         cost: EdgeCost::JumpDown,
-                        exit: (3, CHUNK_SIZE.as_block_coord() - 1, 302).into(),
+                        exit: (3, CHUNK_SIZE.as_i32() - 1, 302).try_into().unwrap(),
                         width: 1,
                     },
                 ),
@@ -728,7 +736,7 @@ mod tests {
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::JumpUp,
-                    exit: (15, 2, 3).into(),
+                    exit: (15, 2, 3).try_into().unwrap(),
                     width: 2,
                 },
             ),
@@ -737,7 +745,7 @@ mod tests {
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::JumpDown,
-                    exit: (15, 5, 4).into(),
+                    exit: (15, 5, 4).try_into().unwrap(),
                     width: 1,
                 },
             ),
@@ -776,7 +784,7 @@ mod tests {
                 AreaNavEdge {
                     direction: NeighbourOffset::East,
                     cost: EdgeCost::Walk,
-                    exit: (15, 2, 202).into(),
+                    exit: (15, 2, 202).try_into().unwrap(),
                     width: 1,
                 },
             ),
@@ -827,14 +835,18 @@ mod tests {
         let edge = AreaNavEdge {
             direction: NeighbourOffset::South,
             cost: EdgeCost::JumpUp,
-            exit: (5, 0, 5).into(),
+            exit: (5, 0, 5).try_into().unwrap(),
             width: 2,
         };
 
         let reversed = AreaNavEdge {
             direction: NeighbourOffset::North,
             cost: EdgeCost::JumpDown,
-            exit: BlockPosition::new(5, CHUNK_SIZE.as_block_coord() - 1, GlobalSliceIndex::new(6)),
+            exit: BlockPosition::new_unchecked(
+                5,
+                CHUNK_SIZE.as_block_coord() - 1,
+                GlobalSliceIndex::new(6),
+            ),
             width: 2,
         };
 
@@ -848,22 +860,31 @@ mod tests {
             AreaNavEdge {
                 direction: NeighbourOffset::South,
                 cost: EdgeCost::Walk,
-                exit: (4, 4, 4).into(),
+                exit: (4, 4, 4).try_into().unwrap(),
                 width: 1
             }
-            .exit_closest((10, 10, 4).into()), // doesn't matter, there is only 1 candidate
-            (4, 4, 4).into()
+            .exit_closest((10, 10, 4).try_into().unwrap()), // doesn't matter, there is only 1 candidate
+            (4, 4, 4).try_into().unwrap()
         );
 
         let edge = AreaNavEdge {
             direction: NeighbourOffset::South,
             cost: EdgeCost::Walk,
-            exit: (4, 4, 4).into(), // [4, 8] in x axis
+            exit: (4, 4, 4).try_into().unwrap(), // [4, 8] in x axis
             width: 5,
         };
 
-        assert_eq!(edge.exit_closest((2, 0, 4).into()), (4, 4, 4).into());
-        assert_eq!(edge.exit_closest((6, 0, 4).into()), (6, 4, 4).into());
-        assert_eq!(edge.exit_closest((15, 0, 4).into()), (8, 4, 4).into());
+        assert_eq!(
+            edge.exit_closest((2, 0, 4).try_into().unwrap()),
+            (4, 4, 4).try_into().unwrap()
+        );
+        assert_eq!(
+            edge.exit_closest((6, 0, 4).try_into().unwrap()),
+            (6, 4, 4).try_into().unwrap()
+        );
+        assert_eq!(
+            edge.exit_closest((15, 0, 4).try_into().unwrap()),
+            (8, 4, 4).try_into().unwrap()
+        );
     }
 }

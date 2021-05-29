@@ -4,6 +4,7 @@ use crate::ecs::*;
 use crate::render::DebugRenderer;
 use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
 
+// TODO show actual steering direction alongside velocity
 #[derive(Default)]
 pub struct SteeringDebugRenderer;
 
@@ -30,7 +31,7 @@ impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
 
         for (transform,) in (&transform,).join() {
             if slices.contains(transform.position.slice()) {
-                let vel_pos = transform.position + (transform.velocity * 5.0);
+                let vel_pos = transform.position + (transform.velocity * 10.0);
                 renderer.debug_add_line(transform.position, vel_pos, ColorRgb::new(255, 0, 50))
             }
         }

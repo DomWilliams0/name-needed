@@ -210,11 +210,7 @@ pub fn ring() -> Vec<ChunkDescriptor> {
     let fill_except_outline = |z| {
         ChunkBuilder::new().fill_range(
             (1, 1, z),
-            (
-                CHUNK_SIZE.as_block_coord() - 1,
-                CHUNK_SIZE.as_block_coord() - 1,
-                z,
-            ),
+            (CHUNK_SIZE.as_i32() - 1, CHUNK_SIZE.as_i32() - 1, z),
             |_| BlockType::Stone,
         )
     };
@@ -230,13 +226,13 @@ pub fn ring() -> Vec<ChunkDescriptor> {
             .build((0, 1)), /* NO west bridge */
         // bottom right
         fill_except_outline(300)
-            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 300), BlockType::Grass) /* north bridge */
+            .set_block((3, CHUNK_SIZE.as_i32() - 1, 300), BlockType::Grass) /* north bridge */
             .set_block((0, 3, 300), BlockType::Grass) /* west bridge */
             .build((0, 0)),
         // bottom left
         fill_except_outline(301)
-            .set_block((3, CHUNK_SIZE.as_block_coord() - 1, 301), BlockType::Grass) /* north bridge */
-            .set_block((CHUNK_SIZE.as_block_coord() - 1, 3, 301), BlockType::Grass) /* east bridge */
+            .set_block((3, CHUNK_SIZE.as_i32() - 1, 301), BlockType::Grass) /* north bridge */
+            .set_block((CHUNK_SIZE.as_i32() - 1, 3, 301), BlockType::Grass) /* east bridge */
             .build((-1, 0)),
     ]
 }

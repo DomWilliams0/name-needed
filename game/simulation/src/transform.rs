@@ -7,8 +7,8 @@ use crate::physics::{Bounds, PhysicsComponent};
 
 use common::cgmath::Rotation;
 use serde::Deserialize;
-use unit::length::{Length, Length3};
-use unit::volume::Volume;
+use unit::space::length::{Length, Length3};
+use unit::space::volume::Volume;
 
 /// Position and rotation component
 #[derive(Debug, Clone, Component, EcsComponent)]
@@ -61,17 +61,17 @@ impl TransformComponent {
 
     pub const fn slice(&self) -> i32 {
         // cant use position.slice() because not const
-        self.position.2 as i32
+        self.position.z() as i32
     }
 
     pub const fn x(&self) -> f32 {
-        self.position.0
+        self.position.x()
     }
     pub const fn y(&self) -> f32 {
-        self.position.1
+        self.position.y()
     }
     pub const fn z(&self) -> f32 {
-        self.position.2
+        self.position.z()
     }
 
     pub fn bounds(&self, bounding_radius: f32) -> Bounds {
@@ -82,7 +82,11 @@ impl TransformComponent {
     }
 
     pub fn feelers_bounds(&self, bounding_radius: f32) -> Bounds {
-        let feelers = self.velocity + (self.velocity.normalize() * bounding_radius);
+        let feelers = if self.velocity.is_zero() {
+            self.velocity // avoid normalizing 0 to get NaN
+        } else {
+            self.velocity + (self.velocity.normalize() * bounding_radius)
+        };
         let centre = self.position + feelers;
 
         const EXTRA: f32 = 1.25;
@@ -139,6 +143,7 @@ pub struct PhysicalComponentTemplate {
     size: Length3,
     volume: Volume,
 }
+
 impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where

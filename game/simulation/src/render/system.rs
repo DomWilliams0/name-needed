@@ -6,6 +6,8 @@ use crate::transform::PhysicalComponent;
 use crate::{Shape2d, SliceRange, TransformComponent};
 use color::ColorRgb;
 use common::*;
+use serde::de::Error;
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -45,10 +47,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 transform.position = {
                     let last_pos: Vector3 = transform.last_position.into();
                     let curr_pos: Vector3 = transform.position.into();
-                    last_pos.lerp(curr_pos, self.interpolation).into()
+                    let lerped = last_pos.lerp(curr_pos, self.interpolation);
+                    lerped.try_into().expect("invalid lerp")
                 };
 
-                self.renderer.sim_entity(&transform, render);
+                self.renderer.sim_entity(&transform, render, physical);
 
                 if selected.is_some() {
                     self.renderer.sim_selected(&transform, &physical);
@@ -69,7 +72,17 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
         Self: Sized,
     {
         let color: RenderHexColor = values.get("color")?.into_type()?;
-        let shape: Shape2d = values.get("shape")?.into_type()?;
+        // TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it
+        // manually parse for now until simple shapes are replaced
+        let shape = match values.get("shape")?.into_string()?.as_str() {
+            "Circle" => Shape2d::Circle,
+            "Rect" => Shape2d::Rect,
+            _ => {
+                return Err(ComponentBuildError::Deserialize(ron::Error::custom(
+                    format_args!("bad shape {:?}", values.get("shape")?.into_string()?),
+                )))
+            }
+        };
 
         Ok(Box::new(Self {
             color: color.into(),

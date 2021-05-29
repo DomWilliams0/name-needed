@@ -26,9 +26,10 @@ pub struct Chunk;
 pub struct Slab;
 
 impl SliceIndexScale for Chunk {
-    const MIN: i32 = std::i32::MIN;
-    const MAX: i32 = std::i32::MAX;
+    const MIN: i32 = i32::MIN;
+    const MAX: i32 = i32::MAX;
 }
+
 impl SliceIndexScale for Slab {
     const MIN: i32 = 0;
     const MAX: i32 = SLAB_SIZE.as_i32() - 1;
@@ -37,6 +38,10 @@ impl SliceIndexScale for Slab {
 /// A slice of blocks in a chunk, z coordinate
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Into, From)]
 pub struct SliceIndex<S: SliceIndexScale>(i32, PhantomData<S>);
+
+/// Slice index in range 0..MAX, so a single z+1 operation is infallible
+#[derive(Copy, Clone)]
+pub struct LocalSliceIndexBelowTop(LocalSliceIndex);
 
 impl<S: SliceIndexScale> SliceIndex<S> {
     pub fn abs(mut self) -> Self {
@@ -49,32 +54,28 @@ impl<S: SliceIndexScale> SliceIndex<S> {
         self.0
     }
 
-    pub fn new(slice: i32) -> Self {
-        // TODO return option and have unchecked version
-        assert!(slice >= S::MIN, "slice {} is invalid for its scale", slice);
-        assert!(slice <= S::MAX, "slice {} is invalid for its scale", slice);
-
+    fn new_srsly_unchecked(slice: i32) -> Self {
         Self(slice, PhantomData)
     }
 
     /// Last valid slice index
     pub fn top() -> Self {
-        Self::new(S::MAX)
+        Self::new_srsly_unchecked(S::MAX)
     }
     pub fn bottom() -> Self {
-        Self::new(S::MIN)
+        Self::new_srsly_unchecked(S::MIN)
     }
 
     pub fn range() -> impl Iterator<Item = Self> {
-        (S::MIN..=S::MAX).map(Self::new)
-    }
-
-    pub fn try_from(slice: i32) -> Option<Self> {
-        (S::MIN..=S::MAX).contains(&slice).as_some(Self::new(slice))
+        (S::MIN..=S::MAX).map(Self::new_srsly_unchecked)
     }
 }
 
 impl SliceIndex<Chunk> {
+    pub fn new(slice: i32) -> Self {
+        Self::new_srsly_unchecked(slice)
+    }
+
     pub fn to_local(self) -> LocalSliceIndex {
         let mut idx = self.0;
         idx %= SLAB_SIZE.as_i32(); // cap at slab size
@@ -82,7 +83,8 @@ impl SliceIndex<Chunk> {
             // negative slices flip
             idx += SLAB_SIZE.as_i32();
         }
-        LocalSliceIndex::new(idx)
+
+        LocalSliceIndex::new_unchecked(idx)
     }
 
     pub fn slab_index(self) -> SlabIndex {
@@ -91,6 +93,19 @@ impl SliceIndex<Chunk> {
 }
 
 impl SliceIndex<Slab> {
+    /// None if out of range for scale
+    pub fn new(slice: i32) -> Option<Self> {
+        let range = Slab::MIN..=Slab::MAX;
+        range
+            .contains(&slice)
+            .as_some_from(|| Self(slice, PhantomData))
+    }
+
+    /// Panics if out of range for scale
+    pub fn new_unchecked(slice: i32) -> Self {
+        Self::new(slice).unwrap_or_else(|| panic!("slice {} is invalid for its scale", slice))
+    }
+
     pub fn to_global(self, slab: SlabIndex) -> GlobalSliceIndex {
         let z_offset = slab * SLAB_SIZE;
         GlobalSliceIndex::new(z_offset.as_i32() + self.0)
@@ -101,8 +116,8 @@ impl SliceIndex<Slab> {
         (Slab::MIN..=Slab::MAX).map(|i| Self(i, PhantomData))
     }
     /// All slices except the last, 0..=SLAB_SIZE-2
-    pub fn slices_except_last() -> impl Iterator<Item = Self> {
-        (Slab::MIN..Slab::MAX).map(|i| Self(i, PhantomData))
+    pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> {
+        (Slab::MIN..Slab::MAX).map(|i| LocalSliceIndexBelowTop(Self(i, PhantomData)))
     }
 
     pub fn slice_unsigned(&self) -> u32 {
@@ -111,11 +126,24 @@ impl SliceIndex<Slab> {
     }
 }
 
-impl<S: SliceIndexScale> Add<i32> for SliceIndex<S> {
+impl LocalSliceIndexBelowTop {
+    pub fn current(self) -> LocalSliceIndex {
+        self.0
+    }
+
+    pub fn above(self) -> LocalSliceIndex {
+        let above = (self.0).0 + 1;
+        debug_assert!(above <= Slab::MAX);
+        SliceIndex::new_srsly_unchecked(above)
+    }
+}
+
+// TODO ideally handle global slice integer overflow, although unlikely
+impl Add<i32> for GlobalSliceIndex {
     type Output = Self;
 
     fn add(self, rhs: i32) -> Self::Output {
-        Self::new(self.0 + rhs)
+        Self::new_srsly_unchecked(self.0 + rhs)
     }
 }
 
@@ -133,27 +161,21 @@ impl Sub<i32> for GlobalSliceIndex {
     }
 }
 
-impl<S: SliceIndexScale> SubAssign<i32> for SliceIndex<S> {
+impl SubAssign<i32> for GlobalSliceIndex {
     fn sub_assign(&mut self, rhs: i32) {
         *self = Self::new(self.0 - rhs);
     }
 }
 
-impl<S: SliceIndexScale> Sub<Self> for SliceIndex<S> {
+impl Sub<Self> for GlobalSliceIndex {
     type Output = Self;
 
-    fn sub(self, rhs: SliceIndex<S>) -> Self::Output {
+    fn sub(self, rhs: Self) -> Self::Output {
         Self::new(self.0 - rhs.0)
     }
 }
 
 impl From<i32> for GlobalSliceIndex {
-    fn from(slice: i32) -> Self {
-        Self::new(slice)
-    }
-}
-
-impl From<i32> for LocalSliceIndex {
     fn from(slice: i32) -> Self {
         Self::new(slice)
     }

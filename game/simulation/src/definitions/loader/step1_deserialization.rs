@@ -37,6 +37,7 @@ pub struct DeserializedDefinition {
     #[serde(skip)]
     source: DefinitionSource,
 }
+
 #[derive(Debug, Clone)]
 pub enum DefinitionSource {
     File(Rc<Path>),
@@ -188,5 +189,14 @@ impl ecs::Value for ron::Value {
 impl Default for DefinitionSource {
     fn default() -> Self {
         Self::Memory
+    }
+}
+
+impl Display for DefinitionSource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DefinitionSource::File(_) => write!(f, "file"),
+            DefinitionSource::Memory => write!(f, "in-memory buffer"),
+        }
     }
 }

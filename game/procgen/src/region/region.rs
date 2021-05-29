@@ -519,8 +519,10 @@ impl<const SIZE: usize> RegionChunk<SIZE> {
             .cartesian_product(0..CHUNK_SIZE.as_u8())
             .enumerate()
         {
-            let point =
-                PlanetPoint::with_precalculated(&precalc, BlockPosition::new(bx, by, 0.into()));
+            let point = PlanetPoint::with_precalculated(
+                &precalc,
+                BlockPosition::new_unchecked(bx, by, 0.into()),
+            );
 
             let (coastal, base_elevation, moisture, temperature) =
                 sampler.sample(point, continents);
@@ -602,7 +604,7 @@ impl ChunkDescription {
                 .cartesian_product(0..CHUNK_SIZE.as_u8())
                 .enumerate()
             {
-                let pos = SlabPosition::new_unchecked(x, y, 0.into());
+                let pos = SlabPosition::new_unchecked(x, y, LocalSliceIndex::bottom());
                 let BlockHeight { ground, biome } =
                     *self.ground_height.get_unchecked(SlabPositionAsCoord(pos));
 

@@ -156,7 +156,10 @@ mod tests {
 
     #[test]
     fn seek_dynamic_radius() {
-        let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
+        let mut seek = Seek::with_target(
+            WorldPoint::new_unchecked(10.0, 0.0, 0.0),
+            NormalizedFloat::one(),
+        );
 
         // starts at 0,0 going to 10,0
         let mut transform = TransformComponent::new(WorldPoint::default());
@@ -170,7 +173,7 @@ mod tests {
 
         // overshoot, but not in arrival range - should still finish because the direction changed
         // we're halfway there but going fast enough to arrive next tick
-        transform.position.0 = 5.0;
+        transform.position.modify_x(|_| 5.0);
         transform.velocity.x = 4.8;
         assert!(matches!(
             seek.tick(&transform, 0.5, &mut output),
@@ -179,8 +182,11 @@ mod tests {
     }
     #[test]
     fn seek_arrived_already() {
-        let mut seek = Seek::with_target(WorldPoint(10.0, 0.0, 0.0), NormalizedFloat::one());
-        let transform = TransformComponent::new(WorldPoint(9.8, 0.0, 0.0));
+        let mut seek = Seek::with_target(
+            WorldPoint::new_unchecked(10.0, 0.0, 0.0),
+            NormalizedFloat::one(),
+        );
+        let transform = TransformComponent::new(WorldPoint::new_unchecked(9.8, 0.0, 0.0));
         let mut output = InterestsContextMap::default();
 
         // already arrived
@@ -193,8 +199,11 @@ mod tests {
     #[test]
     fn seek_exact_pos() {
         // we are not exactly lined up with the target, and a tiny radius
-        let mut seek = Seek::with_target(WorldPoint(10.8, 0.6, 0.0), NormalizedFloat::one());
-        let transform = TransformComponent::new(WorldPoint(0.2, 0.9, 0.0));
+        let mut seek = Seek::with_target(
+            WorldPoint::new_unchecked(10.8, 0.6, 0.0),
+            NormalizedFloat::one(),
+        );
+        let transform = TransformComponent::new(WorldPoint::new_unchecked(0.2, 0.9, 0.0));
         let mut output = ContextMap::default();
 
         // output should be towards the block

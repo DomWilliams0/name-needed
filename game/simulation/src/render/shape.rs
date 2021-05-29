@@ -1,14 +1,12 @@
 use color::ColorRgb;
 use serde::Deserialize;
 
-// TODO physical shape wastes so much space
 #[derive(Debug, Copy, Clone, Deserialize)]
-#[serde(untagged)]
 pub enum Shape2d {
     /// Ordinal 0
-    Circle { radius: f32 },
+    Circle,
     /// Ordinal 1
-    Rectangle { rx: f32, ry: f32 },
+    Rect,
 }
 
 impl Shape2d {
@@ -16,26 +14,7 @@ impl Shape2d {
     pub fn ord(self) -> usize {
         match self {
             Shape2d::Circle { .. } => 0,
-            Shape2d::Rectangle { .. } => 1,
-        }
-    }
-
-    pub fn circle(radius: f32) -> Self {
-        Shape2d::Circle { radius }
-    }
-
-    pub fn rect(rx: f32, ry: f32) -> Self {
-        Shape2d::Rectangle { rx, ry }
-    }
-
-    pub fn square(r: f32) -> Self {
-        Shape2d::Rectangle { rx: r, ry: r }
-    }
-
-    pub fn radius(&self) -> f32 {
-        match self {
-            Shape2d::Circle { radius } => *radius,
-            Shape2d::Rectangle { rx, ry } => rx.max(*ry),
+            Shape2d::Rect { .. } => 1,
         }
     }
 }

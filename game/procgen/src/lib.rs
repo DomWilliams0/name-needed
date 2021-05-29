@@ -68,7 +68,7 @@ mod grid_coord_types {
             match (
                 BlockCoord::try_from(x),
                 BlockCoord::try_from(y),
-                i32::try_from(z).ok().and_then(LocalSliceIndex::try_from),
+                i32::try_from(z).ok().and_then(LocalSliceIndex::new),
             ) {
                 (Ok(x), Ok(y), Some(z)) => Some(Self(SlabPosition::new_unchecked(x, y, z))),
                 _ => None,
@@ -78,14 +78,14 @@ mod grid_coord_types {
 
     impl grid::CoordType for SliceBlockAsCoord {
         fn try_get(self) -> Option<[usize; 3]> {
-            let SliceBlock(x, y) = self.0;
+            let (x, y) = self.0.xy();
             // assume SliceBlock is correctly constructed and all coords are valid
             Some([usize::from(x), usize::from(y), 0])
         }
 
         fn from_coord([x, y, _]: [usize; 3]) -> Option<Self> {
             match (BlockCoord::try_from(x), BlockCoord::try_from(y)) {
-                (Ok(x), Ok(y)) => Some(Self(SliceBlock::new(x, y))),
+                (Ok(x), Ok(y)) => SliceBlock::new(x, y).map(Self),
                 _ => None,
             }
         }

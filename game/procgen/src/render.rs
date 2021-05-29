@@ -11,7 +11,7 @@ use common::num_traits::clamp;
 use common::*;
 use grid::{DynamicGrid, GridImpl};
 use unit::world::{
-    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, SliceBlock, CHUNK_SIZE, SLAB_SIZE,
+    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, CHUNK_SIZE, SLAB_SIZE,
 };
 
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
@@ -316,7 +316,11 @@ impl Render {
                 for y in 0..CHUNK_SIZE.as_block_coord() {
                     for x in 0..CHUNK_SIZE.as_block_coord() {
                         for z in (0..SLAB_SIZE.as_i32()).rev() {
-                            let pos = SlabPosition::new(x, y, LocalSliceIndex::new(z));
+                            let pos = SlabPosition::new_unchecked(
+                                x,
+                                y,
+                                LocalSliceIndex::new_unchecked(z),
+                            );
                             let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;

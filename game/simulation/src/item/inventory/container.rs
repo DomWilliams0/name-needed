@@ -1,8 +1,8 @@
 use sortedvec::*;
 
 use common::*;
-use unit::length::Length3;
-use unit::volume::Volume;
+use unit::space::length::Length3;
+use unit::space::volume::Volume;
 
 use crate::ecs::{Entity, E};
 use crate::item::inventory::container::contents::SortedContents;
@@ -80,7 +80,7 @@ impl Container {
 
     /// Clones on successful add and returns Ok
     pub fn add(&mut self, entity: &HeldEntity) -> Result<(), ContainerError> {
-        if !self.size_limit.fits(&entity.size) {
+        if !self.size_limit.fits(entity.size) {
             return Err(ContainerError::TooBig);
         }
 

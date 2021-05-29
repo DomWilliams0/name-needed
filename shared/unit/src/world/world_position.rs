@@ -4,20 +4,24 @@ use common::derive_more::*;
 
 use common::*;
 
-use crate::view::ViewPoint;
-use crate::world::{GlobalSliceIndex, WorldPoint, SCALE};
+use crate::space::view::ViewPoint;
+use crate::world::{GlobalSliceIndex, WorldPoint, BLOCKS_SCALE};
 
-/// A block anywhere in the world
+/// A block anywhere in the world. All possible values are valid
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
+    pub fn new(x: i32, y: i32, z: GlobalSliceIndex) -> Self {
+        Self(x, y, z)
+    }
+
     pub const fn slice(self) -> GlobalSliceIndex {
         self.2
     }
 
     pub fn centred(self) -> WorldPoint {
-        WorldPoint(
+        WorldPoint::new_unchecked(
             self.0 as f32 + 0.5,
             self.1 as f32 + 0.5,
             self.2.slice() as f32,
@@ -53,10 +57,12 @@ impl From<(u8, u8, GlobalSliceIndex)> for WorldPosition {
 
 impl From<ViewPoint> for WorldPosition {
     fn from(v: ViewPoint) -> Self {
+        // floor() required for negative values
+        let (x, y, z) = v.xyz();
         Self(
-            (v.0 / SCALE).floor() as i32,
-            (v.1 / SCALE).floor() as i32,
-            GlobalSliceIndex::new((v.2 / SCALE).floor() as i32),
+            (x / BLOCKS_SCALE).floor() as i32,
+            (y / BLOCKS_SCALE).floor() as i32,
+            GlobalSliceIndex::new((z / BLOCKS_SCALE).floor() as i32),
         )
     }
 }

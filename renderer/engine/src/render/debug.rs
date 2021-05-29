@@ -1,5 +1,5 @@
 use color::ColorRgb;
-use unit::view::ViewPoint;
+use unit::space::view::ViewPoint;
 
 pub enum DebugShape {
     Line {

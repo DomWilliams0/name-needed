@@ -61,15 +61,12 @@ impl BlockGraph {
         edges
     }
 
-    pub(crate) fn find_block_path<F: Into<BlockPosition>, T: Into<BlockPosition>>(
+    pub(crate) fn find_block_path(
         &self,
-        from: F,
-        to: T,
+        from: BlockPosition,
+        to: BlockPosition,
         goal: SearchGoal,
     ) -> Result<BlockPath, BlockPathError> {
-        let from = from.into();
-        let to = to.into();
-
         // same source and dest is a success, if not a pointless one
         if from == to {
             debug!("pointless block path to same block"; "pos" => ?from);
@@ -149,6 +146,7 @@ mod tests {
     use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkBuilder, EdgeCost};
+    use std::convert::TryInto;
 
     #[test]
     fn simple_path() {
@@ -162,19 +160,23 @@ mod tests {
         let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
 
         let path = graph
-            .find_block_path((3, 5, 2), (6, 5, 4), SearchGoal::Arrive)
+            .find_block_path(
+                (3, 5, 2).try_into().unwrap(),
+                (6, 5, 4).try_into().unwrap(),
+                SearchGoal::Arrive,
+            )
             .expect("path should succeed");
         let expected = vec![
             BlockPathNode {
-                block: (3, 5, 2).into(),
+                block: (3, 5, 2).try_into().unwrap(),
                 exit_cost: EdgeCost::Walk,
             },
             BlockPathNode {
-                block: (4, 5, 2).into(),
+                block: (4, 5, 2).try_into().unwrap(),
                 exit_cost: EdgeCost::JumpUp,
             },
             BlockPathNode {
-                block: (5, 5, 3).into(),
+                block: (5, 5, 3).try_into().unwrap(),
                 exit_cost: EdgeCost::JumpUp,
             },
             // goal omitted
@@ -184,20 +186,24 @@ mod tests {
 
         // in reverse
         let path = graph
-            .find_block_path((6, 5, 4), (3, 5, 2), SearchGoal::Arrive)
+            .find_block_path(
+                (6, 5, 4).try_into().unwrap(),
+                (3, 5, 2).try_into().unwrap(),
+                SearchGoal::Arrive,
+            )
             .expect("reverse path should succeed");
 
         let expected = vec![
             BlockPathNode {
-                block: (6, 5, 4).into(),
+                block: (6, 5, 4).try_into().unwrap(),
                 exit_cost: EdgeCost::JumpDown,
             },
             BlockPathNode {
-                block: (5, 5, 3).into(),
+                block: (5, 5, 3).try_into().unwrap(),
                 exit_cost: EdgeCost::JumpDown,
             },
             BlockPathNode {
-                block: (4, 5, 2).into(),
+                block: (4, 5, 2).try_into().unwrap(),
                 exit_cost: EdgeCost::Walk,
             },
             // goal omitted
@@ -225,7 +231,11 @@ mod tests {
             let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
             let graph = chunk.block_graph_for_area(WorldArea::new((0, 0))).unwrap();
             graph
-                .find_block_path(start, end, SearchGoal::Arrive)
+                .find_block_path(
+                    start.try_into().unwrap(),
+                    end.try_into().unwrap(),
+                    SearchGoal::Arrive,
+                )
                 .expect("path should succeed")
         };
 

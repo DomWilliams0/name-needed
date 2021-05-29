@@ -20,6 +20,7 @@ impl Selection {
             self.state = MouseState::Down(select, pos);
         }
     }
+
     pub fn mouse_up(&mut self, select: SelectType, pos: WorldColumn) -> Option<InputEvent> {
         let evt = match self.state {
             MouseState::Down(prev_select, _) if select == prev_select => {

@@ -176,7 +176,9 @@ impl<'a> AreaDiscovery<'a> {
                     .transparent()
                 {
                     let (x, y, z) = current.xyz();
-                    let above = SlabPosition::new_unchecked(x, y, LocalSliceIndex::new(z + 1));
+                    // xy come from an existing slab position, and we've checked z is not at the top
+                    let above =
+                        SlabPosition::new_unchecked(x, y, LocalSliceIndex::new_unchecked(z + 1));
 
                     for n in SlabNeighbours::new(above) {
                         self.queue.push((n, Some((current, EdgeCost::JumpUp))));
@@ -193,8 +195,12 @@ impl<'a> AreaDiscovery<'a> {
                     let adjacent = self.grid.get_unchecked_mut(SlabPositionAsCoord(n_adjacent));
                     if adjacent.opacity.transparent() {
                         let (x, y, z) = n_adjacent.xyz();
-                        // the check above ensures we stay in this slab
-                        let n_below = SlabPosition::new_unchecked(x, y, (z - 1).into());
+                        // xy come from an existing slab position, and we've checked z is not at the bottom
+                        let n_below = SlabPosition::new_unchecked(
+                            x,
+                            y,
+                            LocalSliceIndex::new_unchecked(z - 1),
+                        );
                         self.queue
                             .push((n_below, Some((current, EdgeCost::JumpDown))));
                     }
@@ -270,7 +276,8 @@ impl<'a> AreaDiscovery<'a> {
                     VerticalOffset::Below => z - 1,
                 };
 
-                let pos = SlabPosition::new_unchecked(x, y, offset_z.into());
+                let pos =
+                    SlabPosition::new_unchecked(x, y, LocalSliceIndex::new_unchecked(offset_z));
                 *self.grid.get_unchecked(SlabPositionAsCoord(pos))
             }
         }

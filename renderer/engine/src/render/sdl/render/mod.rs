@@ -94,19 +94,33 @@ impl Renderer for GlRenderer {
 
     fn sim_start(&mut self) {}
 
-    fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent) {
+    fn sim_entity(
+        &mut self,
+        transform: &TransformComponent,
+        render: &RenderComponent,
+        physical: &PhysicalComponent,
+    ) {
         let frame_target = self.frame_target.as_ref().unwrap();
         let mut position = transform.position;
 
         // TODO render head at head height, not the ground
 
-        // tweak z position to keep normalized around 0
-        position.2 -= frame_target.z_offset;
-        // ...plus a tiny amount to always render above the terrain, not in it
-        position.2 += 0.001;
+        position.modify_z(|mut z| {
+            // tweak z position to keep normalized around 0
+            z -= frame_target.z_offset;
 
-        self.entity_pipeline
-            .add_entity((position, render.shape, render.color));
+            // ...plus a tiny amount to always render above the terrain, not in it
+            z += 0.001;
+
+            z
+        });
+
+        self.entity_pipeline.add_entity((
+            position,
+            render.shape,
+            render.color,
+            physical.size.into(),
+        ));
     }
 
     fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
@@ -128,8 +142,8 @@ impl Renderer for GlRenderer {
     fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: ColorRgb) {
         // keep z normalized around 0
         let frame_target = self.frame_target.as_ref().unwrap();
-        from.2 -= frame_target.z_offset;
-        to.2 -= frame_target.z_offset;
+        from.modify_z(|z| z - frame_target.z_offset);
+        to.modify_z(|z| z - frame_target.z_offset);
 
         self.debug_shapes.push(DebugShape::Line {
             points: [from.into(), to.into()],

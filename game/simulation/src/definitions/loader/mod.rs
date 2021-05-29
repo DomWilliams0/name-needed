@@ -171,7 +171,7 @@ mod tests {
 ]
         "#;
 
-        let definitions = preprocess_from_str(input).expect("should success");
+        let definitions = preprocess_from_str(input).expect("should succeed");
         let a = dbg!(&definitions[0]);
         let b = dbg!(&definitions[1]);
         let c = dbg!(&definitions[2]);
@@ -323,7 +323,7 @@ mod tests {
 ]
         "#;
 
-        let definitions = preprocess_from_str(input).expect("should success");
+        let definitions = preprocess_from_str(input).expect("should succeed");
         assert_eq!(definitions.len(), 1); // only "real"
         let real = dbg!(&definitions[0]);
         assert_eq!(real.uid(), "real");

@@ -204,14 +204,14 @@ impl<I: Into<SliceBlock>> IndexMut<I> for SliceMut<'_> {
 
 // TODO make not pub
 pub fn unflatten_index(index: usize) -> SliceBlock {
-    SliceBlock(
+    SliceBlock::new_unchecked(
         (index % CHUNK_SIZE.as_usize()) as BlockCoord,
         (index / CHUNK_SIZE.as_usize()) as BlockCoord,
     )
 }
 
 fn flatten_coords(block: SliceBlock) -> usize {
-    let SliceBlock(x, y) = block;
+    let (x, y) = block.xy();
     ((y * CHUNK_SIZE.as_block_coord()) + x) as usize
 }
 

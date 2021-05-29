@@ -292,13 +292,14 @@ impl Slab {
                 range @ WorldRange::Range(_, _) => {
                     let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
                     for z in za..=zb {
+                        let z = LocalSliceIndex::new_unchecked(z);
                         let mut slice = self.slice_mut(z);
                         // TODO reserve space in changes_out first
                         for x in xa..=xb {
                             for y in ya..=yb {
                                 let prev_block = slice.set_block((x, y), block_type);
-                                let world_pos =
-                                    SlabPosition::new(x, y, z.into()).to_world_position(this_slab);
+                                let world_pos = SlabPosition::new_unchecked(x, y, z)
+                                    .to_world_position(this_slab);
                                 let event =
                                     WorldChangeEvent::new(world_pos, prev_block, block_type);
                                 changes_out.push(event);

@@ -1,7 +1,8 @@
 use common::num_traits::*;
 
 use crate::world::{
-    BlockCoord, BlockPosition, LocalSliceIndex, SlabPosition, WorldPoint, WorldPosition,
+    BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
+    WorldPosition,
 };
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
@@ -24,9 +25,14 @@ pub trait RangePosition: Copy + Sized {
     type Z: RangeNum + AsPrimitive<Self::Count>;
     type Count: Num + Copy + 'static;
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z);
-    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Self;
 
-    fn below(self) -> Self {
+    /// None if invalid coords
+    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Option<Self>;
+
+    /// Panics if invalid coords
+    fn new_unchecked(xyz: (Self::XY, Self::XY, Self::Z)) -> Self;
+
+    fn below(self) -> Option<Self> {
         let (x, y, z) = self.xyz();
         Self::new((x, y, z - Self::Z::one()))
     }
@@ -65,13 +71,18 @@ impl<P: RangePosition> WorldRange<P> {
             z = min_z
         }
 
-        Self::Range(min, P::new((x, y, z)))
+        let max = P::new_unchecked((x, y, z)); // derived from valid `P`
+        Self::Range(min, max)
     }
 
     /// Inclusive
     pub fn bounds(&self) -> (P, P) {
         let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
-        (P::new((ax, ay, az)), P::new((bx, by, bz)))
+        // derived from valid `P`s
+        (
+            P::new_unchecked((ax, ay, az)),
+            P::new_unchecked((bx, by, bz)),
+        )
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
@@ -112,10 +123,13 @@ impl<P: RangePosition> WorldRange<P> {
         xy.as_() * z.as_()
     }
 
-    pub fn below(self) -> Self {
+    pub fn below(self) -> Option<Self> {
         match self {
-            WorldRange::Single(pos) => WorldRange::Single(pos.below()),
-            WorldRange::Range(from, to) => WorldRange::Range(from.below(), to.below()),
+            WorldRange::Single(pos) => pos.below().map(WorldRange::Single),
+            WorldRange::Range(from, to) => from
+                .below()
+                .zip(to.below())
+                .map(|(from, to)| WorldRange::Range(from, to)),
         }
     }
 }
@@ -147,7 +161,11 @@ impl RangePosition for WorldPosition {
         (self.0, self.1, self.2.slice())
     }
 
-    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Self {
+    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
+        Some(xyz.into())
+    }
+
+    fn new_unchecked(xyz: (Self::XY, Self::XY, Self::Z)) -> Self {
         xyz.into()
     }
 }
@@ -160,8 +178,13 @@ impl RangePosition for SlabPosition {
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {
         (self.x(), self.y(), self.z().slice())
     }
-    fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Self {
-        Self::new(x, y, LocalSliceIndex::new(z))
+
+    fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
+        LocalSliceIndex::new(z).and_then(|z| Self::new(x, y, z))
+    }
+
+    fn new_unchecked((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Self {
+        Self::new_unchecked(x, y, LocalSliceIndex::new_unchecked(z))
     }
 }
 
@@ -173,8 +196,13 @@ impl RangePosition for BlockPosition {
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {
         (self.x(), self.y(), self.z().slice())
     }
-    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Self {
-        xyz.into()
+
+    fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
+        Self::new(x, y, GlobalSliceIndex::new(z))
+    }
+
+    fn new_unchecked((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Self {
+        Self::new_unchecked(x, y, GlobalSliceIndex::new(z))
     }
 }
 
@@ -186,8 +214,13 @@ impl RangePosition for WorldPoint {
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {
         (*self).into()
     }
-    fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Self {
-        xyz.into()
+
+    fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
+        Self::new(x, y, z)
+    }
+
+    fn new_unchecked((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Self {
+        Self::new_unchecked(x, y, z)
     }
 }
 

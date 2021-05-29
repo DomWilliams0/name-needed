@@ -170,13 +170,14 @@ mod split {
     #[cfg(test)]
     mod tests {
         use common::*;
-        use unit::world::CHUNK_SIZE;
         use unit::world::{ChunkLocation, SlabIndex, WorldPositionRange, WorldRange, SLAB_SIZE};
+        use unit::world::{SlabPosition, CHUNK_SIZE};
 
         use crate::block::BlockType;
         use crate::loader::update::split::inter_chunk_boundaries;
         use crate::loader::update::{GenericTerrainUpdate, SlabTerrainUpdate};
         use crate::loader::WorldTerrainUpdate;
+        use std::convert::TryFrom;
 
         #[test]
         fn discover_boundaries() {
@@ -220,10 +221,12 @@ mod split {
             from: (i32, i32, i32),
             to: (i32, i32, i32),
         ) -> (ChunkLocation, SlabIndex, SlabTerrainUpdate) {
+            let from = SlabPosition::try_from([from.0, from.1, from.2]).unwrap();
+            let to = SlabPosition::try_from([to.0, to.1, to.2]).unwrap();
             (
                 chunk.into(),
                 slab,
-                GenericTerrainUpdate(WorldRange::Range(from.into(), to.into()), BlockType::Stone),
+                GenericTerrainUpdate(WorldRange::Range(from, to), BlockType::Stone),
             )
         }
 

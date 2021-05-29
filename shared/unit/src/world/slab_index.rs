@@ -4,7 +4,6 @@ use common::{derive_more::*, *};
 use newtype_derive::*;
 use std::ops::{Div, Mul};
 
-/// Index of a slab in a chunk
 #[derive(
     Debug,
     Default,
@@ -22,6 +21,7 @@ use std::ops::{Div, Mul};
     Sub,
     SubAssign,
 )]
+/// Index of a slab in a chunk
 pub struct SlabIndex(pub i32);
 
 impl SlabIndex {

@@ -1,4 +1,4 @@
-# TODOs (326)
+# TODOs (324)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -256,8 +256,8 @@
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/render/shape.rs](game/simulation/src/render/shape.rs) (1)
-   * `// TODO physical shape wastes so much space`
+ * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
+   * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
@@ -291,6 +291,8 @@
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`
+ * [game/simulation/src/steer/debug.rs](game/simulation/src/steer/debug.rs) (1)
+   * `// TODO show actual steering direction alongside velocity`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
  * [game/simulation/src/transform.rs](game/simulation/src/transform.rs) (1)
@@ -387,10 +389,12 @@
    * `// TODO make stresser use generated terrain again`
  * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
    * `// TODO don't unwrap()`
- * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (1)
+ * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (2)
-   * `// TODO zoom`
+   * `// TODO if mouse wheel is reused for anything else, add an input event for it`
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (3)
+   * `// TODO zoom into mouse position/screen centre`
+   * `// TODO interpolate zoom`
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO smallvec`
@@ -439,16 +443,7 @@
    * `// TODO helper for this-1`
  * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
    * `// TODO pub mod hunger;`
- * [shared/unit/src/world/block_position.rs](shared/unit/src/world/block_position.rs) (1)
-   * `// TODO return Option/implement TryFrom for all coord types instead of asserts`
- * [shared/unit/src/world/mod.rs](shared/unit/src/world/mod.rs) (1)
-   * `// TODO overhaul all *Position and *Point to impl common traits, to reduce repeated code and From/Intos`
- * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (2)
+ * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
-   * `// TODO return option instead of asserting`
- * [shared/unit/src/world/slice_block.rs](shared/unit/src/world/slice_block.rs) (1)
-   * `// TODO try_new constructor that returns option, with unchecked version. make fields non pub`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
-   * `// TODO return option and have unchecked version`
- * [shared/unit/src/world/world_point.rs](shared/unit/src/world/world_point.rs) (1)
-   * `// TODO assert fields are not NaN in points`
+   * `// TODO ideally handle global slice integer overflow, although unlikely`

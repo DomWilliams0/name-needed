@@ -16,7 +16,12 @@ pub trait Renderer {
     fn sim_start(&mut self);
 
     /// `transform` is interpolated
-    fn sim_entity(&mut self, transform: &TransformComponent, render: &RenderComponent);
+    fn sim_entity(
+        &mut self,
+        transform: &TransformComponent,
+        render: &RenderComponent,
+        physical: &PhysicalComponent,
+    );
 
     /// The entity with the given transform is selected, highlight it
     /// Call in addition to `sim_entity`
@@ -46,24 +51,24 @@ pub trait Renderer {
     // ----
 
     fn tile_selection(&mut self, a: WorldPosition, b: WorldPosition, color: ColorRgb) {
-        let a = WorldPoint::from(a);
-        let b = WorldPoint::from(b);
+        let (ax, ay, az) = WorldPoint::from(a).xyz();
+        let (bx, by, bz) = WorldPoint::from(b).xyz();
 
         let bl = {
-            let x = a.0.min(b.0);
-            let y = a.1.min(b.1);
-            let z = a.2.min(b.2);
-            WorldPoint(x, y, z)
+            let x = ax.min(bx);
+            let y = ay.min(by);
+            let z = az.min(bz);
+            WorldPoint::new_unchecked(x, y, z)
         };
         let tr = {
-            let x = a.0.max(b.0) + 1.0;
-            let y = a.1.max(b.1) + 1.0;
-            let z = a.2.max(b.2);
-            WorldPoint(x, y, z)
+            let x = ax.max(bx) + 1.0;
+            let y = ay.max(by) + 1.0;
+            let z = az.max(bz);
+            WorldPoint::new_unchecked(x, y, z)
         };
 
-        let w = tr.0 - bl.0;
-        let h = tr.1 - bl.1;
+        let w = tr.x() - bl.x();
+        let h = tr.y() - bl.y();
 
         let br = bl + Vector2::new(w, 0.0);
         let tl = bl + Vector2::new(0.0, h);

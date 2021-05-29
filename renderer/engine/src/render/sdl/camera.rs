@@ -2,9 +2,10 @@ use cgmath::ortho;
 
 use common::input::CameraDirection;
 use common::*;
-use unit::view::ViewPoint;
-use unit::world::CHUNK_SIZE;
-use unit::world::{ChunkLocation, WorldPoint, WorldPosition, SCALE};
+use std::convert::TryFrom;
+use unit::space::view::ViewPoint;
+use unit::world::{ChunkLocation, WorldPoint, WorldPosition};
+use unit::world::{BLOCKS_SCALE, CHUNK_SIZE};
 
 pub struct Camera {
     /// Camera pos in metres
@@ -25,20 +26,21 @@ impl Camera {
             velocity: Vector2::zero(),
             pos: Point2::new(0.0, 0.0),
             last_extrapolated_pos: Point2::new(0.0, 0.0),
-            zoom: config::get().display.zoom,
+            zoom: config::get().display.initial_zoom,
             window_size: Vector2::zero(), // set in on_resize
         };
         cam.on_resize(width, height);
 
         // centre on the first chunk initially
-        let centre = WorldPoint(CHUNK_SIZE.as_f32() / 2.0, CHUNK_SIZE.as_f32() / 2.0, 0.0);
+        let centre =
+            WorldPoint::new_unchecked(CHUNK_SIZE.as_f32() / 2.0, CHUNK_SIZE.as_f32() / 2.0, 0.0);
         cam.set_centre(centre);
 
         cam
     }
 
     pub(crate) fn set_centre(&mut self, centre: impl Into<ViewPoint>) {
-        let ViewPoint(x, y, _) = centre.into();
+        let (x, y, _) = centre.into().xyz();
         self.pos = Point2::new(x, y) - (self.window_size / 2.0 / SCREEN_SCALE);
         self.last_extrapolated_pos = self.pos;
     }
@@ -58,8 +60,23 @@ impl Camera {
     }
 
     pub fn handle_move(&mut self, direction: CameraDirection, is_down: bool) {
-        // TODO zoom
         self.input[direction as usize] = is_down;
+    }
+
+    pub fn handle_zoom(&mut self, mut delta: i32) {
+        if delta.abs() > 1 {
+            warn!(
+                "mouse wheel scrolled faster than expected, investigate me ({})",
+                delta
+            );
+            delta = delta.signum();
+        }
+
+        let speed = config::get().display.camera_zoom_speed;
+        self.zoom = (self.zoom - (speed * delta as f32)).clamp(0.1, 6.0);
+
+        // TODO zoom into mouse position/screen centre
+        // TODO interpolate zoom
     }
 
     pub fn tick(&mut self) -> (ChunkLocation, ChunkLocation) {
@@ -75,7 +92,7 @@ impl Camera {
         self.pos += self.velocity;
 
         if dx != 0 || dy != 0 {
-            let speed = config::get().display.camera_speed;
+            let speed = config::get().display.camera_move_speed;
             self.velocity.x = dx as f32 * speed;
             self.velocity.y = dy as f32 * speed;
         } else {
@@ -85,9 +102,10 @@ impl Camera {
 
         // calculate visible chunk bounds
         // TODO cache
-        let bottom_left = WorldPosition::from(ViewPoint::from(self.pos));
+        let view_point = ViewPoint::try_from(self.pos).expect("invalid camera position");
+        let bottom_left = WorldPosition::from(view_point);
         let top_right = {
-            let mul = 4.0 * self.zoom * SCALE / SCREEN_SCALE;
+            let mul = self.zoom / SCREEN_SCALE / BLOCKS_SCALE;
             let hor = (mul * self.window_size.x).ceil() as i32;
             let ver = (mul * self.window_size.y).ceil() as i32;
 
@@ -129,6 +147,6 @@ impl Camera {
             let to_metres = self.zoom / SCREEN_SCALE;
             Vector2::new(xpixels * to_metres, ypixels * to_metres)
         };
-        ((self.pos + offset) / SCALE).into()
+        ((self.pos + offset) / BLOCKS_SCALE).into()
     }
 }

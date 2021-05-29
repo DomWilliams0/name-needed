@@ -10,7 +10,7 @@ use unit::world::{
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
 
-use crate::block::{Block, BlockDurability, BlockType};
+use crate::block::{Block, BlockDurability};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slab::Slab;
@@ -69,13 +69,16 @@ pub trait BaseTerrain {
         self.slice_mut_with_cow(index).unwrap()
     }
 
-    fn get_block<B: Into<BlockPosition>>(&self, pos: B) -> Option<Block> {
-        let pos = pos.into();
+    fn get_block(&self, pos: BlockPosition) -> Option<Block> {
         self.slice(pos.z()).map(|slice| slice[pos])
     }
 
-    fn get_block_type<B: Into<BlockPosition>>(&self, pos: B) -> Option<BlockType> {
-        self.get_block(pos).map(|b| b.block_type())
+    /// Panics if invalid position
+    #[cfg(test)]
+    fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block> {
+        use std::convert::TryFrom;
+        let pos = BlockPosition::try_from(pos).expect("bad position");
+        self.slice(pos.z()).map(|slice| slice[pos])
     }
 
     /// Returns the range of slices in this terrain rounded to the nearest slab
@@ -110,7 +113,7 @@ pub trait BaseTerrain {
             for y in 0..CHUNK_SIZE.as_block_coord() {
                 for x in 0..CHUNK_SIZE.as_block_coord() {
                     let z = GlobalSliceIndex::new(z);
-                    let pos = BlockPosition::from((x, y, z));
+                    let pos = BlockPosition::new_unchecked(x, y, z.into());
                     let block = self.get_block(pos);
                     out.push((pos, block.unwrap()));
                 }
@@ -248,21 +251,17 @@ impl RawChunkTerrain {
     }
 
     /// If slab doesn't exist, does nothing and returns false
-    pub fn try_set_block<P, B>(&mut self, pos: P, block: B) -> bool
-    where
-        P: Into<BlockPosition>,
-        B: Into<Block>,
-    {
+    pub fn try_set_block(&mut self, pos: BlockPosition, block: impl Into<Block>) -> bool {
         self.set_block(pos, block, SlabCreationPolicy::PleaseDont)
     }
 
     /// Returns if block was set successfully, depends on slab creation policy
-    pub fn set_block<P, B>(&mut self, pos: P, block: B, policy: SlabCreationPolicy) -> bool
-    where
-        P: Into<BlockPosition>,
-        B: Into<Block>,
-    {
-        let pos = pos.into();
+    pub fn set_block(
+        &mut self,
+        pos: BlockPosition,
+        block: impl Into<Block>,
+        policy: SlabCreationPolicy,
+    ) -> bool {
         let block = block.into();
         self.slice_mut_with_policy(pos.z(), policy, |mut slice| slice[pos] = block)
     }
@@ -400,25 +399,28 @@ impl RawChunkTerrain {
             let other_slab = other.slab(slab_index).unwrap();
 
             for z in LocalSliceIndex::slices_except_last() {
-                let this_slice_above = this_slab.slice(z + 1);
-                let upper_slice = other_slab.slice(z + 1);
+                let z_above = z.above();
+                let z_current = z.current();
+
+                let this_slice_above = this_slab.slice(z_above);
+                let upper_slice = other_slab.slice(z_above);
                 yield_(
                     WhichChunk::ThisChunk,
                     Some(this_slice_above),
                     slab_index,
-                    z,
+                    z_current,
                     upper_slice,
                     offset,
                     &mut f,
                 );
 
-                let upper_slice = this_slab.slice(z + 1);
-                let other_slice_above = other_slab.slice(z + 1);
+                let upper_slice = this_slab.slice(z_above);
+                let other_slice_above = other_slab.slice(z_above);
                 yield_(
                     WhichChunk::OtherChunk,
                     Some(other_slice_above),
                     slab_index,
-                    z,
+                    z_current,
                     upper_slice,
                     offset_opposite,
                     &mut f,
@@ -702,7 +704,7 @@ mod pair_walking {
             // get block pos in this chunk
             let block_pos = {
                 let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition::new(this_pos.0, this_pos.1, slice_idx)
+                BlockPosition::new_unchecked(this_pos.0, this_pos.1, slice_idx)
             };
 
             f(which_chunk, block_pos, opacities);
@@ -809,7 +811,7 @@ mod pair_walking {
             // get block pos in this chunk
             let block_pos = {
                 let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition::new(coord.0, coord.1, slice_idx)
+                BlockPosition::new_unchecked(coord.0, coord.1, slice_idx)
             };
 
             f(which_chunk, block_pos, opacities)
@@ -849,6 +851,7 @@ mod tests {
     use crate::helpers::loader_from_chunks_blocking;
     use crate::loader::WorldTerrainUpdate;
     use crate::navigation::discovery::AreaDiscovery;
+    use std::convert::TryInto;
 
     #[test]
     fn empty() {
@@ -919,18 +922,32 @@ mod tests {
             BlockType::Grass
         );
         assert_eq!(
-            terrain.get_block((3, 3, -1)).unwrap().block_type(),
+            terrain.get_block_tup((3, 3, -1)).unwrap().block_type(),
             BlockType::Grass
         );
 
         let mut terrain = RawChunkTerrain::default();
-        assert_eq!(terrain.try_set_block((2, 0, 0), BlockType::Stone), true);
-        assert_eq!(terrain.try_set_block((2, 0, -2), BlockType::Stone), false);
+        assert_eq!(
+            terrain.set_block(
+                (2, 0, 0).try_into().unwrap(),
+                BlockType::Stone,
+                SlabCreationPolicy::PleaseDont
+            ),
+            true
+        );
+        assert_eq!(
+            terrain.set_block(
+                (2, 0, -2).try_into().unwrap(),
+                BlockType::Stone,
+                SlabCreationPolicy::PleaseDont
+            ),
+            false
+        );
         let mut blocks = Vec::new();
         terrain.blocks(&mut blocks);
 
-        assert_eq!(blocks[0].0, (0, 0, 0).into());
-        assert_eq!(blocks[1].0, (1, 0, 0).into());
+        assert_eq!(blocks[0].0, (0, 0, 0).try_into().unwrap());
+        assert_eq!(blocks[1].0, (1, 0, 0).try_into().unwrap());
         assert_eq!(
             blocks
                 .iter()
@@ -944,7 +961,7 @@ mod tests {
     fn slab_areas() {
         // slab with flat slice 0 should have 1 area
         let mut slab = Slab::empty();
-        slab.slice_mut(LocalSliceIndex::new(0))
+        slab.slice_mut(LocalSliceIndex::new_unchecked(0))
             .fill(BlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
@@ -952,9 +969,9 @@ mod tests {
 
         // slab with 2 unconnected floors should have 2
         let mut slab = Slab::empty();
-        slab.slice_mut(LocalSliceIndex::new(0))
+        slab.slice_mut(LocalSliceIndex::new_unchecked(0))
             .fill(BlockType::Stone);
-        slab.slice_mut(LocalSliceIndex::new(5))
+        slab.slice_mut(LocalSliceIndex::new_unchecked(5))
             .fill(BlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
@@ -1020,8 +1037,12 @@ mod tests {
         let mut terrain = RawChunkTerrain::default();
 
         // 1 slab below should not yet exist
-        assert!(!terrain.set_block((0, 0, -5), BlockType::Stone, SlabCreationPolicy::PleaseDont));
-        assert!(terrain.get_block((0, 0, -5)).is_none());
+        assert!(!terrain.set_block(
+            (0, 0, -5).try_into().unwrap(),
+            BlockType::Stone,
+            SlabCreationPolicy::PleaseDont
+        ));
+        assert!(terrain.get_block_tup((0, 0, -5)).is_none());
         assert_eq!(terrain.slab_count(), 1);
         assert_eq!(
             terrain.slice_bounds_as_slabs(),
@@ -1029,10 +1050,14 @@ mod tests {
         );
 
         // now really set
-        assert!(terrain.set_block((0, 0, -5), BlockType::Stone, SlabCreationPolicy::CreateAll));
+        assert!(terrain.set_block(
+            (0, 0, -5).try_into().unwrap(),
+            BlockType::Stone,
+            SlabCreationPolicy::CreateAll
+        ));
         assert_eq!(
             terrain
-                .get_block((0, 0, -5))
+                .get_block_tup((0, 0, -5))
                 .map(|b| b.block_type())
                 .unwrap(),
             BlockType::Stone
@@ -1044,10 +1069,14 @@ mod tests {
         );
 
         // set a high block that will fill the rest in with air
-        assert!(terrain.set_block((0, 0, 100), BlockType::Grass, SlabCreationPolicy::CreateAll));
+        assert!(terrain.set_block(
+            (0, 0, 100).try_into().unwrap(),
+            BlockType::Grass,
+            SlabCreationPolicy::CreateAll
+        ));
         assert_eq!(
             terrain
-                .get_block((0, 0, 100))
+                .get_block_tup((0, 0, 100))
                 .map(|b| b.block_type())
                 .unwrap(),
             BlockType::Grass
@@ -1059,7 +1088,7 @@ mod tests {
             // air inbetween
             assert_eq!(
                 terrain
-                    .get_block((0, 0, z))
+                    .get_block_tup((0, 0, z))
                     .map(|b| b.block_type())
                     .unwrap(),
                 BlockType::Air
@@ -1095,34 +1124,34 @@ mod tests {
 
         // 4 flat connections
         assert_eq!(
-            graph.edges((5, 5, 52).into()),
+            graph.edges((5, 5, 52).try_into().unwrap()),
             vec![
-                ((4, 5, 52).into(), EdgeCost::Walk),
-                ((5, 4, 52).into(), EdgeCost::Walk),
-                ((5, 6, 52).into(), EdgeCost::Walk),
-                ((6, 5, 52).into(), EdgeCost::Walk),
+                ((4, 5, 52).try_into().unwrap(), EdgeCost::Walk),
+                ((5, 4, 52).try_into().unwrap(), EdgeCost::Walk),
+                ((5, 6, 52).try_into().unwrap(), EdgeCost::Walk),
+                ((6, 5, 52).try_into().unwrap(), EdgeCost::Walk),
             ]
         );
 
         // step up on 1 side
         assert_eq!(
-            graph.edges((2, 3, 52).into()),
+            graph.edges((2, 3, 52).try_into().unwrap()),
             vec![
-                ((1, 3, 52).into(), EdgeCost::Walk),
-                ((2, 2, 53).into(), EdgeCost::JumpUp),
-                ((2, 4, 52).into(), EdgeCost::Walk),
-                ((3, 3, 52).into(), EdgeCost::Walk),
+                ((1, 3, 52).try_into().unwrap(), EdgeCost::Walk),
+                ((2, 2, 53).try_into().unwrap(), EdgeCost::JumpUp),
+                ((2, 4, 52).try_into().unwrap(), EdgeCost::Walk),
+                ((3, 3, 52).try_into().unwrap(), EdgeCost::Walk),
             ]
         );
 
         // step down on all sides
         assert_eq!(
-            graph.edges((2, 2, 53).into()),
+            graph.edges((2, 2, 53).try_into().unwrap()),
             vec![
-                ((1, 2, 52).into(), EdgeCost::JumpDown),
-                ((2, 1, 52).into(), EdgeCost::JumpDown),
-                ((2, 3, 52).into(), EdgeCost::JumpDown),
-                ((3, 2, 52).into(), EdgeCost::JumpDown),
+                ((1, 2, 52).try_into().unwrap(), EdgeCost::JumpDown),
+                ((2, 1, 52).try_into().unwrap(), EdgeCost::JumpDown),
+                ((2, 3, 52).try_into().unwrap(), EdgeCost::JumpDown),
+                ((3, 2, 52).try_into().unwrap(), EdgeCost::JumpDown),
             ]
         );
     }
@@ -1130,10 +1159,13 @@ mod tests {
     #[test]
     fn slice_index_in_slab() {
         // positives are simple modulus
-        assert_eq!(GlobalSliceIndex::new(5).to_local(), LocalSliceIndex::new(5));
+        assert_eq!(
+            GlobalSliceIndex::new(5).to_local(),
+            LocalSliceIndex::new_unchecked(5)
+        );
         assert_eq!(
             GlobalSliceIndex::new(SLAB_SIZE.as_i32() + 4).to_local(),
-            LocalSliceIndex::new(4)
+            LocalSliceIndex::new_unchecked(4)
         );
 
         // negatives work backwards
@@ -1143,20 +1175,20 @@ mod tests {
     #[test]
     fn slice_index_in_chunk() {
         assert_eq!(
-            LocalSliceIndex::new(5).to_global(SlabIndex(0)),
+            LocalSliceIndex::new_unchecked(5).to_global(SlabIndex(0)),
             GlobalSliceIndex::new(5)
         );
         assert_eq!(
-            LocalSliceIndex::new(5).to_global(SlabIndex(1)),
+            LocalSliceIndex::new_unchecked(5).to_global(SlabIndex(1)),
             GlobalSliceIndex::new(SLAB_SIZE.as_i32() + 5),
         );
 
         assert_eq!(
-            LocalSliceIndex::new(0).to_global(SlabIndex(-1)),
+            LocalSliceIndex::new_unchecked(0).to_global(SlabIndex(-1)),
             GlobalSliceIndex::new(-SLAB_SIZE.as_i32()),
         );
         assert_eq!(
-            LocalSliceIndex::new(1).to_global(SlabIndex(-1)),
+            LocalSliceIndex::new_unchecked(1).to_global(SlabIndex(-1)),
             GlobalSliceIndex::new(-SLAB_SIZE.as_i32() + 1),
         );
     }
@@ -1172,7 +1204,7 @@ mod tests {
         let chunk = load_single_chunk(terrain.deep_clone());
 
         let (occlusion, _) = chunk
-            .get_block((2, 2, 2))
+            .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
             .resolve_vertices();
@@ -1192,7 +1224,7 @@ mod tests {
         let chunk = load_single_chunk(terrain);
 
         let (occlusion, _) = chunk
-            .get_block((2, 2, 2))
+            .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
             .resolve_vertices();
@@ -1220,7 +1252,7 @@ mod tests {
         let terrain = load_single_chunk(terrain);
 
         let (occlusion, _) = terrain
-            .get_block((2, 2, SLAB_SIZE.as_i32() - 1))
+            .get_block_tup((2, 2, SLAB_SIZE.as_i32() - 1))
             .unwrap()
             .occlusion()
             .resolve_vertices();
@@ -1242,7 +1274,7 @@ mod tests {
         block: (i32, i32, i32),
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
-        let block = chunk.get_block(block).unwrap();
+        let block = chunk.get_block(block.try_into().unwrap()).unwrap();
         let (occlusion, _) = block.occlusion().resolve_vertices();
         occlusion
     }
@@ -1389,12 +1421,13 @@ mod tests {
         let old = terrain.slabs.get(0).unwrap().clone(); // reference to force a cow clone
 
         let slab = terrain.slab_mut(SlabIndex(0)).unwrap();
-        slab.slice_mut(0).set_block((0, 0), BlockType::Stone);
+        let slice_0 = LocalSliceIndex::new_unchecked(0);
+        slab.slice_mut(slice_0).set_block((0, 0), BlockType::Stone);
 
         // old reference is "dangling", pointing to old
         let immut = terrain.slab(SlabIndex(0)).unwrap();
-        assert_eq!(old.slice(0)[(0, 0)].block_type(), BlockType::Air);
-        assert_eq!(immut.slice(0)[(0, 0)].block_type(), BlockType::Stone);
+        assert_eq!(old.slice(slice_0)[(0, 0)].block_type(), BlockType::Air);
+        assert_eq!(immut.slice(slice_0)[(0, 0)].block_type(), BlockType::Stone);
     }
 
     #[test]

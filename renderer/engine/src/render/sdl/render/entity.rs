@@ -7,13 +7,14 @@ use color::ColorRgb;
 use common::*;
 use resources::Shaders;
 use simulation::Shape2d;
-use unit::view::ViewPoint;
-use unit::world::{WorldPoint, SCALE};
+use unit::space::length::{Length, Length2};
+use unit::space::view::ViewPoint;
+use unit::world::WorldPoint;
 
 pub(crate) struct EntityPipeline {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, Shape2d, ColorRgb)>,
+    entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2)>,
 }
 
 #[repr(C)]
@@ -116,14 +117,14 @@ impl EntityPipeline {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb)) {
+    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb, Length2)) {
         self.entities.push(entity);
     }
 
     pub fn render_entities(&mut self, frame_target: &mut FrameTarget) -> GlResult<()> {
         // sort by shape
         self.entities
-            .sort_unstable_by_key(|(_, phys, _)| phys.ord());
+            .sort_unstable_by_key(|(_, shape, _, _)| shape.ord());
 
         let p = self.pipeline.program.scoped_bind();
         let _vao = self.pipeline.vao.scoped_bind();
@@ -140,17 +141,17 @@ impl EntityPipeline {
         if let Some(mut mapped) = vbo.map_write_only::<EntityInstance>()? {
             // TODO cursor interface in ScopedMap
 
-            for (i, (pos, shape, color)) in self.entities.iter().enumerate() {
+            for (i, (pos, _, color, size)) in self.entities.iter().enumerate() {
                 let pos = ViewPoint::from(*pos);
                 mapped[i].color = (*color).into();
 
-                let (scale_x, scale_y) = match shape {
-                    Shape2d::Circle { radius } => (radius, radius),
-                    Shape2d::Rectangle { rx, ry } => (rx, ry),
+                let scale = {
+                    let (x, y) = size.xy();
+                    let scale = |len: Length| len.metres() / 2.0;
+                    Matrix4::from_nonuniform_scale(scale(x), scale(y), 1.0)
                 };
 
-                let model = Matrix4::from_translation(pos.into())
-                    * Matrix4::from_nonuniform_scale(scale_x * SCALE, scale_y * SCALE, 1.0);
+                let model = Matrix4::from_translation(pos.into()) * scale;
                 mapped[i].model = model.into();
             }
         }
@@ -166,7 +167,7 @@ impl EntityPipeline {
         for (i, grouped) in self
             .entities
             .iter()
-            .group_by(|(_, shape, _)| shape.ord())
+            .group_by(|(_, shape, _, _)| shape.ord())
             .into_iter()
         {
             let (primitive, start_ptr, element_count) = render_data[i];

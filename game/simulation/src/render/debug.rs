@@ -8,6 +8,7 @@ use common::*;
 use std::borrow::Cow;
 use std::ffi::CStr;
 use std::ops::DerefMut;
+use unit::space::view::ViewPoint;
 use unit::world::{WorldPoint, CHUNK_SIZE};
 use world::RegionLocation;
 
@@ -174,16 +175,13 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         _: &EcsWorld,
         _: &WorldViewer,
     ) {
-        renderer.debug_add_line(
-            WorldPoint(0.0, 0.0, 1.0),
-            WorldPoint(1.0, 0.0, 1.0),
-            ColorRgb::new(255, 0, 0),
-        );
-        renderer.debug_add_line(
-            WorldPoint(0.0, 0.0, 1.0),
-            WorldPoint(0.0, 1.0, 1.0),
-            ColorRgb::new(0, 255, 0),
-        );
+        // each line is 1m long
+        let origin = ViewPoint::new_unchecked(0.0, 0.0, 1.0);
+        let a = ViewPoint::new_unchecked(1.0, 0.0, 1.0);
+        let b = ViewPoint::new_unchecked(0.0, 1.0, 1.0);
+
+        renderer.debug_add_line(origin.into(), a.into(), ColorRgb::new(255, 0, 0));
+        renderer.debug_add_line(origin.into(), b.into(), ColorRgb::new(0, 255, 0));
     }
 }
 impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
