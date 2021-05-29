@@ -122,6 +122,11 @@ impl SocietyJobImpl for HaulJob {
 
 impl Display for HaulJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Haul {} to {}", E(self.entity), self.target)
+        // delegate to avoid duplication
+        write!(
+            f,
+            "{}",
+            SocietyTask::Haul(self.entity, self.source, self.target)
+        )
     }
 }

@@ -11,9 +11,9 @@ use crate::activity::{EventUnblockResult, EventUnsubscribeResult};
 
 use crate::activity::activities::NopActivity;
 use crate::activity::event_logging::EntityLoggingComponent;
+use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
 use crate::simulation::Tick;
 use crate::{Societies, SocietyComponent};
-use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
 use std::convert::TryFrom;
 
 pub struct ActivitySystem;
@@ -24,7 +24,7 @@ pub struct ActivityEventSystem;
 #[storage(DenseVecStorage)]
 #[name("activity")]
 pub struct ActivityComponent {
-    pub current: Box<dyn Activity<EcsWorld>>,
+    current: Box<dyn Activity<EcsWorld>>,
     current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
 }
@@ -94,7 +94,8 @@ impl<'a> System<'a> for ActivitySystem {
                 activity.current = new_action.into_activity();
                 activity.current_society_task = new_society_task;
 
-                // TODO unreserve prev society task?
+                // not necessary to manually cancel society reservation here, as the ai interruption
+                // already did
             }
 
             // TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause
@@ -151,7 +152,6 @@ impl<'a> System<'a> for ActivitySystem {
                             job.write().notify_completion(task, result);
                         }
                     }
-
                 }
             }
         }
@@ -237,6 +237,14 @@ impl ActivityComponent {
 
         // ensure unblocked
         world.remove_lazy::<BlockingActivityComponent>(me);
+    }
+
+    pub fn current(&self) -> &dyn Activity<EcsWorld> {
+        &*self.current
+    }
+
+    pub fn current_society_task(&self) -> Option<&(SocietyJobRef, SocietyTask)> {
+        self.current_society_task.as_ref()
     }
 }
 

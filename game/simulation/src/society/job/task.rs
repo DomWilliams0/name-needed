@@ -3,8 +3,9 @@ use crate::ai::dse::{BreakBlockDse, HaulDse};
 use crate::ai::AiContext;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::HaulableItemComponent;
-use crate::ComponentWorld;
+use crate::{ComponentWorld, E};
 use ai::Dse;
+use common::*;
 use unit::world::WorldPosition;
 
 /// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
@@ -42,6 +43,16 @@ impl SocietyTask {
             BreakBlock(_) => true,
             // TODO some types of hauling will be shareable
             Haul(_, _, _) => false,
+        }
+    }
+}
+
+impl Display for SocietyTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use SocietyTask::*;
+        match self {
+            BreakBlock(b) => write!(f, "Break block at {}", b),
+            Haul(e, _, tgt) => write!(f, "Haul {} to {}", E(*e), tgt),
         }
     }
 }

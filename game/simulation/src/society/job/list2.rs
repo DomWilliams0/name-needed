@@ -1,6 +1,6 @@
 use crate::ecs::E;
 use crate::job::job2::{SocietyJob, SocietyJobImpl};
-use crate::job::{SocietyTask};
+use crate::job::SocietyTask;
 use crate::simulation::Tick;
 use crate::society::job::job2::SocietyJobRef;
 use crate::{EcsWorld, Entity};
@@ -72,17 +72,16 @@ impl SocietyJobList {
             self.last_update = this_tick;
             let len_before = self.jobs.len();
             trace!("refreshing {n} jobs", n = len_before);
-            self.jobs
-                .retain(|job| {
-                    let result = job.write().refresh_tasks(world);
-                    match result {
-                        None => true,
-                        Some(result) => {
-                            debug!("job finished"; "result" => ?result, "job" => ?job);
-                            false
-                        }
+            self.jobs.retain(|job| {
+                let result = job.write().refresh_tasks(world);
+                match result {
+                    None => true,
+                    Some(result) => {
+                        debug!("job finished"; "result" => ?result, "job" => ?job);
+                        false
                     }
-                });
+                }
+            });
 
             let len_after = self.jobs.len();
             if len_before != len_after {
@@ -127,6 +126,13 @@ impl SocietyJobList {
 
     pub fn by_index(&self, idx: usize) -> Option<SocietyJobRef> {
         self.jobs.get(idx).cloned()
+    }
+
+    pub fn reservation(&self, entity: Entity) -> Option<&SocietyTask> {
+        self.reservations
+            .reservations
+            .iter()
+            .find_map(move |(task, e)| (*e == entity).as_some(task))
     }
 }
 

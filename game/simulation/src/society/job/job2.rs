@@ -2,12 +2,11 @@ use crate::activity::ActivityFinish;
 use crate::job::SocietyTask;
 use crate::EcsWorld;
 
-
-use common::parking_lot::{RwLock};
+use common::parking_lot::RwLock;
 use common::*;
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::ops::Deref;
+use std::rc::Rc;
 
 /// A high-level society job that produces a number of [SocietyTask]s
 pub struct SocietyJob {
@@ -18,7 +17,6 @@ pub struct SocietyJob {
 
     // TODO remove box and make this type unsized, it's in an rc anyway
     inner: Box<dyn SocietyJobImpl>,
-
     // TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them
 }
 
@@ -61,7 +59,10 @@ impl SocietyJob {
         })))
     }
 
-    pub(in crate::society::job) fn refresh_tasks(&mut self, world: &EcsWorld) -> Option<SocietyTaskResult>{
+    pub(in crate::society::job) fn refresh_tasks(
+        &mut self,
+        world: &EcsWorld,
+    ) -> Option<SocietyTaskResult> {
         self.inner
             .refresh_tasks(world, &mut self.tasks, self.pending_complete.drain(..))
     }
@@ -109,5 +110,14 @@ impl Deref for SocietyJobRef {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Display for SocietyJobRef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self.0.try_read() {
+            None => write!(f, "<locked>)"),
+            Some(job) => write!(f, "{} ({} tasks)", job.inner, job.tasks.len()),
+        }
     }
 }

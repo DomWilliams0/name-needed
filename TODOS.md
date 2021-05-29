@@ -1,4 +1,4 @@
-# TODOs (338)
+# TODOs (337)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -146,9 +146,8 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
    * `// TODO exertion of picking up item depends on item weight`
- * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (3)
+ * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
-   * `// TODO unreserve prev society task?`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`

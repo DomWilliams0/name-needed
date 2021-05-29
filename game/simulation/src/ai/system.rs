@@ -201,7 +201,9 @@ impl<'a> System<'a> for AiSystem {
                         .expect("jobs should not have changed");
 
                     Some((job, task.clone()))
-                } else {None};
+                } else {
+                    None
+                };
 
                 // log decision
                 if let Some(logs) = logging.get_mut(e) {
