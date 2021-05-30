@@ -9,10 +9,11 @@
 * [ ] ai system filters jobs on high level requirements before considering its tasks
 * [X] activity component holds an optional ref to job and current task (passed from ai decision) to report failure/success/interruption, which the job handles uniquely
 * [ ] list society jobs in the ui
+	* [ ] show completed results
 * [X] show reserved task in entity ui
 * [ ] tasks should pregenerate a DSE
 * [X] post task completion to job from activity system
 	* [X] unreserve society task on interruption
 * [.] replace deprecated job, job list, reservations
-* [ ] add tests for reservation list
-	* [ ] bug: multiple reservations assert triggered when adding society job to haul to a position
+* [X] add tests for reservation list
+	* [X] bug: multiple reservations assert triggered when adding society job to haul to a position

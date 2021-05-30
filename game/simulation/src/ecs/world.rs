@@ -38,9 +38,6 @@ pub enum ComponentGetError {
 }
 
 pub trait ComponentWorld: ContainerResolver + Sized {
-    #[cfg(test)]
-    fn test_new() -> Self;
-
     fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError>;
     fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError>;
     fn has_component<T: Component>(&self, entity: Entity) -> bool;
@@ -125,13 +122,6 @@ impl EcsWorld {
 }
 
 impl ComponentWorld for EcsWorld {
-    #[cfg(test)]
-    fn test_new() -> Self {
-        let mut world = Self::new();
-        world.insert(WorldRef::default());
-        world
-    }
-
     fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError> {
         let storage = self.read_storage::<T>();
 

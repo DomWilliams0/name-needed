@@ -5,7 +5,7 @@ use crate::simulation::Tick;
 use crate::society::job::job2::SocietyJobRef;
 use crate::{EcsWorld, Entity};
 use common::*;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 #[derive(Debug)] // TODO implement manually
 pub struct SocietyJobList {
@@ -19,14 +19,20 @@ pub struct SocietyJobList {
 
 pub type ReservationCount = u16;
 pub type JobIndex = usize;
+pub type SocietyTaskReservations = Reservations<SocietyTask>;
 
 #[derive(Debug)]
-pub struct SocietyTaskReservations {
-    reservations: Vec<(SocietyTask, Entity)>,
-    /// Fast check for task membership in reservations
-    task_membership: HashSet<SocietyTask>,
+pub struct Reservations<T> {
+    reservations: Vec<(T, Entity)>,
+    /// Fast check for membership in reservations
+    task_membership: HashMap<T, ReservationCount>,
 }
 
+pub trait ReservationTask: Clone + Hash + Eq + Debug {
+    fn is_shareable(&self) -> bool;
+}
+
+#[cfg_attr(test, derive(Eq, PartialEq, Debug))]
 pub enum Reservation {
     Unreserved,
     ReservedBySelf,
@@ -136,43 +142,66 @@ impl SocietyJobList {
     }
 }
 
-impl Default for SocietyTaskReservations {
+impl<T> Default for Reservations<T> {
     fn default() -> Self {
         Self {
             reservations: Vec::with_capacity(128),
-            task_membership: HashSet::with_capacity(128),
+            task_membership: HashMap::with_capacity(128),
         }
     }
 }
 
-impl SocietyTaskReservations {
+impl<T: ReservationTask> Reservations<T> {
     /// Removes any other reservation for the given entity
-    pub fn reserve(&mut self, task: SocietyTask, reserver: Entity) {
-        self.task_membership.insert(task.clone());
-
+    pub fn reserve(&mut self, task: T, reserver: Entity) {
         let tup = (task, reserver);
-
         if let Some(current_idx) = self.reservations.iter().position(|(_, e)| *e == reserver) {
-            let mut existing = &mut self.reservations[current_idx];
+            let existing = &mut self.reservations[current_idx];
+
+            if existing.0 == tup.0 {
+                // same task
+                debug!("reserving the same task again, doing nothing"; E(reserver), "task" => ?existing.0);
+                return;
+            }
+
             debug!("replaced existing reservation"; E(reserver), "new" => ?tup.0.clone(), "prev" => ?existing.0);
 
             debug_assert_ne!(existing, &tup, "duplicate reservation for {:?}", tup);
 
-            existing.0 = tup.0;
+            let prev = std::mem::replace(&mut existing.0, tup.0.clone());
+
+            self.add_ref(tup.0);
+            self.release_ref(&prev);
 
             // ensure no other reservations
             debug_assert!(
                 !self
                     .reservations
                     .iter()
-                    .skip(current_idx)
+                    .skip(current_idx + 1)
                     .any(|(_, e)| *e == reserver),
                 "{} has multiple reservations",
                 E(reserver)
             );
         } else {
             debug!("adding new reservation"; E(reserver), "new" => ?tup.0.clone());
+            self.add_ref(tup.0.clone());
             self.reservations.push(tup);
+        }
+    }
+
+    fn add_ref(&mut self, task: T) {
+        *self.task_membership.entry(task).or_default() += 1;
+    }
+
+    fn release_ref(&mut self, task: &T) {
+        let count = self
+            .task_membership
+            .get_mut(task)
+            .expect("missing reservation");
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            self.task_membership.remove(task);
         }
     }
 
@@ -180,6 +209,7 @@ impl SocietyTaskReservations {
     pub fn cancel(&mut self, reserver: Entity) {
         if let Some(current_idx) = self.reservations.iter().position(|(_, e)| *e == reserver) {
             let (prev, _) = self.reservations.swap_remove(current_idx);
+            self.release_ref(&prev);
             debug!("unreserved task"; E(reserver), "prev" => ?prev);
 
             // ensure no other reservations
@@ -197,11 +227,12 @@ impl SocietyTaskReservations {
         }
     }
 
-    pub fn check_for(&self, task: &SocietyTask, reserver: Entity) -> Reservation {
+    pub fn check_for(&self, task: &T, reserver: Entity) -> Reservation {
         // fast check
-        if !self.task_membership.contains(task) {
-            return Reservation::Unreserved;
-        }
+        let reserve_count = match self.task_membership.get(task) {
+            None => return Reservation::Unreserved,
+            Some(n) => *n,
+        };
 
         let is_shareable = task.is_shareable();
         let mut count = 0;
@@ -222,16 +253,113 @@ impl SocietyTaskReservations {
             count += 1;
         }
 
+        debug_assert_ne!(count, 0);
+        debug_assert_eq!(count, reserve_count);
         Reservation::ReservedButShareable(count)
+    }
+}
+
+impl ReservationTask for SocietyTask {
+    fn is_shareable(&self) -> bool {
+        SocietyTask::is_shareable(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ecs::Builder;
+    use crate::ComponentWorld;
+
+    impl ReservationTask for i32 {
+        fn is_shareable(&self) -> bool {
+            *self % 2 == 0
+        }
+    }
+
+    fn create() -> (Reservations<i32>, [Entity; 3]) {
+        let reservations = Reservations::default();
+        let ecs = EcsWorld::new();
+        let entities = [
+            ecs.create_entity().build(),
+            ecs.create_entity().build(),
+            ecs.create_entity().build(),
+        ];
+        (reservations, entities)
+    }
 
     #[test]
-    fn simple() {
-        todo!()
+    fn simple_unshareable() {
+        let (mut reservations, [a, b, _]) = create();
+        let task = 1; // odd = unshareable
+
+        assert_eq!(reservations.check_for(&task, a), Reservation::Unreserved);
+        assert_eq!(reservations.check_for(&task, b), Reservation::Unreserved);
+
+        // reserve exclusively
+        reservations.reserve(task, a);
+        assert_eq!(
+            reservations.check_for(&task, a),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(reservations.check_for(&task, b), Reservation::Unavailable);
+    }
+
+    #[test]
+    fn simple_shareable() {
+        let (mut reservations, [a, b, c]) = create();
+        let task = 2; // even = shareable
+
+        // reserve but shared
+        reservations.reserve(task, a);
+        assert_eq!(
+            reservations.check_for(&task, a),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(
+            reservations.check_for(&task, b),
+            Reservation::ReservedButShareable(1)
+        );
+        assert_eq!(
+            reservations.check_for(&task, c),
+            Reservation::ReservedButShareable(1)
+        );
+
+        reservations.reserve(task, b);
+        assert_eq!(
+            reservations.check_for(&task, a),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(
+            reservations.check_for(&task, b),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(
+            reservations.check_for(&task, c),
+            Reservation::ReservedButShareable(2)
+        );
+    }
+
+    #[test]
+    fn replace_and_cancel() {
+        let (mut reservations, [a, b, c]) = create();
+        let task = 9; // odd = unshareable
+
+        // reserve other then swap
+        reservations.reserve(13, a);
+        reservations.reserve(task, a);
+
+        assert_eq!(
+            reservations.check_for(&task, a),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(reservations.check_for(&task, b), Reservation::Unavailable);
+        assert_eq!(reservations.check_for(&task, c), Reservation::Unavailable);
+
+        reservations.cancel(a);
+
+        assert_eq!(reservations.check_for(&task, a), Reservation::Unreserved);
+        assert_eq!(reservations.check_for(&task, b), Reservation::Unreserved);
+        assert_eq!(reservations.check_for(&task, c), Reservation::Unreserved);
     }
 }
