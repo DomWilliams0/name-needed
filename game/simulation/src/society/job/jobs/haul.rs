@@ -5,7 +5,7 @@ use crate::job::SocietyTaskResult;
 use crate::society::job::job2::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
-use crate::TransformComponent;
+use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
@@ -104,6 +104,7 @@ impl SocietyJobImpl for HaulJob {
                     }
                 }
                 HaulTarget::Container(target_container) => {
+                    // check if arrived in the target container
                     match world.component::<ContainedInComponent>(self.entity) {
                         Ok(ContainedInComponent::Container(c)) if *c == target_container => {
                             trace!("hauled item arrived in target container");
@@ -111,6 +112,14 @@ impl SocietyJobImpl for HaulJob {
                         }
                         _ => {}
                     };
+
+                    // check there is space within the target
+                    if let Err(err) =
+                        ensure_item_fits_in_container(target_container, self.entity, world)
+                    {
+                        trace!("hauled item cannot fit in target container");
+                        return Some(SocietyTaskResult::Failure(err));
+                    }
                 }
             };
         }
@@ -118,6 +127,21 @@ impl SocietyJobImpl for HaulJob {
         // keep single haul task
         None
     }
+}
+
+fn ensure_item_fits_in_container(
+    container: Entity,
+    item: Entity,
+    world: &EcsWorld,
+) -> BoxedResult<()> {
+    let container = world.component::<ContainerComponent>(container)?;
+    let item_physical = world.component::<PhysicalComponent>(item)?;
+
+    container
+        .container
+        .fits(item_physical.size, item_physical.volume)?;
+
+    Ok(())
 }
 
 impl Display for HaulJob {

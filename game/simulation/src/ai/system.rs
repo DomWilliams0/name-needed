@@ -253,7 +253,7 @@ impl AiSystem {
                 |(task, job_idx, _reservations)| match task.as_dse(ecs_world) {
                     Some(dse) => Some((task, job_idx, dse)),
                     None => {
-                        warn!("task failed to conversion to DSE"; "task" => ?task);
+                        warn!("task failed conversion to DSE"; "task" => ?task);
                         None
                     }
                 },
