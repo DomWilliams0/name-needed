@@ -1,4 +1,4 @@
-# TODOs (337)
+# TODOs (336)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -166,16 +166,15 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (10)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (9)
    * `// TODO optional components for ai: hunger, inventory`
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
    * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
-   * `// TODO dont return a new vec`
+   * `// TODO dont return a new vec of boxes, have some dignity`
    * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
-   * `// TODO precalculate DSEs for tasks`
    * `// TODO weight dse by number of existing reservations`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
    * `// TODO avoid box by resolving here and storing result`
