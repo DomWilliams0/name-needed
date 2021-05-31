@@ -2,7 +2,7 @@ use crate::activity::HaulTarget;
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
 use crate::job::SocietyTaskResult;
-use crate::society::job::job2::SocietyJobImpl;
+use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};

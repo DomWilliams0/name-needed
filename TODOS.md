@@ -1,4 +1,4 @@
-# TODOs (338)
+# TODOs (335)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -277,12 +277,11 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
-   * `// TODO return a dyn error in result`
- * [game/simulation/src/society/job/job2.rs](game/simulation/src/society/job/job2.rs) (3)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (4)
    * `// TODO remove box and make this type unsized, it's in an rc anyway`
    * `// TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them`
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
+   * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (2)
    * `// TODO add display impl for WorldPositionRange`
    * `// TODO move to world, and cache current slab/chunk for contiguous queries`
@@ -290,11 +289,7 @@
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
    * `// TODO depends on error type?`
    * `// TODO fail early if no space left in container`
- * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
-   * `// TODO use dynstack instead of boxes for society jobs`
-   * `// TODO reuse allocation`
-   * `// TODO dont recalculate all unreserved tasks every tick for every entity`
- * [game/simulation/src/society/job/list2.rs](game/simulation/src/society/job/list2.rs) (2)
+ * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (2)
    * `#[derive(Debug)] // TODO implement manually`
    * `// TODO filter jobs for entity`
  * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)

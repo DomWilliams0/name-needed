@@ -1,12 +1,10 @@
 use crate::ecs::*;
 use crate::item::ContainerComponent;
 use crate::job::SocietyJobList;
-use crate::society::job::JobList;
 use crate::{ComponentWorld, SocietyHandle};
 use common::*;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 
 pub struct Society {
     name: String,

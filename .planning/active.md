@@ -14,6 +14,6 @@
 * [ ] cache task->DSE conversion
 * [X] post task completion to job from activity system
 	* [X] unreserve society task on interruption
-* [.] replace deprecated job, job list, reservations
+* [X] replace deprecated job, job list, reservations
 * [X] add tests for reservation list
 	* [X] bug: multiple reservations assert triggered when adding society job to haul to a position
