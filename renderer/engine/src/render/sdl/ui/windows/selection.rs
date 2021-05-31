@@ -239,7 +239,7 @@ impl SelectionWindow {
         if let Some(activity) = details.component::<ActivityComponent>(context) {
             let tab = context.new_tab(im_str!("Activity"));
             if tab.is_open() {
-                self.do_activity(context, details, activity);
+                self.do_activity(context, activity);
             }
         }
 
@@ -356,12 +356,7 @@ impl SelectionWindow {
         }
     }
 
-    fn do_activity(
-        &mut self,
-        context: &UiContext,
-        details: &SelectedEntityDetails,
-        activity: &ActivityComponent,
-    ) {
+    fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent) {
         context.key_value(
             im_str!("Activity:"),
             || Value::Wrapped(ui_str!(in context, "{}", activity.current())),
