@@ -359,16 +359,45 @@ impl SelectionWindow {
     fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent) {
         context.key_value(
             im_str!("Activity:"),
-            || Value::Wrapped(ui_str!(in context, "{}", activity.current)),
+            || Value::Wrapped(ui_str!(in context, "{}", activity.current())),
             None,
             COLOR_ORANGE,
         );
 
         context.key_value(
             im_str!("Subactivity:"),
-            || Value::Wrapped(ui_str!(in context, "{}", activity.current.current_subactivity())),
+            || Value::Wrapped(ui_str!(in context, "{}", activity.current().current_subactivity())),
             None,
             COLOR_ORANGE,
+        );
+
+        context.separator();
+
+        let reservation = activity.current_society_task();
+        context.key_value(
+            im_str!("Reserved task:"),
+            || {
+                if let Some((_, task)) = reservation {
+                    Value::Wrapped(ui_str!(in context, "{}", task))
+                } else {
+                    Value::None("None")
+                }
+            },
+            None,
+            COLOR_GREEN,
+        );
+
+        context.key_value(
+            im_str!("Job:"),
+            || {
+                if let Some((job, _)) = reservation {
+                    Value::Wrapped(ui_str!(in context, "{}", job))
+                } else {
+                    Value::None("None")
+                }
+            },
+            None,
+            COLOR_GREEN,
         );
     }
 

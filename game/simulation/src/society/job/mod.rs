@@ -1,12 +1,10 @@
 pub use jobs::*;
-pub use list::JobList;
-pub use reserved::TaskReservations;
-pub use task::Task;
+pub use task::SocietyTask;
 
-pub use self::job::{Job, SocietyCommand};
+pub use self::job::{SocietyCommand, SocietyJob, SocietyJobRef, SocietyTaskResult};
+pub use list::{JobIndex, Reservation, SocietyJobList};
 
 mod job;
 mod jobs;
 mod list;
-mod reserved;
 mod task;

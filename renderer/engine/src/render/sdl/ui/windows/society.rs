@@ -1,15 +1,16 @@
 use imgui::{im_str, StyleColor};
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::job::SocietyCommand;
+use simulation::E;
 use simulation::{
     AssociatedBlockData, ComponentWorld, NameComponent, PlayerSociety, Societies, SocietyHandle,
 };
 
-use crate::render::sdl::ui::context::UiContext;
+use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
 use crate::ui_str;
 use serde::{Deserialize, Serialize};
+use simulation::job::SocietyCommand;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct SocietyWindow;
@@ -50,6 +51,7 @@ impl SocietyWindow {
         }
 
         self.do_control(context, society_handle);
+        self.do_jobs(context, society_handle);
     }
 
     fn do_control(&self, context: &UiContext, society_handle: SocietyHandle) {
@@ -128,6 +130,50 @@ impl SocietyWindow {
                 ));
                 style.pop(context);
             }
+        }
+    }
+
+    fn do_jobs(&self, context: &UiContext, society_handle: SocietyHandle) {
+        let tab = context.new_tab(im_str!("Jobs"));
+        if tab.is_open() {
+            let societies = context.simulation().ecs.resource::<Societies>();
+            let society = match societies.society_by_handle(society_handle) {
+                None => {
+                    context.text_disabled("Invalid society");
+                    return;
+                }
+                Some(s) => s,
+            };
+
+            // TODO preserve finished jobs and tasks for a bit and display them in the ui too
+            let jobs = society.jobs();
+            let mut job_node = None;
+            jobs.iter_all(
+                |job| {
+                    // TODO use table API when available
+                    // close previous node first
+                    job_node = None;
+
+                    let node =
+                        context.new_tree_node(ui_str!(in context, "{}", job), DefaultOpen::Closed);
+
+                    if node.is_open() {
+                        job_node = Some(node);
+                        true
+                    } else {
+                        false
+                    }
+                },
+                |task, reservers| {
+                    context.text_wrapped(ui_str!(in context, " - {}", task));
+                    for reserver in reservers.iter() {
+                        context.text_colored(
+                            COLOR_BLUE,
+                            ui_str!(in context, "  * Reserved by {}", E(*reserver)),
+                        );
+                    }
+                },
+            );
         }
     }
 }

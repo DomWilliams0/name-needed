@@ -48,7 +48,8 @@ pub enum BlockTypeMatch {
 impl ai::Input<AiContext> for AiInput {
     fn get(&self, blackboard: &mut <AiContext as Context>::Blackboard) -> f32 {
         match self {
-            AiInput::Hunger => blackboard.hunger.into(),
+            // "full up" if not applicable
+            AiInput::Hunger => blackboard.hunger.map(Into::into).unwrap_or(1.0),
             AiInput::Constant(c) => c.0,
             AiInput::HasInInventory(filter) => match blackboard.inventory {
                 None => 0.0,

@@ -27,6 +27,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * tweak arrival threshold for path waypoints, it's a bit jerky
 * bug: recalculating a path while already following one causes hiccup as the path starts 1 block behind them
 * apply gravity to item entities too, for when block beneath them is mined
+* ensure velocity and acceleration is really m/s instead of voxels/s
 
 ## UI/input
 * graph for fps/tps history
@@ -61,15 +62,17 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
 * ai incentive to choose the same action as last tick
+* ai filtering at the job level on high-level requirements before considering all its subtasks
 * (sub)activities take an amount of ticks to complete
 * be able to block subactivities for a number of ticks, show progress bar up until end tick
 * food/drink vessels and wastage
 * consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
 * if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
 * if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
-* bug: society job is not notified if a subtask fails, causing it to be infinitely attempted
-	* e.g. haul things into a container but it's full, navigating to an inacessible position
-	* a set of completed tasks should be maintained per job
+* preserve info about completed society jobs/tasks to show in the ui
+* revamp hauling to add different methods
+	* carrying (add a new TransformChild component)
+	* dragging/pushing
 
 ## World generation
 * better biome generation
@@ -189,7 +192,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * revisit possible miri-compatibility
 	* no file IO, no slog logging, no `inventory` ctor collection...
 * provide debug logging release builds
-* run procgen bin in CI
 * replace all fs access with resource abstraction, to be able to read from packed archive/miri-compatible runner binary with no IO
 
 ## Code quality

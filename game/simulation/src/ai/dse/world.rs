@@ -1,7 +1,7 @@
 use crate::ai::consideration::{BlockTypeMatchesConsideration, MyProximityToConsideration};
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
-use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
+use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use unit::world::WorldPosition;
 use world::block::BlockType;
 
@@ -28,8 +28,8 @@ impl Dse<AiContext> for BreakBlockDse {
         ]
     }
 
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Normal
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {

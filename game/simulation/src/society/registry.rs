@@ -51,6 +51,7 @@ impl Societies {
             .map(|(handle, society)| ensure_handle!(society, *handle))
     }
 
+    /// Fallible in case societies can be removed
     pub fn society_by_handle_mut(&mut self, handle: SocietyHandle) -> Option<&mut Society> {
         self.registry
             .iter_mut()
@@ -58,6 +59,7 @@ impl Societies {
             .map(|(handle, society)| ensure_handle!(society, *handle))
     }
 
+    /// Fallible in case societies can be removed
     pub fn society_by_handle(&self, handle: SocietyHandle) -> Option<&Society> {
         self.registry
             .iter()

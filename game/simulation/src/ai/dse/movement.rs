@@ -1,4 +1,4 @@
-use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
+use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::ConstantConsideration;
 use crate::ai::{AiAction, AiContext};
@@ -14,8 +14,8 @@ impl Dse<AiContext> for WanderDse {
         vec![AiBox::new(ConstantConsideration(0.2))]
     }
 
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Idle
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Idle
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {

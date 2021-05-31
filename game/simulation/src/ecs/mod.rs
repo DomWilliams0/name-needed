@@ -22,10 +22,13 @@ mod template;
 mod world;
 mod world_ext;
 
+/// Displayable wrapper around spec's entity
 pub struct E(pub Entity);
 
-/// TODO it's technically undefined to convert to spec's entity type like this
-///  but we will eventually reimplement the ECS ourselves so this won't be an issue
+/// Copy of spec's entity type.
+///
+/// It's technically undefined to transmute like this but there's a unit test to confirm it's valid.
+/// We might eventually reimplement the ECS ourselves too
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct EntityWrapper(pub specs::world::Index, pub std::num::NonZeroI32);
@@ -119,7 +122,7 @@ impl ComponentRegistry {
 
 impl From<EntityWrapper> for Entity {
     fn from(e: EntityWrapper) -> Self {
-        // safety: see doc comment on EntityProxy (and unit test below)
+        // safety: see doc comment on EntityWrapper (and unit test below)
         unsafe { std::mem::transmute(e) }
     }
 }

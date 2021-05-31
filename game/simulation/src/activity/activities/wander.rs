@@ -142,7 +142,7 @@ impl<W: ComponentWorld> Activity<W> for WanderActivity {
         }
     }
 
-    fn on_finish(&mut self, _: ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
         ctx.clear_path();
 
         if let WanderSubActivity::Loitering(timer) = self.subactivity {

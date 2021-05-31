@@ -1,10 +1,11 @@
 use crate::activity::HaulTarget;
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
-use crate::society::job::job::JobStatus;
-use crate::society::job::{Job, Task};
-use crate::society::Society;
-use crate::TransformComponent;
+use crate::job::SocietyTaskResult;
+use crate::society::job::job::SocietyJobImpl;
+use crate::society::job::SocietyTask;
+
+use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
@@ -55,52 +56,101 @@ impl HaulJob {
     }
 }
 
-impl Job for HaulJob {
-    fn outstanding_tasks(
+impl SocietyJobImpl for HaulJob {
+    fn populate_initial_tasks(&self, _: &EcsWorld, out: &mut Vec<SocietyTask>) {
+        out.push(SocietyTask::Haul(self.entity, self.source, self.target));
+    }
+
+    fn refresh_tasks(
         &mut self,
         world: &EcsWorld,
-        _: &Society,
-        out: &mut Vec<Task>,
-    ) -> JobStatus {
-        if !world.has_component::<HauledItemComponent>(self.entity) {
-            // skip checks if item is currently being hauled
+        tasks: &mut Vec<SocietyTask>,
+        mut completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+    ) -> Option<SocietyTaskResult> {
+        debug_assert!(tasks.len() <= 1);
 
+        // apply completion
+        if let Some((task, result)) = completions.next() {
+            debug!("haul task completed"; "task" => ?task, "result" => ?result);
+            debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
+
+            // ensure no more
+            assert!(completions.next().is_none(), "single completion expected");
+
+            // end job regardless of success or failure
+            // TODO depends on error type?
+            return Some(result);
+        }
+
+        // TODO fail early if no space left in container
+
+        if world.has_component::<HauledItemComponent>(self.entity) {
+            // skip checks if item is currently being hauled
+            trace!("item is being hauled");
+        } else {
             match self.target {
                 HaulTarget::Position(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => &t.position,
-                        Err(_) => {
+                        Err(err) => {
                             debug!("hauled item is missing transform"; "item" => E(self.entity));
-                            return JobStatus::Finished;
+                            return Some(SocietyTaskResult::Failure(err.into()));
                         }
                     };
 
                     if WorldPoint::from(target_pos).is_almost(current_pos, 2.0) {
                         trace!("hauled item arrived at target");
-                        return JobStatus::Finished;
+                        return Some(SocietyTaskResult::Success);
                     }
                 }
                 HaulTarget::Container(target_container) => {
+                    // check if arrived in the target container
                     match world.component::<ContainedInComponent>(self.entity) {
                         Ok(ContainedInComponent::Container(c)) if *c == target_container => {
                             trace!("hauled item arrived in target container");
-                            return JobStatus::Finished;
+                            return Some(SocietyTaskResult::Success);
                         }
                         _ => {}
                     };
+
+                    // check there is space within the target
+                    if let Err(err) =
+                        ensure_item_fits_in_container(target_container, self.entity, world)
+                    {
+                        trace!("hauled item cannot fit in target container");
+                        return Some(SocietyTaskResult::Failure(err));
+                    }
                 }
             };
-        } else {
-            trace!("item is being hauled");
         }
 
-        out.push(Task::Haul(self.entity, self.source, self.target));
-        JobStatus::Ongoing
+        // keep single haul task
+        None
     }
+}
+
+fn ensure_item_fits_in_container(
+    container: Entity,
+    item: Entity,
+    world: &EcsWorld,
+) -> BoxedResult<()> {
+    let container = world.component::<ContainerComponent>(container)?;
+    let item_physical = world.component::<PhysicalComponent>(item)?;
+
+    container
+        .container
+        .fits(item_physical.size, item_physical.volume)?;
+
+    Ok(())
 }
 
 impl Display for HaulJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Haul {} to {}", E(self.entity), self.target)
+        // delegate to avoid duplication
+        write!(
+            f,
+            "{}",
+            SocietyTask::Haul(self.entity, self.source, self.target)
+        )
     }
 }

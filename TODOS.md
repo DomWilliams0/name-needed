@@ -1,4 +1,4 @@
-# TODOs (324)
+# TODOs (335)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -110,13 +110,12 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (10)
+ * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
-   * `// TODO support hauling multiple things to multiple locations`
+   * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
-   * `// TODO events for items entering/exiting containers`
    * `// TODO arrival radius depends on the size of the item`
-   * `// TODO could the item ever move while we're going to it? only by gravity?`
+   * `// TODO destructive events on items should include moving`
    * `// TODO this should be in the/a subactivity`
    * `// TODO don't always drop item in centre`
    * `// TODO explicit access side for container, e.g. front of chest`
@@ -167,12 +166,14 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (7)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
-   * `// TODO use dynstack to avoid so many small temporary allocations?`
-   * `// TODO fix (eventually) false assumption that all stream DSEs come from a society`
+   * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
+   * `// TODO fix eventually false assumption that all stream DSEs come from a society`
+   * `// TODO dont return a new vec of boxes, have some dignity`
+   * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
    * `// TODO avoid box by resolving here and storing result`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
@@ -183,9 +184,10 @@
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
-   * `/// TODO it's technically undefined to convert to spec's entity type like this`
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
    * `// TODO perfect hashing`
+ * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
+   * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
@@ -251,8 +253,9 @@
  * [game/simulation/src/physics/system.rs](game/simulation/src/physics/system.rs) (2)
    * `// TODO apply fall damage if applicable`
    * `// TODO lerp towards new rotation`
- * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (2)
+ * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (3)
    * `// TODO use dynstack for updates to avoid a separate box per entry`
+   * `// TODO perfect use case for a per-tick arena allocator`
    * `// TODO pool/reuse these boxes`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
@@ -273,17 +276,26 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (4)
+   * `// TODO remove box and make this type unsized, it's in an rc anyway`
+   * `// TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them`
+   * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
    * `// TODO return a dyn error in result`
- * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (1)
+ * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (2)
+   * `// TODO add display impl for WorldPositionRange`
+   * `// TODO move to world, and cache current slab/chunk for contiguous queries`
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
- * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
-   * `// TODO use dynstack instead of boxes for society jobs`
-   * `// TODO reuse allocation`
-   * `// TODO dont recalculate all unreserved tasks every tick for every entity`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (2)
+   * `// TODO depends on error type?`
+   * `// TODO fail early if no space left in container`
+ * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (2)
+   * `#[derive(Debug)] // TODO implement manually`
+   * `// TODO filter jobs for entity`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (4)
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross, use dynstack for dses`
+   * `// TODO use an equation you unmathematical twat`
+   * `// TODO some types of hauling will be shareable`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
@@ -387,8 +399,6 @@
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
- * [game/world/src/world_ref.rs](game/world/src/world_ref.rs) (1)
-   * `// TODO don't unwrap()`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`
@@ -414,8 +424,10 @@
    * `// TODO persist logs after entity is dead`
    * `// TODO switch to table API when available`
    * `// TODO proper way of checking if an entity is living`
- * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (1)
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
    * `.unwrap_or("unnamed"); // TODO another manual name component access`
+   * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
+   * `// TODO use table API when available`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`

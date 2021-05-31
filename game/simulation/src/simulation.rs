@@ -1,5 +1,4 @@
 use std::ops::Add;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use common::*;
 use resources::Resources;
@@ -53,9 +52,9 @@ pub struct WorldContext;
 
 /// Monotonically increasing tick counter. Defaults to 0, the tick BEFORE the game starts, never
 /// produced in tick()
-static mut TICK: AtomicU32 = AtomicU32::new(0);
+static mut TICK: u32 = 0;
 
-#[derive(Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 /// Represents a game tick
 pub struct Tick(u32);
 
@@ -345,7 +344,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     };
 
-                    debug!("submitting job to society"; "society" => ?society, "job" => %job);
+                    debug!("submitting job to society"; "society" => ?society, "job" => ?job);
                     society.jobs_mut().submit(job);
                 }
                 UiRequest::SetContainerOwnership {
@@ -504,19 +503,22 @@ impl<R: Renderer> Simulation<R> {
 }
 
 fn increment_tick() {
+    // safety: called before ticking systems
     unsafe {
-        TICK.fetch_add(1, Ordering::SeqCst);
+        TICK += 1;
     }
 }
 
 fn reset_tick() {
+    // safety: called before ticking systems
     unsafe {
-        TICK.store(0, Ordering::Relaxed);
+        TICK = 0;
     }
 }
 
 pub fn current_tick() -> u32 {
-    unsafe { TICK.load(Ordering::SeqCst) }
+    // safety: only modified between ticks
+    unsafe { TICK }
 }
 
 impl Tick {

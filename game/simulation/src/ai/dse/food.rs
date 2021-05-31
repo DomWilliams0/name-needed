@@ -1,4 +1,4 @@
-use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
+use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, FindLocalItemConsideration, HoldingItemConsideration,
@@ -27,8 +27,8 @@ impl Dse<AiContext> for EatHeldFoodDse {
         ]
     }
 
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::BasicNeeds
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::BasicNeeds
     }
 
     fn action(
@@ -64,8 +64,8 @@ impl Dse<AiContext> for FindLocalFoodDse {
         ]
     }
 
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Normal
     }
 
     fn action(

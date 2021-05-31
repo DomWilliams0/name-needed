@@ -78,16 +78,24 @@ impl Container {
         self.add(&held)
     }
 
-    /// Clones on successful add and returns Ok
-    pub fn add(&mut self, entity: &HeldEntity) -> Result<(), ContainerError> {
-        if !self.size_limit.fits(entity.size) {
+    /// Returns new volume
+    pub fn fits(&self, size: Length3, volume: Volume) -> Result<Volume, ContainerError> {
+        if !self.size_limit.fits(size) {
             return Err(ContainerError::TooBig);
         }
 
-        let new_volume = self.current_volume + entity.volume;
+        let new_volume = self.current_volume + volume;
         if new_volume > self.volume_limit {
             return Err(ContainerError::Full);
         }
+
+        // fits
+        Ok(new_volume)
+    }
+
+    /// Clones on successful add and returns Ok
+    pub fn add(&mut self, entity: &HeldEntity) -> Result<(), ContainerError> {
+        let new_volume = self.fits(entity.size, entity.volume)?;
 
         self.current_volume = new_volume;
         self.contents.insert(entity.to_owned());

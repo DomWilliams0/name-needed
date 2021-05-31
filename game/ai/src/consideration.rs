@@ -27,7 +27,7 @@ pub trait Consideration<C: Context> {
 
     // TODO impl Display for considerations instead
     fn name(&self) -> &'static str {
-        std::any::type_name::<Self>()
+        pretty_type_name(std::any::type_name::<Self>())
     }
 
     #[cfg(feature = "logging")]
@@ -47,6 +47,11 @@ impl ConsiderationParameter {
             }
         }
     }
+}
+
+fn pretty_type_name(name: &str) -> &str {
+    let split_idx = name.rfind(':').map(|i| i + 1).unwrap_or(0);
+    &name[split_idx..]
 }
 
 #[derive(Clone)]
@@ -114,17 +119,16 @@ impl<C: Context> InputCache<C> {
 
 #[cfg(test)]
 mod tests {
-    use std::f32::EPSILON;
-
     use common::{ApproxEq, NormalizedFloat};
 
+    use crate::consideration::pretty_type_name;
     use crate::Curve;
 
     fn assert_eq(curve: Curve, x: f32, y: f32) {
         assert!(curve
             .evaluate(NormalizedFloat::clamped(x))
             .value()
-            .approx_eq(y, (EPSILON, 2)));
+            .approx_eq(y, (f32::EPSILON, 2)));
     }
 
     #[test]
@@ -137,5 +141,13 @@ mod tests {
         let expo = Curve::Exponential(2.0, -4.0, 0.0, -1.0, 1.0);
         assert_eq(expo.clone(), 0.0, 0.0);
         assert_eq(expo, 0.5, 0.75);
+    }
+
+    #[test]
+    fn type_name() {
+        assert_eq!(pretty_type_name("this::is::my::type::Lmao"), "Lmao");
+        assert_eq!(pretty_type_name("boop"), "boop");
+        assert_eq!(pretty_type_name("malformed:"), "");
+        assert_eq!(pretty_type_name(":malformed"), "malformed");
     }
 }

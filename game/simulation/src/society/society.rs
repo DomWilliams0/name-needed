@@ -1,15 +1,15 @@
 use crate::ecs::*;
 use crate::item::ContainerComponent;
-use crate::society::job::JobList;
+use crate::job::SocietyJobList;
 use crate::{ComponentWorld, SocietyHandle};
 use common::*;
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashSet;
 
 pub struct Society {
     name: String,
     handle: SocietyHandle,
-    jobs: RefCell<JobList>,
+    jobs: RefCell<SocietyJobList>,
 
     /// Communal containers
     containers: HashSet<Entity>,
@@ -20,7 +20,7 @@ impl Society {
         Self {
             name,
             handle,
-            jobs: RefCell::new(JobList::default()),
+            jobs: RefCell::new(Default::default()),
             containers: HashSet::new(),
         }
     }
@@ -33,7 +33,11 @@ impl Society {
         self.handle
     }
 
-    pub fn jobs_mut(&self) -> RefMut<JobList> {
+    pub fn jobs(&self) -> Ref<SocietyJobList> {
+        self.jobs.borrow()
+    }
+
+    pub fn jobs_mut(&self) -> RefMut<SocietyJobList> {
         self.jobs.borrow_mut()
     }
 
@@ -87,7 +91,7 @@ impl Debug for Society {
         f.debug_struct("Society")
             .field("name", &self.name)
             .field("handle", &self.handle)
-            .field("jobs", &self.jobs.borrow().count())
+            .field("jobs", &*self.jobs.borrow())
             .field("containers", &self.containers.len())
             .finish()
     }

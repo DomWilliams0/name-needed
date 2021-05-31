@@ -1,4 +1,5 @@
 pub use activities::*;
+pub(crate) use activity::ActivityFinish;
 pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 // TODO move subactivity errors somewhere else
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
@@ -22,14 +23,14 @@ mod action_to_activity {
     use super::*;
 
     impl AiAction {
-        pub fn into_activity<W: ComponentWorld>(self, activity: &mut Box<dyn Activity<W>>) {
+        pub fn into_activity<W: ComponentWorld>(self) -> Box<dyn Activity<W>> {
             macro_rules! activity {
                 ($act:expr) => {
                     Box::new($act) as Box<dyn Activity<W>>
                 };
             }
 
-            *activity = match self {
+            match self {
                 AiAction::Nop => activity!(NopActivity::default()),
                 AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
                 AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {

@@ -1,7 +1,7 @@
 //! Infinite axis utility system
 
 pub use consideration::{Consideration, ConsiderationParameter, Curve, InputCache};
-pub use decision::{DecisionWeight, Dse};
+pub use decision::{DecisionWeightType, Dse, WeightedDse};
 pub use intelligence::{DecisionSource, Intelligence, IntelligentDecision, Smarts};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -50,6 +50,8 @@ mod test_utils {
         MyHunger,
         DoAnythingElse,
         One,
+        /// out of 100
+        Constant(u32),
     }
 
     impl Input<TestContext> for TestInput {
@@ -58,6 +60,7 @@ mod test_utils {
                 TestInput::MyHunger => blackboard.my_hunger,
                 TestInput::DoAnythingElse => 0.001,
                 TestInput::One => 1.0,
+                TestInput::Constant(c) => (*c as f32) / 100.0,
             }
         }
     }
@@ -134,6 +137,23 @@ mod test_utils {
         }
     }
 
+    /// Out of 100
+    pub struct ConstantConsideration(pub u32);
+
+    impl Consideration<TestContext> for ConstantConsideration {
+        fn curve(&self) -> Curve {
+            Curve::Identity
+        }
+
+        fn input(&self) -> TestInput {
+            TestInput::Constant(self.0)
+        }
+
+        fn parameter(&self) -> ConsiderationParameter {
+            ConsiderationParameter::Nop
+        }
+    }
+
     pub struct EatDse;
 
     impl Dse<TestContext> for EatDse {
@@ -145,8 +165,8 @@ mod test_utils {
             vec![AiBox::new(MyHungerConsideration)]
         }
 
-        fn weight(&self) -> DecisionWeight {
-            DecisionWeight::Normal
+        fn weight_type(&self) -> DecisionWeightType {
+            DecisionWeightType::Normal
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
@@ -165,8 +185,8 @@ mod test_utils {
             vec![AiBox::new(CancelExistenceConsideration)]
         }
 
-        fn weight(&self) -> DecisionWeight {
-            DecisionWeight::Emergency
+        fn weight_type(&self) -> DecisionWeightType {
+            DecisionWeightType::Emergency
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
@@ -185,8 +205,8 @@ mod test_utils {
             vec![AiBox::new(AlwaysWinConsideration)]
         }
 
-        fn weight(&self) -> DecisionWeight {
-            DecisionWeight::AbsoluteOverride
+        fn weight_type(&self) -> DecisionWeightType {
+            DecisionWeightType::AbsoluteOverride
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {

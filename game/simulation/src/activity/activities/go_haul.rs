@@ -15,9 +15,8 @@ use crate::{
 };
 
 // TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available
-// TODO support hauling multiple things to multiple locations
+// TODO support hauling multiple things to multiple locations (or via multiple activities?)
 // TODO haul target should hold pos+item radius, assigned once on creation
-// TODO events for items entering/exiting containers
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum HaulTarget {
@@ -77,7 +76,6 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
 
                 // go to it
                 // TODO arrival radius depends on the size of the item
-                // TODO could the item ever move while we're going to it? only by gravity?
                 let goto = GoToSubActivity::with_goal(
                     pos,
                     NormalizedFloat::new(0.8),
@@ -87,6 +85,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
                 let result = goto.init(ctx);
 
                 // subscribe to anything happening to the item
+                // TODO destructive events on items should include moving
                 ctx.subscribe_to(self.thing, EventSubscription::All);
 
                 self.state = HaulState::Going(goto);
@@ -373,7 +372,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
 
     fn on_finish(
         &mut self,
-        finish: ActivityFinish,
+        finish: &ActivityFinish,
         ctx: &mut ActivityContext<W>,
     ) -> BoxedResult<()> {
         // cancel haul if it has been initialised, regardless of state

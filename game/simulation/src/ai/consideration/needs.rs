@@ -29,33 +29,68 @@ impl Consideration<AiContext> for HungerConsideration {
 #[cfg(test)]
 mod tests {
     use crate::ai::consideration::HungerConsideration;
-    use crate::ai::AiBlackboard;
+    use crate::ai::{AiBlackboard, SharedBlackboard};
+    use crate::ecs::Builder;
+    use crate::{ComponentWorld, EcsWorld, WorldPosition};
     use ai::{Consideration, InputCache};
     use common::NormalizedFloat;
-    use std::mem::MaybeUninit;
+
+    struct NoLeaksGuard(*mut EcsWorld, *mut SharedBlackboard);
+
+    impl Drop for NoLeaksGuard {
+        fn drop(&mut self) {
+            // safety: ptrs came from leaked boxes
+            unsafe {
+                let _ = Box::from_raw(self.0);
+                let _ = Box::from_raw(self.1);
+            }
+        }
+    }
+
+    fn dummy_blackboard() -> (AiBlackboard<'static>, NoLeaksGuard) {
+        let world = Box::leak(Box::new(EcsWorld::new()));
+        let shared = Box::leak(Box::new(SharedBlackboard {
+            area_link_cache: Default::default(),
+        }));
+
+        let guard = NoLeaksGuard(world as *mut _, shared as *mut _);
+
+        let blackboard = AiBlackboard {
+            entity: world.create_entity().build(),
+            accessible_position: WorldPosition::new(1, 2, 3.into()),
+            position: Default::default(),
+            hunger: None,
+            inventory: None,
+            inventory_search_cache: Default::default(),
+            local_area_search_cache: Default::default(),
+            world,
+            shared,
+        };
+
+        (blackboard, guard)
+    }
 
     #[test]
     fn hunger() {
         // initialize blackboard with only what we want
-        let blackboard = MaybeUninit::<AiBlackboard>::zeroed();
-        let mut blackboard = unsafe { blackboard.assume_init() };
+        let (mut blackboard, _guard) = dummy_blackboard();
         let mut cache = InputCache::default();
 
         let hunger = HungerConsideration;
 
-        blackboard.hunger = NormalizedFloat::one();
+        blackboard.hunger = Some(NormalizedFloat::one());
         let score_when_full = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
         cache.reset();
 
-        blackboard.hunger = NormalizedFloat::new(0.2);
+        blackboard.hunger = Some(NormalizedFloat::new(0.2));
         let score_when_hungry = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
         cache.reset();
 
-        blackboard.hunger = NormalizedFloat::new(0.01);
+        blackboard.hunger = Some(NormalizedFloat::new(0.01));
         let score_when_empty = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
