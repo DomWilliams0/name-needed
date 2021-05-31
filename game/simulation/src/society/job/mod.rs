@@ -4,7 +4,7 @@ pub use reserved::TaskReservations;
 pub use task::SocietyTask;
 
 pub use self::job::{Job, SocietyCommand};
-pub use self::job2::{SocietyJobRef, SocietyTaskResult};
+pub use self::job2::{SocietyJob, SocietyJobRef, SocietyTaskResult};
 pub use list2::{JobIndex, Reservation, SocietyJobList};
 
 #[deprecated]

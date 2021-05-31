@@ -1,5 +1,4 @@
 use std::ops::Add;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use common::*;
 use resources::Resources;
@@ -346,7 +345,7 @@ impl<R: Renderer> Simulation<R> {
                     };
 
                     debug!("submitting job to society"; "society" => ?society, "job" => ?job);
-                    society.jobs_mut().submit_job(job);
+                    society.jobs_mut().submit(job);
                 }
                 UiRequest::SetContainerOwnership {
                     container,

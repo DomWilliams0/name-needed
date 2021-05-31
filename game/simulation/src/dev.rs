@@ -9,6 +9,7 @@ use crate::activity::HaulTarget;
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity, E};
 use crate::item::{ContainedInComponent, ContainerComponent};
+use crate::job::SocietyJob;
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
 use crate::society::job::HaulJob;
@@ -244,7 +245,7 @@ impl EcsExtDev<'_> {
                     .society_by_handle_mut(society)
                     .expect("bad society")
                     .jobs_mut()
-                    .submit(job);
+                    .submit(SocietyJob::create(world, job));
 
                 info!(
                     "adding society job to haul item to container";

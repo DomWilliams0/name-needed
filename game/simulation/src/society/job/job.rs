@@ -6,7 +6,7 @@ use crate::job::SocietyJobRef;
 use crate::society::job::task::SocietyTask;
 use crate::society::job::{BreakBlocksJob, HaulJob};
 use crate::society::Society;
-use crate::{ComponentWorld, WorldPositionRange};
+use crate::WorldPositionRange;
 use unit::world::WorldPosition;
 
 pub trait Job: Display + Debug {
@@ -38,18 +38,24 @@ pub enum SocietyCommand {
 }
 
 impl SocietyCommand {
-    pub fn into_job(self, world: &impl ComponentWorld) -> Result<SocietyJobRef, Self> {
+    pub fn into_job(self, world: &EcsWorld) -> Result<SocietyJobRef, Self> {
         use self::SocietyCommand::*;
 
+        macro_rules! job {
+            ($job:expr) => {
+                Ok(SocietyJob::create(world, $job))
+            };
+        }
+
         // TODO return a dyn error in result
-        Ok(match self {
-            BreakBlocks(range) => todo!(), // TODO break blocks
+        match self {
+            BreakBlocks(range) => job!(BreakBlocksJob::new(range)),
             HaulToPosition(e, pos) => {
-                SocietyJob::create(HaulJob::with_target_position(e, pos, world).ok_or(self)?)
+                job!(HaulJob::with_target_position(e, pos, world).ok_or(self)?)
             }
             HaulIntoContainer(e, container) => {
-                SocietyJob::create(HaulJob::with_target_container(e, container, world).ok_or(self)?)
+                job!(HaulJob::with_target_container(e, container, world).ok_or(self)?)
             }
-        })
+        }
     }
 }

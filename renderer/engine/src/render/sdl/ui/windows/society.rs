@@ -154,10 +154,8 @@ impl SocietyWindow {
                     // close previous node first
                     job_node = None;
 
-                    let node = context.new_tree_node(
-                        ui_str!(in context, "{}", job),
-                        DefaultOpen::Closed,
-                    );
+                    let node =
+                        context.new_tree_node(ui_str!(in context, "{}", job), DefaultOpen::Closed);
 
                     if node.is_open() {
                         job_node = Some(node);

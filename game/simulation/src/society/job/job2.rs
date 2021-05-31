@@ -35,10 +35,11 @@ pub trait SocietyJobImpl: Display + Debug {
     /// tasks without filtering.
     ///
     /// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)
-    fn populate_initial_tasks(&self, out: &mut Vec<SocietyTask>);
+    fn populate_initial_tasks(&self, world: &EcsWorld, out: &mut Vec<SocietyTask>);
 
     /// Update `tasks` and apply `completions`.
-    /// Return None if ongoing
+    /// Return None if ongoing.
+    /// If 0 tasks are left this counts as a success.
     fn refresh_tasks(
         &mut self,
         world: &EcsWorld,
@@ -48,9 +49,9 @@ pub trait SocietyJobImpl: Display + Debug {
 }
 
 impl SocietyJob {
-    pub fn create<J: SocietyJobImpl + 'static>(job: J) -> SocietyJobRef {
+    pub fn create(world: &EcsWorld, job: impl SocietyJobImpl + 'static) -> SocietyJobRef {
         let mut tasks = Vec::new();
-        job.populate_initial_tasks(&mut tasks);
+        job.populate_initial_tasks(world, &mut tasks);
 
         SocietyJobRef(Rc::new(RwLock::new(SocietyJob {
             tasks,
@@ -65,6 +66,14 @@ impl SocietyJob {
     ) -> Option<SocietyTaskResult> {
         self.inner
             .refresh_tasks(world, &mut self.tasks, self.pending_complete.drain(..))
+            .or_else(|| {
+                if self.tasks.is_empty() {
+                    // no tasks left and no specific result returned
+                    Some(SocietyTaskResult::Success)
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn tasks(&self) -> impl Iterator<Item = &SocietyTask> + '_ {
@@ -75,7 +84,9 @@ impl SocietyJob {
         self.pending_complete.push((task, result));
     }
 
-    pub fn inner(&self) -> &dyn SocietyJobImpl {&*self.inner}
+    pub fn inner(&self) -> &dyn SocietyJobImpl {
+        &*self.inner
+    }
 }
 
 impl TryFrom<ActivityFinish> for SocietyTaskResult {

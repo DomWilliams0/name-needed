@@ -1,5 +1,5 @@
 use crate::ecs::E;
-use crate::job::job2::{SocietyJob, SocietyJobImpl};
+use crate::job::job2::SocietyJobImpl;
 use crate::job::SocietyTask;
 use crate::simulation::Tick;
 use crate::society::job::job2::SocietyJobRef;
@@ -52,11 +52,7 @@ impl Default for SocietyJobList {
 }
 
 impl SocietyJobList {
-    pub fn submit<J: SocietyJobImpl + 'static>(&mut self, job: J) {
-        self.submit_job(SocietyJob::create(job))
-    }
-
-    pub fn submit_job(&mut self, job: SocietyJobRef) {
+    pub fn submit(&mut self, job: SocietyJobRef) {
         debug!("submitting society job"; "job" => ?job);
         assert!(
             !self.no_more_jobs_temporarily,

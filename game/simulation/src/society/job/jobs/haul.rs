@@ -57,7 +57,7 @@ impl HaulJob {
 }
 
 impl SocietyJobImpl for HaulJob {
-    fn populate_initial_tasks(&self, out: &mut Vec<SocietyTask>) {
+    fn populate_initial_tasks(&self, _: &EcsWorld, out: &mut Vec<SocietyTask>) {
         out.push(SocietyTask::Haul(self.entity, self.source, self.target));
     }
 

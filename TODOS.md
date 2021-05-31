@@ -1,4 +1,4 @@
-# TODOs (338)
+# TODOs (339)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -278,13 +278,15 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (2)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `// TODO return a dyn error in result`
-   * `BreakBlocks(range) => todo!(), // TODO break blocks`
  * [game/simulation/src/society/job/job2.rs](game/simulation/src/society/job/job2.rs) (3)
    * `// TODO remove box and make this type unsized, it's in an rc anyway`
    * `// TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them`
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
+ * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (2)
+   * `// TODO add display impl for WorldPositionRange`
+   * `// TODO move to world, and cache current slab/chunk for contiguous queries`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
    * `// TODO depends on error type?`
