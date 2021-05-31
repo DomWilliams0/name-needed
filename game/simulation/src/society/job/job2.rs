@@ -74,6 +74,8 @@ impl SocietyJob {
     pub fn notify_completion(&mut self, task: SocietyTask, result: SocietyTaskResult) {
         self.pending_complete.push((task, result));
     }
+
+    pub fn inner(&self) -> &dyn SocietyJobImpl {&*self.inner}
 }
 
 impl TryFrom<ActivityFinish> for SocietyTaskResult {

@@ -1,4 +1,4 @@
-# TODOs (336)
+# TODOs (338)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -428,8 +428,10 @@
    * `// TODO persist logs after entity is dead`
    * `// TODO switch to table API when available`
    * `// TODO proper way of checking if an entity is living`
- * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (1)
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
    * `.unwrap_or("unnamed"); // TODO another manual name component access`
+   * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
+   * `// TODO use table API when available`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`

@@ -126,7 +126,7 @@ impl SocietyJobList {
         &mut self.reservations
     }
 
-    pub fn allow_jobs_again(&mut self) {
+    pub(crate) fn allow_jobs_again(&mut self) {
         self.no_more_jobs_temporarily = false;
     }
 
@@ -139,6 +139,29 @@ impl SocietyJobList {
             .reservations
             .iter()
             .find_map(move |(task, e)| (*e == entity).as_some(task))
+    }
+
+    /// Quadratic complexity (n total tasks * m total reserved tasks)
+    pub fn iter_all(
+        &self,
+        mut per_job: impl FnMut(&SocietyJobRef) -> bool,
+        mut per_task: impl FnMut(&SocietyTask, &SmallVec<[Entity; 3]>),
+    ) {
+        let mut reservers = SmallVec::new();
+        for job in self.jobs.iter() {
+            if !per_job(job) {
+                continue;
+            }
+
+            let job = job.read();
+            for task in job.tasks() {
+                // gather all reservations for this task, giving us some beautiful n^2 complexity
+                self.reservations.check_all(task, |e| reservers.push(e));
+
+                per_task(task, &reservers);
+                reservers.clear();
+            }
+        }
     }
 }
 
@@ -257,6 +280,27 @@ impl<T: ReservationTask> Reservations<T> {
         debug_assert_eq!(count, reserve_count);
         Reservation::ReservedButShareable(count)
     }
+
+    pub fn check_all(&self, task: &T, mut per_reserver: impl FnMut(Entity)) {
+        // fast check
+        let reserve_count = match self.task_membership.get(task) {
+            None => return,
+            Some(n) => *n,
+        };
+
+        let mut left = reserve_count;
+        let mut reservations = self.reservations.iter();
+        while left != 0 {
+            if let Some((reserved_task, reserver)) = reservations.next() {
+                if reserved_task == task {
+                    per_reserver(*reserver);
+                    left -= 1;
+                }
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 impl ReservationTask for SocietyTask {
@@ -361,5 +405,42 @@ mod tests {
         assert_eq!(reservations.check_for(&task, a), Reservation::Unreserved);
         assert_eq!(reservations.check_for(&task, b), Reservation::Unreserved);
         assert_eq!(reservations.check_for(&task, c), Reservation::Unreserved);
+    }
+
+    #[test]
+    fn check_all() {
+        let (mut reservations, [a, b, c]) = create();
+        let task = 4;
+
+        macro_rules! collect_all {
+            () => {{
+                let mut v = vec![];
+                reservations.check_all(&task, |e| v.push(e));
+                v.sort();
+                v
+            }};
+        }
+
+        assert_eq!(collect_all!(), vec![]);
+
+        // extra random tasks
+        reservations.reserve(5, a);
+        reservations.reserve(6, b);
+        reservations.reserve(9, c);
+
+        reservations.reserve(task, a);
+        assert_eq!(collect_all!(), vec![a]);
+
+        reservations.reserve(task, b);
+        assert_eq!(collect_all!(), vec![a, b]);
+
+        reservations.cancel(a);
+        assert_eq!(collect_all!(), vec![b]);
+
+        reservations.reserve(task, c);
+        assert_eq!(collect_all!(), vec![b, c]);
+
+        reservations.reserve(task, c); // dupe
+        assert_eq!(collect_all!(), vec![b, c]);
     }
 }

@@ -225,7 +225,7 @@ impl<'a> System<'a> for AiSystem {
 }
 
 impl AiSystem {
-    // TODO dont return a new vec
+    // TODO dont return a new vec of boxes, have some dignity
     /// Prevents further jobs being added to society until manually cleared
     fn collect_society_tasks(
         &self,
@@ -248,7 +248,6 @@ impl AiSystem {
                 "society tasks expected to be the only source of extra dses"
             );
 
-            // TODO precalculate DSEs for tasks
             // TODO weight dse by number of existing reservations
             extra_dses.extend(applicable_tasks.into_iter().filter_map(
                 |(task, job_idx, _reservations)| match task.as_dse(ecs_world) {
