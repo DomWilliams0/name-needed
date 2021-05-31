@@ -34,7 +34,8 @@ pub struct AiBlackboard<'a> {
     /// For navigation
     pub accessible_position: WorldPosition,
     pub position: WorldPoint,
-    pub hunger: NormalizedFloat,
+    /// None if missing component
+    pub hunger: Option<NormalizedFloat>,
     pub inventory: Option<&'a InventoryComponent>,
     pub inventory_search_cache: HashMap<ItemFilter, FoundSlot<'a>>,
 

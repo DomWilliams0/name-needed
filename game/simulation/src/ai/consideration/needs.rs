@@ -78,19 +78,19 @@ mod tests {
 
         let hunger = HungerConsideration;
 
-        blackboard.hunger = NormalizedFloat::one();
+        blackboard.hunger = Some(NormalizedFloat::one());
         let score_when_full = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
         cache.reset();
 
-        blackboard.hunger = NormalizedFloat::new(0.2);
+        blackboard.hunger = Some(NormalizedFloat::new(0.2));
         let score_when_hungry = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
         cache.reset();
 
-        blackboard.hunger = NormalizedFloat::new(0.01);
+        blackboard.hunger = Some(NormalizedFloat::new(0.01));
         let score_when_empty = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));

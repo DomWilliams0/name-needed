@@ -85,18 +85,17 @@ impl AiComponent {
 pub struct AiSystem;
 
 impl<'a> System<'a> for AiSystem {
-    // TODO optional components for ai: hunger, inventory
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldFrameRef>,
         Write<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
-        ReadStorage<'a, HungerComponent>,
-        ReadStorage<'a, InventoryComponent>,
+        ReadStorage<'a, HungerComponent>,    // optional
+        ReadStorage<'a, InventoryComponent>, // optional
         WriteStorage<'a, AiComponent>,
         WriteStorage<'a, ActivityComponent>,
-        WriteStorage<'a, SocietyComponent>,
-        WriteStorage<'a, EntityLoggingComponent>,
+        WriteStorage<'a, SocietyComponent>,       // optional
+        WriteStorage<'a, EntityLoggingComponent>, // optional
     );
 
     fn run(
@@ -127,10 +126,11 @@ impl<'a> System<'a> for AiSystem {
             area_link_cache: HashMap::new(),
         };
 
-        for (e, transform, hunger, ai, activity, society_opt) in (
+        for (e, transform, hunger_opt, inventory_opt, ai, activity, society_opt) in (
             &entities,
             &transform,
-            &hunger,
+            hunger.maybe(),
+            inventory.maybe(),
             &mut ai,
             &mut activity,
             society.maybe(),
@@ -146,10 +146,10 @@ impl<'a> System<'a> for AiSystem {
                 entity: e,
                 accessible_position: transform.accessible_position(),
                 position: transform.position,
-                hunger: hunger.hunger(),
+                hunger: hunger_opt.map(|h| h.hunger()),
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
-                inventory: inventory.get(e),
+                inventory: inventory_opt,
                 world: ecs_world,
                 shared: &mut shared_bb,
             };
