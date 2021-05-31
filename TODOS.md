@@ -166,7 +166,7 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (8)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (7)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO use arena/bump allocator and share instance between entities`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
@@ -174,7 +174,6 @@
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
    * `// TODO dont return a new vec of boxes, have some dignity`
    * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
-   * `// TODO weight dse by number of existing reservations`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
    * `// TODO avoid box by resolving here and storing result`
  * [game/simulation/src/definitions/loader/load.rs](game/simulation/src/definitions/loader/load.rs) (1)
@@ -292,9 +291,10 @@
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (2)
    * `#[derive(Debug)] // TODO implement manually`
    * `// TODO filter jobs for entity`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (3)
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (4)
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross, use dynstack for dses`
+   * `// TODO use an equation you unmathematical twat`
    * `// TODO some types of hauling will be shareable`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`

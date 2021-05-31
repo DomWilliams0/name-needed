@@ -93,6 +93,7 @@ impl<C: Context> Intelligence<C> {
             input_cache: InputCache::default(),
         }
     }
+
     pub fn choose<'a>(&'a mut self, blackboard: &'a mut C::Blackboard) -> IntelligentDecision<C> {
         self.choose_with_stream_dses(blackboard, empty())
     }
@@ -240,8 +241,12 @@ impl<C: Context> Debug for DecisionSource<C> {
 
 #[cfg(test)]
 mod tests {
+    use crate::decision::WeightedDse;
     use crate::test_utils::*;
-    use crate::{AiBox, Dse, Intelligence, IntelligentDecision};
+    use crate::{
+        AiBox, Consideration, DecisionSource, DecisionWeightType, Dse, Intelligence,
+        IntelligentDecision,
+    };
     use common::once;
 
     #[test]
@@ -257,7 +262,7 @@ mod tests {
 
         // eat wins
         assert!(
-            matches!( intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
+            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
         );
         assert!(matches!(
             intelligence.choose(&mut blackboard),
@@ -270,20 +275,95 @@ mod tests {
             vec![AiBox::new(EmergencyDse) as AiBox<dyn Dse<TestContext>>].into_iter(),
         );
         assert!(
-            matches!( intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
+            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
         );
 
         // pop it, back to original
         intelligence.pop_smarts(&100);
         assert!(
-            matches!( intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
+            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
         );
 
         // add emergency as stream
         let emergency = Box::new(EmergencyDse);
         let streams = once(emergency.as_ref() as &dyn Dse<TestContext>);
         assert!(
-            matches!( intelligence.choose_with_stream_dses(&mut blackboard, streams), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
+            matches!(intelligence.choose_with_stream_dses(&mut blackboard, streams), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
         );
+    }
+
+    //noinspection DuplicatedCode
+    #[test]
+    fn society_task_reservation_weight() {
+        let mut blackboard = TestBlackboard { my_hunger: 0.5 };
+
+        pub struct ConfigurableDse(TestAction);
+
+        impl Dse<TestContext> for ConfigurableDse {
+            fn name(&self) -> &'static str {
+                "Configurable"
+            }
+
+            fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
+                vec![AiBox::new(ConstantConsideration(50))]
+            }
+
+            fn weight_type(&self) -> DecisionWeightType {
+                DecisionWeightType::Normal
+            }
+
+            fn action(&self, _: &mut TestBlackboard) -> TestAction {
+                self.0.clone()
+            }
+        }
+
+        let dses =
+            vec![AiBox::new(ConfigurableDse(TestAction::Eat)) as AiBox<dyn Dse<TestContext>>];
+
+        let mut intelligence = Intelligence::new(dses.into_iter());
+
+        // choose the only available Eat
+        match intelligence.choose(&mut blackboard) {
+            IntelligentDecision::New { action, src, .. } => {
+                assert_eq!(action, TestAction::Eat);
+                assert!(matches!(src, DecisionSource::Base(0)));
+            }
+            _ => unreachable!(),
+        };
+
+        // add a weighted dse
+        intelligence.add_smarts(
+            5,
+            once(
+                AiBox::new(WeightedDse::new(ConfigurableDse(TestAction::Nop), 1.1))
+                    as AiBox<dyn Dse<TestContext>>,
+            ),
+        );
+
+        // choose the new weighted Nop
+        match intelligence.choose(&mut blackboard) {
+            IntelligentDecision::New { action, src, .. } => {
+                assert_eq!(action, TestAction::Nop); // changed
+                assert!(matches!(src, DecisionSource::Additional(5, 0)));
+            }
+            _ => unreachable!(),
+        };
+
+        // back to a higher Eat
+        intelligence.add_smarts(
+            8,
+            once(
+                AiBox::new(WeightedDse::new(ConfigurableDse(TestAction::Eat), 1.9))
+                    as AiBox<dyn Dse<TestContext>>,
+            ),
+        );
+
+        match intelligence.choose(&mut blackboard) {
+            IntelligentDecision::New { action, src, .. } => {
+                assert_eq!(action, TestAction::Eat); // changed
+                assert!(matches!(src, DecisionSource::Additional(8, 0)));
+            }
+            _ => unreachable!(),
+        };
     }
 }

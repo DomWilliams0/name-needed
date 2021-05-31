@@ -1,11 +1,11 @@
 use crate::ecs::EcsWorld;
+use crate::job::job::SocietyJobImpl;
 use crate::job::SocietyTaskResult;
 use crate::society::job::SocietyTask;
 use crate::{BlockType, ComponentWorld, InnerWorldRef, WorldPositionRange, WorldRef};
 use common::derive_more::*;
 use common::*;
 use std::hint::unreachable_unchecked;
-use crate::job::job::SocietyJobImpl;
 
 #[derive(Constructor, Debug)]
 pub struct BreakBlocksJob(WorldPositionRange);

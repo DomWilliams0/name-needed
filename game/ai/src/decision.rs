@@ -4,7 +4,7 @@ use crate::consideration::InputCache;
 use crate::{AiBox, Consideration, Context};
 
 #[derive(Copy, Clone, Debug)]
-pub enum DecisionWeight {
+pub enum DecisionWeightType {
     Idle,
     Normal,
     /// This normally follows another decision and is disabled by a switch - once the switch toggles
@@ -15,13 +15,24 @@ pub enum DecisionWeight {
     /// Obedience without question, for dev mode and debugging
     AbsoluteOverride,
 }
+#[derive(Copy, Clone, Debug)]
+
+pub enum DecisionWeight {
+    Plain(DecisionWeightType),
+    /// Extra multiplier
+    Weighted(DecisionWeightType, f32),
+}
 
 pub trait Dse<C: Context> {
     fn name(&self) -> &'static str;
     /// TODO pooled vec/slice rather than Vec each time
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;
-    fn weight(&self) -> DecisionWeight;
+    fn weight_type(&self) -> DecisionWeightType;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
+
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Plain(self.weight_type())
+    }
 
     fn score(
         &self,
@@ -64,6 +75,13 @@ pub trait Dse<C: Context> {
     }
 }
 
+/// A DSE with an additional weight multiplier
+pub struct WeightedDse<C: Context, D: Dse<C>> {
+    dse: D,
+    additional_weight: f32,
+    phantom: PhantomData<C>,
+}
+
 impl<C: Context> Debug for dyn Dse<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_struct("Dse")
@@ -76,14 +94,64 @@ impl<C: Context> Debug for dyn Dse<C> {
 
 impl DecisionWeight {
     pub fn multiplier(self) -> f32 {
-        match self {
-            DecisionWeight::Idle => 1.0,
-            DecisionWeight::Normal => 2.0,
-            DecisionWeight::Dependent => 2.5,
-            DecisionWeight::BasicNeeds => 3.5,
-            DecisionWeight::Emergency => 4.0,
-            DecisionWeight::AbsoluteOverride => 1000.0,
+        use DecisionWeightType::*;
+        let ty = match self {
+            DecisionWeight::Plain(ty) | DecisionWeight::Weighted(ty, _) => ty,
+        };
+
+        let mut weight = match ty {
+            Idle => 1.0,
+            Normal => 2.0,
+            Dependent => 2.5,
+            BasicNeeds => 3.5,
+            Emergency => 4.0,
+            AbsoluteOverride => 1000.0,
+        };
+
+        if let DecisionWeight::Weighted(_, mul) = self {
+            weight *= mul;
         }
+
+        weight
+    }
+}
+
+impl From<DecisionWeightType> for DecisionWeight {
+    fn from(ty: DecisionWeightType) -> Self {
+        Self::Plain(ty)
+    }
+}
+
+impl<C: Context, D: Dse<C>> WeightedDse<C, D> {
+    pub fn new(dse: D, weight: f32) -> Self {
+        debug_assert!(weight.is_sign_positive());
+        Self {
+            dse,
+            additional_weight: weight,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
+    fn name(&self) -> &'static str {
+        self.dse.name()
+    }
+
+    fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>> {
+        self.dse.considerations()
+    }
+
+    fn weight_type(&self) -> DecisionWeightType {
+        unreachable!()
+    }
+
+    fn action(&self, blackboard: &mut <C as Context>::Blackboard) -> <C as Context>::Action {
+        self.dse.action(blackboard)
+    }
+
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Weighted(self.dse.weight_type(), self.additional_weight)
     }
 }
 

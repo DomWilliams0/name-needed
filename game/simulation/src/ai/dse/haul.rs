@@ -2,7 +2,7 @@ use crate::activity::HaulTarget;
 use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
-use ai::{AiBox, Consideration, Context, DecisionWeight, Dse};
+use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use unit::world::WorldPoint;
 
 pub struct HaulDse {
@@ -32,8 +32,8 @@ impl Dse<AiContext> for HaulDse {
         ]
     }
 
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Normal
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
