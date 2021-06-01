@@ -1,4 +1,4 @@
-# TODOs (341)
+# TODOs (342)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -420,8 +420,9 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (6)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (7)
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
+   * `// TODO component-specific widget`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
    * `.unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere`
    * `// TODO persist logs after entity is dead`

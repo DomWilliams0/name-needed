@@ -53,8 +53,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * inventory window (separate from debug window) to show items in person's inventory/container in a nice way
 * common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
-* view list of components on selected entity
-	* reflection-like api to do actions per-component in ui?
+* reflection-like api on components to do actions per-component in ui
 
 ## Entity behaviour
 * more society level jobs

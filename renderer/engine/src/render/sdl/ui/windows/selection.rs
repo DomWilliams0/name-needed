@@ -152,6 +152,14 @@ impl SelectionWindow {
             );
         }
 
+        let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
+        if components_node.is_open() {
+            // TODO component-specific widget
+            for component in context.simulation().ecs.all_components_for(details.entity) {
+                context.text(ui_str!(in context, " - {}", component));
+            }
+        }
+
         let tabbar = context.new_tab_bar(im_str!("##entitydetailstabbar"));
         if tabbar.is_open() {
             match details.ty {

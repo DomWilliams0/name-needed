@@ -119,6 +119,11 @@ impl EcsWorld {
             component_registry: reg,
         }
     }
+
+    /// Iterates through all known component types and checks each one
+    pub fn all_components_for(&self, entity: Entity) -> impl Iterator<Item = &'static str> + '_ {
+        self.component_registry.all_components_for(self, entity)
+    }
 }
 
 impl ComponentWorld for EcsWorld {
