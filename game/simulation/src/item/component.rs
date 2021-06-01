@@ -8,7 +8,7 @@ use crate::needs::Fuel;
 #[derive(Component, EcsComponent, Constructor, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("name")]
-// TODO smol string
+// TODO smol string and/or cow
 pub struct NameComponent(pub String);
 
 /// Condition/durability of an entity, e.g. a tool or food

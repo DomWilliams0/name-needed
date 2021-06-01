@@ -62,13 +62,26 @@ mod entity_fmt {
     }
 }
 
+/// Reflection-like functionality through the ui, optionally implemented by components
+/// TODO implement InteractiveComponent for some components
+pub trait InteractiveComponent {
+    fn as_debug(&self) -> Option<&dyn Debug>;
+}
+
+pub enum InteractiveResult<'a> {
+    NonInteractive,
+    Interactive(&'a dyn InteractiveComponent),
+}
+
 pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
+pub type GetInteractiveFn = fn(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult>;
 
 pub struct ComponentEntry {
     pub name: &'static str,
     pub has_comp_fn: HasCompFn,
     pub register_comp_fn: RegisterCompFn,
+    pub get_interactive_fn: GetInteractiveFn,
 }
 
 inventory::collect!(ComponentEntry);
@@ -80,6 +93,7 @@ pub struct ComponentRegistry {
 
 struct ComponentFunctions {
     has_comp: HasCompFn,
+    get_interactive: GetInteractiveFn,
 }
 
 impl ComponentRegistry {
@@ -91,6 +105,7 @@ impl ComponentRegistry {
                 comp.name,
                 ComponentFunctions {
                     has_comp: comp.has_comp_fn,
+                    get_interactive: comp.get_interactive_fn,
                 },
             );
 
@@ -124,13 +139,12 @@ impl ComponentRegistry {
         &'a self,
         world: &'a EcsWorld,
         entity: Entity,
-    ) -> impl Iterator<Item = &'static str> + 'a {
+    ) -> impl Iterator<Item = (&'static str, Option<&dyn InteractiveComponent>)> + 'a {
         self.map.iter().filter_map(move |(name, funcs)| {
-            if (funcs.has_comp)(world, entity) {
-                Some(*name)
-            } else {
-                None
-            }
+            (funcs.get_interactive)(world, entity).map(|res| match res {
+                InteractiveResult::NonInteractive => (*name, None),
+                InteractiveResult::Interactive(i) => (*name, Some(i)),
+            })
         })
     }
 }

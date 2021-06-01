@@ -3,7 +3,7 @@ use specs::storage::InsertResult;
 
 use common::*;
 
-use crate::ecs::{ComponentRegistry, SpecsWorld, E};
+use crate::ecs::{ComponentRegistry, InteractiveComponent, SpecsWorld, E};
 use crate::event::{EntityEvent, EntityEventQueue};
 
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
@@ -121,7 +121,10 @@ impl EcsWorld {
     }
 
     /// Iterates through all known component types and checks each one
-    pub fn all_components_for(&self, entity: Entity) -> impl Iterator<Item = &'static str> + '_ {
+    pub fn all_components_for(
+        &self,
+        entity: Entity,
+    ) -> impl Iterator<Item = (&'static str, Option<&dyn InteractiveComponent>)> + '_ {
         self.component_registry.all_components_for(self, entity)
     }
 }

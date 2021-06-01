@@ -1,4 +1,4 @@
-# TODOs (336)
+# TODOs (337)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -184,7 +184,8 @@
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (1)
+ * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
+   * `/// TODO implement InteractiveComponent for some components`
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
@@ -199,7 +200,7 @@
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
-   * `// TODO smol string`
+   * `// TODO smol string and/or cow`
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`

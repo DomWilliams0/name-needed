@@ -155,8 +155,35 @@ impl SelectionWindow {
         let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
         if components_node.is_open() {
             // TODO component-specific widget
-            for component in context.simulation().ecs.all_components_for(details.entity) {
-                context.text(ui_str!(in context, " - {}", component));
+            for (name, interactive) in context.simulation().ecs.all_components_for(details.entity) {
+                let interactive = match interactive {
+                    None => {
+                        // just show name
+                        context.text(ui_str!(in context, " - {}", name));
+                        continue;
+                    }
+                    Some(i) => i,
+                };
+
+                // nice tree node
+                let title = ui_str!(in context, "{}", name);
+                let node = context.new_tree_node(title, DefaultOpen::Closed);
+                if !node.is_open() {
+                    continue;
+                }
+
+                context.key_value(
+                    im_str!("Summary"),
+                    || {
+                        if let Some(dbg) = interactive.as_debug() {
+                            Value::Wrapped(ui_str!(in context, "{:?}", dbg))
+                        } else {
+                            Value::None("Not implemented")
+                        }
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
             }
         }
 
