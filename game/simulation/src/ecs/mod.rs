@@ -118,6 +118,21 @@ impl ComponentRegistry {
             }
         }
     }
+
+    /// Iterates through all known component types and checks each one
+    pub fn all_components_for<'a>(
+        &'a self,
+        world: &'a EcsWorld,
+        entity: Entity,
+    ) -> impl Iterator<Item = &'static str> + 'a {
+        self.map.iter().filter_map(move |(name, funcs)| {
+            if (funcs.has_comp)(world, entity) {
+                Some(*name)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl From<EntityWrapper> for Entity {
