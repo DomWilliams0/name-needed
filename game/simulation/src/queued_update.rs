@@ -9,52 +9,77 @@ use world::BlockDamageResult;
 use crate::ecs::EcsWorld;
 use crate::ComponentWorld;
 
-type Update = dyn FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>;
-type Entry = (&'static str, Box<Update>);
+pub type QueuedUpdates = RawQueuedUpdates<naive::NaiveImpl>;
 
-pub struct QueuedUpdates {
-    // TODO use dynstack for updates to avoid a separate box per entry
-    // TODO perfect use case for a per-tick arena allocator
-    updates: RefCell<Vec<Entry>>,
+// TODO perfect use case for a per-tick arena allocator
+// TODO dynstack impl
+
+pub struct RawQueuedUpdates<Q> {
+    inner: RefCell<Q>,
 }
 
-impl Default for QueuedUpdates {
+pub trait QueuedUpdatesImpl: Default {
+    /// Returns index of this new update
+    fn queue<F: 'static + FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>>(
+        &mut self,
+        name: &'static str,
+        update: F,
+    ) -> usize;
+
+    fn len(&self) -> usize;
+
+    fn drain_and_execute<N: FnMut(&'static str), R: FnMut(&'static str, BoxedResult<()>)>(
+        &mut self,
+        per_name: N,
+        per_result: R,
+        world: &mut EcsWorld,
+    );
+}
+
+impl<Q: Default> Default for RawQueuedUpdates<Q> {
     fn default() -> Self {
         Self {
-            updates: RefCell::new(Vec::with_capacity(256)),
+            inner: RefCell::new(Q::default()),
         }
     }
 }
 
-impl QueuedUpdates {
+impl<Q: QueuedUpdatesImpl> RawQueuedUpdates<Q> {
     pub fn queue<F: 'static + FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>>(
         &self,
         name: &'static str,
         update: F,
     ) {
-        // TODO pool/reuse these boxes
-        let update = Box::new(update);
-        let mut updates = self.updates.borrow_mut();
-        let old_len = updates.len();
-        updates.push((name, update));
+        let mut inner = self.inner.borrow_mut();
+        let n = inner.queue(name, update);
 
-        trace!("queued update #{n} for next tick", n = old_len; "name" => name)
+        trace!("queued update #{n} for next tick", n = n; "name" => name)
     }
 
     pub fn execute(&mut self, world: &mut EcsWorld) {
-        let mut vec = self.updates.borrow_mut();
-        if !vec.is_empty() {
-            debug!("running {count} queued updates", count = vec.len());
+        let mut inner = self.inner.borrow_mut();
+        let n = inner.len();
+        if n > 0 {
+            debug!("running {count} queued updates", count = n);
 
-            for (name, update) in vec.drain(..) {
-                log_scope!(o!("queued_update" => name));
-
-                match update(world) {
-                    Err(e) => warn!("queued update failed"; "error" => %e),
-                    Ok(_) => trace!("queued update was successful"),
-                }
-            }
+            let mut i = 0usize;
+            inner.drain_and_execute(
+                |name| {
+                    // TODO try to use a slog scope here
+                    debug!("executing queued update #{}", n; "name" => name);
+                    i += 1;
+                },
+                |name, result| {
+                    match result {
+                        Err(e) => warn!("queued update failed"; "error" => %e, "name" => name),
+                        Ok(_) => trace!("queued update was successful"; "name" => name),
+                    };
+                },
+                world,
+            );
         }
+
+        debug_assert_eq!(inner.len(), 0);
     }
 
     pub fn queue_block_damage(&self, block: WorldPosition, damage: BlockDurability) {
@@ -72,5 +97,92 @@ impl QueuedUpdates {
 
             Ok(())
         });
+    }
+}
+
+mod naive {
+    use super::*;
+
+    /// Vec of boxes
+    pub struct NaiveImpl(
+        Vec<(
+            &'static str,
+            Box<dyn FnOnce(&mut EcsWorld) -> BoxedResult<()>>,
+        )>,
+    );
+
+    impl Default for NaiveImpl {
+        fn default() -> Self {
+            Self(Vec::with_capacity(256))
+        }
+    }
+
+    impl QueuedUpdatesImpl for NaiveImpl {
+        fn queue<F: 'static + FnOnce(&mut EcsWorld) -> BoxedResult<()>>(
+            &mut self,
+            name: &'static str,
+            update: F,
+        ) -> usize {
+            let old_len = self.0.len();
+            self.0.push((name, Box::new(update)));
+            old_len
+        }
+
+        fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        fn drain_and_execute<N: FnMut(&'static str), R: FnMut(&'static str, BoxedResult<()>)>(
+            &mut self,
+            mut per_name: N,
+            mut per_result: R,
+            world: &mut EcsWorld,
+        ) {
+            for (name, update) in self.0.drain(..) {
+                per_name(name);
+                per_result(name, update(world));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::queued_update::naive::NaiveImpl;
+
+    fn do_basic<Q: QueuedUpdatesImpl>() {
+        let mut updates = RawQueuedUpdates::<Q>::default();
+
+        let mut ecs = {
+            let mut world = EcsWorld::new();
+            world.insert(Vec::<i32>::new());
+            world
+        };
+
+        updates.queue("nice", |w| {
+            let results = w.resource_mut::<Vec<i32>>();
+            results.push(123);
+            info!("NICE!");
+            Ok(())
+        });
+
+        updates.queue("cool", |w| {
+            let results = w.resource_mut::<Vec<i32>>();
+            results.push(456);
+            info!("COOL!");
+            Err("damn".into())
+        });
+
+        updates.execute(&mut ecs);
+
+        let results = ecs.resource::<Vec<i32>>();
+        assert_eq!(results, &vec![123, 456]);
+    }
+
+    #[test]
+    fn basic_naive() {
+        // logging::for_tests();
+        do_basic::<NaiveImpl>()
     }
 }

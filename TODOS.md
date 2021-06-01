@@ -254,9 +254,9 @@
    * `// TODO apply fall damage if applicable`
    * `// TODO lerp towards new rotation`
  * [game/simulation/src/queued_update.rs](game/simulation/src/queued_update.rs) (3)
-   * `// TODO use dynstack for updates to avoid a separate box per entry`
    * `// TODO perfect use case for a per-tick arena allocator`
-   * `// TODO pool/reuse these boxes`
+   * `// TODO dynstack impl`
+   * `// TODO try to use a slog scope here`
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
