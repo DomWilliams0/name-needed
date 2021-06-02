@@ -120,6 +120,7 @@ impl Renderer for GlRenderer {
             render.shape,
             render.color,
             physical.size.into(),
+            transform.rotation,
         ));
     }
 

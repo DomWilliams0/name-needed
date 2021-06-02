@@ -14,7 +14,7 @@ use unit::world::WorldPoint;
 pub(crate) struct EntityPipeline {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2)>,
+    entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2, Basis2)>,
 }
 
 #[repr(C)]
@@ -117,14 +117,14 @@ impl EntityPipeline {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb, Length2)) {
+    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb, Length2, Basis2)) {
         self.entities.push(entity);
     }
 
     pub fn render_entities(&mut self, frame_target: &mut FrameTarget) -> GlResult<()> {
         // sort by shape
         self.entities
-            .sort_unstable_by_key(|(_, shape, _, _)| shape.ord());
+            .sort_unstable_by_key(|(_, shape, _, _, _)| shape.ord());
 
         let p = self.pipeline.program.scoped_bind();
         let _vao = self.pipeline.vao.scoped_bind();
@@ -141,7 +141,7 @@ impl EntityPipeline {
         if let Some(mut mapped) = vbo.map_write_only::<EntityInstance>()? {
             // TODO cursor interface in ScopedMap
 
-            for (i, (pos, _, color, size)) in self.entities.iter().enumerate() {
+            for (i, (pos, _, color, size, rot)) in self.entities.iter().enumerate() {
                 let pos = ViewPoint::from(*pos);
                 mapped[i].color = (*color).into();
 
@@ -150,8 +150,10 @@ impl EntityPipeline {
                     let scale = |len: Length| len.metres() / 2.0;
                     Matrix4::from_nonuniform_scale(scale(x), scale(y), 1.0)
                 };
+                let rot = Matrix4::from(*rot.as_ref());
+                let pos = Matrix4::from_translation(pos.into());
 
-                let model = Matrix4::from_translation(pos.into()) * scale;
+                let model = pos * rot * scale; // order is important
                 mapped[i].model = model.into();
             }
         }
@@ -167,7 +169,7 @@ impl EntityPipeline {
         for (i, grouped) in self
             .entities
             .iter()
-            .group_by(|(_, shape, _, _)| shape.ord())
+            .group_by(|(_, shape, _, _, _)| shape.ord())
             .into_iter()
         {
             let (primitive, start_ptr, element_count) = render_data[i];
