@@ -56,22 +56,26 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * reflection-like api on components to do actions per-component in ui
 
 ## Entity behaviour
+* ai incentive to choose the same action as last tick
+* (sub)activities take an amount of ticks to complete
+* be able to block subactivities for a number of ticks, show progress bar up until end tick - work items?
+* food/drink vessels and wastage
+* define ai in definitions with a collection of "features"/tags/capabilities rather than raw DSEs/behaviours
+* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
+* if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
+* revamp hauling to add different methods
+	* carrying (add a new TransformChild component)
+	* dragging/pushing
+
+### Society-oriented behaviours
 * more society level jobs
 	* place blocks, destroying what's currently there (DAG for dependencies)
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
-* ai incentive to choose the same action as last tick
 * ai filtering at the job level on high-level requirements before considering all its subtasks
-* (sub)activities take an amount of ticks to complete
-* be able to block subactivities for a number of ticks, show progress bar up until end tick
-* food/drink vessels and wastage
-* consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
-* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
-* if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
 * preserve info about completed society jobs/tasks to show in the ui
-* revamp hauling to add different methods
-	* carrying (add a new TransformChild component)
-	* dragging/pushing
+* etiquette/morality "meters" that vary based on personality and mood. if low, they take things reserved for work items, take other's food, consider items stored inside other people's personal containers
+* specify a limit on job reservations per task, e.g. 2 maximum on sawing a tree trunk
 
 ## World generation
 * better biome generation
@@ -219,6 +223,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* voxel world access
 	* autorun scripts in a dir on startup
 	* port scenarios from rust to scripts
+* saving and loading should use its own entity id/referencing (calculated during save) so that on load new entities are spawned starting from generation 1 again. this might be critical for long running games to ensure the monotonic id+generation count doesn't exceed the max
 
 ## Entity diversity
 * animal species
