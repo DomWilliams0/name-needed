@@ -57,7 +57,7 @@ impl<'a> System<'a> for InputSystem<'a> {
                     .find(|(_, transform, _)| {
                         transform.position.is_almost(&point, SELECT_THRESHOLD)
                     }) // just choose the first in range for now
-                    .map(|(e, _, _)| e)
+                    .map(|(e, _, _)| e.into())
             })
         };
 
@@ -154,8 +154,8 @@ impl SelectedEntity {
         // unselect current entity
         self.unselect_with_comps(selecteds);
 
-        debug!("selected entity"; E(e));
-        let _ = selecteds.insert(e, SelectedComponent);
+        debug!("selected entity"; e);
+        let _ = selecteds.insert(e.into(), SelectedComponent);
         self.0 = Some(e);
     }
 
@@ -166,8 +166,8 @@ impl SelectedEntity {
 
     fn unselect_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
         if let Some(old) = self.0.take() {
-            debug!("unselected entity"; E(old));
-            comp.remove(old);
+            debug!("unselected entity"; old);
+            comp.remove(old.into());
         }
     }
 }

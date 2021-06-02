@@ -56,7 +56,7 @@ mod tests {
         let guard = NoLeaksGuard(world as *mut _, shared as *mut _);
 
         let blackboard = AiBlackboard {
-            entity: world.create_entity().build(),
+            entity: world.create_entity().build().into(),
             accessible_position: WorldPosition::new(1, 2, 3.into()),
             position: Default::default(),
             hunger: None,

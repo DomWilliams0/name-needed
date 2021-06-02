@@ -46,8 +46,8 @@ impl SubActivity for PickupItemSubActivity {
                         .ok_or(PickupItemError::NotAvailable)?;
 
                     // get holder inventory, free up enough hands and try to fill em
-                    let inventory = inventories
-                        .get_mut(holder)
+                    let inventory = holder
+                        .get_mut(&mut inventories)
                         .ok_or(PickupItemError::NoInventory)?;
 
                     inventory

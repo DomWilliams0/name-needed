@@ -370,13 +370,13 @@ impl<R: Renderer> Simulation<R> {
                         .component_mut::<ContainerComponent>(container)
                     {
                         Err(e) => {
-                            warn!("invalid container entity"; "entity" => E(container), "error" => %e);
+                            warn!("invalid container entity"; "entity" => container, "error" => %e);
                             continue;
                         }
                         Ok(c) => {
                             if let Some(owner) = owner {
                                 c.owner = owner;
-                                info!("set container owner"; "container" => E(container), "owner" => owner.map(E))
+                                info!("set container owner"; "container" => container, "owner" => owner)
                             }
 
                             if let Some(communal) = communal {
@@ -385,7 +385,7 @@ impl<R: Renderer> Simulation<R> {
                                     .helpers_containers()
                                     .set_container_communal(container, communal)
                                 {
-                                    warn!("failed to set container society"; "container" => E(container), "society" => ?communal, "error" => %e);
+                                    warn!("failed to set container society"; "container" => container, "society" => ?communal, "error" => %e);
                                 }
                             }
                         }

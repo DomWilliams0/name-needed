@@ -33,7 +33,7 @@ impl Spatial {
         self.entities.clear();
 
         for (e, transform, _) in (&entities, &transforms, &physicals).join() {
-            self.entities.push((e, transform.position));
+            self.entities.push((e.into(), transform.position));
         }
 
         if !self.entities.is_empty() {

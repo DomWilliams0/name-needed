@@ -2,11 +2,12 @@ use common::*;
 
 use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+use crate::ComponentWorld;
+
 use crate::event::prelude::*;
 use crate::item::ContainedInComponent;
 use crate::needs::BeingEatenComponent;
-use crate::ComponentWorld;
 
 /// Eat the item, which should be equipped in an equip slot
 #[derive(Debug)]
@@ -66,6 +67,6 @@ impl SubActivity for ItemEatSubActivity {
 
 impl Display for ItemEatSubActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Eating {}", E(self.0))
+        write!(f, "Eating {}", self.0)
     }
 }

@@ -1,7 +1,6 @@
 use imgui::{im_str, StyleColor};
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::E;
 use simulation::{
     AssociatedBlockData, ComponentWorld, NameComponent, PlayerSociety, Societies, SocietyHandle,
 };
@@ -169,7 +168,7 @@ impl SocietyWindow {
                     for reserver in reservers.iter() {
                         context.text_colored(
                             COLOR_BLUE,
-                            ui_str!(in context, "  * Reserved by {}", E(*reserver)),
+                            ui_str!(in context, "  * Reserved by {}", *reserver),
                         );
                     }
                 },

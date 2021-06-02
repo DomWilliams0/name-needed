@@ -78,7 +78,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 // already did
 
                 let ctx = ActivityContext2 {
-                    entity,
+                    entity: entity.into(),
                     world: self.0,
                 };
 

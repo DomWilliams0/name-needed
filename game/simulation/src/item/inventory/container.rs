@@ -4,12 +4,14 @@ use common::*;
 use unit::space::length::Length3;
 use unit::space::volume::Volume;
 
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+
 use crate::item::inventory::container::contents::SortedContents;
 use crate::item::inventory::HeldEntity;
 
 mod contents {
     #![allow(clippy::toplevel_ref_arg, clippy::from_over_into)]
+
     use super::*;
 
     // TODO sort by some item type identifier so common items are grouped together
@@ -50,7 +52,7 @@ pub enum ContainerError {
     #[error("Container is full")]
     Full,
 
-    #[error("Container does not contain {}", E(*.0))]
+    #[error("Container does not contain {}", *.0)]
     NotFound(Entity),
 }
 

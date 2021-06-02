@@ -59,13 +59,15 @@ impl<'a> System<'a> for HaulSystem {
 
         // collect new positions
         for (item, hauled) in (&entities, &hauled).join() {
-            log_scope!(o!("system" => "haul", E(item)));
+            let item = Entity::from(item);
+            log_scope!(o!("system" => "haul", item));
 
             // gross but we cant join on transform storage to be able to query the hauler
-            let transform = transforms
-                .get(hauled.hauler)
+            let transform = hauled
+                .hauler
+                .get(&transforms)
                 .expect("hauler has no transform");
-            assert!(transforms.get(item).is_some(), "hauled has no transform");
+            assert!(item.get(&transforms).is_some(), "hauled has no transform");
 
             let hauler_pos =
                 position_hauled_item(hauled.haul_type, &transform.position, transform.forwards());

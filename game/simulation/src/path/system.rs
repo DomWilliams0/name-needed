@@ -48,7 +48,8 @@ impl<'a> System<'a> for PathSteeringSystem {
         for (e, transform, mut path, steer) in
             (&entities, &mut transform, &mut path, &mut steer).join()
         {
-            log_scope!(o!("system" => "path steering", E(e)));
+            let e = Entity::from(e);
+            log_scope!(o!("system" => "path steering", e));
 
             // new path request
             if let Some(req) = path.pop_request() {

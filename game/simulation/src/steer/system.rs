@@ -36,7 +36,8 @@ impl<'a> System<'a> for SteeringSystem {
         for (e, transform, physical, mut steer, mut movement) in
             (&entities, &transform, &physical, &mut steer, &mut movement).join()
         {
-            log_scope!(o!("system" => "steering", E(e)));
+            let e = Entity::from(e);
+            log_scope!(o!("system" => "steering", e));
 
             let mut context_map = ContextMap::default();
             let bounding_radius = physical.max_dimension().metres() / 2.0;

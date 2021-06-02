@@ -93,7 +93,7 @@ impl SocietyJobImpl for HaulJob {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => &t.position,
                         Err(err) => {
-                            debug!("hauled item is missing transform"; "item" => E(self.entity));
+                            debug!("hauled item is missing transform"; "item" => self.entity);
                             return Some(SocietyTaskResult::Failure(err.into()));
                         }
                     };

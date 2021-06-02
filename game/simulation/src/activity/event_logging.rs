@@ -1,14 +1,14 @@
-use crate::activity::HaulTarget;
-
-use crate::ecs::*;
-
-use crate::simulation::Tick;
-use crate::WorldPosition;
-use common::*;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::convert::TryInto;
+
+use common::*;
 use unit::world::WorldPoint;
+
+use crate::activity::HaulTarget;
+use crate::ecs::*;
+use crate::simulation::Tick;
+use crate::WorldPosition;
 
 struct RingBuffer<T>(VecDeque<T>, usize);
 
@@ -103,21 +103,22 @@ impl Display for LoggedEntityEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use LoggedEntityDecision::*;
         use LoggedEntityEvent::*;
+
         match self {
-            Equipped(e) => write!(f, "equipped {}", E(*e)),
-            Eaten(e) => write!(f, "ate {}", E(*e)),
-            PickedUp(e) => write!(f, "picked up {}", E(*e)),
+            Equipped(e) => write!(f, "equipped {}", e),
+            Eaten(e) => write!(f, "ate {}", e),
+            PickedUp(e) => write!(f, "picked up {}", e),
 
             AiDecision(decision) => {
                 write!(f, "decided to ")?;
                 match decision {
                     GoPickup(what) => write!(f, "pickup nearby {}", what),
-                    EatHeldItem(e) => write!(f, "eat held {}", E(*e)),
+                    EatHeldItem(e) => write!(f, "eat held {}", e),
                     Wander => write!(f, "wander around"),
                     Goto { target, reason } => write!(f, "go to {} because {}", target, *reason),
                     GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
-                    Follow(e) => write!(f, "follow {}", E(*e)),
-                    Haul { item, dest } => write!(f, "haul {} to {}", E(*item), dest),
+                    Follow(e) => write!(f, "follow {}", e),
+                    Haul { item, dest } => write!(f, "haul {} to {}", item, dest),
                 }
             }
         }
@@ -132,8 +133,9 @@ impl Display for TimedLoggedEntityEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use common::Itertools;
+
+    use super::*;
 
     #[test]
     fn ring_buffer_basic() {

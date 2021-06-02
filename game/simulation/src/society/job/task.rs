@@ -1,12 +1,14 @@
+use ai::{Dse, WeightedDse};
+use common::*;
+use unit::world::WorldPosition;
+
 use crate::activity::HaulTarget;
 use crate::ai::dse::{BreakBlockDse, HaulDse};
 use crate::ai::AiContext;
 use crate::ecs::{EcsWorld, Entity};
+use crate::ComponentWorld;
+
 use crate::item::HaulableItemComponent;
-use crate::{ComponentWorld, E};
-use ai::{Dse, WeightedDse};
-use common::*;
-use unit::world::WorldPosition;
 
 /// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
@@ -75,7 +77,7 @@ impl Display for SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
-            Haul(e, _, tgt) => write!(f, "Haul {} to {}", E(*e), tgt),
+            Haul(e, _, tgt) => write!(f, "Haul {} to {}", e, tgt),
         }
     }
 }

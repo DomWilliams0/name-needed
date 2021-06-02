@@ -1,7 +1,9 @@
-use crate::ecs::{EcsWorld, Entity};
-use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
-use crate::{ComponentWorld, TransformComponent, E};
 use unit::world::WorldPoint;
+
+use crate::ecs::{EcsWorld, Entity};
+use crate::{ComponentWorld, TransformComponent};
+
+use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtComponents<'w>(&'w EcsWorld);
@@ -77,11 +79,7 @@ impl EcsExtComponents<'_> {
     /// Removes ContainedInComponent
     pub fn remove_from_container(&mut self, item: Entity) {
         let result = self.remove_now::<ContainedInComponent>(item);
-        debug_assert!(
-            result.is_some(),
-            "{} didnt have contained component",
-            E(item)
-        );
+        debug_assert!(result.is_some(), "{} didnt have contained component", item);
     }
 
     /// Removes TransformComponent and adds given ContainedInComponent

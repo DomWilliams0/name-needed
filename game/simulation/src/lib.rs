@@ -28,7 +28,7 @@ pub use crate::simulation::{
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{ActivityComponent, EntityLoggingComponent};
 pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentWorld, EcsWorld, Entity, E};
+pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
 pub use item::{
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, InventoryComponent,
     ItemCondition, NameComponent,

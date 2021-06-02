@@ -87,7 +87,8 @@ impl<'a> System<'a> for EatingSystem {
         for (item, being_eaten, edible, condition) in
             (&entities, &eating, &edible_item, &mut condition).join()
         {
-            log_scope!(o!("system" => "being-eating", E(item)));
+            let item = item.into();
+            log_scope!(o!("system" => "being-eating", item));
 
             let mut do_eat = || {
                 // get eater
@@ -96,7 +97,7 @@ impl<'a> System<'a> for EatingSystem {
                 {
                     Some(comps) => comps,
                     None => {
-                        warn!("food eater doesn't have inventory or hunger component"; "eater" => E(being_eaten.eater));
+                        warn!("food eater doesn't have inventory or hunger component"; "eater" => being_eaten.eater);
                         return Some(Err(()));
                     }
                 };
@@ -111,7 +112,7 @@ impl<'a> System<'a> for EatingSystem {
                 eater_hunger.current_fuel.add(fuel_to_consume);
                 condition.0 -= proportion_to_eat;
 
-                trace!("{eater} is eating", eater = E(being_eaten.eater);
+                trace!("{eater} is eating", eater = being_eaten.eater;
                     "new_hunger" => ?eater_hunger.current_fuel,
                     "new_food_condition" => ?condition.0,
                 );
@@ -126,7 +127,7 @@ impl<'a> System<'a> for EatingSystem {
                     debug_assert!(remove_count > 0); // should have been in an equip slot
 
                     // queue food entity for deletion
-                    let delete_result = entities.delete(item);
+                    let delete_result = entities.delete(item.into());
                     debug_assert!(delete_result.is_ok());
 
                     // do post event

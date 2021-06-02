@@ -1,20 +1,22 @@
-use specs::prelude::*;
 use specs::storage::InsertResult;
 
 use common::*;
 
-use crate::ecs::{ComponentRegistry, SpecsWorld, E};
 use crate::event::{EntityEvent, EntityEventQueue};
 
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::item::{ContainerComponent, ContainerResolver};
 use crate::runtime::{Runtime, TaskRef};
-use crate::{definitions, WorldRef};
+use crate::{definitions, WorldRef, Entity};
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use crate::ecs::component::ComponentRegistry;
+use crate::ecs::*;
+use specs::prelude::Resource;
 
+pub type SpecsWorld = specs::World;
 pub struct EcsWorld {
     world: SpecsWorld,
     component_registry: ComponentRegistry,
@@ -23,19 +25,12 @@ pub struct EcsWorld {
 /// World reference for the current frame only - very unsafe, don't store!
 pub struct EcsWorldFrameRef(&'static EcsWorld);
 
-#[macro_export]
-macro_rules! entity_pretty {
-    ($e:expr) => {
-        format_args!("{}:{}", $e.gen().id(), $e.id())
-    };
-}
-
 #[derive(Debug, Error)]
 pub enum ComponentGetError {
-    #[error("The entity {} doesn't exist", E(*.0))]
+    #[error("The entity {} doesn't exist", *.0)]
     NoSuchEntity(Entity),
 
-    #[error("The entity {} doesn't have the given component '{1}'", E(*.0))]
+    #[error("The entity {} doesn't have the given component '{1}'", *.0)]
     NoSuchComponent(Entity, &'static str),
 }
 
@@ -139,7 +134,7 @@ impl ComponentWorld for EcsWorld {
 
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self
-        let result: Option<&T> = unsafe { std::mem::transmute(storage.get(entity)) };
+        let result: Option<&T> = unsafe { std::mem::transmute(entity.get(&storage)) };
         result.ok_or_else(|| self.mk_component_error::<T>(entity))
     }
 
@@ -147,13 +142,13 @@ impl ComponentWorld for EcsWorld {
         let mut storage = self.write_storage::<T>();
         // safety: storage has the same lifetime as self, so its ok to "upcast" the components
         // lifetime from that of the storage to that of self
-        let result: Option<&mut T> = unsafe { std::mem::transmute(storage.get_mut(entity)) };
+        let result: Option<&mut T> = unsafe { std::mem::transmute(entity.get_mut(&mut storage)) };
         result.ok_or_else(|| self.mk_component_error::<T>(entity))
     }
 
     fn has_component<T: Component>(&self, entity: Entity) -> bool {
         let storage = self.read_storage::<T>();
-        storage.contains(entity)
+        storage.contains(entity.into())
     }
 
     fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool {
@@ -162,7 +157,7 @@ impl ComponentWorld for EcsWorld {
 
     fn components<J: Join>(&self, entity: Entity, storages: J) -> Option<J::Type> {
         let entities = self.read_resource::<EntitiesRes>();
-        storages.join().get(entity, &entities.into())
+        storages.join().get(entity.into(), &entities.into())
     }
 
     fn resource<T: Resource>(&self) -> &T {
@@ -182,23 +177,23 @@ impl ComponentWorld for EcsWorld {
 
     fn add_now<T: Component>(&self, entity: Entity, component: T) -> InsertResult<T> {
         let mut storage = self.write_storage::<T>();
-        storage.insert(entity, component)
+        storage.insert(entity.into(), component)
     }
 
     fn remove_now<T: Component>(&self, entity: Entity) -> Option<T> {
         let mut storage = self.write_storage::<T>();
-        storage.remove(entity)
+        storage.remove(entity.into())
     }
 
     // TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead
     fn add_lazy<T: Component>(&self, entity: Entity, component: T) {
         let lazy = self.read_resource::<LazyUpdate>();
-        lazy.insert(entity, component);
+        lazy.insert(entity.into(), component);
     }
 
     fn remove_lazy<T: Component>(&self, entity: Entity) {
         let lazy = self.read_resource::<LazyUpdate>();
-        lazy.remove::<T>(entity);
+        lazy.remove::<T>(entity.into());
     }
 
     fn voxel_world(&self) -> WorldRef {
@@ -219,14 +214,14 @@ impl ComponentWorld for EcsWorld {
 
     fn kill_entity(&self, entity: Entity) {
         let entities = self.read_resource::<EntitiesRes>();
-        if let Err(e) = entities.delete(entity) {
-            warn!("failed to delete entity"; E(entity), "error" => %e);
+        if let Err(e) = entities.delete(entity.into()) {
+            warn!("failed to delete entity"; entity, "error" => %e);
         }
     }
 
     fn is_entity_alive(&self, entity: Entity) -> bool {
         // must check if generation is alive first to avoid panic
-        entity.gen().is_alive() && self.is_alive(entity)
+        entity.gen().is_alive() && self.is_alive(entity.into())
     }
 }
 

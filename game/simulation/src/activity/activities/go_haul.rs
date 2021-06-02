@@ -7,12 +7,13 @@ use crate::activity::activity::{
 };
 use crate::activity::subactivities::{GoToSubActivity, HaulError, HaulSubActivity};
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-use crate::ecs::{Entity, E};
-use crate::event::prelude::*;
-use crate::item::{ContainedInComponent, ContainerComponent};
+use crate::ecs::Entity;
 use crate::{
     nop_subactivity, unexpected_event, ComponentWorld, PhysicalComponent, TransformComponent,
 };
+
+use crate::event::prelude::*;
+use crate::item::{ContainedInComponent, ContainerComponent};
 
 // TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available
 // TODO support hauling multiple things to multiple locations (or via multiple activities?)
@@ -220,8 +221,8 @@ impl Activity for HaulActivity {
                                         ContainedInComponent::Container(container_entity),
                                     );
 
-                                    trace!("put item into container"; "item" => E(item),
-                                        "container" => E(container_entity), "hauler" => E(hauler)
+                                    trace!("put item into container"; "item" => item,
+                                        "container" => container_entity, "hauler" => hauler
                                     );
 
                                     Ok(container_entity)
@@ -344,7 +345,7 @@ impl Activity for HaulActivity {
                         Err(err.to_owned().into())
                     }
                     Ok(container) => {
-                        trace!("put item in container successfully"; "container" => E(*container));
+                        trace!("put item in container successfully"; "container" => container);
                         Ok(())
                     }
                 };
@@ -440,7 +441,7 @@ impl HaulTarget {
 impl Display for HaulActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // TODO format the other entity better e.g. get item name. or do this in the ui layer?
-        write!(f, "Hauling {} to {}", E(self.thing), self.target)
+        write!(f, "Hauling {} to {}", self.thing, self.target)
     }
 }
 
@@ -448,7 +449,7 @@ impl Display for HaulTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             HaulTarget::Position(pos) => write!(f, "position {}", pos),
-            HaulTarget::Container(container) => write!(f, "container {}", E(*container)),
+            HaulTarget::Container(container) => write!(f, "container {}", container),
         }
     }
 }

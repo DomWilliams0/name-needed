@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use common::*;
 use unit::world::WorldPoint;
 use world::NavigationError;
@@ -9,12 +11,12 @@ use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
 use crate::activity::{
     Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult, PickupItemError,
 };
-use crate::ecs::{Entity, E};
-use crate::event::prelude::*;
-use crate::item::HauledItemComponent;
+use crate::ecs::Entity;
 use crate::{nop_subactivity, unexpected_event};
 use crate::{ComponentWorld, TransformComponent};
-use std::borrow::Cow;
+
+use crate::event::prelude::*;
+use crate::item::HauledItemComponent;
 
 #[derive(Debug)]
 enum PickupItemsState {
@@ -60,7 +62,7 @@ impl Activity for PickupItemsActivity {
                 // choose a new item to pickup
                 match self.best_item(ctx.world) {
                     BestItem::Excellent { item, pos, .. } => {
-                        trace!("new best item chosen"; "item" => E(item), "position" => %pos);
+                        trace!("new best item chosen"; "item" => item, "position" => %pos);
 
                         // subscribe to anything happening to the item
                         ctx.subscribe_to(item, EventSubscription::All);
@@ -210,7 +212,7 @@ impl PickupItemsActivity {
             if let Some((last, _)) = last {
                 debug!(
                     "removed last best item due to pickup failure";
-                    "item" => E(last), "error" => ?err
+                    "item" => last, "error" => ?err
                 );
             } else {
                 debug!(

@@ -253,7 +253,7 @@ fn search_local_area(
     let results = spatial
         .query_in_radius(self_position.centred(), max_radius)
         .filter_map(|(entity, pos, dist)| {
-            let condition = conditions.get(entity)?;
+            let condition = entity.get(&conditions)?;
 
             // check item filter matches
             (entity, Some(world)).matches(*filter).as_option()?;
@@ -307,7 +307,7 @@ impl Display for AiInput {
             // TODO lowercase BlockType
             AiInput::BlockTypeMatches(pos, bt_match) => write!(f, "{} at {}", bt_match, pos),
             AiInput::HasExtraHandsForHauling(n, _) => {
-                write!(f, "Has {} extra hands for hauling", *n)
+                write!(f, "Has {} extra hands for hauling", n)
             }
             AiInput::CanUseHeldItem(filter) => write!(f, "Can use held item matching {}", filter),
         }

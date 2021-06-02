@@ -1,4 +1,3 @@
-use crate::ecs::E;
 use crate::job::SocietyTask;
 use crate::simulation::Tick;
 use crate::society::job::job::SocietyJobRef;
@@ -178,11 +177,11 @@ impl<T: ReservationTask> Reservations<T> {
 
             if existing.0 == tup.0 {
                 // same task
-                debug!("reserving the same task again, doing nothing"; E(reserver), "task" => ?existing.0);
+                debug!("reserving the same task again, doing nothing"; reserver, "task" => ?existing.0);
                 return;
             }
 
-            debug!("replaced existing reservation"; E(reserver), "new" => ?tup.0.clone(), "prev" => ?existing.0);
+            debug!("replaced existing reservation"; reserver, "new" => ?tup.0.clone(), "prev" => ?existing.0);
 
             debug_assert_ne!(existing, &tup, "duplicate reservation for {:?}", tup);
 
@@ -199,10 +198,10 @@ impl<T: ReservationTask> Reservations<T> {
                     .skip(current_idx + 1)
                     .any(|(_, e)| *e == reserver),
                 "{} has multiple reservations",
-                E(reserver)
+                reserver
             );
         } else {
-            debug!("adding new reservation"; E(reserver), "new" => ?tup.0.clone());
+            debug!("adding new reservation"; reserver, "new" => ?tup.0.clone());
             self.add_ref(tup.0.clone());
             self.reservations.push(tup);
         }
@@ -228,7 +227,7 @@ impl<T: ReservationTask> Reservations<T> {
         if let Some(current_idx) = self.reservations.iter().position(|(_, e)| *e == reserver) {
             let (prev, _) = self.reservations.swap_remove(current_idx);
             self.release_ref(&prev);
-            debug!("unreserved task"; E(reserver), "prev" => ?prev);
+            debug!("unreserved task"; reserver, "prev" => ?prev);
 
             // ensure no other reservations
             debug_assert!(
@@ -238,10 +237,10 @@ impl<T: ReservationTask> Reservations<T> {
                     .skip(current_idx)
                     .any(|(_, e)| *e == reserver),
                 "{} had multiple reservations",
-                E(reserver)
+                reserver
             );
         } else {
-            trace!("no task to unreserve"; E(reserver));
+            trace!("no task to unreserve"; reserver);
         }
     }
 
@@ -320,9 +319,9 @@ mod tests {
         let reservations = Reservations::default();
         let ecs = EcsWorld::new();
         let entities = [
-            ecs.create_entity().build(),
-            ecs.create_entity().build(),
-            ecs.create_entity().build(),
+            ecs.create_entity().build().into(),
+            ecs.create_entity().build().into(),
+            ecs.create_entity().build().into(),
         ];
         (reservations, entities)
     }

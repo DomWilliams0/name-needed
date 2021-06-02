@@ -1,5 +1,4 @@
 use common::*;
-
 use world::SearchGoal;
 
 use crate::activity::activity::{
@@ -7,12 +6,13 @@ use crate::activity::activity::{
 };
 use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+use crate::ComponentWorld;
+use crate::{unexpected_event, TransformComponent};
+
 use crate::event::prelude::*;
 use crate::event::TimerToken;
 use crate::nop_subactivity;
-use crate::ComponentWorld;
-use crate::{unexpected_event, TransformComponent};
 
 const FOLLOW_CHECK_SCHEDULE: u32 = 35;
 
@@ -159,6 +159,6 @@ impl FollowActivity {
 
 impl Display for FollowActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Following {}", E(self.target))
+        write!(f, "Following {}", self.target)
     }
 }
