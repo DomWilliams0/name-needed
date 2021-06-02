@@ -8,11 +8,13 @@ use crate::{ComponentWorld, SocietyHandle};
 
 use crate::item::ContainerComponent;
 use crate::job::SocietyJobList;
+use crate::society::work_item::WorkItems;
 
 pub struct Society {
     name: String,
     handle: SocietyHandle,
     jobs: RefCell<SocietyJobList>,
+    work_items: RefCell<WorkItems>,
 
     /// Communal containers
     containers: HashSet<Entity>,
@@ -24,6 +26,7 @@ impl Society {
             name,
             handle,
             jobs: RefCell::new(Default::default()),
+            work_items: RefCell::new(Default::default()),
             containers: HashSet::new(),
         }
     }
@@ -42,6 +45,10 @@ impl Society {
 
     pub fn jobs_mut(&self) -> RefMut<SocietyJobList> {
         self.jobs.borrow_mut()
+    }
+
+    pub fn work_items_mut(&self) -> RefMut<WorkItems> {
+        self.work_items.borrow_mut()
     }
 
     /// The given container must already be set to communal, returns true if successful

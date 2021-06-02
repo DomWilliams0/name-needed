@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity, clippy::module_inception)]
 
+pub use self::ai::AiAction;
 pub use activity::{ActivityComponent, EntityLoggingComponent};
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
@@ -10,7 +11,7 @@ pub use item::{
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
-pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use society::{job, work_item, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,

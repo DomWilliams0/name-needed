@@ -9,13 +9,14 @@ use crate::ecs::{EcsWorld, Entity};
 use crate::ComponentWorld;
 
 use crate::item::HaulableItemComponent;
+use crate::society::work_item::WorkItemRef;
 
 /// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
     BreakBlock(WorldPosition),
     Haul(Entity, HaulTarget, HaulTarget),
-    // TODO PlaceBlocks(block type, at position)
+    WorkOnWorkItem(WorkItemRef),
 }
 
 impl SocietyTask {
@@ -59,15 +60,18 @@ impl SocietyTask {
                     destination: pos,
                 })
             }
+            WorkOnWorkItem(h) => todo!(), // TODO
         }
     }
 
+    /// TODO add limit on number of shares
     pub fn is_shareable(&self) -> bool {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
             // TODO some types of hauling will be shareable
-            Haul(_, _, _) => false,
+            // TODO depends on work item
+            Haul(_, _, _) | WorkOnWorkItem(_) => false,
         }
     }
 }
@@ -78,6 +82,7 @@ impl Display for SocietyTask {
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
             Haul(e, _, tgt) => write!(f, "Haul {} to {}", e, tgt),
+            WorkOnWorkItem(wi) => write!(f, "Work on {}", wi),
         }
     }
 }

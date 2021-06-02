@@ -1,6 +1,10 @@
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety};
+use simulation::work_item::{Location, TreeLogCuttingWorkItem, WorkItem};
+use simulation::{
+    ActivityComponent, AiAction, ComponentWorld, EcsWorld, PlayerSociety, Societies,
+    TransformComponent,
+};
 
 pub type Scenario = fn(&mut EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -117,18 +121,48 @@ fn log_cutting(ecs: &mut EcsWorld) {
         .0
         .expect("no player society");
 
-    spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
+    let humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next_please())
             .with_player_society()
             .thanks()
     });
 
-    let trunks = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
+    let trunk = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
         helpers::new_entity("core_tree_trunk", ecs, pos)
             .with_condition(NormalizedFloat::one())
             .thanks()
-    });
+    })[0];
+
+    if let Some(human) = humans.first().copied() {
+        let society = ecs
+            .resource_mut::<Societies>()
+            .society_by_handle_mut(society)
+            .expect("bad society");
+        let activity = ecs
+            .component_mut::<ActivityComponent>(human)
+            .expect("no activity");
+
+        let location = {
+            let pos = ecs
+                .component::<TransformComponent>(trunk)
+                .expect("no trunk transform")
+                .position;
+            // TODO work item should encompass full trunk
+            let point = geo::Point::new(pos.x(), pos.y());
+            Location::new(point, pos.z())
+        };
+        let work_item = society
+            .work_items_mut()
+            .add(WorkItem::new(location, TreeLogCuttingWorkItem::default()));
+
+        activity.interrupt_with_new_activity(
+            AiAction::GoWorkOnWorkItem(work_item),
+            None,
+            human,
+            ecs,
+        );
+    }
 }
 
 fn haul_to_container(ecs: &mut EcsWorld) {

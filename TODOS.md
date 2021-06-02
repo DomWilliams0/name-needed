@@ -1,4 +1,4 @@
-# TODOs (341)
+# TODOs (355)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -129,8 +129,9 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
+ * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (2)
    * `// TODO move subactivity errors somewhere else`
+   * `// TODO work item activity`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
    * `// TODO helper on ctx to get component`
    * `// TODO better exertion calculation for movement speed`
@@ -149,13 +150,20 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (4)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`
- * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (1)
+   * `/// TODO`
+   * `AiAction::GoWorkOnWorkItem(_) => return Err(()), // TODO`
+ * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
+   * `/// TODO consider society stores before scanning the local area`
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
+ * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
+   * `// TODO shorter haul distance should be more desirable`
+ * [game/simulation/src/ai/dse/work.rs](game/simulation/src/ai/dse/work.rs) (1)
+   * `// TODO actual considerations`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
@@ -291,16 +299,26 @@
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
    * `// TODO depends on error type?`
    * `// TODO fail early if no space left in container`
+ * [game/simulation/src/society/job/jobs/work_item.rs](game/simulation/src/society/job/jobs/work_item.rs) (3)
+   * `// TODO check work item dependencies`
+   * `// TODO manage completions`
+   * `// TODO remove when complete`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (2)
    * `#[derive(Debug)] // TODO implement manually`
    * `// TODO filter jobs for entity`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (4)
-   * `// TODO PlaceBlocks(block type, at position)`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (6)
    * `// TODO temporary box allocation is gross, use dynstack for dses`
    * `// TODO use an equation you unmathematical twat`
+   * `WorkOnWorkItem(h) => todo!(), // TODO`
+   * `/// TODO add limit on number of shares`
    * `// TODO some types of hauling will be shareable`
+   * `// TODO depends on work item`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
+ * [game/simulation/src/society/work_item/spatial.rs](game/simulation/src/society/work_item/spatial.rs) (1)
+   * `// TODO consider rtree params`
+ * [game/simulation/src/society/work_item/work_item.rs](game/simulation/src/society/work_item/work_item.rs) (1)
+   * `// TODO return option instead of asserts`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
    * `// TODO reimplement with octree`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
@@ -438,7 +456,8 @@
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
- * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (2)
+   * `// TODO work item should encompass full trunk`
    * `// TODO random pos offset away from the voxel centre`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`

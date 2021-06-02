@@ -29,6 +29,7 @@ impl Dse<AiContext> for HaulDse {
                 target: self.destination.floor(),
                 max_distance: 5000.0, // squared
             }),
+            // TODO shorter haul distance should be more desirable
         ]
     }
 

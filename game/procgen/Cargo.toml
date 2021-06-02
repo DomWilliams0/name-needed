@@ -18,9 +18,7 @@ strum = "0.19"
 strum_macros = "0.19"
 tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
 futures = { version = "0.3", default-features = false, features = ["std", "alloc", "async-await"] }
-geo = "0.16"
 geo-booleanop = "0.3"
-rstar = "0.8"
 spiral = "0.1"
 
 line_drawing = "0.8"
@@ -42,7 +40,7 @@ sha2 = { version = "0.9", optional = true }
 default = []
 bin = ["image", "imageproc", "color", "async-trait", "async-scoped", "panik"]
 climate = ["crossbeam"]
-cache = ["bincode", "sha2", "geo/use-serde"]
+cache = ["bincode", "sha2", "common/geo-serde"]
 benchmarking = []
 
 

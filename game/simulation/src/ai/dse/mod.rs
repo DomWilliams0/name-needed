@@ -12,6 +12,7 @@ mod dev;
 mod food;
 mod haul;
 mod movement;
+mod work;
 mod world;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]

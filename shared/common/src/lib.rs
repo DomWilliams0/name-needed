@@ -8,6 +8,7 @@ pub use cgmath::{
 };
 pub use derive_more;
 pub use float_cmp::ApproxEq;
+pub use geo;
 pub use itertools::*;
 pub use num_derive;
 pub use num_traits;
@@ -15,6 +16,7 @@ pub use ordered_float::OrderedFloat;
 pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
+pub use rstar;
 pub use smallvec::*;
 pub use thiserror::{self, Error};
 

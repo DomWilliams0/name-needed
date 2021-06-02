@@ -17,6 +17,9 @@ declare_entity_metric!(
 /// Switch, 1 if holding an item matching the filter, otherwise 0
 pub struct HoldingItemConsideration(pub ItemFilter);
 
+/// Find nearby items matching a filter with a higher weight the more and better condition are found
+///
+/// TODO consider society stores before scanning the local area
 pub struct FindLocalItemConsideration {
     pub filter: ItemFilter,
     pub max_radius: u32,
