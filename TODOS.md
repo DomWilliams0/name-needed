@@ -1,4 +1,4 @@
-# TODOs (337)
+# TODOs (338)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -182,11 +182,12 @@
    * `// TODO consider using `nested` vecs as an optimization`
  * [game/simulation/src/definitions/mod.rs](game/simulation/src/definitions/mod.rs) (1)
    * `// TODO include which key caused the problem`
- * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (1)
+ * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (3)
    * `// TODO should be a Box<dyn Error>`
- * [game/simulation/src/ecs/mod.rs](game/simulation/src/ecs/mod.rs) (2)
    * `/// TODO implement InteractiveComponent for some components`
    * `// TODO perfect hashing`
+ * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
+   * `// TODO custom hash? just itself`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)

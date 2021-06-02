@@ -137,7 +137,8 @@ impl<'a> System<'a> for AiSystem {
         )
             .join()
         {
-            log_scope!(o!("system" => "ai", E(e)));
+            let e = Entity::from(e);
+            log_scope!(o!("system" => "ai", e));
             let society_opt: Option<&SocietyComponent> = society_opt; // for IDE
 
             // initialize blackboard
@@ -206,7 +207,7 @@ impl<'a> System<'a> for AiSystem {
                 };
 
                 // log decision
-                if let Some(logs) = logging.get_mut(e) {
+                if let Some(logs) = e.get_mut(&mut logging) {
                     logs.log_event(&action);
                 }
 

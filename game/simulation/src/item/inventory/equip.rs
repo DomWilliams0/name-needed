@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+
 use crate::item::inventory::HeldEntity;
 
 // TODO equip slots will require a lot of integration with the body tree, so dont flesh out properly
@@ -33,7 +34,7 @@ impl Display for EquipSlot {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             EquipSlot::Empty => write!(f, "[ ]"),
-            EquipSlot::Occupied(e) => write!(f, "[ {} ]", E(e.entity)),
+            EquipSlot::Occupied(e) => write!(f, "[ {} ]", e.entity),
             EquipSlot::Overflow(_) => write!(f, "[ .. ]"),
         }
     }

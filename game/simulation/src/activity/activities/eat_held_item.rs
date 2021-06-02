@@ -5,11 +5,12 @@ use crate::activity::activity::{
 };
 use crate::activity::subactivities::{ItemEatSubActivity, ItemEquipSubActivity};
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+use crate::{nop_subactivity, ComponentWorld};
+
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::item::EdibleItemComponent;
 use crate::unexpected_event;
-use crate::{nop_subactivity, ComponentWorld};
 
 #[derive(Debug)]
 pub struct EatHeldItemActivity {
@@ -140,6 +141,6 @@ impl EatHeldItemActivity {
 
 impl Display for EatHeldItemActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Eating {}", E(self.item))
+        write!(f, "Eating {}", self.item)
     }
 }

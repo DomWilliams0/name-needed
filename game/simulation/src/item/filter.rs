@@ -1,5 +1,5 @@
 use crate::ecs::Entity;
-use crate::{entity_pretty, ComponentWorld};
+use crate::ComponentWorld;
 use common::*;
 
 #[derive(Eq, PartialEq, Copy, Clone, Hash, Debug, Ord, PartialOrd)]
@@ -52,7 +52,7 @@ impl<W: ComponentWorld> ItemFilterable for (Option<Entity>, Option<&W>) {
 impl Display for ItemFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            ItemFilter::SpecificEntity(e) => write!(f, "item == {}", entity_pretty!(e)),
+            ItemFilter::SpecificEntity(e) => write!(f, "item == {}", e),
             ItemFilter::Predicate(p) => write!(f, "f(item) where f = {:#x}", *p as usize),
             ItemFilter::HasComponent(comp) => write!(f, "item has {:?}", comp),
         }

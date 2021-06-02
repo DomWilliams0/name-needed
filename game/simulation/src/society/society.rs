@@ -1,10 +1,13 @@
-use crate::ecs::*;
-use crate::item::ContainerComponent;
-use crate::job::SocietyJobList;
-use crate::{ComponentWorld, SocietyHandle};
-use common::*;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashSet;
+
+use common::*;
+
+use crate::ecs::*;
+use crate::{ComponentWorld, SocietyHandle};
+
+use crate::item::ContainerComponent;
+use crate::job::SocietyJobList;
 
 pub struct Society {
     name: String,
@@ -48,7 +51,7 @@ impl Society {
         world: &impl ComponentWorld,
     ) -> bool {
         if !self.is_communal_to_this(container, world) {
-            warn!("communal container is not communal"; "container" => E(container), "society" => ?self);
+            warn!("communal container is not communal"; "container" => container, "society" => ?self);
             false
         } else {
             self.containers.insert(container);
@@ -63,14 +66,14 @@ impl Society {
         world: &impl ComponentWorld,
     ) -> bool {
         if !self.is_communal_to_this(container, world) {
-            warn!("communal container is not communal"; "container" => E(container), "society" => ?self);
+            warn!("communal container is not communal"; "container" => container, "society" => ?self);
             false
         } else {
             let contained = self.containers.remove(&container);
             debug_assert!(
                 contained,
                 "society did not contain removed communal container {}",
-                E(container)
+                container
             );
             true
         }

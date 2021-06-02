@@ -2,21 +2,21 @@
 //! API for testing
 
 use common::*;
-
 use unit::world::WorldPosition;
 
 use crate::activity::HaulTarget;
 use crate::ai::{AiAction, AiComponent};
-use crate::ecs::{EcsWorld, Entity, E};
+use crate::ecs::{EcsWorld, Entity};
+use crate::{
+    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
+    TransformComponent,
+};
+
 use crate::item::{ContainedInComponent, ContainerComponent};
 use crate::job::SocietyJob;
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
 use crate::society::job::HaulJob;
-use crate::{
-    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
-    TransformComponent,
-};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtDev<'w>(&'w mut EcsWorld);
@@ -39,7 +39,7 @@ impl EcsExtDev<'_> {
             .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
-        info!("giving bag {} to {}", E(bag), E(lucky_holder));
+        info!("giving bag {} to {}", bag, lucky_holder);
 
         inv.give_container(bag);
         self.helpers_comps()
@@ -57,9 +57,7 @@ impl EcsExtDev<'_> {
 
         info!(
             "putting {} into container {} in inventory of {}",
-            E(food),
-            E(bag),
-            E(lucky_holder)
+            food, bag, lucky_holder
         );
 
         container
@@ -82,8 +80,8 @@ impl EcsExtDev<'_> {
 
         info!(
             "forcing {follower} to follow {followee}",
-            follower = E(follower),
-            followee = E(followee)
+            follower = follower,
+            followee = followee
         );
     }
 
@@ -101,7 +99,7 @@ impl EcsExtDev<'_> {
                 {
                     info!(
                         "forcing container to be communal";
-                        "container" => E(*e),
+                        "container" => e,
                         "society" => ?society,
                     );
 
@@ -140,8 +138,8 @@ impl EcsExtDev<'_> {
 
                     info!(
                         "forcing {hauler} to haul {haulee}",
-                        hauler = E(hauler),
-                        haulee = E(haulee);
+                        hauler = hauler,
+                        haulee = haulee;
                         "source" => %from,
                         "target" => %to,
                     );
@@ -216,8 +214,8 @@ impl EcsExtDev<'_> {
 
                 info!(
                     "forcing {hauler} to haul {haulee}",
-                    hauler = E(hauler),
-                    haulee = E(haulee);
+                    hauler = hauler,
+                    haulee = haulee;
                     "source" => %from,
                     "target" => %to,
                 );
@@ -250,7 +248,7 @@ impl EcsExtDev<'_> {
                 info!(
                     "adding society job to haul item to container";
                     "society" => ?society,
-                    "haulee" => E(haulee),
+                    "haulee" => haulee,
                     "container" => %container_pos,
                 );
             },
@@ -268,7 +266,7 @@ impl EcsExtDev<'_> {
 
         info!(
             "forcing {entity} to follow divine command",
-            entity = E(slave);
+            entity = slave;
             "action" => ?action,
         );
 

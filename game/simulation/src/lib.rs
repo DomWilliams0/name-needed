@@ -1,32 +1,8 @@
 #![allow(clippy::type_complexity, clippy::module_inception)]
 
-// Exports from world so the renderer only needs to link against simulation
-pub use world::{
-    block::{BlockType, IntoEnumIterator},
-    loader::{
-        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams,
-        TerrainSourceError, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate,
-    },
-    presets, BaseVertex, SliceRange,
-};
-
-// Rexports for specialised world types
-pub type WorldRef = world::WorldRef<simulation::WorldContext>;
-pub type World = world::World<simulation::WorldContext>;
-pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
-pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
-pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
-
-pub use self::simulation::current_tick;
-pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
-pub use crate::render::{RenderComponent, Renderer, Shape2d};
-pub use crate::simulation::{
-    AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, WorldContext,
-};
-pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{ActivityComponent, EntityLoggingComponent};
 pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentWorld, EcsWorld, Entity, E};
+pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
 pub use item::{
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, InventoryComponent,
     ItemCondition, NameComponent,
@@ -39,6 +15,31 @@ pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,
 };
+// Exports from world so the renderer only needs to link against simulation
+pub use world::{
+    block::{BlockType, IntoEnumIterator},
+    loader::{
+        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams,
+        TerrainSourceError, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate,
+    },
+    presets, BaseVertex, SliceRange,
+};
+
+pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
+pub use crate::render::{RenderComponent, Renderer, Shape2d};
+pub use crate::simulation::{
+    AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, WorldContext,
+};
+pub use crate::transform::{PhysicalComponent, TransformComponent};
+
+pub use self::simulation::current_tick;
+
+// Rexports for specialised world types
+pub type WorldRef = world::WorldRef<simulation::WorldContext>;
+pub type World = world::World<simulation::WorldContext>;
+pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
+pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
+pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 
 pub const TICKS_PER_SECOND: usize = 20;
 

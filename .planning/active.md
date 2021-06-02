@@ -8,4 +8,4 @@
 	* [ ] reduce tree trunk size
 	* [ ] drop a log item
 	* [ ] drop a *stack* of log items
-* [ ] chore: replace direct uses of specs Entity with our own wrapper
+* [X] chore: replace direct uses of specs Entity with our own wrapper

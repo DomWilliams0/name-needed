@@ -1,4 +1,5 @@
 use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable};
+use serde::{Deserialize, Serialize};
 
 use common::*;
 use simulation::input::{
@@ -9,16 +10,14 @@ use simulation::{
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
     InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
-    TransformComponent, E,
+    TransformComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
-
 use crate::render::sdl::ui::windows::{
     with_fake_owned_imstr, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
 };
 use crate::ui_str;
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct SelectionWindow {
@@ -94,7 +93,7 @@ impl SelectionWindow {
 
         context.key_value(
             im_str!("Entity:"),
-            || ui_str!(in context, "{}", E(e)),
+            || ui_str!(in context, "{}", e),
             None,
             COLOR_GREEN,
         );
@@ -386,7 +385,7 @@ impl SelectionWindow {
                 .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
 
             context.text_wrapped(
-                ui_str!(in context, " - {} ({}, vol {})", name, E(entity.entity), entity.volume),
+                ui_str!(in context, " - {} ({}, vol {})", name, entity.entity, entity.volume),
             );
         }
     }
@@ -681,7 +680,7 @@ impl SelectionWindow {
                     || {
                         container
                             .owner
-                            .map(|o| ui_str!(in context, "{}", E(o)))
+                            .map(|o| ui_str!(in context, "{}", o))
                             .unwrap_or(im_str!("No owner"))
                     },
                     None,

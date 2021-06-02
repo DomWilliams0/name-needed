@@ -1,9 +1,12 @@
-use crate::activity::EventUnsubscribeResult;
-use crate::ecs::{Entity, E};
-use crate::event::prelude::*;
-use common::{num_traits::FromPrimitive, *};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+
+use common::{num_traits::FromPrimitive, *};
+
+use crate::activity::EventUnsubscribeResult;
+use crate::ecs::Entity;
+
+use crate::event::prelude::*;
 
 type BitsetInner = u32;
 
@@ -81,7 +84,7 @@ impl EntityEventQueue {
 
         trace!(
             "unsubscribed {subscriber} from {count}",
-            subscriber = E(subscriber),
+            subscriber = subscriber,
             count = removals
         );
         self.needs_cleanup += removals;
@@ -135,7 +138,7 @@ impl EntityEventQueue {
                         0
                     };
                     trace!("dropping {count} events because subject has no subscribers",
-                        count = count; "subject" => E(subject)
+                        count = count; "subject" => subject
                     );
                     continue;
                 }
@@ -157,13 +160,13 @@ impl EntityEventQueue {
 
                     if is_unsubscribed_already {
                         // already unsubscribed, no more events pls
-                        trace!("already unsubscribed, skipping"; "subscriber" => E(*subscriber), "event" => ?event);
+                        trace!("already unsubscribed, skipping"; "subscriber" => subscriber, "event" => ?event);
                         continue;
                     }
 
-                    debug!("passing event"; "subscriber" => E(*subscriber), "event" => ?event);
+                    debug!("passing event"; "subscriber" => subscriber, "event" => ?event);
                     let result = f(*subscriber, event);
-                    trace!("result"; "result" => ?result, "subscriber" => E(*subscriber), "event" => ?event);
+                    trace!("result"; "result" => ?result, "subscriber" => subscriber, "event" => ?event);
 
                     let unsubscription = match result {
                         EventUnsubscribeResult::UnsubscribeAll => None,
@@ -184,7 +187,7 @@ impl EntityEventQueue {
                 None => {
                     debug!(
                         "unsubscribing from all subscriptions";
-                        "unsubscriber" => E(unsubscriber)
+                        "unsubscriber" => unsubscriber
                     );
                     self.unsubscribe_all(unsubscriber)
                 }
@@ -192,7 +195,7 @@ impl EntityEventQueue {
                     debug!(
                         "unsubscribing from specific subscription";
                         "subscription" => ?unsub,
-                        "unsubscriber" => E(unsubscriber)
+                        "unsubscriber" => unsubscriber
                     );
                     self.unsubscribe(unsubscriber, unsub)
                 }
@@ -219,11 +222,11 @@ impl EntityEventQueue {
                 trace!(
                     "subject has {count} subscribers",
                     count = count;
-                    "subject" => E(*subject),
+                    "subject" => subject,
                 );
                 for (subscriber, bitset) in subs {
                     if !bitset.is_empty() {
-                        trace!("subscriptions for {subscriber}", subscriber = E(*subscriber); "subscriptions" => ?bitset);
+                        trace!("subscriptions for {subscriber}", subscriber = *subscriber; "subscriptions" => ?bitset);
                     }
                 }
             }
@@ -321,17 +324,19 @@ impl Debug for BitSet {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use common::once;
+
     use crate::ecs::*;
     use crate::ComponentWorld;
-    use common::once;
+
+    use super::*;
 
     fn make_entities() -> (Entity, Entity) {
         {
             let w = EcsWorld::new();
             let a = w.create_entity().build();
             let b = w.create_entity().build();
-            (a, b)
+            (a.into(), b.into())
         }
     }
 

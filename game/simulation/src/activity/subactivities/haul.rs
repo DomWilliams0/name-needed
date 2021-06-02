@@ -2,11 +2,11 @@ use common::*;
 
 use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
+use crate::ecs::{Entity, WorldExt};
+use crate::{ComponentWorld, InventoryComponent, PhysicalComponent, TransformComponent};
 
-use crate::ecs::{Entity, WorldExt, E};
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
-use crate::{ComponentWorld, InventoryComponent, PhysicalComponent, TransformComponent};
 
 /// Handles holding of an item in the hauler's hands. No moving
 #[derive(Debug)]
@@ -65,7 +65,7 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
                             (haulable.extra_hands, physical.volume, physical.size)
                         }
                         None => {
-                            warn!("item is not haulable"; "item" => E(item));
+                            warn!("item is not haulable"; "item" => item);
                             return Err(HaulError::BadItem);
                         }
                     }
@@ -73,8 +73,8 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
 
                 debug!(
                     "{entity} wants to haul {item} which needs {extra_hands} extra hands",
-                    entity = E(hauler),
-                    item = E(item),
+                    entity = hauler,
+                    item = item,
                     extra_hands = extra_hands
                 );
 
@@ -91,11 +91,11 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
                 // get hauler position if needed
                 let hauler_pos = {
                     let transforms = world.read_storage::<TransformComponent>();
-                    if transforms.get(item).is_some() {
+                    if item.get(&transforms).is_some() {
                         // not needed, item already has a transform
                         None
                     } else {
-                        let transform = transforms.get(hauler).ok_or(HaulError::BadHauler)?;
+                        let transform = hauler.get(&transforms).ok_or(HaulError::BadHauler)?;
                         Some(transform.position)
                     }
                 };
@@ -103,14 +103,14 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
                 // ensure hauler is close enough to haulee
                 if cfg!(debug_assertions) {
                     let transforms = world.read_storage::<TransformComponent>();
-                    let hauler_pos = transforms.get(hauler).unwrap().position;
-                    let haulee_pos = transforms.get(item).unwrap().position;
+                    let hauler_pos = hauler.get(&transforms).unwrap().position;
+                    let haulee_pos = item.get(&transforms).unwrap().position;
 
                     assert!(
                         hauler_pos.is_almost(&haulee_pos, 3.0),
                         "{} is trying to haul {} but they are too far apart (hauler at {}, item at {}, distance is {:?}",
-                        E(hauler),
-                        E(item),
+                        hauler,
+                        item,
                         hauler_pos,
                         haulee_pos,
                         hauler_pos.distance2(haulee_pos).sqrt()
@@ -173,8 +173,8 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
 
             debug!(
                 "{hauler} stopped hauling {item}, removed from {slots} slots",
-                hauler = E(hauler),
-                item = E(item),
+                hauler = hauler,
+                item = item,
                 slots = count;
                 "behaviour" => ?behaviour,
             );
@@ -195,6 +195,6 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
 
 impl Display for HaulSubActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Hauling {}", E(self.thing))
+        write!(f, "Hauling {}", self.thing)
     }
 }

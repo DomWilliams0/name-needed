@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
+
 use common::derive_more::IntoIterator;
 use common::*;
 
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use crate::ecs::world::SpecsWorld;
+use crate::{EcsWorld, Entity};
 
 #[derive(Debug, Error)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -40,6 +43,40 @@ pub trait Value: Debug {
     fn into_float(self) -> Result<f64, ComponentBuildError>;
     fn into_string(self) -> Result<String, ComponentBuildError>;
     fn into_type<T: serde::de::DeserializeOwned>(self) -> Result<T, ComponentBuildError>;
+}
+
+/// Reflection-like functionality through the ui, optionally implemented by components
+/// TODO implement InteractiveComponent for some components
+pub trait InteractiveComponent {
+    fn as_debug(&self) -> Option<&dyn Debug>;
+}
+
+pub enum InteractiveResult<'a> {
+    NonInteractive,
+    Interactive(&'a dyn InteractiveComponent),
+}
+
+pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
+pub type RegisterCompFn = fn(&mut SpecsWorld);
+pub type GetInteractiveFn = fn(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult>;
+
+pub struct ComponentEntry {
+    pub name: &'static str,
+    pub has_comp_fn: HasCompFn,
+    pub register_comp_fn: RegisterCompFn,
+    pub get_interactive_fn: GetInteractiveFn,
+}
+
+inventory::collect!(ComponentEntry);
+
+pub struct ComponentFunctions {
+    has_comp: HasCompFn,
+    get_interactive: GetInteractiveFn,
+}
+
+pub struct ComponentRegistry {
+    // TODO perfect hashing
+    map: HashMap<&'static str, ComponentFunctions>,
 }
 
 impl<V: Value> Map<V> {
@@ -95,5 +132,58 @@ impl<V: Value> Map<V> {
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+}
+
+impl ComponentRegistry {
+    pub fn new(world: &mut SpecsWorld) -> Self {
+        let mut map = HashMap::with_capacity(128);
+        for comp in inventory::iter::<ComponentEntry> {
+            debug!("registering component {:?}", comp.name);
+            let old = map.insert(
+                comp.name,
+                ComponentFunctions {
+                    has_comp: comp.has_comp_fn,
+                    get_interactive: comp.get_interactive_fn,
+                },
+            );
+
+            if old.is_some() {
+                panic!("duplicate component with name {:?}", comp.name)
+            }
+
+            (comp.register_comp_fn)(world);
+        }
+
+        info!("registered {} components", map.len());
+        map.shrink_to_fit();
+        ComponentRegistry { map }
+    }
+
+    pub fn has_component(&self, comp: &str, world: &EcsWorld, entity: Entity) -> bool {
+        match self.map.get(comp) {
+            Some(funcs) => (funcs.has_comp)(world, entity),
+            None => {
+                warn!("looking up non-existent component {:?}", comp);
+                if cfg!(debug_assertions) {
+                    panic!("looking up non-existent component {:?}", comp)
+                }
+                false
+            }
+        }
+    }
+
+    /// Iterates through all known component types and checks each one
+    pub fn all_components_for<'a>(
+        &'a self,
+        world: &'a EcsWorld,
+        entity: Entity,
+    ) -> impl Iterator<Item = (&'static str, Option<&dyn InteractiveComponent>)> + 'a {
+        self.map.iter().filter_map(move |(name, funcs)| {
+            (funcs.get_interactive)(world, entity).map(|res| match res {
+                InteractiveResult::NonInteractive => (*name, None),
+                InteractiveResult::Interactive(i) => (*name, Some(i)),
+            })
+        })
     }
 }

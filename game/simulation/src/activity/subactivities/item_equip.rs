@@ -2,13 +2,14 @@ use common::*;
 
 use crate::activity::activity::{ActivityFinish, ActivityResult, SubActivity};
 use crate::activity::ActivityContext;
-use crate::ecs::{Entity, E};
+use crate::ecs::Entity;
+use crate::ComponentWorld;
+
 use crate::event::prelude::*;
 use crate::item::{
     ContainedInComponent, EndHaulBehaviour, FoundSlot, HauledItemComponent, InventoryComponent,
     ItemFilter,
 };
-use crate::ComponentWorld;
 
 /// Equip the given item, given it's already somewhere in the holder's inventory
 #[derive(Debug)]
@@ -60,7 +61,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
             }
             Some(slot) => {
                 // in inventory but not equipped
-                debug!("found item"; "slot" => ?slot, "item" => E(self.item));
+                debug!("found item"; "slot" => ?slot, "item" => self.item);
 
                 ctx.updates.queue("equip item", move |world| {
                     let mut do_equip = || -> Result<Entity, EquipItemError> {
@@ -126,6 +127,6 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
 
 impl Display for ItemEquipSubActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Equipping {}", E(self.item))
+        write!(f, "Equipping {}", self.item)
     }
 }

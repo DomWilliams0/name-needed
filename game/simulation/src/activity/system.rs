@@ -65,7 +65,9 @@ impl<'a> System<'a> for ActivitySystem {
     ) {
         let mut subscriptions = Vec::new(); // TODO reuse allocation in system
         for (entity, ai, activity, _) in (&entities, &mut ai, &mut activities, !&blocking).join() {
-            log_scope!(o!("system" => "activity", E(entity)));
+            let entity = Entity::from(entity);
+
+            log_scope!(o!("system" => "activity", entity));
             debug!("current activity"; "activity" => &activity.current);
 
             debug_assert!(subscriptions.is_empty());
@@ -88,7 +90,7 @@ impl<'a> System<'a> for ActivitySystem {
 
                 // unsubscribe from all events from previous activity
                 event_queue.unsubscribe_all(entity);
-                comp_updates.remove::<BlockingActivityComponent>(entity);
+                comp_updates.remove::<BlockingActivityComponent>(entity.into());
 
                 // replace current with new activity, dropping the old one
                 activity.current = new_action.into_activity();
@@ -111,7 +113,7 @@ impl<'a> System<'a> for ActivitySystem {
                     event_queue.subscribe(entity, subscriptions.drain(..));
 
                     // mark activity as blocked
-                    comp_updates.insert(entity, BlockingActivityComponent::default());
+                    comp_updates.insert(entity.into(), BlockingActivityComponent::default());
                     debug!("blocking activity");
                 }
 
@@ -132,12 +134,12 @@ impl<'a> System<'a> for ActivitySystem {
 
                     // ensure unblocked and unsubscribed
                     event_queue.unsubscribe_all(entity);
-                    comp_updates.remove::<BlockingActivityComponent>(entity);
+                    comp_updates.remove::<BlockingActivityComponent>(entity.into());
 
                     // interrupt ai and unreserve society task
                     ai.interrupt_current_action(entity, None, || {
-                        society
-                            .get(entity)
+                        entity
+                            .get(&society)
                             .and_then(|soc| societies.society_by_handle_mut(soc.handle))
                             .expect("should have society")
                     });
@@ -180,20 +182,19 @@ impl<'a> System<'a> for ActivityEventSystem {
                 payload: EntityEventPayload::TimerElapsed(token),
             });
 
-            trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
+            trace!("entity timer elapsed"; "subject" => subject, "token" => ?token);
         }
 
         events.consume_events(|subscriber, event| {
-            let activity = match activities
-                .get_mut(subscriber) {
+            let activity = match subscriber.get_mut(&mut activities) {
                 Some(comp) => comp,
                 None => {
-                    warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
+                    warn!("subscriber is missing activity component"; "subscriber" => subscriber, "event" => ?event);
                     return EventUnsubscribeResult::UnsubscribeAll;
                 }
             };
 
-            log_scope!(o!("subscriber" => E(subscriber)));
+            log_scope!(o!("subscriber" => subscriber));
 
             let ctx = ActivityEventContext { subscriber };
             let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
@@ -201,7 +202,7 @@ impl<'a> System<'a> for ActivityEventSystem {
 
             if let EventUnblockResult::Unblock = unblock {
                 // entity is now unblocked
-                updates.remove::<BlockingActivityComponent>(subscriber);
+                updates.remove::<BlockingActivityComponent>(subscriber.into());
             }
 
             unsubscribe
@@ -209,8 +210,7 @@ impl<'a> System<'a> for ActivityEventSystem {
 
             // log all events per subject
             for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
-                let logging = match logging
-                    .get_mut(subject) {
+                let logging = match subject.get_mut(&mut logging) {
                     Some(comp) => comp,
                     None => continue,
                 };
