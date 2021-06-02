@@ -1,6 +1,6 @@
 # Active tasks
 
-* [ ] add raw tree trunk entity (pre-placed for now)
+* [X] add raw tree trunk entity (pre-placed for now)
 * [ ] add saw tool
 * [ ] add simple work item to saw a tree trunk
 	* [ ] saw equip requirement

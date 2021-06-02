@@ -1,4 +1,4 @@
-# TODOs (338)
+# TODOs (341)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -211,11 +211,12 @@
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
  * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
    * `// TODO filters on other fields e.g. mass, size, condition, etc`
- * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (5)
+ * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (6)
    * `// TODO multiple people sharing a haul`
    * `// TODO cart/wagon/vehicle`
    * `// TODO carry vs drag`
-   * `// TODO this is awful and should be generalised to a part of the physics system e.g. relative positioned entity`
+   * `// TODO this is awful and should be generalised with a separate transform child/parent component`
+   * `// TODO also update rotation when hauling`
    * `// TODO position at the correct arm(s) location`
  * [game/simulation/src/item/inventory/component.rs](game/simulation/src/item/inventory/component.rs) (7)
    * `// TODO owner should be handled in the same way as communal i.e. mirror state elsewhere`
@@ -437,8 +438,12 @@
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
+   * `// TODO random pos offset away from the voxel centre`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
+ * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)
+   * `// TODO tree trunk size depends on the tree it came from`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
    * `/// TODO will this work with big endian?`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)
