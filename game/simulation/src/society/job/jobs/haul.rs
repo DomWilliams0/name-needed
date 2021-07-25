@@ -6,6 +6,7 @@ use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
 use crate::job::job::CompletedTasks;
+use crate::job::task::HaulSocietyTask;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -59,7 +60,7 @@ impl HaulJob {
 
 impl SocietyJobImpl for HaulJob {
     fn populate_initial_tasks(&self, _: &EcsWorld, out: &mut Vec<SocietyTask>) {
-        out.push(SocietyTask::Haul(self.entity, self.source, self.target));
+        out.push(SocietyTask::haul(self.entity, self.source, self.target));
     }
 
     fn refresh_tasks(
@@ -155,7 +156,11 @@ impl Display for HaulJob {
         write!(
             f,
             "{}",
-            SocietyTask::Haul(self.entity, self.source, self.target)
+            HaulSocietyTask {
+                item: self.entity,
+                src: self.source,
+                dst: self.target,
+            },
         )
     }
 }
