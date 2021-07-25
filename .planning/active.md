@@ -2,7 +2,6 @@
 
 * [X] add raw tree trunk entity (pre-placed for now)
 * [ ] add saw tool
-* [.] spatial lookup of work items
 * [ ] add simple work item to saw a tree trunk
 	* [ ] saw equip requirement
 	* [ ] sawing job(s) produced

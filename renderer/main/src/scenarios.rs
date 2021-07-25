@@ -1,6 +1,5 @@
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::work_item::{Location, TreeLogCuttingWorkItem, WorkItem};
 use simulation::{
     ActivityComponent, AiAction, ComponentWorld, EcsWorld, PlayerSociety, Societies,
     TransformComponent,
@@ -143,25 +142,26 @@ fn log_cutting(ecs: &mut EcsWorld) {
             .component_mut::<ActivityComponent>(human)
             .expect("no activity");
 
-        let location = {
-            let pos = ecs
-                .component::<TransformComponent>(trunk)
-                .expect("no trunk transform")
-                .position;
-            // TODO work item should encompass full trunk
-            let point = geo::Point::new(pos.x(), pos.y());
-            Location::new(point, pos.z())
-        };
-        let work_item = society
-            .work_items_mut()
-            .add(WorkItem::new(location, TreeLogCuttingWorkItem::default()));
-
-        activity.interrupt_with_new_activity(
-            AiAction::GoWorkOnWorkItem(work_item),
-            None,
-            human,
-            ecs,
-        );
+        // TODO
+        // let location = {
+        //     let pos = ecs
+        //         .component::<TransformComponent>(trunk)
+        //         .expect("no trunk transform")
+        //         .position;
+        //     // TODO work item should encompass full trunk
+        //     let point = geo::Point::new(pos.x(), pos.y());
+        //     Location::new(point, pos.z())
+        // };
+        // let work_item = society
+        //     .work_items_mut()
+        //     .add(WorkItem::new(location, TreeLogCuttingWorkItem::default()));
+        //
+        // activity.interrupt_with_new_activity(
+        //     AiAction::GoWorkOnWorkItem(work_item),
+        //     None,
+        //     human,
+        //     ecs,
+        // );
     }
 }
 

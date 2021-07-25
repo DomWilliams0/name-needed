@@ -27,7 +27,7 @@ enum PickupItemsState {
 
 #[derive(Debug)]
 pub struct PickupItemsActivity {
-    items: Vec<(Entity, WorldPoint)>,
+    items: Vec<(Entity, WorldPoint)>, // TODO smallvec
     item_desc: Cow<'static, str>,
     state: PickupItemsState,
     last_error: Option<PickupFailure>,

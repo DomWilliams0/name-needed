@@ -6,7 +6,6 @@ pub use go_pickup::PickupItemsActivity;
 pub use go_to::GoToActivity;
 pub use nop::NopActivity;
 pub use wander::WanderActivity;
-pub use work_item::WorkOnWorkItemActivity;
 
 mod eat_held_item;
 mod follow;
@@ -16,6 +15,5 @@ mod go_pickup;
 mod go_to;
 mod nop;
 mod wander;
-mod work_item;
 
 // TODO helpers for GoToThen, EquipItemThen, etc

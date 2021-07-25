@@ -9,7 +9,6 @@ use crate::ecs::{EcsWorld, Entity};
 use crate::ComponentWorld;
 
 use crate::item::HaulableItemComponent;
-use crate::society::work_item::WorkItemRef;
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
@@ -24,7 +23,6 @@ pub enum SocietyTask {
     BreakBlock(WorldPosition),
     /// Boxed as this variant is much larger than the rest
     Haul(Box<HaulSocietyTask>),
-    WorkOnWorkItem(WorkItemRef),
 }
 
 impl SocietyTask {
@@ -72,18 +70,16 @@ impl SocietyTask {
                     destination: pos,
                 })
             }
-            WorkOnWorkItem(h) => todo!(), // TODO
         }
     }
 
-    /// TODO add limit on number of shares
     pub fn is_shareable(&self) -> bool {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
-            Haul(_) | WorkOnWorkItem(_) => false,
+            Haul(_)=> false,
         }
     }
 }
@@ -94,7 +90,6 @@ impl Display for SocietyTask {
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
             Haul(haul) => Display::fmt(haul, f),
-            WorkOnWorkItem(wi) => write!(f, "Work on {}", wi),
         }
     }
 }

@@ -45,10 +45,6 @@ mod action_to_activity {
                     activity!(HaulActivity::new(thing, source, target))
                 }
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
-                // TODO work item activity
-                AiAction::GoWorkOnWorkItem(wi) => {
-                    activity!(GoToActivity::new(wi.borrow().nearby(), "work item"))
-                }
             }
         }
     }

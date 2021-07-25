@@ -3,7 +3,6 @@ use unit::world::{WorldPoint, WorldPosition};
 use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
 use crate::item::ItemsToPickUp;
-use crate::society::work_item::WorkItemRef;
 use std::convert::TryInto;
 
 // TODO speed should be specified as an enum for all go??? actions
@@ -37,9 +36,6 @@ pub enum AiAction {
 
     /// Haul the entity from the source to the destination target
     Haul(Entity, HaulTarget, HaulTarget),
-
-    /// TODO
-    GoWorkOnWorkItem(WorkItemRef),
 }
 
 impl Default for AiAction {
@@ -72,7 +68,6 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
                 item: *e,
                 dest: *tgt,
             },
-            AiAction::GoWorkOnWorkItem(_) => return Err(()), // TODO
         }))
     }
 }
