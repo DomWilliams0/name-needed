@@ -137,7 +137,7 @@ fn log_cutting(ecs: &mut EcsWorld) {
     if let Some(human) = humans.first().copied() {
         let society = ecs
             .resource_mut::<Societies>()
-            .society_by_handle_mut(society)
+            .society_by_handle(society)
             .expect("bad society");
         let activity = ecs
             .component_mut::<ActivityComponent>(human)

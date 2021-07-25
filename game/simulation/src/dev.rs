@@ -240,7 +240,7 @@ impl EcsExtDev<'_> {
 
                 world
                     .resource_mut::<Societies>()
-                    .society_by_handle_mut(society)
+                    .society_by_handle(society)
                     .expect("bad society")
                     .jobs_mut()
                     .submit(SocietyJob::create(world, job));

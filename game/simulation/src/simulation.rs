@@ -336,7 +336,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     };
 
-                    let society = match self.societies().society_by_handle_mut(society) {
+                    let society = match self.societies().society_by_handle(society) {
                         Some(s) => s,
                         None => {
                             warn!("invalid society while issuing job"; "society" => ?society, "job" => ?job);

@@ -31,7 +31,7 @@ macro_rules! ensure_handle {
 
 impl Societies {
     pub fn new_society(&mut self, name: String) -> Option<SocietyHandle> {
-        if self.society_by_name_mut(&name).is_some() {
+        if self.society_by_name(&name).is_some() {
             return None;
         }
 
@@ -44,9 +44,9 @@ impl Societies {
         Some(handle)
     }
 
-    pub fn society_by_name_mut(&mut self, name: &str) -> Option<&mut Society> {
+    pub fn society_by_name(&mut self, name: &str) -> Option<&Society> {
         self.registry
-            .iter_mut()
+            .iter()
             .find(|(_, s)| s.name() == name)
             .map(|(handle, society)| ensure_handle!(society, *handle))
     }

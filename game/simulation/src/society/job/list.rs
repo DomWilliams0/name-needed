@@ -138,12 +138,12 @@ impl SocietyJobList {
     /// Quadratic complexity (n total tasks * m total reserved tasks)
     pub fn iter_all(
         &self,
-        mut per_job: impl FnMut(&SocietyJobRef) -> bool,
+        mut job_filter: impl FnMut(&SocietyJobRef) -> bool,
         mut per_task: impl FnMut(&SocietyTask, &SmallVec<[Entity; 3]>),
     ) {
         let mut reservers = SmallVec::new();
         for job in self.jobs.iter() {
-            if !per_job(job) {
+            if !job_filter(job) {
                 continue;
             }
 

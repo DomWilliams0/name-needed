@@ -44,7 +44,7 @@ impl<'a> System<'a> for ActivitySystem {
         Read<'a, EcsWorldFrameRef>,
         Read<'a, QueuedUpdates>,
         Read<'a, LazyUpdate>,
-        Write<'a, Societies>,
+        Read<'a, Societies>,
         Write<'a, EntityEventQueue>,
     );
 
@@ -59,7 +59,7 @@ impl<'a> System<'a> for ActivitySystem {
             world,
             updates,
             comp_updates,
-            mut societies,
+            societies,
             mut event_queue,
         ): Self::SystemData,
     ) {
@@ -137,12 +137,10 @@ impl<'a> System<'a> for ActivitySystem {
                     comp_updates.remove::<BlockingActivityComponent>(entity.into());
 
                     // interrupt ai and unreserve society task
-                    ai.interrupt_current_action(entity, None, || {
-                        entity
-                            .get(&society)
-                            .and_then(|soc| societies.society_by_handle_mut(soc.handle))
-                            .expect("should have society")
-                    });
+                    let society = entity
+                        .get(&society)
+                        .and_then(|soc| societies.society_by_handle(soc.handle));
+                    ai.interrupt_current_action(entity, None, society);
 
                     // next tick ai should return a new decision rather than unchanged to avoid
                     // infinite Nop loops
