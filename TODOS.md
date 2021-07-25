@@ -1,4 +1,4 @@
-# TODOs (356)
+# TODOs (357)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -318,7 +318,8 @@
    * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/society/work_item/spatial.rs](game/simulation/src/society/work_item/spatial.rs) (1)
    * `// TODO consider rtree params`
- * [game/simulation/src/society/work_item/work_item.rs](game/simulation/src/society/work_item/work_item.rs) (1)
+ * [game/simulation/src/society/work_item/work_item.rs](game/simulation/src/society/work_item/work_item.rs) (2)
+   * `/// TODO filter accessible/nearest to a given point`
    * `// TODO return option instead of asserts`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
    * `// TODO reimplement with octree`

@@ -5,6 +5,7 @@ use crate::job::SocietyTaskResult;
 use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
+use crate::job::job::CompletedTasks;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -65,20 +66,24 @@ impl SocietyJobImpl for HaulJob {
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        mut completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
         debug_assert!(tasks.len() <= 1);
 
-        // apply completion
-        if let Some((task, result)) = completions.next() {
-            debug!("haul task completed"; "task" => ?task, "result" => ?result);
-            debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
+        assert!(
+            completions.len() <= 1,
+            "single completion expected but got {}",
+            completions.len()
+        );
 
-            // ensure no more
-            assert!(completions.next().is_none(), "single completion expected");
+        // apply completion
+        if let Some((task, result)) = completions.get_mut(0) {
+            debug!("haul task completed"; "task" => ?task, "result" => ?result);
+            debug_assert_eq!(tasks.get(0), Some(&*task), "unexpected completion");
 
             // end job regardless of success or failure
             // TODO depends on error type?
+            let result = std::mem::replace(result, SocietyTaskResult::Success);
             return Some(result);
         }
 

@@ -1,5 +1,5 @@
 use crate::ecs::EcsWorld;
-use crate::job::job::SocietyJobImpl;
+use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::SocietyTask;
 use crate::{BlockType, ComponentWorld, InnerWorldRef, WorldPositionRange, WorldRef};
@@ -27,13 +27,13 @@ impl SocietyJobImpl for BreakBlocksJob {
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
         // obtain world ref lazily only once
         let mut voxel_world = LazyWorldRef::new(world);
 
         tasks.retain(|task| {
-            if completions.as_slice().iter().any(|(t, _)| t == task) {
+            if completions.iter().any(|(t, _)| t == task) {
                 // task completed, remove it
                 false
             } else {

@@ -1,4 +1,4 @@
-use crate::job::job::SocietyJobImpl;
+use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::{SocietyTask, SocietyTaskResult};
 use crate::society::work_item::WorkItemRef;
 use crate::EcsWorld;
@@ -17,12 +17,10 @@ impl SocietyJobImpl for WorkOnWorkItemJob {
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
         // TODO check work item dependencies
         // TODO manage completions
-        completions.for_each(|_| {});
-
         // TODO remove when complete
         None
     }

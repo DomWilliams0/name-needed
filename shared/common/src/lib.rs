@@ -17,7 +17,7 @@ pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
 pub use rstar;
-pub use smallvec::*;
+pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
 
 pub use lazy_static::lazy_static;

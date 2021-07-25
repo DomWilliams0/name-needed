@@ -13,7 +13,7 @@ pub struct SocietyJob {
     /// Tasks still in progress
     tasks: Vec<SocietyTask>,
 
-    pending_complete: Vec<(SocietyTask, SocietyTaskResult)>,
+    pending_complete: SmallVec<[(SocietyTask, SocietyTaskResult); 1]>,
 
     // TODO remove box and make this type unsized, it's in an rc anyway
     inner: Box<dyn SocietyJobImpl>,
@@ -30,6 +30,8 @@ pub enum SocietyTaskResult {
 #[derive(Clone)]
 pub struct SocietyJobRef(Rc<RwLock<SocietyJob>>);
 
+pub(in crate::society::job) type CompletedTasks<'a> = &'a mut [(SocietyTask, SocietyTaskResult)];
+
 pub trait SocietyJobImpl: Display + Debug {
     /// [refresh] will be called after this before any tasks are dished out, so this can eagerly add
     /// tasks without filtering.
@@ -37,14 +39,15 @@ pub trait SocietyJobImpl: Display + Debug {
     /// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)
     fn populate_initial_tasks(&self, world: &EcsWorld, out: &mut Vec<SocietyTask>);
 
-    /// Update `tasks` and apply `completions`.
+    /// Update `tasks` and apply `completions`. Completions are considered owned by this method, as
+    /// the underlying container will be cleared on return, so feel free to move results out.
     /// Return None if ongoing.
     /// If 0 tasks are left this counts as a success.
     fn refresh_tasks(
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult>;
 }
 
@@ -89,7 +92,7 @@ impl SocietyJob {
 
         SocietyJobRef(Rc::new(RwLock::new(SocietyJob {
             tasks,
-            pending_complete: Vec::new(),
+            pending_complete: SmallVec::new(),
             inner: Box::new(job),
         })))
     }
@@ -98,8 +101,9 @@ impl SocietyJob {
         &mut self,
         world: &EcsWorld,
     ) -> Option<SocietyTaskResult> {
-        self.inner
-            .refresh_tasks(world, &mut self.tasks, self.pending_complete.drain(..))
+        let ret = self
+            .inner
+            .refresh_tasks(world, &mut self.tasks, &mut self.pending_complete)
             .or_else(|| {
                 if self.tasks.is_empty() {
                     // no tasks left and no specific result returned
@@ -107,7 +111,10 @@ impl SocietyJob {
                 } else {
                     None
                 }
-            })
+            });
+
+        self.pending_complete.clear();
+        ret
     }
 
     pub fn tasks(&self) -> impl Iterator<Item = &SocietyTask> + '_ {
