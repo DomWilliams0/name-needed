@@ -6,8 +6,8 @@ use imgui::{
     ImStr, TabBar, TabBarFlags, TabBarToken, TabItem, TabItemToken, TreeNode, TreeNodeToken, Ui,
 };
 use std::cell::RefCell;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
-use std::ptr::null;
 
 /// Context for a single frame. Provides communication to the game
 pub struct UiContext<'ctx> {
@@ -108,9 +108,10 @@ impl<T: UiGuardable> UiGuard<T> {
 impl<T: UiGuardable> Drop for UiGuard<T> {
     fn drop(&mut self) {
         if let Some(inner) = self.0.take() {
+            let null_ui = MaybeUninit::<Ui>::uninit();
             // safety: implementation guarantees this is unused
-            let null_ui = unsafe { &*null() };
-            inner.end(null_ui);
+            let null_ui = ManuallyDrop::new(unsafe { null_ui.assume_init() });
+            inner.end(&null_ui);
         }
     }
 }

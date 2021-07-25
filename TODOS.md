@@ -161,7 +161,7 @@
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
-   * `// TODO shorter haul distance should be more desirable`
+   * `// TODO consider distance to source too`
  * [game/simulation/src/ai/dse/work.rs](game/simulation/src/ai/dse/work.rs) (1)
    * `// TODO actual considerations`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
