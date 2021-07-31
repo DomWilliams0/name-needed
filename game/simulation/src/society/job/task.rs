@@ -79,7 +79,7 @@ impl SocietyTask {
             BreakBlock(_) => true,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
-            Haul(_)=> false,
+            Haul(_) => false,
         }
     }
 }

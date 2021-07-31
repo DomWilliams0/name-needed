@@ -338,7 +338,7 @@ impl Planet {
         &self,
         chunks: impl Iterator<Item = ChunkLocation>,
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        mut per_point: impl FnMut(u64, WorldPosition),
+        mut per_point: impl FnMut(usize, WorldPosition),
     ) {
         let inner = self.0.read().await;
         for region in chunks

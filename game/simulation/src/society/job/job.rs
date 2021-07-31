@@ -8,16 +8,15 @@ use std::convert::TryFrom;
 use std::ops::Deref;
 use std::rc::Rc;
 
-/// A high-level society job that produces a number of [SocietyTask]s
-pub struct SocietyJob {
+/// A high-level society job that produces a number of [SocietyTask]s. Unsized but it lives in an
+/// Rc anyway
+pub struct SocietyJob<J: ?Sized = dyn SocietyJobImpl> {
     /// Tasks still in progress
     tasks: Vec<SocietyTask>,
 
     pending_complete: SmallVec<[(SocietyTask, SocietyTaskResult); 1]>,
 
-    // TODO remove box and make this type unsized, it's in an rc anyway
-    inner: Box<dyn SocietyJobImpl>,
-    // TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them
+    inner: J,
 }
 
 #[derive(Debug)]
@@ -85,7 +84,7 @@ impl SocietyCommand {
     }
 }
 
-impl SocietyJob {
+impl SocietyJob<dyn SocietyJobImpl> {
     pub fn create(world: &EcsWorld, job: impl SocietyJobImpl + 'static) -> SocietyJobRef {
         let mut tasks = Vec::new();
         job.populate_initial_tasks(world, &mut tasks);
@@ -93,7 +92,7 @@ impl SocietyJob {
         SocietyJobRef(Rc::new(RwLock::new(SocietyJob {
             tasks,
             pending_complete: SmallVec::new(),
-            inner: Box::new(job),
+            inner: job,
         })))
     }
 
@@ -126,7 +125,7 @@ impl SocietyJob {
     }
 
     pub fn inner(&self) -> &dyn SocietyJobImpl {
-        &*self.inner
+        &self.inner
     }
 }
 
@@ -151,7 +150,7 @@ impl Debug for SocietyJobRef {
             Some(job) => write!(
                 f,
                 "{:?} | {} tasks: {:?})",
-                job.inner,
+                &job.inner,
                 job.tasks.len(),
                 job.tasks
             ),
@@ -171,7 +170,7 @@ impl Display for SocietyJobRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self.0.try_read() {
             None => write!(f, "<locked>)"),
-            Some(job) => write!(f, "{} ({} tasks)", job.inner, job.tasks.len()),
+            Some(job) => write!(f, "{} ({} tasks)", &job.inner, job.tasks.len()),
         }
     }
 }

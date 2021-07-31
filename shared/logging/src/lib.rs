@@ -27,7 +27,7 @@ pub mod prelude {
 
 #[macro_export]
 macro_rules! slog_value_debug {
-    ($ty:ident) => {
+    ($ty:ty) => {
         impl $crate::prelude::slog::Value for $ty {
             fn serialize(
                 &self,
@@ -43,7 +43,7 @@ macro_rules! slog_value_debug {
 
 #[macro_export]
 macro_rules! slog_kv_debug {
-    ($ty:ident, $key:expr) => {
+    ($ty:ty, $key:expr) => {
         impl $crate::prelude::slog::KV for $ty {
             fn serialize(
                 &self,
@@ -58,7 +58,7 @@ macro_rules! slog_kv_debug {
 
 #[macro_export]
 macro_rules! slog_value_display {
-    ($ty:ident) => {
+    ($ty:ty) => {
         impl $crate::prelude::slog::Value for $ty {
             fn serialize(
                 &self,
@@ -74,7 +74,7 @@ macro_rules! slog_value_display {
 
 #[macro_export]
 macro_rules! slog_kv_display {
-    ($ty:ident, $key:expr) => {
+    ($ty:ty, $key:expr) => {
         impl $crate::prelude::slog::KV for $ty {
             fn serialize(
                 &self,

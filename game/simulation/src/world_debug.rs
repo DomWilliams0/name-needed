@@ -43,7 +43,7 @@ impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
 
 struct Frame<'a> {
     cache: &'a mut Vec<FeatureLine>,
-    last: Option<(u64, WorldPoint)>,
+    last: Option<(usize, WorldPoint)>,
     color: ColorRgb,
     this_frame_idx: usize,
 }
@@ -59,7 +59,7 @@ impl<'a> Frame<'a> {
         }
     }
 
-    fn submit(&mut self, feat: u64, point: impl Into<WorldPoint>) {
+    fn submit(&mut self, feat: usize, point: impl Into<WorldPoint>) {
         let point = point.into();
         let mut new_color = true;
         if let Some((last_feat, last)) = self.last {
@@ -73,7 +73,7 @@ impl<'a> Frame<'a> {
             // calculate unique color for feature that hopefully doesn't clash with others
             let feat_hash = {
                 let mut hasher = ahash::AHasher::new_with_keys(123, 456);
-                hasher.write_u64(feat);
+                hasher.write_usize(feat);
                 hasher.finish()
             };
 

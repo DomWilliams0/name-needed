@@ -1,4 +1,4 @@
-# TODOs (348)
+# TODOs (344)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -49,8 +49,7 @@
    * `// TODO every thread returns the same pathbuf`
  * [game/procgen/src/rasterize.rs](game/procgen/src/rasterize.rs) (1)
    * `// TODO custom block types for procgen that are translated to game blocks`
- * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (6)
-   * `// TODO make this struct a dst and store trait object inline without extra indirection`
+ * [game/procgen/src/region/feature.rs](game/procgen/src/region/feature.rs) (5)
    * `// TODO ensure these are optimised out`
    * `// TODO this only serves as an assert - revisit the need to merge non-rasterised features`
    * `// TODO give each feature a guid instead`
@@ -83,9 +82,8 @@
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
- * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (7)
    * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
-   * `// TODO inline dyn subfeature or use pooled allocation`
    * `// TODO use dynstack here`
    * `// TODO reuse borrowed vec allocation`
    * `/// TODO handle case where block is multiple slabs over from root slab`
@@ -286,9 +284,7 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (4)
-   * `// TODO remove box and make this type unsized, it's in an rc anyway`
-   * `// TODO weak references to other jobs that act as dependencies to this one, to enable/cancel them`
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (2)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
    * `// TODO return a dyn error in result`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (2)

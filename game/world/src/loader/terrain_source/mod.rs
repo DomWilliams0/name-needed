@@ -114,7 +114,7 @@ impl TerrainSource {
         &self,
         chunks: impl Iterator<Item = ChunkLocation>,
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        per_point: impl FnMut(u64, WorldPosition),
+        per_point: impl FnMut(usize, WorldPosition),
     ) {
         match self {
             TerrainSource::Memory(_) => {}
