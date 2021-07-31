@@ -18,6 +18,7 @@ pub use self::world::{ComponentGetError, ComponentWorld, EcsWorld, EcsWorldFrame
 
 mod component;
 mod entity;
+mod tag;
 mod template;
 mod world;
 mod world_ext;

@@ -1,8 +1,7 @@
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
 use simulation::{
-    ActivityComponent, AiAction, ComponentWorld, EcsWorld, PlayerSociety, Societies,
-    TransformComponent,
+    ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies, TransformComponent,
 };
 
 pub type Scenario = fn(&mut EcsWorld);
@@ -129,6 +128,12 @@ fn log_cutting(ecs: &mut EcsWorld) {
 
     let trunk = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
         helpers::new_entity("core_tree_trunk", ecs, pos)
+            .with_condition(NormalizedFloat::one())
+            .thanks()
+    })[0];
+
+    let saw = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
+        helpers::new_entity("core_saw", ecs, pos)
             .with_condition(NormalizedFloat::one())
             .thanks()
     })[0];

@@ -1,4 +1,4 @@
-# TODOs (347)
+# TODOs (348)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -193,6 +193,8 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
+ * [game/simulation/src/ecs/tag.rs](game/simulation/src/ecs/tag.rs) (1)
+   * `// TODO intern these strings`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)

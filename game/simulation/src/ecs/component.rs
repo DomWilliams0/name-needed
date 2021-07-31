@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use common::derive_more::IntoIterator;
 use common::*;
 
 use crate::ecs::world::SpecsWorld;
@@ -31,9 +30,18 @@ pub enum ComponentBuildError {
     // TODO should be a Box<dyn Error>
     #[error("Template error: {0}")]
     TemplateSpecific(String),
+
+    #[error("Expected lowercase string but got {0:?}")]
+    NotLowercase(String),
+
+    #[error("Percentage should be 0-100 but is {0}")]
+    BadPercentage(i64),
+
+    #[error("Unexpected tag value {0:?}")]
+    UnexpectedTagValue(String),
 }
 
-#[derive(Debug, IntoIterator)]
+#[derive(Debug)]
 pub struct Map<V: Value> {
     map: HashMap<String, V>,
 }
@@ -42,6 +50,10 @@ pub trait Value: Debug {
     fn into_int(self) -> Result<i64, ComponentBuildError>;
     fn into_float(self) -> Result<f64, ComponentBuildError>;
     fn into_string(self) -> Result<String, ComponentBuildError>;
+    fn into_unit(self) -> Result<(), ComponentBuildError>;
+
+    fn as_unit(&self) -> Result<(), ComponentBuildError>;
+    fn as_int(&self) -> Result<i64, ComponentBuildError>;
     fn into_type<T: serde::de::DeserializeOwned>(self) -> Result<T, ComponentBuildError>;
 }
 
@@ -132,6 +144,26 @@ impl<V: Value> Map<V> {
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &V)> + '_ {
+        self.map.iter()
+    }
+
+    /// Only use for free-form structures where all keys are valid
+    pub fn take(&mut self) -> Self {
+        Self {
+            map: std::mem::take(&mut self.map),
+        }
+    }
+}
+
+impl<V: Value> IntoIterator for Map<V> {
+    type Item = (String, V);
+    type IntoIter = std::collections::hash_map::IntoIter<String, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.into_iter()
     }
 }
 
