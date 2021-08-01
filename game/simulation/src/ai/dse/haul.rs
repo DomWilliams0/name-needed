@@ -26,7 +26,7 @@ impl Dse<AiContext> for HaulDse {
                 self.thing,
             )),
             AiBox::new(MyProximityToConsideration {
-                target: self.destination.floor(),
+                target: self.destination,
                 max_distance: 5000.0, // squared
             }),
             // TODO consider distance to source too

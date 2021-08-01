@@ -1,11 +1,11 @@
 use crate::ai::{AiContext, AiInput};
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::input::BlockTypeMatch;
 
 pub struct MyProximityToConsideration {
-    pub target: WorldPosition,
+    pub target: WorldPoint,
 
     /// Anything further than this radius is 0.0
     pub max_distance: f32,
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn proximity_consideration() {
         let c = MyProximityToConsideration {
-            target: (0, 0, 0).into(),
+            target: WorldPoint::new_unchecked(0.0, 0.0, 0.0),
             max_distance: 5.0,
         };
 

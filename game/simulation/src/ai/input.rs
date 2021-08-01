@@ -33,8 +33,8 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
-    /// Distance squared to given pos. Can't be WorldPoint because needs to be Hash
-    MyDistance2To(WorldPosition),
+    /// Distance squared to given pos
+    MyDistance2To(WorldPoint),
 
     BlockTypeMatches(WorldPosition, BlockTypeMatch),
 }
@@ -67,10 +67,7 @@ impl ai::Input<AiContext> for AiInput {
                 max_count,
             } => search_local_area_with_cache(blackboard, filter, *max_radius, *max_count),
 
-            AiInput::MyDistance2To(pos) => {
-                let target = pos.centred();
-                blackboard.position.distance2(target)
-            }
+            AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
             AiInput::BlockTypeMatches(pos, bt_match) => {
                 let world = blackboard.world.voxel_world();
                 let block_type = world

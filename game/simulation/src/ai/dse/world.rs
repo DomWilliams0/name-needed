@@ -18,7 +18,7 @@ impl Dse<AiContext> for BreakBlockDse {
             // TODO calculate path and use length, cache path which can be reused by movement system
             // TODO has the right tool/is the right tool nearby/close enough in society storage
             AiBox::new(MyProximityToConsideration {
-                target: self.0,
+                target: self.0.centred(),
                 max_distance: 400.0,
             }),
             AiBox::new(BlockTypeMatchesConsideration(

@@ -1,24 +1,42 @@
 use std::convert::TryFrom;
 use std::ops::{Add, AddAssign, Sub};
 
-use common::derive_more::*;
-
-use common::{Display, FmtResult, Formatter, Point3, Vector2, Vector3};
+use common::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
+use std::fmt::Debug;
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
-#[derive(Debug, Copy, Clone, PartialEq, Default, Into, From, PartialOrd)]
-pub struct WorldPoint(f32, f32, f32);
+#[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
+pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
+
+#[inline]
+fn not_nan(x: f32) -> Option<NotNan<f32>> {
+    if x.is_finite() {
+        // safety: is_finite includes nan check
+        Some(unsafe { NotNan::new_unchecked(x) })
+    } else {
+        None
+    }
+}
+
+/// xyz must be finite
+unsafe fn new_xyz(x: f32, y: f32, z: f32) -> WorldPoint {
+    debug_assert!(WorldPoint::new(x, y, z).is_some());
+    WorldPoint(
+        NotNan::new_unchecked(x),
+        NotNan::new_unchecked(y),
+        NotNan::new_unchecked(z),
+    )
+}
 
 impl WorldPoint {
     /// None if any coord is not finite
     pub fn new(x: f32, y: f32, z: f32) -> Option<Self> {
-        if x.is_finite() && y.is_finite() && z.is_finite() {
-            Some(Self(x, y, z))
-        } else {
-            None
+        match (not_nan(x), not_nan(y), not_nan(z)) {
+            (Some(x), Some(y), Some(z)) => Some(Self(x, y, z)),
+            _ => None,
         }
     }
 
@@ -28,34 +46,37 @@ impl WorldPoint {
     }
 
     pub fn slice(&self) -> GlobalSliceIndex {
-        GlobalSliceIndex::new(self.2 as i32)
+        GlobalSliceIndex::new(self.z() as i32)
     }
 
     pub fn floored(&self) -> Self {
-        Self(self.0.floor(), self.1.floor(), self.2.floor())
+        let (x, y, z) = (self.x().floor(), self.y().floor(), self.z().floor());
+
+        // safety: non-nan.floor() != nan
+        unsafe { new_xyz(x, y, z) }
     }
 
     pub fn floor(&self) -> WorldPosition {
         WorldPosition(
-            self.0.floor() as i32,
-            self.1.floor() as i32,
-            GlobalSliceIndex::new(self.2.floor() as i32),
+            self.x().floor() as i32,
+            self.y().floor() as i32,
+            GlobalSliceIndex::new(self.z().floor() as i32),
         )
     }
 
     pub fn ceil(&self) -> WorldPosition {
         WorldPosition(
-            self.0.ceil() as i32,
-            self.1.ceil() as i32,
-            GlobalSliceIndex::new(self.2.ceil() as i32),
+            self.x().ceil() as i32,
+            self.y().ceil() as i32,
+            GlobalSliceIndex::new(self.z().ceil() as i32),
         )
     }
 
     pub fn round(&self) -> WorldPosition {
         WorldPosition(
-            self.0.round() as i32,
-            self.1.round() as i32,
-            GlobalSliceIndex::new(self.2.round() as i32),
+            self.x().round() as i32,
+            self.y().round() as i32,
+            GlobalSliceIndex::new(self.z().round() as i32),
         )
     }
 
@@ -70,59 +91,61 @@ impl WorldPoint {
         (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2) + (self.2 - other.2).powi(2)
     }
 
-    pub const fn xyz(&self) -> (f32, f32, f32) {
-        (self.0, self.1, self.2)
+    #[inline]
+    pub fn xyz(&self) -> (f32, f32, f32) {
+        (self.x(), self.y(), self.z())
     }
 
-    pub const fn x(&self) -> f32 {
-        self.0
+    #[inline]
+    pub fn x(&self) -> f32 {
+        self.0.into_inner()
     }
 
-    pub const fn y(&self) -> f32 {
-        self.1
+    #[inline]
+    pub fn y(&self) -> f32 {
+        self.1.into_inner()
     }
 
-    pub const fn z(&self) -> f32 {
-        self.2
+    #[inline]
+    pub fn z(&self) -> f32 {
+        self.2.into_inner()
     }
 
     /// Panics if new value is not finite
     pub fn modify_z(&mut self, f: impl FnOnce(f32) -> f32) {
-        let new_z = f(self.2);
-        assert!(new_z.is_finite());
-        self.2 = new_z;
+        let new_z = f(self.2.into_inner());
+        self.2 = not_nan(new_z).expect("new value is not finite");
     }
 
     /// Panics if new value is not finite
     pub fn modify_x(&mut self, f: impl FnOnce(f32) -> f32) {
-        let new_x = f(self.0);
-        assert!(new_x.is_finite());
-        self.0 = new_x;
+        let new_x = f(self.2.into_inner());
+        self.0 = not_nan(new_x).expect("new value is not finite");
     }
 }
 
 impl From<WorldPoint> for Vector3 {
     fn from(p: WorldPoint) -> Self {
         Vector3 {
-            x: p.0,
-            y: p.1,
-            z: p.2,
+            x: p.x(),
+            y: p.y(),
+            z: p.z(),
         }
     }
 }
 
 impl From<WorldPoint> for Vector2 {
     fn from(p: WorldPoint) -> Self {
-        Vector2 { x: p.0, y: p.1 }
+        Vector2 { x: p.x(), y: p.y() }
     }
 }
 
 impl From<WorldPoint> for Point3 {
     fn from(p: WorldPoint) -> Self {
         Point3 {
-            x: p.0,
-            y: p.1,
-            z: p.2,
+            x: p.x(),
+            y: p.y(),
+            z: p.z(),
         }
     }
 }
@@ -151,7 +174,14 @@ impl AddAssign<Vector2> for WorldPoint {
 impl From<WorldPoint> for [f32; 3] {
     fn from(p: WorldPoint) -> Self {
         let WorldPoint(x, y, z) = p;
-        [x, y, z]
+        [x.into_inner(), y.into_inner(), z.into_inner()]
+    }
+}
+
+impl From<WorldPoint> for (f32, f32, f32) {
+    fn from(p: WorldPoint) -> Self {
+        let WorldPoint(x, y, z) = p;
+        (x.into_inner(), y.into_inner(), z.into_inner())
     }
 }
 
@@ -213,10 +243,23 @@ impl Sub for WorldPoint {
 
 impl From<ViewPoint> for WorldPoint {
     fn from(pos: ViewPoint) -> Self {
-        // guaranteed valid coords from viewpoint
         let (x, y, z) = pos.xyz();
-        const SCALE: f32 = BLOCKS_PER_METRE as f32;
-        Self(x * SCALE, y * SCALE, z * SCALE)
+
+        // safety: guaranteed valid coords from viewpoint
+        unsafe {
+            const SCALE: f32 = BLOCKS_PER_METRE as f32;
+            new_xyz(x * SCALE, y * SCALE, z * SCALE)
+        }
+    }
+}
+
+impl Debug for WorldPoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("WorldPoint")
+            .field(&self.x())
+            .field(&self.y())
+            .field(&self.z())
+            .finish()
     }
 }
 
@@ -228,15 +271,15 @@ mod tests {
     /// Shows it's necessary to floor a float before casting to i32
     fn flooring() {
         assert_eq!(
-            WorldPoint(1.1, 2.2, 3.6).floor(),
+            WorldPoint::new_unchecked(1.1, 2.2, 3.6).floor(),
             WorldPosition::from((1, 2, 3))
         );
         assert_eq!(
-            WorldPoint(-2.6, -10.8, -0.2).floor(),
+            WorldPoint::new_unchecked(-2.6, -10.8, -0.2).floor(),
             WorldPosition::from((-3, -11, -1))
         );
         assert_eq!(
-            WorldPoint(-1.2, -1.9, -0.9).floor(),
+            WorldPoint::new_unchecked(-1.2, -1.9, -0.9).floor(),
             WorldPosition::from((-2, -2, -1))
         );
     }
