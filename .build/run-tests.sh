@@ -2,6 +2,7 @@
 set -e
 
 export RUST_BACKTRACE=1
+export CARGO_INCREMENTAL=0
 export NN_LOG=debug
 export NN_TEST_WORLD_TIMEOUT=180 # seconds
 
