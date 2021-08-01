@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity, clippy::module_inception)]
+#![allow(clippy::type_complexity, clippy::module_inception, dead_code)]
 
 pub use self::ai::AiAction;
 pub use activity::{ActivityComponent, EntityLoggingComponent};

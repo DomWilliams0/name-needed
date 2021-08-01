@@ -120,7 +120,7 @@ impl<'a> From<&'a ImStr> for Value<'a> {
 const COLOR_GREEN: [f32; 4] = [0.4, 0.77, 0.33, 1.0];
 const COLOR_ORANGE: [f32; 4] = [1.0, 0.46, 0.2, 1.0];
 const COLOR_BLUE: [f32; 4] = [0.2, 0.66, 1.0, 1.0];
-const COLOR_RED: [f32; 4] = [0.9, 0.3, 0.2, 1.0];
+// const COLOR_RED: [f32; 4] = [0.9, 0.3, 0.2, 1.0];
 
 /// # Safety
 /// Do not modify the "mutable" ImString!

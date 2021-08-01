@@ -1,8 +1,7 @@
+#![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::{
-    ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies, TransformComponent,
-};
+use simulation::{ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies};
 
 pub type Scenario = fn(&mut EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
