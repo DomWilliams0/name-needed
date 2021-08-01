@@ -1,0 +1,17 @@
+[package]
+name = "testing"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "test-runner"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["rlib", "dylib"]
+
+[dependencies]
+simulation = { path = "../game/simulation" }
+
+inventory = "0.1"
+argh = "0.1"

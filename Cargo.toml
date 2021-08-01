@@ -18,6 +18,8 @@ members = [
 	"shared/metrics",
 	"shared/logging",
 	"shared/unit",
+
+	"testing",
 ]
 
 [profile.dev]

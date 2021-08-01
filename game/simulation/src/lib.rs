@@ -21,7 +21,8 @@ pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
 pub use crate::simulation::{
-    AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, WorldContext,
+    AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
+    WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{ActivityComponent, EntityLoggingComponent};

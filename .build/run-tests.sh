@@ -10,3 +10,4 @@ FLAGS="--verbose --workspace --exclude engine --exclude main"
 
 cargo test $FLAGS
 cargo test $FLAGS -- --ignored
+cargo run --bin test-runner

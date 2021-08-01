@@ -7,6 +7,7 @@ use simulation::{
 
 use crate::presets::ContinuousIntegrationGamePreset;
 
+use crate::scenarios::Scenario;
 use config::ConfigType;
 use engine::Engine;
 use resources::ResourceContainer;
@@ -50,9 +51,11 @@ struct Args {
     #[argh(option, default = "PathBuf::from(\".\")")]
     directory: PathBuf,
 
+    #[cfg(not(feature = "tests"))]
     /// scenario to load
     #[argh(option)]
     scenario: Option<String>,
+    // TODO specify e2e test by name (feature = "tests")
 }
 
 #[derive(Debug, Error)]
@@ -62,6 +65,39 @@ enum StartError {
 
     #[error("No such preset '{0}'")]
     NoSuchPreset(String),
+}
+
+fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
+    let name;
+    #[cfg(feature = "tests")]
+    {
+        name = Some("nop");
+    }
+    #[cfg(not(feature = "tests"))]
+    {
+        name = args.scenario.as_deref();
+    }
+
+    let resolved = scenarios::resolve(name);
+    match resolved {
+        Some((name, s)) => {
+            info!(
+                "resolved scenario '{scenario}' to {:#x}",
+                s as usize,
+                scenario = name,
+            );
+            Ok(s)
+        }
+        None => {
+            let name = name.unwrap(); // would have panicked already if bad default
+            error!("failed to resolve scenario"; "name" => ?name);
+
+            let possibilities = scenarios::all_names().collect_vec();
+            info!("available scenarios: {:?}", possibilities);
+
+            return Err(StartError::NoSuchScenario(name.to_owned()).into());
+        }
+    }
 }
 
 fn do_main() -> BoxedResult<()> {
@@ -76,29 +112,7 @@ fn do_main() -> BoxedResult<()> {
 
     info!("chosen game preset"; "preset" => ?preset.name());
 
-    let scenario = {
-        let name = args.scenario.as_deref();
-        let resolved = scenarios::resolve(name);
-        match resolved {
-            Some((name, s)) => {
-                info!(
-                    "resolved scenario '{scenario}' to {:#x}",
-                    s as usize,
-                    scenario = name,
-                );
-                s
-            }
-            None => {
-                let name = name.unwrap(); // would have panicked already if bad default
-                error!("failed to resolve scenario"; "name" => ?name);
-
-                let possibilities = scenarios::all_names().collect_vec();
-                info!("available scenarios: {:?}", possibilities);
-
-                return Err(StartError::NoSuchScenario(name.to_owned()).into());
-            }
-        }
-    };
+    let scenario = resolve_scenario(&args)?;
 
     // start metrics server
     #[cfg(feature = "metrics")]
@@ -133,19 +147,40 @@ fn do_main() -> BoxedResult<()> {
         let world_viewer = WorldViewer::with_world(simulation.voxel_world(), initial_block)?;
         let backend = backend_state.start(world_viewer, initial_block);
 
-        // create and run engine
-        let engine = Engine::new(simulation, backend);
+        // initialize engine
+        let mut engine = Engine::new(simulation, backend);
+
+        #[cfg(feature = "tests")]
+        {
+            use testing::HookResult;
+            engine.set_tick_hook(Some(testing::tick_hook));
+            info!("running test init hook");
+            let ctx = engine.hook_context();
+            match testing::init_hook(&ctx) {
+                HookResult::KeepGoing => {}
+                HookResult::TestSuccess => {
+                    info!("test finished successfully");
+                    break Ok(());
+                }
+                HookResult::TestFailure(err) => {
+                    error!("test failed: {}", err);
+                    break Err(err.into());
+                }
+            }
+        }
+
+        // run game until exit
         let exit = engine.run();
 
         // uninitialize backend
         backend_state.end();
 
-        if let Exit::Stop = exit {
-            break;
+        match exit {
+            Exit::Stop => break Ok(()),
+            Exit::Abort(err) => break Err(err.into()),
+            Exit::Restart => continue,
         }
     }
-
-    Ok(())
 }
 
 fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {

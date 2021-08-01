@@ -75,7 +75,16 @@ pub struct Simulation<R: Renderer> {
     scripting: ScriptingContext,
 }
 
-/// A little bundle of references to the game state without the generic [Renderer] param on [Simulation]
+/// A little bundle of references to the game state without the generic [Renderer] param
+/// on [Simulation], and no renderer fields
+pub struct SimulationRefLite<'s> {
+    pub ecs: &'s EcsWorld,
+    pub world: &'s WorldRef,
+    pub loader: &'s ThreadedWorldLoader,
+}
+
+/// A little bundle of references to the game state without the generic [Renderer] param
+/// on [Simulation], with renderer fields
 pub struct SimulationRef<'s> {
     pub ecs: &'s EcsWorld,
     pub world: &'s WorldRef,
@@ -488,6 +497,14 @@ impl<R: Renderer> Simulation<R> {
             }
 
             _ => {}
+        }
+    }
+
+    pub fn as_lite_ref<'a>(&'a self) -> SimulationRefLite<'a> {
+        SimulationRefLite {
+            ecs: &self.ecs_world,
+            world: &self.voxel_world,
+            loader: &self.world_loader,
         }
     }
 
