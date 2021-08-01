@@ -4,11 +4,20 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::input::BlockTypeMatch;
 
+pub enum Proximity {
+    /// e.g. a job that can be walked to
+    Walkable,
+    /// Very close, probably in view
+    Nearby,
+    /// Distance, not squared
+    Custom(f32),
+}
+
 pub struct MyProximityToConsideration {
     pub target: WorldPoint,
 
-    /// Anything further than this radius is 0.0
-    pub max_distance: f32,
+    /// Anything further than this will be 0.0
+    pub proximity: Proximity,
 }
 
 pub struct BlockTypeMatchesConsideration(pub WorldPosition, pub BlockTypeMatch);
@@ -23,9 +32,10 @@ impl Consideration<AiContext> for MyProximityToConsideration {
     }
 
     fn parameter(&self) -> ConsiderationParameter {
+        // TODO take mobility into account, e.g. more injured = prefer closer
         ConsiderationParameter::Range {
             min: 0.25,
-            max: self.max_distance,
+            max: self.proximity.distance().powi(2),
         }
     }
 }
@@ -44,6 +54,16 @@ impl Consideration<AiContext> for BlockTypeMatchesConsideration {
     }
 }
 
+impl Proximity {
+    fn distance(&self) -> f32 {
+        match self {
+            Proximity::Walkable => 400.0,
+            Proximity::Nearby => 40.0,
+            Proximity::Custom(f) => *f,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,7 +72,7 @@ mod tests {
     fn proximity_consideration() {
         let c = MyProximityToConsideration {
             target: WorldPoint::new_unchecked(0.0, 0.0, 0.0),
-            max_distance: 5.0,
+            proximity: Proximity::Custom(5.0),
         };
 
         let value = |val| {
@@ -60,7 +80,7 @@ mod tests {
             c.curve().evaluate(x).value()
         };
 
-        let very_far = value(10.0);
+        let very_far = value(60.0);
         let far = value(4.0);
         let closer = value(2.0);
         let closerrr = value(0.5);

@@ -1,4 +1,4 @@
-# TODOs (344)
+# TODOs (345)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -154,6 +154,8 @@
  * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
    * `/// TODO consider society stores before scanning the local area`
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
+ * [game/simulation/src/ai/consideration/world.rs](game/simulation/src/ai/consideration/world.rs) (1)
+   * `// TODO take mobility into account, e.g. more injured = prefer closer`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)

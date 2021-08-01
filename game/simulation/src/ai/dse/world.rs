@@ -1,4 +1,6 @@
-use crate::ai::consideration::{BlockTypeMatchesConsideration, MyProximityToConsideration};
+use crate::ai::consideration::{
+    BlockTypeMatchesConsideration, MyProximityToConsideration, Proximity,
+};
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
@@ -19,7 +21,7 @@ impl Dse<AiContext> for BreakBlockDse {
             // TODO has the right tool/is the right tool nearby/close enough in society storage
             AiBox::new(MyProximityToConsideration {
                 target: self.0.centred(),
-                max_distance: 400.0,
+                proximity: Proximity::Walkable,
             }),
             AiBox::new(BlockTypeMatchesConsideration(
                 self.0,

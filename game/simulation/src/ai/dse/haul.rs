@@ -1,5 +1,7 @@
 use crate::activity::HaulTarget;
-use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
+use crate::ai::consideration::{
+    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
+};
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
@@ -27,7 +29,7 @@ impl Dse<AiContext> for HaulDse {
             )),
             AiBox::new(MyProximityToConsideration {
                 target: self.destination,
-                max_distance: 5000.0, // squared
+                proximity: Proximity::Walkable,
             }),
             // TODO consider distance to source too
         ]
