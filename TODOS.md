@@ -1,4 +1,4 @@
-# TODOs (340)
+# TODOs (339)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -460,8 +460,7 @@
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
    * `// TODO ideally handle global slice integer overflow, although unlikely`
- * [testing/src/main.rs](testing/src/main.rs) (4)
+ * [testing/src/main.rs](testing/src/main.rs) (3)
    * `// TODO specify single test to run`
    * `// TODO run n in parallel`
-   * `// TODO test thread needs to exit game`
    * `// TODO unix special case to get exit code on signal`

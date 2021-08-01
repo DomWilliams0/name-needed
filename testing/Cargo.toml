@@ -15,3 +15,5 @@ simulation = { path = "../game/simulation" }
 
 inventory = "0.1"
 argh = "0.1"
+tokio = { version = "1.0", default-features = false, features = ["rt", "macros", "process", "time"] }
+futures = { version = "0.3", default-features = false }

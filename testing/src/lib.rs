@@ -1,3 +1,4 @@
+use crate::tests::TestWrapper;
 use simulation::input::UiCommands;
 use simulation::SimulationRefLite;
 use std::any::Any;
@@ -57,7 +58,7 @@ pub struct TestInstance {
     pub name: &'static str,
     init: Init,
     tick: Tick,
-    instance: Box<dyn Any>,
+    instance: TestWrapper,
 }
 
 pub const TEST_NAME_VAR: &str = "NN_TEST_NAME_CURRENT";
@@ -79,7 +80,7 @@ fn current() -> &'static mut TestInstance {
             name: test.name,
             init: test.init,
             tick: test.tick,
-            instance: (test.create_instance)(),
+            instance: TestWrapper::new((test.create_instance)()),
         });
 
         unsafe {
@@ -90,26 +91,18 @@ fn current() -> &'static mut TestInstance {
     unsafe { *INSTANCE.as_mut_ptr() }
 }
 
-impl TestInstance {
-    pub fn on_init(&mut self, ctx: &HookContext) -> HookResult {
-        let this = (&mut *self.instance) as *mut _ as *mut ();
-        unsafe { (self.init)(&mut *this, ctx) }
-    }
-
-    fn on_tick(&mut self, ctx: &HookContext) -> HookResult {
-        let this = (&mut *self.instance) as *mut _ as *mut ();
-        unsafe { (self.tick)(&mut *this, ctx) }
-    }
-}
-
 /// Called by engine
 pub fn init_hook(ctx: &HookContext) -> HookResult {
-    current().on_init(ctx)
+    let test = current();
+    test.instance
+        .invoke_with_self(|this| (test.init)(this, ctx))
 }
 
 /// Called by engine
 pub fn tick_hook(ctx: &HookContext) -> HookResult {
-    current().on_tick(ctx)
+    let test = current();
+    test.instance
+        .invoke_with_self(|this| (test.tick)(this, ctx))
 }
 
 /// inventory doesn't work unless the test module object is actually referenced, defeating the
