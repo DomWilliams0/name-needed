@@ -35,7 +35,7 @@ jobs:
         if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         uses: Swatinem/rust-cache@v1
 
-      - name: Build and run unit tests
+      - name: Build and run tests
         if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         run: ./.build/run-tests.sh
         shell: bash

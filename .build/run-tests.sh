@@ -11,4 +11,8 @@ FLAGS="--verbose --workspace --exclude engine --exclude main"
 
 cargo test $FLAGS
 cargo test $FLAGS -- --ignored
-cargo run --bin test-runner
+
+# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows
+if [[ "$RUNNER_OS" != "Windows" ]]; then
+	cargo run --bin test-runner
+fi
