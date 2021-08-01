@@ -5,8 +5,8 @@ pub struct MovingAverage<A: Array<Item = f64>> {
     data: Box<ArrayDeque<A, Wrapping>>,
 }
 
-pub type Tick = MovingAverage<[f64; 20]>;
-pub type Render = MovingAverage<[f64; 64]>;
+type Tick = MovingAverage<[f64; 20]>;
+type Render = MovingAverage<[f64; 64]>;
 
 #[derive(Default)]
 pub struct Perf {

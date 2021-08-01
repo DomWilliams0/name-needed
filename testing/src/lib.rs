@@ -1,4 +1,4 @@
-use crate::tests::TestWrapper;
+use crate::tests::{TestHelper, TestWrapper};
 use simulation::input::UiCommands;
 use simulation::SimulationRefLite;
 use std::any::Any;
@@ -37,14 +37,14 @@ pub enum HookResult {
     TestFailure(String),
 }
 
-pub(crate) type FnGeneric<T> = fn(&mut T, &'_ HookContext) -> HookResult;
+pub(crate) type FnGeneric<T> = fn(&mut T, TestHelper, &'_ HookContext) -> HookResult;
 pub(crate) fn cast_fn<T>(generic: FnGeneric<T>) -> Tick {
     unsafe { std::mem::transmute(generic) }
 }
 
 pub type TickHookThunk = fn(&'_ HookContext) -> HookResult;
 
-pub type Tick = fn(&'_ mut (), &'_ HookContext) -> HookResult;
+pub type Tick = fn(&'_ mut (), TestHelper, &'_ HookContext) -> HookResult;
 pub type Init = Tick;
 
 pub struct TestDeclaration {
@@ -94,15 +94,17 @@ fn current() -> &'static mut TestInstance {
 /// Called by engine
 pub fn init_hook(ctx: &HookContext) -> HookResult {
     let test = current();
+    let helper = test.instance.helper();
     test.instance
-        .invoke_with_self(|this| (test.init)(this, ctx))
+        .invoke_with_self(|this| (test.init)(this, helper, ctx))
 }
 
 /// Called by engine
 pub fn tick_hook(ctx: &HookContext) -> HookResult {
     let test = current();
+    let helper = test.instance.helper();
     test.instance
-        .invoke_with_self(|this| (test.tick)(this, ctx))
+        .invoke_with_self(|this| (test.tick)(this, helper, ctx))
 }
 
 /// inventory doesn't work unless the test module object is actually referenced, defeating the

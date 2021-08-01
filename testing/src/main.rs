@@ -67,7 +67,7 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         eprintln!("{}", msg);
 
         // abort test process
-        test_process.kill().await?;
+        let _ = test_process.kill().await;
         std::process::exit(1);
     }
 

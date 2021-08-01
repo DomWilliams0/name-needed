@@ -22,7 +22,7 @@ pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSi
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
-    WorldContext,
+    Tick, WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{ActivityComponent, EntityLoggingComponent};
@@ -34,7 +34,7 @@ pub use item::{
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
-pub use perf::{Perf, PerfAvg, Render, Tick, Timing};
+pub use perf::{Perf, PerfAvg, Timing};
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
