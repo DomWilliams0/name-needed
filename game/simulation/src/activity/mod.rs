@@ -18,15 +18,14 @@ mod action_to_activity {
     use crate::activity::Activity;
     use crate::ai::AiAction;
     use crate::item::ItemsToPickUp;
-    use crate::ComponentWorld;
 
     use super::*;
 
     impl AiAction {
-        pub fn into_activity<W: ComponentWorld>(self) -> Box<dyn Activity<W>> {
+        pub fn into_activity(self) -> Box<dyn Activity> {
             macro_rules! activity {
                 ($act:expr) => {
-                    Box::new($act) as Box<dyn Activity<W>>
+                    Box::new($act) as Box<dyn Activity>
                 };
             }
 

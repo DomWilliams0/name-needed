@@ -1,6 +1,6 @@
 use common::*;
 
-use crate::ComponentWorld;
+use crate::{ComponentWorld, EcsWorld};
 
 use crate::ecs::Entity;
 use crate::event::{
@@ -36,10 +36,10 @@ pub enum ActivityFinish {
     Interrupted,
 }
 
-pub struct ActivityContext<'a, W: ComponentWorld> {
+pub struct ActivityContext<'a> {
     pub entity: Entity,
     /// Immutable getters only! Use lazy_updates for adding/removing components
-    pub world: &'a W,
+    pub world: &'a EcsWorld,
     pub updates: &'a QueuedUpdates,
     pub subscriptions: &'a mut Vec<EntityEventSubscription>,
 }
@@ -68,8 +68,8 @@ macro_rules! unexpected_event {
     };
 }
 
-pub trait Activity<W: ComponentWorld>: Display + Debug {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult;
+pub trait Activity: Display + Debug {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult;
 
     #[allow(unused_variables)]
     fn on_event(
@@ -81,17 +81,13 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
         unreachable!("unexpected event {:?}", event);
     }
 
-    fn on_finish(
-        &mut self,
-        finish: &ActivityFinish,
-        ctx: &mut ActivityContext<W>,
-    ) -> BoxedResult<()>;
+    fn on_finish(&mut self, finish: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()>;
 
     // ---
-    fn current_subactivity(&self) -> &dyn SubActivity<W>;
+    fn current_subactivity(&self) -> &dyn SubActivity;
 
     /// Calls on_finish on both activity and sub activity
-    fn finish(&mut self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn finish(&mut self, finish: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         let a = self.current_subactivity().on_finish(finish, ctx);
         let b = self.on_finish(finish, ctx);
 
@@ -107,14 +103,14 @@ pub trait Activity<W: ComponentWorld>: Display + Debug {
     }
 }
 
-pub trait SubActivity<W: ComponentWorld>: Display {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult;
-    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()>;
+pub trait SubActivity: Display {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult;
+    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()>;
 
     fn exertion(&self) -> f32;
 }
 
-impl<'a, W: ComponentWorld> ActivityContext<'a, W> {
+impl<'a> ActivityContext<'a> {
     pub fn subscribe_to(&mut self, subject_entity: Entity, subscription: EventSubscription) {
         self.subscriptions
             .push(EntityEventSubscription(subject_entity, subscription));
@@ -155,7 +151,7 @@ impl From<BoxedResult<()>> for ActivityResult {
 //     }
 // }
 
-impl<W: ComponentWorld> slog::Value for dyn Activity<W> {
+impl slog::Value for dyn Activity {
     fn serialize(
         &self,
         _: &Record,

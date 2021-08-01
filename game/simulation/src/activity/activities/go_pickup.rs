@@ -50,8 +50,8 @@ enum PickupFailure {
     Other,
 }
 
-impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+impl Activity for PickupItemsActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult {
         if self.complete {
             return ActivityResult::Finished(ActivityFinish::Success);
         }
@@ -177,12 +177,12 @@ impl<W: ComponentWorld> Activity<W> for PickupItemsActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         ctx.clear_path();
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         match &self.state {
             PickupItemsState::GoingTo(_, sub) => sub,
             PickupItemsState::PickingUp(sub) => sub,

@@ -65,8 +65,8 @@ impl HaulActivity {
     }
 }
 
-impl<W: ComponentWorld> Activity<W> for HaulActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+impl Activity for HaulActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult {
         match std::mem::replace(&mut self.state, HaulState::Dummy) {
             HaulState::Start => {
                 // find source position
@@ -371,11 +371,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
         }
     }
 
-    fn on_finish(
-        &mut self,
-        finish: &ActivityFinish,
-        ctx: &mut ActivityContext<W>,
-    ) -> BoxedResult<()> {
+    fn on_finish(&mut self, finish: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         // cancel haul if it has been initialised, regardless of state
         if let Some(haul) = self.haul_sub.take() {
             haul.on_finish(&finish, ctx)
@@ -384,7 +380,7 @@ impl<W: ComponentWorld> Activity<W> for HaulActivity {
         }
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         match &self.state {
             HaulState::Start
             | HaulState::Finished(_)

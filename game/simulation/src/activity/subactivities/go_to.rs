@@ -39,8 +39,8 @@ impl GoToSubActivity {
     }
 }
 
-impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+impl SubActivity for GoToSubActivity {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult {
         let follow_path = match ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {
             Ok(comp) => comp,
             Err(e) => {
@@ -62,7 +62,7 @@ impl<W: ComponentWorld> SubActivity<W> for GoToSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         // TODO helper on ctx to get component
 
         if let Ok(comp) = ctx.world.component_mut::<FollowPathComponent>(ctx.entity) {

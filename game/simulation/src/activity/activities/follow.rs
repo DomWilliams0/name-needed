@@ -35,8 +35,8 @@ pub enum FollowError {
     MissingTransform,
 }
 
-impl<W: ComponentWorld> Activity<W> for FollowActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<W>) -> ActivityResult {
+impl Activity for FollowActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext) -> ActivityResult {
         ctx.clear_path();
 
         let (distance2, target_pos) = {
@@ -132,11 +132,11 @@ impl<W: ComponentWorld> Activity<W> for FollowActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext) -> BoxedResult<()> {
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         if let Some(goto) = self.goto.as_ref() {
             goto
         } else {

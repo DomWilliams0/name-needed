@@ -1,4 +1,4 @@
-# TODOs (345)
+# TODOs (349)
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -143,7 +143,8 @@
    * `// TODO varying exertion per food`
  * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
- * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (1)
+ * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
+   * `let mut shifted_items = Vec::new(); // TODO smallvec`
    * `// TODO exertion of picking up item depends on item weight`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
@@ -158,13 +159,15 @@
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
- * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
+ * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (2)
    * `// TODO consider distance to source too`
+   * `// TODO proximity to entity (if no transform, check if contained in something and use its pos)`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
+   * `// TODO check in society and personal containers for item`
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
@@ -207,7 +210,7 @@
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (9)
    * `// TODO smol string and/or cow`
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
@@ -216,6 +219,7 @@
    * `// TODO drinkable`
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
+   * `register_component_template!("breakable", ConditionComponent); // TODO rename`
  * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
    * `// TODO filters on other fields e.g. mass, size, condition, etc`
  * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (6)

@@ -35,8 +35,8 @@ enum EatHeldItemState {
     Eating(ItemEatSubActivity),
 }
 
-impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+impl Activity for EatHeldItemActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult {
         if let Some(result) = self.finished.take() {
             return ActivityResult::from(result);
         }
@@ -116,11 +116,11 @@ impl<W: ComponentWorld> Activity<W> for EatHeldItemActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext) -> BoxedResult<()> {
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         match &self.state {
             EatHeldItemState::Equipping(sub) => sub,
             EatHeldItemState::Eating(sub) => sub,

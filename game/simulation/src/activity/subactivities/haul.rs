@@ -44,8 +44,8 @@ impl HaulSubActivity {
     }
 }
 
-impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+impl SubActivity for HaulSubActivity {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult {
         let hauler = ctx.entity;
         let item = self.thing;
 
@@ -147,7 +147,7 @@ impl<W: ComponentWorld> SubActivity<W> for HaulSubActivity {
     }
 
     /// Only fails if holder has no inventory component
-    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, finish: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         let hauler = ctx.entity;
         let item = self.thing;
         let interrupted = matches!(finish, ActivityFinish::Interrupted);
