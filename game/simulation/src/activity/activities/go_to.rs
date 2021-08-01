@@ -9,7 +9,6 @@ use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::event::{EntityEvent, EntityEventPayload};
 use crate::unexpected_event;
-use crate::ComponentWorld;
 
 /// Simple wrapper around goto subactivity with a given reason
 #[derive(Debug)]
@@ -19,8 +18,8 @@ pub struct GoToActivity {
     result: Option<Result<(), NavigationError>>,
 }
 
-impl<W: ComponentWorld> Activity<W> for GoToActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<W>) -> ActivityResult {
+impl Activity for GoToActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext) -> ActivityResult {
         match self.result.take() {
             Some(Ok(_)) => ActivityResult::Finished(ActivityFinish::Success),
             Some(Err(e)) => ActivityResult::Finished(ActivityFinish::Failure(Box::new(e))),
@@ -46,11 +45,11 @@ impl<W: ComponentWorld> Activity<W> for GoToActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, _: &mut ActivityContext) -> BoxedResult<()> {
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         &self.goto
     }
 }

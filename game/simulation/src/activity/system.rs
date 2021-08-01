@@ -24,7 +24,7 @@ pub struct ActivityEventSystem;
 #[storage(DenseVecStorage)]
 #[name("activity")]
 pub struct ActivityComponent {
-    current: Box<dyn Activity<EcsWorld>>,
+    current: Box<dyn Activity>,
     current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
 }
@@ -69,7 +69,7 @@ impl<'a> System<'a> for ActivitySystem {
             debug!("current activity"; "activity" => &activity.current);
 
             debug_assert!(subscriptions.is_empty());
-            let mut ctx = ActivityContext::<EcsWorld> {
+            let mut ctx = ActivityContext {
                 entity,
                 world: &*world,
                 updates: &*updates,
@@ -239,7 +239,7 @@ impl ActivityComponent {
         world.remove_lazy::<BlockingActivityComponent>(me);
     }
 
-    pub fn current(&self) -> &dyn Activity<EcsWorld> {
+    pub fn current(&self) -> &dyn Activity {
         &*self.current
     }
 

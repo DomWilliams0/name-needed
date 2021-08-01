@@ -45,8 +45,8 @@ pub enum WanderError {
 
 const WANDER_RADIUS: u16 = 10;
 
-impl<W: ComponentWorld> Activity<W> for WanderActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+impl Activity for WanderActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult {
         match self.state {
             WanderState::Wandering(count) => {
                 trace!(
@@ -142,7 +142,7 @@ impl<W: ComponentWorld> Activity<W> for WanderActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         ctx.clear_path();
 
         if let WanderSubActivity::Loitering(timer) = self.subactivity {
@@ -151,7 +151,7 @@ impl<W: ComponentWorld> Activity<W> for WanderActivity {
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         match &self.subactivity {
             WanderSubActivity::Wandering(goto) => goto,
             _ => nop_subactivity!("Loitering", 0.15),

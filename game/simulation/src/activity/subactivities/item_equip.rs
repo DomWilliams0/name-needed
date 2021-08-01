@@ -32,8 +32,8 @@ pub enum EquipItemError {
     NotEnoughSpace,
 }
 
-impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+impl SubActivity for ItemEquipSubActivity {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult {
         let holder = ctx.entity;
         let item = self.item;
         let extra_hands = self.extra_hands;
@@ -115,7 +115,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEquipSubActivity {
         }
     }
 
-    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext) -> BoxedResult<()> {
         Ok(())
     }
 

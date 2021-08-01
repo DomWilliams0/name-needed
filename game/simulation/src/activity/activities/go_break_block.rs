@@ -23,8 +23,8 @@ pub struct GoBreakBlockActivity {
     finished: Option<BoxedResult<()>>,
 }
 
-impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
-    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_, W>) -> ActivityResult {
+impl Activity for GoBreakBlockActivity {
+    fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult {
         if let Some(res) = self.finished.take() {
             return ActivityResult::from(res);
         }
@@ -92,12 +92,12 @@ impl<W: ComponentWorld> Activity<W> for GoBreakBlockActivity {
         }
     }
 
-    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&mut self, _: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         ctx.clear_path();
         Ok(())
     }
 
-    fn current_subactivity(&self) -> &dyn SubActivity<W> {
+    fn current_subactivity(&self) -> &dyn SubActivity {
         match &self.state {
             BreakBlockState::Going(sub) => sub,
             BreakBlockState::Breaking => nop_subactivity!("Breaking block", 1.2),

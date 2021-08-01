@@ -24,8 +24,8 @@ pub enum PickupItemError {
     NoFreeHands,
 }
 
-impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+impl SubActivity for PickupItemSubActivity {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult {
         // assumes we are close enough to pick it up already
 
         let item = self.0;
@@ -33,7 +33,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
 
         ctx.updates.queue("pick up item", move |world| {
             let mut do_pickup = || -> Result<Entity, PickupItemError> {
-                let mut shifted_items = Vec::new();
+                let mut shifted_items = Vec::new(); // TODO smallvec
                 {
                     let mut inventories = world.write_storage::<InventoryComponent>();
                     let transforms = world.read_storage::<TransformComponent>();
@@ -104,7 +104,7 @@ impl<W: ComponentWorld> SubActivity<W> for PickupItemSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, _: &mut ActivityContext) -> BoxedResult<()> {
         Ok(())
     }
 

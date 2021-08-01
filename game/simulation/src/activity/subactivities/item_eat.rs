@@ -18,8 +18,8 @@ pub enum ItemEatError {
     NotInInventory,
 }
 
-impl<W: ComponentWorld> SubActivity<W> for ItemEatSubActivity {
-    fn init(&self, ctx: &mut ActivityContext<W>) -> ActivityResult {
+impl SubActivity for ItemEatSubActivity {
+    fn init(&self, ctx: &mut ActivityContext) -> ActivityResult {
         // start eating and block until complete
 
         let item = self.0;
@@ -49,7 +49,7 @@ impl<W: ComponentWorld> SubActivity<W> for ItemEatSubActivity {
         ActivityResult::Blocked
     }
 
-    fn on_finish(&self, _: &ActivityFinish, ctx: &mut ActivityContext<W>) -> BoxedResult<()> {
+    fn on_finish(&self, _: &ActivityFinish, ctx: &mut ActivityContext) -> BoxedResult<()> {
         let item = self.0;
         ctx.updates.queue("end eating", move |world| {
             let _ = world.remove_now::<BeingEatenComponent>(item);
