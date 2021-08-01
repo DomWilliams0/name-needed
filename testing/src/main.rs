@@ -1,5 +1,8 @@
 use std::error::Error;
 use std::process::Command;
+use std::sync::mpsc::{channel, RecvTimeoutError};
+use std::thread::spawn;
+use std::time::Duration;
 use testing::{register_tests, TestDeclaration, TEST_NAME_VAR};
 
 /// Test runner
@@ -8,7 +11,11 @@ struct Args {
     /// if graphical renderer should be used
     #[argh(switch)]
     graphical: bool,
+
     // TODO specify single test to run
+    /// timeout in seconds per test
+    #[argh(option, default = "30")]
+    timeout: u32,
 }
 
 fn main() {
@@ -24,16 +31,34 @@ fn main() {
     let tests = inventory::iter::<TestDeclaration>
         .into_iter()
         .collect::<Vec<_>>();
+    eprintln!("running {} tests", tests.len());
 
     CargoCommand::Build.run(renderer).expect("failed to build");
-    for test in &tests {
+    for test in tests {
         eprintln!("running test {:?}", test.name);
-        // TODO run in parallel
-        CargoCommand::Run { test: test.name }
-            .run(renderer)
-            .expect("test failed");
+        // TODO run n in parallel
+
+        let (tx, rx) = channel();
+        let _ = spawn(move || {
+            let result = CargoCommand::Run { test: test.name }.run(renderer);
+            tx.send(result.map_err(|err| format!("{}", err)))
+                .expect("failed to send result");
+        });
+
+        let error = match rx.recv_timeout(Duration::from_secs(args.timeout as u64)) {
+            Ok(Ok(_)) => {
+                eprintln!("test {} passed", test.name);
+                continue;
+            }
+            Ok(Err(err)) => err,
+            Err(_) => "timed out".to_owned(),
+        };
+
+        // TODO test thread needs to exit game
+        panic!("test {} failed: {}", test.name, error);
     }
-    eprintln!("done");
+
+    eprintln!("done")
 }
 
 enum CargoCommand<'a> {
