@@ -17,7 +17,7 @@ if [[ "$DETECTED_OS" != "Linux" ]]; then
 
 	# remove testing crate from workspace for windows
 	sed -i '/"testing",/d' Cargo.toml
-	echo 'exclude = ["testing"]' >> Cargo.toml
+	sed -i 's/] # end members/]\nexclude = ["testing"]/g' Cargo.toml
 fi
 
 cat Cargo.toml
