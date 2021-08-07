@@ -11,9 +11,9 @@ FLAGS="--verbose --workspace --exclude engine --exclude main"
 
 # TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate
 DETECTED_OS=$(uname)
-RUN_E2E_TESTS=0
+RUN_E2E_TESTS=1
 if [[ "$DETECTED_OS" != "Linux" ]]; then
-	RUN_E2E_TESTS=1
+	RUN_E2E_TESTS=0
 
 	# remove testing crate from workspace for windows
 	sed -i '/"testing",/d' Cargo.toml
