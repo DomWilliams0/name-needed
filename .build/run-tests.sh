@@ -13,6 +13,7 @@ cargo test $FLAGS
 cargo test $FLAGS -- --ignored
 
 # TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows
-if [[ "$RUNNER_OS" != "Windows" ]]; then
+DETECTED_OS=$(uname)
+if [[ "$DETECTED_OS" == "Linux" ]]; then
 	cargo run --bin test-runner
 fi
