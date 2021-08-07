@@ -1,6 +1,6 @@
 # TODOs (340)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
-   * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows`
+   * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)

@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 simulation = { path = "../../game/simulation" }
 resources = { path = "../../game/resources" }
-testing = { path = "../../testing" }
+testing = { path = "../../testing", optional = true }
 
 config = { path = "../../shared/config" }
 unit = { path = "../../shared/unit" }
@@ -37,4 +37,4 @@ use-sdl = ["sdl2", "sdl2-sys", "gl", "imgui-sdl2", "imgui-opengl-renderer", "img
 lite = []
 gl-trace-log = []
 scripting = ["simulation/scripting"]
-hook = [] # for testing
+hook = ["testing"] # for testing
