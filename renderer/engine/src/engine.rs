@@ -10,6 +10,8 @@ pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>
     perf: Perf,
     /// Commands from UI -> game, accumulated over render frames and passed to sim on each tick
     sim_ui_commands: UiCommands,
+    #[cfg(feature = "hook")]
+    tick_hook: Option<testing::TickHookThunk>,
 }
 
 impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, R, B> {
@@ -19,6 +21,21 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             simulation,
             perf: Default::default(),
             sim_ui_commands: Vec::with_capacity(32),
+            #[cfg(feature = "hook")]
+            tick_hook: None,
+        }
+    }
+
+    #[cfg(feature = "hook")]
+    pub fn set_tick_hook(&mut self, hook: Option<testing::TickHookThunk>) {
+        self.tick_hook = hook
+    }
+
+    #[cfg(feature = "hook")]
+    pub fn hook_context(&mut self) -> testing::HookContext {
+        testing::HookContext {
+            simulation: self.simulation.as_lite_ref(),
+            commands: &mut self.sim_ui_commands,
         }
     }
 
@@ -72,14 +89,35 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
 
     fn tick(&mut self) -> Option<Exit> {
         trace!("tick");
-        let _timer = self.perf.tick.time();
+        let exit = {
+            let _timer = self.perf.tick.time();
 
-        let world_viewer = self.backend.world_viewer();
+            let world_viewer = self.backend.world_viewer();
 
-        let commands = self.sim_ui_commands.drain(..);
-        let exit = self.simulation.tick(commands, world_viewer);
+            let commands = self.sim_ui_commands.drain(..);
+            self.simulation.tick(commands, world_viewer)
+        };
 
         self.backend.tick();
+
+        #[cfg(feature = "hook")]
+        {
+            use testing::HookResult;
+            if let Some(hook) = self.tick_hook {
+                let ctx = self.hook_context();
+                match hook(&ctx) {
+                    HookResult::KeepGoing => {}
+                    HookResult::TestSuccess => {
+                        info!("test finished successfully");
+                        return Some(Exit::Stop);
+                    }
+                    HookResult::TestFailure(err) => {
+                        error!("test failed: {}", err);
+                        return Some(Exit::Abort(err));
+                    }
+                }
+            }
+        }
 
         exit
     }

@@ -1,0 +1,19 @@
+[package]
+name = "testing"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "test-runner"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["rlib", "dylib"]
+
+[dependencies]
+simulation = { path = "../game/simulation" }
+
+inventory = "0.1"
+argh = "0.1"
+tokio = { version = "1.0", default-features = false, features = ["rt", "macros", "process", "time"] }
+futures = { version = "0.3", default-features = false }

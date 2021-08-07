@@ -1,4 +1,6 @@
-# TODOs (349)
+# TODOs (351)
+ * [.build/run-tests.sh](.build/run-tests.sh) (1)
+   * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -159,15 +161,13 @@
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
- * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (2)
+ * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
    * `// TODO consider distance to source too`
-   * `// TODO proximity to entity (if no transform, check if contained in something and use its pos)`
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
-   * `// TODO check in society and personal containers for item`
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
@@ -210,7 +210,7 @@
    * `// TODO spatial query rather than checking every entity ever`
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (9)
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
    * `// TODO smol string and/or cow`
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
@@ -219,7 +219,6 @@
    * `// TODO drinkable`
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
-   * `register_component_template!("breakable", ConditionComponent); // TODO rename`
  * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
    * `// TODO filters on other fields e.g. mass, size, condition, etc`
  * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (6)
@@ -441,7 +440,8 @@
    * `.unwrap_or("unnamed"); // TODO another manual name component access`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (4)
+   * `// TODO specify e2e test by name (feature = "tests")`
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
@@ -478,3 +478,7 @@
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
    * `// TODO ideally handle global slice integer overflow, although unlikely`
+ * [testing/src/main.rs](testing/src/main.rs) (3)
+   * `// TODO specify single test to run`
+   * `// TODO run n in parallel`
+   * `// TODO unix special case to get exit code on signal`

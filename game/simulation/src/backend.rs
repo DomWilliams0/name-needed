@@ -5,9 +5,11 @@ use common::Error;
 use resources::Resources;
 use unit::world::WorldPosition;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum Exit {
     Stop,
+    /// Used for test failures
+    Abort(String),
     Restart,
 }
 

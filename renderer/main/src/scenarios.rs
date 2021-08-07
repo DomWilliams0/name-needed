@@ -77,7 +77,7 @@ fn following_dogs(ecs: &mut EcsWorld) {
     });
 }
 
-fn nop(_: &mut EcsWorld) {}
+pub fn nop(_: &mut EcsWorld) {}
 
 fn wander_and_eat(ecs: &mut EcsWorld) {
     let world = ecs.voxel_world();
