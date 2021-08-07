@@ -12,6 +12,7 @@ engine = { path = "../engine" }
 
 simulation = { path = "../../game/simulation" }
 resources = { path = "../../game/resources" }
+testing = {path = "../../testing", optional = true}
 
 config = { path = "../../shared/config" }
 common = { path = "../../shared/common", features = ["binary"] }
@@ -24,9 +25,9 @@ inventory = "0.1"
 argh = "0.1"
 
 [features]
-default = ["use-sdl", "common/log-to-file", "panik/use-slog", "common/binary", "scripting"]
+default = ["use-sdl"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 count-allocs = ["alloc_counter"]
 metrics = ["simulation/metrics"]
-scripting = ["simulation/scripting", "engine/scripting"]
+tests = ["engine/hook", "testing"]

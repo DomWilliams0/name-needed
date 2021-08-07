@@ -18,7 +18,10 @@ members = [
 	"shared/metrics",
 	"shared/logging",
 	"shared/unit",
-]
+
+	# ensure this is the last member! so it can be sed'd out in CI
+	"testing",
+] # end members
 
 [profile.dev]
 debug = 0 # for faster build times

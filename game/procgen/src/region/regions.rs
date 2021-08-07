@@ -1056,6 +1056,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn region_requesting_separate_directions() {
+        logging::for_tests();
         let regions_to_request = vec![
             (5, 5), // arbitrary region
             (8, 5), // multiple regions away with no shared neighbours

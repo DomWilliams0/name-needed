@@ -1,4 +1,6 @@
-# TODOs (335)
+# TODOs (340)
+ * [.build/run-tests.sh](.build/run-tests.sh) (1)
+   * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO impl Display for considerations instead`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -428,7 +430,8 @@
    * `.unwrap_or("unnamed"); // TODO another manual name component access`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (3)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (4)
+   * `// TODO specify e2e test by name (feature = "tests")`
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
@@ -459,3 +462,7 @@
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
    * `// TODO ideally handle global slice integer overflow, although unlikely`
+ * [testing/src/main.rs](testing/src/main.rs) (3)
+   * `// TODO specify single test to run`
+   * `// TODO run n in parallel`
+   * `// TODO unix special case to get exit code on signal`
