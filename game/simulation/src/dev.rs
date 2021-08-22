@@ -19,16 +19,16 @@ use crate::{
 };
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtDev<'w>(&'w mut EcsWorld);
+pub struct EcsExtDev<'w>(&'w EcsWorld);
 
 impl EcsWorld {
-    pub fn helpers_dev(&mut self) -> EcsExtDev {
+    pub fn helpers_dev(&self) -> EcsExtDev {
         EcsExtDev(self)
     }
 }
 
 impl EcsExtDev<'_> {
-    pub fn give_bag(&mut self, lucky_holder: Entity) {
+    pub fn give_bag(&self, lucky_holder: Entity) {
         let bag = self
             .build_entity("core_storage_backpack")
             .expect("no backpack")

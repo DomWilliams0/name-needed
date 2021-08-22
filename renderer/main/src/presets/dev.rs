@@ -54,7 +54,7 @@ impl<R: Renderer> GamePreset<R> for DevGamePreset<R> {
         *sim.player_society() = Some(player_society);
 
         // defer to scenario for all entity spawning
-        scenario(sim.world_mut());
+        scenario(&sim.world());
         Ok(())
     }
 }

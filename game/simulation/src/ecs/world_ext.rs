@@ -4,11 +4,11 @@ use crate::{ComponentWorld, TransformComponent, E};
 use unit::world::WorldPoint;
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtComponents<'w>(&'w mut EcsWorld);
+pub struct EcsExtComponents<'w>(&'w EcsWorld);
 
 impl EcsWorld {
     /// Helper methods to add and remove components for given actions
-    pub fn helpers_comps(&mut self) -> EcsExtComponents {
+    pub fn helpers_comps(&self) -> EcsExtComponents {
         EcsExtComponents(self)
     }
 }
@@ -19,7 +19,7 @@ impl EcsExtComponents<'_> {
     ///
     /// Panics if haulee is not alive
     pub fn begin_haul(
-        &mut self,
+        &self,
         haulee: Entity,
         hauler: Entity,
         hauler_pos: Option<WorldPoint>,

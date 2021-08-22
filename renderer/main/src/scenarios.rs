@@ -2,7 +2,7 @@ use crate::scenarios::helpers::spawn_entities_randomly;
 use common::*;
 use simulation::{AiAction, ComponentWorld, EcsWorld, PlayerSociety};
 
-pub type Scenario = fn(&mut EcsWorld);
+pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
 
 struct ScenarioEntry {
@@ -46,7 +46,7 @@ scenario!(nop);
 scenario!(wander_and_eat);
 scenario!(haul_to_container);
 
-fn following_dogs(ecs: &mut EcsWorld) {
+fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
     let world = world.borrow();
 
@@ -75,9 +75,9 @@ fn following_dogs(ecs: &mut EcsWorld) {
     });
 }
 
-pub fn nop(_: &mut EcsWorld) {}
+pub fn nop(_: &EcsWorld) {}
 
-fn wander_and_eat(ecs: &mut EcsWorld) {
+fn wander_and_eat(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
     let world = world.borrow();
 
@@ -108,7 +108,7 @@ fn wander_and_eat(ecs: &mut EcsWorld) {
     });
 }
 
-fn haul_to_container(ecs: &mut EcsWorld) {
+fn haul_to_container(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
     let world = world.borrow();
 
@@ -164,14 +164,10 @@ mod helpers {
         ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap()
     }
 
-    pub struct EntityBuilder<'a>(&'a mut EcsWorld, Entity);
+    pub struct EntityBuilder<'a>(&'a EcsWorld, Entity);
 
     impl<'a> EntityBuilder<'a> {
-        fn new(
-            definition: &str,
-            pos: impl EntityPosition + 'static,
-            world: &'a mut EcsWorld,
-        ) -> Self {
+        fn new(definition: &str, pos: impl EntityPosition + 'static, world: &'a EcsWorld) -> Self {
             let entity = world
                 .build_entity(definition)
                 .expect("no definition")
@@ -249,7 +245,7 @@ mod helpers {
 
     pub fn new_entity<'a>(
         definition: &str,
-        ecs: &'a mut EcsWorld,
+        ecs: &'a EcsWorld,
         pos: impl EntityPosition + 'static,
     ) -> EntityBuilder<'a> {
         EntityBuilder::new(definition, pos, ecs)
@@ -276,7 +272,7 @@ mod helpers {
     }
 
     pub fn create_chest(
-        ecs: &mut EcsWorld,
+        ecs: &EcsWorld,
         world: &InnerWorldRef,
         society: Option<SocietyHandle>,
     ) -> WorldPosition {

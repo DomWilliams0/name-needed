@@ -50,8 +50,8 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     #[allow(clippy::mut_from_ref)]
     fn resource_mut<T: Resource>(&self) -> &mut T;
 
-    fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T>;
-    fn remove_now<T: Component>(&mut self, entity: Entity) -> Option<T>;
+    fn add_now<T: Component>(&self, entity: Entity, component: T) -> InsertResult<T>;
+    fn remove_now<T: Component>(&self, entity: Entity) -> Option<T>;
 
     fn add_lazy<T: Component>(&self, entity: Entity, component: T);
 
@@ -60,7 +60,7 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     fn voxel_world(&self) -> WorldRef;
 
     fn build_entity(
-        &mut self,
+        &self,
         definition_uid: &str,
     ) -> Result<DefinitionBuilder<Self>, DefinitionErrorKind>;
 
@@ -180,12 +180,12 @@ impl ComponentWorld for EcsWorld {
         res
     }
 
-    fn add_now<T: Component>(&mut self, entity: Entity, component: T) -> InsertResult<T> {
+    fn add_now<T: Component>(&self, entity: Entity, component: T) -> InsertResult<T> {
         let mut storage = self.write_storage::<T>();
         storage.insert(entity, component)
     }
 
-    fn remove_now<T: Component>(&mut self, entity: Entity) -> Option<T> {
+    fn remove_now<T: Component>(&self, entity: Entity) -> Option<T> {
         let mut storage = self.write_storage::<T>();
         storage.remove(entity)
     }
@@ -206,7 +206,7 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn build_entity(
-        &mut self,
+        &self,
         definition_uid: &str,
     ) -> Result<DefinitionBuilder<Self>, DefinitionErrorKind> {
         let definitions = self.resource::<definitions::Registry>();

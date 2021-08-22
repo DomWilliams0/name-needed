@@ -503,7 +503,7 @@ impl<R: Renderer> Simulation<R> {
         }
     }
 
-    pub fn as_lite_ref<'a>(&'a self) -> SimulationRefLite<'a> {
+    pub fn as_lite_ref(&self) -> SimulationRefLite {
         SimulationRefLite {
             ecs: &self.ecs_world,
             world: &self.voxel_world,
