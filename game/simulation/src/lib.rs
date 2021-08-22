@@ -17,6 +17,7 @@ pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
 pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
 pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 
+pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};

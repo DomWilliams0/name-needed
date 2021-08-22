@@ -2624,6 +2624,7 @@ dependencies = [
  "ahash 0.7.2",
  "ai",
  "arraydeque",
+ "async-trait",
  "bitflags",
  "color",
  "common",

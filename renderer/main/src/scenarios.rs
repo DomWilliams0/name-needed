@@ -1,6 +1,6 @@
 use crate::scenarios::helpers::spawn_entities_randomly;
 use common::*;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety};
+use simulation::{AiAction, ComponentWorld, EcsWorld, PlayerSociety};
 
 pub type Scenario = fn(&mut EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -87,11 +87,15 @@ fn wander_and_eat(ecs: &mut EcsWorld) {
 
     spawn_entities_randomly(&world, humans, |pos| {
         let satiety = NormalizedFloat::new(random::get().gen_range(0.4, 0.5));
-        helpers::new_entity("core_living_human", ecs, pos)
+        let e = helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next_please())
             .with_player_society()
             .with_satiety(satiety)
-            .thanks()
+            .thanks();
+
+        ecs.helpers_dev().force_activity(e, AiAction::Wander); // TODO temporary
+
+        e
     });
 
     spawn_entities_randomly(&world, food, |pos| {

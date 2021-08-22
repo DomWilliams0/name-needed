@@ -4,7 +4,7 @@ use crate::{ComponentWorld, EcsWorld};
 
 use crate::ecs::Entity;
 use crate::event::{
-    EntityEvent, EntityEventSubscription, EntityTimers, EventSubscription, TimerToken,
+    EntityEvent, EntityEventSubscription, EventSubscription, RuntimeTimers, TimerToken,
 };
 use crate::path::FollowPathComponent;
 use crate::queued_update::QueuedUpdates;
@@ -122,10 +122,12 @@ impl<'a> ActivityContext<'a> {
         }
     }
 
+    #[deprecated]
     pub fn schedule_timer(&self, count: u32, subject: Entity) -> TimerToken {
-        self.world
-            .resource_mut::<EntityTimers>()
-            .schedule(count, subject)
+        unreachable!()
+        // self.world
+        //     .resource_mut::<RuntimeTimers>()
+        //     .schedule(count, subject)
     }
 }
 

@@ -3,7 +3,7 @@ use crate::activity::activity::{
 };
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
-use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EntityTimers};
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, RuntimeTimers};
 use crate::queued_update::QueuedUpdates;
 use common::*;
 
@@ -18,6 +18,7 @@ use std::convert::TryFrom;
 
 pub struct ActivitySystem;
 
+#[deprecated = "runtime will replace this system"]
 pub struct ActivityEventSystem;
 
 #[derive(Component, EcsComponent)]
@@ -163,7 +164,7 @@ impl<'a> System<'a> for ActivitySystem {
 impl<'a> System<'a> for ActivityEventSystem {
     type SystemData = (
         Write<'a, EntityEventQueue>,
-        Write<'a, EntityTimers>,
+        Write<'a, RuntimeTimers>,
         WriteStorage<'a, EntityLoggingComponent>,
         WriteStorage<'a, ActivityComponent>,
         Read<'a, LazyUpdate>,
@@ -173,51 +174,54 @@ impl<'a> System<'a> for ActivityEventSystem {
         &mut self,
         (mut events, mut timers, mut logging, mut activities, updates): Self::SystemData,
     ) {
-        // post events for elapsed timers
-        for (token, subject) in timers.maintain(Tick::fetch()) {
-            events.post(EntityEvent {
-                subject,
-                payload: EntityEventPayload::TimerElapsed(token),
-            });
+        unimplemented!()
 
-            trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
-        }
+        /*        // post events for elapsed timers
+                for (token, subject) in timers.maintain(Tick::fetch()) {
+                    events.post(EntityEvent {
+                        subject,
+                        payload: EntityEventPayload::TimerElapsed(token),
+                    });
 
-        events.consume_events(|subscriber, event| {
-            let activity = match activities
-                .get_mut(subscriber) {
-                Some(comp) => comp,
-                None => {
-                    warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
-                    return EventUnsubscribeResult::UnsubscribeAll;
+                    trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
                 }
-            };
 
-            log_scope!(o!("subscriber" => E(subscriber)));
+                events.consume_events(|subscriber, event| {
+                    let activity = match activities
+                        .get_mut(subscriber) {
+                        Some(comp) => comp,
+                        None => {
+                            warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
+                            return EventUnsubscribeResult::UnsubscribeAll;
+                        }
+                    };
 
-            let ctx = ActivityEventContext { subscriber };
-            let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
-            debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
+                    log_scope!(o!("subscriber" => E(subscriber)));
 
-            if let EventUnblockResult::Unblock = unblock {
-                // entity is now unblocked
-                updates.remove::<BlockingActivityComponent>(subscriber);
-            }
+                    let ctx = ActivityEventContext { subscriber };
+                    let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
+                    debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
 
-            unsubscribe
-        }, |events| {
+                    if let EventUnblockResult::Unblock = unblock {
+                        // entity is now unblocked
+                        updates.remove::<BlockingActivityComponent>(subscriber);
+                    }
 
-            // log all events per subject
-            for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
-                let logging = match logging
-                    .get_mut(subject) {
-                    Some(comp) => comp,
-                    None => continue,
-                };
+                    unsubscribe
+                }, |events| {
 
-                logging.log_events(events.map(|e| &e.payload));
-            }
-        });
+                    // log all events per subject
+                    for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
+                        let logging = match logging
+                            .get_mut(subject) {
+                            Some(comp) => comp,
+                            None => continue,
+                        };
+
+                        logging.log_events(events.map(|e| &e.payload));
+                    }
+                });
+        */
     }
 }
 

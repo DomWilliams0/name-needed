@@ -22,21 +22,21 @@ pub struct Runtime(Rc<RefCell<RuntimeInner>>);
 #[derive(Eq, PartialEq, Copy, Clone, Default)]
 pub struct TaskHandle(u64);
 
-struct Task {
+pub struct Task {
     runtime: Runtime,
     handle: TaskHandle,
     future: RefCell<Option<LocalBoxFuture<'static, ()>>>,
 }
 
 #[derive(Clone)]
-struct TaskRef(Rc<Task>);
+pub struct TaskRef(Rc<Task>);
 
 // everything will run on the main thread
 unsafe impl Send for TaskRef {}
 unsafe impl Sync for TaskRef {}
 
 impl Runtime {
-    pub fn spawn(&self, future: impl Future<Output = ()> + 'static) {
+    pub fn spawn(&self, future: impl Future<Output = ()> + 'static) -> TaskRef {
         let mut runtime = self.0.borrow_mut();
         let task = Task {
             runtime: self.clone(),
@@ -45,7 +45,9 @@ impl Runtime {
         };
 
         // task is ready immediately
-        runtime.ready.push(TaskRef(Rc::new(task)));
+        let task = TaskRef(Rc::new(task));
+        runtime.ready.push(task.clone());
+        task
     }
 
     /// Uses game state and events to update ready status of queued tasks, **does not execute any
@@ -57,7 +59,10 @@ impl Runtime {
     /// Polls all ready tasks
     pub fn tick(&self) {
         let mut runtime = self.0.borrow_mut();
-        trace!("{} ready tasks", runtime.ready.len());
+        if !runtime.ready.is_empty() {
+            trace!("{} ready tasks", runtime.ready.len());
+        }
+
         for task in runtime.ready.drain(..) {
             let mut fut_slot = task.0.future.borrow_mut();
             if let Some(mut fut) = fut_slot.take() {
@@ -95,6 +100,17 @@ impl Default for Runtime {
         });
 
         Runtime(Rc::new(inner))
+    }
+}
+
+impl TaskRef {
+    pub fn is_finished(&self) -> bool {
+        self.0.future.borrow().is_none()
+    }
+
+    pub fn cancel(self) {
+        // drop future
+        let _ = self.0.future.borrow_mut().take();
     }
 }
 
@@ -151,25 +167,30 @@ mod tests {
 
         let fut2 = fut.clone();
         let it_worked2 = it_worked.clone();
-        runtime.spawn(async move {
+        let task = runtime.spawn(async move {
             debug!("here we go!!");
             let msg = fut2.await;
             debug!("all done!!!! string is '{}'", msg);
             it_worked2.store(true, Ordering::Relaxed);
         });
 
+        assert!(!task.is_finished());
+
         for _ in 0..4 {
             runtime.refresh_ready_tasks();
             runtime.tick();
+            assert!(!task.is_finished());
         }
 
         fut.trigger("nice");
+        assert!(!task.is_finished());
 
         for _ in 0..2 {
             runtime.refresh_ready_tasks();
             runtime.tick();
         }
 
+        assert!(task.is_finished());
         assert!(it_worked.load(Ordering::Relaxed), "future did not complete");
     }
 }

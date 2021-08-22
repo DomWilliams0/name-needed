@@ -1,4 +1,4 @@
-# TODOs (346)
+# TODOs (356)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,6 +131,13 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
+ * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (6)
+   * `// TODO need a context that can be stored forever`
+   * `// TODO temporary`
+   * `// TODO temporary`
+   * `debug!("TODO wandering");`
+   * `// TODO reimplement nop`
+   * `// TODO ensure destructor runs when cancelled`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO move subactivity errors somewhere else`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
@@ -152,6 +159,11 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (4)
+   * `// TODO rename`
+   * `// TODO access to world`
+   * `// TODO cancel current`
+   * `// TODO unsubscribe from all events from previous activity`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`
@@ -279,11 +291,10 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
-   * `// TODO new activity system`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (4)
    * `// TODO remove box and make this type unsized, it's in an rc anyway`
@@ -445,6 +456,8 @@
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
+   * `ecs.helpers_dev().force_activity(e, AiAction::Wander); // TODO temporary`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

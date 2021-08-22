@@ -8,12 +8,12 @@ use crate::event::{EntityEvent, EntityEventQueue};
 
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::item::{ContainerComponent, ContainerResolver};
+use crate::runtime::{Runtime, TaskRef};
 use crate::{definitions, WorldRef};
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
-use std::ops::{Deref, DerefMut};
-use crate::runtime::{Runtime, RuntimeHandle};
 use std::future::Future;
+use std::ops::{Deref, DerefMut};
 
 pub struct EcsWorld {
     world: SpecsWorld,
@@ -127,8 +127,8 @@ impl EcsWorld {
         self.component_registry.all_components_for(self, entity)
     }
 
-    pub fn spawn_task(&mut self, task: impl Future<Output = ()> + 'static + Send) {
-        let runtime = self.resource::<RuntimeHandle>();
+    pub fn spawn_task(&mut self, task: impl Future<Output = ()> + 'static) -> TaskRef {
+        let runtime = self.resource::<Runtime>();
         runtime.spawn(task)
     }
 }

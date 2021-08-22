@@ -8,11 +8,11 @@ use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
-use crate::activity::{ActivityEventSystem, ActivitySystem};
+use crate::activity::{ActivityEventSystem, ActivitySystem, ActivitySystem2};
 use crate::ai::{AiAction, AiComponent, AiSystem};
 
 use crate::ecs::*;
-use crate::event::{EntityEventQueue, EntityTimers};
+use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
     UiCommand, UiRequest, UiResponsePayload,
@@ -30,6 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
@@ -180,7 +181,8 @@ impl<R: Renderer> Simulation<R> {
 
         // choose and tick activity
         AiSystem.run_now(&self.ecs_world);
-        ActivitySystem.run_now(&self.ecs_world);
+        ActivitySystem2.run_now(&self.ecs_world);
+        self.ecs_world.resource::<Runtime>().tick();
 
         // follow paths with steering
         PathSteeringSystem.run_now(&self.ecs_world);
@@ -192,7 +194,8 @@ impl<R: Renderer> Simulation<R> {
         MovementFulfilmentSystem.run_now(&self.ecs_world);
 
         // process entity events
-        ActivityEventSystem.run_now(&self.ecs_world);
+        // ActivityEventSystem.run_now(&self.ecs_world);
+        RuntimeSystem.run_now(&self.ecs_world);
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
@@ -570,7 +573,8 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(PlayerSociety::default());
     world.insert(EntityEventQueue::default());
     world.insert(Spatial::default());
-    world.insert(EntityTimers::default());
+    world.insert(RuntimeTimers::default());
+    world.insert(Runtime::default());
 }
 
 fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {

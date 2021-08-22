@@ -5,7 +5,7 @@ use crate::activity::subactivities::GoToSubActivity;
 use crate::activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 use crate::ecs::ComponentGetError;
 use crate::event::{
-    EntityEvent, EntityEventPayload, EntityEventType, EntityTimers, EventSubscription, TimerToken,
+    EntityEvent, EntityEventPayload, EntityEventType, EventSubscription, RuntimeTimers, TimerToken,
 };
 use crate::path::WANDER_SPEED;
 use crate::{nop_subactivity, unexpected_event, ComponentWorld, TransformComponent};
@@ -83,11 +83,12 @@ impl Activity for WanderActivity {
             WanderState::Loitering(count) => {
                 trace!("loitering for {count} ticks", count = count);
 
-                let token = ctx
-                    .world
-                    .resource_mut::<EntityTimers>()
-                    .schedule(count as u32, ctx.entity);
-                self.subactivity = WanderSubActivity::Loitering(token);
+                unimplemented!();
+                // let token = ctx
+                //     .world
+                //     .resource_mut::<RuntimeTimers>()
+                //     .schedule(count as u32, ctx.entity);
+                // self.subactivity = WanderSubActivity::Loitering(token);
 
                 ctx.subscribe_to(
                     ctx.entity,
@@ -146,7 +147,8 @@ impl Activity for WanderActivity {
         ctx.clear_path();
 
         if let WanderSubActivity::Loitering(timer) = self.subactivity {
-            ctx.world.resource_mut::<EntityTimers>().cancel(timer);
+            unimplemented!()
+            // ctx.world.resource_mut::<RuntimeTimers>().cancel(timer);
         }
         Ok(())
     }

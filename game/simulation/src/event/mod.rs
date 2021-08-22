@@ -14,6 +14,7 @@ pub mod prelude {
     };
 }
 
+use crate::runtime::{ManualFuture, TaskHandle};
 pub use timer::{Timer, TimerToken, Timers, Token};
 
-pub type EntityTimers = Timers<crate::ecs::Entity, TimerToken>;
+pub type RuntimeTimers = Timers<ManualFuture<()>, TaskHandle>;
