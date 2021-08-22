@@ -1,4 +1,4 @@
-# TODOs (349)
+# TODOs (346)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -266,12 +266,9 @@
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/runtime/futures.rs](game/simulation/src/runtime/futures.rs) (1)
    * `// TODO could use rc and refcell instead`
- * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (5)
-   * `// TODO could use Rc`
-   * `// TODO dont need Send requirement`
-   * `// TODO dont need mutex or option probably`
-   * `// take temporarily TODO maybeuninit`
-   * `// TODO dont need arc`
+ * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
+   * `// TODO`
+   * `// TODO unnecessary unconditional clone of task reference?`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)

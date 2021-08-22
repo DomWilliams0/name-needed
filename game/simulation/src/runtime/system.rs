@@ -1,7 +1,7 @@
 use crate::activity::{BlockingActivityComponent, EventUnblockResult, EventUnsubscribeResult};
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, RuntimeTimers};
-use crate::runtime::{Runtime, RuntimeHandle};
+use crate::runtime::Runtime;
 use crate::{ActivityComponent, EntityLoggingComponent, Tick};
 use common::*;
 
@@ -12,7 +12,7 @@ impl<'a> System<'a> for RuntimeSystem {
     type SystemData = (
         Write<'a, EntityEventQueue>,
         Write<'a, RuntimeTimers>,
-        Read<'a, RuntimeHandle>,
+        Read<'a, Runtime>,
         WriteStorage<'a, EntityLoggingComponent>,
         WriteStorage<'a, ActivityComponent>,
         Read<'a, LazyUpdate>,

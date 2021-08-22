@@ -7,4 +7,4 @@
 	* [ ] nop that only uses a timer
 	* [ ] wander that uses goto
 	* [ ] ...the remaining activities
-* [ ] consider removing unnecessary Arc and thread safety from single threaded runtime
+* [X] consider removing unnecessary Arc and thread safety from single threaded runtime
