@@ -28,6 +28,12 @@ pub struct Task {
     future: RefCell<Option<LocalBoxFuture<'static, ()>>>,
 }
 
+impl Drop for Task {
+    fn drop(&mut self) {
+        trace!("dropping task {:?}", self.handle);
+    }
+}
+
 #[derive(Clone)]
 pub struct TaskRef(Rc<Task>);
 
@@ -109,6 +115,8 @@ impl TaskRef {
     }
 
     pub fn cancel(self) {
+        trace!("cancelling task {:?}", self.0.handle);
+
         // drop future
         let _ = self.0.future.borrow_mut().take();
     }
@@ -138,14 +146,6 @@ unsafe impl ViaRawPointer for TaskRef {
 impl Debug for TaskHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "TaskHandle({:#x})", self.0)
-    }
-}
-
-impl crate::event::Token for TaskHandle {
-    fn increment(&mut self) -> Self {
-        let prev = *self;
-        self.0 += 1;
-        prev
     }
 }
 

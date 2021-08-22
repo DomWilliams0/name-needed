@@ -5,16 +5,16 @@ use common::*;
 use crate::event::{EntityEvent, EntityEventQueue};
 
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
+use crate::ecs::component::ComponentRegistry;
+use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 use crate::runtime::{Runtime, TaskRef};
-use crate::{definitions, WorldRef, Entity};
+use crate::{definitions, Entity, WorldRef};
+use specs::prelude::Resource;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
-use crate::ecs::component::ComponentRegistry;
-use crate::ecs::*;
-use specs::prelude::Resource;
 
 pub type SpecsWorld = specs::World;
 pub struct EcsWorld {

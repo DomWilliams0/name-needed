@@ -19,7 +19,6 @@ pub struct Timers<D, T: Token> {
 }
 
 /// Unique token to differentiate timers
-#[deprecated]
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct TimerToken(u64);
 

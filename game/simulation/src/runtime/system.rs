@@ -23,7 +23,7 @@ impl<'a> System<'a> for RuntimeSystem {
         (mut events, mut timers, runtime, mut logging, mut activities, updates): Self::SystemData,
     ) {
         // consume timers
-        for (task_handle, mut fut) in timers.maintain(Tick::fetch()) {
+        for (task_handle, fut) in timers.maintain(Tick::fetch()) {
             trace!("timer elapsed"; "task" => ?task_handle);
             fut.trigger(());
         }

@@ -1,4 +1,4 @@
-# TODOs (359)
+# TODOs (352)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,14 +131,10 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (7)
-   * `// TODO need a context that can be stored forever`
-   * `// TODO temporary`
+ * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
    * `// TODO temporary`
    * `debug!("TODO wandering");`
    * `// TODO ensure component refs cant be held across awaits`
-   * `// TODO reimplement nop`
-   * `// TODO ensure destructor runs when cancelled`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO move subactivity errors somewhere else`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
@@ -160,11 +156,9 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (4)
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (2)
    * `// TODO rename`
-   * `// TODO cancel current`
    * `// TODO unsubscribe from all events from previous activity`
-   * `// TODO store task`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`
@@ -279,8 +273,6 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
- * [game/simulation/src/runtime/futures.rs](game/simulation/src/runtime/futures.rs) (1)
-   * `// TODO could use rc and refcell instead`
  * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
    * `// TODO`
    * `// TODO unnecessary unconditional clone of task reference?`

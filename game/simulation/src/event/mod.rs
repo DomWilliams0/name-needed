@@ -17,4 +17,4 @@ pub mod prelude {
 use crate::runtime::{ManualFuture, TaskHandle};
 pub use timer::{Timer, TimerToken, Timers, Token};
 
-pub type RuntimeTimers = Timers<ManualFuture<()>, TaskHandle>;
+pub type RuntimeTimers = Timers<ManualFuture<()>, TimerToken>;
