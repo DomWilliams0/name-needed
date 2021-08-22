@@ -5,9 +5,10 @@
 * [o] async-safe activity context to get access to the world
 	* [ ] replace EcsWorldFrameRef with this
 * [ ] remove timer elapsed event
-* [ ] new activity system with async activities
+* [.] new activity system with async activities
 	* [X] nop that only uses a timer
 	* [ ] wander that uses goto
 	* [ ] ...the remaining activities
+* [ ] report activity and subactivities in ui
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
 * [X] cancelling/interrupting of current activity

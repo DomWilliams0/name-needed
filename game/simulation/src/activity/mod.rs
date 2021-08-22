@@ -2,6 +2,7 @@ pub use activities::*;
 pub(crate) use activity::ActivityFinish;
 pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
 // TODO move subactivity errors somewhere else
+pub use activities2::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use subactivities::{EquipItemError, HaulError, PickupItemError};
 pub use system::{
@@ -11,6 +12,7 @@ pub use system2::{ActivityComponent2, ActivitySystem2};
 
 #[deprecated]
 mod activities;
+mod activities2;
 mod activity;
 mod activity2;
 mod event_logging;
@@ -20,7 +22,7 @@ mod system;
 mod system2;
 
 mod action_to_activity {
-    use crate::activity::activity2::{Activity2, TestActivity2};
+    use crate::activity::activity2::Activity2;
     use crate::activity::Activity;
     use crate::ai::AiAction;
     use crate::item::ItemsToPickUp;
@@ -36,7 +38,8 @@ mod action_to_activity {
             }
 
             match self {
-                AiAction::Wander => activity!(TestActivity2::default()),
+                AiAction::Wander => activity!(WanderActivity2::default()),
+                AiAction::Nop => activity!(NopActivity2::default()),
                 _ => unreachable!(),
                 // AiAction::Nop => activity!(NopActivity::default()),
                 // AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),

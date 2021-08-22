@@ -1,4 +1,4 @@
-# TODOs (352)
+# TODOs (351)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,8 +131,7 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
-   * `// TODO temporary`
+ * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (2)
    * `debug!("TODO wandering");`
    * `// TODO ensure component refs cant be held across awaits`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)

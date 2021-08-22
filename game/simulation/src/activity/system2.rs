@@ -1,16 +1,17 @@
+use std::pin::Pin;
+
 use async_trait::async_trait;
 use futures::Future;
 
 use common::*;
 
-use crate::activity::activity2::{Activity2, NopActivity2};
-use crate::activity::ActivityContext;
+use crate::activity::activity2::{Activity2, ActivityContext2};
+use crate::activity::{ActivityContext, NopActivity2};
 use crate::ai::AiAction;
 use crate::ecs::*;
 use crate::event::RuntimeTimers;
 use crate::job::{SocietyJobRef, SocietyTask};
 use crate::runtime::{ManualFuture, Runtime, TaskHandle, TaskRef, TimerFuture};
-use std::pin::Pin;
 
 // TODO rename
 #[derive(Component, EcsComponent)]
@@ -24,15 +25,6 @@ pub struct ActivityComponent2 {
 
     current_task: Option<TaskRef>,
 }
-
-pub struct ActivityContext2<'a> {
-    pub entity: Entity,
-    pub world: Pin<&'a EcsWorld>,
-}
-
-// only used on the main thread
-unsafe impl Sync for ActivityContext2<'_> {}
-unsafe impl Send for ActivityContext2<'_> {}
 
 /// Interrupts current with new activities
 pub struct ActivitySystem2<'a>(pub Pin<&'a EcsWorld>);
@@ -91,7 +83,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 .unwrap_or(true)
             {
                 // current task has finished
-                debug!("current activity has ended, reverting to nop"; e);
+                debug!("no activity, reverting to nop"; e);
                 new_activity = Some(Box::new(NopActivity2::default()));
             }
 
@@ -143,14 +135,5 @@ impl ActivityComponent2 {
                 }
             };
         }));
-    }
-}
-
-impl<'a> ActivityContext2<'a> {
-    pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> + 'a {
-        let timers = self.world.resource_mut::<RuntimeTimers>();
-        let trigger = ManualFuture::default();
-        let token = timers.schedule(ticks, trigger.clone());
-        TimerFuture::new(trigger, token, self.world)
     }
 }
