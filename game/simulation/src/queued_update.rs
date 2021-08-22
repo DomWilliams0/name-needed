@@ -8,8 +8,9 @@ use world::BlockDamageResult;
 
 use crate::ecs::EcsWorld;
 use crate::ComponentWorld;
+use std::pin::Pin;
 
-type Update = dyn FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>;
+type Update = dyn FnOnce(Pin<&mut EcsWorld>) -> Result<(), Box<dyn Error>>;
 type Entry = (&'static str, Box<Update>);
 
 pub struct QueuedUpdates {
@@ -27,7 +28,7 @@ impl Default for QueuedUpdates {
 }
 
 impl QueuedUpdates {
-    pub fn queue<F: 'static + FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>>(
+    pub fn queue<F: 'static + FnOnce(Pin<&mut EcsWorld>) -> Result<(), Box<dyn Error>>>(
         &self,
         name: &'static str,
         update: F,
@@ -41,7 +42,7 @@ impl QueuedUpdates {
         trace!("queued update #{n} for next tick", n = old_len; "name" => name)
     }
 
-    pub fn execute(&mut self, world: &mut EcsWorld) {
+    pub fn execute(&mut self, mut world: Pin<&mut EcsWorld>) {
         let mut vec = self.updates.borrow_mut();
         if !vec.is_empty() {
             debug!("running {count} queued updates", count = vec.len());
@@ -49,7 +50,7 @@ impl QueuedUpdates {
             for (name, update) in vec.drain(..) {
                 log_scope!(o!("queued_update" => name));
 
-                match update(world) {
+                match update(world.as_mut()) {
                     Err(e) => warn!("queued update failed"; "error" => %e),
                     Ok(_) => trace!("queued update was successful"),
                 }

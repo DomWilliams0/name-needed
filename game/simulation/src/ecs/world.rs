@@ -80,7 +80,7 @@ pub trait ComponentWorld: ContainerResolver + Sized {
         }
     }
 
-    fn post_event(&mut self, event: EntityEvent) {
+    fn post_event(&self, event: EntityEvent) {
         let queue = self.resource_mut::<EntityEventQueue>();
         queue.post(event)
     }

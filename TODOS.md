@@ -1,4 +1,4 @@
-# TODOs (356)
+# TODOs (357)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,11 +131,12 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (6)
+ * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (7)
    * `// TODO need a context that can be stored forever`
    * `// TODO temporary`
    * `// TODO temporary`
    * `debug!("TODO wandering");`
+   * `// TODO ensure component refs cant be held across awaits`
    * `// TODO reimplement nop`
    * `// TODO ensure destructor runs when cancelled`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
@@ -161,9 +162,9 @@
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
  * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (4)
    * `// TODO rename`
-   * `// TODO access to world`
    * `// TODO cancel current`
    * `// TODO unsubscribe from all events from previous activity`
+   * `// TODO store task`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`

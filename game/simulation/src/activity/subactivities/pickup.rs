@@ -52,7 +52,7 @@ impl SubActivity for PickupItemSubActivity {
 
                     inventory
                         .insert_item(
-                            world,
+                            &*world,
                             item,
                             haulable.extra_hands,
                             physical.volume,

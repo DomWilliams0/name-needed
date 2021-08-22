@@ -9,6 +9,7 @@ use crate::ai::AiAction;
 use crate::ecs::*;
 use crate::job::{SocietyJobRef, SocietyTask};
 use crate::runtime::{ManualFuture, Runtime, TaskHandle};
+use std::pin::Pin;
 
 // TODO rename
 #[derive(Component, EcsComponent)]
@@ -23,13 +24,17 @@ pub struct ActivityComponent2 {
     current: Box<dyn Activity2>,
 }
 
-pub struct ActivityContext2 {
+pub struct ActivityContext2<'a> {
     pub entity: Entity,
-    // TODO access to world
+    pub world: Pin<&'a EcsWorld>,
 }
 
+// only used on the main thread
+unsafe impl Sync for ActivityContext2<'_> {}
+unsafe impl Send for ActivityContext2<'_> {}
+
 /// Interrupts current with new activities
-pub struct ActivitySystem2;
+pub struct ActivitySystem2<'a>(pub Pin<&'a EcsWorld>);
 
 impl Default for ActivityComponent2 {
     fn default() -> Self {
@@ -40,15 +45,14 @@ impl Default for ActivityComponent2 {
     }
 }
 
-impl<'a> System<'a> for ActivitySystem2 {
+impl<'a> System<'a> for ActivitySystem2<'a> {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, Runtime>,
-        Read<'a, EcsWorldFrameRef>,
         WriteStorage<'a, ActivityComponent2>,
     );
 
-    fn run(&mut self, (entities, runtime, world, mut activities): Self::SystemData) {
+    fn run(&mut self, (entities, runtime, mut activities): Self::SystemData) {
         for (entity, activity) in (&entities, &mut activities).join() {
             if let Some((new_action, new_society_task)) = activity.new_activity.take() {
                 debug!("interrupting activity with new"; "action" => ?new_action);
@@ -73,8 +77,20 @@ impl<'a> System<'a> for ActivitySystem2 {
                 // not necessary to manually cancel society reservation here, as the ai interruption
                 // already did
 
+                let ctx = ActivityContext2 {
+                    entity,
+                    world: self.0,
+                };
+
+                // safety: ecs world is pinned and guaranteed to be valid as long as this system
+                // is being ticked
+                let ctx = unsafe {
+                    std::mem::transmute::<ActivityContext2, ActivityContext2<'static>>(ctx)
+                };
+
+                // TODO store task
                 let task = runtime.spawn(async move {
-                    if let Err(err) = activity.dew_it().await {
+                    if let Err(err) = activity.dew_it(ctx).await {
                         warn!("activity failed"; "activity" => %activity, "error" => %err);
                     }
                 });

@@ -41,6 +41,7 @@ use crate::{
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
+use std::pin::Pin;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
@@ -60,7 +61,7 @@ static mut TICK: u32 = 0;
 pub struct Tick(u32);
 
 pub struct Simulation<R: Renderer> {
-    ecs_world: EcsWorld,
+    ecs_world: Pin<Box<EcsWorld>>,
     voxel_world: WorldRef,
 
     world_loader: ThreadedWorldLoader,
@@ -121,7 +122,7 @@ impl<R: Renderer> Simulation<R> {
         reset_tick();
 
         Ok(Self {
-            ecs_world,
+            ecs_world: Box::pin(ecs_world),
             voxel_world,
             world_loader,
             debug_renderers,
@@ -159,7 +160,7 @@ impl<R: Renderer> Simulation<R> {
         // per tick maintenance
         // must remove resource from world first so we can use &mut ecs_world
         let mut updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
-        updates.execute(&mut self.ecs_world);
+        updates.execute(Pin::as_mut(&mut self.ecs_world));
         self.ecs_world.insert(updates);
 
         self.ecs_world.maintain();
@@ -181,7 +182,7 @@ impl<R: Renderer> Simulation<R> {
 
         // choose and tick activity
         AiSystem.run_now(&self.ecs_world);
-        ActivitySystem2.run_now(&self.ecs_world);
+        ActivitySystem2(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
         self.ecs_world.resource::<Runtime>().tick();
 
         // follow paths with steering
@@ -314,7 +315,7 @@ impl<R: Renderer> Simulation<R> {
                     let entity = match self
                         .ecs_world
                         .resource_mut::<SelectedEntity>()
-                        .get(&self.ecs_world)
+                        .get(&*self.ecs_world)
                     {
                         Some(e) => e,
                         None => {
@@ -340,7 +341,7 @@ impl<R: Renderer> Simulation<R> {
                     }
                 }
                 UiRequest::IssueSocietyCommand(society, command) => {
-                    let job = match command.into_job(&self.ecs_world) {
+                    let job = match command.into_job(&*self.ecs_world) {
                         Ok(job) => job,
                         Err(cmd) => {
                             warn!("failed to issue society command"; "command" => ?cmd);
@@ -395,7 +396,7 @@ impl<R: Renderer> Simulation<R> {
                     info!("executing script"; "path" => %path.display());
                     let result = self
                         .scripting
-                        .eval_path(&path, &self.ecs_world, &self.voxel_world)
+                        .eval_path(&path, &*self.ecs_world, &self.voxel_world)
                         .map(|output| output.into_string());
 
                     if let Err(err) = result.as_ref() {
@@ -429,7 +430,7 @@ impl<R: Renderer> Simulation<R> {
         input: &[InputEvent],
     ) -> R::Target {
         // process input before rendering
-        InputSystem { events: input }.run_now(&self.ecs_world);
+        InputSystem { events: input }.run_now(&*self.ecs_world);
 
         // start frame
         renderer.init(target);
@@ -444,7 +445,7 @@ impl<R: Renderer> Simulation<R> {
                     interpolation: interpolation as f32,
                 };
 
-                render_system.run_now(&self.ecs_world);
+                render_system.run_now(&*self.ecs_world);
             }
             if let Err(e) = renderer.sim_finish() {
                 warn!("render sim_finish() failed"; "error" => %e);
@@ -454,7 +455,7 @@ impl<R: Renderer> Simulation<R> {
         // render debug shapes
         {
             renderer.debug_start();
-            let ecs_world = &self.ecs_world;
+            let ecs_world = &*self.ecs_world;
             let voxel_world = self.voxel_world.borrow();
             let world_loader = &self.world_loader;
 
@@ -505,7 +506,7 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn as_lite_ref(&self) -> SimulationRefLite {
         SimulationRefLite {
-            ecs: &self.ecs_world,
+            ecs: &*self.ecs_world,
             world: &self.voxel_world,
             loader: &self.world_loader,
         }
@@ -513,7 +514,7 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn as_ref<'a>(&'a self, viewer: &'a WorldViewer) -> SimulationRef<'a> {
         SimulationRef {
-            ecs: &self.ecs_world,
+            ecs: &*self.ecs_world,
             world: &self.voxel_world,
             loader: &self.world_loader,
             viewer,

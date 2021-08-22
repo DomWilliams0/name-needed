@@ -100,6 +100,7 @@ fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
     }
 }
 
+#[allow(unused_mut)]
 fn do_main() -> BoxedResult<()> {
     let args = argh::from_env::<Args>();
 

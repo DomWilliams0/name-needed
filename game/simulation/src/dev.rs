@@ -17,6 +17,7 @@ use crate::{
     ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
     TransformComponent,
 };
+use std::pin::Pin;
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtDev<'w>(&'w EcsWorld);
@@ -175,7 +176,7 @@ impl EcsExtDev<'_> {
         &mut self,
         wat: &'static str,
         container_pos: WorldPosition,
-        mut f: impl FnMut(&mut EcsWorld, Entity) + 'static,
+        mut f: impl FnMut(Pin<&mut EcsWorld>, Entity) + 'static,
     ) {
         self.resource::<QueuedUpdates>().queue(wat, move |world| {
             let w = world.voxel_world();
@@ -237,7 +238,7 @@ impl EcsExtDev<'_> {
             "queue society haul to container job",
             container_pos,
             move |world, container| {
-                let job = HaulJob::with_target_container(haulee, container, world)
+                let job = HaulJob::with_target_container(haulee, container, &*world)
                     .expect("cant create job");
 
                 world
@@ -245,7 +246,7 @@ impl EcsExtDev<'_> {
                     .society_by_handle_mut(society)
                     .expect("bad society")
                     .jobs_mut()
-                    .submit(SocietyJob::create(world, job));
+                    .submit(SocietyJob::create(&*world, job));
 
                 info!(
                     "adding society job to haul item to container";

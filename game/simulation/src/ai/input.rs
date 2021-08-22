@@ -236,7 +236,7 @@ fn search_local_area(
 ) {
     let conditions = world.read_storage::<ConditionComponent>();
 
-    let voxel_world_ref = &*world.read_resource::<WorldRef>();
+    let voxel_world_ref = &*world.resource::<WorldRef>();
     let voxel_world = voxel_world_ref.borrow();
 
     // find the area we are in

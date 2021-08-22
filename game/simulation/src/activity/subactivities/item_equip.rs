@@ -71,10 +71,10 @@ impl SubActivity for ItemEquipSubActivity {
                         // TODO inventory operations should not be immediate
 
                         let slot = inventory
-                            .search_mut(&filter, world)
+                            .search_mut(&filter, &*world)
                             .ok_or(EquipItemError::NotInInventory)?;
 
-                        if slot.equip(extra_hands, world) {
+                        if slot.equip(extra_hands, &*world) {
                             world
                                 .helpers_comps()
                                 .add_to_container(item, ContainedInComponent::InventoryOf(holder));
