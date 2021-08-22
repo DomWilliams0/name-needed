@@ -1,4 +1,4 @@
-# TODOs (342)
+# TODOs (349)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -264,6 +264,14 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
+ * [game/simulation/src/runtime/futures.rs](game/simulation/src/runtime/futures.rs) (1)
+   * `// TODO could use rc and refcell instead`
+ * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (5)
+   * `// TODO could use Rc`
+   * `// TODO dont need Send requirement`
+   * `// TODO dont need mutex or option probably`
+   * `// take temporarily TODO maybeuninit`
+   * `// TODO dont need arc`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)
@@ -274,10 +282,11 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (5)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
+   * `// TODO new activity system`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (4)
    * `// TODO remove box and make this type unsized, it's in an rc anyway`

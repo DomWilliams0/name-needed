@@ -2624,6 +2624,7 @@ dependencies = [
  "config",
  "daggy",
  "ecs-derive",
+ "futures",
  "hex-serde",
  "inventory",
  "rbl_circular_buffer",

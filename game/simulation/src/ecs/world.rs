@@ -12,6 +12,8 @@ use crate::{definitions, WorldRef};
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 use std::ops::{Deref, DerefMut};
+use crate::runtime::{Runtime, RuntimeHandle};
+use std::future::Future;
 
 pub struct EcsWorld {
     world: SpecsWorld,
@@ -123,6 +125,11 @@ impl EcsWorld {
     /// Iterates through all known component types and checks each one
     pub fn all_components_for(&self, entity: Entity) -> impl Iterator<Item = &'static str> + '_ {
         self.component_registry.all_components_for(self, entity)
+    }
+
+    pub fn spawn_task(&mut self, task: impl Future<Output = ()> + 'static + Send) {
+        let runtime = self.resource::<RuntimeHandle>();
+        runtime.spawn(task)
     }
 }
 
