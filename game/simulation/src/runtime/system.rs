@@ -1,4 +1,6 @@
-use crate::activity::{BlockingActivityComponent, EventUnblockResult, EventUnsubscribeResult};
+use crate::activity::{
+    ActivityComponent2, BlockingActivityComponent, EventUnblockResult, EventUnsubscribeResult,
+};
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, RuntimeTimers};
 use crate::runtime::Runtime;
@@ -14,7 +16,7 @@ impl<'a> System<'a> for RuntimeSystem {
         Write<'a, RuntimeTimers>,
         Read<'a, Runtime>,
         WriteStorage<'a, EntityLoggingComponent>,
-        WriteStorage<'a, ActivityComponent>,
+        WriteStorage<'a, ActivityComponent2>,
         Read<'a, LazyUpdate>,
     );
 
@@ -25,43 +27,46 @@ impl<'a> System<'a> for RuntimeSystem {
         // consume timers
         for (task_handle, fut) in timers.maintain(Tick::fetch()) {
             trace!("timer elapsed"; "task" => ?task_handle);
+            // TODO could avoid the need for allocations in ManualFutures here and lookup the task in the runtime by id instead?
             fut.trigger(());
         }
-        /*
-            events.consume_events(|subscriber, event| {
-            let activity = match activities
-                .get_mut(subscriber) {
+
+        // log events
+        for (subject, events) in events.events().group_by(|evt| evt.subject).into_iter() {
+            let logging = match logging.get_mut(subject.into()) {
                 Some(comp) => comp,
+                None => continue,
+            };
+
+            logging.log_events(events.map(|e| &e.payload));
+        }
+
+        // consume events
+        events.consume_events(|subscriber, evt| {
+            let subscriber = Entity::from(subscriber);
+            let task = match activities.get_mut(subscriber.into()) {
+                Some(comp) => {
+                    if let Some(task) = comp.task() {
+                        task
+                    } else {
+                        warn!("no current task?"; "subscriber" => subscriber); // TODO wut do? task is finished?
+                        return EventUnsubscribeResult::UnsubscribeAll;
+                    }
+                }
                 None => {
-                    warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
+                    warn!("subscriber is missing activity component"; "event" => ?evt, "subscriber" => subscriber);
                     return EventUnsubscribeResult::UnsubscribeAll;
                 }
             };
 
-            log_scope!(o!("subscriber" => E(subscriber)));
+            // event has arrived for task, push it onto task event queue
+            task.push_event(evt);
 
-            let ctx = ActivityEventContext { subscriber };
-            let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
-            debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
+            // mark task as ready now to be polled next tick
+            runtime.mark_ready(task);
 
-            if let EventUnblockResult::Unblock = unblock {
-                // entity is now unblocked
-                updates.remove::<BlockingActivityComponent>(subscriber);
-            }
-
-            unsubscribe
-        }, |events| {
-
-            // log all events per subject
-            for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
-                let logging = match logging
-                    .get_mut(subject) {
-                    Some(comp) => comp,
-                    None => continue,
-                };
-
-                logging.log_events(events.map(|e| &e.payload));
-            }
-        });*/
+            // task has not yet responded to event, can't return anything useful here TODO
+            EventUnsubscribeResult::StaySubscribed
+        });
     }
 }

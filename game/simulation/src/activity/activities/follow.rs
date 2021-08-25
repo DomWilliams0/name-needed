@@ -115,10 +115,10 @@ impl Activity for FollowActivity {
                     // stay subscribed anyway
                     (
                         EventUnblockResult::Unblock,
-                        EventUnsubscribeResult::Unsubscribe(EntityEventSubscription(
-                            event.subject,
-                            EventSubscription::Specific(EntityEventType::Arrived),
-                        )),
+                        EventUnsubscribeResult::Unsubscribe(EntityEventSubscription {
+                            subject: event.subject,
+                            subscription: EventSubscription::Specific(EntityEventType::Arrived),
+                        }),
                     )
                 } else {
                     (

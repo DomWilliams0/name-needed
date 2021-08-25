@@ -66,24 +66,27 @@ pub struct EntityEvent {
     pub payload: EntityEventPayload,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum EventSubscription {
     All,
     Specific(EntityEventType),
 }
 
-#[derive(Clone, Debug)]
-pub struct EntityEventSubscription(#[doc = "Subject"] pub Entity, pub EventSubscription);
+#[derive(Clone, Copy, Debug)]
+pub struct EntityEventSubscription {
+    pub subject: Entity,
+    pub subscription: EventSubscription,
+}
 
 impl EntityEventSubscription {
-    pub fn matches(&self, event: &EntityEvent) -> bool {
-        if event.subject != self.0 {
+    pub fn matches(&self, subject: Entity, event_ty: EntityEventType) -> bool {
+        if subject != self.subject {
             return false;
         }
 
-        match self.1 {
+        match self.subscription {
             EventSubscription::All => true,
-            EventSubscription::Specific(ty) => EntityEventType::from(&event.payload) == ty,
+            EventSubscription::Specific(ty) => event_ty == ty,
         }
     }
 }

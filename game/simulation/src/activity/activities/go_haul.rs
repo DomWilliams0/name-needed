@@ -292,10 +292,10 @@ impl Activity for HaulActivity {
                         // unsubscribe from arrival/self events but stay subscribed to all item events
                         (
                             EventUnblockResult::Unblock,
-                            EventUnsubscribeResult::Unsubscribe(EntityEventSubscription(
-                                ctx.subscriber,
-                                EventSubscription::All,
-                            )),
+                            EventUnsubscribeResult::Unsubscribe(EntityEventSubscription {
+                                subject: ctx.subscriber,
+                                subscription: EventSubscription::All,
+                            }),
                         )
                     }
 

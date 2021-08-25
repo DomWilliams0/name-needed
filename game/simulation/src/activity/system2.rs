@@ -12,6 +12,7 @@ use crate::ecs::*;
 use crate::event::RuntimeTimers;
 use crate::job::{SocietyJobRef, SocietyTask};
 use crate::runtime::{ManualFuture, Runtime, TaskHandle, TaskRef, TimerFuture};
+use std::mem::transmute;
 
 // TODO rename
 #[derive(Component, EcsComponent)]
@@ -88,13 +89,40 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
             }
 
             // spawn task for new activity
-            if let Some(new_activity) = new_activity {
-                let ctx = ActivityContext2 {
-                    entity: e.into(),
-                    world: self.0,
-                };
+            if let Some(mut new_activity) = new_activity {
+                // safety: ecs world is pinned and guaranteed to be valid as long as this system
+                // is being ticked
+                let world = unsafe { transmute::<Pin<&EcsWorld>, Pin<&'static EcsWorld>>(self.0) };
 
-                activity.kick_off(&*runtime, new_activity, ctx);
+                let (tx, rx) = futures::channel::oneshot::channel();
+                let task = runtime.spawn(tx, async move {
+                    // recv task ref from runtime
+                    let task = rx.await.unwrap(); // will not be cancelled
+
+                    // create context
+                    let entity = e.into();
+                    let ctx = ActivityContext2 {
+                        entity,
+                        world,
+                        task,
+                    };
+
+                    // safety: ecs world is pinned and guaranteed to be valid as long as this system
+                    // is being ticked
+                    // let ctx =
+                    //     unsafe { std::mem::transmute::<ActivityContext2, ActivityContext2<'static>>(ctx) };
+
+                    match new_activity.dew_it(ctx).await {
+                        Ok(_) => {
+                            debug!("activity finished"; entity, "activity" => %new_activity);
+                        }
+                        Err(err) => {
+                            debug!("activity failed"; entity, "activity" => %new_activity, "err" => %err);
+                        }
+                    };
+                });
+
+                activity.current_task = Some(task);
             }
         }
     }
@@ -113,27 +141,7 @@ impl ActivityComponent2 {
         // world.remove_lazy::<BlockingActivityComponent>(me);
     }
 
-    fn kick_off(
-        &mut self,
-        runtime: &Runtime,
-        mut activity: Box<dyn Activity2>,
-        ctx: ActivityContext2<'_>,
-    ) {
-        // safety: ecs world is pinned and guaranteed to be valid as long as this system
-        // is being ticked
-        let ctx =
-            unsafe { std::mem::transmute::<ActivityContext2, ActivityContext2<'static>>(ctx) };
-
-        self.current_task = Some(runtime.spawn(async move {
-            let e = ctx.entity;
-            match activity.dew_it(ctx).await {
-                Ok(_) => {
-                    debug!("activity finished"; e, "activity" => %activity);
-                }
-                Err(err) => {
-                    debug!("activity failed"; e, "activity" => %activity, "err" => %err);
-                }
-            };
-        }));
+    pub fn task(&self) -> Option<&TaskRef> {
+        self.current_task.as_ref()
     }
 }

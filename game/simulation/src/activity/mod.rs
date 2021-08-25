@@ -17,6 +17,7 @@ mod activity;
 mod activity2;
 mod event_logging;
 mod subactivities;
+mod subactivities2;
 #[deprecated]
 mod system;
 mod system2;

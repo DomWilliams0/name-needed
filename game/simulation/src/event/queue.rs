@@ -41,10 +41,10 @@ impl EntityEventQueue {
         subscriptions: impl Iterator<Item = EntityEventSubscription>,
     ) {
         subscriptions
-            .group_by(|EntityEventSubscription(subject, _)| *subject)
+            .group_by(|sub| sub.subject)
             .into_iter()
             .for_each(|(subject, subscriptions)| {
-                let subscriptions = subscriptions.map(|EntityEventSubscription(_, sub)| sub);
+                let subscriptions = subscriptions.map(|sub| sub.subscription);
 
                 match self.subscriptions.entry(subject) {
                     Entry::Occupied(mut e) => {
@@ -91,11 +91,10 @@ impl EntityEventQueue {
     }
 
     pub fn unsubscribe(&mut self, subscriber: Entity, unsubscription: EntityEventSubscription) {
-        let EntityEventSubscription(subject, sub) = unsubscription;
-        if let Some(subs) = self.subscriptions.get_mut(&subject) {
+        if let Some(subs) = self.subscriptions.get_mut(&unsubscription.subject) {
             if let Some(idx) = subs.iter().position(|(e, _)| *e == subscriber) {
                 let (_, bitset) = unsafe { subs.get_unchecked_mut(idx) };
-                if bitset.remove(sub) {
+                if bitset.remove(unsubscription.subscription) {
                     self.needs_cleanup += 1;
                 }
             }
@@ -113,18 +112,22 @@ impl EntityEventQueue {
         }
     }
 
+    /// A chance to view all events before consuming them
+    pub fn events(&self) -> impl Iterator<Item = &EntityEvent> + '_ {
+        self.events.iter()
+    }
+
     /// Consumes all events posted since the last call.
     ///
     /// * f: called per subscribed entity, f(subscriber, event)
-    /// * all_events: called with all events regardless of subscriptions
     pub fn consume_events(
         &mut self,
-        mut f: impl FnMut(Entity, &EntityEvent) -> EventUnsubscribeResult,
-        all_events: impl FnOnce(&[EntityEvent]),
+        mut f: impl FnMut(Entity, EntityEvent) -> EventUnsubscribeResult,
     ) {
-        all_events(&self.events);
+        // move out of self
+        let mut events = std::mem::take(&mut self.events);
 
-        let grouped_events = self.events.iter().group_by(|evt| evt.subject);
+        let grouped_events = events.drain(..).group_by(|evt| evt.subject);
 
         for (subject, events) in grouped_events.into_iter() {
             // find subscribers interested in this subject entity
@@ -149,12 +152,15 @@ impl EntityEventQueue {
                 for subscriber in subscribers.iter().filter_map(|(subscriber, sub)| {
                     sub.contains(&event.payload).as_some(subscriber)
                 }) {
+                    let event = event.clone(); // TODO reimplement groupby to own the event without cloning
+
+                    let event_ty = EntityEventType::from(&event.payload);
                     let is_unsubscribed_already = self
                         .unsubscribers
                         .get(subscriber)
                         .map(|unsub| match unsub {
                             None => true, // unsub from all
-                            Some(sub) => sub.matches(event),
+                            Some(sub) => sub.matches(event.subject, event_ty),
                         })
                         .unwrap_or(false);
 
@@ -166,7 +172,14 @@ impl EntityEventQueue {
 
                     debug!("passing event"; "subscriber" => subscriber, "event" => ?event);
                     let result = f(*subscriber, event);
-                    trace!("result"; "result" => ?result, "subscriber" => subscriber, "event" => ?event);
+
+                    #[cfg(not(test))]
+                    {
+                        // TODO the runtime does not return a subscription result synchronously - remove this branch?
+                        assert!(matches!(result, EventUnsubscribeResult::StaySubscribed));
+                    }
+
+                    trace!("result"; "result" => ?result, "subscriber" => subscriber);
 
                     let unsubscription = match result {
                         EventUnsubscribeResult::UnsubscribeAll => None,
@@ -178,6 +191,8 @@ impl EntityEventQueue {
                 }
             }
         }
+
+        drop(grouped_events);
 
         // handle unsubscriptions
         // need to swap vec out from self to be able to access self mutably
@@ -205,7 +220,11 @@ impl EntityEventQueue {
         debug_assert!(unsubs.is_empty());
         std::mem::forget(unsubs);
 
+        // swap back allocation
         self.events.clear();
+        let dummy = std::mem::replace(&mut self.events, events);
+        debug_assert!(dummy.is_empty());
+        std::mem::forget(dummy);
 
         self.maintain()
     }
@@ -362,33 +381,33 @@ mod tests {
         // no subs yet
         q.post(evt_1_dummy_a.clone());
         q.post(evt_1_dummy_b.clone());
-        q.consume_events(|_, _| panic!("no subs"), |_| {});
+        q.consume_events(|_, _| panic!("no subs"));
 
         // sub e2 to e1's dummy A only
         q.subscribe(
             e2,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyA),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyA),
+            }),
         );
 
         q.post(evt_1_dummy_a.clone());
         q.post(evt_1_dummy_b.clone());
-        q.consume_events(
-            |subscriber, e| {
-                assert_eq!(subscriber, e2);
-                assert_eq!(e.subject, e1);
-                assert!(matches!(e.payload, EntityEventPayload::DummyA));
-                EventUnsubscribeResult::UnsubscribeAll
-            },
-            |_| {},
-        );
+        q.consume_events(|subscriber, e| {
+            assert_eq!(subscriber, e2);
+            assert_eq!(e.subject, e1);
+            assert!(matches!(e.payload, EntityEventPayload::DummyA));
+            EventUnsubscribeResult::UnsubscribeAll
+        });
 
         // subscribe to e1 all
         q.subscribe(
             e2,
-            once(EntityEventSubscription(e1, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::All,
+            }),
         );
         q.post(evt_1_dummy_a);
         q.post(evt_1_dummy_b);
@@ -396,25 +415,22 @@ mod tests {
 
         let mut dummy_a = 0;
         let mut dummy_b = 0;
-        q.consume_events(
-            |subscriber, e| {
-                assert_eq!(subscriber, e2);
-                assert_eq!(e.subject, e1);
+        q.consume_events(|subscriber, e| {
+            assert_eq!(subscriber, e2);
+            assert_eq!(e.subject, e1);
 
-                match &e.payload {
-                    EntityEventPayload::DummyA => {
-                        dummy_a += 1;
-                    }
-                    EntityEventPayload::DummyB => {
-                        dummy_b += 1;
-                    }
-                    _ => unreachable!(),
+            match &e.payload {
+                EntityEventPayload::DummyA => {
+                    dummy_a += 1;
                 }
+                EntityEventPayload::DummyB => {
+                    dummy_b += 1;
+                }
+                _ => unreachable!(),
+            }
 
-                EventUnsubscribeResult::StaySubscribed
-            },
-            |_| {},
-        );
+            EventUnsubscribeResult::StaySubscribed
+        });
 
         assert_eq!(dummy_a, 1);
         assert_eq!(dummy_b, 1);
@@ -422,13 +438,10 @@ mod tests {
 
     fn count_events(q: &mut EntityEventQueue) -> usize {
         let mut count = 0;
-        q.consume_events(
-            |_, _| {
-                count += 1;
-                EventUnsubscribeResult::StaySubscribed
-            },
-            |_| {},
-        );
+        q.consume_events(|_, _| {
+            count += 1;
+            EventUnsubscribeResult::StaySubscribed
+        });
 
         count
     }
@@ -445,32 +458,38 @@ mod tests {
 
         q.subscribe(
             e2,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyA),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyA),
+            }),
         );
         q.subscribe(
             e2,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyA),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyA),
+            }),
         );
         q.subscribe(
             e2,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyB),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            }),
         );
         q.subscribe(
             e2,
-            once(EntityEventSubscription(e1, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::All,
+            }),
         );
         q.subscribe(
             e2,
-            once(EntityEventSubscription(e1, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::All,
+            }),
         );
 
         q.post(evt_1_dummy_a);
@@ -511,11 +530,17 @@ mod tests {
         // initially sub to all
         q.subscribe(
             e1,
-            once(EntityEventSubscription(e1, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::All,
+            }),
         );
         q.subscribe(
             e1,
-            once(EntityEventSubscription(e2, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e2,
+                subscription: EventSubscription::All,
+            }),
         );
 
         assert_eq!(count_events(&mut q), 4);
@@ -523,27 +548,42 @@ mod tests {
         // get rid of e1 subs manually
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyA)),
+            EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyA),
+            },
         );
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
+            EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            },
         );
 
         // e2 has no subs, no effect
         q.unsubscribe(
             e2,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
+            EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            },
         );
 
         // repeated unsub, no effect
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
+            EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            },
         );
         q.unsubscribe(
             e1,
-            EntityEventSubscription(e1, EventSubscription::Specific(EntityEventType::DummyB)),
+            EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            },
         );
 
         // e2 events only
@@ -552,21 +592,30 @@ mod tests {
         // resub manually
         q.subscribe(
             e1,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyA),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyA),
+            }),
         );
 
         // unsub from all e2
-        q.unsubscribe(e1, EntityEventSubscription(e2, EventSubscription::All));
+        q.unsubscribe(
+            e1,
+            EntityEventSubscription {
+                subject: e2,
+                subscription: EventSubscription::All,
+            },
+        );
 
         assert_eq!(count_events(&mut q), 1);
 
         // unsub from all
         q.subscribe(
             e1,
-            once(EntityEventSubscription(e2, EventSubscription::All)),
+            once(EntityEventSubscription {
+                subject: e2,
+                subscription: EventSubscription::All,
+            }),
         );
 
         q.unsubscribe_all(e1);
@@ -594,17 +643,17 @@ mod tests {
         // both subscribe to e1 dummy_b event
         q.subscribe(
             e1,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyB),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            }),
         );
         q.subscribe(
             e2,
-            once(EntityEventSubscription(
-                e1,
-                EventSubscription::Specific(EntityEventType::DummyB),
-            )),
+            once(EntityEventSubscription {
+                subject: e1,
+                subscription: EventSubscription::Specific(EntityEventType::DummyB),
+            }),
         );
 
         q.log();
@@ -615,13 +664,10 @@ mod tests {
         });
 
         let mut subs = Vec::with_capacity(2);
-        q.consume_events(
-            |sub, _| {
-                subs.push(sub);
-                EventUnsubscribeResult::StaySubscribed
-            },
-            |_| {},
-        );
+        q.consume_events(|sub, _| {
+            subs.push(sub);
+            EventUnsubscribeResult::StaySubscribed
+        });
 
         assert_eq!(subs.len(), 2);
     }

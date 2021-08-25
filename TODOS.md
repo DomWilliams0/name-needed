@@ -1,4 +1,4 @@
-# TODOs (351)
+# TODOs (359)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,9 +131,12 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (2)
-   * `debug!("TODO wandering");`
+ * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
+   * `unreachable!("received unexpected event {:?}", $event); // TODO skip them instead`
+ * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
    * `// TODO ensure component refs cant be held across awaits`
+   * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
+   * `// TODO event queue needs to be cleared of events after unsubscribing? or just consume them and ignore them?`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO move subactivity errors somewhere else`
  * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
@@ -152,6 +155,8 @@
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
    * `let mut shifted_items = Vec::new(); // TODO smallvec`
    * `// TODO exertion of picking up item depends on item weight`
+ * [game/simulation/src/activity/subactivities2/go_to.rs](game/simulation/src/activity/subactivities2/go_to.rs) (1)
+   * `let result = goto_result.expect("did not get goto event?"); // TODO possible?`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
@@ -199,9 +204,11 @@
    * `// TODO custom hash? just itself`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
- * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
+ * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (4)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
+   * `let event = event.clone(); // TODO reimplement groupby to own the event without cloning`
+   * `// TODO the runtime does not return a subscription result synchronously - remove this branch?`
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
@@ -273,8 +280,12 @@
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
-   * `// TODO`
+   * `// TODO reuse/share/pool this allocation between tasks, maybe own it in the runtime`
    * `// TODO unnecessary unconditional clone of task reference?`
+ * [game/simulation/src/runtime/system.rs](game/simulation/src/runtime/system.rs) (3)
+   * `// TODO could avoid the need for allocations in ManualFutures here and lookup the task in the runtime by id instead?`
+   * `warn!("no current task?"; "subscriber" => subscriber); // TODO wut do? task is finished?`
+   * `// task has not yet responded to event, can't return anything useful here TODO`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)

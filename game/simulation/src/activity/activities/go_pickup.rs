@@ -129,7 +129,10 @@ impl Activity for PickupItemsActivity {
                         self.state = PickupItemsState::PickingUp(PickupItemSubActivity(*item));
 
                         // unsubscribe from our arrival but stay subscribed to item events
-                        let unsubscribe = EntityEventSubscription(ctx.subscriber, EventSubscription::Specific(EntityEventType::Arrived));
+                        let unsubscribe = EntityEventSubscription {
+                            subject: ctx.subscriber,
+                            subscription: EventSubscription::Specific(EntityEventType::Arrived),
+                        };
 
                         (
                             EventUnblockResult::Unblock,

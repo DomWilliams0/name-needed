@@ -10,6 +10,7 @@ use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 use crate::runtime::{Runtime, TaskRef};
 use crate::{definitions, Entity, WorldRef};
+use futures::channel::oneshot::Sender;
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
@@ -122,9 +123,13 @@ impl EcsWorld {
         self.component_registry.all_components_for(self, entity)
     }
 
-    pub fn spawn_task(&mut self, task: impl Future<Output = ()> + 'static) -> TaskRef {
+    pub fn spawn_task(
+        &mut self,
+        gimme_task_ref: Sender<TaskRef>,
+        task: impl Future<Output = ()> + 'static,
+    ) -> TaskRef {
         let runtime = self.resource::<Runtime>();
-        runtime.spawn(task)
+        runtime.spawn(gimme_task_ref, task)
     }
 }
 

@@ -68,6 +68,14 @@ macro_rules! unexpected_event {
     };
 }
 
+#[macro_export]
+macro_rules! unexpected_event2 {
+    ($event:expr) => {{
+        // debug!("ignoring unexpected event"; "event" => ?$event);
+        unreachable!("received unexpected event {:?}", $event); // TODO skip them instead
+    }};
+}
+
 pub trait Activity: Display + Debug {
     fn on_tick<'a>(&mut self, ctx: &'a mut ActivityContext<'_>) -> ActivityResult;
 
@@ -112,8 +120,10 @@ pub trait SubActivity: Display {
 
 impl<'a> ActivityContext<'a> {
     pub fn subscribe_to(&mut self, subject_entity: Entity, subscription: EventSubscription) {
-        self.subscriptions
-            .push(EntityEventSubscription(subject_entity, subscription));
+        self.subscriptions.push(EntityEventSubscription {
+            subject: subject_entity,
+            subscription: subscription,
+        });
     }
 
     pub fn clear_path(&self) {

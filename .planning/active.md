@@ -5,10 +5,21 @@
 * [o] async-safe activity context to get access to the world
 	* [ ] replace EcsWorldFrameRef with this
 * [ ] remove timer elapsed event
-* [.] new activity system with async activities
+* [o] new activity system with async activities
 	* [X] nop that only uses a timer
-	* [ ] wander that uses goto
+	* [X] wander that uses goto
+	* [ ] goto and break block
+	* [ ] goto and haul
+	* [ ] goto and pickup
+	* [ ] goto and equip
 	* [ ] ...the remaining activities
 * [ ] report activity and subactivities in ui
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
 * [X] cancelling/interrupting of current activity
+* [ ] refactor event queue consumption to not require event cloning
+	* [ ] also dont expect immediate unsubscription from event
+* [ ] avoid unconditional cloning of taskref during runtime polling
+* [ ] ensure extra events in queue after unsubscripting/switching task are not a problem
+* [ ] add safe !Send wrappers for component references that can't be held across awaits in activities
+* [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
+* [ ] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
