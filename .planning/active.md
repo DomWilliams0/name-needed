@@ -13,7 +13,8 @@
 	* [ ] goto and pickup
 	* [ ] goto and equip
 	* [ ] ...the remaining activities
-* [ ] report activity and subactivities in ui
+* [X] report activity and subactivities in ui
+* [ ] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
 * [X] cancelling/interrupting of current activity
 * [ ] refactor event queue consumption to not require event cloning
@@ -23,3 +24,4 @@
 * [ ] add safe !Send wrappers for component references that can't be held across awaits in activities
 * [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
 * [ ] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
+* [ ] reuse status updater allocation when changing activities

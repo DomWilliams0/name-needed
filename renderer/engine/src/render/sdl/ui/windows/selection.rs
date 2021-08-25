@@ -6,7 +6,7 @@ use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
 use simulation::{
-    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
+    ActivityComponent2, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
     InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
@@ -243,7 +243,7 @@ impl SelectionWindow {
         }
 
         // activity
-        if let Some(activity) = details.component::<ActivityComponent>(context) {
+        if let Some(activity) = details.component::<ActivityComponent2>(context) {
             let tab = context.new_tab(im_str!("Activity"));
             if tab.is_open() {
                 self.do_activity(context, activity);
@@ -363,49 +363,52 @@ impl SelectionWindow {
         }
     }
 
-    fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent) {
-        context.key_value(
-            im_str!("Activity:"),
-            || Value::Wrapped(ui_str!(in context, "{}", activity.current())),
-            None,
-            COLOR_ORANGE,
-        );
+    fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent2) {
+        if let Some((activity, status)) = activity.status() {
+            context.key_value(
+                im_str!("Activity:"),
+                || Value::Wrapped(ui_str!(in context, "{}", activity)),
+                None,
+                COLOR_ORANGE,
+            );
 
-        context.key_value(
-            im_str!("Subactivity:"),
-            || Value::Wrapped(ui_str!(in context, "{}", activity.current().current_subactivity())),
-            None,
-            COLOR_ORANGE,
-        );
+            context.key_value(
+                im_str!("Status:"),
+                || Value::Wrapped(ui_str!(in context, "{}", &*status)),
+                None,
+                COLOR_ORANGE,
+            );
 
-        context.separator();
+            context.separator();
 
-        let reservation = activity.current_society_task();
-        context.key_value(
-            im_str!("Reserved task:"),
-            || {
-                if let Some((_, task)) = reservation {
-                    Value::Wrapped(ui_str!(in context, "{}", task))
-                } else {
-                    Value::None("None")
-                }
-            },
-            None,
-            COLOR_GREEN,
-        );
-
-        context.key_value(
-            im_str!("Job:"),
-            || {
-                if let Some((job, _)) = reservation {
-                    Value::Wrapped(ui_str!(in context, "{}", job))
-                } else {
-                    Value::None("None")
-                }
-            },
-            None,
-            COLOR_GREEN,
-        );
+            // TODO society task
+            // let reservation = activity.current_society_task();
+            // context.key_value(
+            //     im_str!("Reserved task:"),
+            //     || {
+            //         if let Some((_, task)) = reservation {
+            //             Value::Wrapped(ui_str!(in context, "{}", task))
+            //         } else {
+            //             Value::None("None")
+            //         }
+            //     },
+            //     None,
+            //     COLOR_GREEN,
+            // );
+            //
+            // context.key_value(
+            //     im_str!("Job:"),
+            //     || {
+            //         if let Some((job, _)) = reservation {
+            //             Value::Wrapped(ui_str!(in context, "{}", job))
+            //         } else {
+            //             Value::None("None")
+            //         }
+            //     },
+            //     None,
+            //     COLOR_GREEN,
+            // );
+        }
     }
 
     fn do_logs(&mut self, context: &UiContext, details: &SelectedEntityDetails) {

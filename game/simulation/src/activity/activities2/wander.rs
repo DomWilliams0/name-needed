@@ -8,8 +8,8 @@ use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, TransformComponent, WorldPosition};
 
-#[derive(Debug)]
-pub struct WanderActivity2(State);
+#[derive(Debug, Default)]
+pub struct WanderActivity2;
 
 #[derive(Debug)]
 enum State {
@@ -30,10 +30,14 @@ const WANDER_RADIUS: u16 = 10;
 
 #[async_trait]
 impl Activity2 for WanderActivity2 {
+    fn description(&self) -> Box<dyn Display> {
+        Box::new(Self)
+    }
+
     async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
         loop {
             // wander to a new target
-            self.0 = State::Wander;
+            ctx.update_status(State::Wander);
 
             let tgt = find_target(&ctx)?;
             trace!("wandering to {:?}", tgt);
@@ -41,7 +45,7 @@ impl Activity2 for WanderActivity2 {
                 .await?;
 
             // loiter for a bit
-            self.0 = State::Loiter;
+            ctx.update_status(State::Loiter);
             let loiter_ticks = random::get().gen_range(5, 60);
             ctx.wait(loiter_ticks).await;
         }
@@ -49,6 +53,7 @@ impl Activity2 for WanderActivity2 {
 }
 
 fn find_target(ctx: &ActivityContext2) -> Result<WorldPosition, WanderError> {
+    // TODO special SearchGoal for wandering instead of randomly choosing an accessible target
     let transform = ctx
         .world
         .component::<TransformComponent>(ctx.entity)
@@ -68,12 +73,17 @@ fn find_target(ctx: &ActivityContext2) -> Result<WorldPosition, WanderError> {
 
 impl Display for WanderActivity2 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
+        write!(f, "Wandering aimlessly")
     }
 }
 
-impl Default for WanderActivity2 {
-    fn default() -> Self {
-        Self(State::Wander)
+impl Display for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            State::Wander => "Ambling about",
+            State::Loiter => "Loitering",
+        };
+
+        f.write_str(s)
     }
 }

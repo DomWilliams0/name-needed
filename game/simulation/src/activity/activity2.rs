@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use common::*;
 
 use crate::activity::subactivities2::{GoToSubactivity, GotoError};
+use crate::activity::StatusUpdater;
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
@@ -18,6 +19,7 @@ pub type ActivityResult = Result<(), Box<dyn Error>>;
 
 #[async_trait]
 pub trait Activity2: Display + Debug {
+    fn description(&self) -> Box<dyn Display>;
     async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult;
 }
 
@@ -26,6 +28,7 @@ pub struct ActivityContext2<'a> {
     // TODO ensure component refs cant be held across awaits
     pub world: Pin<&'a EcsWorld>,
     pub task: TaskRef,
+    pub status: StatusUpdater,
 }
 
 // only used on the main thread
@@ -92,6 +95,10 @@ impl<'a> ActivityContext2<'a> {
                 Some(evt) => return evt,
             }
         }
+    }
+
+    pub fn update_status(&self, status: impl Display + 'static) {
+        self.status.update(status);
     }
 
     // async fn yield_now(&self) {

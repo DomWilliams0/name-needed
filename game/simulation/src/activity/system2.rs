@@ -1,17 +1,15 @@
 use std::pin::Pin;
 
-use async_trait::async_trait;
-use futures::Future;
-
 use common::*;
 
-use crate::activity::activity2::{Activity2, ActivityContext2};
-use crate::activity::{ActivityContext, NopActivity2};
+use crate::activity::activity2::ActivityContext2;
+use crate::activity::NopActivity2;
 use crate::ai::AiAction;
 use crate::ecs::*;
-use crate::event::RuntimeTimers;
+
+use crate::activity::status::{status_channel, StatusReceiver, StatusRef};
 use crate::job::{SocietyJobRef, SocietyTask};
-use crate::runtime::{ManualFuture, Runtime, TaskHandle, TaskRef, TimerFuture};
+use crate::runtime::{Runtime, TaskHandle, TaskRef, TimerFuture};
 use std::mem::transmute;
 
 // TODO rename
@@ -23,8 +21,13 @@ pub struct ActivityComponent2 {
     // current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     /// Set by AI to trigger a new activity
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
+    current: Option<ActiveTask>,
+}
 
-    current_task: Option<TaskRef>,
+struct ActiveTask {
+    task: TaskRef,
+    status: StatusReceiver,
+    description: Box<dyn Display>,
 }
 
 /// Interrupts current with new activities
@@ -34,8 +37,7 @@ impl Default for ActivityComponent2 {
     fn default() -> Self {
         Self {
             new_activity: None,
-            // current: Box::new(NopActivity2::default()),
-            current_task: None,
+            current: None,
         }
     }
 }
@@ -53,11 +55,12 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
             let mut new_activity = None;
 
             if let Some((new_action, new_society_task)) = activity.new_activity.take() {
+                // TODO handle society task
                 debug!("interrupting activity with new"; e, "action" => ?new_action);
 
                 // cancel current
-                if let Some(task) = activity.current_task.take() {
-                    task.cancel();
+                if let Some(task) = activity.current.take() {
+                    task.task.cancel();
                 }
                 // if let Err(e) = activity
                 //     .current
@@ -78,9 +81,9 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
             // not necessary to manually cancel society reservation here, as the ai interruption
             // already did
             } else if activity
-                .current_task
+                .current
                 .as_ref()
-                .map(|t| t.is_finished())
+                .map(|t| t.task.is_finished())
                 .unwrap_or(true)
             {
                 // current task has finished
@@ -94,10 +97,14 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 // is being ticked
                 let world = unsafe { transmute::<Pin<&EcsWorld>, Pin<&'static EcsWorld>>(self.0) };
 
-                let (tx, rx) = futures::channel::oneshot::channel();
-                let task = runtime.spawn(tx, async move {
+                let description = new_activity.description();
+
+                // TODO reuse same status updater from previous activity, no need to throw it away
+                let (status_tx, status_rx) = status_channel();
+                let (taskref_tx, taskref_rx) = futures::channel::oneshot::channel();
+                let task = runtime.spawn(taskref_tx, async move {
                     // recv task ref from runtime
-                    let task = rx.await.unwrap(); // will not be cancelled
+                    let task = taskref_rx.await.unwrap(); // will not be cancelled
 
                     // create context
                     let entity = e.into();
@@ -105,12 +112,8 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                         entity,
                         world,
                         task,
+                        status: status_tx,
                     };
-
-                    // safety: ecs world is pinned and guaranteed to be valid as long as this system
-                    // is being ticked
-                    // let ctx =
-                    //     unsafe { std::mem::transmute::<ActivityContext2, ActivityContext2<'static>>(ctx) };
 
                     match new_activity.dew_it(ctx).await {
                         Ok(_) => {
@@ -122,7 +125,11 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                     };
                 });
 
-                activity.current_task = Some(task);
+                activity.current = Some(ActiveTask {
+                    task,
+                    status: status_rx,
+                    description,
+                });
             }
         }
     }
@@ -142,6 +149,13 @@ impl ActivityComponent2 {
     }
 
     pub fn task(&self) -> Option<&TaskRef> {
-        self.current_task.as_ref()
+        self.current.as_ref().map(|t| &t.task)
+    }
+
+    /// (activity description, current status)
+    pub fn status(&self) -> Option<(&dyn Display, StatusRef)> {
+        self.current
+            .as_ref()
+            .map(|t| (&*t.description, t.status.current()))
     }
 }

@@ -1,4 +1,4 @@
-# TODOs (359)
+# TODOs (363)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,6 +131,8 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
+ * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
+   * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
    * `unreachable!("received unexpected event {:?}", $event); // TODO skip them instead`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
@@ -160,9 +162,11 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (2)
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (4)
    * `// TODO rename`
+   * `// TODO handle society task`
    * `// TODO unsubscribe from all events from previous activity`
+   * `// TODO reuse same status updater from previous activity, no need to throw it away`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`
@@ -442,11 +446,12 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (7)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (8)
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO component-specific widget`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
    * `.unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere`
+   * `// TODO society task`
    * `// TODO persist logs after entity is dead`
    * `// TODO switch to table API when available`
    * `// TODO proper way of checking if an entity is living`

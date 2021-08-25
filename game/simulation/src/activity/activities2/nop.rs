@@ -12,6 +12,10 @@ pub struct NopActivity2;
 
 #[async_trait]
 impl Activity2 for NopActivity2 {
+    fn description(&self) -> Box<dyn Display> {
+        Box::new(Self)
+    }
+
     async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
         loop {
             ctx.wait(NOP_WARN_THRESHOLD).await;
@@ -26,6 +30,6 @@ impl Activity2 for NopActivity2 {
 
 impl Display for NopActivity2 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
+        write!(f, "Doing nothing")
     }
 }

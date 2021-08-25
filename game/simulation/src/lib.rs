@@ -26,7 +26,7 @@ pub use crate::simulation::{
     Tick, WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
-pub use activity::{ActivityComponent, EntityLoggingComponent};
+pub use activity::{ActivityComponent, ActivityComponent2, EntityLoggingComponent};
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
 pub use item::{
