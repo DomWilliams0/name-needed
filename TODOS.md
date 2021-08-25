@@ -1,4 +1,4 @@
-# TODOs (363)
+# TODOs (361)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -133,8 +133,6 @@
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/activity.rs](game/simulation/src/activity/activity.rs) (1)
-   * `unreachable!("received unexpected event {:?}", $event); // TODO skip them instead`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
    * `// TODO ensure component refs cant be held across awaits`
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
@@ -157,8 +155,6 @@
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
    * `let mut shifted_items = Vec::new(); // TODO smallvec`
    * `// TODO exertion of picking up item depends on item weight`
- * [game/simulation/src/activity/subactivities2/go_to.rs](game/simulation/src/activity/subactivities2/go_to.rs) (1)
-   * `let result = goto_result.expect("did not get goto event?"); // TODO possible?`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`

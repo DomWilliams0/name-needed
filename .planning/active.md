@@ -25,3 +25,4 @@
 * [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
 * [ ] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
 * [ ] reuse status updater allocation when changing activities
+* [ ] add exertion to activity status

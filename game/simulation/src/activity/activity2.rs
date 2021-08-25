@@ -11,14 +11,14 @@ use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
 use crate::runtime::{ManualFuture, TaskRef, TimerFuture};
-use crate::{ComponentWorld, EcsWorld, Entity};
+use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent};
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
 pub type ActivityResult = Result<(), Box<dyn Error>>;
 
 #[async_trait]
-pub trait Activity2: Display + Debug {
+pub trait Activity2: Debug {
     fn description(&self) -> Box<dyn Display>;
     async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult;
 }
@@ -43,10 +43,20 @@ impl<'a> ActivityContext2<'a> {
         TimerFuture::new(trigger, token, self.world)
     }
 
-    pub async fn go_to(&self, pos: WorldPoint, speed: NormalizedFloat) -> Result<(), GotoError> {
-        GoToSubactivity
-            .go_to(self, pos, speed, SearchGoal::Arrive)
-            .await
+    /// Does not update activity status
+    pub async fn go_to(
+        &self,
+        pos: WorldPoint,
+        speed: NormalizedFloat,
+        goal: SearchGoal,
+    ) -> Result<(), GotoError> {
+        GoToSubactivity::new(self).go_to(pos, speed, goal).await
+    }
+
+    pub fn clear_path(&self) {
+        if let Ok(comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
+            comp.clear_path();
+        }
     }
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].

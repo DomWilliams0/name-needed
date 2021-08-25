@@ -7,11 +7,11 @@ use crate::activity::activity2::{Activity2, ActivityResult};
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, TransformComponent, WorldPosition};
+use world::SearchGoal;
 
 #[derive(Debug, Default)]
 pub struct WanderActivity2;
 
-#[derive(Debug)]
 enum State {
     Wander,
     Loiter,
@@ -41,8 +41,12 @@ impl Activity2 for WanderActivity2 {
 
             let tgt = find_target(&ctx)?;
             trace!("wandering to {:?}", tgt);
-            ctx.go_to(tgt.centred(), NormalizedFloat::new(WANDER_SPEED))
-                .await?;
+            ctx.go_to(
+                tgt.centred(),
+                NormalizedFloat::new(WANDER_SPEED),
+                SearchGoal::Arrive,
+            )
+            .await?;
 
             // loiter for a bit
             ctx.update_status(State::Loiter);

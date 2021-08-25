@@ -17,16 +17,27 @@ pub enum GotoError {
     Navigation(#[from] NavigationError),
 }
 
-pub struct GoToSubactivity;
+pub struct GoToSubactivity<'a> {
+    context: &'a ActivityContext2<'a>,
+    complete: bool,
+}
 
-impl GoToSubactivity {
-    pub async fn go_to<'a>(
+impl<'a> GoToSubactivity<'a> {
+    pub fn new(context: &'a ActivityContext2<'a>) -> Self {
+        Self {
+            context,
+            complete: false,
+        }
+    }
+
+    pub async fn go_to(
         &mut self,
-        ctx: &ActivityContext2<'a>,
         dest: WorldPoint,
         speed: NormalizedFloat,
         goal: SearchGoal,
     ) -> Result<(), GotoError> {
+        let ctx = self.context;
+
         let follow_path = ctx
             .world
             .component_mut::<FollowPathComponent>(ctx.entity)
@@ -51,10 +62,21 @@ impl GoToSubactivity {
         })
         .await;
 
-        let result = goto_result.expect("did not get goto event?"); // TODO possible?
+        self.complete = true;
+
+        let result = goto_result.expect("did not get goto event?"); // shouldn't happen
         match result {
             Ok(_) => Ok(()),
             Err(err) => Err(err.into()),
+        }
+    }
+}
+
+impl Drop for GoToSubactivity<'_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            debug!("aborting incomplete goto"; self.context.entity);
+            self.context.clear_path();
         }
     }
 }

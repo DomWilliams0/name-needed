@@ -117,10 +117,10 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
 
                     match new_activity.dew_it(ctx).await {
                         Ok(_) => {
-                            debug!("activity finished"; entity, "activity" => %new_activity);
+                            debug!("activity finished"; entity, "activity" => ?new_activity);
                         }
                         Err(err) => {
-                            debug!("activity failed"; entity, "activity" => %new_activity, "err" => %err);
+                            debug!("activity failed"; entity, "activity" => ?new_activity, "err" => %err);
                         }
                     };
                 });

@@ -71,8 +71,8 @@ macro_rules! unexpected_event {
 #[macro_export]
 macro_rules! unexpected_event2 {
     ($event:expr) => {{
-        // debug!("ignoring unexpected event"; "event" => ?$event);
-        unreachable!("received unexpected event {:?}", $event); // TODO skip them instead
+        debug!("ignoring unexpected event"; "event" => ?$event);
+        true
     }};
 }
 
