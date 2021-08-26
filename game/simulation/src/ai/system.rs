@@ -10,7 +10,7 @@ use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
-use crate::simulation::Tick;
+use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
 use crate::{EntityLoggingComponent, TransformComponent};
@@ -87,7 +87,7 @@ pub struct AiSystem;
 impl<'a> System<'a> for AiSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         Write<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,    // optional
@@ -119,7 +119,6 @@ impl<'a> System<'a> for AiSystem {
             return;
         }
 
-        let ecs_world: &EcsWorld = &*ecs_world;
         let societies: &mut Societies = &mut *societies;
 
         let mut shared_bb = SharedBlackboard {
@@ -151,7 +150,7 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
-                world: ecs_world,
+                world: &*ecs_world,
                 shared: &mut shared_bb,
             };
 
@@ -164,7 +163,7 @@ impl<'a> System<'a> for AiSystem {
             // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             // TODO fix eventually false assumption that all stream DSEs come from a society
             let mut society = society_opt.and_then(|comp| comp.resolve(societies));
-            let extra_dses = self.collect_society_tasks(e, tick, society.as_mut(), ecs_world);
+            let extra_dses = self.collect_society_tasks(e, tick, society.as_mut(), &ecs_world);
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_, _, dse)| &**dse);
@@ -214,7 +213,12 @@ impl<'a> System<'a> for AiSystem {
                 ai.current = Some(src);
 
                 // pass on to activity system
-                activity.interrupt_with_new_activity(action, society_task, e, ecs_world);
+                activity.interrupt_with_new_activity(
+                    action,
+                    society_task,
+                    e,
+                    &ecs_world as &EcsWorld,
+                );
             }
 
             // job indices are finished with, allow modifications again

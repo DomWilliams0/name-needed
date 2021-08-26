@@ -23,9 +23,6 @@ pub struct EcsWorld {
     component_registry: ComponentRegistry,
 }
 
-/// World reference for the current frame only - very unsafe, don't store!
-pub struct EcsWorldFrameRef(&'static EcsWorld);
-
 #[derive(Debug, Error)]
 pub enum ComponentGetError {
     #[error("The entity {} doesn't exist", *.0)]
@@ -227,25 +224,6 @@ impl ComponentWorld for EcsWorld {
     fn is_entity_alive(&self, entity: Entity) -> bool {
         // must check if generation is alive first to avoid panic
         entity.gen().is_alive() && self.is_alive(entity.into())
-    }
-}
-
-impl EcsWorldFrameRef {
-    pub unsafe fn init(world_ref: &EcsWorld) -> Self {
-        Self(std::mem::transmute(world_ref))
-    }
-}
-
-impl Default for EcsWorldFrameRef {
-    fn default() -> Self {
-        unreachable!("ecs world ref missing")
-    }
-}
-impl Deref for EcsWorldFrameRef {
-    type Target = EcsWorld;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
     }
 }
 

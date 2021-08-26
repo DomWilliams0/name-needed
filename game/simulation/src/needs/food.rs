@@ -5,6 +5,7 @@ use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
+use crate::simulation::EcsWorldRef;
 use crate::ConditionComponent;
 
 // TODO newtype for Fuel
@@ -62,7 +63,7 @@ impl<'a> System<'a> for HungerSystem {
 impl<'a> System<'a> for EatingSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         Write<'a, EntityEventQueue>,
         WriteStorage<'a, InventoryComponent>,
         ReadStorage<'a, BeingEatenComponent>,

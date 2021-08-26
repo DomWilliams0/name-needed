@@ -2,8 +2,8 @@
 
 * [X] runtime and task types
 * [X] repurpose event system to use async tasks as subscribers, not entities
-* [o] async-safe activity context to get access to the world
-	* [ ] replace EcsWorldFrameRef with this
+* [X] async-safe activity context to get access to the world
+	* [X] replace EcsWorldFrameRef with this
 * [ ] remove timer elapsed event
 * [o] new activity system with async activities
 	* [X] nop that only uses a timer

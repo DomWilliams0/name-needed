@@ -12,7 +12,7 @@ use crate::activity::{EventUnblockResult, EventUnsubscribeResult};
 use crate::activity::activities::NopActivity;
 use crate::activity::event_logging::EntityLoggingComponent;
 use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
-use crate::simulation::Tick;
+use crate::simulation::{EcsWorldRef, Tick};
 use crate::{Societies, SocietyComponent};
 use std::convert::TryFrom;
 
@@ -42,7 +42,7 @@ impl<'a> System<'a> for ActivitySystem {
         ReadStorage<'a, BlockingActivityComponent>,
         WriteStorage<'a, SocietyComponent>,
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         Read<'a, QueuedUpdates>,
         Read<'a, LazyUpdate>,
         Write<'a, Societies>,
@@ -74,7 +74,7 @@ impl<'a> System<'a> for ActivitySystem {
             debug_assert!(subscriptions.is_empty());
             let mut ctx = ActivityContext {
                 entity,
-                world: &*world,
+                world: unreachable!(),
                 updates: &*updates,
                 subscriptions: &mut subscriptions,
             };

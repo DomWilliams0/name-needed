@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use crate::ecs::*;
 
 use crate::item::{ContainedInComponent, ContainerComponent, InventoryComponent};
+use crate::simulation::EcsWorldRef;
 
 pub struct InventoryValidationSystem;
 
 impl<'a> System<'a> for InventoryValidationSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         ReadStorage<'a, InventoryComponent>,
         ReadStorage<'a, ContainerComponent>,
         ReadStorage<'a, ContainedInComponent>,

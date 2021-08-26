@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::ops::{Add, Deref};
 
 use common::*;
 use resources::Resources;
@@ -95,6 +95,8 @@ pub struct SimulationRef<'s> {
     pub debug_renderers: &'s DebugRenderersState,
 }
 
+pub struct EcsWorldRef(Pin<&'static EcsWorld>);
+
 impl world::WorldContext for WorldContext {
     type AssociatedBlockData = AssociatedBlockData;
 }
@@ -116,13 +118,25 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
+        // get a self referential ecs world resource pointing to itself
+        // safety: static lifetime is as long as the game is running, as any system that uses it
+        // lives within in
+        let mut pinned_world = Box::pin(ecs_world);
+        unsafe {
+            let w = Pin::get_unchecked_mut(pinned_world.as_mut());
+            let world_ptr = w as *mut EcsWorld as *const EcsWorld;
+
+            let pinned_ref = Pin::new(&*world_ptr as &'static EcsWorld);
+            w.insert(EcsWorldRef(pinned_ref));
+        }
+
         let debug_renderers = register_debug_renderers()?;
 
         // ensure tick is reset
         reset_tick();
 
         Ok(Self {
-            ecs_world: Box::pin(ecs_world),
+            ecs_world: pinned_world,
             voxel_world,
             world_loader,
             debug_renderers,
@@ -141,9 +155,6 @@ impl<R: Renderer> Simulation<R> {
         increment_tick();
 
         // TODO sort out systems so they all have an ecs_world reference and can keep state
-        // safety: only lives for the duration of this tick
-        let ecs_ref = unsafe { EcsWorldFrameRef::init(&self.ecs_world) };
-        self.ecs_world.insert(ecs_ref);
 
         // TODO limit time/count
         self.apply_world_updates(world_viewer);
@@ -153,9 +164,6 @@ impl<R: Renderer> Simulation<R> {
 
         // tick game logic
         self.tick_systems();
-
-        // we're about to go mutable, drop this fuzzy ball of unsafeness
-        let _ = self.ecs_world.remove::<EcsWorldFrameRef>();
 
         // per tick maintenance
         // must remove resource from world first so we can use &mut ecs_world
@@ -591,4 +599,19 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<FeatureBoundaryDebugRenderer>()?;
 
     Ok(builder.build())
+}
+
+impl Default for EcsWorldRef {
+    fn default() -> Self {
+        // register manually
+        unreachable!()
+    }
+}
+
+impl Deref for EcsWorldRef {
+    type Target = EcsWorld;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
 }
