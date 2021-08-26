@@ -43,6 +43,7 @@ mod action_to_activity {
             match self {
                 AiAction::Wander => activity!(WanderActivity2::default()),
                 AiAction::Nop => activity!(NopActivity2::default()),
+                AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity2::new(pos)),
                 _ => unreachable!(),
                 // AiAction::Nop => activity!(NopActivity::default()),
                 // AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),

@@ -8,7 +8,7 @@
 * [o] new activity system with async activities
 	* [X] nop that only uses a timer
 	* [X] wander that uses goto
-	* [ ] goto and break block
+	* [X] goto and break block
 	* [ ] goto and haul
 	* [ ] goto and pickup
 	* [ ] goto and equip
@@ -26,3 +26,4 @@
 * [ ] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
 * [ ] reuse status updater allocation when changing activities
 * [ ] add exertion to activity status
+* [ ] remove old deprecated Activities and remove 2 suffix

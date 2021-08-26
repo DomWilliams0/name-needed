@@ -5,13 +5,16 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::subactivities2::{GoToSubactivity, GotoError};
+use crate::activity::subactivities2::{
+    BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError,
+};
 use crate::activity::StatusUpdater;
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
 use crate::runtime::{ManualFuture, TaskRef, TimerFuture};
-use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent};
+use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent, WorldPosition};
+use std::task::{Context, Poll};
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
@@ -57,6 +60,13 @@ impl<'a> ActivityContext2<'a> {
         if let Ok(comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
             comp.clear_path();
         }
+    }
+
+    /// Must be close enough
+    pub async fn break_block(&self, block: WorldPosition) -> Result<(), BreakBlockError> {
+        BreakBlockSubactivity::default()
+            .break_block(self, block)
+            .await
     }
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].
@@ -111,22 +121,23 @@ impl<'a> ActivityContext2<'a> {
         self.status.update(status);
     }
 
-    // async fn yield_now(&self) {
-    //     pub struct YieldNow(bool);
-    //
-    //     impl Future for YieldNow {
-    //         type Output = ();
-    //
-    //         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    //             if std::mem::replace(&mut self.0, true) {
-    //                 Poll::Ready(())
-    //             } else {
-    //                 cx.waker().wake_by_ref();
-    //                 Poll::Pending
-    //             }
-    //         }
-    //     }
-    //
-    //     YieldNow(false).await
-    // }
+    /// Ready next tick
+    pub async fn yield_now(&self) {
+        pub struct YieldNow(bool);
+
+        impl Future for YieldNow {
+            type Output = ();
+
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                if std::mem::replace(&mut self.0, true) {
+                    Poll::Ready(())
+                } else {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
+        }
+
+        YieldNow(false).await
+    }
 }

@@ -1,6 +1,6 @@
 use crate::scenarios::helpers::spawn_entities_randomly;
 use common::*;
-use simulation::{AiAction, ComponentWorld, EcsWorld, PlayerSociety};
+use simulation::{AiAction, ComponentWorld, EcsWorld, PlayerSociety, WorldPosition};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -93,7 +93,8 @@ fn wander_and_eat(ecs: &EcsWorld) {
             .with_satiety(satiety)
             .thanks();
 
-        ecs.helpers_dev().force_activity(e, AiAction::Wander); // TODO temporary
+        ecs.helpers_dev()
+            .force_activity(e, AiAction::GoBreakBlock((0, 0, 0).into())); // TODO temporary
 
         e
     });

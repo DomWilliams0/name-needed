@@ -1,4 +1,4 @@
-# TODOs (361)
+# TODOs (364)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -155,6 +155,10 @@
  * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
    * `let mut shifted_items = Vec::new(); // TODO smallvec`
    * `// TODO exertion of picking up item depends on item weight`
+ * [game/simulation/src/activity/subactivities2/break_block.rs](game/simulation/src/activity/subactivities2/break_block.rs) (3)
+   * `// TODO get current held tool to determine how fast the block can be broken`
+   * `// TODO breaking blocks with your hand hurts!`
+   * `// TODO define proper scale/enum/consts for block and tool durability`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
@@ -463,7 +467,7 @@
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
  * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
-   * `ecs.helpers_dev().force_activity(e, AiAction::Wander); // TODO temporary`
+   * `.force_activity(e, AiAction::GoBreakBlock((0, 0, 0).into())); // TODO temporary`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)
