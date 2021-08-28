@@ -21,8 +21,8 @@ pub enum EntityEventPayload {
     /// Path finding ended
     Arrived(PathToken, Result<WorldPoint, NavigationError>),
 
-    /// Item entity (subject) picked up by the given holder
-    BeenPickedUp(Result<Entity, PickupItemError>),
+    /// Item entity (subject) picked up by the given holder (.0)
+    BeenPickedUp(Entity, Result<(), PickupItemError>),
 
     /// Entity (subject) has picked up the given item entity
     HasPickedUp(Entity),
@@ -95,7 +95,7 @@ impl EntityEventPayload {
     pub fn is_destructive(&self) -> bool {
         use EntityEventPayload::*;
         match self {
-            BeenPickedUp(_) | BeenEaten(_) | Hauled(_) | ExitedContainer(_)
+            BeenPickedUp(_,_) | BeenEaten(_) | Hauled(_) | ExitedContainer(_)
             | EnteredContainer(_) => true,
             Arrived(_, _)
             | HasPickedUp(_)
@@ -121,7 +121,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
             BeenEaten(_)
-            | BeenPickedUp(_)
+            | BeenPickedUp(_,_)
             | Arrived(_, _)
             | BeenEquipped(_)
             | Hauled(_)

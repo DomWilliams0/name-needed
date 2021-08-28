@@ -32,7 +32,7 @@ impl SubActivity for PickupItemSubActivity {
         let holder = ctx.entity;
 
         ctx.updates.queue("pick up item", move |world| {
-            let mut do_pickup = || -> Result<Entity, PickupItemError> {
+            let mut do_pickup = || -> Result<(), PickupItemError> {
                 let mut shifted_items = Vec::new(); // TODO smallvec
                 {
                     let mut inventories = world.write_storage::<InventoryComponent>();
@@ -76,7 +76,7 @@ impl SubActivity for PickupItemSubActivity {
                 world
                     .helpers_comps()
                     .add_to_container(item, ContainedInComponent::InventoryOf(holder));
-                Ok(holder)
+                Ok(())
             };
 
             let result = do_pickup();
@@ -87,10 +87,7 @@ impl SubActivity for PickupItemSubActivity {
                 });
             }
 
-            world.post_event(EntityEvent {
-                subject: item,
-                payload: EntityEventPayload::BeenPickedUp(result),
-            });
+            unreachable!();
 
             Ok(())
         });

@@ -142,10 +142,10 @@ impl Activity for PickupItemsActivity {
                     ref e => unreachable!("should only receive arrival event while going to item, but is in state {:?}", e),
                 }
             }
-            EntityEventPayload::BeenPickedUp(result) => {
+            EntityEventPayload::BeenPickedUp(picker_upper, result) => {
                 // our item has been picked up, who was it?
                 match (&self.state, result) {
-                    (PickupItemsState::PickingUp(_), Ok(picker_upper))
+                    (PickupItemsState::PickingUp(_), Ok(_))
                         if *picker_upper == ctx.subscriber =>
                     {
                         // oh hey it was us, pickup complete!

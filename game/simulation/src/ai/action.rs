@@ -23,7 +23,11 @@ pub enum AiAction {
 
     /// Go pickup the (1) best item.
     /// TODO reduce cost of cloning vec of items
+    #[deprecated]
     GoPickUp(ItemsToPickUp),
+
+    /// Go and pickup the given item
+    GoEquip(Entity),
 
     /// Equip and eat the given entity, assuming it's already in the inventory
     EatHeldItem(Entity),
@@ -59,8 +63,11 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
                 reason,
             },
             AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => {
-                return Ok(AiDecision(GoPickup(wat.clone())))
-            }
+                unreachable!()
+            },
+            AiAction::GoEquip(item) => {
+                GoEquip(*item)
+            },
             AiAction::EatHeldItem(item) => EatHeldItem(*item),
             AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
             AiAction::Follow { target, .. } => Follow(*target),

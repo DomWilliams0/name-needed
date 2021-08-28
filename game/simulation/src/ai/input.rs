@@ -25,7 +25,7 @@ pub enum AiInput {
     CanUseHeldItem(ItemFilter),
 
     // TODO HasInInventoryGraded - returns number,quality of matches
-    CanFindLocally {
+    CanFindGradedItems {
         filter: ItemFilter,
         max_radius: u32,
         max_count: u32,
@@ -61,11 +61,11 @@ impl ai::Input<AiContext> for AiInput {
                     }
                 }
             },
-            AiInput::CanFindLocally {
+            AiInput::CanFindGradedItems {
                 filter,
                 max_radius,
                 max_count,
-            } => search_local_area_with_cache(blackboard, filter, *max_radius, *max_count),
+            } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
 
             AiInput::MyDistance2To(pos) => {
                 let target = pos.centred();
@@ -153,7 +153,7 @@ fn search_inventory_with_cache<'a>(
 /// (item entity, position, direct distance, item condition)
 pub type LocalAreaSearch = Vec<(Entity, WorldPoint, f32, NormalizedFloat)>;
 
-fn search_local_area_with_cache(
+fn search_local_area_with_cache_graded(
     blackboard: &mut AiBlackboard,
     filter: &ItemFilter,
     max_radius: u32,
@@ -291,7 +291,7 @@ impl Display for AiInput {
         match self {
             AiInput::Hunger => write!(f, "Hunger"),
             AiInput::HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
-            AiInput::CanFindLocally {
+            AiInput::CanFindGradedItems {
                 filter,
                 max_radius,
                 max_count,

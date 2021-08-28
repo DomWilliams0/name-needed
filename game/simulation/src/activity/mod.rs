@@ -5,11 +5,12 @@ pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscri
 pub use activities2::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use status::{StatusReceiver, StatusUpdater};
-pub use subactivities::{EquipItemError, HaulError, PickupItemError};
+pub use subactivities::{EquipItemError, HaulError};
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
 };
 pub use system2::{ActivityComponent2, ActivitySystem2};
+pub use subactivities2::{PickupItemError};
 
 #[deprecated]
 mod activities;
@@ -44,7 +45,8 @@ mod action_to_activity {
                 AiAction::Wander => activity!(WanderActivity2::default()),
                 AiAction::Nop => activity!(NopActivity2::default()),
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity2::new(pos)),
-                _ => unreachable!(),
+                AiAction::GoEquip(e) => activity!(GoEquipActivity2::new(e)),
+                _ => unreachable!("activity not implemented"),
                 // AiAction::Nop => activity!(NopActivity::default()),
                 // AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
                 // AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {
@@ -61,6 +63,7 @@ mod action_to_activity {
                 // AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
             }
         }
+        #[deprecated]
         pub fn into_activity(self) -> Box<dyn Activity> {
             macro_rules! activity {
                 ($act:expr) => {
@@ -83,6 +86,7 @@ mod action_to_activity {
                     activity!(HaulActivity::new(thing, source, target))
                 }
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
+                _ => unreachable!(),
             }
         }
     }

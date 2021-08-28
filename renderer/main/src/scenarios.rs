@@ -87,16 +87,11 @@ fn wander_and_eat(ecs: &EcsWorld) {
 
     spawn_entities_randomly(&world, humans, |pos| {
         let satiety = NormalizedFloat::new(random::get().gen_range(0.4, 0.5));
-        let e = helpers::new_entity("core_living_human", ecs, pos)
+        helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next_please())
             .with_player_society()
             .with_satiety(satiety)
-            .thanks();
-
-        ecs.helpers_dev()
-            .force_activity(e, AiAction::GoBreakBlock((0, 0, 0).into())); // TODO temporary
-
-        e
+            .thanks()
     });
 
     spawn_entities_randomly(&world, food, |pos| {

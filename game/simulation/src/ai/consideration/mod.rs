@@ -1,6 +1,6 @@
 pub use self::world::{BlockTypeMatchesConsideration, MyProximityToConsideration};
 pub use items::{
-    CanUseHeldItemConsideration, FindLocalItemConsideration, HasExtraHandsForHaulingConsideration,
+    CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HasExtraHandsForHaulingConsideration,
     HoldingItemConsideration,
 };
 pub use misc::ConstantConsideration;

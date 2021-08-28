@@ -4,7 +4,7 @@ use common::*;
 
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::NopActivity2;
-use crate::ai::AiAction;
+use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 
 use crate::activity::status::{status_channel, StatusReceiver, StatusRef};
@@ -47,10 +47,11 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
         Read<'a, EntitiesRes>,
         Read<'a, Runtime>,
         WriteStorage<'a, ActivityComponent2>,
+        WriteStorage<'a, AiComponent>,
     );
 
-    fn run(&mut self, (entities, runtime, mut activities): Self::SystemData) {
-        for (e, activity) in (&entities, &mut activities).join() {
+    fn run(&mut self, (entities, runtime, mut activities, mut ais): Self::SystemData) {
+        for (e, activity, ai) in (&entities, &mut activities, &mut ais).join() {
             let e = Entity::from(e);
             let mut new_activity = None;
 
@@ -89,6 +90,25 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 // current task has finished
                 debug!("no activity, reverting to nop"; e);
                 new_activity = Some(Box::new(NopActivity2::default()));
+
+                // TODO interrupt ai and unreserve society task
+                // ai.interrupt_current_action(entity, None, || {
+                //     entity
+                //         .get(&society)
+                //         .and_then(|soc| societies.society_by_handle_mut(soc.handle))
+                //         .expect("should have society")
+                // });
+
+                // next tick ai should return a new decision rather than unchanged to avoid
+                // infinite Nop loops
+                ai.clear_last_action();
+
+                // TODO notify society job of completion
+                // if let Some((job, task)) = activity.current_society_task.take() {
+                //     if let Ok(result) = SocietyTaskResult::try_from(finish) {
+                //         job.write().notify_completion(task, result);
+                //     }
+                // }
             }
 
             // spawn task for new activity

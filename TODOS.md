@@ -1,4 +1,4 @@
-# TODOs (364)
+# TODOs (367)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,6 +131,8 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
+ * [game/simulation/src/activity/activities2/go_equip.rs](game/simulation/src/activity/activities2/go_equip.rs) (1)
+   * `// TODO somehow cancel if any destructive event happens to the item`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
@@ -159,13 +161,17 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
+ * [game/simulation/src/activity/subactivities2/equip.rs](game/simulation/src/activity/subactivities2/equip.rs) (1)
+   * `// TODO subscribe to destructive events on the item, get interrupted if hit`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (4)
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (6)
    * `// TODO rename`
    * `// TODO handle society task`
    * `// TODO unsubscribe from all events from previous activity`
+   * `// TODO interrupt ai and unreserve society task`
+   * `// TODO notify society job of completion`
    * `// TODO reuse same status updater from previous activity, no need to throw it away`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
@@ -466,8 +472,6 @@
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
  * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
- * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
-   * `.force_activity(e, AiAction::GoBreakBlock((0, 0, 0).into())); // TODO temporary`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [shared/color/src/lib.rs](shared/color/src/lib.rs) (1)

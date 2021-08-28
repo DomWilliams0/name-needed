@@ -5,10 +5,8 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::subactivities2::{
-    BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError,
-};
-use crate::activity::StatusUpdater;
+use crate::activity::subactivities2::{BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError, PickupSubactivity};
+use crate::activity::{StatusUpdater, PickupItemError};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
@@ -67,6 +65,11 @@ impl<'a> ActivityContext2<'a> {
         BreakBlockSubactivity::default()
             .break_block(self, block)
             .await
+    }
+
+    /// Pick up item off the ground, checks if close enough first
+    pub async fn pick_up(&self, item: Entity) -> Result<(), PickupItemError>{
+        PickupSubactivity.pick_up(self, item).await
     }
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].

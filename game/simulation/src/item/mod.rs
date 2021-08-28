@@ -18,6 +18,7 @@ mod containers;
 mod filter;
 mod haul;
 mod inventory;
+#[deprecated]
 mod pickup;
 
 #[cfg(debug_assertions)]

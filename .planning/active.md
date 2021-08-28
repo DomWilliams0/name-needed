@@ -9,10 +9,16 @@
 	* [X] nop that only uses a timer
 	* [X] wander that uses goto
 	* [X] goto and break block
+	* [X] goto and equip
+		* [X] collapse pickup into this as it's the same problem
+		* [ ] cancel early if item is destroyed
 	* [ ] goto and haul
-	* [ ] goto and pickup
-	* [ ] goto and equip
-	* [ ] ...the remaining activities
+* [ ] e2e tests
+		* [ ] equipping an item activity
+			* [ ] far away and needs pickup 
+			* [ ] in inv but not equipped 
+			* [ ] already equipped
+			* [ ] destroying item during going to equip it
 * [X] report activity and subactivities in ui
 * [ ] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
