@@ -21,7 +21,7 @@
 			* [ ] already equipped
 			* [ ] destroying item during going to equip it
 * [X] report activity and subactivities in ui
-* [ ] reintegrate society job with activity
+* [X] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
 * [X] cancelling/interrupting of current activity
 * [ ] refactor event queue consumption to not require event cloning

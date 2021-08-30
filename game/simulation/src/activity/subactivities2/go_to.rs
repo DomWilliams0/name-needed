@@ -57,7 +57,6 @@ impl<'a> GoToSubactivity<'a> {
         };
 
         ctx.subscribe_to_until(subscription, |evt| {
-            debug!("goto is waiting for arrival of token {:?}", path_token);
             match evt {
                 EntityEventPayload::Arrived(token, result) if token == path_token => {
                     goto_result = Some(result);

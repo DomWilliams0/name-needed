@@ -16,6 +16,7 @@ use crate::{Entity, Tick};
 use common::*;
 use futures::channel::oneshot::Sender;
 use std::collections::VecDeque;
+use std::hint::unreachable_unchecked;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -33,10 +34,23 @@ pub struct Runtime(Rc<RefCell<RuntimeInner>>);
 #[derive(Eq, PartialEq, Copy, Clone, Default)]
 pub struct TaskHandle(u64);
 
+pub enum TaskFuture {
+    Running(LocalBoxFuture<'static, BoxedResult<()>>),
+    Polling,
+    Done(TaskResult),
+    DoneButConsumed,
+}
+
+#[derive(Debug)]
+pub enum TaskResult {
+    Cancelled,
+    Finished(BoxedResult<()>),
+}
+
 pub struct Task {
     runtime: Runtime,
     handle: TaskHandle,
-    future: RefCell<Option<LocalBoxFuture<'static, ()>>>,
+    future: RefCell<TaskFuture>,
     // TODO reuse/share/pool this allocation between tasks, maybe own it in the runtime
     event_sink: RefCell<VecDeque<EntityEvent>>,
     ready: AtomicBool,
@@ -48,7 +62,7 @@ impl Drop for Task {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TaskRef(Rc<Task>);
 
 // everything will run on the main thread
@@ -59,13 +73,13 @@ impl Runtime {
     pub fn spawn(
         &self,
         gimme_task_ref: Sender<TaskRef>,
-        future: impl Future<Output = ()> + 'static,
+        future: impl Future<Output = BoxedResult<()>> + 'static,
     ) -> TaskRef {
         let mut runtime = self.0.borrow_mut();
         let task = Task {
             runtime: self.clone(),
             handle: runtime.next_task_handle(),
-            future: RefCell::new(Some(future.boxed_local())),
+            future: RefCell::new(TaskFuture::Running(future.boxed_local())),
             event_sink: RefCell::new(VecDeque::new()),
             ready: AtomicBool::new(false),
         };
@@ -103,7 +117,7 @@ impl Runtime {
             let was_ready = task.0.ready.swap(false, Ordering::Relaxed);
             debug_assert!(was_ready, "task should've been ready but wasn't");
 
-            task.poll();
+            task.poll_task();
         }
 
         // swap ready list back
@@ -171,7 +185,30 @@ impl Default for Runtime {
 
 impl TaskRef {
     pub fn is_finished(&self) -> bool {
-        self.0.future.borrow().is_none()
+        let fut = self.0.future.borrow();
+        match &*fut {
+            TaskFuture::DoneButConsumed | TaskFuture::Done(_) => true,
+            TaskFuture::Running(_) => false,
+            TaskFuture::Polling => unreachable!(),
+        }
+    }
+
+    /// Call once only, panics the second time
+    pub fn result(&self) -> Option<TaskResult> {
+        let mut fut = self.0.future.borrow_mut();
+        match &*fut {
+            TaskFuture::Running(_) => None,
+            TaskFuture::Polling => unreachable!(),
+            TaskFuture::DoneButConsumed => panic!("result has already been consumed"),
+            TaskFuture::Done(_) => {
+                let done = std::mem::replace(&mut *fut, TaskFuture::DoneButConsumed);
+                let result = match done {
+                    TaskFuture::Done(res) => res,
+                    _ => unsafe { unreachable_unchecked() }, // already checked
+                };
+                Some(result)
+            }
+        }
     }
 
     pub fn is_ready(&self) -> bool {
@@ -199,26 +236,45 @@ impl TaskRef {
     }
 
     pub fn cancel(self) {
-        trace!("cancelling task {:?}", self.0.handle);
-
-        // drop future
-        let _ = self.0.future.borrow_mut().take();
+        let mut fut = self.0.future.borrow_mut();
+        match &mut *fut {
+            TaskFuture::Running(_) => {
+                trace!("cancelling task {:?}", self.0.handle);
+                // drop future
+                *fut = TaskFuture::Done(TaskResult::Cancelled);
+            }
+            TaskFuture::Done(res) => {
+                // consume
+                debug!("cancelling finished task {:?}, consuming result", self.0.handle; "result" => ?res);
+                *fut = TaskFuture::Done(TaskResult::Cancelled);
+            }
+            TaskFuture::Polling => unreachable!("task is in invalid state"),
+            TaskFuture::DoneButConsumed => {
+                drop(fut);
+                warn!("cancelling task that's already consumed"; "task" => ?self.0);
+            }
+        }
     }
 
-    pub fn poll(&self) {
+    fn poll_task(&self) {
         let mut fut_slot = self.0.future.borrow_mut();
-        if let Some(mut fut) = fut_slot.take() {
+
+        // take ownership for poll
+        let fut = std::mem::replace(&mut *fut_slot, TaskFuture::Polling);
+
+        if let TaskFuture::Running(mut fut) = fut {
             // TODO unnecessary unconditional clone of task reference?
             let waker = self.clone().into_waker();
             let mut ctx = Context::from_waker(&waker);
             trace!("polling task"; "task" => ?self.0.handle);
             match fut.as_mut().poll(&mut ctx) {
-                Poll::Ready(_) => {
-                    trace!("task is complete"; "task" => ?self.0.handle);
+                Poll::Ready(result) => {
+                    trace!("task is complete"; "task" => ?self.0.handle, "result" => ?result);
+                    *fut_slot = TaskFuture::Done(TaskResult::Finished(result));
                 }
                 Poll::Pending => {
                     trace!("task is still ongoing"; "task" => ?self.0.handle);
-                    *fut_slot = Some(fut);
+                    *fut_slot = TaskFuture::Running(fut);
                 }
             }
         }
@@ -263,6 +319,30 @@ impl Debug for TaskHandle {
     }
 }
 
+impl Debug for TaskFuture {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.write_str(match self {
+            TaskFuture::Running(_) => "Running",
+            TaskFuture::Polling => "Polling (invalid state)",
+            TaskFuture::DoneButConsumed => "Done(consumed)",
+            TaskFuture::Done(res) => {
+                return write!(f, "Done({:?})", res);
+            }
+        })
+    }
+}
+
+impl Debug for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("Task")
+            .field("handle", &self.handle)
+            .field("events", &self.event_sink.borrow().len())
+            .field("ready", &self.ready.load(Ordering::Relaxed))
+            .field("state", &self.future.borrow())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -290,6 +370,7 @@ mod tests {
             let msg = fut2.await;
             debug!("all done!!!! string is '{}'", msg);
             it_worked2.store(true, Ordering::Relaxed);
+            Ok(())
         });
 
         assert!(!task.is_finished());

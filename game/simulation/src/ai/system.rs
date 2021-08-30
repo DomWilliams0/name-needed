@@ -213,12 +213,7 @@ impl<'a> System<'a> for AiSystem {
                 ai.current = Some(src);
 
                 // pass on to activity system
-                activity.interrupt_with_new_activity(
-                    action,
-                    society_task,
-                    e,
-                    &ecs_world as &EcsWorld,
-                );
+                activity.interrupt_with_new_activity(action, society_task);
             }
 
             // job indices are finished with, allow modifications again

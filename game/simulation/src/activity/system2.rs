@@ -9,19 +9,20 @@ use crate::ecs::*;
 
 use crate::activity::status::{status_channel, StatusReceiver, StatusRef};
 use crate::event::EntityEventQueue;
-use crate::job::{SocietyJobRef, SocietyTask};
-use crate::runtime::{Runtime, TaskHandle, TaskRef, TimerFuture};
+use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
+use crate::runtime::{Runtime, TaskHandle, TaskRef, TaskResult, TimerFuture};
+use crate::{Societies, SocietyComponent};
 use std::cell::Cell;
+use std::convert::TryFrom;
 use std::mem::transmute;
 use std::rc::Rc;
 
 // TODO rename
-#[derive(Component, EcsComponent)]
+#[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
 #[name("activity2")]
 pub struct ActivityComponent2 {
-    // current: Box<dyn Activity>,
-    // current_society_task: Option<(SocietyJobRef, SocietyTask)>,
+    current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     /// Set by AI to trigger a new activity
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
     current: Option<ActiveTask>,
@@ -36,27 +37,28 @@ struct ActiveTask {
 /// Interrupts current with new activities
 pub struct ActivitySystem2<'a>(pub Pin<&'a EcsWorld>);
 
-impl Default for ActivityComponent2 {
-    fn default() -> Self {
-        Self {
-            new_activity: None,
-            current: None,
-        }
-    }
-}
-
 impl<'a> System<'a> for ActivitySystem2<'a> {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, Runtime>,
         Write<'a, EntityEventQueue>,
+        Write<'a, Societies>,
         WriteStorage<'a, ActivityComponent2>,
         WriteStorage<'a, AiComponent>,
+        WriteStorage<'a, SocietyComponent>,
     );
 
     fn run(
         &mut self,
-        (entities, runtime, mut event_queue, mut activities, mut ais): Self::SystemData,
+        (
+            entities,
+            runtime,
+            mut event_queue,
+            mut societies_res,
+            mut activities,
+            mut ais,
+            societies,
+        ): Self::SystemData,
     ) {
         for (e, activity, ai) in (&entities, &mut activities, &mut ais).join() {
             let e = Entity::from(e);
@@ -73,54 +75,53 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                     // unsubscribe from all events from previous activity
                     event_queue.unsubscribe_all(e);
                 }
-                // if let Err(e) = activity
-                //     .current
-                //     .finish(&ActivityFinish::Interrupted, &mut ctx)
-                // {
-                //     error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
-                // }
-
-                // comp_updates.remove::<BlockingActivityComponent>(entity);
 
                 // replace current with new activity, dropping the old one
                 new_activity = Some(new_action.into_activity2());
-            // activity.current = new_action.into_activity2();
-            // activity.current_society_task = new_society_task;
+                activity.current_society_task = new_society_task;
 
             // not necessary to manually cancel society reservation here, as the ai interruption
             // already did
-            } else if activity
-                .current
-                .as_ref()
-                .map(|t| t.task.is_finished())
-                .unwrap_or(true)
-            {
-                // current task has finished
-                debug!("no activity, reverting to nop"; e);
-                new_activity = Some(Rc::new(NopActivity2::default()));
+            } else {
+                let (finished, result) = match activity.current.as_ref() {
+                    None => (true, None),
+                    Some(task) => {
+                        let result = task.task.result();
+                        (result.is_some(), result)
+                    }
+                };
 
-                // TODO interrupt ai and unreserve society task
-                // ai.interrupt_current_action(entity, None, || {
-                //     entity
-                //         .get(&society)
-                //         .and_then(|soc| societies.society_by_handle_mut(soc.handle))
-                //         .expect("should have society")
-                // });
+                if finished {
+                    // current task has finished
+                    if let Some(res) = result.as_ref() {
+                        debug!("activity finished, reverting to nop"; e, "result" => ?res);
+                    } else {
+                        debug!("activity finished, reverting to nop"; e);
+                    }
+                    new_activity = Some(Rc::new(NopActivity2::default()));
 
-                // next tick ai should return a new decision rather than unchanged to avoid
-                // infinite Nop loops
-                ai.clear_last_action();
+                    // interrupt ai and unreserve society task
+                    ai.interrupt_current_action(e, None, || {
+                        e.get(&societies)
+                            .and_then(|soc| societies_res.society_by_handle_mut(soc.handle))
+                            .expect("should have society")
+                    });
 
-                // TODO notify society job of completion
-                // if let Some((job, task)) = activity.current_society_task.take() {
-                //     if let Ok(result) = SocietyTaskResult::try_from(finish) {
-                //         job.write().notify_completion(task, result);
-                //     }
-                // }
+                    // next tick ai should return a new decision rather than unchanged to avoid
+                    // infinite Nop loops
+                    ai.clear_last_action();
+
+                    // notify society job of completion
+                    if let Some((job, task)) = activity.current_society_task.take() {
+                        if let Some(TaskResult::Finished(finish)) = result {
+                            job.write().notify_completion(task, finish.into());
+                        }
+                    }
+                }
             }
 
             // spawn task for new activity
-            if let Some(mut new_activity) = new_activity {
+            if let Some(new_activity) = new_activity {
                 // safety: ecs world is pinned and guaranteed to be valid as long as this system
                 // is being ticked
                 let world = unsafe { transmute::<Pin<&EcsWorld>, Pin<&'static EcsWorld>>(self.0) };
@@ -144,7 +145,8 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                         new_activity.clone(),
                     );
 
-                    match new_activity.dew_it(ctx).await {
+                    let result = new_activity.dew_it(ctx).await;
+                    match result.as_ref() {
                         Ok(_) => {
                             debug!("activity finished"; entity, "activity" => ?new_activity);
                         }
@@ -152,6 +154,8 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                             debug!("activity failed"; entity, "activity" => ?new_activity, "err" => %err);
                         }
                     };
+
+                    result
                 });
 
                 activity.current = Some(ActiveTask {
@@ -169,12 +173,8 @@ impl ActivityComponent2 {
         &mut self,
         action: AiAction,
         society_task: Option<(SocietyJobRef, SocietyTask)>,
-        me: Entity,
-        world: &impl ComponentWorld,
     ) {
         self.new_activity = Some((action, society_task));
-        // // ensure unblocked
-        // world.remove_lazy::<BlockingActivityComponent>(me);
     }
 
     pub fn task(&self) -> Option<&TaskRef> {

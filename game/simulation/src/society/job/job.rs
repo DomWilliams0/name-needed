@@ -135,6 +135,15 @@ impl TryFrom<ActivityFinish> for SocietyTaskResult {
     }
 }
 
+impl From<BoxedResult<()>> for SocietyTaskResult {
+    fn from(result: BoxedResult<()>) -> Self {
+        match result {
+            Ok(_) => Self::Success,
+            Err(err) => Self::Failure(err),
+        }
+    }
+}
+
 impl Debug for SocietyJobRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "SocietyJob(")?;

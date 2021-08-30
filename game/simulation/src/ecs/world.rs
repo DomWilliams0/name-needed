@@ -119,15 +119,6 @@ impl EcsWorld {
     pub fn all_components_for(&self, entity: Entity) -> impl Iterator<Item = &'static str> + '_ {
         self.component_registry.all_components_for(self, entity)
     }
-
-    pub fn spawn_task(
-        &mut self,
-        gimme_task_ref: Sender<TaskRef>,
-        task: impl Future<Output = ()> + 'static,
-    ) -> TaskRef {
-        let runtime = self.resource::<Runtime>();
-        runtime.spawn(gimme_task_ref, task)
-    }
 }
 
 impl ComponentWorld for EcsWorld {

@@ -15,6 +15,7 @@ pub use system2::{ActivityComponent2, ActivitySystem2};
 #[deprecated]
 mod activities;
 mod activities2;
+#[deprecated]
 mod activity;
 mod activity2;
 mod event_logging;
