@@ -1,6 +1,6 @@
 use crate::ecs::*;
 use crate::senses::sense::{HearingSphere, Sense, VisionCone};
-use crate::spatial::Spatial;
+use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
 use common::*;
 use serde::Deserialize;
@@ -93,7 +93,7 @@ impl<'a> System<'a> for SensesSystem {
             // TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)
 
             spatial
-                .query_in_radius(transform.position, max_radius)
+                .query_in_radius((&transforms).into(), transform.position, max_radius)
                 .filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list
                 .for_each(|(entity, pos, dist)| {
                     let sensed = senses.senses(transform, &pos, dist);

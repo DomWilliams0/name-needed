@@ -6,7 +6,7 @@ use unit::world::{WorldPoint, WorldPosition};
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::{HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
-use crate::spatial::Spatial;
+use crate::spatial::{Spatial, Transforms};
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
 
@@ -250,13 +250,16 @@ fn search_local_area(
     };
 
     let spatial = world.resource::<Spatial>();
+    let transforms = Transforms::from(world);
     let results = spatial
-        .query_in_radius(self_position.centred(), max_radius)
+        .query_in_radius(transforms, self_position.centred(), max_radius)
         .filter_map(|(entity, pos, dist)| {
             let condition = entity.get(&conditions)?;
 
             // check item filter matches
-            (entity, Some(world)).matches(*filter).as_option()?;
+            if !(entity, Some(world)).matches(*filter) {
+                return None;
+            }
 
             // check this item is accessible
             // TODO use accessible position?

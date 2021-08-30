@@ -15,6 +15,11 @@ pub struct Spatial {
 /// Update spatial resource
 pub struct SpatialSystem;
 
+pub enum Transforms<'a> {
+    Storage(&'a ReadStorage<'a, TransformComponent>),
+    World(&'a EcsWorld),
+}
+
 impl Default for Spatial {
     fn default() -> Self {
         Self {
@@ -49,9 +54,24 @@ impl Spatial {
     #[inline(never)]
     pub fn query_in_radius(
         &self,
+        transforms: Transforms,
         centre: WorldPoint,
         radius: f32,
     ) -> impl Iterator<Item = (Entity, WorldPoint, f32)> {
+        let transforms = match transforms {
+            Transforms::Storage(storage) => storage,
+            Transforms::World(w) => {
+                let transforms = &w.read_storage();
+                // safety: storage definitely lives as long as this function
+                unsafe {
+                    std::mem::transmute::<
+                        &ReadStorage<TransformComponent>,
+                        &ReadStorage<TransformComponent>,
+                    >(transforms)
+                }
+            }
+        };
+
         // awful allocation only acceptable because this is an awful temporary brute force implementation
         self.entities
             .iter()
@@ -59,7 +79,8 @@ impl Spatial {
                 let distance2 = point.distance2(centre);
                 (e, point, distance2)
             })
-            .filter(|(_, _, dist2)| *dist2 < radius.powi(2))
+            // positions are cached so check transform is still present after filtering by distance
+            .filter(|(e, _, dist2)| *dist2 < radius.powi(2) && transforms.contains((**e).into()))
             .map(|(e, point, dist2)| (*e, *point, dist2.sqrt()))
             .sorted_by_key(|(_, _, dist)| OrderedFloat(*dist))
     }
@@ -79,5 +100,17 @@ impl<'a> System<'a> for SpatialSystem {
         if tick.value() % 8 == 0 {
             spatial.update(entities, transforms, physicals);
         }
+    }
+}
+
+impl<'a> From<&'a ReadStorage<'a, TransformComponent>> for Transforms<'a> {
+    fn from(t: &'a ReadStorage<'a, TransformComponent>) -> Self {
+        Self::Storage(t)
+    }
+}
+
+impl<'a> From<&'a EcsWorld> for Transforms<'a> {
+    fn from(w: &'a EcsWorld) -> Self {
+        Self::World(w)
     }
 }
