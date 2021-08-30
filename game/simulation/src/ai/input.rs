@@ -25,6 +25,7 @@ pub enum AiInput {
     CanUseHeldItem(ItemFilter),
 
     // TODO HasInInventoryGraded - returns number,quality of matches
+    // TODO should include check for n free slots anywhere in inventory (not just hands)
     CanFindGradedItems {
         filter: ItemFilter,
         max_radius: u32,

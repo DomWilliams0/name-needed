@@ -1,6 +1,5 @@
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::EventResult::Consumed;
-use crate::activity::EventUnsubscribeResult;
 use crate::ecs::ComponentGetError;
 use crate::event::prelude::*;
 use crate::unexpected_event2;
@@ -16,6 +15,9 @@ pub enum GotoError {
 
     #[error("Failed to navigate: {0}")]
     Navigation(#[from] NavigationError),
+
+    #[error("Goto was cancelled")]
+    Cancelled,
 }
 
 pub struct GoToSubactivity<'a> {
@@ -54,21 +56,24 @@ impl<'a> GoToSubactivity<'a> {
             subscription: EventSubscription::Specific(EntityEventType::Arrived),
         };
 
-        ctx.subscribe_to_until(subscription, |evt| match evt {
-            EntityEventPayload::Arrived(token, result) if token == path_token => {
-                goto_result = Some(result);
-                Consumed
+        ctx.subscribe_to_until(subscription, |evt| {
+            debug!("goto is waiting for arrival of token {:?}", path_token);
+            match evt {
+                EntityEventPayload::Arrived(token, result) if token == path_token => {
+                    goto_result = Some(result);
+                    Consumed
+                }
+                _ => unexpected_event2!(evt),
             }
-            _ => unexpected_event2!(evt),
         })
         .await;
 
         self.complete = true;
 
-        let result = goto_result.expect("did not get goto event?"); // shouldn't happen
-        match result {
-            Ok(_) => Ok(()),
-            Err(err) => Err(err.into()),
+        match goto_result {
+            None => Err(GotoError::Cancelled),
+            Some(Ok(_)) => Ok(()),
+            Some(Err(err)) => Err(err.into()),
         }
     }
 }

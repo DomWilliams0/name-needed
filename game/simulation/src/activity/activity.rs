@@ -71,7 +71,7 @@ macro_rules! unexpected_event {
 #[macro_export]
 macro_rules! unexpected_event2 {
     ($event:expr) => {{
-        debug!("ignoring unexpected event"; "event" => ?$event);
+        trace!("ignoring unexpected event"; "event" => ?$event);
         $crate::activity::activity2::EventResult::Unconsumed($event)
     }};
 }

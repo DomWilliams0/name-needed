@@ -62,12 +62,8 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
                 target: *target,
                 reason,
             },
-            AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => {
-                unreachable!()
-            },
-            AiAction::GoEquip(item) => {
-                GoEquip(*item)
-            },
+            AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => unreachable!(),
+            AiAction::GoEquip(item) => GoEquip(*item),
             AiAction::EatHeldItem(item) => EatHeldItem(*item),
             AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
             AiAction::Follow { target, .. } => Follow(*target),

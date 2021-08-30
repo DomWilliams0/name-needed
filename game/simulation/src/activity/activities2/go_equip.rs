@@ -1,6 +1,8 @@
-use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult, EventResult};
+use crate::activity::activity2::{
+    Activity2, ActivityContext2, ActivityResult, EventResult, InterruptResult,
+};
 use crate::ecs::ComponentGetError;
-use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
+use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
 use crate::{ComponentWorld, Entity, TransformComponent};
 use async_trait::async_trait;
 use common::*;
@@ -28,7 +30,11 @@ impl Activity2 for GoEquipActivity2 {
     }
 
     async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
-        // TODO somehow cancel if any destructive event happens to the item
+        // cancel if any destructive event happens to the item
+        ctx.subscribe_to(EntityEventSubscription {
+            subject: self.0,
+            subscription: EventSubscription::All,
+        });
 
         // go to the item
         ctx.update_status(State::Going);
@@ -41,6 +47,15 @@ impl Activity2 for GoEquipActivity2 {
         ctx.pick_up(self.0).await?;
 
         Ok(())
+    }
+
+    fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
+        if event.subject == self.0 && event.payload.is_destructive() {
+            debug!("item has been destroyed, cancelling equip");
+            InterruptResult::Cancel
+        } else {
+            InterruptResult::Continue
+        }
     }
 }
 

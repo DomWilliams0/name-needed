@@ -27,6 +27,9 @@ pub enum PickupItemError {
 
     #[error("Too far away to pick up")]
     TooFar,
+
+    #[error("Pickup was cancelled")]
+    Cancelled,
 }
 
 impl PickupSubactivity {
@@ -56,13 +59,12 @@ impl PickupSubactivity {
                 pickup_result = Some(result);
                 Consumed
             }
+            // calling activity can handle other destructive events
             _ => unexpected_event2!(evt),
         })
         .await;
 
-        // TODO subscribe to destructive events on the item, get interrupted if hit
-
-        pickup_result.expect("did not get pickup event?") // shouldn't happen
+        pickup_result.unwrap_or(Err(PickupItemError::Cancelled))
     }
 
     fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), PickupItemError> {

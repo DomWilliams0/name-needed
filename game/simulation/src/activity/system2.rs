@@ -8,9 +8,12 @@ use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 
 use crate::activity::status::{status_channel, StatusReceiver, StatusRef};
+use crate::event::EntityEventQueue;
 use crate::job::{SocietyJobRef, SocietyTask};
 use crate::runtime::{Runtime, TaskHandle, TaskRef, TimerFuture};
+use std::cell::Cell;
 use std::mem::transmute;
+use std::rc::Rc;
 
 // TODO rename
 #[derive(Component, EcsComponent)]
@@ -46,11 +49,15 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, Runtime>,
+        Write<'a, EntityEventQueue>,
         WriteStorage<'a, ActivityComponent2>,
         WriteStorage<'a, AiComponent>,
     );
 
-    fn run(&mut self, (entities, runtime, mut activities, mut ais): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, runtime, mut event_queue, mut activities, mut ais): Self::SystemData,
+    ) {
         for (e, activity, ai) in (&entities, &mut activities, &mut ais).join() {
             let e = Entity::from(e);
             let mut new_activity = None;
@@ -62,6 +69,9 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 // cancel current
                 if let Some(task) = activity.current.take() {
                     task.task.cancel();
+
+                    // unsubscribe from all events from previous activity
+                    event_queue.unsubscribe_all(e);
                 }
                 // if let Err(e) = activity
                 //     .current
@@ -70,8 +80,6 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                 //     error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
                 // }
 
-                // TODO unsubscribe from all events from previous activity
-                // event_queue.unsubscribe_all(entity);
                 // comp_updates.remove::<BlockingActivityComponent>(entity);
 
                 // replace current with new activity, dropping the old one
@@ -89,7 +97,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
             {
                 // current task has finished
                 debug!("no activity, reverting to nop"; e);
-                new_activity = Some(Box::new(NopActivity2::default()));
+                new_activity = Some(Rc::new(NopActivity2::default()));
 
                 // TODO interrupt ai and unreserve society task
                 // ai.interrupt_current_action(entity, None, || {
@@ -133,6 +141,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                         world,
                         task,
                         status_tx,
+                        new_activity.clone(),
                     );
 
                     match new_activity.dew_it(ctx).await {

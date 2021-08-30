@@ -32,12 +32,13 @@ mod action_to_activity {
     use crate::item::ItemsToPickUp;
 
     use super::*;
+    use std::rc::Rc;
 
     impl AiAction {
-        pub fn into_activity2(self) -> Box<dyn Activity2> {
+        pub fn into_activity2(self) -> Rc<dyn Activity2> {
             macro_rules! activity {
                 ($act:expr) => {
-                    Box::new($act) as Box<dyn Activity2>
+                    Rc::new($act) as Rc<dyn Activity2>
                 };
             }
 

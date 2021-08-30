@@ -1,8 +1,8 @@
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::{
-    CanUseHeldItemConsideration,
-    FindLocalGradedItemConsideration, HoldingItemConsideration, HungerConsideration,
+    CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,
+    HungerConsideration,
 };
 use crate::ai::{AiAction, AiContext};
 use crate::item::{ItemFilter, ItemsToPickUp};

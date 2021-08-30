@@ -11,7 +11,8 @@
 	* [X] goto and break block
 	* [X] goto and equip
 		* [X] collapse pickup into this as it's the same problem
-		* [ ] cancel early if item is destroyed
+		* [X] cancel early if item is destroyed
+	* [ ] eat
 	* [ ] goto and haul
 * [ ] e2e tests
 		* [ ] equipping an item activity
@@ -33,3 +34,4 @@
 * [ ] reuse status updater allocation when changing activities
 * [ ] add exertion to activity status
 * [ ] remove old deprecated Activities and remove 2 suffix
+* [ ] add check for space anywhere in inventory before deciding to go pick something up
