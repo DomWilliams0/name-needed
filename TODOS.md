@@ -1,4 +1,4 @@
-# TODOs (367)
+# TODOs (366)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -166,10 +166,9 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (6)
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (5)
    * `// TODO rename`
    * `// TODO handle society task`
-   * `// TODO unsubscribe from all events from previous activity`
    * `// TODO interrupt ai and unreserve society task`
    * `// TODO notify society job of completion`
    * `// TODO reuse same status updater from previous activity, no need to throw it away`

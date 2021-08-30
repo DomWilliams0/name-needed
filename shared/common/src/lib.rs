@@ -7,6 +7,7 @@ pub use cgmath::{
     VectorSpace, Zero,
 };
 pub use derive_more;
+pub use dynslot::DynSlot;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use num_derive;
@@ -77,6 +78,7 @@ pub fn truncate<F: cgmath::BaseFloat, V: cgmath::InnerSpace<Scalar = F>>(vec: V,
     }
 }
 
+pub mod dynslot;
 pub mod input;
 pub mod newtype;
 pub mod random;
