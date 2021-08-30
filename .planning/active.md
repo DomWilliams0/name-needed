@@ -12,7 +12,7 @@
 	* [X] goto and equip
 		* [X] collapse pickup into this as it's the same problem
 		* [X] cancel early if item is destroyed
-	* [ ] eat
+	* [X] eat
 	* [ ] goto and haul
 * [ ] e2e tests
 		* [ ] equipping an item activity

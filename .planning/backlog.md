@@ -160,6 +160,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * when submitting slab changes to the worker pool, cancel any other tasks queued for the same slab as they're now outdated
 * investigate thousands of occlusion updates for empty all-air slabs
 	* completely solid slabs (air, stone, etc) should be treated as a special case
+* switch away from `async_trait` when a non boxing impl is available
 
 ### Memory usage
 * CoW terrain slabs

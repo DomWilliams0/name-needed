@@ -1,7 +1,8 @@
-use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent, PickupItemError};
+use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
 use crate::event::timer::TimerToken;
 
+use crate::needs::FoodEatingError;
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits};
 use std::convert::TryInto;
@@ -22,13 +23,13 @@ pub enum EntityEventPayload {
     Arrived(PathToken, Result<WorldPoint, NavigationError>),
 
     /// Item entity (subject) picked up by the given holder (.0)
-    BeenPickedUp(Entity, Result<(), PickupItemError>),
+    BeenPickedUp(Entity, Result<(), EquipItemError>),
 
     /// Entity (subject) has picked up the given item entity
     HasPickedUp(Entity),
 
-    /// Food entity (subject) has been fully eaten
-    BeenEaten(Result<(), ()>),
+    /// Food entity (subject) has been fully eaten by the given living entity
+    BeenEaten(Result<Entity, FoodEatingError>),
 
     /// Hungry entity (subject) has finished eating the given food entity
     HasEaten(Entity),

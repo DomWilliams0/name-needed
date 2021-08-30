@@ -43,7 +43,7 @@ impl Dse<AiContext> for EatHeldFoodDse {
             .get(&FOOD_FILTER)
             .expect("item search succeeded but missing result in cache");
 
-        let inventory = blackboard.inventory.unwrap();
+        let inventory = blackboard.inventory.unwrap(); // certainly has an inv by now
         let food = slot.get(inventory, blackboard.world);
 
         AiAction::EatHeldItem(food)

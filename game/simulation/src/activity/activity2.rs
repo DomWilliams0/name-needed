@@ -7,9 +7,10 @@ use common::*;
 
 use crate::activity::activity2::EventResult::Unconsumed;
 use crate::activity::subactivities2::{
-    BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError, PickupSubactivity,
+    BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
+    GoToSubactivity, GotoError, PickupSubactivity,
 };
-use crate::activity::{PickupItemError, StatusUpdater};
+use crate::activity::{EquipItemError, StatusUpdater};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
@@ -119,8 +120,18 @@ impl<'a> ActivityContext2<'a> {
     }
 
     /// Pick up item off the ground, checks if close enough first
-    pub async fn pick_up(&self, item: Entity) -> Result<(), PickupItemError> {
+    pub async fn pick_up(&self, item: Entity) -> Result<(), EquipItemError> {
         PickupSubactivity.pick_up(self, item).await
+    }
+
+    /// Equip item that's already in inventory
+    pub async fn equip(&self, item: Entity, extra_hands: u16) -> Result<(), EquipItemError> {
+        EquipSubActivity2.equip(self, item, extra_hands).await
+    }
+
+    /// Item should already be equipped
+    pub async fn eat(&self, item: Entity) -> Result<(), EatItemError> {
+        EatItemSubactivity2.eat(self, item).await
     }
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].

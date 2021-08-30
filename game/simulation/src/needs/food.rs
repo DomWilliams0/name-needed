@@ -35,6 +35,12 @@ pub struct BeingEatenComponent {
     pub eater: Entity,
 }
 
+#[derive(Error, Debug, Clone)]
+pub enum FoodEatingError {
+    #[error("Food is not equipped by the eater")]
+    NotEquipped,
+}
+
 /// Decreases hunger over time
 pub struct HungerSystem;
 
@@ -99,7 +105,7 @@ impl<'a> System<'a> for EatingSystem {
                     Some(comps) => comps,
                     None => {
                         warn!("food eater doesn't have inventory or hunger component"; "eater" => being_eaten.eater);
-                        return Some(Err(()));
+                        return Some(Err(FoodEatingError::NotEquipped));
                     }
                 };
 
@@ -132,7 +138,7 @@ impl<'a> System<'a> for EatingSystem {
                     debug_assert!(delete_result.is_ok());
 
                     // do post event
-                    Some(Ok(()))
+                    Some(Ok(being_eaten.eater))
                 } else {
                     // still eating
                     None
@@ -142,7 +148,7 @@ impl<'a> System<'a> for EatingSystem {
             if let Some(result) = do_eat() {
                 events.post(EntityEvent {
                     subject: item,
-                    payload: EntityEventPayload::BeenEaten(result),
+                    payload: EntityEventPayload::BeenEaten(result.clone()),
                 });
 
                 if result.is_ok() {

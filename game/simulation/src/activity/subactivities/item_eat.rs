@@ -32,7 +32,7 @@ impl SubActivity for ItemEatSubActivity {
                     debug!("cannot eat because food is not held"; "error" => ?other);
                     world.post_event(EntityEvent {
                         subject: item,
-                        payload: EntityEventPayload::BeenEaten(Err(())),
+                        payload: EntityEventPayload::BeenEaten(unreachable!()),
                     });
                     return Err(ItemEatError::NotInInventory.into());
                 }

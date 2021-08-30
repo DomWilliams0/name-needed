@@ -30,6 +30,6 @@ impl Activity2 for NopActivity2 {
 
 impl Display for NopActivity2 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Doing nothing")
+        write!(f, "Thinking")
     }
 }

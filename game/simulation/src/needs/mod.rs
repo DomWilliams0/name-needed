@@ -1,3 +1,5 @@
-pub use food::{BeingEatenComponent, EatingSystem, Fuel, HungerComponent, HungerSystem};
+pub use food::{
+    BeingEatenComponent, EatingSystem, FoodEatingError, Fuel, HungerComponent, HungerSystem,
+};
 
 mod food;

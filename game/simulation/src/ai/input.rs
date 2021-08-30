@@ -5,7 +5,7 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::{HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
+use crate::item::{FoundSlot, HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
 use crate::spatial::{Spatial, Transforms};
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
@@ -55,7 +55,7 @@ impl ai::Input<AiContext> for AiInput {
             AiInput::HasInInventory(filter) => match blackboard.inventory {
                 None => 0.0,
                 Some(inv) => {
-                    if search_inventory_with_cache(blackboard, inv, filter) {
+                    if search_inventory_with_cache(blackboard, inv, filter).is_some() {
                         1.0
                     } else {
                         0.0
@@ -110,11 +110,11 @@ impl ai::Input<AiContext> for AiInput {
                 }
             }
             AiInput::CanUseHeldItem(filter) => {
-                match blackboard.inventory_search_cache.get(filter) {
-                    Some(found) => {
-                        // resolve found item entity
-                        let inventory = blackboard.inventory.expect("item was already found");
-                        let item = found.get(inventory, blackboard.world);
+                match blackboard.inventory.and_then(|inv| {
+                    search_inventory_with_cache(blackboard, inv, filter).map(|slot| (inv, slot))
+                }) {
+                    Some((inventory, slot)) => {
+                        let item = slot.get(inventory, blackboard.world);
 
                         // check if being hauled
                         let is_hauled = blackboard.world.has_component::<HauledItemComponent>(item);
@@ -138,17 +138,15 @@ fn search_inventory_with_cache<'a>(
     blackboard: &mut AiBlackboard<'a>,
     inventory: &'a InventoryComponent,
     filter: &ItemFilter,
-) -> bool {
+) -> Option<FoundSlot<'a>> {
     let cache_entry = blackboard.inventory_search_cache.entry(*filter);
 
-    let result = match cache_entry {
+    match cache_entry {
         Entry::Vacant(v) => inventory
             .search(filter, blackboard.world)
             .map(|item| *v.insert(item)),
         Entry::Occupied(e) => Some(*e.get()),
-    };
-
-    result.is_some()
+    }
 }
 
 /// (item entity, position, direct distance, item condition)

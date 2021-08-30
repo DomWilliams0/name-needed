@@ -9,7 +9,7 @@ use crate::activity::activity::{
 };
 use crate::activity::subactivities::{GoToSubActivity, PickupItemSubActivity};
 use crate::activity::{
-    Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult, PickupItemError,
+    Activity, ActivityContext, EquipItemError, EventUnblockResult, EventUnsubscribeResult,
 };
 use crate::ecs::Entity;
 use crate::{nop_subactivity, unexpected_event};
@@ -45,7 +45,7 @@ enum BestItem {
 
 #[derive(Debug)]
 enum PickupFailure {
-    PickupError(PickupItemError),
+    PickupError(EquipItemError),
     NavigationError(NavigationError),
     Other,
 }
@@ -257,7 +257,7 @@ impl PickupItemsActivity {
                 let err: Box<dyn Error> = match err {
                     PickupFailure::PickupError(e) => Box::new(e),
                     PickupFailure::NavigationError(e) => Box::new(e),
-                    PickupFailure::Other => Box::new(PickupItemError::NotAvailable),
+                    PickupFailure::Other => Box::new(EquipItemError::NotAvailable),
                 };
 
                 BestItem::NoneLeft(ActivityFinish::Failure(err))

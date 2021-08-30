@@ -19,6 +19,7 @@ pub struct ItemEquipSubActivity {
 }
 
 #[derive(Clone, Debug, Error)]
+#[deprecated]
 pub enum EquipItemError {
     #[error("Entity is not an item")]
     NotAnItem,
@@ -95,7 +96,7 @@ impl SubActivity for ItemEquipSubActivity {
 
                     world.post_event(EntityEvent {
                         subject: item,
-                        payload: EntityEventPayload::BeenEquipped(result),
+                        payload: EntityEventPayload::BeenEquipped(unimplemented!()),
                     });
 
                     Ok(())

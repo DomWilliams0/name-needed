@@ -2,7 +2,10 @@ use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::EventResult::Consumed;
 use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::{ContainedInComponent, HaulableItemComponent};
+use crate::item::{
+    ContainedInComponent, EndHaulBehaviour, FoundSlot, HaulableItemComponent, HauledItemComponent,
+    ItemFilter,
+};
 use crate::queued_update::QueuedUpdates;
 use crate::unexpected_event2;
 use crate::{ComponentWorld, Entity, InventoryComponent, PhysicalComponent, TransformComponent};
@@ -11,12 +14,15 @@ use common::*;
 /// Pick up item off the ground, checks if close enough first
 pub struct PickupSubactivity;
 
+/// Equip item that's already in inventory
+pub struct EquipSubActivity2;
+
 const MAX_DISTANCE: f32 = 4.0;
 
 #[derive(Error, Debug, Clone)]
 #[allow(clippy::enum_variant_names)]
-pub enum PickupItemError {
-    #[error("Item is invalid, non-existent or already picked up")]
+pub enum EquipItemError {
+    #[error("Item is invalid, non-existent or not pickupable")]
     NotAvailable,
 
     #[error("Holder has no inventory")]
@@ -25,10 +31,16 @@ pub enum PickupItemError {
     #[error("Can't free up any/enough equip slots")]
     NoFreeHands,
 
-    #[error("Too far away to pick up")]
+    #[error("Item not found in inventory")]
+    NotInInventory,
+
+    #[error("Not enough space in inventory to equip item")]
+    NotEnoughSpace,
+
+    #[error("Item is too far away to pick up")]
     TooFar,
 
-    #[error("Pickup was cancelled")]
+    #[error("Equip was cancelled")]
     Cancelled,
 }
 
@@ -38,12 +50,12 @@ impl PickupSubactivity {
         &mut self,
         ctx: &ActivityContext2<'_>,
         item: Entity,
-    ) -> Result<(), PickupItemError> {
+    ) -> Result<(), EquipItemError> {
         // ensure close enough
         self.check_distance(ctx, item)?;
 
         // queue pickup for next tick
-        self.queue_pickup(ctx, item);
+        queue_pickup(ctx.world().resource(), ctx.entity(), item);
 
         // await event
         let subscription = EntityEventSubscription {
@@ -64,93 +76,200 @@ impl PickupSubactivity {
         })
         .await;
 
-        pickup_result.unwrap_or(Err(PickupItemError::Cancelled))
+        pickup_result.unwrap_or(Err(EquipItemError::Cancelled))
     }
 
-    fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), PickupItemError> {
+    fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), EquipItemError> {
         let transforms = ctx.world().read_storage::<TransformComponent>();
         let my_pos = transforms.get(ctx.entity().into());
         let item_pos = transforms.get(item.into());
 
         my_pos
             .zip(item_pos)
-            .ok_or(PickupItemError::NotAvailable)
+            .ok_or(EquipItemError::NotAvailable)
             .and_then(|(me, item)| {
                 if me.position.distance2(item.position) < MAX_DISTANCE.powi(2) {
                     Ok(())
                 } else {
-                    Err(PickupItemError::TooFar)
+                    Err(EquipItemError::TooFar)
                 }
             })
     }
+}
 
-    fn queue_pickup(&self, ctx: &ActivityContext2, item: Entity) {
+impl EquipSubActivity2 {
+    pub async fn equip(
+        &self,
+        ctx: &ActivityContext2<'_>,
+        item: Entity,
+        extra_hands: u16,
+    ) -> Result<(), EquipItemError> {
         let holder = ctx.entity();
-        ctx.world()
-            .resource::<QueuedUpdates>()
-            .queue("pick up item", move |world| {
-                let do_pickup = || -> Result<(), PickupItemError> {
-                    let mut shifted_items = SmallVec::<[(Entity, Entity); 3]>::new();
-                    {
-                        let mut inventories = world.write_storage::<InventoryComponent>();
-                        let transforms = world.read_storage::<TransformComponent>();
-                        let haulables = world.read_storage::<HaulableItemComponent>();
-                        let physicals = world.read_storage::<PhysicalComponent>();
+        let filter = ItemFilter::SpecificEntity(item);
 
-                        // get item components and ensure transform i.e. not already picked up
-                        let (_, haulable, physical) = world
-                            .components(item, (&transforms, &haulables, &physicals))
-                            .ok_or(PickupItemError::NotAvailable)?;
+        let inventory = ctx
+            .world()
+            .component::<InventoryComponent>(holder)
+            .map_err(|_| EquipItemError::NoInventory)?;
 
-                        // get holder inventory, free up enough hands and try to fill em
-                        let inventory = holder
-                            .get_mut(&mut inventories)
-                            .ok_or(PickupItemError::NoInventory)?;
+        // check if already equipped
+        let inv_slot = inventory.search(&filter, ctx.world());
+        match inv_slot {
+            None => Err(EquipItemError::NotInInventory),
+            Some(FoundSlot::Equipped(_)) => {
+                // already equipped
 
-                        inventory
-                            .insert_item(
-                                &*world,
-                                item,
-                                haulable.extra_hands,
-                                physical.volume,
-                                physical.size,
-                                |item, container| {
-                                    // cant mutate world in this callback
-                                    shifted_items.push((item, container));
-                                },
-                            )
-                            .ok_or(PickupItemError::NoFreeHands)?;
-                    }
-
-                    // update items that have been shifted into containers
-                    for (item, container) in shifted_items {
-                        world
-                            .helpers_comps()
-                            .add_to_container(item, ContainedInComponent::Container(container));
-                    }
-
-                    // pickup success
-                    world
-                        .helpers_comps()
-                        .add_to_container(item, ContainedInComponent::InventoryOf(holder));
-
-                    Ok(())
-                };
-
-                let result = do_pickup();
-                if result.is_ok() {
-                    world.post_event(EntityEvent {
-                        subject: holder,
-                        payload: EntityEventPayload::HasPickedUp(item),
-                    });
+                // if its currently being hauled, don't drop it
+                if let Ok(hauling) = ctx.world().component_mut::<HauledItemComponent>(item) {
+                    hauling.interrupt_behaviour = EndHaulBehaviour::KeepEquipped;
+                    debug!("item is currently being hauled, ensuring it is kept in inventory");
                 }
 
-                world.post_event(EntityEvent {
-                    subject: item,
-                    payload: EntityEventPayload::BeenPickedUp(holder, result),
-                });
-
                 Ok(())
-            });
+            }
+            Some(slot) => {
+                // in inventory but not equipped
+                debug!("found item"; "slot" => ?slot, "item" => item);
+
+                // equip next tick
+                queue_equip(ctx.world().resource(), holder, item, extra_hands, filter);
+
+                // wait for equip event
+                let sub = EntityEventSubscription {
+                    subject: item,
+                    subscription: EventSubscription::Specific(EntityEventType::BeenEquipped),
+                };
+
+                let mut equip_result = None;
+                ctx.subscribe_to_until(sub, |evt| match evt {
+                    EntityEventPayload::BeenEquipped(result) => {
+                        equip_result = Some(result);
+                        Consumed
+                    }
+                    // calling activity can handle other destructive events
+                    _ => unexpected_event2!(evt),
+                })
+                .await;
+
+                equip_result
+                    .unwrap_or(Err(EquipItemError::Cancelled))
+                    .map(|_| {})
+            }
+        }
     }
+}
+
+#[inline]
+fn queue_equip(
+    updates: &QueuedUpdates,
+    holder: Entity,
+    item: Entity,
+    extra_hands: u16,
+    filter: ItemFilter,
+) {
+    updates.queue("equip item", move |world| {
+        let mut do_equip = || -> Result<Entity, EquipItemError> {
+            let inventory = world
+                .component_mut::<InventoryComponent>(holder)
+                .map_err(|_| EquipItemError::NoInventory)?;
+
+            // TODO inventory operations should not be immediate
+
+            let slot = inventory
+                .search_mut(&filter, &*world)
+                .ok_or(EquipItemError::NotInInventory)?;
+
+            if slot.equip(extra_hands, &*world) {
+                world
+                    .helpers_comps()
+                    .add_to_container(item, ContainedInComponent::InventoryOf(holder));
+                Ok(holder)
+            } else {
+                Err(EquipItemError::NotEnoughSpace)
+            }
+        };
+
+        let result = do_equip();
+        if result.is_ok() {
+            world.post_event(EntityEvent {
+                subject: holder,
+                payload: EntityEventPayload::HasEquipped(item),
+            });
+        }
+
+        world.post_event(EntityEvent {
+            subject: item,
+            payload: EntityEventPayload::BeenEquipped(result),
+        });
+
+        Ok(())
+    });
+}
+
+#[inline]
+fn queue_pickup(updates: &QueuedUpdates, holder: Entity, item: Entity) {
+    updates.queue("pick up item", move |world| {
+        let do_pickup = || -> Result<(), EquipItemError> {
+            let mut shifted_items = SmallVec::<[(Entity, Entity); 3]>::new();
+            {
+                let mut inventories = world.write_storage::<InventoryComponent>();
+                let transforms = world.read_storage::<TransformComponent>();
+                let haulables = world.read_storage::<HaulableItemComponent>();
+                let physicals = world.read_storage::<PhysicalComponent>();
+
+                // get item components and ensure transform i.e. not already picked up
+                let (_, haulable, physical) = world
+                    .components(item, (&transforms, &haulables, &physicals))
+                    .ok_or(EquipItemError::NotAvailable)?;
+
+                // get holder inventory, free up enough hands and try to fill em
+                let inventory = holder
+                    .get_mut(&mut inventories)
+                    .ok_or(EquipItemError::NoInventory)?;
+
+                inventory
+                    .insert_item(
+                        &*world,
+                        item,
+                        haulable.extra_hands,
+                        physical.volume,
+                        physical.size,
+                        |item, container| {
+                            // cant mutate world in this callback
+                            shifted_items.push((item, container));
+                        },
+                    )
+                    .ok_or(EquipItemError::NoFreeHands)?;
+            }
+
+            // update items that have been shifted into containers
+            for (item, container) in shifted_items {
+                world
+                    .helpers_comps()
+                    .add_to_container(item, ContainedInComponent::Container(container));
+            }
+
+            // pickup success
+            world
+                .helpers_comps()
+                .add_to_container(item, ContainedInComponent::InventoryOf(holder));
+
+            Ok(())
+        };
+
+        let result = do_pickup();
+        if result.is_ok() {
+            world.post_event(EntityEvent {
+                subject: holder,
+                payload: EntityEventPayload::HasPickedUp(item),
+            });
+        }
+
+        world.post_event(EntityEvent {
+            subject: item,
+            payload: EntityEventPayload::BeenPickedUp(holder, result),
+        });
+
+        Ok(())
+    });
 }
