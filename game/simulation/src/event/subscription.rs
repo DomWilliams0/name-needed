@@ -36,7 +36,7 @@ pub enum EntityEventPayload {
     /// Item entity (subject) has been equipped in an equip slot of this entity
     BeenEquipped(Result<Entity, EquipItemError>),
 
-    /// Entity (subject) has equipped the given item entity
+    /// Entity (subject) has equipped the given item entity that was already in their inventory
     HasEquipped(Entity),
 
     /// Item entity (subject) has been picked up for hauling by a hauler
@@ -94,13 +94,20 @@ impl EntityEventSubscription {
 impl EntityEventPayload {
     pub fn is_destructive(&self) -> bool {
         use EntityEventPayload::*;
+        // only destructive on success
         match self {
-            BeenPickedUp(_, _)
-            | BeenEaten(_)
-            | Hauled(_)
-            | ExitedContainer(_)
-            | EnteredContainer(_) => true,
+            BeenPickedUp(_, Ok(_))
+            | BeenEaten(Ok(_))
+            | Hauled(Ok(_))
+            | ExitedContainer(Ok(_))
+            | EnteredContainer(Ok(_)) => true,
+
             Arrived(_, _)
+            | BeenPickedUp(_, Err(_))
+            | BeenEaten(Err(_))
+            | Hauled(Err(_))
+            | ExitedContainer(Err(_))
+            | EnteredContainer(Err(_))
             | HasPickedUp(_)
             | HasEaten(_)
             | HasEquipped(_)

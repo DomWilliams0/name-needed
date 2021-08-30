@@ -1,4 +1,4 @@
-# TODOs (366)
+# TODOs (365)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,8 +131,6 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activities2/go_equip.rs](game/simulation/src/activity/activities2/go_equip.rs) (1)
-   * `// TODO somehow cancel if any destructive event happens to the item`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
@@ -161,8 +159,6 @@
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/subactivities2/equip.rs](game/simulation/src/activity/subactivities2/equip.rs) (1)
-   * `// TODO subscribe to destructive events on the item, get interrupted if hit`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
@@ -182,8 +178,9 @@
  * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
+   * `// TODO should include check for n free slots anywhere in inventory (not just hands)`
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
