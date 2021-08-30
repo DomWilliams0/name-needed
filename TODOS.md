@@ -1,4 +1,4 @@
-# TODOs (366)
+# TODOs (368)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -131,6 +131,8 @@
    * `// TODO helpers for GoToThen, EquipItemThen, etc`
  * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
+ * [game/simulation/src/activity/activities2/eat_held_item.rs](game/simulation/src/activity/activities2/eat_held_item.rs) (1)
+   * `// TODO varying exertion per food`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
@@ -256,14 +258,15 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food.rs](game/simulation/src/needs/food.rs) (9)
+ * [game/simulation/src/needs/food.rs](game/simulation/src/needs/food.rs) (10)
    * `// TODO newtype for Fuel`
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
    * `// TODO generic needs component with hunger/thirst/toilet/social etc`
-   * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
+   * `ReadStorage<'a, ActivityComponent2>, // for current exertion TODO moving average`
    * `// TODO individual metabolism rate`
-   * `// TODO compensate multipliers`
+   * `// TODO elaborate and specify metabolism rate`
+   * `// TODO take into account general movement speed in addition to this`
    * `let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)

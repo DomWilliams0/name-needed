@@ -4,6 +4,7 @@ use common::*;
 
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::{Activity2, ActivityResult};
+use crate::activity::status::Status;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, TransformComponent, WorldPosition};
@@ -89,5 +90,14 @@ impl Display for State {
         };
 
         f.write_str(s)
+    }
+}
+
+impl Status for State {
+    fn exertion(&self) -> f32 {
+        match self {
+            State::Wander => 0.6,
+            State::Loiter => 0.2,
+        }
     }
 }

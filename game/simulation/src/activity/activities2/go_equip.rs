@@ -1,6 +1,7 @@
 use crate::activity::activity2::{
     Activity2, ActivityContext2, ActivityResult, EventResult, InterruptResult,
 };
+use crate::activity::status::Status;
 use crate::ecs::ComponentGetError;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
 use crate::{ComponentWorld, Entity, TransformComponent};
@@ -86,5 +87,14 @@ impl Display for State {
             State::Going => "Going to item",
             State::PickingUp => "Picking up item",
         })
+    }
+}
+
+impl Status for State {
+    fn exertion(&self) -> f32 {
+        match self {
+            State::Going => 1.0,
+            State::PickingUp => 0.6,
+        }
     }
 }

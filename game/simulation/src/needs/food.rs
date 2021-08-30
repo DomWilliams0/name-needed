@@ -6,7 +6,7 @@ use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
 use crate::simulation::EcsWorldRef;
-use crate::ConditionComponent;
+use crate::{ActivityComponent2, ConditionComponent};
 
 // TODO newtype for Fuel
 pub type Fuel = u16;
@@ -50,13 +50,14 @@ pub struct EatingSystem;
 impl<'a> System<'a> for HungerSystem {
     type SystemData = (
         WriteStorage<'a, HungerComponent>,
-        ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average
+        ReadStorage<'a, ActivityComponent2>, // for current exertion TODO moving average
     );
 
     fn run(&mut self, (mut hunger, activity): Self::SystemData) {
         for (hunger, activity) in (&mut hunger, &activity).join() {
             // TODO individual metabolism rate
-            // TODO compensate multipliers
+            // TODO elaborate and specify metabolism rate
+            // TODO take into account general movement speed in addition to this
             let metabolism = 1.0;
             let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
 

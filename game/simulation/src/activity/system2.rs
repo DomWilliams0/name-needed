@@ -187,4 +187,12 @@ impl ActivityComponent2 {
             .as_ref()
             .map(|t| (&*t.description, t.status.current()))
     }
+
+    /// Exertion of current subactivity
+    pub fn exertion(&self) -> f32 {
+        self.current
+            .as_ref()
+            .map(|t| t.status.current().exertion())
+            .unwrap_or(0.0)
+    }
 }

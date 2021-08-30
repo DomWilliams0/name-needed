@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use common::*;
 
 use crate::activity::activity2::EventResult::Unconsumed;
+use crate::activity::status::Status;
 use crate::activity::subactivities2::{
     BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
     GoToSubactivity, GotoError, PickupSubactivity,
@@ -216,7 +217,7 @@ impl<'a> ActivityContext2<'a> {
         }
     }
 
-    pub fn update_status(&self, status: impl Display + 'static) {
+    pub fn update_status(&self, status: impl Status + 'static) {
         self.status.update(status);
     }
 

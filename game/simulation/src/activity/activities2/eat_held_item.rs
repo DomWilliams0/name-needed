@@ -1,4 +1,5 @@
 use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult, InterruptResult};
+use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::EntityEvent;
 use crate::{EdibleItemComponent, Entity};
@@ -74,5 +75,17 @@ impl Display for State {
             State::Equipping => "Equipping food",
             State::Eating => "Eating food",
         })
+    }
+}
+
+impl Status for State {
+    fn exertion(&self) -> f32 {
+        match self {
+            State::Equipping => 0.5,
+            State::Eating => {
+                // TODO varying exertion per food
+                0.3
+            }
+        }
     }
 }

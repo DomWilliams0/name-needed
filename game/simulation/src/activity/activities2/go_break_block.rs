@@ -4,6 +4,7 @@ use common::*;
 
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::{Activity2, ActivityResult};
+use crate::activity::status::Status;
 use crate::WorldPosition;
 use world::SearchGoal;
 
@@ -60,5 +61,14 @@ impl Display for State {
             State::Going => "Going to block",
             State::Breaking => "Breaking block",
         })
+    }
+}
+
+impl Status for State {
+    fn exertion(&self) -> f32 {
+        match self {
+            State::Going => 1.0,
+            State::Breaking => 1.3,
+        }
     }
 }
