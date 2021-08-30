@@ -1,4 +1,5 @@
 use crate::activity::activity2::ActivityContext2;
+use crate::activity::activity2::EventResult::Consumed;
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{ContainedInComponent, HaulableItemComponent};
@@ -49,11 +50,11 @@ impl PickupSubactivity {
         let mut pickup_result = None;
         ctx.subscribe_to_until(subscription, |evt| match evt {
             EntityEventPayload::BeenPickedUp(picker_upper, result)
-                if picker_upper == ctx.entity =>
+                if picker_upper == ctx.entity() =>
             {
                 // it was us, and we tried
                 pickup_result = Some(result);
-                false
+                Consumed
             }
             _ => unexpected_event2!(evt),
         })
@@ -65,8 +66,8 @@ impl PickupSubactivity {
     }
 
     fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), PickupItemError> {
-        let transforms = ctx.world.read_storage::<TransformComponent>();
-        let my_pos = transforms.get(ctx.entity.into());
+        let transforms = ctx.world().read_storage::<TransformComponent>();
+        let my_pos = transforms.get(ctx.entity().into());
         let item_pos = transforms.get(item.into());
 
         my_pos
@@ -82,8 +83,8 @@ impl PickupSubactivity {
     }
 
     fn queue_pickup(&self, ctx: &ActivityContext2, item: Entity) {
-        let holder = ctx.entity;
-        ctx.world
+        let holder = ctx.entity();
+        ctx.world()
             .resource::<QueuedUpdates>()
             .queue("pick up item", move |world| {
                 let do_pickup = || -> Result<(), PickupItemError> {

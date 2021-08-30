@@ -95,7 +95,10 @@ impl EntityEventPayload {
     pub fn is_destructive(&self) -> bool {
         use EntityEventPayload::*;
         match self {
-            BeenPickedUp(_,_) | BeenEaten(_) | Hauled(_) | ExitedContainer(_)
+            BeenPickedUp(_, _)
+            | BeenEaten(_)
+            | Hauled(_)
+            | ExitedContainer(_)
             | EnteredContainer(_) => true,
             Arrived(_, _)
             | HasPickedUp(_)
@@ -121,7 +124,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
             BeenEaten(_)
-            | BeenPickedUp(_,_)
+            | BeenPickedUp(_, _)
             | Arrived(_, _)
             | BeenEquipped(_)
             | Hauled(_)

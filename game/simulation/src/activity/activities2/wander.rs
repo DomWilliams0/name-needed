@@ -34,7 +34,7 @@ impl Activity2 for WanderActivity2 {
         Box::new(Self)
     }
 
-    async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
         loop {
             // wander to a new target
             ctx.update_status(State::Wander);
@@ -59,11 +59,11 @@ impl Activity2 for WanderActivity2 {
 fn find_target(ctx: &ActivityContext2) -> Result<WorldPosition, WanderError> {
     // TODO special SearchGoal for wandering instead of randomly choosing an accessible target
     let transform = ctx
-        .world
-        .component::<TransformComponent>(ctx.entity)
+        .world()
+        .component::<TransformComponent>(ctx.entity())
         .map_err(WanderError::MissingTransform)?;
 
-    let world = ctx.world.voxel_world();
+    let world = ctx.world().voxel_world();
     let world = world.borrow();
 
     world

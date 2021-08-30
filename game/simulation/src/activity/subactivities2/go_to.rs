@@ -1,4 +1,5 @@
 use crate::activity::activity2::ActivityContext2;
+use crate::activity::activity2::EventResult::Consumed;
 use crate::activity::EventUnsubscribeResult;
 use crate::ecs::ComponentGetError;
 use crate::event::prelude::*;
@@ -39,8 +40,8 @@ impl<'a> GoToSubactivity<'a> {
         let ctx = self.context;
 
         let follow_path = ctx
-            .world
-            .component_mut::<FollowPathComponent>(ctx.entity)
+            .world()
+            .component_mut::<FollowPathComponent>(ctx.entity())
             .map_err(GotoError::MissingComponent)?;
 
         // assign path
@@ -49,14 +50,14 @@ impl<'a> GoToSubactivity<'a> {
         // await arrival
         let mut goto_result = None;
         let subscription = EntityEventSubscription {
-            subject: ctx.entity,
+            subject: ctx.entity(),
             subscription: EventSubscription::Specific(EntityEventType::Arrived),
         };
 
         ctx.subscribe_to_until(subscription, |evt| match evt {
             EntityEventPayload::Arrived(token, result) if token == path_token => {
                 goto_result = Some(result);
-                false
+                Consumed
             }
             _ => unexpected_event2!(evt),
         })
@@ -75,7 +76,7 @@ impl<'a> GoToSubactivity<'a> {
 impl Drop for GoToSubactivity<'_> {
     fn drop(&mut self) {
         if !self.complete {
-            debug!("aborting incomplete goto"; self.context.entity);
+            debug!("aborting incomplete goto"; self.context.entity());
             self.context.clear_path();
         }
     }

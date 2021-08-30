@@ -1,5 +1,6 @@
-use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult};
+use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult, EventResult};
 use crate::ecs::ComponentGetError;
+use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
 use crate::{ComponentWorld, Entity, TransformComponent};
 use async_trait::async_trait;
 use common::*;
@@ -26,7 +27,7 @@ impl Activity2 for GoEquipActivity2 {
         Box::new(self.clone())
     }
 
-    async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
         // TODO somehow cancel if any destructive event happens to the item
 
         // go to the item
@@ -50,7 +51,7 @@ impl GoEquipActivity2 {
 
     fn find_item(&self, ctx: &ActivityContext2) -> Result<WorldPoint, EquipError> {
         let transform = ctx
-            .world
+            .world()
             .component::<TransformComponent>(self.0)
             .map_err(EquipError::MissingTransform)?;
 

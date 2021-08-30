@@ -16,13 +16,13 @@ impl Activity2 for NopActivity2 {
         Box::new(Self)
     }
 
-    async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
         loop {
             ctx.wait(NOP_WARN_THRESHOLD).await;
 
             warn!(
                 "{} has been stuck in nop activity for a while, possible infinite loop",
-                ctx.entity
+                ctx.entity()
             );
         }
     }

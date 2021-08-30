@@ -32,8 +32,8 @@ impl BreakBlockSubactivity {
     ) -> Result<(), BreakBlockError> {
         // check we are close enough to break it
         let pos = ctx
-            .world
-            .component::<TransformComponent>(ctx.entity)
+            .world()
+            .component::<TransformComponent>(ctx.entity())
             .map_err(BreakBlockError::MissingTransform)?
             .position;
 
@@ -44,7 +44,7 @@ impl BreakBlockSubactivity {
             });
         }
 
-        let world = ctx.world.voxel_world();
+        let world = ctx.world().voxel_world();
         loop {
             {
                 // can't hold world ref across ticks
@@ -63,7 +63,7 @@ impl BreakBlockSubactivity {
                 let break_rate = 6;
                 // lets assume this is with a hand and terribly slow
                 trace!("damaging block"; "damage" => break_rate, "block" => %block);
-                ctx.world
+                ctx.world()
                     .resource::<QueuedUpdates>()
                     .queue_block_damage(block, break_rate);
             }

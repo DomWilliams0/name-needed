@@ -145,9 +145,7 @@ impl Activity for PickupItemsActivity {
             EntityEventPayload::BeenPickedUp(picker_upper, result) => {
                 // our item has been picked up, who was it?
                 match (&self.state, result) {
-                    (PickupItemsState::PickingUp(_), Ok(_))
-                        if *picker_upper == ctx.subscriber =>
-                    {
+                    (PickupItemsState::PickingUp(_), Ok(_)) if *picker_upper == ctx.subscriber => {
                         // oh hey it was us, pickup complete!
                         trace!("completed pick up");
                         self.complete = true;

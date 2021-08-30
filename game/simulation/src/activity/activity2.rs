@@ -5,13 +5,16 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::subactivities2::{BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError, PickupSubactivity};
-use crate::activity::{StatusUpdater, PickupItemError};
+use crate::activity::subactivities2::{
+    BreakBlockError, BreakBlockSubactivity, GoToSubactivity, GotoError, PickupSubactivity,
+};
+use crate::activity::{PickupItemError, StatusUpdater};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
 use crate::runtime::{ManualFuture, TaskRef, TimerFuture};
 use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent, WorldPosition};
+use std::cell::{Cell, RefCell};
 use std::task::{Context, Poll};
 use unit::world::WorldPoint;
 use world::SearchGoal;
@@ -21,15 +24,26 @@ pub type ActivityResult = Result<(), Box<dyn Error>>;
 #[async_trait]
 pub trait Activity2: Debug {
     fn description(&self) -> Box<dyn Display>;
-    async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult;
+    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult;
 }
 
 pub struct ActivityContext2<'a> {
-    pub entity: Entity,
+    entity: Entity,
     // TODO ensure component refs cant be held across awaits
-    pub world: Pin<&'a EcsWorld>,
-    pub task: TaskRef,
-    pub status: StatusUpdater,
+    world: Pin<&'a EcsWorld>,
+    task: TaskRef,
+    status: StatusUpdater,
+}
+
+pub struct ScopedSubscription<'a> {
+    subscription: EntityEventSubscription,
+    ctx: &'a ActivityContext2<'a>,
+}
+
+pub enum EventResult {
+    Consumed,
+    /// Give it back
+    Unconsumed(EntityEventPayload),
 }
 
 // only used on the main thread
@@ -37,6 +51,28 @@ unsafe impl Sync for ActivityContext2<'_> {}
 unsafe impl Send for ActivityContext2<'_> {}
 
 impl<'a> ActivityContext2<'a> {
+    pub fn new(
+        entity: Entity,
+        world: Pin<&'a EcsWorld>,
+        task: TaskRef,
+        status: StatusUpdater,
+    ) -> Self {
+        Self {
+            entity,
+            world,
+            task,
+            status,
+        }
+    }
+
+    pub const fn entity(&self) -> Entity {
+        self.entity
+    }
+
+    pub fn world(&self) -> &EcsWorld {
+        &self.world
+    }
+
     pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> + 'a {
         let timers = self.world.resource_mut::<RuntimeTimers>();
         let trigger = ManualFuture::default();
@@ -46,7 +82,7 @@ impl<'a> ActivityContext2<'a> {
 
     /// Does not update activity status
     pub async fn go_to(
-        &self,
+        &'a self,
         pos: WorldPoint,
         speed: NormalizedFloat,
         goal: SearchGoal,
@@ -68,7 +104,7 @@ impl<'a> ActivityContext2<'a> {
     }
 
     /// Pick up item off the ground, checks if close enough first
-    pub async fn pick_up(&self, item: Entity) -> Result<(), PickupItemError>{
+    pub async fn pick_up(&self, item: Entity) -> Result<(), PickupItemError> {
         PickupSubactivity.pick_up(self, item).await
     }
 
@@ -79,7 +115,7 @@ impl<'a> ActivityContext2<'a> {
     pub async fn subscribe_to_until(
         &self,
         subscription: EntityEventSubscription,
-        mut filter: impl FnMut(EntityEventPayload) -> bool,
+        mut filter: impl FnMut(EntityEventPayload) -> EventResult,
     ) {
         // TODO other subscribe method to batch up a few subscriptions before adding to evt queue
         // register subscription
@@ -87,15 +123,32 @@ impl<'a> ActivityContext2<'a> {
         evts.subscribe(self.entity, once(subscription));
 
         loop {
-            let evt = self.next_event().await;
-            debug_assert_eq!(evt.subject, subscription.subject);
-            if !filter(evt.payload) {
-                break;
+            let mut evt = self.next_event().await;
+            if evt.subject == subscription.subject {
+                match filter(evt.payload) {
+                    EventResult::Consumed => break,
+                    EventResult::Unconsumed(payload) => evt.payload = payload,
+                }
             }
+
+            // event is unconsumed
+            unreachable!("event {:?}", evt);
         }
 
         // unsubscribe
         evts.unsubscribe(self.entity, subscription);
+    }
+
+    pub fn subscribe_to_scoped(
+        &'a self,
+        subscription: EntityEventSubscription,
+    ) -> ScopedSubscription<'_> {
+        let evts = self.world.resource_mut::<EntityEventQueue>();
+        evts.subscribe(self.entity, once(subscription));
+        ScopedSubscription {
+            subscription,
+            ctx: self,
+        }
     }
 
     async fn next_event(&self) -> EntityEvent {
@@ -142,5 +195,12 @@ impl<'a> ActivityContext2<'a> {
         }
 
         YieldNow(false).await
+    }
+}
+
+impl Drop for ScopedSubscription<'_> {
+    fn drop(&mut self) {
+        let evts = self.ctx.world.resource_mut::<EntityEventQueue>();
+        evts.unsubscribe(self.ctx.entity, self.subscription);
     }
 }

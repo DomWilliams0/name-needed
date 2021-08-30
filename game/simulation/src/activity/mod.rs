@@ -6,11 +6,11 @@ pub use activities2::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use status::{StatusReceiver, StatusUpdater};
 pub use subactivities::{EquipItemError, HaulError};
+pub use subactivities2::PickupItemError;
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
 };
 pub use system2::{ActivityComponent2, ActivitySystem2};
-pub use subactivities2::{PickupItemError};
 
 #[deprecated]
 mod activities;

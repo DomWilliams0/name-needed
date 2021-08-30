@@ -24,7 +24,7 @@ impl Activity2 for GoBreakBlockActivity2 {
         Box::new(self.clone())
     }
 
-    async fn dew_it<'a>(&'a mut self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
         // walk to the block
         ctx.update_status(State::Going);
         ctx.go_to(

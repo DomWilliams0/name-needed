@@ -128,12 +128,12 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
 
                     // create context
                     let entity = e.into();
-                    let ctx = ActivityContext2 {
+                    let ctx = ActivityContext2::new(
                         entity,
                         world,
                         task,
-                        status: status_tx,
-                    };
+                        status_tx,
+                    );
 
                     match new_activity.dew_it(ctx).await {
                         Ok(_) => {
