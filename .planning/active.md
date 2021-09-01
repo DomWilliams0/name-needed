@@ -30,7 +30,7 @@
 * [ ] ensure extra events in queue after unsubscripting/switching task are not a problem
 * [ ] add safe !Send wrappers for component references that can't be held across awaits in activities
 * [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
-* [ ] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
+* [X] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
 * [ ] reuse status updater allocation when changing activities
 * [X] add exertion to activity status
 * [ ] remove old deprecated Activities and remove 2 suffix

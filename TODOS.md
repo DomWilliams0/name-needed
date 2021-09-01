@@ -288,11 +288,12 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
+ * [game/simulation/src/runtime/futures.rs](game/simulation/src/runtime/futures.rs) (1)
+   * `// TODO profile cancelling early here or just letting timer elapse with expired weak task ref`
  * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
    * `// TODO reuse/share/pool this allocation between tasks, maybe own it in the runtime`
    * `// TODO unnecessary unconditional clone of task reference?`
- * [game/simulation/src/runtime/system.rs](game/simulation/src/runtime/system.rs) (3)
-   * `// TODO could avoid the need for allocations in ManualFutures here and lookup the task in the runtime by id instead?`
+ * [game/simulation/src/runtime/system.rs](game/simulation/src/runtime/system.rs) (2)
    * `warn!("no current task?"; "subscriber" => subscriber); // TODO wut do? task is finished?`
    * `// task has not yet responded to event, can't return anything useful here TODO`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)

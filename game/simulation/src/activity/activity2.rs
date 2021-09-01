@@ -92,9 +92,8 @@ impl<'a> ActivityContext2<'a> {
 
     pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> + 'a {
         let timers = self.world.resource_mut::<RuntimeTimers>();
-        let trigger = ManualFuture::default();
-        let token = timers.schedule(ticks, trigger.clone());
-        TimerFuture::new(trigger, token, self.world)
+        let timer = timers.schedule(ticks, self.task.weak());
+        TimerFuture::new(timer, self.world)
     }
 
     /// Does not update activity status
@@ -208,7 +207,7 @@ impl<'a> ActivityContext2<'a> {
                         }
                     }
                     // keep waiting until an event marks this as ready again
-                    self.task.park_until_event().await;
+                    self.task.park_until_triggered().await;
 
                     n += 1;
                 }

@@ -17,18 +17,23 @@ impl<'a> System<'a> for RuntimeSystem {
         Read<'a, Runtime>,
         WriteStorage<'a, EntityLoggingComponent>,
         WriteStorage<'a, ActivityComponent2>,
-        Read<'a, LazyUpdate>,
     );
 
     fn run(
         &mut self,
-        (mut events, mut timers, runtime, mut logging, mut activities, updates): Self::SystemData,
+        (mut events, mut timers, runtime, mut logging, mut activities): Self::SystemData,
     ) {
         // consume timers
-        for (task_handle, fut) in timers.maintain(Tick::fetch()) {
-            trace!("timer elapsed"; "task" => ?task_handle);
-            // TODO could avoid the need for allocations in ManualFutures here and lookup the task in the runtime by id instead?
-            fut.trigger(());
+        for (timer_token, task) in timers.maintain(Tick::fetch()) {
+            match task.upgrade() {
+                Some(task) => {
+                    trace!("timer elapsed"; "task" => ?task, "timer" => ?timer_token);
+                    runtime.mark_ready(&task);
+                }
+                None => {
+                    trace!("timer elapsed for expired task"; "timer" => ?timer_token);
+                }
+            }
         }
 
         // log events

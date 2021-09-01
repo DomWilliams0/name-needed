@@ -75,7 +75,7 @@ impl<D, T: Token> Timers<D, T> {
             data,
         });
 
-        trace!("scheduled timer for {tick}", tick = end_tick.value(); "token" => ?token);
+        trace!("scheduled timer for {tick} (+{n})", tick = end_tick.value(), n = relative_ticks; "token" => ?token);
 
         token
     }

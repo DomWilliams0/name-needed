@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
+/// Beware, contains allocation
 #[derive(Clone)]
 pub struct ManualFuture<V>(Rc<RefCell<ManualFutureInner<V>>>);
 
@@ -25,12 +26,43 @@ struct ManualFutureInner<V> {
     value: MaybeUninit<V>,
 }
 
-#[derive(Clone)]
 pub struct TimerFuture<'w> {
-    trigger: ManualFuture<()>,
+    parked: ParkUntilWakeupFuture,
     /// For cancelling on drop
     token: TimerToken,
     world: Pin<&'w EcsWorld>,
+}
+
+/// Task must be manually readied up by runtime
+pub struct ParkUntilWakeupFuture(ParkState);
+
+#[derive(Copy, Clone, Debug)]
+enum ParkState {
+    Unpolled,
+    Parked,
+    Complete,
+}
+
+impl Future for ParkUntilWakeupFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.0 {
+            ParkState::Unpolled => {
+                // first call
+                self.0 = ParkState::Parked;
+
+                // intentionally does use waker - this will be done by the runtime
+                Poll::Pending
+            }
+            ParkState::Parked => {
+                // woken up
+                self.0 = ParkState::Complete;
+                Poll::Ready(())
+            }
+            ParkState::Complete => unreachable!("task has already been unparked"),
+        }
+    }
 }
 
 // only used on main thread
@@ -94,9 +126,9 @@ impl<V> Future for ManualFuture<V> {
 }
 
 impl<'w> TimerFuture<'w> {
-    pub fn new(trigger: ManualFuture<()>, token: TimerToken, world: Pin<&'w EcsWorld>) -> Self {
+    pub fn new(token: TimerToken, world: Pin<&'w EcsWorld>) -> Self {
         Self {
-            trigger,
+            parked: ParkUntilWakeupFuture::default(),
             token,
             world,
         }
@@ -105,7 +137,8 @@ impl<'w> TimerFuture<'w> {
 
 impl Drop for TimerFuture<'_> {
     fn drop(&mut self) {
-        if matches!(self.trigger.state(), TriggerStatus::NotTriggered) {
+        // TODO profile cancelling early here or just letting timer elapse with expired weak task ref
+        if !matches!(self.parked.0, ParkState::Complete) {
             trace!(
                 "cancelling timer {:?} due to task dropping before trigger",
                 self.token
@@ -122,6 +155,12 @@ impl Future for TimerFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut Pin::into_inner(self).trigger).poll(cx)
+        Pin::new(&mut Pin::into_inner(self).parked).poll(cx)
+    }
+}
+
+impl Default for ParkUntilWakeupFuture {
+    fn default() -> Self {
+        Self(ParkState::Unpolled)
     }
 }

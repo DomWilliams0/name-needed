@@ -56,14 +56,12 @@ impl<'a> GoToSubactivity<'a> {
             subscription: EventSubscription::Specific(EntityEventType::Arrived),
         };
 
-        ctx.subscribe_to_until(subscription, |evt| {
-            match evt {
-                EntityEventPayload::Arrived(token, result) if token == path_token => {
-                    goto_result = Some(result);
-                    Consumed
-                }
-                _ => unexpected_event2!(evt),
+        ctx.subscribe_to_until(subscription, |evt| match evt {
+            EntityEventPayload::Arrived(token, result) if token == path_token => {
+                goto_result = Some(result);
+                Consumed
             }
+            _ => unexpected_event2!(evt),
         })
         .await;
 

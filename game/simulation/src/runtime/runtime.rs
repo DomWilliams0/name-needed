@@ -1,7 +1,7 @@
 //! Async runtime for functionality crossing multiple ticks
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::task::Poll;
 
 use cooked_waker::{IntoWaker, ViaRawPointer, Wake, WakeRef};
@@ -12,6 +12,7 @@ use futures::task::Context;
 use crate::activity::{ActivityComponent2, EventUnsubscribeResult};
 use crate::ecs::WriteStorage;
 use crate::event::{EntityEvent, EntityEventQueue, RuntimeTimers};
+use crate::runtime::futures::ParkUntilWakeupFuture;
 use crate::{Entity, Tick};
 use common::*;
 use futures::channel::oneshot::Sender;
@@ -65,9 +66,13 @@ impl Drop for Task {
 #[derive(Clone, Debug)]
 pub struct TaskRef(Rc<Task>);
 
+pub struct WeakTaskRef(Weak<Task>);
+
 // everything will run on the main thread
 unsafe impl Send for TaskRef {}
 unsafe impl Sync for TaskRef {}
+unsafe impl Send for WeakTaskRef {}
+unsafe impl Sync for WeakTaskRef {}
 
 impl Runtime {
     pub fn spawn(
@@ -215,24 +220,9 @@ impl TaskRef {
         self.0.ready.load(Ordering::Relaxed)
     }
 
-    /// Only wakes up when next event arrives for this task
-    pub async fn park_until_event(&self) {
-        pub struct ParkUntilEvent(bool);
-
-        impl Future for ParkUntilEvent {
-            type Output = ();
-
-            fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-                if std::mem::replace(&mut self.0, true) {
-                    Poll::Ready(())
-                } else {
-                    // intentionally does not wake up - this will be done when an event arrives
-                    Poll::Pending
-                }
-            }
-        }
-
-        ParkUntilEvent(false).await
+    /// Only wakes up when the runtime manually wakes it up via event
+    pub async fn park_until_triggered(&self) {
+        ParkUntilWakeupFuture::default().await
     }
 
     pub fn cancel(self) {
@@ -290,6 +280,16 @@ impl TaskRef {
 
     pub fn handle(&self) -> TaskHandle {
         self.0.handle
+    }
+
+    pub fn weak(&self) -> WeakTaskRef {
+        WeakTaskRef(Rc::downgrade(&self.0))
+    }
+}
+
+impl WeakTaskRef {
+    pub fn upgrade(&self) -> Option<TaskRef> {
+        self.0.upgrade().map(TaskRef)
     }
 }
 
