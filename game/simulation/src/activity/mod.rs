@@ -49,8 +49,8 @@ mod action_to_activity {
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity2::new(pos)),
                 AiAction::GoEquip(e) => activity!(GoEquipActivity2::new(e)),
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity2::new(item)),
+                AiAction::Goto { target, reason } => activity!(GoToActivity2::new(target, reason)),
                 _ => unreachable!("activity not implemented"),
-                // AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
                 // AiAction::Follow { target, radius } => {
                 //     activity!(FollowActivity::new(target, radius))
                 // }
