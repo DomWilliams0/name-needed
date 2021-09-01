@@ -13,6 +13,7 @@ pub trait Status: Display {
 
 struct Inner(DynSlot<'static, dyn Status>);
 
+#[derive(Clone)]
 pub struct StatusUpdater(Rc<RefCell<Inner>>);
 pub struct StatusReceiver(Rc<RefCell<Inner>>);
 
@@ -21,7 +22,7 @@ pub struct StatusRef<'a> {
 }
 
 #[derive(Copy, Clone)]
-struct NopStatus;
+pub struct NopStatus;
 
 pub fn status_channel() -> (StatusUpdater, StatusReceiver) {
     let inner = Inner(dynslot_new!(NopStatus));

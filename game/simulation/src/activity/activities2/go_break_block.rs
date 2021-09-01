@@ -4,7 +4,8 @@ use common::*;
 
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::{Activity2, ActivityResult};
-use crate::activity::status::Status;
+use crate::activity::status::{NopStatus, Status};
+use crate::activity::subactivities2::GoingToStatus;
 use crate::WorldPosition;
 use world::SearchGoal;
 
@@ -13,11 +14,7 @@ pub struct GoBreakBlockActivity2 {
     block: WorldPosition,
 }
 
-#[derive(Debug)]
-enum State {
-    Going,
-    Breaking,
-}
+struct BreakBlockStatus;
 
 #[async_trait]
 impl Activity2 for GoBreakBlockActivity2 {
@@ -25,18 +22,18 @@ impl Activity2 for GoBreakBlockActivity2 {
         Box::new(self.clone())
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
         // walk to the block
-        ctx.update_status(State::Going);
         ctx.go_to(
             self.block.centred(),
             NormalizedFloat::new(0.8),
             SearchGoal::Adjacent,
+            GoingToStatus::target("block"),
         )
         .await?;
 
         // breaky breaky
-        ctx.update_status(State::Breaking);
+        ctx.update_status(BreakBlockStatus);
         ctx.break_block(self.block).await?;
 
         Ok(())
@@ -55,20 +52,14 @@ impl Display for GoBreakBlockActivity2 {
     }
 }
 
-impl Display for State {
+impl Display for BreakBlockStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.write_str(match self {
-            State::Going => "Going to block",
-            State::Breaking => "Breaking block",
-        })
+        f.write_str("Breaking block")
     }
 }
 
-impl Status for State {
+impl Status for BreakBlockStatus {
     fn exertion(&self) -> f32 {
-        match self {
-            State::Going => 1.0,
-            State::Breaking => 1.3,
-        }
+        1.3
     }
 }

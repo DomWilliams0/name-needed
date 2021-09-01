@@ -16,7 +16,7 @@ impl Activity2 for NopActivity2 {
         Box::new(Self)
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
         loop {
             ctx.wait(NOP_WARN_THRESHOLD).await;
 

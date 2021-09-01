@@ -15,11 +15,8 @@ pub enum AiAction {
     /// Wander aimlessly
     Wander,
 
-    /// Navigate to the destination for the given reason
-    Goto {
-        target: WorldPoint,
-        reason: &'static str,
-    },
+    /// Navigate to the given target
+    Goto(WorldPoint),
 
     /// Go pickup the (1) best item.
     /// TODO reduce cost of cloning vec of items
@@ -58,10 +55,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
         Ok(AiDecision(match self {
             AiAction::Nop => return Err(()),
             AiAction::Wander => Wander,
-            AiAction::Goto { target, reason } => Goto {
-                target: *target,
-                reason,
-            },
+            AiAction::Goto(target) => Goto(*target),
             AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => unreachable!(),
             AiAction::GoEquip(item) => GoEquip(*item),
             AiAction::EatHeldItem(item) => EatHeldItem(*item),

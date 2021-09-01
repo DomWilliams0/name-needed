@@ -35,3 +35,4 @@
 * [X] add exertion to activity status
 * [ ] remove old deprecated Activities and remove 2 suffix
 * [ ] add check for space anywhere in inventory before deciding to go pick something up
+* [X] enable activities to call each other directly

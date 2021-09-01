@@ -26,8 +26,8 @@ pub struct BreakBlockSubactivity;
 
 impl BreakBlockSubactivity {
     pub async fn break_block(
-        &mut self,
-        ctx: &ActivityContext2<'_>,
+        &self,
+        ctx: &ActivityContext2,
         block: WorldPosition,
     ) -> Result<(), BreakBlockError> {
         // check we are close enough to break it

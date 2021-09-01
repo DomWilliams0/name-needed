@@ -27,7 +27,7 @@ impl Activity2 for EatHeldItemActivity2 {
         Box::new(self.clone())
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
         // ensure enough hands are free for eating
         let extra_hands = match ctx.world().component::<EdibleItemComponent>(self.0) {
             Ok(comp) => comp.extra_hands,

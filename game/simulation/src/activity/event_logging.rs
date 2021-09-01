@@ -38,16 +38,10 @@ pub enum LoggedEntityDecision {
     GoEquip(Entity),
     EatHeldItem(Entity),
     Wander,
-    Goto {
-        target: WorldPoint,
-        reason: &'static str,
-    },
+    Goto(WorldPoint),
     GoBreakBlock(WorldPosition),
     Follow(Entity),
-    Haul {
-        item: Entity,
-        dest: HaulTarget,
-    },
+    Haul { item: Entity, dest: HaulTarget },
 }
 
 impl<T> RingBuffer<T> {
@@ -117,7 +111,7 @@ impl Display for LoggedEntityEvent {
                     GoEquip(e) => write!(f, "go pickup {}", *e),
                     EatHeldItem(e) => write!(f, "eat held {}", e),
                     Wander => write!(f, "wander around"),
-                    Goto { target, reason } => write!(f, "go to {} because {}", target, *reason),
+                    Goto(target) => write!(f, "go to {}", target),
                     GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
                     Follow(e) => write!(f, "follow {}", e),
                     Haul { item, dest } => write!(f, "haul {} to {}", item, dest),

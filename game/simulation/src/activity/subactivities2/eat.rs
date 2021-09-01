@@ -25,7 +25,7 @@ pub enum EatItemError {
 }
 
 impl EatItemSubactivity2 {
-    pub async fn eat(&self, ctx: &ActivityContext2<'_>, item: Entity) -> Result<(), EatItemError> {
+    pub async fn eat(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), EatItemError> {
         let eater = ctx.entity();
         ctx.world()
             .resource::<QueuedUpdates>()

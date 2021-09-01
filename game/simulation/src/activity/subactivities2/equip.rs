@@ -47,8 +47,8 @@ pub enum EquipItemError {
 impl PickupSubactivity {
     /// Checks if close enough to pick up
     pub async fn pick_up(
-        &mut self,
-        ctx: &ActivityContext2<'_>,
+        &self,
+        ctx: &ActivityContext2,
         item: Entity,
     ) -> Result<(), EquipItemError> {
         // ensure close enough
@@ -100,7 +100,7 @@ impl PickupSubactivity {
 impl EquipSubActivity2 {
     pub async fn equip(
         &self,
-        ctx: &ActivityContext2<'_>,
+        ctx: &ActivityContext2,
         item: Entity,
         extra_hands: u16,
     ) -> Result<(), EquipItemError> {

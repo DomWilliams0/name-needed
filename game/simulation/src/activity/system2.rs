@@ -145,7 +145,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                         new_activity.clone(),
                     );
 
-                    let result = new_activity.dew_it(ctx).await;
+                    let result = new_activity.dew_it(&ctx).await;
                     match result.as_ref() {
                         Ok(_) => {
                             debug!("activity finished"; entity, "activity" => ?new_activity);

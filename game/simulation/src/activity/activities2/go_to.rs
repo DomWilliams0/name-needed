@@ -4,53 +4,50 @@ use common::*;
 
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::{Activity2, ActivityResult};
-use crate::activity::status::Status;
+use crate::activity::subactivities2::GoingToStatus;
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
 #[derive(Debug, Clone)]
 pub struct GoToActivity2 {
     target: WorldPoint,
-    reason: &'static str,
+    speed: NormalizedFloat,
+    goal: SearchGoal,
 }
 
-struct GoingToState;
+struct GoingToDescription(WorldPoint);
 
 #[async_trait]
 impl Activity2 for GoToActivity2 {
     fn description(&self) -> Box<dyn Display> {
-        Box::new(self.clone())
+        Box::new(GoingToDescription(self.target))
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
-        ctx.update_status(GoingToState);
-        ctx.go_to(self.target, NormalizedFloat::new(0.8), SearchGoal::Arrive)
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+        ctx.go_to(self.target, self.speed, self.goal, GoingToStatus::default())
             .await?;
-
         Ok(())
     }
 }
 
 impl GoToActivity2 {
-    pub fn new(target: WorldPoint, reason: &'static str) -> Self {
-        Self { target, reason }
+    pub fn new(target: WorldPoint, speed: NormalizedFloat, goal: SearchGoal) -> Self {
+        Self {
+            target,
+            speed,
+            goal,
+        }
     }
 }
 
 impl Display for GoToActivity2 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Going to {} because {}", self.target, self.reason)
+        write!(f, "Going to {}", self.target)
     }
 }
 
-impl Display for GoingToState {
+impl Display for GoingToDescription {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.write_str("Going to target")
-    }
-}
-
-impl Status for GoingToState {
-    fn exertion(&self) -> f32 {
-        1.0
+        write!(f, "Going to {}", self.0)
     }
 }

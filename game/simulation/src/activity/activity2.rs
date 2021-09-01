@@ -6,12 +6,12 @@ use async_trait::async_trait;
 use common::*;
 
 use crate::activity::activity2::EventResult::Unconsumed;
-use crate::activity::status::Status;
+use crate::activity::status::{NopStatus, Status};
 use crate::activity::subactivities2::{
     BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
-    GoToSubactivity, GotoError, PickupSubactivity,
+    GoToSubactivity, GoingToStatus, GotoError, PickupSubactivity,
 };
-use crate::activity::{EquipItemError, StatusUpdater};
+use crate::activity::{EquipItemError, GoToActivity2, StatusUpdater};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
@@ -33,17 +33,18 @@ pub enum InterruptResult {
 #[async_trait]
 pub trait Activity2: Debug {
     fn description(&self) -> Box<dyn Display>;
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult;
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult;
 
     fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
         InterruptResult::Continue
     }
 }
 
-pub struct ActivityContext2<'a> {
+#[derive(Clone)]
+pub struct ActivityContext2 {
     entity: Entity,
     // TODO ensure component refs cant be held across awaits
-    world: Pin<&'a EcsWorld>,
+    world: Pin<&'static EcsWorld>,
     task: TaskRef,
     status: StatusUpdater,
     activity: Rc<dyn Activity2>,
@@ -62,13 +63,13 @@ pub enum GenericEventResult {
 }
 
 // only used on the main thread
-unsafe impl Sync for ActivityContext2<'_> {}
-unsafe impl Send for ActivityContext2<'_> {}
+unsafe impl Sync for ActivityContext2 {}
+unsafe impl Send for ActivityContext2 {}
 
-impl<'a> ActivityContext2<'a> {
+impl ActivityContext2 {
     pub fn new(
         entity: Entity,
-        world: Pin<&'a EcsWorld>,
+        world: Pin<&'static EcsWorld>,
         task: TaskRef,
         status: StatusUpdater,
         activity: Rc<dyn Activity2>,
@@ -90,20 +91,23 @@ impl<'a> ActivityContext2<'a> {
         &self.world
     }
 
-    pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> + 'a {
+    pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> {
         let timers = self.world.resource_mut::<RuntimeTimers>();
         let timer = timers.schedule(ticks, self.task.weak());
         TimerFuture::new(timer, self.world)
     }
 
-    /// Does not update activity status
-    pub async fn go_to(
-        &'a self,
+    /// Updates status
+    pub async fn go_to<S: Status + 'static>(
+        &self,
         pos: WorldPoint,
         speed: NormalizedFloat,
         goal: SearchGoal,
+        status: GoingToStatus<S>,
     ) -> Result<(), GotoError> {
-        GoToSubactivity::new(self).go_to(pos, speed, goal).await
+        GoToSubactivity::new(self)
+            .go_to(pos, speed, goal, status)
+            .await
     }
 
     pub fn clear_path(&self) {
@@ -189,7 +193,7 @@ impl<'a> ActivityContext2<'a> {
     }
 
     /// Must manually unsubscribe or wait until activity end
-    pub fn subscribe_to(&'a self, subscription: EntityEventSubscription) {
+    pub fn subscribe_to(&self, subscription: EntityEventSubscription) {
         let evts = self.world.resource_mut::<EntityEventQueue>();
         evts.subscribe(self.entity, once(subscription));
     }

@@ -2,6 +2,7 @@ use crate::activity::activity2::{
     Activity2, ActivityContext2, ActivityResult, EventResult, InterruptResult,
 };
 use crate::activity::status::Status;
+use crate::activity::subactivities2::GoingToStatus;
 use crate::ecs::ComponentGetError;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
 use crate::{ComponentWorld, Entity, TransformComponent};
@@ -19,10 +20,7 @@ pub enum EquipError {
     MissingTransform(#[from] ComponentGetError),
 }
 
-pub enum State {
-    Going,
-    PickingUp,
-}
+struct PickingUpState;
 
 #[async_trait]
 impl Activity2 for GoEquipActivity2 {
@@ -30,7 +28,7 @@ impl Activity2 for GoEquipActivity2 {
         Box::new(self.clone())
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
         // cancel if any destructive event happens to the item
         ctx.subscribe_to(EntityEventSubscription {
             subject: self.0,
@@ -38,13 +36,17 @@ impl Activity2 for GoEquipActivity2 {
         });
 
         // go to the item
-        ctx.update_status(State::Going);
         let item_pos = self.find_item(&ctx)?;
-        ctx.go_to(item_pos, NormalizedFloat::new(0.8), SearchGoal::Arrive)
-            .await?;
+        ctx.go_to(
+            item_pos,
+            NormalizedFloat::new(0.8),
+            SearchGoal::Arrive,
+            GoingToStatus::target("item"),
+        )
+        .await?;
 
         // picky uppy
-        ctx.update_status(State::PickingUp);
+        ctx.update_status(PickingUpState);
         ctx.pick_up(self.0).await?;
 
         Ok(())
@@ -81,20 +83,14 @@ impl Display for GoEquipActivity2 {
     }
 }
 
-impl Display for State {
+impl Display for PickingUpState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            State::Going => "Going to item",
-            State::PickingUp => "Picking up item",
-        })
+        f.write_str("Equipping")
     }
 }
 
-impl Status for State {
+impl Status for PickingUpState {
     fn exertion(&self) -> f32 {
-        match self {
-            State::Going => 1.0,
-            State::PickingUp => 0.6,
-        }
+        0.6
     }
 }

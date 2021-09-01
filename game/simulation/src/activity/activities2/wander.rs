@@ -5,6 +5,7 @@ use common::*;
 use crate::activity::activity2::ActivityContext2;
 use crate::activity::activity2::{Activity2, ActivityResult};
 use crate::activity::status::Status;
+use crate::activity::subactivities2::GoingToStatus;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, TransformComponent, WorldPosition};
@@ -35,17 +36,16 @@ impl Activity2 for WanderActivity2 {
         Box::new(Self)
     }
 
-    async fn dew_it<'a>(&'a self, ctx: ActivityContext2<'a>) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
         loop {
             // wander to a new target
-            ctx.update_status(State::Wander);
-
             let tgt = find_target(&ctx)?;
             trace!("wandering to {:?}", tgt);
             ctx.go_to(
                 tgt.centred(),
                 NormalizedFloat::new(WANDER_SPEED),
                 SearchGoal::Arrive,
+                GoingToStatus::Custom(State::Wander),
             )
             .await?;
 

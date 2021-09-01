@@ -33,7 +33,9 @@ mod action_to_activity {
     use crate::item::ItemsToPickUp;
 
     use super::*;
+    use common::NormalizedFloat;
     use std::rc::Rc;
+    use world::SearchGoal;
 
     impl AiAction {
         pub fn into_activity2(self) -> Rc<dyn Activity2> {
@@ -49,7 +51,11 @@ mod action_to_activity {
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity2::new(pos)),
                 AiAction::GoEquip(e) => activity!(GoEquipActivity2::new(e)),
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity2::new(item)),
-                AiAction::Goto { target, reason } => activity!(GoToActivity2::new(target, reason)),
+                AiAction::Goto(target) => activity!(GoToActivity2::new(
+                    target,
+                    NormalizedFloat::new(0.8),
+                    SearchGoal::Arrive
+                )),
                 _ => unreachable!("activity not implemented"),
                 // AiAction::Follow { target, radius } => {
                 //     activity!(FollowActivity::new(target, radius))
@@ -69,7 +75,7 @@ mod action_to_activity {
 
             match self {
                 AiAction::Nop => activity!(NopActivity::default()),
-                AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
+                AiAction::Goto(target) => activity!(GoToActivity::new(target, todo!())),
                 AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {
                     activity!(PickupItemsActivity::with_items(items, desc))
                 }

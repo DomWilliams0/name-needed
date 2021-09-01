@@ -333,10 +333,7 @@ impl<R: Renderer> Simulation<R> {
                     };
 
                     let command = match divine_command {
-                        DivineInputCommand::Goto(pos) => AiAction::Goto {
-                            target: pos.centred(),
-                            reason: "I said so",
-                        },
+                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
                         DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(*pos),
                     };
 
