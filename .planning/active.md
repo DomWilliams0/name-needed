@@ -4,7 +4,7 @@
 * [X] repurpose event system to use async tasks as subscribers, not entities
 * [X] async-safe activity context to get access to the world
 	* [X] replace EcsWorldFrameRef with this
-* [ ] remove timer elapsed event
+* [X] remove timer elapsed event
 * [o] new activity system with async activities
 	* [X] nop that only uses a timer
 	* [X] wander that uses goto

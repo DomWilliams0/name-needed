@@ -89,12 +89,6 @@ impl Activity for WanderActivity {
                 //     .resource_mut::<RuntimeTimers>()
                 //     .schedule(count as u32, ctx.entity);
                 // self.subactivity = WanderSubActivity::Loitering(token);
-
-                ctx.subscribe_to(
-                    ctx.entity,
-                    EventSubscription::Specific(EntityEventType::TimerElapsed),
-                );
-                ActivityResult::Blocked
             }
         }
     }
@@ -126,18 +120,6 @@ impl Activity for WanderActivity {
                     EventUnblockResult::KeepBlocking,
                     EventUnsubscribeResult::StaySubscribed,
                 )
-            }
-            EntityEventPayload::TimerElapsed(token) => {
-                let unblock = match self.subactivity {
-                    WanderSubActivity::Loitering(my_token) if my_token == *token => {
-                        // stop loitering
-                        self.state = WanderState::wander();
-                        EventUnblockResult::Unblock
-                    }
-                    _ => EventUnblockResult::KeepBlocking,
-                };
-
-                (unblock, EventUnsubscribeResult::StaySubscribed)
             }
             _ => unexpected_event!(event),
         }

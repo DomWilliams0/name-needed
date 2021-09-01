@@ -49,9 +49,6 @@ pub enum EntityEventPayload {
     /// Item entity has been inserted into a container
     EnteredContainer(Result<Entity, HaulError>),
 
-    /// Timer elapsed
-    TimerElapsed(TimerToken),
-
     #[doc(hidden)]
     #[cfg(test)]
     DummyA,
@@ -112,8 +109,7 @@ impl EntityEventPayload {
             | HasPickedUp(_)
             | HasEaten(_)
             | HasEquipped(_)
-            | BeenEquipped(_)
-            | TimerElapsed(_) => false,
+            | BeenEquipped(_) => false,
             #[cfg(test)]
             DummyA | DummyB => false,
         }
@@ -137,8 +133,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             | BeenEquipped(_)
             | Hauled(_)
             | ExitedContainer(_)
-            | EnteredContainer(_)
-            | TimerElapsed(_) => Err(()),
+            | EnteredContainer(_) => Err(()),
             #[cfg(test)]
             DummyA | DummyB => Err(()),
         }

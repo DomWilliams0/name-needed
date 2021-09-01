@@ -68,10 +68,7 @@ impl Activity for FollowActivity {
 
             // only subscribe once
             if !std::mem::replace(&mut self.subscribed, true) {
-                ctx.subscribe_to(
-                    ctx.entity,
-                    EventSubscription::Specific(EntityEventType::TimerElapsed),
-                );
+                ctx.subscribe_to(ctx.entity, EventSubscription::Specific(unreachable!()));
             }
 
             result
@@ -98,27 +95,6 @@ impl Activity for FollowActivity {
                     (
                         EventUnblockResult::Unblock,
                         EventUnsubscribeResult::StaySubscribed,
-                    )
-                } else {
-                    (
-                        EventUnblockResult::KeepBlocking,
-                        EventUnsubscribeResult::StaySubscribed,
-                    )
-                }
-            }
-
-            EntityEventPayload::TimerElapsed(token) => {
-                if self.timer.map(|t| t == *token).unwrap_or(false) {
-                    // timer elapsed, reconsider
-                    self.timer = None;
-
-                    // stay subscribed anyway
-                    (
-                        EventUnblockResult::Unblock,
-                        EventUnsubscribeResult::Unsubscribe(EntityEventSubscription {
-                            subject: event.subject,
-                            subscription: EventSubscription::Specific(EntityEventType::Arrived),
-                        }),
                     )
                 } else {
                     (
