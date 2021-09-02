@@ -15,7 +15,7 @@ use crate::activity::{EquipItemError, GoToActivity2, StatusUpdater};
 use crate::event::{
     EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
 };
-use crate::runtime::{ManualFuture, TaskRef, TimerFuture};
+use crate::runtime::{TaskRef, TimerFuture};
 use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent, WorldPosition};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -91,10 +91,10 @@ impl ActivityContext2 {
         &self.world
     }
 
-    pub fn wait(&self, ticks: u32) -> impl Future<Output = ()> {
+    pub fn wait(&self, ticks: u32) -> TimerFuture {
         let timers = self.world.resource_mut::<RuntimeTimers>();
-        let timer = timers.schedule(ticks, self.task.weak());
-        TimerFuture::new(timer, self.world)
+        let (end_tick, timer) = timers.schedule(ticks, self.task.weak());
+        TimerFuture::new(end_tick, timer, self.world)
     }
 
     /// Updates status

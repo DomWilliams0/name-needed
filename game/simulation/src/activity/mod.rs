@@ -56,10 +56,10 @@ mod action_to_activity {
                     NormalizedFloat::new(0.8),
                     SearchGoal::Arrive
                 )),
+                AiAction::Follow { target, radius } => {
+                    activity!(FollowActivity2::new(target, radius))
+                }
                 _ => unreachable!("activity not implemented"),
-                // AiAction::Follow { target, radius } => {
-                //     activity!(FollowActivity::new(target, radius))
-                // }
                 // AiAction::Haul(thing, source, target) => {
                 //     activity!(HaulActivity::new(thing, source, target))
                 // }

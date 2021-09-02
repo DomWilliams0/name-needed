@@ -1,8 +1,9 @@
 use crate::event::{RuntimeTimers, TimerToken};
-use crate::{ComponentWorld, EcsWorld};
+use crate::{ComponentWorld, EcsWorld, Tick};
 use common::*;
+use futures::future::FusedFuture;
 use futures::task::Waker;
-use futures::Future;
+use futures::{Future, FutureExt};
 use std::cell::RefCell;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
@@ -27,7 +28,7 @@ struct ManualFutureInner<V> {
 }
 
 pub struct TimerFuture<'w> {
-    parked: ParkUntilWakeupFuture,
+    end_tick: Tick,
     /// For cancelling on drop
     token: TimerToken,
     world: Pin<&'w EcsWorld>,
@@ -126,26 +127,30 @@ impl<V> Future for ManualFuture<V> {
 }
 
 impl<'w> TimerFuture<'w> {
-    pub fn new(token: TimerToken, world: Pin<&'w EcsWorld>) -> Self {
+    pub fn new(end_tick: Tick, token: TimerToken, world: Pin<&'w EcsWorld>) -> Self {
         Self {
-            parked: ParkUntilWakeupFuture::default(),
             token,
+            end_tick,
             world,
         }
+    }
+
+    fn elapsed(&self) -> bool {
+        let now = Tick::fetch();
+        now.value() >= self.end_tick.value()
     }
 }
 
 impl Drop for TimerFuture<'_> {
     fn drop(&mut self) {
-        // TODO profile cancelling early here or just letting timer elapse with expired weak task ref
-        if !matches!(self.parked.0, ParkState::Complete) {
+        if !self.elapsed() {
             trace!(
                 "cancelling timer {:?} due to task dropping before trigger",
                 self.token
             );
             let timers = self.world.resource_mut::<RuntimeTimers>();
             if !timers.cancel(self.token) {
-                warn!("failed to cancel timer {:?}", self.token);
+                warn!("failed to cancel timer {:?} (already elapsed?)", self.token);
             }
         }
     }
@@ -155,7 +160,21 @@ impl Future for TimerFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut Pin::into_inner(self).parked).poll(cx)
+        if self.elapsed() {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl FusedFuture for ParkUntilWakeupFuture {
+    fn is_terminated(&self) -> bool {
+        // futures::future::Fuse will poll this once too many and mark as always Complete when it
+        // isn't really. implementing this manually avoids this special case and removes extra
+        // polls
+        !matches!(self.0, ParkState::Unpolled)
     }
 }
 

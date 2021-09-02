@@ -291,6 +291,11 @@ impl WeakTaskRef {
     pub fn upgrade(&self) -> Option<TaskRef> {
         self.0.upgrade().map(TaskRef)
     }
+
+    #[cfg(test)]
+    pub fn dangling() -> Self {
+        Self(Weak::default())
+    }
 }
 
 impl WakeRef for TaskRef {
@@ -347,9 +352,8 @@ impl Debug for Task {
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    use crate::runtime::ManualFuture;
-
     use super::*;
+    use crate::runtime::futures::ManualFuture;
     use common::bumpalo::core_alloc::sync::Arc;
     use futures::channel::oneshot::channel;
 

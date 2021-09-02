@@ -1,4 +1,4 @@
-# TODOs (367)
+# TODOs (369)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -133,6 +133,9 @@
    * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
  * [game/simulation/src/activity/activities2/eat_held_item.rs](game/simulation/src/activity/activities2/eat_held_item.rs) (1)
    * `// TODO varying exertion per food`
+ * [game/simulation/src/activity/activities2/follow.rs](game/simulation/src/activity/activities2/follow.rs) (2)
+   * `// TODO this can generate path requests that are immediately complete, leading to a lot of path spam`
+   * `// TODO specify follow speed in activity too`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
@@ -219,7 +222,8 @@
    * `// TODO track by game tick instead of just number of ops`
    * `let event = event.clone(); // TODO reimplement groupby to own the event without cloning`
    * `// TODO the runtime does not return a subscription result synchronously - remove this branch?`
- * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (2)
+ * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (3)
+   * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
@@ -290,8 +294,6 @@
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (1)
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
- * [game/simulation/src/runtime/futures.rs](game/simulation/src/runtime/futures.rs) (1)
-   * `// TODO profile cancelling early here or just letting timer elapse with expired weak task ref`
  * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
    * `// TODO reuse/share/pool this allocation between tasks, maybe own it in the runtime`
    * `// TODO unnecessary unconditional clone of task reference?`
