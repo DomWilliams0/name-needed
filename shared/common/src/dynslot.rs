@@ -11,26 +11,26 @@ pub struct DynSlot<'a, T: ?Sized + 'a> {
 #[macro_export]
 macro_rules! dynslot_new {
     ($val:expr) => {{
-        let mut val = $val;
-        let slot = unsafe { DynSlot::new(&mut val as *mut _) };
-        ::std::mem::forget(val);
-        slot
+        let mut val = ::std::mem::ManuallyDrop::new($val);
+        unsafe { DynSlot::new(&mut *val as *mut _) }
     }};
 }
 
 #[macro_export]
 macro_rules! dynslot_update {
     ($slot:expr, $val:expr) => {{
-        let mut val = $val;
+        let mut val = ::std::mem::ManuallyDrop::new($val);
         unsafe {
-            $slot.update(&mut val as *mut _);
+            $slot.update(&mut *val as *mut _);
         }
-        ::std::mem::forget(val);
     }};
 }
 
 impl<'a, T: ?Sized + 'a> DynSlot<'a, T> {
     /// Use [dynslot_new]
+    ///
+    /// # Safety
+    /// `val` must be forgotten after this returns to avoid double free
     pub unsafe fn new(val: *mut T) -> Self {
         assert_eq!(
             std::mem::size_of::<*mut T>(),
@@ -77,6 +77,8 @@ impl<'a, T: ?Sized + 'a> DynSlot<'a, T> {
     }
 
     /// Use [dynslot_update]
+    /// # Safety
+    /// `val` must be forgotten after this returns to avoid double free
     pub unsafe fn update(&mut self, val: *mut T) {
         self.drop_current();
         self.update_value(val);
@@ -181,7 +183,7 @@ mod tests {
 
     #[test]
     fn proper_destructor() {
-        let mut drops = Arc::new(AtomicUsize::new(0));
+        let drops = Arc::new(AtomicUsize::new(0));
         struct DropCheck(Arc<AtomicUsize>);
 
         impl Display for DropCheck {
