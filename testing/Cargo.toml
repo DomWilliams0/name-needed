@@ -7,11 +7,9 @@ edition = "2018"
 name = "test-runner"
 path = "src/main.rs"
 
-[lib]
-crate-type = ["rlib", "dylib"]
-
 [dependencies]
 simulation = { path = "../game/simulation" }
+common = { path = "../shared/common" }
 
 inventory = "0.1"
 argh = "0.1"

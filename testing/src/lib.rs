@@ -1,4 +1,5 @@
 use crate::tests::{TestHelper, TestWrapper};
+use common::BoxedResult;
 use simulation::input::UiCommands;
 use simulation::SimulationRefLite;
 use std::any::Any;
@@ -24,6 +25,7 @@ macro_rules! declare_test {
     };
 }
 
+mod helpers;
 pub mod tests;
 
 pub struct HookContext<'a> {
@@ -112,5 +114,15 @@ pub fn tick_hook(ctx: &HookContext) -> HookResult {
 pub fn register_tests() {
     use tests::*;
 
-    dummy::register();
+    // dummy::register(); // TODO keep dummy test?
+    equip_with_pickup::register();
+}
+
+impl HookResult {
+    pub fn try_ongoing(res: BoxedResult<()>) -> Self {
+        match res {
+            Ok(_) => Self::KeepGoing,
+            Err(err) => Self::TestFailure(format!("{}", err)),
+        }
+    }
 }

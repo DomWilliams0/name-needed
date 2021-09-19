@@ -2861,6 +2861,7 @@ name = "testing"
 version = "0.1.0"
 dependencies = [
  "argh",
+ "common",
  "futures",
  "inventory",
  "simulation",

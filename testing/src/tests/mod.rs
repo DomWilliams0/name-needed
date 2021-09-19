@@ -4,7 +4,10 @@ use crate::HookResult;
 use std::any::Any;
 use std::cell::RefCell;
 
+// ---------- test modules
 pub mod dummy;
+pub mod equip_with_pickup;
+// ---------- end test modules
 
 pub struct TestWrapper {
     test: RefCell<Box<dyn Any>>,

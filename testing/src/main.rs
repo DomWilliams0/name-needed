@@ -112,10 +112,13 @@ impl CargoCommand<'_> {
             Renderer::Lite => "lite",
             Renderer::Graphical => "use-sdl",
         };
-        builder
-            .args(&["--features", feature])
-            .spawn()
-            .map_err(Into::into)
+        builder.args(&["--features", feature]);
+
+        if let CargoCommand::Run { .. } = self {
+            builder.args(&["--", "--config", "tests"]);
+        }
+
+        builder.spawn().map_err(Into::into)
     }
 }
 
