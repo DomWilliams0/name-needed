@@ -20,6 +20,7 @@
 			* [ ] in inv but not equipped 
 			* [ ] already equipped
 			* [ ] destroying item during going to equip it
+		* [ ] ensure test runner is run from project root via --bin
 * [X] report activity and subactivities in ui
 * [X] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
@@ -36,3 +37,4 @@
 * [ ] remove old deprecated Activities and remove 2 suffix
 * [ ] add check for space anywhere in inventory before deciding to go pick something up
 * [X] enable activities to call each other directly
+* [X] replace outdated game preset with just a config file path argument, where config specifies world loader
