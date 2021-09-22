@@ -15,9 +15,10 @@
 	* [X] eat
 	* [ ] goto and haul
 * [ ] e2e tests
-		* [ ] equipping an item activity
-			* [ ] far away and needs pickup 
-			* [ ] in inv but not equipped 
+		* [o] equipping an item activity
+			* [X] far away and needs pickup, inventory is empty
+			* [X] far away and needs pickup, equip slots are full
+			* [ ] in inv but not equipped
 			* [ ] already equipped
 			* [ ] destroying item during going to equip it
 		* [ ] ensure test runner is run from project root via --bin

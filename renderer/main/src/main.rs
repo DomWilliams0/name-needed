@@ -147,10 +147,12 @@ fn do_main() -> BoxedResult<()> {
                 HookResult::KeepGoing => {}
                 HookResult::TestSuccess => {
                     info!("test finished successfully");
+                    testing::destroy_hook();
                     break Ok(());
                 }
                 HookResult::TestFailure(err) => {
                     error!("test failed: {}", err);
+                    testing::destroy_hook();
                     break Err(err.into());
                 }
             }

@@ -43,3 +43,4 @@ rlua = { version = "0.17", optional = true }
 default = []
 metrics = ["ai/logging", "common/metrics"]
 scripting = ["rlua"]
+testing = []

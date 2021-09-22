@@ -1,8 +1,9 @@
 // tests must be registered in lib::register_tests!
 
-use crate::HookResult;
+use crate::{HookResult, InitHookResult, TestInstance};
 use std::any::Any;
 use std::cell::RefCell;
+use std::mem::{ManuallyDrop, MaybeUninit};
 
 // ---------- test modules
 pub mod dummy;
@@ -10,7 +11,8 @@ pub mod equip_with_pickup;
 // ---------- end test modules
 
 pub struct TestWrapper {
-    test: RefCell<Box<dyn Any>>,
+    /// None before init is called. Is not actually a () but a test type, so must be manually dropped
+    test: RefCell<Option<ManuallyDrop<Box<()>>>>,
     state: RefCell<TestState>,
 }
 
@@ -23,10 +25,26 @@ struct TestState {
 pub struct TestHelper<'a>(&'a RefCell<TestState>);
 
 impl TestWrapper {
-    pub fn new<T: 'static>(t: T) -> Self {
+    pub fn new() -> Self {
         Self {
-            test: RefCell::new(Box::new(t)),
+            test: RefCell::new(None),
             state: RefCell::new(TestState::default()),
+        }
+    }
+
+    pub fn invoke_init(&self, do_it: impl FnOnce() -> InitHookResult<()>) -> HookResult {
+        let mut this = self.test.borrow_mut();
+        assert!(this.is_none(), "test init called multiple times");
+
+        let result = do_it();
+
+        match result {
+            InitHookResult::Success(instance) => {
+                *this = Some(ManuallyDrop::new(instance));
+                HookResult::KeepGoing
+            }
+            InitHookResult::TestSuccess => HookResult::TestSuccess,
+            InitHookResult::TestFailure(err) => HookResult::TestFailure(err),
         }
     }
 
@@ -39,12 +57,18 @@ impl TestWrapper {
         }
 
         let mut this = self.test.borrow_mut();
-        let this = (&mut **this) as *mut _ as *mut ();
-        unsafe { do_it(&mut *this) }
+        let this = this.as_mut().expect("init was not called");
+        let this: &mut () = &mut **this;
+        unsafe { do_it(this) }
     }
 
     pub fn helper(&self) -> TestHelper {
         TestHelper(&self.state)
+    }
+
+    /// Not really Box<()>, but Box<test type>
+    pub fn take_inner(&mut self) -> Option<ManuallyDrop<Box<()>>> {
+        self.test.take()
     }
 }
 

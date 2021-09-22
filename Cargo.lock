@@ -2866,6 +2866,7 @@ dependencies = [
  "inventory",
  "simulation",
  "tokio",
+ "unit",
 ]
 
 [[package]]

@@ -109,10 +109,12 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     HookResult::KeepGoing => {}
                     HookResult::TestSuccess => {
                         info!("test finished successfully");
+                        testing::destroy_hook();
                         return Some(Exit::Stop);
                     }
                     HookResult::TestFailure(err) => {
                         error!("test failed: {}", err);
+                        testing::destroy_hook();
                         return Some(Exit::Abort(err));
                     }
                 }

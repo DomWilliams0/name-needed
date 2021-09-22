@@ -1,6 +1,6 @@
 use crate::HookContext;
 use common::BoxedResult;
-use simulation::{ComponentWorld, Entity, WorldPosition};
+use simulation::{ComponentWorld, Entity, EntityLoggingComponent, WorldPosition};
 use std::error::Error;
 
 pub enum EntityPosition {
@@ -27,6 +27,12 @@ impl HookContext<'_> {
             .build_entity(def)?
             .with_position(pos)
             .spawn()?;
+
+        // enable logging for all entities
+        self.simulation
+            .ecs
+            .add_now(e, EntityLoggingComponent::default())?;
+
         Ok(e)
     }
 }

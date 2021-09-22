@@ -22,6 +22,7 @@ pub struct EntityLoggingComponent {
 struct TimedLoggedEntityEvent(Tick, LoggedEntityEvent);
 
 /// An event that relates to an entity and is displayed in the ui. All variants relate to THIS entity
+#[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
 pub enum LoggedEntityEvent {
     /// Equipped the given item
     Equipped(Entity),
@@ -33,6 +34,7 @@ pub enum LoggedEntityEvent {
     AiDecision(LoggedEntityDecision),
 }
 
+#[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
 pub enum LoggedEntityDecision {
     GoPickup(Cow<'static, str>),
     GoEquip(Entity),
@@ -91,6 +93,9 @@ impl EntityLoggingComponent {
 
     pub fn iter_logs(&self) -> impl Iterator<Item = &dyn Display> + DoubleEndedIterator + '_ {
         self.logs.0.iter().map(|e| e as &dyn Display)
+    }
+    pub fn iter_raw_logs(&self) -> impl Iterator<Item = &LoggedEntityEvent> + '_ {
+        self.logs.0.iter().map(|e| &e.1)
     }
 }
 

@@ -8,8 +8,9 @@ name = "test-runner"
 path = "src/main.rs"
 
 [dependencies]
-simulation = { path = "../game/simulation" }
+simulation = { path = "../game/simulation", features = ["testing"] }
 common = { path = "../shared/common" }
+unit = { path = "../shared/unit" }
 
 inventory = "0.1"
 argh = "0.1"

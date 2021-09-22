@@ -201,6 +201,14 @@ impl InventoryComponent {
         self.equip_slots.iter()
     }
 
+    pub fn has_equipped(&self, item: Entity) -> bool {
+        self.equip_slots.iter().any(|slot| match slot {
+            EquipSlot::Empty => false,
+            EquipSlot::Occupied(e) => e.entity == item,
+            EquipSlot::Overflow(e) => *e == item,
+        })
+    }
+
     pub fn containers_unresolved(&self) -> impl ExactSizeIterator<Item = &Entity> + '_ {
         self.containers.iter()
     }
