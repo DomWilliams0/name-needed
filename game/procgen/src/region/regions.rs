@@ -539,7 +539,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
     pub async fn is_region_loaded(&self, region: RegionLocation<SIZE>) -> bool {
         let entry = self.entry_unchecked(region);
         let ro = entry.0.read().await;
-        matches!(&*ro, RegionLoadState::Partially(_) | RegionLoadState::Fully(_))
+        matches!(
+            &*ro,
+            RegionLoadState::Partially(_) | RegionLoadState::Fully(_)
+        )
     }
 
     #[cfg(debug_assertions)]

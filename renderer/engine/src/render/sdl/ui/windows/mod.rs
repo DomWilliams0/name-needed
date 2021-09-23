@@ -50,7 +50,7 @@ impl UiExt for Ui<'_> {
         // label
         self.text_colored(color, key);
 
-        if !matches!(value, Value::MultilineReadonly {..}) {
+        if !matches!(value, Value::MultilineReadonly { .. }) {
             self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 10.0);
         }
 
