@@ -143,10 +143,10 @@ mod tests {
         let mut timers = Timers::<i32, TimerToken>::default();
 
         let now = Tick::with(10);
-        let a = timers.schedule_with(now, 2, 0);
-        let b = timers.schedule_with(now, 4, 1);
-        let d = timers.schedule_with(now, 8, 2);
-        let c = timers.schedule_with(now, 6, 3);
+        let (_, a) = timers.schedule_with(now, 2, 0);
+        let (_, b) = timers.schedule_with(now, 4, 1);
+        let (_, d) = timers.schedule_with(now, 8, 2);
+        let (_, c) = timers.schedule_with(now, 6, 3);
 
         let now = Tick::with(11);
         let finished = timers.maintain(now).collect_vec();
@@ -157,8 +157,8 @@ mod tests {
         assert_eq!(finished, vec![(a, 0), (b, 1)]);
 
         // late to the party
-        let e = timers.schedule_with(now, 15, 4);
-        let f = timers.schedule_with(now, 16, 5);
+        let (_, e) = timers.schedule_with(now, 15, 4);
+        let (_, f) = timers.schedule_with(now, 16, 5);
 
         let now = Tick::with(22);
         let finished = timers.maintain(now).collect_vec();
