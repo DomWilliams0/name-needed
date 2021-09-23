@@ -127,7 +127,7 @@ fn do_main() -> BoxedResult<()> {
         BackendState::<Backend>::new(&resources)?
     };
 
-    loop {
+    let ret = loop {
         let (simulation, initial_block) = start::create_simulation(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
@@ -147,12 +147,10 @@ fn do_main() -> BoxedResult<()> {
                 HookResult::KeepGoing => {}
                 HookResult::TestSuccess => {
                     info!("test finished successfully");
-                    testing::destroy_hook();
                     break Ok(());
                 }
                 HookResult::TestFailure(err) => {
                     error!("test failed: {}", err);
-                    testing::destroy_hook();
                     break Err(err.into());
                 }
             }
@@ -169,7 +167,14 @@ fn do_main() -> BoxedResult<()> {
             Exit::Abort(err) => break Err(err.into()),
             Exit::Restart => continue,
         }
+    };
+
+    #[cfg(feature = "tests")]
+    {
+        testing::destroy_hook();
     }
+
+    ret
 }
 
 fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {

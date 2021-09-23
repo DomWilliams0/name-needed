@@ -5,7 +5,8 @@ use crate::activity::status::Status;
 use crate::activity::subactivities2::GoingToStatus;
 use crate::ecs::ComponentGetError;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
-use crate::{ComponentWorld, Entity, TransformComponent};
+use crate::item::HaulableItemComponent;
+use crate::{ComponentWorld, Entity, PhysicalComponent, TransformComponent};
 use async_trait::async_trait;
 use common::*;
 use unit::world::WorldPoint;
@@ -18,9 +19,12 @@ pub struct GoEquipActivity2(Entity);
 pub enum EquipError {
     #[error("Can't get item transform")]
     MissingTransform(#[from] ComponentGetError),
+
+    #[error("Item can not be picked up or equipped (missing haulable component)")]
+    NotHaulable,
 }
 
-struct PickingUpState;
+struct EquippingState;
 
 #[async_trait]
 impl Activity2 for GoEquipActivity2 {
@@ -35,19 +39,30 @@ impl Activity2 for GoEquipActivity2 {
             subscription: EventSubscription::All,
         });
 
-        // go to the item
-        let item_pos = self.find_item(&ctx)?;
-        ctx.go_to(
-            item_pos,
-            NormalizedFloat::new(0.8),
-            SearchGoal::Arrive,
-            GoingToStatus::target("item"),
-        )
-        .await?;
+        // check if the item exists in the world
+        if let Ok(item_pos) = self.find_item(&ctx) {
+            // go to the item
+            ctx.go_to(
+                item_pos,
+                NormalizedFloat::new(0.8),
+                SearchGoal::Arrive,
+                GoingToStatus::target("item"),
+            )
+            .await?;
 
-        // picky uppy
-        ctx.update_status(PickingUpState);
-        ctx.pick_up(self.0).await?;
+            // picky uppy
+            ctx.update_status(EquippingState);
+            ctx.pick_up(self.0).await?;
+        } else {
+            // it must be held by someone, try equipping instead
+            let extra_hands = match ctx.world().component::<HaulableItemComponent>(self.0) {
+                Ok(comp) => comp.extra_hands,
+                Err(err) => return Err(EquipError::NotHaulable.into()),
+            };
+
+            ctx.update_status(EquippingState);
+            ctx.equip(self.0, extra_hands).await?;
+        }
 
         Ok(())
     }
@@ -83,13 +98,13 @@ impl Display for GoEquipActivity2 {
     }
 }
 
-impl Display for PickingUpState {
+impl Display for EquippingState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str("Equipping")
     }
 }
 
-impl Status for PickingUpState {
+impl Status for EquippingState {
     fn exertion(&self) -> f32 {
         0.6
     }

@@ -28,7 +28,8 @@ impl EcsWorld {
 }
 
 impl EcsExtDev<'_> {
-    pub fn give_bag(&self, lucky_holder: Entity) {
+    /// Returns the bag
+    pub fn give_bag(&self, lucky_holder: Entity) -> Entity {
         let bag = self
             .build_entity("core_storage_backpack")
             .expect("no backpack")
@@ -44,6 +45,8 @@ impl EcsExtDev<'_> {
         inv.give_container(bag);
         self.helpers_comps()
             .add_to_container(bag, ContainedInComponent::InventoryOf(lucky_holder));
+
+        bag
     }
 
     pub fn put_food_in_container(&mut self, food: Entity, lucky_holder: Entity) {

@@ -82,7 +82,8 @@ impl EcsExtComponents<'_> {
         debug_assert!(result.is_some(), "{} didnt have contained component", item);
     }
 
-    /// Removes TransformComponent and adds given ContainedInComponent
+    /// Removes TransformComponent and adds given ContainedInComponent.
+    /// Item must still be added to ContainerComponent!!
     pub fn add_to_container(&mut self, item: Entity, container: ContainedInComponent) {
         debug_assert!(self.is_entity_alive(item));
 

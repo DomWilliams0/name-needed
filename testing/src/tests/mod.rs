@@ -59,7 +59,7 @@ impl TestWrapper {
         let mut this = self.test.borrow_mut();
         let this = this.as_mut().expect("init was not called");
         let this: &mut () = &mut **this;
-        unsafe { do_it(this) }
+        do_it(this)
     }
 
     pub fn helper(&self) -> TestHelper {

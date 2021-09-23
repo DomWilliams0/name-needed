@@ -14,14 +14,15 @@
 		* [X] cancel early if item is destroyed
 	* [X] eat
 	* [ ] goto and haul
-* [ ] e2e tests
+* [o] e2e tests
 		* [o] equipping an item activity
 			* [X] far away and needs pickup, inventory is empty
 			* [X] far away and needs pickup, equip slots are full
-			* [ ] in inv but not equipped
-			* [ ] already equipped
+			* [X] in inv but not equipped
+			* [X] already equipped
 			* [ ] destroying item during going to equip it
 		* [ ] ensure test runner is run from project root via --bin
+		* [ ] allow tests to receive entity events OOB
 * [X] report activity and subactivities in ui
 * [X] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime
@@ -39,3 +40,4 @@
 * [ ] add check for space anywhere in inventory before deciding to go pick something up
 * [X] enable activities to call each other directly
 * [X] replace outdated game preset with just a config file path argument, where config specifies world loader
+* [ ] bug: entities are not rendered on 1 particular linux laptop
