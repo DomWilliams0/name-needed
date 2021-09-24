@@ -7,7 +7,7 @@ use crate::activity::NopActivity2;
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 
-use crate::activity::status::{status_channel, StatusReceiver, StatusRef};
+use crate::activity::status::{StatusReceiver, StatusRef};
 use crate::event::EntityEventQueue;
 use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
 use crate::runtime::{Runtime, TaskHandle, TaskRef, TaskResult, TimerFuture};
@@ -26,11 +26,12 @@ pub struct ActivityComponent2 {
     /// Set by AI to trigger a new activity
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
     current: Option<ActiveTask>,
+    /// Reused between tasks
+    status: StatusReceiver,
 }
 
 struct ActiveTask {
     task: TaskRef,
-    status: StatusReceiver,
     description: Box<dyn Display>,
 }
 
@@ -128,8 +129,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
 
                 let description = new_activity.description();
 
-                // TODO reuse same status updater from previous activity, no need to throw it away
-                let (status_tx, status_rx) = status_channel();
+                let status_tx = activity.status.updater();
                 let (taskref_tx, taskref_rx) = futures::channel::oneshot::channel();
                 let task = runtime.spawn(taskref_tx, async move {
                     // recv task ref from runtime
@@ -158,11 +158,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                     result
                 });
 
-                activity.current = Some(ActiveTask {
-                    task,
-                    status: status_rx,
-                    description,
-                });
+                activity.current = Some(ActiveTask { task, description });
             }
         }
     }
@@ -185,14 +181,11 @@ impl ActivityComponent2 {
     pub fn status(&self) -> Option<(&dyn Display, StatusRef)> {
         self.current
             .as_ref()
-            .map(|t| (&*t.description, t.status.current()))
+            .map(|t| (&*t.description, self.status.current()))
     }
 
     /// Exertion of current subactivity
     pub fn exertion(&self) -> f32 {
-        self.current
-            .as_ref()
-            .map(|t| t.status.current().exertion())
-            .unwrap_or(0.0)
+        self.status.current().exertion()
     }
 }

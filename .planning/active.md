@@ -34,7 +34,7 @@
 * [ ] add safe !Send wrappers for component references that can't be held across awaits in activities
 * [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
 * [X] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
-* [ ] reuse status updater allocation when changing activities
+* [X] reuse status updater allocation when changing activities
 * [X] add exertion to activity status
 * [ ] remove old deprecated Activities and remove 2 suffix
 * [ ] add check for space anywhere in inventory before deciding to go pick something up

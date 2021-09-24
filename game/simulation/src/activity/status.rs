@@ -24,14 +24,6 @@ pub struct StatusRef<'a> {
 #[derive(Copy, Clone)]
 pub struct NopStatus;
 
-pub fn status_channel() -> (StatusUpdater, StatusReceiver) {
-    let inner = Inner(dynslot_new!(NopStatus));
-    let inner = Rc::new(RefCell::new(inner));
-    let tx = StatusUpdater(inner.clone());
-    let rx = StatusReceiver(inner);
-    (tx, rx)
-}
-
 impl StatusUpdater {
     pub fn update<S: Status + 'static>(&self, status: S) {
         let mut inner = self.0.borrow_mut();
@@ -40,10 +32,22 @@ impl StatusUpdater {
 }
 
 impl StatusReceiver {
+    pub fn updater(&self) -> StatusUpdater {
+        StatusUpdater(self.0.clone())
+    }
+
     pub fn current(&self) -> StatusRef {
         StatusRef {
             guard: self.0.borrow(),
         }
+    }
+}
+
+impl Default for StatusReceiver {
+    fn default() -> Self {
+        let inner = Inner(dynslot_new!(NopStatus));
+        let inner = Rc::new(RefCell::new(inner));
+        StatusReceiver(inner)
     }
 }
 
@@ -87,7 +91,8 @@ mod tests {
 
     #[test]
     fn status_updater() {
-        let (tx, rx) = status_channel();
+        let rx = StatusReceiver::default();
+        let tx = rx.updater();
         tx.update(MyStr("nice"));
         assert_eq!(format!("{}", &*rx.current()), "nice");
         assert!(rx.current().exertion().approx_eq(1.5, (f32::EPSILON, 2)));

@@ -171,10 +171,9 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (3)
+ * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (2)
    * `// TODO rename`
    * `// TODO handle society task`
-   * `// TODO reuse same status updater from previous activity, no need to throw it away`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
    * `/// TODO reduce cost of cloning vec of items`
@@ -469,12 +468,11 @@
    * `.unwrap_or("unnamed"); // TODO another manual name component access`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (4)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (5)
    * `// TODO specify e2e test by name (feature = "tests")`
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
- * [renderer/main/src/presets/mod.rs](renderer/main/src/presets/mod.rs) (1)
    * `// TODO middle of requested chunk instead of corner`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
@@ -505,3 +503,5 @@
    * `// TODO specify single test to run`
    * `// TODO run n in parallel`
    * `// TODO unix special case to get exit code on signal`
+ * [testing/src/tests/equip_with_pickup.rs](testing/src/tests/equip_with_pickup.rs) (1)
+   * `// TODO actually subscribe to the entity event to get Ok/Err, instead of just success like this`

@@ -180,6 +180,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: occlusion flickers after world changes, updates are probably being queued for too long
 * bug: occlusion shadows above a 9 block drop
 * bug: occlusion shadows cast by blocks above current viewing slice (like treetops) look very weird
+* bug: entities not rendered on a particular laptop (ticket #90)
 
 ## Building and testing
 * separate config and preset for tests
