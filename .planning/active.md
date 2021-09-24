@@ -15,14 +15,14 @@
 	* [X] eat
 	* [ ] goto and haul
 * [o] e2e tests
-		* [o] equipping an item activity
+		* [X] equipping an item activity
 			* [X] far away and needs pickup, inventory is empty
 			* [X] far away and needs pickup, equip slots are full
 			* [X] in inv but not equipped
 			* [X] already equipped
-			* [ ] destroying item during going to equip it
 		* [ ] ensure test runner is run from project root via --bin
-		* [ ] allow tests to receive entity events OOB
+		* [X] allow tests to receive entity events OOB
+		* [ ] hauling activity
 * [X] report activity and subactivities in ui
 * [X] reintegrate society job with activity
 * [X] consider removing unnecessary Arc and thread safety from single threaded runtime

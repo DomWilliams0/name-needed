@@ -4,8 +4,8 @@ use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::*;
 use simulation::{
     AiAction, ComponentWorld, ConditionComponent, ContainedInComponent, ContainerComponent, Entity,
-    EntityLoggingComponent, HungerComponent, InventoryComponent, LoggedEntityEvent,
-    PhysicalComponent,
+    EntityEventPayload, EntityLoggingComponent, HungerComponent, InventoryComponent,
+    LoggedEntityEvent, PhysicalComponent,
 };
 use unit::space::{length::Length3, volume::Volume};
 
@@ -20,7 +20,7 @@ pub trait InitialInventoryState {
 
     fn validate(
         test: &EquipWithPickup<Self>,
-        logs: &EntityLoggingComponent,
+        ctx: &HookContext,
         inv: &InventoryComponent,
     ) -> HookResult;
 }
@@ -37,12 +37,68 @@ pub struct AlreadyEquipped;
 /// Item is already in a held container
 pub struct AlreadyInInventory;
 
+enum EventResult {
+    Success,
+    Failed(String),
+}
+
 impl<I: InitialInventoryState> EquipWithPickup<I> {
     // TODO actually subscribe to the entity event to get Ok/Err, instead of just success like this
-    fn has_pickup_event(&self, logging: &EntityLoggingComponent) -> bool {
-        logging
-            .iter_raw_logs()
-            .any(|e| *e == LoggedEntityEvent::PickedUp(self.item))
+    fn has_pickup_event(&self, ctx: &HookContext) -> bool {
+        let human_picked_up = ctx.events.iter().find_map(|e| {
+            if e.subject == self.human {
+                if let EntityEventPayload::HasPickedUp(picked_up) = e.payload {
+                    if picked_up == self.item {
+                        // picked up expected item
+                        return Some(EventResult::Success);
+                    }
+                    return Some(EventResult::Failed(format!("picked up wrong entity")));
+                }
+            }
+
+            None
+        });
+
+        let item_was_picked_up = ctx.events.iter().find_map(|e| {
+            if e.subject == self.item {
+                if let EntityEventPayload::BeenPickedUp(picker_upper, ref result) = e.payload {
+                    if picker_upper == self.human && result.is_ok() {
+                        // picked up by expected human
+                        return Some(EventResult::Success);
+                    }
+
+                    return Some(EventResult::Failed(format!(
+                        "pickup failed or was by wrong entity: {:?}",
+                        e.payload
+                    )));
+                }
+            }
+
+            None
+        });
+
+        let mut failures = Vec::new();
+
+        if let Some(EventResult::Failed(ref err)) = human_picked_up {
+            failures.push(err.clone());
+        }
+
+        if let Some(EventResult::Failed(ref err)) = item_was_picked_up {
+            failures.push(err.clone());
+        }
+
+        if failures.is_empty() {
+            // success if both were triggered
+            assert_eq!(
+                human_picked_up.is_some(),
+                item_was_picked_up.is_some(),
+                "both or neither events should have triggered"
+            );
+            human_picked_up.is_some()
+        } else {
+            let err = failures.into_iter().join(", ");
+            panic!("{}", err)
+        }
     }
 
     fn has_equipped(&self, inv: &InventoryComponent) -> bool {
@@ -50,19 +106,13 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
     }
 
     pub fn on_tick(&mut self, test: TestHelper, ctx: &HookContext) -> HookResult {
-        let logs = ctx
-            .simulation
-            .ecs
-            .component::<EntityLoggingComponent>(self.human)
-            .expect("no logging component");
-
         let inv = ctx
             .simulation
             .ecs
             .component::<InventoryComponent>(self.human)
             .expect("no inventory");
 
-        I::validate(self, logs, inv)
+        I::validate(self, ctx, inv)
     }
 
     pub fn on_init(test: TestHelper, ctx: &HookContext) -> InitHookResult<Self> {
@@ -108,11 +158,11 @@ impl InitialInventoryState for EmptyInventory {
 
     fn validate(
         test: &EquipWithPickup<Self>,
-        logs: &EntityLoggingComponent,
+        ctx: &HookContext,
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(logs) {
+        if test.has_pickup_event(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {
@@ -149,12 +199,12 @@ impl InitialInventoryState for AlreadyEquipped {
 
     fn validate(
         test: &EquipWithPickup<Self>,
-        logs: &EntityLoggingComponent,
+        ctx: &HookContext,
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
         if test.has_equipped(inv) {
-            assert!(!test.has_pickup_event(logs));
+            assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
             HookResult::KeepGoing
@@ -192,12 +242,12 @@ impl InitialInventoryState for AlreadyInInventory {
 
     fn validate(
         test: &EquipWithPickup<Self>,
-        logs: &EntityLoggingComponent,
+        ctx: &HookContext,
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
         if test.has_equipped(inv) {
-            assert!(!test.has_pickup_event(logs));
+            assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
             HookResult::KeepGoing
@@ -240,11 +290,11 @@ impl InitialInventoryState for FullInventory {
 
     fn validate(
         test: &EquipWithPickup<Self>,
-        logs: &EntityLoggingComponent,
+        ctx: &HookContext,
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(logs) {
+        if test.has_pickup_event(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {

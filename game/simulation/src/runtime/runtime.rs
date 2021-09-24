@@ -27,6 +27,10 @@ struct RuntimeInner {
     ready_double_buf: Vec<TaskRef>,
 
     next_task: TaskHandle,
+
+    /// Stores all triggered events for use by e2e tests
+    #[cfg(feature = "testing")]
+    event_log: Vec<crate::event::EntityEvent>,
 }
 
 #[derive(Clone)]
@@ -168,6 +172,25 @@ impl Runtime {
     }
 }
 
+#[cfg(feature = "testing")]
+impl Runtime {
+    pub fn post_events(&self, events: impl Iterator<Item = EntityEvent>) {
+        let mut inner = self.0.borrow_mut();
+        inner.event_log.extend(events);
+    }
+
+    /// Only used in tests, so allocation waste doesn't matter
+    pub fn event_log(&self) -> Vec<EntityEvent> {
+        let inner = self.0.borrow();
+        inner.event_log.clone()
+    }
+
+    pub fn clear_event_log(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.event_log.clear();
+    }
+}
+
 impl RuntimeInner {
     fn next_task_handle(&mut self) -> TaskHandle {
         let this = self.next_task;
@@ -182,6 +205,8 @@ impl Default for Runtime {
             ready: Vec::with_capacity(128),
             ready_double_buf: Vec::with_capacity(128),
             next_task: TaskHandle::default(),
+            #[cfg(feature = "testing")]
+            event_log: Vec::new(),
         });
 
         Runtime(Rc::new(inner))

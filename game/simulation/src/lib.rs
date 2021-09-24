@@ -33,6 +33,7 @@ pub use activity::{
 };
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
+pub use event::{EntityEvent, EntityEventPayload};
 pub use item::{
     ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
     InventoryComponent, ItemCondition, NameComponent,
@@ -40,6 +41,7 @@ pub use item::{
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
+pub use runtime::Runtime;
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,

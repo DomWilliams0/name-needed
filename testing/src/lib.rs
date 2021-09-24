@@ -1,7 +1,7 @@
 use crate::tests::{TestHelper, TestWrapper};
 use common::BoxedResult;
 use simulation::input::UiCommands;
-use simulation::SimulationRefLite;
+use simulation::{EntityEvent, LoggedEntityEvent, SimulationRefLite};
 use std::any::Any;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::sync::Once;
@@ -29,6 +29,8 @@ pub mod tests;
 pub struct HookContext<'a> {
     pub simulation: SimulationRefLite<'a>,
     pub commands: &'a mut UiCommands,
+    /// Events triggered since last tick
+    pub events: Vec<EntityEvent>,
 }
 
 pub enum InitHookResult<T> {

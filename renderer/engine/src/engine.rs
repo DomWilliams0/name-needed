@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use common::*;
 use simulation::input::UiCommands;
-use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
+use simulation::{
+    self, ComponentWorld, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation,
+};
 
 pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
     backend: &'b mut B,
@@ -33,9 +35,11 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
 
     #[cfg(feature = "hook")]
     pub fn hook_context(&mut self) -> testing::HookContext {
+        let runtime = self.simulation.world().resource::<simulation::Runtime>();
         testing::HookContext {
             simulation: self.simulation.as_lite_ref(),
             commands: &mut self.sim_ui_commands,
+            events: runtime.event_log(),
         }
     }
 

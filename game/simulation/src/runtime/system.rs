@@ -2,7 +2,7 @@ use crate::activity::{
     ActivityComponent2, BlockingActivityComponent, EventUnblockResult, EventUnsubscribeResult,
 };
 use crate::ecs::*;
-use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, RuntimeTimers};
+use crate::event::{EntityEventPayload, EntityEventQueue, RuntimeTimers};
 use crate::runtime::Runtime;
 use crate::{ActivityComponent, EntityLoggingComponent, Tick};
 use common::*;
@@ -44,6 +44,11 @@ impl<'a> System<'a> for RuntimeSystem {
             };
 
             logging.log_events(events.map(|e| &e.payload));
+        }
+
+        #[cfg(feature = "testing")]
+        {
+            runtime.post_events(events.events().cloned());
         }
 
         // consume events
