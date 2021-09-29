@@ -53,28 +53,19 @@ impl EatItemSubactivity2 {
             });
 
         // wait for completion
-        let mut eat_result = None;
-        ctx.subscribe_to_until(
-            EntityEventSubscription {
-                subject: item,
-                subscription: EventSubscription::Specific(EntityEventType::BeenEaten),
-            },
-            |evt| {
+        let eat_result = ctx
+            .subscribe_to_specific_until(item, EntityEventType::BeenEaten, |evt| {
                 match evt {
                     EntityEventPayload::BeenEaten(Ok(actual_eater)) if actual_eater != eater => {
                         // someone else ate it, damn
-                        Unconsumed(evt)
+                        Err(evt)
                     }
-                    EntityEventPayload::BeenEaten(result) => {
-                        eat_result = Some(result);
-                        Consumed
-                    }
+                    EntityEventPayload::BeenEaten(result) => Ok(result),
                     // calling activity can handle other destructive events
-                    _ => unexpected_event2!(evt),
+                    _ => Err(evt),
                 }
-            },
-        )
-        .await;
+            })
+            .await;
 
         match eat_result {
             Some(Ok(_)) => Ok(()),

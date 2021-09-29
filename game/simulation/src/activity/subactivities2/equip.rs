@@ -58,25 +58,20 @@ impl PickupSubactivity {
         queue_pickup(ctx.world().resource(), ctx.entity(), item);
 
         // await event
-        let subscription = EntityEventSubscription {
-            subject: item,
-            subscription: EventSubscription::Specific(EntityEventType::BeenPickedUp),
-        };
-        let mut pickup_result = None;
-        ctx.subscribe_to_until(subscription, |evt| match evt {
-            EntityEventPayload::BeenPickedUp(picker_upper, result)
-                if picker_upper == ctx.entity() =>
-            {
-                // it was us, and we tried
-                pickup_result = Some(result);
-                Consumed
+        ctx.subscribe_to_specific_until(item, EntityEventType::BeenPickedUp, |evt| {
+            match evt {
+                EntityEventPayload::BeenPickedUp(picker_upper, result)
+                    if picker_upper == ctx.entity() =>
+                {
+                    // it was us, and we tried
+                    Ok(result)
+                }
+                // calling activity can handle other destructive events
+                _ => Err(evt),
             }
-            // calling activity can handle other destructive events
-            _ => unexpected_event2!(evt),
         })
-        .await;
-
-        pickup_result.unwrap_or(Err(EquipItemError::Cancelled))
+        .await
+        .unwrap_or(Err(EquipItemError::Cancelled))
     }
 
     fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), EquipItemError> {
@@ -135,25 +130,16 @@ impl EquipSubActivity2 {
                 queue_equip(ctx.world().resource(), holder, item, extra_hands, filter);
 
                 // wait for equip event
-                let sub = EntityEventSubscription {
-                    subject: item,
-                    subscription: EventSubscription::Specific(EntityEventType::BeenEquipped),
-                };
-
-                let mut equip_result = None;
-                ctx.subscribe_to_until(sub, |evt| match evt {
-                    EntityEventPayload::BeenEquipped(result) => {
-                        equip_result = Some(result);
-                        Consumed
+                ctx.subscribe_to_specific_until(item, EntityEventType::BeenEquipped, |evt| {
+                    if let EntityEventPayload::BeenEquipped(result) = evt {
+                        Ok(result)
+                    } else {
+                        Err(evt)
                     }
-                    // calling activity can handle other destructive events
-                    _ => unexpected_event2!(evt),
                 })
-                .await;
-
-                equip_result
-                    .unwrap_or(Err(EquipItemError::Cancelled))
-                    .map(|_| {})
+                .await
+                .unwrap_or(Err(EquipItemError::Cancelled))
+                .map(|_| {})
             }
         }
     }

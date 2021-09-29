@@ -70,20 +70,12 @@ impl<'a> GoToSubactivity<'a> {
         let path_token = follow_path.new_path_with_goal(dest, goal, speed);
 
         // await arrival
-        let mut goto_result = None;
-        let subscription = EntityEventSubscription {
-            subject: ctx.entity(),
-            subscription: EventSubscription::Specific(EntityEventType::Arrived),
-        };
-
-        ctx.subscribe_to_until(subscription, |evt| match evt {
-            EntityEventPayload::Arrived(token, result) if token == path_token => {
-                goto_result = Some(result);
-                Consumed
-            }
-            _ => unexpected_event2!(evt),
-        })
-        .await;
+        let goto_result = ctx
+            .subscribe_to_specific_until(ctx.entity(), EntityEventType::Arrived, |evt| match evt {
+                EntityEventPayload::Arrived(token, result) if token == path_token => Ok(result),
+                _ => Err(evt),
+            })
+            .await;
 
         self.complete = true;
 

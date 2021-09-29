@@ -1,4 +1,4 @@
-# TODOs (369)
+# TODOs (370)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -138,9 +138,10 @@
    * `// TODO specify follow speed in activity too`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (3)
+ * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (4)
    * `// TODO ensure component refs cant be held across awaits`
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
+   * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
    * `// TODO event queue needs to be cleared of events after unsubscribing? or just consume them and ignore them?`
  * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
    * `// TODO move subactivity errors somewhere else`

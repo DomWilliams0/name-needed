@@ -5,16 +5,15 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::activity2::EventResult::Unconsumed;
+use crate::activity::activity2::EventResult::{Consumed, Unconsumed};
 use crate::activity::status::{NopStatus, Status};
 use crate::activity::subactivities2::{
     BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
     GoToSubactivity, GoingToStatus, GotoError, PickupSubactivity,
 };
 use crate::activity::{EquipItemError, GoToActivity2, StatusUpdater};
-use crate::event::{
-    EntityEvent, EntityEventPayload, EntityEventQueue, EntityEventSubscription, RuntimeTimers,
-};
+use crate::event::prelude::*;
+use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::runtime::{TaskRef, TimerFuture};
 use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent, WorldPosition};
 use std::cell::{Cell, RefCell};
@@ -169,6 +168,36 @@ impl ActivityContext2 {
 
         // unsubscribe
         evts.unsubscribe(self.entity, subscription);
+    }
+
+    /// Common pattern using [subscribe_to_specific] that waits for a single event type, and returns
+    /// the payload on success.
+    pub async fn subscribe_to_specific_until<T>(
+        &self,
+        subject: Entity,
+        event_type: EntityEventType,
+        mut filter_map: impl FnMut(EntityEventPayload) -> Result<T, EntityEventPayload>,
+    ) -> Option<T> {
+        let sub = EntityEventSubscription {
+            subject,
+            subscription: EventSubscription::Specific(event_type),
+        };
+
+        let mut final_result = None;
+        self.subscribe_to_until(sub, |evt| {
+            // TODO possible to compare std::mem::discriminants instead of converting to evt type enum?
+
+            match filter_map(evt) {
+                Ok(result) => {
+                    final_result = Some(result);
+                    Consumed
+                }
+                Err(evt) => Unconsumed(evt),
+            }
+        })
+        .await;
+
+        final_result
     }
 
     /// Hangs in event loop running filter against all of them until unconsumed is returned
