@@ -1,3 +1,4 @@
+#![cfg(feature = "testing")]
 use crate::tests::{TestHelper, TestWrapper};
 use common::BoxedResult;
 use simulation::input::UiCommands;

@@ -17,7 +17,7 @@ if [[ "$DETECTED_OS" == "Linux" ]]; then
 else
 	RUN_E2E_TESTS=0
 
-	# remove testing crate from workspace for windows
+	# remove testing crate from workspace for windows as it doesn't compile
 	sed -i '/"testing",/d' Cargo.toml
 	sed -i 's/] # end members/]\nexclude = ["testing"]/g' Cargo.toml
 fi
@@ -29,7 +29,7 @@ cargo test $FLAGS
 cargo test $FLAGS -- --ignored
 
 if (( $RUN_E2E_TESTS )); then
-	cargo run --bin test-runner
+	cargo run --bin test-runner --features testing
 else
 	echo "skipping e2e tests for platform $DETECTED_OS"
 fi

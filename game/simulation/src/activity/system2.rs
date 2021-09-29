@@ -8,7 +8,7 @@ use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 
 use crate::activity::status::{StatusReceiver, StatusRef};
-use crate::event::{EntityEventDebugPayload, EntityEventQueue};
+use crate::event::EntityEventQueue;
 use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
 use crate::runtime::{Runtime, TaskHandle, TaskRef, TaskResult, TimerFuture};
 use crate::{EntityEvent, EntityEventPayload, Societies, SocietyComponent};
@@ -100,6 +100,7 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                         // post debug event with activity result
                         #[cfg(feature = "testing")]
                         {
+                            use crate::event::EntityEventDebugPayload;
                             if let Some(current) = activity.current.as_ref() {
                                 event_queue.post(EntityEvent {
                                     subject: e,

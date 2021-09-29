@@ -2,7 +2,6 @@ use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
 use crate::event::timer::TimerToken;
 
-use crate::event::subscription::debug_events::EntityEventDebugPayload;
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
 use crate::runtime::TaskResult;
@@ -53,7 +52,7 @@ pub enum EntityEventPayload {
 
     /// Debug event needed for tests only
     #[cfg(feature = "testing")]
-    Debug(EntityEventDebugPayload),
+    Debug(crate::event::subscription::debug_events::EntityEventDebugPayload),
 
     #[doc(hidden)]
     #[cfg(test)]
@@ -66,6 +65,10 @@ pub enum EntityEventPayload {
 
 #[cfg(feature = "testing")]
 pub mod debug_events {
+
+    #[cfg(not(debug_assertions))]
+    compile_error!("no testing in release builds!");
+
     use crate::runtime::TaskResult;
 
     #[derive(Debug, Clone)]

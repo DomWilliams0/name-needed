@@ -2,7 +2,6 @@ use futures::TryFutureExt;
 use std::error::Error;
 use std::process::Stdio;
 use std::time::Duration;
-use testing::{register_tests, TestDeclaration, TEST_NAME_VAR};
 use tokio::process::{Child, Command};
 
 /// Test runner
@@ -20,13 +19,20 @@ struct Args {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 5)]
 async fn main() {
+    #[cfg(not(feature = "testing"))]
+    {
+        panic!("\"testing\" feature is needed")
+    }
+
+    #[cfg(feature = "testing")]
     if let Err(err) = do_main().await {
         panic!("{}", err)
     }
 }
 
+#[cfg(feature = "testing")]
 async fn do_main() -> Result<(), Box<dyn Error>> {
-    register_tests();
+    testing::register_tests();
 
     let args = argh::from_env::<Args>();
     let renderer = if args.graphical {
@@ -35,7 +41,7 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         Renderer::Lite
     };
 
-    let tests = inventory::iter::<TestDeclaration>
+    let tests = inventory::iter::<testing::TestDeclaration>
         .into_iter()
         .collect::<Vec<_>>();
     eprintln!("running {} tests", tests.len());
@@ -86,6 +92,7 @@ enum Renderer {
     Graphical,
 }
 
+#[cfg(feature = "testing")]
 impl CargoCommand<'_> {
     async fn run(self, renderer: Renderer) -> Result<Child, Box<dyn Error>> {
         let subcmd = match &self {
@@ -95,7 +102,7 @@ impl CargoCommand<'_> {
 
         let mut builder = Command::new(env!("CARGO"));
         if let CargoCommand::Run { test } = self {
-            builder.env(TEST_NAME_VAR, test);
+            builder.env(testing::TEST_NAME_VAR, test);
         }
         builder
             .args(&[
