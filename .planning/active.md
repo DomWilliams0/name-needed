@@ -5,7 +5,7 @@
 * [X] async-safe activity context to get access to the world
 	* [X] replace EcsWorldFrameRef with this
 * [X] remove timer elapsed event
-* [o] new activity system with async activities
+* [X] new activity system with async activities
 	* [X] nop that only uses a timer
 	* [X] wander that uses goto
 	* [X] goto and break block
@@ -13,7 +13,7 @@
 		* [X] collapse pickup into this as it's the same problem
 		* [X] cancel early if item is destroyed
 	* [X] eat
-	* [ ] goto and haul
+	* [X] goto and haul
 * [o] e2e tests
 		* [X] equipping an item activity
 			* [X] far away and needs pickup, inventory is empty

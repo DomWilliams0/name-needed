@@ -1,6 +1,6 @@
 use unit::world::WorldPoint;
 
-use crate::ecs::{EcsWorld, Entity};
+use crate::ecs::{EcsWorld, Entity, WorldExt};
 use crate::{ComponentWorld, TransformComponent};
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
@@ -29,11 +29,8 @@ impl EcsExtComponents<'_> {
     ) {
         debug_assert!(self.is_entity_alive(haulee));
 
-        self.add_now(haulee, HauledItemComponent::new(hauler, haul_type))
-            .unwrap(); // haulee is alive
-
-        self.add_now(haulee, ContainedInComponent::InventoryOf(hauler))
-            .unwrap();
+        let _ = self.add_now(haulee, HauledItemComponent::new(hauler, haul_type));
+        let _ = self.add_now(haulee, ContainedInComponent::InventoryOf(hauler));
 
         // add transform to the haulee if it doesn't already have one
         if let Some(hauler_pos) = hauler_pos {
@@ -65,11 +62,9 @@ impl EcsExtComponents<'_> {
                 let _ = self.remove_now::<ContainedInComponent>(haulee);
             }
             EndHaulBehaviour::KeepEquipped => {
-                let contained_in = self
-                    .component::<ContainedInComponent>(haulee)
-                    .unwrap()
-                    .clone();
-                self.add_to_container(haulee, contained_in);
+                if let Ok(contained_in) = self.component::<ContainedInComponent>(haulee) {
+                    self.add_to_container(haulee, contained_in.clone());
+                }
             }
         };
 
@@ -88,6 +83,6 @@ impl EcsExtComponents<'_> {
         debug_assert!(self.is_entity_alive(item));
 
         let _ = self.remove_now::<TransformComponent>(item);
-        self.add_now(item, container).unwrap();
+        let _ = self.add_now(item, container);
     }
 }

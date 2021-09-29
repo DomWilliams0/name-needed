@@ -1,8 +1,8 @@
+use crate::activity::HaulTarget;
 use ai::{Dse, WeightedDse};
 use common::*;
 use unit::world::WorldPosition;
 
-use crate::activity::HaulTarget;
 use crate::ai::dse::{BreakBlockDse, HaulDse};
 use crate::ai::AiContext;
 use crate::ecs::{EcsWorld, Entity};

@@ -35,19 +35,19 @@ pub enum EntityEventPayload {
     /// Hungry entity (subject) has finished eating the given food entity
     HasEaten(Entity),
 
-    /// Item entity (subject) has been equipped in an equip slot of this entity
+    /// Item entity (subject) has been equipped in an equip slot of the given entity
     BeenEquipped(Result<Entity, EquipItemError>),
 
     /// Entity (subject) has equipped the given item entity that was already in their inventory
     HasEquipped(Entity),
 
-    /// Item entity (subject) has been picked up for hauling by a hauler
+    /// Item entity (subject) has been picked up for hauling by the given hauler
     Hauled(Result<Entity, HaulError>),
 
-    /// Item entity has been removed from a container
+    /// Item entity has been removed from the given container
     ExitedContainer(Result<Entity, HaulError>),
 
-    /// Item entity has been inserted into a container
+    /// Item entity has been inserted into the given container
     EnteredContainer(Result<Entity, HaulError>),
 
     /// Debug event needed for tests only

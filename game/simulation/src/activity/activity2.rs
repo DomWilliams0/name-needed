@@ -6,17 +6,20 @@ use async_trait::async_trait;
 use common::*;
 
 use crate::activity::activity2::EventResult::{Consumed, Unconsumed};
-use crate::activity::status::{NopStatus, Status};
+use crate::activity::status::Status;
 use crate::activity::subactivities2::{
     BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
-    GoToSubactivity, GoingToStatus, GotoError, PickupSubactivity,
+    GoToSubactivity, GoingToStatus, GotoError, HaulSubactivity2, PickupSubactivity,
 };
-use crate::activity::{EquipItemError, GoToActivity2, StatusUpdater};
+use crate::activity::{EquipItemError, HaulError, HaulTarget, StatusUpdater};
+use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::runtime::{TaskRef, TimerFuture};
-use crate::{ComponentWorld, EcsWorld, Entity, FollowPathComponent, WorldPosition};
-use std::cell::{Cell, RefCell};
+use crate::{
+    ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent, WorldPosition,
+};
+
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use unit::world::WorldPoint;
@@ -59,6 +62,13 @@ pub enum GenericEventResult {
     Consumed,
     /// Give it back
     Unconsumed(EntityEvent),
+}
+
+pub enum DistanceCheckResult {
+    /// No transform or invalid entity
+    NotAvailable,
+    TooFar,
+    InRange,
 }
 
 // only used on the main thread
@@ -135,6 +145,31 @@ impl ActivityContext2 {
     /// Item should already be equipped
     pub async fn eat(&self, item: Entity) -> Result<(), EatItemError> {
         EatItemSubactivity2.eat(self, item).await
+    }
+
+    /// Picks up thing for hauling, checks if close enough first
+    pub async fn haul(
+        &self,
+        thing: Entity,
+        source: HaulTarget,
+    ) -> Result<HaulSubactivity2<'_>, HaulError> {
+        HaulSubactivity2::start_hauling(self, thing, source).await
+    }
+
+    pub fn check_entity_distance(&self, entity: Entity, max_dist_2: f32) -> DistanceCheckResult {
+        let transforms = self.world().read_storage::<TransformComponent>();
+        let my_pos = transforms.get(self.entity().into());
+        let entity_pos = transforms.get(entity.into());
+
+        if let Some((me, entity)) = my_pos.zip(entity_pos) {
+            if me.position.distance2(entity.position) < max_dist_2 {
+                DistanceCheckResult::InRange
+            } else {
+                DistanceCheckResult::TooFar
+            }
+        } else {
+            DistanceCheckResult::NotAvailable
+        }
     }
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].

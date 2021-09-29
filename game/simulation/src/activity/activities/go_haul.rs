@@ -123,7 +123,7 @@ impl Activity for HaulActivity {
                                 let result = do_remove().map(|_| container);
                                 world.post_event(EntityEvent {
                                     subject: item,
-                                    payload: EntityEventPayload::ExitedContainer(result),
+                                    payload: EntityEventPayload::ExitedContainer(todo!()),
                                 });
 
                                 Ok(())
@@ -231,7 +231,7 @@ impl Activity for HaulActivity {
                                 let payload = do_put();
                                 world.post_event(EntityEvent {
                                     subject: item,
-                                    payload: EntityEventPayload::EnteredContainer(payload),
+                                    payload: EntityEventPayload::EnteredContainer(unreachable!()),
                                 });
 
                                 Ok(())

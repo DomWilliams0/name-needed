@@ -1,9 +1,10 @@
+use std::convert::TryInto;
+
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
 use crate::item::ItemsToPickUp;
-use std::convert::TryInto;
 
 // TODO speed should be specified as an enum for all go??? actions
 

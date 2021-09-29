@@ -1,5 +1,4 @@
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::EventResult::Consumed;
+use crate::activity::activity2::{ActivityContext2, DistanceCheckResult};
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{
@@ -7,7 +6,7 @@ use crate::item::{
     ItemFilter,
 };
 use crate::queued_update::QueuedUpdates;
-use crate::unexpected_event2;
+
 use crate::{ComponentWorld, Entity, InventoryComponent, PhysicalComponent, TransformComponent};
 use common::*;
 
@@ -52,7 +51,11 @@ impl PickupSubactivity {
         item: Entity,
     ) -> Result<(), EquipItemError> {
         // ensure close enough
-        self.check_distance(ctx, item)?;
+        match ctx.check_entity_distance(item, MAX_DISTANCE.powi(2)) {
+            DistanceCheckResult::NotAvailable => return Err(EquipItemError::NotAvailable),
+            DistanceCheckResult::TooFar => return Err(EquipItemError::TooFar),
+            DistanceCheckResult::InRange => {}
+        }
 
         // queue pickup for next tick
         queue_pickup(ctx.world().resource(), ctx.entity(), item);
@@ -72,23 +75,6 @@ impl PickupSubactivity {
         })
         .await
         .unwrap_or(Err(EquipItemError::Cancelled))
-    }
-
-    fn check_distance(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), EquipItemError> {
-        let transforms = ctx.world().read_storage::<TransformComponent>();
-        let my_pos = transforms.get(ctx.entity().into());
-        let item_pos = transforms.get(item.into());
-
-        my_pos
-            .zip(item_pos)
-            .ok_or(EquipItemError::NotAvailable)
-            .and_then(|(me, item)| {
-                if me.position.distance2(item.position) < MAX_DISTANCE.powi(2) {
-                    Ok(())
-                } else {
-                    Err(EquipItemError::TooFar)
-                }
-            })
     }
 }
 
@@ -154,7 +140,7 @@ fn queue_equip(
     filter: ItemFilter,
 ) {
     updates.queue("equip item", move |world| {
-        let mut do_equip = || -> Result<Entity, EquipItemError> {
+        let do_equip = || -> Result<Entity, EquipItemError> {
             let inventory = world
                 .component_mut::<InventoryComponent>(holder)
                 .map_err(|_| EquipItemError::NoInventory)?;

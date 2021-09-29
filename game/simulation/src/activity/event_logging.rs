@@ -2,10 +2,10 @@ use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::convert::TryInto;
 
+use crate::activity::HaulTarget;
 use common::*;
 use unit::world::WorldPoint;
 
-use crate::activity::HaulTarget;
 use crate::ecs::*;
 use crate::simulation::Tick;
 use crate::WorldPosition;

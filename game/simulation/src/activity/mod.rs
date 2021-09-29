@@ -5,8 +5,7 @@ pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscri
 pub use activities2::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use status::{StatusReceiver, StatusUpdater};
-pub use subactivities::HaulError;
-pub use subactivities2::EquipItemError;
+pub use subactivities2::{EquipItemError, HaulError, HaulTarget};
 pub use system::{
     ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
 };
@@ -20,6 +19,7 @@ mod activity;
 mod activity2;
 mod event_logging;
 mod status;
+#[deprecated]
 mod subactivities;
 mod subactivities2;
 #[deprecated]
@@ -59,10 +59,10 @@ mod action_to_activity {
                 AiAction::Follow { target, radius } => {
                     activity!(FollowActivity2::new(target, radius))
                 }
-                _ => unreachable!("activity not implemented"),
-                // AiAction::Haul(thing, source, target) => {
-                //     activity!(HaulActivity::new(thing, source, target))
-                // }
+                AiAction::Haul(thing, source, target) => {
+                    activity!(GoHaulActivity2::new(thing, source, target))
+                }
+                AiAction::GoPickUp(_) => unreachable!("replaced by GoEquip"),
             }
         }
         #[deprecated]
@@ -73,23 +73,7 @@ mod action_to_activity {
                 };
             }
 
-            match self {
-                AiAction::Nop => activity!(NopActivity::default()),
-                AiAction::Goto(target) => activity!(GoToActivity::new(target, todo!())),
-                AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {
-                    activity!(PickupItemsActivity::with_items(items, desc))
-                }
-                AiAction::Wander => activity!(WanderActivity::default()),
-                AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
-                AiAction::Follow { target, radius } => {
-                    activity!(FollowActivity::new(target, radius))
-                }
-                AiAction::Haul(thing, source, target) => {
-                    activity!(HaulActivity::new(thing, source, target))
-                }
-                AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
-                _ => unreachable!(),
-            }
+            unreachable!()
         }
     }
 }

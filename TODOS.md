@@ -1,4 +1,4 @@
-# TODOs (370)
+# TODOs (382)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -136,6 +136,14 @@
  * [game/simulation/src/activity/activities2/follow.rs](game/simulation/src/activity/activities2/follow.rs) (2)
    * `// TODO this can generate path requests that are immediately complete, leading to a lot of path spam`
    * `// TODO specify follow speed in activity too`
+ * [game/simulation/src/activity/activities2/go_haul.rs](game/simulation/src/activity/activities2/go_haul.rs) (7)
+   * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
+   * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
+   * `// TODO haul target should hold pos+item radius, assigned once on creation`
+   * `// TODO destructive events on items should include moving/falling`
+   * `// TODO destructive events on the container? society job handles this but not always the source`
+   * `// TODO arrival radius depends on the size of the item`
+   * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
  * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (4)
@@ -169,6 +177,12 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivities2/go_to.rs](game/simulation/src/activity/subactivities2/go_to.rs) (1)
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
+ * [game/simulation/src/activity/subactivities2/haul.rs](game/simulation/src/activity/subactivities2/haul.rs) (5)
+   * `// TODO worldpoint`
+   * `// TODO depends on item size`
+   * `// TODO statuses`
+   * `// TODO don't always drop item in centre`
+   * `// TODO explicit access side for container, e.g. front of chest`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`

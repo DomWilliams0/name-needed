@@ -14,6 +14,7 @@ pub struct HaulSubActivity {
     thing: Entity,
 }
 
+#[deprecated]
 #[derive(Debug, Error, Clone)]
 pub enum HaulError {
     #[error("Item destroyed/moved by a destructive event")]
@@ -134,7 +135,7 @@ impl SubActivity for HaulSubActivity {
             let result = do_haul();
             world.post_event(EntityEvent {
                 subject: item,
-                payload: EntityEventPayload::Hauled(result),
+                payload: EntityEventPayload::Hauled(unreachable!()),
             });
 
             Ok(())
