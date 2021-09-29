@@ -4,8 +4,8 @@ use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::*;
 use simulation::{
     AiAction, ComponentWorld, ConditionComponent, ContainedInComponent, ContainerComponent, Entity,
-    EntityEventPayload, EntityLoggingComponent, HungerComponent, InventoryComponent,
-    LoggedEntityEvent, PhysicalComponent,
+    EntityEventDebugPayload, EntityEventPayload, EntityLoggingComponent, HungerComponent,
+    InventoryComponent, LoggedEntityEvent, PhysicalComponent, TaskResultSummary,
 };
 use unit::space::{length::Length3, volume::Volume};
 
@@ -37,13 +37,13 @@ pub struct AlreadyEquipped;
 /// Item is already in a held container
 pub struct AlreadyInInventory;
 
+#[derive(Debug)]
 enum EventResult {
     Success,
     Failed(String),
 }
 
 impl<I: InitialInventoryState> EquipWithPickup<I> {
-    // TODO actually subscribe to the entity event to get Ok/Err, instead of just success like this
     fn has_pickup_event(&self, ctx: &HookContext) -> bool {
         let human_picked_up = ctx.events.iter().find_map(|e| {
             if e.subject == self.human {
@@ -98,6 +98,35 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
         } else {
             let err = failures.into_iter().join(", ");
             panic!("{}", err)
+        }
+    }
+
+    fn has_activity_succeeded(&self, ctx: &HookContext) -> bool {
+        let result = ctx.events.iter().find_map(|e| {
+            if e.subject == self.human {
+                if let EntityEventPayload::Debug(EntityEventDebugPayload::FinishedActivity {
+                    description,
+                    result,
+                }) = &e.payload
+                {
+                    if description.contains("Picking up") {
+                        return Some(match result {
+                            TaskResultSummary::Succeeded => EventResult::Success,
+                            TaskResultSummary::Cancelled => {
+                                EventResult::Failed("cancelled".to_owned())
+                            }
+                            TaskResultSummary::Failed(err) => EventResult::Failed(err.clone()),
+                        });
+                    }
+                }
+            }
+
+            None
+        });
+        match result {
+            Some(EventResult::Success) => true,
+            Some(other) => panic!("activity failed: {:?}", other),
+            None => false,
         }
     }
 
@@ -162,7 +191,7 @@ impl InitialInventoryState for EmptyInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(ctx) {
+        if test.has_pickup_event(ctx) && test.has_activity_succeeded(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {
@@ -203,7 +232,7 @@ impl InitialInventoryState for AlreadyEquipped {
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
-        if test.has_equipped(inv) {
+        if test.has_equipped(inv) && test.has_activity_succeeded(ctx) {
             assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
@@ -246,7 +275,7 @@ impl InitialInventoryState for AlreadyInInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
-        if test.has_equipped(inv) {
+        if test.has_equipped(inv) && test.has_activity_succeeded(ctx) {
             assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
@@ -294,7 +323,7 @@ impl InitialInventoryState for FullInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(ctx) {
+        if test.has_pickup_event(ctx) && test.has_activity_succeeded(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {

@@ -34,6 +34,8 @@ pub use activity::{
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
 pub use event::{EntityEvent, EntityEventPayload};
+#[cfg(feature = "testing")]
+pub use event::{EntityEventDebugPayload, TaskResultSummary};
 pub use item::{
     ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
     InventoryComponent, ItemCondition, NameComponent,

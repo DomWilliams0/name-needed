@@ -8,10 +8,10 @@ use crate::ai::{AiAction, AiComponent};
 use crate::ecs::*;
 
 use crate::activity::status::{StatusReceiver, StatusRef};
-use crate::event::EntityEventQueue;
+use crate::event::{EntityEventDebugPayload, EntityEventQueue};
 use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
 use crate::runtime::{Runtime, TaskHandle, TaskRef, TaskResult, TimerFuture};
-use crate::{Societies, SocietyComponent};
+use crate::{EntityEvent, EntityEventPayload, Societies, SocietyComponent};
 use std::cell::Cell;
 use std::convert::TryFrom;
 use std::mem::transmute;
@@ -96,6 +96,22 @@ impl<'a> System<'a> for ActivitySystem2<'a> {
                     // current task has finished
                     if let Some(res) = result.as_ref() {
                         debug!("activity finished, reverting to nop"; e, "result" => ?res);
+
+                        // post debug event with activity result
+                        #[cfg(feature = "testing")]
+                        {
+                            if let Some(current) = activity.current.as_ref() {
+                                event_queue.post(EntityEvent {
+                                    subject: e,
+                                    payload: EntityEventPayload::Debug(
+                                        EntityEventDebugPayload::FinishedActivity {
+                                            description: current.description.to_string(),
+                                            result: res.into(),
+                                        },
+                                    ),
+                                })
+                            }
+                        }
                     } else {
                         debug!("activity finished, reverting to nop"; e);
                     }

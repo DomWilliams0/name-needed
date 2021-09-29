@@ -2,9 +2,11 @@ use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
 use crate::event::timer::TimerToken;
 
+use crate::event::subscription::debug_events::EntityEventDebugPayload;
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
-use common::{num_derive::FromPrimitive, num_traits};
+use crate::runtime::TaskResult;
+use common::{num_derive::FromPrimitive, num_traits, Display};
 use std::convert::TryInto;
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
@@ -49,6 +51,10 @@ pub enum EntityEventPayload {
     /// Item entity has been inserted into a container
     EnteredContainer(Result<Entity, HaulError>),
 
+    /// Debug event needed for tests only
+    #[cfg(feature = "testing")]
+    Debug(EntityEventDebugPayload),
+
     #[doc(hidden)]
     #[cfg(test)]
     DummyA,
@@ -56,6 +62,39 @@ pub enum EntityEventPayload {
     #[doc(hidden)]
     #[cfg(test)]
     DummyB,
+}
+
+#[cfg(feature = "testing")]
+pub mod debug_events {
+    use crate::runtime::TaskResult;
+
+    #[derive(Debug, Clone)]
+    pub enum TaskResultSummary {
+        Cancelled,
+        Succeeded,
+        Failed(String),
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum EntityEventDebugPayload {
+        /// Current activity finished
+        FinishedActivity {
+            /// Gross but the only activity description we can get at the moment
+            /// TODO type name of activity instead?
+            description: String,
+            result: TaskResultSummary,
+        },
+    }
+
+    impl From<&TaskResult> for TaskResultSummary {
+        fn from(res: &TaskResult) -> Self {
+            match res {
+                TaskResult::Cancelled => Self::Cancelled,
+                TaskResult::Finished(Ok(_)) => Self::Succeeded,
+                TaskResult::Finished(Err(err)) => Self::Failed(err.to_string()),
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -112,6 +151,8 @@ impl EntityEventPayload {
             | BeenEquipped(_) => false,
             #[cfg(test)]
             DummyA | DummyB => false,
+            #[cfg(feature = "testing")]
+            Debug(_) => false,
         }
     }
 }
@@ -136,6 +177,8 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             | EnteredContainer(_) => Err(()),
             #[cfg(test)]
             DummyA | DummyB => Err(()),
+            #[cfg(feature = "testing")]
+            Debug(_) => Err(()),
         }
     }
 }

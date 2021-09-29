@@ -221,6 +221,8 @@
    * `// TODO track by game tick instead of just number of ops`
    * `let event = event.clone(); // TODO reimplement groupby to own the event without cloning`
    * `// TODO the runtime does not return a subscription result synchronously - remove this branch?`
+ * [game/simulation/src/event/subscription.rs](game/simulation/src/event/subscription.rs) (1)
+   * `/// TODO type name of activity instead?`
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (3)
    * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
@@ -503,5 +505,3 @@
    * `// TODO specify single test to run`
    * `// TODO run n in parallel`
    * `// TODO unix special case to get exit code on signal`
- * [testing/src/tests/equip_with_pickup.rs](testing/src/tests/equip_with_pickup.rs) (1)
-   * `// TODO actually subscribe to the entity event to get Ok/Err, instead of just success like this`

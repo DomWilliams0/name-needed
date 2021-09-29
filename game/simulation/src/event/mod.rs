@@ -7,6 +7,9 @@ pub use subscription::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 
+#[cfg(feature = "testing")]
+pub use subscription::debug_events::{EntityEventDebugPayload, TaskResultSummary};
+
 pub mod prelude {
     pub use super::{
         EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType,
