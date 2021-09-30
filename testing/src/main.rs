@@ -52,23 +52,32 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         .into_iter()
         .collect::<Vec<_>>();
 
-    if let Some(filter) = args.filter {
-        let total_count = tests.len();
-        let filter = filter.to_lowercase();
-        tests.retain(|test| test.name.to_lowercase().contains(&filter));
-        eprintln!(
-            "running {}/{} tests matching filter '{}':",
-            tests.len(),
-            total_count,
-            filter
-        );
-    } else {
-        eprintln!("running {} tests:", tests.len());
-    }
+    let summary = {
+        let mut s = if let Some(filter) = args.filter {
+            let total_count = tests.len();
+            let filter = filter.to_lowercase();
+            tests.retain(|test| test.name.to_lowercase().contains(&filter));
+            format!(
+                "{}/{} tests matching filter '{}':\n",
+                tests.len(),
+                total_count,
+                filter
+            )
+        } else {
+            format!("{} tests:\n", tests.len())
+        };
 
-    for test in &tests {
-        eprintln!(" - {}", test.name);
-    }
+        for test in &tests {
+            s.push_str(" - ");
+            s.push_str(test.name);
+            s.push('\n');
+        }
+
+        s.pop(); // last nl
+
+        s
+    };
+    eprintln!("running {}", summary);
 
     if args.dry_run {
         return Ok(());
@@ -108,7 +117,7 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    eprintln!("done");
+    eprintln!("successfully ran {}", summary);
     Ok(())
 }
 
