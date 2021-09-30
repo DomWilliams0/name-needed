@@ -1,4 +1,4 @@
-# TODOs (382)
+# TODOs (380)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -516,7 +516,5 @@
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)
    * `// TODO ideally handle global slice integer overflow, although unlikely`
- * [testing/src/main.rs](testing/src/main.rs) (3)
-   * `// TODO specify single test to run`
-   * `// TODO run n in parallel`
+ * [testing/src/main.rs](testing/src/main.rs) (1)
    * `// TODO unix special case to get exit code on signal`

@@ -11,10 +11,17 @@ struct Args {
     #[argh(switch)]
     graphical: bool,
 
-    // TODO specify single test to run
     /// timeout in seconds per test
     #[argh(option, default = "30")]
     timeout: u32,
+
+    /// only run tests containing this string in their name
+    #[argh(option)]
+    filter: Option<String>,
+
+    /// just collect tests, don't run them
+    #[argh(switch)]
+    dry_run: bool,
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 5)]
@@ -41,10 +48,30 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         Renderer::Lite
     };
 
-    let tests = inventory::iter::<testing::TestDeclaration>
+    let mut tests = inventory::iter::<testing::TestDeclaration>
         .into_iter()
         .collect::<Vec<_>>();
-    eprintln!("running {} tests", tests.len());
+
+    if let Some(filter) = args.filter {
+        let total_count = tests.len();
+        tests.retain(|test| test.name.contains(&filter));
+        eprintln!(
+            "running {}/{} tests matching filter '{}':",
+            tests.len(),
+            total_count,
+            filter
+        );
+    } else {
+        eprintln!("running {} tests:", tests.len());
+    }
+
+    for test in &tests {
+        eprintln!(" - {}", test.name);
+    }
+
+    if args.dry_run {
+        return Ok(());
+    }
 
     CargoCommand::Build
         .run(renderer)
@@ -53,7 +80,6 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
 
     for test in tests {
         eprintln!("running test {:?}", test.name);
-        // TODO run n in parallel
 
         let mut test_process = CargoCommand::Run { test: test.name }.run(renderer).await?;
         let result_fut = wait_on_process_ref(&mut test_process);
