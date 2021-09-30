@@ -54,7 +54,8 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
 
     if let Some(filter) = args.filter {
         let total_count = tests.len();
-        tests.retain(|test| test.name.contains(&filter));
+        let filter = filter.to_lowercase();
+        tests.retain(|test| test.name.to_lowercase().contains(&filter));
         eprintln!(
             "running {}/{} tests matching filter '{}':",
             tests.len(),
@@ -71,6 +72,10 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
 
     if args.dry_run {
         return Ok(());
+    }
+
+    if tests.is_empty() {
+        return Err("no tests".into());
     }
 
     CargoCommand::Build
