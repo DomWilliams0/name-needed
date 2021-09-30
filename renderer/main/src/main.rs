@@ -163,8 +163,17 @@ fn do_main() -> BoxedResult<()> {
         backend_state.end();
 
         match exit {
+            Exit::Stop | Exit::Restart if cfg!(feature = "testing") => {
+                break Err("test was aborted".into())
+            }
+
+            #[cfg(feature = "testing")]
+            Exit::TestSuccess => break Ok(()),
+
+            #[cfg(feature = "testing")]
+            Exit::TestFailure(err) => break Err(err.into()),
+
             Exit::Stop => break Ok(()),
-            Exit::Abort(err) => break Err(err.into()),
             Exit::Restart => continue,
         }
     };

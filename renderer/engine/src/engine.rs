@@ -113,11 +113,11 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     HookResult::KeepGoing => {}
                     HookResult::TestSuccess => {
                         info!("test finished successfully");
-                        return Some(Exit::Stop);
+                        return Some(Exit::TestSuccess);
                     }
                     HookResult::TestFailure(err) => {
                         error!("test failed: {}", err);
-                        return Some(Exit::Abort(err));
+                        return Some(Exit::TestFailure(err));
                     }
                 }
             }

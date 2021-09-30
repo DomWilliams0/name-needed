@@ -41,3 +41,4 @@
 * [X] enable activities to call each other directly
 * [X] replace outdated game preset with just a config file path argument, where config specifies world loader
 * [ ] bug: entities are not rendered on 1 particular linux laptop
+* [ ] haul activity status updates

@@ -7,10 +7,16 @@ use unit::world::WorldPosition;
 
 #[derive(Debug)]
 pub enum Exit {
+    /// Player requested
     Stop,
-    /// Used for test failures
-    Abort(String),
     Restart,
+
+    /// Test succeeded
+    #[cfg(feature = "testing")]
+    TestSuccess,
+    /// Test failed
+    #[cfg(feature = "testing")]
+    TestFailure(String),
 }
 
 pub trait InitializedSimulationBackend: Sized {
