@@ -145,6 +145,7 @@ pub fn register_tests() {
 
     dummy::register();
     equip_with_pickup::register();
+    haul::register();
 }
 
 impl HookResult {

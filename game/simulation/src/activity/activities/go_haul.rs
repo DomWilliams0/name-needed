@@ -313,13 +313,13 @@ impl Activity for HaulActivity {
                     _ => unexpected_event!(event),
                 }
             }
-            EntityEventPayload::Hauled(Ok(hauler)) if *hauler == ctx.subscriber => {
-                // this is the one thing we *wanted* to happen!
-                (
-                    EventUnblockResult::KeepBlocking,
-                    EventUnsubscribeResult::StaySubscribed,
-                )
-            }
+            // EntityEventPayload::Hauled(Ok(hauler)) if *hauler == ctx.subscriber => {
+            //     // this is the one thing we *wanted* to happen!
+            //     (
+            //         EventUnblockResult::KeepBlocking,
+            //         EventUnsubscribeResult::StaySubscribed,
+            //     )
+            // }
             EntityEventPayload::ExitedContainer(result) => {
                 if let HaulState::StartHauling = self.state {
                     if let Err(err) = result {

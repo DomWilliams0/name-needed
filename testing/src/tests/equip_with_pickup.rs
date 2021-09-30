@@ -135,6 +135,10 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
     }
 
     pub fn on_tick(&mut self, test: TestHelper, ctx: &HookContext) -> HookResult {
+        if !self.has_activity_succeeded(ctx) {
+            return HookResult::KeepGoing;
+        }
+
         let inv = ctx
             .simulation
             .ecs
@@ -180,6 +184,7 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
     }
 }
 
+// TODO move item creation into dev helpers
 impl InitialInventoryState for EmptyInventory {
     fn populate(_: &EquipWithPickup<Self>, _: &mut InventoryComponent, _: &HookContext) {
         // leave empty
@@ -191,7 +196,7 @@ impl InitialInventoryState for EmptyInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(ctx) && test.has_activity_succeeded(ctx) {
+        if test.has_pickup_event(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {
@@ -232,7 +237,7 @@ impl InitialInventoryState for AlreadyEquipped {
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
-        if test.has_equipped(inv) && test.has_activity_succeeded(ctx) {
+        if test.has_equipped(inv) {
             assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
@@ -275,7 +280,7 @@ impl InitialInventoryState for AlreadyInInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // no pickup event, just equip
-        if test.has_equipped(inv) && test.has_activity_succeeded(ctx) {
+        if test.has_equipped(inv) {
             assert!(!test.has_pickup_event(ctx));
             HookResult::TestSuccess
         } else {
@@ -323,7 +328,7 @@ impl InitialInventoryState for FullInventory {
         inv: &InventoryComponent,
     ) -> HookResult {
         // should have picked the item up
-        if test.has_pickup_event(ctx) && test.has_activity_succeeded(ctx) {
+        if test.has_pickup_event(ctx) {
             assert!(test.has_equipped(inv));
             HookResult::TestSuccess
         } else {

@@ -135,7 +135,7 @@ impl SubActivity for HaulSubActivity {
             let result = do_haul();
             world.post_event(EntityEvent {
                 subject: item,
-                payload: EntityEventPayload::Hauled(unreachable!()),
+                payload: unreachable!(),
             });
 
             Ok(())

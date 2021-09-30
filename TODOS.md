@@ -1,4 +1,4 @@
-# TODOs (381)
+# TODOs (383)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -520,3 +520,6 @@
    * `// TODO unix special case to get exit code on signal`
  * [testing/src/tests/equip_with_pickup.rs](testing/src/tests/equip_with_pickup.rs) (1)
    * `// TODO move item creation into dev helpers`
+ * [testing/src/tests/haul.rs](testing/src/tests/haul.rs) (2)
+   * `// TODO share between tests`
+   * `// TODO move this to a helper, mostly duplicated in equip tests`

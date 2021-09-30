@@ -37,3 +37,8 @@ impl<'a> System<'a> for InventoryValidationSystem {
         }
     }
 }
+
+/// Panics if any container/inventory components are invalid
+pub fn validate_all_inventories(world: &EcsWorld) {
+    InventoryValidationSystem.run_now(world);
+}

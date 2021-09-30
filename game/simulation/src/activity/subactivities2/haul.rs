@@ -25,8 +25,11 @@ pub enum HaulError {
     #[error("Item is not valid, haulable or physical")]
     BadItem,
 
-    #[error("Invalid container entity for haul target")]
-    BadContainer,
+    #[error("Invalid source container entity for haul")]
+    BadSourceContainer,
+
+    #[error("Invalid target container entity for haul")]
+    BadTargetContainer,
 
     #[error("Hauler doesn't have a transform")]
     BadHauler,
@@ -71,10 +74,12 @@ impl<'a> HaulSubactivity2<'a> {
         source: HaulTarget,
     ) -> Result<HaulSubactivity2<'a>, HaulError> {
         // check distance
-        match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
-            DistanceCheckResult::NotAvailable => return Err(HaulError::BadItem),
-            DistanceCheckResult::TooFar => return Err(HaulError::TooFar),
-            DistanceCheckResult::InRange => {}
+        if let HaulTarget::Position(_) = source {
+            match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
+                DistanceCheckResult::NotAvailable => return Err(HaulError::BadItem),
+                DistanceCheckResult::TooFar => return Err(HaulError::TooFar),
+                DistanceCheckResult::InRange => {}
+            }
         }
 
         // TODO statuses
@@ -117,12 +122,10 @@ impl<'a> HaulSubactivity2<'a> {
 
         // wait for event and ensure the haul succeeded
         ctx.subscribe_to_specific_until(thing, EntityEventType::Hauled, |evt| match evt {
-            EntityEventPayload::Hauled(result) => {
-                if let Ok(hauler) = result.as_ref() {
-                    if *hauler != ctx.entity() {
-                        // someone else picked it up
-                        return Err(EntityEventPayload::Hauled(result));
-                    }
+            EntityEventPayload::Hauled(hauler, result) => {
+                if hauler != ctx.entity() {
+                    // someone else picked it up
+                    return Err(EntityEventPayload::Hauled(hauler, result));
                 }
                 Ok(result)
             }
@@ -284,7 +287,7 @@ impl HaulTarget {
                 Self::position_of(world, item).ok_or(HaulError::BadItem)
             }
             HaulTarget::Container(container) => {
-                Self::position_of(world, *container).ok_or(HaulError::BadContainer)
+                Self::position_of(world, *container).ok_or(HaulError::BadSourceContainer)
             }
         }
     }
@@ -303,7 +306,7 @@ fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_enti
         let do_remove = || -> Result<Entity, HaulError> {
             let container = world
                 .component_mut::<ContainerComponent>(container_entity)
-                .map_err(|_| HaulError::BadContainer)?;
+                .map_err(|_| HaulError::BadSourceContainer)?;
 
             // remove from container
             container.container.remove(item)?;
@@ -328,7 +331,7 @@ fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_enti
 
 fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
     updates.queue("haul item", move |world| {
-        let do_haul = || -> Result<Entity, HaulError> {
+        let do_haul = || -> Result<(), HaulError> {
             // check item is alive first, to ensure .insert() succeeds below
             if !world.is_entity_alive(item) {
                 return Err(HaulError::BadItem);
@@ -388,13 +391,13 @@ fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
                 .helpers_comps()
                 .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
 
-            Ok(hauler)
+            Ok(())
         };
 
         let result = do_haul();
         world.post_event(EntityEvent {
             subject: item,
-            payload: EntityEventPayload::Hauled(result),
+            payload: EntityEventPayload::Hauled(hauler, result),
         });
 
         Ok(())
@@ -447,7 +450,7 @@ fn queue_put_into_container(
 
             let container = world
                 .component_mut::<ContainerComponent>(container_entity)
-                .map_err(|_| HaulError::BadContainer)?;
+                .map_err(|_| HaulError::BadTargetContainer)?;
 
             container
                 .container

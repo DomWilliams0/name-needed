@@ -42,7 +42,7 @@ pub enum EntityEventPayload {
     HasEquipped(Entity),
 
     /// Item entity (subject) has been picked up for hauling by the given hauler
-    Hauled(Result<Entity, HaulError>),
+    Hauled(Entity, Result<(), HaulError>),
 
     /// Item entity has been removed from the given container
     ExitedContainer(Result<Entity, HaulError>),
@@ -138,14 +138,14 @@ impl EntityEventPayload {
         match self {
             BeenPickedUp(_, Ok(_))
             | BeenEaten(Ok(_))
-            | Hauled(Ok(_))
+            | Hauled(_, Ok(_))
             | ExitedContainer(Ok(_))
             | EnteredContainer(Ok(_)) => true,
 
             Arrived(_, _)
             | BeenPickedUp(_, Err(_))
             | BeenEaten(Err(_))
-            | Hauled(Err(_))
+            | Hauled(_, Err(_))
             | ExitedContainer(Err(_))
             | EnteredContainer(Err(_))
             | HasPickedUp(_)
@@ -175,7 +175,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             | BeenPickedUp(_, _)
             | Arrived(_, _)
             | BeenEquipped(_)
-            | Hauled(_)
+            | Hauled(_, _)
             | ExitedContainer(_)
             | EnteredContainer(_) => Err(()),
             #[cfg(test)]

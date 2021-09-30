@@ -8,6 +8,7 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 // ---------- test modules
 pub mod dummy;
 pub mod equip_with_pickup;
+pub mod haul;
 // ---------- end test modules
 
 pub struct TestWrapper {

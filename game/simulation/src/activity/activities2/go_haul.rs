@@ -68,7 +68,7 @@ impl Activity2 for GoHaulActivity2 {
         let pos = self
             .target
             .target_position(ctx.world())
-            .ok_or(HaulError::BadContainer)?;
+            .ok_or(HaulError::BadTargetContainer)?;
 
         ctx.go_to(
             pos,

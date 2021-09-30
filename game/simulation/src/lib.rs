@@ -28,8 +28,8 @@ pub use crate::simulation::{
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{
-    ActivityComponent, ActivityComponent2, EntityLoggingComponent, LoggedEntityDecision,
-    LoggedEntityEvent,
+    ActivityComponent, ActivityComponent2, EntityLoggingComponent, HaulTarget,
+    LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
@@ -37,12 +37,13 @@ pub use event::{EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 pub use item::{
-    ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
-    InventoryComponent, ItemCondition, NameComponent,
+    validation::validate_all_inventories, ConditionComponent, ContainedInComponent, Container,
+    ContainerComponent, EdibleItemComponent, InventoryComponent, ItemCondition, NameComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
+pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
 pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{

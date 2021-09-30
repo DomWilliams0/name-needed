@@ -71,6 +71,26 @@ impl EcsExtDev<'_> {
             .add_to_container(food, ContainedInComponent::Container(bag));
     }
 
+    pub fn put_item_into_container(&mut self, item: Entity, container_entity: Entity) {
+        let container = self
+            .component_mut::<ContainerComponent>(container_entity)
+            .expect("bad container");
+
+        let physical = self
+            .component::<PhysicalComponent>(item)
+            .expect("item has no physical");
+
+        info!("putting {} into container {}", item, container_entity);
+
+        container
+            .container
+            .add_with(item, physical.volume, physical.size)
+            .expect("failed to add to container");
+
+        self.helpers_comps()
+            .add_to_container(item, ContainedInComponent::Container(container_entity));
+    }
+
     pub fn follow(&mut self, follower: Entity, followee: Entity) {
         let ai = self
             .component_mut::<AiComponent>(follower)
