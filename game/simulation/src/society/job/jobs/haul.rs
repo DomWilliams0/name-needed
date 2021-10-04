@@ -75,7 +75,10 @@ impl SocietyJobImpl for HaulJob {
             debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
 
             // ensure no more
-            assert!(completions.next().is_none(), "single completion expected");
+            assert!(
+                completions.next().is_none(),
+                "single completion expected for non-shareable haul"
+            );
 
             // end job regardless of success or failure
             // TODO depends on error type?

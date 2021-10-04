@@ -222,7 +222,8 @@ impl<T: ReservationTask> Reservations<T> {
         }
     }
 
-    /// Removes current reservation, not necessary if immediately followed by a new reservation
+    /// Removes current reservation, not necessary if immediately followed by a new reservation.
+    /// TODO cancelling a shared reservation might cancel it for everyone else too, oh no
     pub fn cancel(&mut self, reserver: Entity) {
         if let Some(current_idx) = self.reservations.iter().position(|(_, e)| *e == reserver) {
             let (prev, _) = self.reservations.swap_remove(current_idx);

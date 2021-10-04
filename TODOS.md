@@ -1,4 +1,4 @@
-# TODOs (383)
+# TODOs (385)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -177,12 +177,13 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivities2/go_to.rs](game/simulation/src/activity/subactivities2/go_to.rs) (1)
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
- * [game/simulation/src/activity/subactivities2/haul.rs](game/simulation/src/activity/subactivities2/haul.rs) (5)
+ * [game/simulation/src/activity/subactivities2/haul.rs](game/simulation/src/activity/subactivities2/haul.rs) (6)
    * `// TODO worldpoint`
    * `// TODO depends on item size`
-   * `// TODO statuses`
    * `// TODO don't always drop item in centre`
    * `// TODO explicit access side for container, e.g. front of chest`
+   * `// TODO depends on weight of item`
+   * `// TODO depends on weight of item`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
    * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
@@ -343,9 +344,10 @@
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
    * `// TODO depends on error type?`
    * `// TODO fail early if no space left in container`
- * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (2)
+ * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (3)
    * `#[derive(Debug)] // TODO implement manually`
    * `// TODO filter jobs for entity`
+   * `/// TODO cancelling a shared reservation might cancel it for everyone else too, oh no`
  * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (4)
    * `// TODO PlaceBlocks(block type, at position)`
    * `// TODO temporary box allocation is gross, use dynstack for dses`

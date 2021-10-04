@@ -2,6 +2,7 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::activity::activity2::{ActivityContext2, DistanceCheckResult};
+use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
@@ -66,6 +67,10 @@ pub enum HaulTarget {
 // TODO depends on item size
 const MAX_DISTANCE: f32 = 4.0;
 
+struct StartHaulingStatus(HaulTarget);
+
+struct StopHaulingStatus(Option<HaulTarget>);
+
 impl<'a> HaulSubactivity2<'a> {
     /// Checks if close enough to start hauling
     pub async fn start_hauling(
@@ -82,7 +87,8 @@ impl<'a> HaulSubactivity2<'a> {
             }
         }
 
-        // TODO statuses
+        ctx.update_status(StartHaulingStatus(source));
+
         // get item out of container if necessary
 
         // create instance now, so on drop/failure we can fix up the transform
@@ -157,6 +163,8 @@ impl<'a> HaulSubactivity2<'a> {
     /// async method after this to put in container
     fn end_haul_impl_sync(&self, target: Option<HaulTarget>) -> Result<(), HaulError> {
         let updates = self.ctx.world().resource();
+
+        self.ctx.update_status(StopHaulingStatus(target));
 
         // fix up components next tick infallibly
         queue_stop_hauling(updates, self.thing, self.ctx.entity(), !self.complete);
@@ -476,4 +484,36 @@ fn queue_put_into_container(
 
         Ok(())
     });
+}
+
+impl Status for StartHaulingStatus {
+    fn exertion(&self) -> f32 {
+        // TODO depends on weight of item
+        2.0
+    }
+}
+
+impl Display for StartHaulingStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            HaulTarget::Position(_) => f.write_str("Picking up item"),
+            HaulTarget::Container(_) => f.write_str("Taking item out of container"),
+        }
+    }
+}
+
+impl Display for StopHaulingStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            None | Some(HaulTarget::Position(_)) => f.write_str("Dropping item"),
+            Some(HaulTarget::Container(_)) => f.write_str("Putting item into container"),
+        }
+    }
+}
+
+impl Status for StopHaulingStatus {
+    fn exertion(&self) -> f32 {
+        // TODO depends on weight of item
+        2.0
+    }
 }
