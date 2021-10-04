@@ -9,11 +9,14 @@ use crate::activity::subactivity::GoingToStatus;
 use crate::WorldPosition;
 use world::SearchGoal;
 
-#[derive(Debug, Clone)]
+/// Breaking block at {block}
+#[derive(Debug, Clone, Display)]
 pub struct GoBreakBlockActivity {
     block: WorldPosition,
 }
 
+/// Breaking block
+#[derive(Display)]
 struct BreakBlockStatus;
 
 #[async_trait]
@@ -43,18 +46,6 @@ impl Activity for GoBreakBlockActivity {
 impl GoBreakBlockActivity {
     pub fn new(block: WorldPosition) -> Self {
         Self { block }
-    }
-}
-
-impl Display for GoBreakBlockActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Breaking block at {}", self.block)
-    }
-}
-
-impl Display for BreakBlockStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.write_str("Breaking block")
     }
 }
 

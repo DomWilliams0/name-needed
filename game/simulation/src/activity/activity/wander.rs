@@ -8,10 +8,11 @@ use crate::activity::subactivity::GoingToStatus;
 use crate::activity::Activity;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
-use crate::{ComponentWorld, QueuedUpdates, TransformComponent, WorldPosition};
+use crate::{ComponentWorld, TransformComponent, WorldPosition};
 use world::SearchGoal;
 
-#[derive(Debug, Default)]
+/// Wandering aimlessly
+#[derive(Debug, Default, Display)]
 pub struct WanderActivity;
 
 enum State {
@@ -74,12 +75,6 @@ fn find_target(ctx: &ActivityContext) -> Result<WorldPosition, WanderError> {
             20,
         )
         .ok_or(WanderError::Inaccessible)
-}
-
-impl Display for WanderActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Wandering aimlessly")
-    }
 }
 
 impl Display for State {

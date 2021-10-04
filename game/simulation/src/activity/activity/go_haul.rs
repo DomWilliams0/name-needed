@@ -18,7 +18,9 @@ use crate::event::{EntityEventSubscription, EventSubscription};
 // TODO support hauling multiple things to multiple locations (or via multiple activities?)
 // TODO haul target should hold pos+item radius, assigned once on creation
 
-#[derive(Debug, Clone)]
+// TODO format the other entity better e.g. get item name. or do this in the ui layer?
+/// Hauling {thing} to {target}
+#[derive(Debug, Clone, Display)]
 pub struct GoHaulActivity {
     thing: Entity,
     source: HaulTarget,
@@ -91,12 +93,5 @@ impl Activity for GoHaulActivity {
         } else {
             InterruptResult::Continue
         }
-    }
-}
-
-impl Display for GoHaulActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO format the other entity better e.g. get item name. or do this in the ui layer?
-        write!(f, "Hauling {} to {}", self.thing, self.target)
     }
 }

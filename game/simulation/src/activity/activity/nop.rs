@@ -6,7 +6,8 @@ use common::*;
 
 const NOP_WARN_THRESHOLD: u32 = 60;
 
-#[derive(Default, Debug)]
+/// Thinking
+#[derive(Default, Debug, Display)]
 pub struct NopActivity;
 
 #[async_trait]
@@ -24,11 +25,5 @@ impl Activity for NopActivity {
                 ctx.entity()
             );
         }
-    }
-}
-
-impl Display for NopActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Thinking")
     }
 }

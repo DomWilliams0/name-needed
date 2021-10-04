@@ -31,7 +31,7 @@
 * [~] avoid unconditional cloning of taskref during runtime polling
 * [X] ensure extra events in queue after unsubscripting/switching task are not a problem
 * [X] add safe !Send wrappers for component references that can't be held across awaits in activities
-* [ ] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
+* [~] consider pinninig the runtime too to avoid overhead of looking up resource in world/ref counting
 * [X] consider parking the task to implement timers (like events) to avoid overhead of manually triggered future allocation
 * [X] reuse status updater allocation when changing activities
 * [X] add exertion to activity status
@@ -42,4 +42,4 @@
 * [ ] bug: entities are not rendered on 1 particular linux laptop
 * [X] haul activity status updates
 * [ ] when entity is in a container, show that instead of "unknown" in ui for position
-* [ ] derive display for statuses instead of manually implementing
+* [X] derive display for statuses instead of manually implementing

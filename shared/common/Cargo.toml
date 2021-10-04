@@ -27,6 +27,7 @@ arrayvec = "0.6"
 boolinator = "2.4"
 parking_lot = "0.11"
 backtrace = "0.3"
+displaydoc = "0.2"
 
 # TODO feature for cgmath
 [features]

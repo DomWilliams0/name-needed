@@ -8,7 +8,8 @@ use async_trait::async_trait;
 use common::*;
 use std::fmt::Formatter;
 
-#[derive(Debug, Clone)]
+/// Eating {0}
+#[derive(Debug, Clone, Display)]
 pub struct EatHeldItemActivity(Entity);
 
 enum State {
@@ -60,12 +61,6 @@ impl Activity for EatHeldItemActivity {
 impl EatHeldItemActivity {
     pub fn new(item: Entity) -> Self {
         Self(item)
-    }
-}
-
-impl Display for EatHeldItemActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Eating {}", self.0)
     }
 }
 

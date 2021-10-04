@@ -13,7 +13,8 @@ use std::fmt::Formatter;
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
-#[derive(Debug, Clone)]
+/// Following {target}
+#[derive(Debug, Clone, Display)]
 pub struct FollowActivity {
     target: Entity,
     radius: u8,
@@ -94,12 +95,6 @@ impl FollowActivity {
             Some((me, you)) => Ok((me.position.distance2(you.position), you.position)),
             None => Err(FollowError::MissingTransform),
         }
-    }
-}
-
-impl Display for FollowActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Following {}", self.target)
     }
 }
 

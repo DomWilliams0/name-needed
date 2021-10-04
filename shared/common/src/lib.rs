@@ -7,6 +7,7 @@ pub use cgmath::{
     VectorSpace, Zero,
 };
 pub use derive_more;
+pub use displaydoc::Display;
 pub use dynslot::DynSlot;
 pub use float_cmp::ApproxEq;
 pub use itertools::*;

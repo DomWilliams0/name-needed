@@ -112,10 +112,10 @@
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
+   * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
    * `// TODO destructive events on items should include moving/falling`
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
-   * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (3)

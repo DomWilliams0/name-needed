@@ -8,13 +8,16 @@ use crate::activity::Activity;
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
-#[derive(Debug, Clone)]
+/// Going to {target}
+#[derive(Debug, Clone, Display)]
 pub struct GoToActivity {
     target: WorldPoint,
     speed: NormalizedFloat,
     goal: SearchGoal,
 }
 
+/// Going to {0}
+#[derive(Display)]
 struct GoingToDescription(WorldPoint);
 
 #[async_trait]
@@ -37,17 +40,5 @@ impl GoToActivity {
             speed,
             goal,
         }
-    }
-}
-
-impl Display for GoToActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Going to {}", self.target)
-    }
-}
-
-impl Display for GoingToDescription {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Going to {}", self.0)
     }
 }

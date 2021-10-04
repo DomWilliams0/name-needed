@@ -11,7 +11,8 @@ use common::*;
 use unit::world::WorldPoint;
 use world::SearchGoal;
 
-#[derive(Debug, Clone)]
+/// Picking up {0}
+#[derive(Debug, Clone, Display)]
 pub struct GoEquipActivity(Entity);
 
 #[derive(Debug, Error)]
@@ -23,6 +24,8 @@ pub enum EquipError {
     NotHaulable(#[source] ComponentGetError),
 }
 
+/// Equipping
+#[derive(Display)]
 struct EquippingState;
 
 #[async_trait]
@@ -88,18 +91,6 @@ impl GoEquipActivity {
             .map_err(EquipError::MissingTransform)?;
 
         Ok(transform.position)
-    }
-}
-
-impl Display for GoEquipActivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Picking up {}", self.0)
-    }
-}
-
-impl Display for EquippingState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Equipping")
     }
 }
 
