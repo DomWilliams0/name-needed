@@ -1,12 +1,11 @@
 use common::newtype::AccumulativeInt;
 use common::*;
 
-use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
 use crate::simulation::EcsWorldRef;
-use crate::{ActivityComponent2, ConditionComponent};
+use crate::{ActivityComponent, ConditionComponent};
 
 // TODO newtype for Fuel
 pub type Fuel = u16;
@@ -50,7 +49,7 @@ pub struct EatingSystem;
 impl<'a> System<'a> for HungerSystem {
     type SystemData = (
         WriteStorage<'a, HungerComponent>,
-        ReadStorage<'a, ActivityComponent2>, // for current exertion TODO moving average
+        ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average
     );
 
     fn run(&mut self, (mut hunger, activity): Self::SystemData) {

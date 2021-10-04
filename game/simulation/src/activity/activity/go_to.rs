@@ -2,14 +2,14 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::{Activity2, ActivityResult};
-use crate::activity::subactivities2::GoingToStatus;
+use crate::activity::subactivity::GoingToStatus;
 use unit::world::WorldPoint;
 use world::SearchGoal;
+use crate::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
-pub struct GoToActivity2 {
+pub struct GoToActivity {
     target: WorldPoint,
     speed: NormalizedFloat,
     goal: SearchGoal,
@@ -18,19 +18,19 @@ pub struct GoToActivity2 {
 struct GoingToDescription(WorldPoint);
 
 #[async_trait]
-impl Activity2 for GoToActivity2 {
+impl Activity for GoToActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(GoingToDescription(self.target))
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         ctx.go_to(self.target, self.speed, self.goal, GoingToStatus::default())
             .await?;
         Ok(())
     }
 }
 
-impl GoToActivity2 {
+impl GoToActivity {
     pub fn new(target: WorldPoint, speed: NormalizedFloat, goal: SearchGoal) -> Self {
         Self {
             target,
@@ -40,7 +40,7 @@ impl GoToActivity2 {
     }
 }
 
-impl Display for GoToActivity2 {
+impl Display for GoToActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Going to {}", self.target)
     }

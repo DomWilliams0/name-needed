@@ -6,7 +6,7 @@ use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
 use simulation::{
-    ActivityComponent2, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
+    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
     ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
     InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
@@ -243,7 +243,7 @@ impl SelectionWindow {
         }
 
         // activity
-        if let Some(activity) = details.component::<ActivityComponent2>(context) {
+        if let Some(activity) = details.component::<ActivityComponent>(context) {
             let tab = context.new_tab(im_str!("Activity"));
             if tab.is_open() {
                 self.do_activity(context, activity);
@@ -363,7 +363,7 @@ impl SelectionWindow {
         }
     }
 
-    fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent2) {
+    fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent) {
         if let Some((activity, status)) = activity.status() {
             context.key_value(
                 im_str!("Activity:"),

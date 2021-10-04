@@ -1,4 +1,3 @@
-use crate::activity::activity2::{ActivityContext2, DistanceCheckResult};
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{
@@ -9,12 +8,13 @@ use crate::queued_update::QueuedUpdates;
 
 use crate::{ComponentWorld, Entity, InventoryComponent, PhysicalComponent, TransformComponent};
 use common::*;
+use crate::activity::context::{ActivityContext, DistanceCheckResult};
 
 /// Pick up item off the ground, checks if close enough first
 pub struct PickupSubactivity;
 
 /// Equip item that's already in inventory
-pub struct EquipSubActivity2;
+pub struct EquipSubActivity;
 
 const MAX_DISTANCE: f32 = 4.0;
 
@@ -47,7 +47,7 @@ impl PickupSubactivity {
     /// Checks if close enough to pick up
     pub async fn pick_up(
         &self,
-        ctx: &ActivityContext2,
+        ctx: &ActivityContext,
         item: Entity,
     ) -> Result<(), EquipItemError> {
         // ensure close enough
@@ -78,10 +78,10 @@ impl PickupSubactivity {
     }
 }
 
-impl EquipSubActivity2 {
+impl EquipSubActivity {
     pub async fn equip(
         &self,
-        ctx: &ActivityContext2,
+        ctx: &ActivityContext,
         item: Entity,
         extra_hands: u16,
     ) -> Result<(), EquipItemError> {

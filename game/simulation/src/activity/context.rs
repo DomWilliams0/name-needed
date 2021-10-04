@@ -1,17 +1,14 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use async_trait::async_trait;
-
 use common::*;
 
-use crate::activity::activity2::EventResult::{Consumed, Unconsumed};
 use crate::activity::status::Status;
-use crate::activity::subactivities2::{
-    BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity2, EquipSubActivity2,
-    GoToSubactivity, GoingToStatus, GotoError, HaulSubactivity2, PickupSubactivity,
+use crate::activity::subactivity::{
+    BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity, EquipSubActivity,
+    GoToSubactivity, GoingToStatus, GotoError, HaulSubactivity, PickupSubactivity,
 };
-use crate::activity::{EquipItemError, HaulError, HaulTarget, StatusUpdater};
+use crate::activity::{Activity, EquipItemError, HaulError, HaulTarget, StatusUpdater};
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::event::{EntityEventQueue, RuntimeTimers};
@@ -24,6 +21,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use unit::world::WorldPoint;
 use world::SearchGoal;
+use crate::activity::context::EventResult::{Consumed, Unconsumed};
 
 pub type ActivityResult = Result<(), Box<dyn Error>>;
 
@@ -32,24 +30,22 @@ pub enum InterruptResult {
     Cancel,
 }
 
-#[async_trait]
-pub trait Activity2: Debug {
-    fn description(&self) -> Box<dyn Display>;
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult;
-
-    fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
-        InterruptResult::Continue
-    }
+#[macro_export]
+macro_rules! unexpected_event2 {
+    ($event:expr) => {{
+        trace!("ignoring unexpected event"; "event" => ?$event);
+        $crate::activity::activity::EventResult::Unconsumed($event)
+    }};
 }
 
 #[derive(Clone)]
-pub struct ActivityContext2 {
+pub struct ActivityContext {
     entity: Entity,
     // TODO ensure component refs cant be held across awaits
     world: Pin<&'static EcsWorld>,
     task: TaskRef,
     status: StatusUpdater,
-    activity: Rc<dyn Activity2>,
+    activity: Rc<dyn Activity>,
 }
 
 pub enum EventResult {
@@ -72,16 +68,16 @@ pub enum DistanceCheckResult {
 }
 
 // only used on the main thread
-unsafe impl Sync for ActivityContext2 {}
-unsafe impl Send for ActivityContext2 {}
+unsafe impl Sync for ActivityContext {}
+unsafe impl Send for ActivityContext {}
 
-impl ActivityContext2 {
+impl ActivityContext {
     pub fn new(
         entity: Entity,
         world: Pin<&'static EcsWorld>,
         task: TaskRef,
         status: StatusUpdater,
-        activity: Rc<dyn Activity2>,
+        activity: Rc<dyn Activity>,
     ) -> Self {
         Self {
             entity,
@@ -139,12 +135,12 @@ impl ActivityContext2 {
 
     /// Equip item that's already in inventory
     pub async fn equip(&self, item: Entity, extra_hands: u16) -> Result<(), EquipItemError> {
-        EquipSubActivity2.equip(self, item, extra_hands).await
+        EquipSubActivity.equip(self, item, extra_hands).await
     }
 
     /// Item should already be equipped
     pub async fn eat(&self, item: Entity) -> Result<(), EatItemError> {
-        EatItemSubactivity2.eat(self, item).await
+        EatItemSubactivity.eat(self, item).await
     }
 
     /// Picks up thing for hauling, checks if close enough first
@@ -152,8 +148,8 @@ impl ActivityContext2 {
         &self,
         thing: Entity,
         source: HaulTarget,
-    ) -> Result<HaulSubactivity2<'_>, HaulError> {
-        HaulSubactivity2::start_hauling(self, thing, source).await
+    ) -> Result<HaulSubactivity<'_>, HaulError> {
+        HaulSubactivity::start_hauling(self, thing, source).await
     }
 
     pub fn check_entity_distance(&self, entity: Entity, max_dist_2: f32) -> DistanceCheckResult {

@@ -5,7 +5,7 @@ use crate::ai::consideration::{
     HungerConsideration,
 };
 use crate::ai::{AiAction, AiContext};
-use crate::item::{ItemFilter, ItemsToPickUp};
+use crate::item::ItemFilter;
 use common::*;
 
 /// Equips food in inventory and eats it

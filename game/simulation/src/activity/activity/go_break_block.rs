@@ -2,27 +2,27 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::{Activity2, ActivityResult};
-use crate::activity::status::{NopStatus, Status};
-use crate::activity::subactivities2::GoingToStatus;
+use crate::activity::activity::{Activity,};
+use crate::activity::status::Status;
+use crate::activity::subactivity::GoingToStatus;
 use crate::WorldPosition;
 use world::SearchGoal;
+use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
-pub struct GoBreakBlockActivity2 {
+pub struct GoBreakBlockActivity {
     block: WorldPosition,
 }
 
 struct BreakBlockStatus;
 
 #[async_trait]
-impl Activity2 for GoBreakBlockActivity2 {
+impl Activity for GoBreakBlockActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(self.clone())
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         // walk to the block
         ctx.go_to(
             self.block.centred(),
@@ -40,13 +40,13 @@ impl Activity2 for GoBreakBlockActivity2 {
     }
 }
 
-impl GoBreakBlockActivity2 {
+impl GoBreakBlockActivity {
     pub fn new(block: WorldPosition) -> Self {
         Self { block }
     }
 }
 
-impl Display for GoBreakBlockActivity2 {
+impl Display for GoBreakBlockActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Breaking block at {}", self.block)
     }

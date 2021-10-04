@@ -1,6 +1,3 @@
-use crate::activity::{
-    ActivityComponent2, BlockingActivityComponent, EventUnblockResult, EventUnsubscribeResult,
-};
 use crate::ecs::*;
 use crate::event::{EntityEventPayload, EntityEventQueue, RuntimeTimers};
 use crate::runtime::Runtime;
@@ -16,7 +13,7 @@ impl<'a> System<'a> for RuntimeSystem {
         Write<'a, RuntimeTimers>,
         Read<'a, Runtime>,
         WriteStorage<'a, EntityLoggingComponent>,
-        WriteStorage<'a, ActivityComponent2>,
+        WriteStorage<'a, ActivityComponent>,
     );
 
     fn run(

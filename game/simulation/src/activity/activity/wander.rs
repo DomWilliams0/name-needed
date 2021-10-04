@@ -2,17 +2,17 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::{Activity2, ActivityResult};
 use crate::activity::status::Status;
-use crate::activity::subactivities2::GoingToStatus;
+use crate::activity::subactivity::GoingToStatus;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, TransformComponent, WorldPosition};
 use world::SearchGoal;
+use crate::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Default)]
-pub struct WanderActivity2;
+pub struct WanderActivity;
 
 enum State {
     Wander,
@@ -31,15 +31,15 @@ pub enum WanderError {
 const WANDER_RADIUS: u16 = 10;
 
 #[async_trait]
-impl Activity2 for WanderActivity2 {
+impl Activity for WanderActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(Self)
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         loop {
             // wander to a new target
-            let tgt = find_target(&ctx)?;
+            let tgt = find_target(ctx)?;
             trace!("wandering to {:?}", tgt);
             ctx.go_to(
                 tgt.centred(),
@@ -57,7 +57,7 @@ impl Activity2 for WanderActivity2 {
     }
 }
 
-fn find_target(ctx: &ActivityContext2) -> Result<WorldPosition, WanderError> {
+fn find_target(ctx: &ActivityContext) -> Result<WorldPosition, WanderError> {
     // TODO special SearchGoal for wandering instead of randomly choosing an accessible target
     let transform = ctx
         .world()
@@ -76,7 +76,7 @@ fn find_target(ctx: &ActivityContext2) -> Result<WorldPosition, WanderError> {
         .ok_or(WanderError::Inaccessible)
 }
 
-impl Display for WanderActivity2 {
+impl Display for WanderActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Wandering aimlessly")
     }

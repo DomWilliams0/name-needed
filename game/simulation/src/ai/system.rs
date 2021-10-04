@@ -4,7 +4,7 @@ use std::iter::once;
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
 
-use crate::activity::{ActivityComponent, ActivityComponent2};
+use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
@@ -93,7 +93,7 @@ impl<'a> System<'a> for AiSystem {
         ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
         WriteStorage<'a, AiComponent>,
-        WriteStorage<'a, ActivityComponent2>,
+        WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, SocietyComponent>,       // optional
         WriteStorage<'a, EntityLoggingComponent>, // optional
     );
@@ -301,7 +301,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         let ai = AiComponent::with_species(&self.species);
-        builder.with(ai).with(ActivityComponent2::default())
+        builder.with(ai).with(ActivityComponent::default())
     }
 }
 

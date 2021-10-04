@@ -378,7 +378,7 @@ mod tests {
 
     use common::bumpalo::core_alloc::sync::Arc;
 
-    use crate::runtime::futures::ManualFuture;
+    use crate::runtime::futures::manual::ManualFuture;
 
     use super::*;
 

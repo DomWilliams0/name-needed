@@ -1,22 +1,22 @@
 use async_trait::async_trait;
 
 use common::*;
+use crate::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult};
 
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::{Activity2, ActivityResult};
 
 const NOP_WARN_THRESHOLD: u32 = 60;
 
 #[derive(Default, Debug)]
-pub struct NopActivity2;
+pub struct NopActivity;
 
 #[async_trait]
-impl Activity2 for NopActivity2 {
+impl Activity for NopActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(Self)
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         loop {
             ctx.wait(NOP_WARN_THRESHOLD).await;
 
@@ -28,7 +28,7 @@ impl Activity2 for NopActivity2 {
     }
 }
 
-impl Display for NopActivity2 {
+impl Display for NopActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Thinking")
     }

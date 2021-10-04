@@ -1,7 +1,6 @@
 use common::*;
 use unit::world::WorldPoint;
 
-use crate::activity::activity2::{ActivityContext2, DistanceCheckResult};
 use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::prelude::*;
@@ -11,6 +10,7 @@ use crate::{
     ComponentWorld, ContainedInComponent, ContainerComponent, EntityEvent, EntityEventPayload,
     InventoryComponent, PhysicalComponent, TransformComponent, WorldPosition,
 };
+use crate::activity::context::{ActivityContext, DistanceCheckResult};
 
 #[derive(Debug, Error, Clone)]
 pub enum HaulError {
@@ -47,8 +47,8 @@ pub enum HaulError {
 
 /// Handles the start (picking up) and finish (putting down), and fixing up components on abort
 #[must_use]
-pub struct HaulSubactivity2<'a> {
-    ctx: &'a ActivityContext2,
+pub struct HaulSubactivity<'a> {
+    ctx: &'a ActivityContext,
     thing: Entity,
     complete: bool,
     needs_transform: bool,
@@ -71,13 +71,13 @@ struct StartHaulingStatus(HaulTarget);
 
 struct StopHaulingStatus(Option<HaulTarget>);
 
-impl<'a> HaulSubactivity2<'a> {
+impl<'a> HaulSubactivity<'a> {
     /// Checks if close enough to start hauling
     pub async fn start_hauling(
-        ctx: &'a ActivityContext2,
+        ctx: &'a ActivityContext,
         thing: Entity,
         source: HaulTarget,
-    ) -> Result<HaulSubactivity2<'a>, HaulError> {
+    ) -> Result<HaulSubactivity<'a>, HaulError> {
         // check distance
         if let HaulTarget::Position(_) = source {
             match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
@@ -92,7 +92,7 @@ impl<'a> HaulSubactivity2<'a> {
         // get item out of container if necessary
 
         // create instance now, so on drop/failure we can fix up the transform
-        let mut subactivity = HaulSubactivity2 {
+        let mut subactivity = HaulSubactivity {
             ctx,
             thing,
             complete: false,
@@ -246,7 +246,7 @@ impl<'a> HaulSubactivity2<'a> {
     }
 }
 
-impl<'a> Drop for HaulSubactivity2<'a> {
+impl<'a> Drop for HaulSubactivity<'a> {
     fn drop(&mut self) {
         if !self.complete {
             if let Err(err) = self.end_haul_impl_sync(None) {

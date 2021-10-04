@@ -4,28 +4,28 @@ use common::*;
 
 use world::SearchGoal;
 
-use crate::activity::activity2::{Activity2, ActivityResult};
-use crate::activity::activity2::{ActivityContext2, InterruptResult};
+use crate::activity::activity::{Activity,};
 
-use crate::activity::subactivities2::{GoingToStatus, HaulError};
+use crate::activity::subactivity::{GoingToStatus, HaulError};
 use crate::activity::HaulTarget;
 
 use crate::event::{EntityEventSubscription, EventSubscription};
 
-use crate::{Entity, EntityEvent, EntityEventPayload, TransformComponent, WorldPosition};
+use crate::{Entity, EntityEvent};
+use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
 // TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available
 // TODO support hauling multiple things to multiple locations (or via multiple activities?)
 // TODO haul target should hold pos+item radius, assigned once on creation
 
 #[derive(Debug, Clone)]
-pub struct GoHaulActivity2 {
+pub struct GoHaulActivity {
     thing: Entity,
     source: HaulTarget,
     target: HaulTarget,
 }
 
-impl GoHaulActivity2 {
+impl GoHaulActivity {
     pub fn new(entity: Entity, source: HaulTarget, target: HaulTarget) -> Self {
         Self {
             thing: entity,
@@ -36,12 +36,12 @@ impl GoHaulActivity2 {
 }
 
 #[async_trait]
-impl Activity2 for GoHaulActivity2 {
+impl Activity for GoHaulActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(self.clone())
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         // cancel if any destructive event happens to the hauled thing
         // TODO destructive events on items should include moving/falling
         // TODO destructive events on the container? society job handles this but not always the source
@@ -94,7 +94,7 @@ impl Activity2 for GoHaulActivity2 {
     }
 }
 
-impl Display for GoHaulActivity2 {
+impl Display for GoHaulActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // TODO format the other entity better e.g. get item name. or do this in the ui layer?
         write!(f, "Hauling {} to {}", self.thing, self.target)

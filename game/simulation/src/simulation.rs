@@ -8,7 +8,7 @@ use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
-use crate::activity::{ActivityEventSystem, ActivitySystem, ActivitySystem2};
+use crate::activity::ActivitySystem;
 use crate::ai::{AiAction, AiComponent, AiSystem};
 
 use crate::ecs::*;
@@ -190,7 +190,7 @@ impl<R: Renderer> Simulation<R> {
 
         // choose and tick activity
         AiSystem.run_now(&self.ecs_world);
-        ActivitySystem2(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
+        ActivitySystem(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
         self.ecs_world.resource::<Runtime>().tick();
 
         // follow paths with steering

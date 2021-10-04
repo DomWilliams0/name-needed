@@ -1,19 +1,20 @@
-use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult, InterruptResult};
+use crate::activity::activity::{Activity};
 use crate::activity::status::Status;
-use crate::activity::subactivities2::GoingToStatus;
+use crate::activity::subactivity::GoingToStatus;
 use crate::ecs::*;
-use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
-use crate::{EdibleItemComponent, Entity, TransformComponent};
+
+use crate::{Entity, TransformComponent};
 use async_trait::async_trait;
 use common::*;
 use futures::future::Either;
-use futures::{pin_mut, select, FutureExt};
+use futures::pin_mut;
 use std::fmt::Formatter;
 use unit::world::WorldPoint;
 use world::SearchGoal;
+use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
-pub struct FollowActivity2 {
+pub struct FollowActivity {
     target: Entity,
     radius: u8,
 }
@@ -30,12 +31,12 @@ pub enum FollowError {
 }
 
 #[async_trait]
-impl Activity2 for FollowActivity2 {
+impl Activity for FollowActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(self.clone())
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         let mut loitering = false;
         loop {
             let (distance2, target_pos) = self.distance(ctx)?;
@@ -80,12 +81,12 @@ impl Activity2 for FollowActivity2 {
     }
 }
 
-impl FollowActivity2 {
+impl FollowActivity {
     pub fn new(target: Entity, radius: u8) -> Self {
         Self { target, radius }
     }
 
-    fn distance(&self, ctx: &ActivityContext2) -> Result<(f32, WorldPoint), FollowError> {
+    fn distance(&self, ctx: &ActivityContext) -> Result<(f32, WorldPoint), FollowError> {
         let me = ctx.world().component::<TransformComponent>(ctx.entity());
         let you = ctx.world().component::<TransformComponent>(self.target);
 
@@ -96,7 +97,7 @@ impl FollowActivity2 {
     }
 }
 
-impl Display for FollowActivity2 {
+impl Display for FollowActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Following {}", self.target)
     }

@@ -1,13 +1,11 @@
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::EventUnsubscribeResult;
 use crate::ecs::ComponentGetError;
-use crate::event::prelude::*;
+
 use crate::queued_update::QueuedUpdates;
-use crate::{unexpected_event2, TransformComponent, WorldPosition};
-use crate::{ComponentWorld, FollowPathComponent};
+use crate::ComponentWorld;
+use crate::{TransformComponent, WorldPosition};
 use common::*;
 use unit::world::WorldPoint;
-use world::{NavigationError, SearchGoal};
+use crate::activity::context::ActivityContext;
 
 #[derive(Debug, Error)]
 pub enum BreakBlockError {
@@ -27,7 +25,7 @@ pub struct BreakBlockSubactivity;
 impl BreakBlockSubactivity {
     pub async fn break_block(
         &self,
-        ctx: &ActivityContext2,
+        ctx: &ActivityContext,
         block: WorldPosition,
     ) -> Result<(), BreakBlockError> {
         // check we are close enough to break it

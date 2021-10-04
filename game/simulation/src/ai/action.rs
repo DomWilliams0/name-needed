@@ -4,7 +4,6 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
-use crate::item::ItemsToPickUp;
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -18,11 +17,6 @@ pub enum AiAction {
 
     /// Navigate to the given target
     Goto(WorldPoint),
-
-    /// Go pickup the (1) best item.
-    /// TODO reduce cost of cloning vec of items
-    #[deprecated]
-    GoPickUp(ItemsToPickUp),
 
     /// Go and pickup the given item
     GoEquip(Entity),
@@ -57,7 +51,6 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
             AiAction::Nop => return Err(()),
             AiAction::Wander => Wander,
             AiAction::Goto(target) => Goto(*target),
-            AiAction::GoPickUp(ItemsToPickUp(wat, _, _)) => unreachable!(),
             AiAction::GoEquip(item) => GoEquip(*item),
             AiAction::EatHeldItem(item) => EatHeldItem(*item),
             AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),

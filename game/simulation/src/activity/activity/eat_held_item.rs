@@ -1,4 +1,4 @@
-use crate::activity::activity2::{Activity2, ActivityContext2, ActivityResult, InterruptResult};
+use crate::activity::activity::{Activity};
 use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::EntityEvent;
@@ -6,9 +6,10 @@ use crate::{EdibleItemComponent, Entity};
 use async_trait::async_trait;
 use common::*;
 use std::fmt::Formatter;
+use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
 #[derive(Debug, Clone)]
-pub struct EatHeldItemActivity2(Entity);
+pub struct EatHeldItemActivity(Entity);
 
 enum State {
     Equipping,
@@ -22,12 +23,12 @@ pub enum EatHeldItemError {
 }
 
 #[async_trait]
-impl Activity2 for EatHeldItemActivity2 {
+impl Activity for EatHeldItemActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(self.clone())
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         // ensure enough hands are free for eating
         let extra_hands = match ctx.world().component::<EdibleItemComponent>(self.0) {
             Ok(comp) => comp.extra_hands,
@@ -56,13 +57,13 @@ impl Activity2 for EatHeldItemActivity2 {
     }
 }
 
-impl EatHeldItemActivity2 {
+impl EatHeldItemActivity {
     pub fn new(item: Entity) -> Self {
         Self(item)
     }
 }
 
-impl Display for EatHeldItemActivity2 {
+impl Display for EatHeldItemActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Eating {}", self.0)
     }

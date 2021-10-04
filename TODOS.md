@@ -1,4 +1,4 @@
-# TODOs (382)
+# TODOs (347)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -103,40 +103,12 @@
  * [game/resources/src/container.rs](game/resources/src/container.rs) (2)
    * `// TODO depends on feature gate`
    * `// TODO add feature gate info e.g. from disk, from archive`
- * [game/simulation/src/activity/activities/eat_held_item.rs](game/simulation/src/activity/activities/eat_held_item.rs) (1)
-   * `// TODO sanity check equipper is this entity`
- * [game/simulation/src/activity/activities/follow.rs](game/simulation/src/activity/activities/follow.rs) (1)
-   * `// TODO will probably need porting to a follow subactivity`
- * [game/simulation/src/activity/activities/go_break_block.rs](game/simulation/src/activity/activities/go_break_block.rs) (4)
-   * `// TODO block breaking/world interacting should be done in a system`
-   * `// TODO get current held tool to determine how fast the block can be broken`
-   * `// TODO breaking blocks with your hand hurts!`
-   * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/activities/go_haul.rs](game/simulation/src/activity/activities/go_haul.rs) (9)
-   * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
-   * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
-   * `// TODO haul target should hold pos+item radius, assigned once on creation`
-   * `// TODO arrival radius depends on the size of the item`
-   * `// TODO destructive events on items should include moving`
-   * `// TODO this should be in the/a subactivity`
-   * `// TODO don't always drop item in centre`
-   * `// TODO explicit access side for container, e.g. front of chest`
-   * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
- * [game/simulation/src/activity/activities/go_pickup.rs](game/simulation/src/activity/activities/go_pickup.rs) (2)
-   * `// TODO detect other destructive events e.g. entity removal`
-   * `// TODO other destructive events happening to the item`
- * [game/simulation/src/activity/activities/go_to.rs](game/simulation/src/activity/activities/go_to.rs) (1)
-   * `// TODO reason specification should be type level and used everywhere. ties into localization`
- * [game/simulation/src/activity/activities/mod.rs](game/simulation/src/activity/activities/mod.rs) (1)
-   * `// TODO helpers for GoToThen, EquipItemThen, etc`
- * [game/simulation/src/activity/activities/wander.rs](game/simulation/src/activity/activities/wander.rs) (1)
-   * `// TODO add additional DSEs while wandering and loitering e.g. whistling, waving, humming`
- * [game/simulation/src/activity/activities2/eat_held_item.rs](game/simulation/src/activity/activities2/eat_held_item.rs) (1)
+ * [game/simulation/src/activity/activity/eat_held_item.rs](game/simulation/src/activity/activity/eat_held_item.rs) (1)
    * `// TODO varying exertion per food`
- * [game/simulation/src/activity/activities2/follow.rs](game/simulation/src/activity/activities2/follow.rs) (2)
+ * [game/simulation/src/activity/activity/follow.rs](game/simulation/src/activity/activity/follow.rs) (2)
    * `// TODO this can generate path requests that are immediately complete, leading to a lot of path spam`
    * `// TODO specify follow speed in activity too`
- * [game/simulation/src/activity/activities2/go_haul.rs](game/simulation/src/activity/activities2/go_haul.rs) (7)
+ * [game/simulation/src/activity/activity/go_haul.rs](game/simulation/src/activity/activity/go_haul.rs) (7)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
    * `// TODO haul target should hold pos+item radius, assigned once on creation`
@@ -144,40 +116,22 @@
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
    * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
- * [game/simulation/src/activity/activities2/wander.rs](game/simulation/src/activity/activities2/wander.rs) (1)
+ * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/activity2.rs](game/simulation/src/activity/activity2.rs) (4)
+ * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (4)
    * `// TODO ensure component refs cant be held across awaits`
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
    * `// TODO event queue needs to be cleared of events after unsubscribing? or just consume them and ignore them?`
- * [game/simulation/src/activity/mod.rs](game/simulation/src/activity/mod.rs) (1)
-   * `// TODO move subactivity errors somewhere else`
- * [game/simulation/src/activity/subactivities/go_to.rs](game/simulation/src/activity/subactivities/go_to.rs) (3)
-   * `// TODO helper on ctx to get component`
-   * `// TODO better exertion calculation for movement speed`
-   * `// TODO use movement speed enum for display e.g. wandering to, running to`
- * [game/simulation/src/activity/subactivities/haul.rs](game/simulation/src/activity/subactivities/haul.rs) (4)
-   * `// TODO apply slowness effect to holder`
-   * `// TODO subscribe to container being destroyed`
-   * `// TODO remove slowness effect if any`
-   * `// TODO depends on the weight of the item(s)`
- * [game/simulation/src/activity/subactivities/item_eat.rs](game/simulation/src/activity/subactivities/item_eat.rs) (1)
-   * `// TODO varying exertion per food`
- * [game/simulation/src/activity/subactivities/item_equip.rs](game/simulation/src/activity/subactivities/item_equip.rs) (1)
-   * `// TODO inventory operations should not be immediate`
- * [game/simulation/src/activity/subactivities/pickup.rs](game/simulation/src/activity/subactivities/pickup.rs) (2)
-   * `let mut shifted_items = Vec::new(); // TODO smallvec`
-   * `// TODO exertion of picking up item depends on item weight`
- * [game/simulation/src/activity/subactivities2/break_block.rs](game/simulation/src/activity/subactivities2/break_block.rs) (3)
+ * [game/simulation/src/activity/subactivity/break_block.rs](game/simulation/src/activity/subactivity/break_block.rs) (3)
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`
    * `// TODO define proper scale/enum/consts for block and tool durability`
- * [game/simulation/src/activity/subactivities2/equip.rs](game/simulation/src/activity/subactivities2/equip.rs) (1)
+ * [game/simulation/src/activity/subactivity/equip.rs](game/simulation/src/activity/subactivity/equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
- * [game/simulation/src/activity/subactivities2/go_to.rs](game/simulation/src/activity/subactivities2/go_to.rs) (1)
+ * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (1)
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
- * [game/simulation/src/activity/subactivities2/haul.rs](game/simulation/src/activity/subactivities2/haul.rs) (6)
+ * [game/simulation/src/activity/subactivity/haul.rs](game/simulation/src/activity/subactivity/haul.rs) (6)
    * `// TODO worldpoint`
    * `// TODO depends on item size`
    * `// TODO don't always drop item in centre`
@@ -185,14 +139,10 @@
    * `// TODO depends on weight of item`
    * `// TODO depends on weight of item`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
-   * `let mut subscriptions = Vec::new(); // TODO reuse allocation in system`
-   * `// TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause`
- * [game/simulation/src/activity/system2.rs](game/simulation/src/activity/system2.rs) (2)
    * `// TODO rename`
    * `// TODO handle society task`
- * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
-   * `/// TODO reduce cost of cloning vec of items`
  * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (1)
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
@@ -282,7 +232,7 @@
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
    * `// TODO generic needs component with hunger/thirst/toilet/social etc`
-   * `ReadStorage<'a, ActivityComponent2>, // for current exertion TODO moving average`
+   * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
    * `// TODO individual metabolism rate`
    * `// TODO elaborate and specify metabolism rate`
    * `// TODO take into account general movement speed in addition to this`

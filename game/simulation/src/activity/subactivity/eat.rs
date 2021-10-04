@@ -1,19 +1,15 @@
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::EventResult::{Consumed, Unconsumed};
-use crate::ecs::*;
+use crate::activity::context::ActivityContext;
+
 use crate::event::prelude::*;
-use crate::item::{
-    ContainedInComponent, EndHaulBehaviour, FoundSlot, HaulableItemComponent, HauledItemComponent,
-    ItemFilter,
-};
+use crate::item::ContainedInComponent;
 use crate::needs::{BeingEatenComponent, FoodEatingError};
 use crate::queued_update::QueuedUpdates;
-use crate::unexpected_event2;
-use crate::{ComponentWorld, Entity, InventoryComponent, PhysicalComponent, TransformComponent};
+
+use crate::{ComponentWorld, Entity};
 use common::*;
 
 /// Eats an item that's already equipped
-pub struct EatItemSubactivity2;
+pub struct EatItemSubactivity;
 
 #[derive(Error, Debug, Clone)]
 pub enum EatItemError {
@@ -24,8 +20,8 @@ pub enum EatItemError {
     Food(#[from] FoodEatingError),
 }
 
-impl EatItemSubactivity2 {
-    pub async fn eat(&self, ctx: &ActivityContext2, item: Entity) -> Result<(), EatItemError> {
+impl EatItemSubactivity {
+    pub async fn eat(&self, ctx: &ActivityContext, item: Entity) -> Result<(), EatItemError> {
         let eater = ctx.entity();
         ctx.world()
             .resource::<QueuedUpdates>()

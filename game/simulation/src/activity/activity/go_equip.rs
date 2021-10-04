@@ -1,38 +1,37 @@
-use crate::activity::activity2::{
-    Activity2, ActivityContext2, ActivityResult, EventResult, InterruptResult,
-};
+use crate::activity::activity::{Activity};
 use crate::activity::status::Status;
-use crate::activity::subactivities2::GoingToStatus;
+use crate::activity::subactivity::GoingToStatus;
 use crate::ecs::ComponentGetError;
-use crate::event::{EntityEvent, EntityEventPayload, EntityEventSubscription, EventSubscription};
+use crate::event::{EntityEvent, EntityEventSubscription, EventSubscription};
 use crate::item::HaulableItemComponent;
-use crate::{ComponentWorld, Entity, PhysicalComponent, TransformComponent};
+use crate::{ComponentWorld, Entity, TransformComponent};
 use async_trait::async_trait;
 use common::*;
 use unit::world::WorldPoint;
 use world::SearchGoal;
+use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
 #[derive(Debug, Clone)]
-pub struct GoEquipActivity2(Entity);
+pub struct GoEquipActivity(Entity);
 
 #[derive(Debug, Error)]
 pub enum EquipError {
     #[error("Can't get item transform")]
-    MissingTransform(#[from] ComponentGetError),
+    MissingTransform(#[source] ComponentGetError),
 
-    #[error("Item can not be picked up or equipped (missing haulable component)")]
-    NotHaulable,
+    #[error("Item can not be picked up or equipped ({0})")]
+    NotHaulable(#[source] ComponentGetError),
 }
 
 struct EquippingState;
 
 #[async_trait]
-impl Activity2 for GoEquipActivity2 {
+impl Activity for GoEquipActivity {
     fn description(&self) -> Box<dyn Display> {
         Box::new(self.clone())
     }
 
-    async fn dew_it(&self, ctx: &ActivityContext2) -> ActivityResult {
+    async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         // cancel if any destructive event happens to the item
         ctx.subscribe_to(EntityEventSubscription {
             subject: self.0,
@@ -40,7 +39,7 @@ impl Activity2 for GoEquipActivity2 {
         });
 
         // check if the item exists in the world
-        if let Ok(item_pos) = self.find_item(&ctx) {
+        if let Ok(item_pos) = self.find_item(ctx) {
             // go to the item
             ctx.go_to(
                 item_pos,
@@ -57,7 +56,7 @@ impl Activity2 for GoEquipActivity2 {
             // it must be held by someone, try equipping instead
             let extra_hands = match ctx.world().component::<HaulableItemComponent>(self.0) {
                 Ok(comp) => comp.extra_hands,
-                Err(err) => return Err(EquipError::NotHaulable.into()),
+                Err(err) => return Err(EquipError::NotHaulable(err).into()),
             };
 
             ctx.update_status(EquippingState);
@@ -77,12 +76,12 @@ impl Activity2 for GoEquipActivity2 {
     }
 }
 
-impl GoEquipActivity2 {
+impl GoEquipActivity {
     pub fn new(item: Entity) -> Self {
         Self(item)
     }
 
-    fn find_item(&self, ctx: &ActivityContext2) -> Result<WorldPoint, EquipError> {
+    fn find_item(&self, ctx: &ActivityContext) -> Result<WorldPoint, EquipError> {
         let transform = ctx
             .world()
             .component::<TransformComponent>(self.0)
@@ -92,7 +91,7 @@ impl GoEquipActivity2 {
     }
 }
 
-impl Display for GoEquipActivity2 {
+impl Display for GoEquipActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Picking up {}", self.0)
     }

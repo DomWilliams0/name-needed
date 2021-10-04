@@ -1,9 +1,9 @@
-use crate::activity::activity2::ActivityContext2;
-use crate::activity::activity2::EventResult::Consumed;
+use crate::activity::context::ActivityContext;
+
 use crate::activity::status::{NopStatus, Status};
 use crate::ecs::ComponentGetError;
 use crate::event::prelude::*;
-use crate::unexpected_event2;
+
 use crate::{ComponentWorld, FollowPathComponent};
 use common::*;
 use unit::world::WorldPoint;
@@ -22,7 +22,7 @@ pub enum GotoError {
 }
 
 pub struct GoToSubactivity<'a> {
-    context: &'a ActivityContext2,
+    context: &'a ActivityContext,
     complete: bool,
 }
 
@@ -43,7 +43,7 @@ impl GoingToStatus {
 }
 
 impl<'a> GoToSubactivity<'a> {
-    pub fn new(context: &'a ActivityContext2) -> Self {
+    pub fn new(context: &'a ActivityContext) -> Self {
         Self {
             context,
             complete: false,
