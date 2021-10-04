@@ -1,25 +1,22 @@
 //! Async runtime for functionality crossing multiple ticks
 
 use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::hint::unreachable_unchecked;
 use std::rc::{Rc, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::Poll;
 
 use cooked_waker::{IntoWaker, ViaRawPointer, Wake, WakeRef};
+use futures::channel::oneshot::Sender;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 use futures::task::Context;
 
-use crate::activity::{ActivityComponent2, EventUnsubscribeResult};
-use crate::ecs::WriteStorage;
-use crate::event::{EntityEvent, EntityEventQueue, RuntimeTimers};
-use crate::runtime::futures::ParkUntilWakeupFuture;
-use crate::{Entity, Tick};
 use common::*;
-use futures::channel::oneshot::Sender;
-use std::collections::VecDeque;
-use std::hint::unreachable_unchecked;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::event::EntityEvent;
+use crate::runtime::futures::ParkUntilWakeupFuture;
 
 struct RuntimeInner {
     ready: Vec<TaskRef>,
@@ -134,7 +131,7 @@ impl Runtime {
         let mut double_buf = std::mem::replace(&mut runtime.ready, ready_tasks);
 
         // move any newly ready tasks into proper ready queue out of double buf
-        runtime.ready.extend(double_buf.drain(..));
+        runtime.ready.append(&mut double_buf);
 
         // store double buf allocation again
         let dummy = std::mem::replace(&mut runtime.ready_double_buf, double_buf);
@@ -271,14 +268,14 @@ impl TaskRef {
         }
     }
 
-    fn poll_task(&self) {
+    fn poll_task(self) {
         let mut fut_slot = self.0.future.borrow_mut();
 
         // take ownership for poll
         let fut = std::mem::replace(&mut *fut_slot, TaskFuture::Polling);
 
         if let TaskFuture::Running(mut fut) = fut {
-            // TODO unnecessary unconditional clone of task reference?
+            // TODO reimplement raw waiter manually to avoid this unconditional clone
             let waker = self.clone().into_waker();
             let mut ctx = Context::from_waker(&waker);
             trace!("polling task"; "task" => ?self.0.handle);
@@ -377,10 +374,13 @@ impl Debug for Task {
 mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    use super::*;
-    use crate::runtime::futures::ManualFuture;
-    use common::bumpalo::core_alloc::sync::Arc;
     use futures::channel::oneshot::channel;
+
+    use common::bumpalo::core_alloc::sync::Arc;
+
+    use crate::runtime::futures::ManualFuture;
+
+    use super::*;
 
     #[test]
     fn basic_operation() {
