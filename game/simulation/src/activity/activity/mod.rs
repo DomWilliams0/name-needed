@@ -19,10 +19,10 @@ mod nop;
 mod wander;
 
 mod activity_trait {
-    use std::fmt::{Debug, Display};
     use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
     use crate::EntityEvent;
     use async_trait::async_trait;
+    use std::fmt::{Debug, Display};
 
     #[async_trait]
     pub trait Activity: Debug {

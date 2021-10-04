@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hint::unreachable_unchecked;
 use std::iter::repeat_with;
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range};
 
 use common::*;
 use unit::space::length::Length3;
@@ -67,15 +67,15 @@ pub enum FoundSlot<'a> {
 pub struct FoundSlotMut<'a>(&'a mut InventoryComponent, FoundSlot<'a>);
 
 pub trait ContainerResolver {
-    fn container(&self, e: Entity) -> Option<&ContainerComponent>;
-    fn container_mut(&self, e: Entity) -> Option<&mut ContainerComponent>;
+    fn container(&self, e: Entity) -> Option<ComponentRef<'_, ContainerComponent>>;
+    fn container_mut(&self, e: Entity) -> Option<ComponentRefMut<'_, ContainerComponent>>;
 
-    fn container_unchecked(&self, e: Entity) -> &ContainerComponent {
+    fn container_unchecked(&self, e: Entity) -> ComponentRef<'_, ContainerComponent> {
         self.container(e).expect("entity does not have container")
     }
 
     #[allow(clippy::mut_from_ref)]
-    fn container_mut_unchecked(&self, e: Entity) -> &mut ContainerComponent {
+    fn container_mut_unchecked(&self, e: Entity) -> ComponentRefMut<'_, ContainerComponent> {
         self.container_mut(e)
             .expect("entity does not have container")
     }
@@ -217,20 +217,25 @@ impl InventoryComponent {
     pub fn containers<'a>(
         &'a self,
         resolver: &'a impl ContainerResolver,
-    ) -> impl ExactSizeIterator<Item = (Entity, &Container)> + '_ {
+    ) -> impl ExactSizeIterator<Item = (Entity, impl Deref<Target = Container> + 'a)> + '_ {
         self.containers
             .iter()
-            .map(move |e| (*e, &resolver.container_unchecked(*e).container))
+            .map(move |e| (*e, resolver.container_unchecked(*e).map(|c| &c.container)))
     }
 
     /// Panics if any containers are missing container component
     pub fn containers_mut<'a>(
         &'a mut self,
         resolver: &'a impl ContainerResolver,
-    ) -> impl ExactSizeIterator<Item = (Entity, &mut Container)> + '_ {
-        self.containers
-            .iter()
-            .map(move |e| (*e, &mut resolver.container_mut_unchecked(*e).container))
+    ) -> impl ExactSizeIterator<Item = (Entity, impl DerefMut<Target = Container> + 'a)> + '_ {
+        self.containers.iter().map(move |e| {
+            (
+                *e,
+                resolver
+                    .container_mut_unchecked(*e)
+                    .map(|c| &mut c.container),
+            )
+        })
     }
 
     fn get_first_held_range(&self) -> Option<(HeldEntity, Range<usize>)> {
@@ -305,7 +310,7 @@ impl InventoryComponent {
             let attempt_fit = |container: &&Entity| {
                 resolver
                     .container_mut(**container)
-                    .and_then(|comp| comp.container.add(&item_to_move).ok())
+                    .and_then(|mut comp| comp.container.add(&item_to_move).ok())
                     .is_some()
             };
 
@@ -405,7 +410,7 @@ impl InventoryComponent {
                 );
             }
 
-            validate_container(container, e, held_entities, world);
+            validate_container(&container, e, held_entities, world);
         }
     }
 }
@@ -430,7 +435,7 @@ fn validate_container(
                 assert_eq!(
                     holder, container_entity,
                     "item {} found in container {} has invalid ContainedInComponent '{}'",
-                    e, container_entity, contained
+                    e, container_entity, *contained
                 );
             } else {
                 panic!(
@@ -555,8 +560,7 @@ impl<'a> FoundSlot<'a> {
             FoundSlot::Container(c, i, _) => inventory
                 .containers(resolver)
                 .find(|(e, _)| *e == c)
-                .and_then(|(_, c)| c.contents_as_slice().get(i))
-                .map(|e| e.entity),
+                .and_then(|(_, c)| c.contents_as_slice().get(i).map(|e| e.entity)),
         };
 
         entity.expect("entity should exist in inventory")

@@ -1,6 +1,7 @@
 use common::*;
 use unit::world::WorldPoint;
 
+use crate::activity::context::{ActivityContext, DistanceCheckResult};
 use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::prelude::*;
@@ -10,7 +11,6 @@ use crate::{
     ComponentWorld, ContainedInComponent, ContainerComponent, EntityEvent, EntityEventPayload,
     InventoryComponent, PhysicalComponent, TransformComponent, WorldPosition,
 };
-use crate::activity::context::{ActivityContext, DistanceCheckResult};
 
 #[derive(Debug, Error, Clone)]
 pub enum HaulError {
@@ -196,7 +196,7 @@ impl<'a> HaulSubactivity<'a> {
                 let needs_transform = self.needs_transform;
 
                 updates.queue("drop hauled item", move |world| {
-                    if let Ok(transform) = world.component_mut::<TransformComponent>(item) {
+                    if let Ok(mut transform) = world.component_mut::<TransformComponent>(item) {
                         transform.reset_position(pos);
                     } else if needs_transform {
                         // add transform if missing
@@ -268,7 +268,7 @@ impl Display for HaulTarget {
 impl HaulTarget {
     /// Creates from entity's current position or the container it is currently contained in
     pub fn with_entity(entity: Entity, world: &impl ComponentWorld) -> Option<Self> {
-        if let Ok(ContainedInComponent::Container(container)) = world.component(entity) {
+        if let Ok(ContainedInComponent::Container(container)) = world.component(entity).as_deref() {
             Some(Self::Container(*container))
         } else if let Ok(transform) = world.component::<TransformComponent>(entity) {
             Some(Self::Position(transform.accessible_position()))
@@ -312,7 +312,7 @@ impl HaulTarget {
 fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_entity: Entity) {
     updates.queue("remove item from container", move |world| {
         let do_remove = || -> Result<Entity, HaulError> {
-            let container = world
+            let mut container = world
                 .component_mut::<ContainerComponent>(container_entity)
                 .map_err(|_| HaulError::BadSourceContainer)?;
 
@@ -368,7 +368,7 @@ fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
             );
 
             // get hauler inventory
-            let inventory = world
+            let mut inventory = world
                 .component_mut::<InventoryComponent>(hauler)
                 .map_err(|_| HaulError::NoInventory)?;
 
@@ -420,7 +420,7 @@ fn queue_stop_hauling(updates: &QueuedUpdates, item: Entity, hauler: Entity, int
         let count = match behaviour {
             EndHaulBehaviour::Drop => {
                 // free holder's hands
-                let inventory = world
+                let mut inventory = world
                     .component_mut::<InventoryComponent>(hauler)
                     .map_err(|_| HaulError::NoInventory)?;
 
@@ -456,7 +456,7 @@ fn queue_put_into_container(
                 .component::<PhysicalComponent>(item)
                 .map_err(|_| HaulError::BadItem)?;
 
-            let container = world
+            let mut container = world
                 .component_mut::<ContainerComponent>(container_entity)
                 .map_err(|_| HaulError::BadTargetContainer)?;
 

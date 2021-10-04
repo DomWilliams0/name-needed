@@ -62,7 +62,8 @@ impl EcsExtComponents<'_> {
                 let _ = self.remove_now::<ContainedInComponent>(haulee);
             }
             EndHaulBehaviour::KeepEquipped => {
-                if let Ok(contained_in) = self.component::<ContainedInComponent>(haulee) {
+                if let Ok(contained_in) = self.component::<ContainedInComponent>(haulee).as_deref()
+                {
                     self.add_to_container(haulee, contained_in.clone());
                 }
             }

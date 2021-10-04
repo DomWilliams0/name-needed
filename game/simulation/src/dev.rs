@@ -36,7 +36,7 @@ impl EcsExtDev<'_> {
             .spawn()
             .expect("cant make backpack");
 
-        let inv = self
+        let mut inv = self
             .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
@@ -50,11 +50,11 @@ impl EcsExtDev<'_> {
     }
 
     pub fn put_food_in_container(&mut self, food: Entity, lucky_holder: Entity) {
-        let inv = self
+        let mut inv = self
             .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
-        let (bag, container) = inv.containers_mut(self.0).next().expect("no container");
+        let (bag, mut container) = inv.containers_mut(self.0).next().expect("no container");
 
         let physical = self.component::<PhysicalComponent>(food).expect("bad food");
 
@@ -72,7 +72,7 @@ impl EcsExtDev<'_> {
     }
 
     pub fn put_item_into_container(&mut self, item: Entity, container_entity: Entity) {
-        let container = self
+        let mut container = self
             .component_mut::<ContainerComponent>(container_entity)
             .expect("bad container");
 
@@ -92,7 +92,7 @@ impl EcsExtDev<'_> {
     }
 
     pub fn follow(&mut self, follower: Entity, followee: Entity) {
-        let ai = self
+        let mut ai = self
             .component_mut::<AiComponent>(follower)
             .expect("no activity");
 
@@ -152,7 +152,7 @@ impl EcsExtDev<'_> {
                 if let Some(AssociatedBlockData::Container(container)) =
                     w.associated_block_data(container_pos)
                 {
-                    let ai = world
+                    let mut ai = world
                         .component_mut::<AiComponent>(hauler)
                         .expect("no activity");
 
@@ -228,7 +228,7 @@ impl EcsExtDev<'_> {
                     .unwrap()
                     .accessible_position();
 
-                let ai = world
+                let mut ai = world
                     .component_mut::<AiComponent>(hauler)
                     .expect("no activity");
 
@@ -283,7 +283,7 @@ impl EcsExtDev<'_> {
     }
 
     pub fn force_activity(&mut self, slave: Entity, action: AiAction) {
-        let ai = self
+        let mut ai = self
             .component_mut::<AiComponent>(slave)
             .expect("no activity");
 

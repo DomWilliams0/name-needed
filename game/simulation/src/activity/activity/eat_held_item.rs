@@ -1,4 +1,5 @@
-use crate::activity::activity::{Activity};
+use crate::activity::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 use crate::activity::status::Status;
 use crate::ecs::*;
 use crate::event::EntityEvent;
@@ -6,7 +7,6 @@ use crate::{EdibleItemComponent, Entity};
 use async_trait::async_trait;
 use common::*;
 use std::fmt::Formatter;
-use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
 #[derive(Debug, Clone)]
 pub struct EatHeldItemActivity(Entity);

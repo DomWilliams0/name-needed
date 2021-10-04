@@ -26,7 +26,7 @@ impl EatItemSubactivity {
         ctx.world()
             .resource::<QueuedUpdates>()
             .queue("begin eating", move |world| {
-                match world.component::<ContainedInComponent>(item) {
+                match world.component::<ContainedInComponent>(item).as_deref() {
                     Ok(ContainedInComponent::InventoryOf(holder)) if *holder == eater => {
                         // success
                     }

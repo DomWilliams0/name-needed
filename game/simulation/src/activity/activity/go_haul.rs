@@ -1,18 +1,18 @@
 use async_trait::async_trait;
 
+use common::NormalizedFloat;
 use common::*;
 
 use world::SearchGoal;
 
-use crate::activity::activity::{Activity,};
+use crate::activity::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
-use crate::activity::subactivity::{GoingToStatus, HaulError};
-use crate::activity::HaulTarget;
+use crate::activity::subactivity::GoingToStatus;
+use crate::activity::HaulError;
+use crate::{Entity, EntityEvent, HaulTarget};
 
 use crate::event::{EntityEventSubscription, EventSubscription};
-
-use crate::{Entity, EntityEvent};
-use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
 // TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available
 // TODO support hauling multiple things to multiple locations (or via multiple activities?)

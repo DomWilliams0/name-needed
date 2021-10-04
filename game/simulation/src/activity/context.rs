@@ -17,11 +17,11 @@ use crate::{
     ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent, WorldPosition,
 };
 
+use crate::activity::context::EventResult::{Consumed, Unconsumed};
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use unit::world::WorldPoint;
 use world::SearchGoal;
-use crate::activity::context::EventResult::{Consumed, Unconsumed};
 
 pub type ActivityResult = Result<(), Box<dyn Error>>;
 
@@ -116,7 +116,7 @@ impl ActivityContext {
     }
 
     pub fn clear_path(&self) {
-        if let Ok(comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
+        if let Ok(mut comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
             comp.clear_path();
         }
     }
@@ -259,7 +259,6 @@ impl ActivityContext {
     }
 
     async fn next_event(&self) -> EntityEvent {
-        // TODO event queue needs to be cleared of events after unsubscribing? or just consume them and ignore them?
         let mut n = 0;
         loop {
             match self.task.pop_event() {

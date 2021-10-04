@@ -1,8 +1,9 @@
-use crate::activity::activity::{Activity};
+use crate::activity::activity::Activity;
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
 use crate::ecs::*;
 
+use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::{Entity, TransformComponent};
 use async_trait::async_trait;
 use common::*;
@@ -11,7 +12,6 @@ use futures::pin_mut;
 use std::fmt::Formatter;
 use unit::world::WorldPoint;
 use world::SearchGoal;
-use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
 pub struct FollowActivity {

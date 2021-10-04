@@ -3,9 +3,10 @@ use crate::tests::TestHelper;
 use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::*;
 use simulation::{
-    AiAction, ComponentWorld, ConditionComponent, ContainedInComponent, ContainerComponent, Entity,
-    EntityEventDebugPayload, EntityEventPayload, EntityLoggingComponent, HungerComponent,
-    InventoryComponent, LoggedEntityEvent, PhysicalComponent, TaskResultSummary,
+    AiAction, ComponentRefMut, ComponentWorld, ConditionComponent, ContainedInComponent,
+    ContainerComponent, Entity, EntityEventDebugPayload, EntityEventPayload,
+    EntityLoggingComponent, HungerComponent, InventoryComponent, LoggedEntityEvent,
+    PhysicalComponent, TaskResultSummary,
 };
 use unit::space::{length::Length3, volume::Volume};
 
@@ -16,7 +17,7 @@ pub struct EquipWithPickup<I: ?Sized> {
 }
 
 pub trait InitialInventoryState {
-    fn populate(test: &EquipWithPickup<Self>, inv: &mut InventoryComponent, ctx: &HookContext);
+    fn populate(test: &EquipWithPickup<Self>, ctx: &HookContext);
 
     fn validate(
         test: &EquipWithPickup<Self>,
@@ -52,7 +53,7 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
                         // picked up expected item
                         return Some(EventResult::Success);
                     }
-                    return Some(EventResult::Failed(format!("picked up wrong entity")));
+                    return Some(EventResult::Failed("picked up wrong entity".to_owned()));
                 }
             }
 
@@ -134,7 +135,7 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
         inv.has_equipped(self.item)
     }
 
-    pub fn on_tick(&mut self, test: TestHelper, ctx: &HookContext) -> HookResult {
+    pub fn on_tick(&mut self, _test: TestHelper, ctx: &HookContext) -> HookResult {
         if !self.has_activity_succeeded(ctx) {
             return HookResult::KeepGoing;
         }
@@ -145,48 +146,48 @@ impl<I: InitialInventoryState> EquipWithPickup<I> {
             .component::<InventoryComponent>(self.human)
             .expect("no inventory");
 
-        I::validate(self, ctx, inv)
+        I::validate(self, ctx, &*inv)
     }
 
-    pub fn on_init(test: TestHelper, ctx: &HookContext) -> InitHookResult<Self> {
-        Self::setup(test, ctx).into()
+    pub fn on_init(_test: TestHelper, ctx: &HookContext) -> InitHookResult<Self> {
+        let setup = || {
+            let human = ctx.new_human(EntityPosition::Origin)?;
+            let item = ctx.new_entity("core_food_apple", EntityPosition::Far)?;
+
+            // remove temptation to eat the food
+            ctx.simulation.ecs.remove_now::<HungerComponent>(human);
+
+            // go pick it up
+            ctx.simulation
+                .ecs
+                .helpers_dev()
+                .force_activity(human, AiAction::GoEquip(item));
+
+            // setup inventory
+            let test = Self {
+                human,
+                item,
+                dummy: PhantomData,
+            };
+
+            I::populate(&test, ctx);
+
+            Ok(test)
+        };
+        setup().into()
     }
 
-    fn setup(test: TestHelper, ctx: &HookContext) -> BoxedResult<Self> {
-        let human = ctx.new_human(EntityPosition::Origin)?;
-        let item = ctx.new_entity("core_food_apple", EntityPosition::Far)?;
-
-        // remove temptation to eat the food
-        ctx.simulation.ecs.remove_now::<HungerComponent>(human);
-
-        // go pick it up
+    fn inventory<'a>(&self, ctx: &'a HookContext) -> ComponentRefMut<'a, InventoryComponent> {
         ctx.simulation
             .ecs
-            .helpers_dev()
-            .force_activity(human, AiAction::GoEquip(item));
-
-        // setup inventory
-        let inv = ctx
-            .simulation
-            .ecs
-            .component_mut(human)
-            .expect("no inventory");
-
-        let test = Self {
-            human,
-            item,
-            dummy: PhantomData,
-        };
-
-        I::populate(&test, inv, ctx);
-
-        Ok(test)
+            .component_mut(self.human)
+            .expect("no inventory")
     }
 }
 
 // TODO move item creation into dev helpers
 impl InitialInventoryState for EmptyInventory {
-    fn populate(_: &EquipWithPickup<Self>, _: &mut InventoryComponent, _: &HookContext) {
+    fn populate(_: &EquipWithPickup<Self>, _: &HookContext) {
         // leave empty
     }
 
@@ -206,8 +207,9 @@ impl InitialInventoryState for EmptyInventory {
 }
 
 impl InitialInventoryState for AlreadyEquipped {
-    fn populate(test: &EquipWithPickup<Self>, inv: &mut InventoryComponent, ctx: &HookContext) {
+    fn populate(test: &EquipWithPickup<Self>, ctx: &HookContext) {
         // add to inventory
+        let mut inv = test.inventory(ctx);
         assert!(
             inv.insert_item(
                 ctx.simulation.ecs,
@@ -247,12 +249,12 @@ impl InitialInventoryState for AlreadyEquipped {
 }
 
 impl InitialInventoryState for AlreadyInInventory {
-    fn populate(test: &EquipWithPickup<Self>, inv: &mut InventoryComponent, ctx: &HookContext) {
+    fn populate(test: &EquipWithPickup<Self>, ctx: &HookContext) {
         // give container
         let bag = ctx.simulation.ecs.helpers_dev().give_bag(test.human);
 
         // put item in the container
-        let container = ctx
+        let mut container = ctx
             .simulation
             .ecs
             .component_mut::<ContainerComponent>(bag)
@@ -290,13 +292,16 @@ impl InitialInventoryState for AlreadyInInventory {
 }
 
 impl InitialInventoryState for FullInventory {
-    fn populate(test: &EquipWithPickup<Self>, inv: &mut InventoryComponent, ctx: &HookContext) {
+    fn populate(test: &EquipWithPickup<Self>, ctx: &HookContext) {
         // fill equip slots
-        let slot_count = inv.equip_slots().len();
+        let slot_count = test.inventory(ctx).equip_slots().len();
+
         for _ in 0..slot_count {
             let item = ctx
                 .new_entity("core_food_apple", EntityPosition::Origin)
                 .expect("failed to create dummy item");
+
+            let mut inv = test.inventory(ctx);
             let success = inv.insert_item(
                 ctx.simulation.ecs,
                 item,

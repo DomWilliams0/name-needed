@@ -33,8 +33,14 @@ pub enum ComponentGetError {
 }
 
 pub trait ComponentWorld: ContainerResolver + Sized {
-    fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError>;
-    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError>;
+    fn component<T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRef<'_, T>, ComponentGetError>;
+    fn component_mut<T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRefMut<'_, T>, ComponentGetError>;
     fn has_component<T: Component>(&self, entity: Entity) -> bool;
     fn has_component_by_name(&self, comp: &str, entity: Entity) -> bool;
     fn components<J: Join>(&self, entity: Entity, storages: J) -> Option<J::Type>;
@@ -79,12 +85,42 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     }
 }
 
+/// Component reference that keeps a ReadStorage instance
+#[derive(Clone)]
+#[repr(C)] // component should be first member
+pub struct ComponentRef<'a, T: Component> {
+    comp: &'a T,
+    storage: ReadStorage<'a, T>,
+}
+
+/// A reference to an inner field of a component held in a [ComponentRef]
+#[derive(Clone)]
+#[repr(C)] // value should be first member
+pub struct ComponentRefMapped<'a, T: Component, U> {
+    value: &'a U,
+    storage: ReadStorage<'a, T>,
+}
+
+/// Component reference that keeps a ReadStorage instance
+#[repr(C)] // component should be first member
+pub struct ComponentRefMut<'a, T: Component> {
+    comp: &'a mut T,
+    storage: WriteStorage<'a, T>,
+}
+
+/// A reference to an inner field of a component held in a [ComponentRef]
+#[repr(C)] // value should be first member
+pub struct ComponentRefMutMapped<'a, T: Component, U> {
+    value: &'a mut U,
+    storage: WriteStorage<'a, T>,
+}
+
 impl<W: ComponentWorld> ContainerResolver for W {
-    fn container(&self, e: Entity) -> Option<&ContainerComponent> {
+    fn container(&self, e: Entity) -> Option<ComponentRef<'_, ContainerComponent>> {
         self.component(e).ok()
     }
 
-    fn container_mut(&self, e: Entity) -> Option<&mut ContainerComponent> {
+    fn container_mut(&self, e: Entity) -> Option<ComponentRefMut<'_, ContainerComponent>> {
         self.component_mut(e).ok()
     }
 }
@@ -122,21 +158,30 @@ impl EcsWorld {
 }
 
 impl ComponentWorld for EcsWorld {
-    fn component<T: Component>(&self, entity: Entity) -> Result<&T, ComponentGetError> {
+    fn component<T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRef<'_, T>, ComponentGetError> {
         let storage = self.read_storage::<T>();
+        let comp = storage
+            .get(entity.into())
+            .ok_or_else(|| self.mk_component_error::<T>(entity))?;
 
-        // safety: storage has the same lifetime as self, so its ok to "upcast" the components
-        // lifetime from that of the storage to that of self
-        let result: Option<&T> = unsafe { std::mem::transmute(entity.get(&storage)) };
-        result.ok_or_else(|| self.mk_component_error::<T>(entity))
+        let comp = unsafe { std::mem::transmute::<&T, &T>(comp) };
+        Ok(ComponentRef { storage, comp })
     }
 
-    fn component_mut<T: Component>(&self, entity: Entity) -> Result<&mut T, ComponentGetError> {
+    fn component_mut<T: Component>(
+        &self,
+        entity: Entity,
+    ) -> Result<ComponentRefMut<'_, T>, ComponentGetError> {
         let mut storage = self.write_storage::<T>();
-        // safety: storage has the same lifetime as self, so its ok to "upcast" the components
-        // lifetime from that of the storage to that of self
-        let result: Option<&mut T> = unsafe { std::mem::transmute(entity.get_mut(&mut storage)) };
-        result.ok_or_else(|| self.mk_component_error::<T>(entity))
+        let comp = storage
+            .get_mut(entity.into())
+            .ok_or_else(|| self.mk_component_error::<T>(entity))?;
+
+        let comp = unsafe { std::mem::transmute::<&mut T, &mut T>(comp) };
+        Ok(ComponentRefMut { storage, comp })
     }
 
     fn has_component<T: Component>(&self, entity: Entity) -> bool {
@@ -221,5 +266,69 @@ impl ComponentWorld for EcsWorld {
 impl ComponentGetError {
     fn no_such_component<T>(entity: Entity) -> Self {
         Self::NoSuchComponent(entity, std::any::type_name::<T>())
+    }
+}
+
+impl<T: Component> Deref for ComponentRef<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.comp
+    }
+}
+
+impl<T: Component> Deref for ComponentRefMut<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.comp
+    }
+}
+
+impl<T: Component> DerefMut for ComponentRefMut<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.comp
+    }
+}
+
+impl<'a, T: Component> ComponentRef<'a, T> {
+    pub fn map<U>(&self, f: impl FnOnce(&'a T) -> &'a U) -> ComponentRefMapped<'a, T, U> {
+        let new_val = f(self.comp);
+        ComponentRefMapped {
+            value: new_val,
+            storage: self.storage.clone(),
+        }
+    }
+}
+
+impl<T: Component, U> Deref for ComponentRefMapped<'_, T, U> {
+    type Target = U;
+
+    fn deref(&self) -> &Self::Target {
+        self.value
+    }
+}
+
+impl<'a, T: Component> ComponentRefMut<'a, T> {
+    pub fn map<U>(self, f: impl FnOnce(&'a mut T) -> &'a mut U) -> ComponentRefMutMapped<'a, T, U> {
+        let new_val = f(self.comp);
+        ComponentRefMutMapped {
+            value: new_val,
+            storage: self.storage,
+        }
+    }
+}
+
+impl<T: Component, U> Deref for ComponentRefMutMapped<'_, T, U> {
+    type Target = U;
+
+    fn deref(&self) -> &Self::Target {
+        self.value
+    }
+}
+
+impl<T: Component, U> DerefMut for ComponentRefMutMapped<'_, T, U> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.value
     }
 }

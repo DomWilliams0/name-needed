@@ -177,7 +177,7 @@ mod helpers {
         pub fn with_color(self, color: ColorRgb) -> Self {
             self.0
                 .component_mut::<RenderComponent>(self.1)
-                .map(|render| render.color = color)
+                .map(|mut render| render.color = color)
                 .expect("render component");
 
             self
@@ -203,7 +203,7 @@ mod helpers {
         pub fn with_satiety(self, satiety: NormalizedFloat) -> Self {
             self.0
                 .component_mut::<HungerComponent>(self.1)
-                .map(|hunger| hunger.set_satiety(satiety))
+                .map(|mut hunger| hunger.set_satiety(satiety))
                 .expect("hunger component");
 
             self
@@ -212,7 +212,7 @@ mod helpers {
         pub fn with_condition(self, condition: NormalizedFloat) -> Self {
             self.0
                 .component_mut::<ConditionComponent>(self.1)
-                .map(|comp| comp.0.set(condition))
+                .map(|mut comp| comp.0.set(condition))
                 .expect("condition component");
 
             self

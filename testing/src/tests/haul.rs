@@ -220,7 +220,8 @@ impl<H: HaulVariant + 'static> Haul<H> {
                         // put item in src location
                         match src {
                             HaulTarget::Position(pos) => {
-                                let transform = world.component_mut::<TransformComponent>(item)?;
+                                let mut transform =
+                                    world.component_mut::<TransformComponent>(item)?;
                                 transform.reset_position(pos.centred());
                             }
                             HaulTarget::Container(c) => {

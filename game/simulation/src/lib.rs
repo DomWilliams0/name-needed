@@ -31,7 +31,7 @@ pub use activity::{
     ActivityComponent, EntityLoggingComponent, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
+pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
 pub use event::{EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};

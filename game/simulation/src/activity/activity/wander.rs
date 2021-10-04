@@ -2,14 +2,14 @@ use async_trait::async_trait;
 
 use common::*;
 
+use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
+use crate::activity::Activity;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
-use crate::{ComponentWorld, TransformComponent, WorldPosition};
+use crate::{ComponentWorld, QueuedUpdates, TransformComponent, WorldPosition};
 use world::SearchGoal;
-use crate::activity::Activity;
-use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Default)]
 pub struct WanderActivity;

@@ -2,12 +2,12 @@ use async_trait::async_trait;
 
 use common::*;
 
-use crate::activity::activity::{Activity,};
+use crate::activity::activity::Activity;
+use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
 use crate::WorldPosition;
 use world::SearchGoal;
-use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
 pub struct GoBreakBlockActivity {

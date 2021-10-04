@@ -1,4 +1,4 @@
-# TODOs (347)
+# TODOs (346)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -118,11 +118,10 @@
    * `// TODO format the other entity better e.g. get item name. or do this in the ui layer?`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (4)
+ * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (3)
    * `// TODO ensure component refs cant be held across awaits`
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
-   * `// TODO event queue needs to be cleared of events after unsubscribing? or just consume them and ignore them?`
  * [game/simulation/src/activity/subactivity/break_block.rs](game/simulation/src/activity/subactivity/break_block.rs) (3)
    * `// TODO get current held tool to determine how fast the block can be broken`
    * `// TODO breaking blocks with your hand hurts!`

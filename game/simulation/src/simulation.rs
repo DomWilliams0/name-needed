@@ -339,7 +339,7 @@ impl<R: Renderer> Simulation<R> {
 
                     match self.ecs_world.component_mut::<AiComponent>(entity) {
                         Err(e) => warn!("can't issue divine command"; "error" => %e),
-                        Ok(ai) => {
+                        Ok(mut ai) => {
                             // add DSE
                             ai.add_divine_command(command.clone());
                         }
@@ -378,7 +378,7 @@ impl<R: Renderer> Simulation<R> {
                             warn!("invalid container entity"; "entity" => container, "error" => %e);
                             continue;
                         }
-                        Ok(c) => {
+                        Ok(mut c) => {
                             if let Some(owner) = owner {
                                 c.owner = owner;
                                 info!("set container owner"; "container" => container, "owner" => owner)

@@ -94,21 +94,24 @@ impl SocietyJobImpl for HaulJob {
             match self.target {
                 HaulTarget::Position(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
-                        Ok(t) => &t.position,
+                        Ok(t) => t.position,
                         Err(err) => {
                             debug!("hauled item is missing transform"; "item" => self.entity);
                             return Some(SocietyTaskResult::Failure(err.into()));
                         }
                     };
 
-                    if WorldPoint::from(target_pos).is_almost(current_pos, 2.0) {
+                    if WorldPoint::from(target_pos).is_almost(&current_pos, 2.0) {
                         trace!("hauled item arrived at target");
                         return Some(SocietyTaskResult::Success);
                     }
                 }
                 HaulTarget::Container(target_container) => {
                     // check if arrived in the target container
-                    match world.component::<ContainedInComponent>(self.entity) {
+                    match world
+                        .component::<ContainedInComponent>(self.entity)
+                        .as_deref()
+                    {
                         Ok(ContainedInComponent::Container(c)) if *c == target_container => {
                             trace!("hauled item arrived in target container");
                             return Some(SocietyTaskResult::Success);

@@ -1,11 +1,11 @@
 use crate::ecs::ComponentGetError;
 
+use crate::activity::context::ActivityContext;
 use crate::queued_update::QueuedUpdates;
 use crate::ComponentWorld;
 use crate::{TransformComponent, WorldPosition};
 use common::*;
 use unit::world::WorldPoint;
-use crate::activity::context::ActivityContext;
 
 #[derive(Debug, Error)]
 pub enum BreakBlockError {

@@ -2,11 +2,11 @@ use async_trait::async_trait;
 
 use common::*;
 
+use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::subactivity::GoingToStatus;
+use crate::activity::Activity;
 use unit::world::WorldPoint;
 use world::SearchGoal;
-use crate::activity::Activity;
-use crate::activity::context::{ActivityContext, ActivityResult};
 
 #[derive(Debug, Clone)]
 pub struct GoToActivity {

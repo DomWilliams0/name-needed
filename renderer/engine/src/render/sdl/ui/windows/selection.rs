@@ -6,8 +6,8 @@ use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
 use simulation::{
-    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentWorld,
-    ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
+    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
+    ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
     InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
     TransformComponent,
@@ -27,15 +27,15 @@ pub struct SelectionWindow {
 
 struct SelectedEntityDetails<'a> {
     entity: Entity,
-    name: Option<&'a NameComponent>,
-    transform: Option<&'a TransformComponent>,
-    physical: Option<&'a PhysicalComponent>,
+    name: Option<ComponentRef<'a, NameComponent>>,
+    transform: Option<ComponentRef<'a, TransformComponent>>,
+    physical: Option<ComponentRef<'a, PhysicalComponent>>,
     ty: EntityType<'a>,
 }
 
 enum EntityType<'a> {
     Living,
-    Item(&'a ConditionComponent),
+    Item(ComponentRef<'a, ConditionComponent>),
 }
 
 #[derive(Debug)]
@@ -117,6 +117,7 @@ impl SelectionWindow {
             || {
                 details
                     .name
+                    .as_ref()
                     .map(|n| ui_str!(in context, "{}", n.0))
                     .ok_or("Unnamed")
             },
@@ -128,6 +129,7 @@ impl SelectionWindow {
             || {
                 details
                     .transform
+                    .as_ref()
                     .map(|t| ui_str!(in context, "{}", t.position))
                     .ok_or("Unknown")
             },
@@ -135,7 +137,7 @@ impl SelectionWindow {
             COLOR_GREEN,
         );
 
-        if let Some(physical) = details.physical {
+        if let Some(physical) = details.physical.as_ref() {
             context.key_value(
                 im_str!("Size:"),
                 || ui_str!(in context, "{}", physical.size),
@@ -163,7 +165,7 @@ impl SelectionWindow {
         if tabbar.is_open() {
             match details.ty {
                 EntityType::Living => self.do_living(context, &details),
-                EntityType::Item(condition) => self.do_item(context, &details, condition),
+                EntityType::Item(ref condition) => self.do_item(context, &details, &*condition),
             }
         }
 
@@ -182,6 +184,7 @@ impl SelectionWindow {
                     || {
                         details
                             .transform
+                            .as_ref()
                             .map(|t| ui_str!(in context, "{:.2}m/s", t.velocity.magnitude() ))
                     },
                     None,
@@ -219,6 +222,7 @@ impl SelectionWindow {
                     im_str!("Society:"),
                     || {
                         society
+                            .as_ref()
                             .map(|comp| {
                                 let name = societies
                                     .society_by_handle(comp.handle)
@@ -228,7 +232,9 @@ impl SelectionWindow {
                             })
                             .ok_or("None")
                     },
-                    society.map(|comp| ui_str!(in context, "{:?}", comp.handle)),
+                    society
+                        .as_ref()
+                        .map(|comp| ui_str!(in context, "{:?}", comp.handle)),
                     COLOR_ORANGE,
                 );
             }
@@ -238,7 +244,7 @@ impl SelectionWindow {
         if let Some(inv) = details.component::<InventoryComponent>(context) {
             let tab = context.new_tab(im_str!("Inventory"));
             if tab.is_open() {
-                self.do_inventory(context, inv);
+                self.do_inventory(context, &*inv);
             }
         }
 
@@ -246,7 +252,7 @@ impl SelectionWindow {
         if let Some(activity) = details.component::<ActivityComponent>(context) {
             let tab = context.new_tab(im_str!("Activity"));
             if tab.is_open() {
-                self.do_activity(context, activity);
+                self.do_activity(context, &*activity);
             }
         }
 
@@ -326,8 +332,9 @@ impl SelectionWindow {
         );
 
         for (i, (e, container)) in inventory.containers(ecs).enumerate() {
-            let name = ecs
-                .component::<NameComponent>(e)
+            let name_comp = ecs.component::<NameComponent>(e);
+            let name = name_comp
+                .as_ref()
                 .map(|n| n.0.as_str())
                 .unwrap_or("unnamed");
 
@@ -337,7 +344,7 @@ impl SelectionWindow {
             );
 
             if tree.is_open() {
-                self.do_container(context, container);
+                self.do_container(context, &container);
             }
         }
     }
@@ -352,8 +359,9 @@ impl SelectionWindow {
 
         let ecs = context.simulation().ecs;
         for entity in container.contents() {
-            let name = ecs
-                .component::<NameComponent>(entity.entity)
+            let name_comp = ecs.component::<NameComponent>(entity.entity);
+            let name = name_comp
+                .as_ref()
                 .map(|n| n.0.as_str())
                 .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
 
@@ -457,7 +465,7 @@ impl SelectionWindow {
                 if context.button(im_str!("Disable logs"), [0.0, 0.0]) {
                     req = Some(false);
                 } else {
-                    render_logs(comp);
+                    render_logs(&*comp);
                 }
             }
             _ => {
@@ -630,9 +638,9 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         match *data {
             AssociatedBlockData::Container(container_entity) => {
-                let name = ecs
-                    .component::<NameComponent>(container_entity)
-                    .ok()
+                let name_comp = ecs.component::<NameComponent>(container_entity).ok();
+                let name = name_comp
+                    .as_ref()
                     .map(|c| c.0.as_str())
                     .unwrap_or("Unnamed");
 
@@ -855,7 +863,10 @@ impl SelectionWindow {
 }
 
 impl<'a> SelectedEntityDetails<'a> {
-    fn component<T: simulation::Component>(&'a self, ctx: &'a UiContext) -> Option<&'a T> {
+    fn component<T: simulation::Component>(
+        &'a self,
+        ctx: &'a UiContext,
+    ) -> Option<ComponentRef<'a, T>> {
         ctx.simulation().ecs.component(self.entity).ok()
     }
 }

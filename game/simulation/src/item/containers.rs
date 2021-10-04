@@ -115,7 +115,7 @@ impl EcsExtContainers<'_> {
         container_entity: Entity,
         new_society: Option<SocietyHandle>,
     ) -> Result<(), ContainerError> {
-        let container = self
+        let mut container = self
             .component_mut::<ContainerComponent>(container_entity)
             .map_err(|_| ContainerError::BadEntity)?;
 

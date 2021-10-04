@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 
-use common::*;
-use crate::activity::Activity;
 use crate::activity::context::{ActivityContext, ActivityResult};
-
+use crate::activity::Activity;
+use common::*;
 
 const NOP_WARN_THRESHOLD: u32 = 60;
 

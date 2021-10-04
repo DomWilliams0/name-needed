@@ -6,9 +6,9 @@ use crate::item::{
 };
 use crate::queued_update::QueuedUpdates;
 
+use crate::activity::context::{ActivityContext, DistanceCheckResult};
 use crate::{ComponentWorld, Entity, InventoryComponent, PhysicalComponent, TransformComponent};
 use common::*;
-use crate::activity::context::{ActivityContext, DistanceCheckResult};
 
 /// Pick up item off the ground, checks if close enough first
 pub struct PickupSubactivity;
@@ -45,11 +45,7 @@ pub enum EquipItemError {
 
 impl PickupSubactivity {
     /// Checks if close enough to pick up
-    pub async fn pick_up(
-        &self,
-        ctx: &ActivityContext,
-        item: Entity,
-    ) -> Result<(), EquipItemError> {
+    pub async fn pick_up(&self, ctx: &ActivityContext, item: Entity) -> Result<(), EquipItemError> {
         // ensure close enough
         match ctx.check_entity_distance(item, MAX_DISTANCE.powi(2)) {
             DistanceCheckResult::NotAvailable => return Err(EquipItemError::NotAvailable),
@@ -88,46 +84,51 @@ impl EquipSubActivity {
         let holder = ctx.entity();
         let filter = ItemFilter::SpecificEntity(item);
 
-        let inventory = ctx
-            .world()
-            .component::<InventoryComponent>(holder)
-            .map_err(|_| EquipItemError::NoInventory)?;
+        {
+            let inventory = ctx
+                .world()
+                .component::<InventoryComponent>(holder)
+                .map_err(|_| EquipItemError::NoInventory)?;
 
-        // check if already equipped
-        let inv_slot = inventory.search(&filter, ctx.world());
-        match inv_slot {
-            None => Err(EquipItemError::NotInInventory),
-            Some(FoundSlot::Equipped(_)) => {
-                // already equipped
+            // check if already equipped
+            let inv_slot = inventory.search(&filter, ctx.world());
+            match inv_slot {
+                None => return Err(EquipItemError::NotInInventory),
+                Some(FoundSlot::Equipped(_)) => {
+                    // already equipped
 
-                // if its currently being hauled, don't drop it
-                if let Ok(hauling) = ctx.world().component_mut::<HauledItemComponent>(item) {
-                    hauling.interrupt_behaviour = EndHaulBehaviour::KeepEquipped;
-                    debug!("item is currently being hauled, ensuring it is kept in inventory");
-                }
-
-                Ok(())
-            }
-            Some(slot) => {
-                // in inventory but not equipped
-                debug!("found item"; "slot" => ?slot, "item" => item);
-
-                // equip next tick
-                queue_equip(ctx.world().resource(), holder, item, extra_hands, filter);
-
-                // wait for equip event
-                ctx.subscribe_to_specific_until(item, EntityEventType::BeenEquipped, |evt| {
-                    if let EntityEventPayload::BeenEquipped(result) = evt {
-                        Ok(result)
-                    } else {
-                        Err(evt)
+                    // if its currently being hauled, don't drop it
+                    if let Ok(mut hauling) = ctx.world().component_mut::<HauledItemComponent>(item)
+                    {
+                        hauling.interrupt_behaviour = EndHaulBehaviour::KeepEquipped;
+                        debug!("item is currently being hauled, ensuring it is kept in inventory");
                     }
-                })
-                .await
-                .unwrap_or(Err(EquipItemError::Cancelled))
-                .map(|_| {})
-            }
+
+                    return Ok(());
+                }
+                Some(slot) => {
+                    // in inventory but not equipped
+                    debug!("found item"; "slot" => ?slot, "item" => item);
+
+                    // continue outside of match, to allow dropping of the inventory component ref
+                }
+            };
         }
+
+        // equip next tick
+        queue_equip(ctx.world().resource(), holder, item, extra_hands, filter);
+
+        // wait for equip event
+        ctx.subscribe_to_specific_until(item, EntityEventType::BeenEquipped, |evt| {
+            if let EntityEventPayload::BeenEquipped(result) = evt {
+                Ok(result)
+            } else {
+                Err(evt)
+            }
+        })
+        .await
+        .unwrap_or(Err(EquipItemError::Cancelled))
+        .map(|_| {})
     }
 }
 
@@ -141,7 +142,7 @@ fn queue_equip(
 ) {
     updates.queue("equip item", move |world| {
         let do_equip = || -> Result<Entity, EquipItemError> {
-            let inventory = world
+            let mut inventory = world
                 .component_mut::<InventoryComponent>(holder)
                 .map_err(|_| EquipItemError::NoInventory)?;
 

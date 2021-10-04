@@ -61,13 +61,16 @@ impl<'a> GoToSubactivity<'a> {
 
         ctx.update_status(status);
 
-        let follow_path = ctx
-            .world()
-            .component_mut::<FollowPathComponent>(ctx.entity())
-            .map_err(GotoError::MissingComponent)?;
+        let path_token;
+        {
+            let mut follow_path = ctx
+                .world()
+                .component_mut::<FollowPathComponent>(ctx.entity())
+                .map_err(GotoError::MissingComponent)?;
 
-        // assign path
-        let path_token = follow_path.new_path_with_goal(dest, goal, speed);
+            // assign path
+            path_token = follow_path.new_path_with_goal(dest, goal, speed);
+        }
 
         // await arrival
         let goto_result = ctx
