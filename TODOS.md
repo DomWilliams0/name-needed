@@ -1,4 +1,4 @@
-# TODOs (385)
+# TODOs (382)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -232,11 +232,9 @@
    * `// TODO custom hash? just itself`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
- * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (4)
+ * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
-   * `let event = event.clone(); // TODO reimplement groupby to own the event without cloning`
-   * `// TODO the runtime does not return a subscription result synchronously - remove this branch?`
  * [game/simulation/src/event/subscription.rs](game/simulation/src/event/subscription.rs) (1)
    * `/// TODO type name of activity instead?`
  * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (3)
@@ -313,10 +311,9 @@
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/runtime/runtime.rs](game/simulation/src/runtime/runtime.rs) (2)
    * `// TODO reuse/share/pool this allocation between tasks, maybe own it in the runtime`
-   * `// TODO unnecessary unconditional clone of task reference?`
- * [game/simulation/src/runtime/system.rs](game/simulation/src/runtime/system.rs) (2)
+   * `// TODO reimplement raw waiter manually to avoid this unconditional clone`
+ * [game/simulation/src/runtime/system.rs](game/simulation/src/runtime/system.rs) (1)
    * `warn!("no current task?"; "subscriber" => subscriber); // TODO wut do? task is finished?`
-   * `// task has not yet responded to event, can't return anything useful here TODO`
  * [game/simulation/src/scripting/lua.rs](game/simulation/src/scripting/lua.rs) (1)
    * `// TODO configure lua GC`
  * [game/simulation/src/senses/sense.rs](game/simulation/src/senses/sense.rs) (1)

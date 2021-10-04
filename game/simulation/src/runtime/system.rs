@@ -60,12 +60,12 @@ impl<'a> System<'a> for RuntimeSystem {
                         task
                     } else {
                         warn!("no current task?"; "subscriber" => subscriber); // TODO wut do? task is finished?
-                        return EventUnsubscribeResult::UnsubscribeAll;
+                        return false;
                     }
                 }
                 None => {
                     warn!("subscriber is missing activity component"; "event" => ?evt, "subscriber" => subscriber);
-                    return EventUnsubscribeResult::UnsubscribeAll;
+                    return false;
                 }
             };
 
@@ -75,8 +75,7 @@ impl<'a> System<'a> for RuntimeSystem {
             // mark task as ready now to be polled next tick
             runtime.mark_ready(task);
 
-            // task has not yet responded to event, can't return anything useful here TODO
-            EventUnsubscribeResult::StaySubscribed
+            true
         });
     }
 }

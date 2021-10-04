@@ -1,9 +1,8 @@
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use common::{num_traits::FromPrimitive, *};
 
-use crate::activity::EventUnsubscribeResult;
 use crate::ecs::Entity;
 
 use crate::event::prelude::*;
@@ -16,7 +15,6 @@ struct BitSet(BitsetInner);
 // TODO event queue generic over event type
 pub struct EntityEventQueue {
     events: Vec<EntityEvent>,
-    unsubscribers: HashMap<Entity, Option<EntityEventSubscription>>,
 
     /// subject -> interested subscriber and his subscriptions
     subscriptions: HashMap<Entity, SmallVec<[(Entity, BitSet); 2]>>,
@@ -27,7 +25,6 @@ impl Default for EntityEventQueue {
     fn default() -> Self {
         Self {
             events: Vec::with_capacity(512),
-            unsubscribers: HashMap::with_capacity(64),
             subscriptions: HashMap::with_capacity(64),
             needs_cleanup: 0,
         }
@@ -40,30 +37,27 @@ impl EntityEventQueue {
         subscriber: Entity,
         subscriptions: impl Iterator<Item = EntityEventSubscription>,
     ) {
-        subscriptions
-            .group_by(|sub| sub.subject)
-            .into_iter()
-            .for_each(|(subject, subscriptions)| {
-                let subscriptions = subscriptions.map(|sub| sub.subscription);
+        for (subject, subscriptions) in subscriptions.group_by(|sub| sub.subject).into_iter() {
+            let subscriptions = subscriptions.map(|sub| sub.subscription);
 
-                match self.subscriptions.entry(subject) {
-                    Entry::Occupied(mut e) => {
-                        let subs = e.get_mut();
-                        let existing = subs.iter_mut().find(|(sub, _)| *sub == subscriber);
+            match self.subscriptions.entry(subject) {
+                Entry::Occupied(mut e) => {
+                    let subs = e.get_mut();
+                    let existing = subs.iter_mut().find(|(sub, _)| *sub == subscriber);
 
-                        if let Some((_, bitset)) = existing {
-                            bitset.add_all(subscriptions);
-                        } else {
-                            let bitset = BitSet::with(subscriptions);
-                            subs.push((subscriber, bitset));
-                        }
-                    }
-                    Entry::Vacant(e) => {
+                    if let Some((_, bitset)) = existing {
+                        bitset.add_all(subscriptions);
+                    } else {
                         let bitset = BitSet::with(subscriptions);
-                        e.insert(smallvec![(subscriber, bitset)]);
+                        subs.push((subscriber, bitset));
                     }
-                };
-            });
+                }
+                Entry::Vacant(e) => {
+                    let bitset = BitSet::with(subscriptions);
+                    e.insert(smallvec![(subscriber, bitset)]);
+                }
+            };
+        }
     }
 
     pub fn post(&mut self, event: EntityEvent) {
@@ -119,15 +113,16 @@ impl EntityEventQueue {
 
     /// Consumes all events posted since the last call.
     ///
-    /// * f: called per subscribed entity, f(subscriber, event)
-    pub fn consume_events(
-        &mut self,
-        mut f: impl FnMut(Entity, EntityEvent) -> EventUnsubscribeResult,
-    ) {
+    /// * f: called per subscribed entity, f(subscriber, event). If returns false, the subscriber
+    ///  is erroneous and won't get any more events
+    pub fn consume_events(&mut self, mut f: impl FnMut(Entity, EntityEvent) -> bool) {
         // move out of self
         let mut events = std::mem::take(&mut self.events);
 
         let grouped_events = events.drain(..).group_by(|evt| evt.subject);
+
+        // shouldn't happen often if ever, so no need to cache this allocation in self
+        let mut erroneous_subscribers = HashSet::new();
 
         for (subject, events) in grouped_events.into_iter() {
             // find subscribers interested in this subject entity
@@ -149,76 +144,37 @@ impl EntityEventQueue {
 
             // pass events to subscriptions
             for event in events {
-                for subscriber in subscribers.iter().filter_map(|(subscriber, sub)| {
-                    sub.contains(&event.payload).as_some(subscriber)
-                }) {
-                    let event = event.clone(); // TODO reimplement groupby to own the event without cloning
+                let event_type = EntityEventType::from(&event.payload);
+                for subscriber in subscribers
+                    .iter()
+                    .filter_map(|(subscriber, sub)| sub.contains(event_type).as_some(subscriber))
+                {
+                    // need to clone event for each iteration, and we don't know how many iterations
+                    // there will be up-front
+                    let event = event.clone();
 
-                    let event_ty = EntityEventType::from(&event.payload);
-                    let is_unsubscribed_already = self
-                        .unsubscribers
-                        .get(subscriber)
-                        .map(|unsub| match unsub {
-                            None => true, // unsub from all
-                            Some(sub) => sub.matches(event.subject, event_ty),
-                        })
-                        .unwrap_or(false);
+                    debug!("passing event"; "subscriber" => subscriber, "event" => ?&event);
+                    let not_erroneous = f(*subscriber, event);
 
-                    if is_unsubscribed_already {
-                        // already unsubscribed, no more events pls
-                        trace!("already unsubscribed, skipping"; "subscriber" => subscriber, "event" => ?event);
-                        continue;
+                    // events are passed asynchronously to handlers now, so we can't know at this
+                    // point whether or not to unsubscribe
+
+                    if !not_erroneous {
+                        warn!("skipping remaining events for erroneous subscriber"; "subscriber" => subscriber);
+                        erroneous_subscribers.insert(*subscriber);
+                        break;
                     }
-
-                    debug!("passing event"; "subscriber" => subscriber, "event" => ?event);
-                    let result = f(*subscriber, event);
-
-                    #[cfg(not(test))]
-                    {
-                        // TODO the runtime does not return a subscription result synchronously - remove this branch?
-                        assert!(matches!(result, EventUnsubscribeResult::StaySubscribed));
-                    }
-
-                    trace!("result"; "result" => ?result, "subscriber" => subscriber);
-
-                    let unsubscription = match result {
-                        EventUnsubscribeResult::UnsubscribeAll => None,
-                        EventUnsubscribeResult::Unsubscribe(subs) => Some(subs),
-                        EventUnsubscribeResult::StaySubscribed => continue,
-                    };
-
-                    self.unsubscribers.insert(*subscriber, unsubscription);
                 }
             }
         }
 
         drop(grouped_events);
 
-        // handle unsubscriptions
+        // unsubscribe erroneous subscribers from all
         // need to swap vec out from self to be able to access self mutably
-        let mut unsubs = std::mem::take(&mut self.unsubscribers);
-        for (unsubscriber, unsubs) in unsubs.drain() {
-            match unsubs {
-                None => {
-                    debug!(
-                        "unsubscribing from all subscriptions";
-                        "unsubscriber" => unsubscriber
-                    );
-                    self.unsubscribe_all(unsubscriber)
-                }
-                Some(unsub) => {
-                    debug!(
-                        "unsubscribing from specific subscription";
-                        "subscription" => ?unsub,
-                        "unsubscriber" => unsubscriber
-                    );
-                    self.unsubscribe(unsubscriber, unsub)
-                }
-            }
+        for subscriber in erroneous_subscribers {
+            self.unsubscribe_all(subscriber)
         }
-        std::mem::swap(&mut unsubs, &mut self.unsubscribers);
-        debug_assert!(unsubs.is_empty());
-        std::mem::forget(unsubs);
 
         // swap back allocation
         self.events.clear();
@@ -398,7 +354,7 @@ mod tests {
             assert_eq!(subscriber, e2);
             assert_eq!(e.subject, e1);
             assert!(matches!(e.payload, EntityEventPayload::DummyA));
-            EventUnsubscribeResult::UnsubscribeAll
+            false
         });
 
         // subscribe to e1 all
@@ -429,7 +385,7 @@ mod tests {
                 _ => unreachable!(),
             }
 
-            EventUnsubscribeResult::StaySubscribed
+            true
         });
 
         assert_eq!(dummy_a, 1);
@@ -440,7 +396,7 @@ mod tests {
         let mut count = 0;
         q.consume_events(|_, _| {
             count += 1;
-            EventUnsubscribeResult::StaySubscribed
+            true
         });
 
         count
@@ -666,7 +622,7 @@ mod tests {
         let mut subs = Vec::with_capacity(2);
         q.consume_events(|sub, _| {
             subs.push(sub);
-            EventUnsubscribeResult::StaySubscribed
+            true
         });
 
         assert_eq!(subs.len(), 2);
