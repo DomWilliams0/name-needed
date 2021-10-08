@@ -49,6 +49,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * resolve an entity to its displayable name including state in the UI layer only
 	* e.g. get item name ("Apple (rotten)"), person name ("Steve (unconscious)")
 	* expose via helper on NameComponent and replace all the current duplication with "unnamed"
+* when entity is in a container, show that instead of "unknown" position
 * ui button to skip up/down to next surface
 * inventory window (separate from debug window) to show items in person's inventory/container in a nice way
 * common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
@@ -72,6 +73,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * revamp hauling to add different methods
 	* carrying (add a new TransformChild component)
 	* dragging/pushing
+* [ ] add check for space anywhere in inventory before deciding to go pick something up, instead of going there and failing immediately
 
 ## World generation
 * better biome generation
@@ -172,6 +174,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * world update batcher
 * iaus ai
 * config with watcher
+* dynslot in activity status updates
 
 ## Rendering
 * textures/sprites/animations
@@ -183,11 +186,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: entities not rendered on a particular laptop (ticket #90)
 
 ## Building and testing
-* separate config and preset for tests
 * fuzzing
 * stress test(s)
 * code coverage in CI
-* smoke tests i.e. world+entity+food, should pickup and eat some. could use events to make sure or just query world after a time
 * tag pre-alpha commits in develop, and generate changelog in release notes
 * add tokio tracing feature to help debug deadlocks
 * revisit possible miri-compatibility

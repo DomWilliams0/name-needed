@@ -36,10 +36,10 @@
 * [X] reuse status updater allocation when changing activities
 * [X] add exertion to activity status
 * [X] remove old deprecated Activities and remove 2 suffix
-* [ ] add check for space anywhere in inventory before deciding to go pick something up
+* [~] add check for space anywhere in inventory before deciding to go pick something up
 * [X] enable activities to call each other directly
 * [X] replace outdated game preset with just a config file path argument, where config specifies world loader
-* [ ] bug: entities are not rendered on 1 particular linux laptop
+* [~] bug: entities are not rendered on 1 particular linux laptop
 * [X] haul activity status updates
-* [ ] when entity is in a container, show that instead of "unknown" in ui for position
+* [~] when entity is in a container, show that instead of "unknown" in ui for position
 * [X] derive display for statuses instead of manually implementing

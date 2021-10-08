@@ -12,6 +12,8 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 08 Oct 2021: <em>Major overhaul of activities (go pick this up, go break this block, etc) to use a custom async runtime for long running tasks, rather than manually implementing state machines. Activities are now much easier to write and maintain.</em>
+
 * 16 May 2021: <em>Simple Lua scripting API.</em>
 <p style="margin: auto">
     <img src=".screenshots/basic-scripting.gif" width="500"/>
