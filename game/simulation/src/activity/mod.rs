@@ -1,50 +1,50 @@
-pub use activities::*;
-pub(crate) use activity::ActivityFinish;
-pub use activity::{Activity, ActivityContext, EventUnblockResult, EventUnsubscribeResult};
-// TODO move subactivity errors somewhere else
+pub use activity::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
-pub use subactivities::{EquipItemError, HaulError, PickupItemError};
-pub use system::{
-    ActivityComponent, ActivityEventSystem, ActivitySystem, BlockingActivityComponent,
-};
+pub use status::{StatusReceiver, StatusUpdater};
+pub use subactivity::{EquipItemError, HaulError, HaulTarget};
+pub use system::{ActivityComponent, ActivitySystem};
 
-mod activities;
 mod activity;
+mod context;
 mod event_logging;
-mod subactivities;
+mod status;
+mod subactivity;
 mod system;
 
 mod action_to_activity {
-    use crate::activity::Activity;
+    use crate::activity::activity::Activity;
     use crate::ai::AiAction;
-    use crate::item::ItemsToPickUp;
-    use crate::ComponentWorld;
 
     use super::*;
+    use common::NormalizedFloat;
+    use std::rc::Rc;
+    use world::SearchGoal;
 
     impl AiAction {
-        pub fn into_activity<W: ComponentWorld>(self) -> Box<dyn Activity<W>> {
+        pub fn into_activity(self) -> Rc<dyn Activity> {
             macro_rules! activity {
                 ($act:expr) => {
-                    Box::new($act) as Box<dyn Activity<W>>
+                    Rc::new($act) as Rc<dyn Activity>
                 };
             }
 
             match self {
-                AiAction::Nop => activity!(NopActivity::default()),
-                AiAction::Goto { target, reason } => activity!(GoToActivity::new(target, reason)),
-                AiAction::GoPickUp(ItemsToPickUp(desc, _, items)) => {
-                    activity!(PickupItemsActivity::with_items(items, desc))
-                }
                 AiAction::Wander => activity!(WanderActivity::default()),
+                AiAction::Nop => activity!(NopActivity::default()),
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
+                AiAction::GoEquip(e) => activity!(GoEquipActivity::new(e)),
+                AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::new(item)),
+                AiAction::Goto(target) => activity!(GoToActivity::new(
+                    target,
+                    NormalizedFloat::new(0.8),
+                    SearchGoal::Arrive
+                )),
                 AiAction::Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }
                 AiAction::Haul(thing, source, target) => {
-                    activity!(HaulActivity::new(thing, source, target))
+                    activity!(GoHaulActivity::new(thing, source, target))
                 }
-                AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::with_item(item)),
             }
         }
     }

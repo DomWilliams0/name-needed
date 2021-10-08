@@ -1,6 +1,6 @@
 use crate::ecs::*;
 use crate::senses::sense::{HearingSphere, Sense, VisionCone};
-use crate::spatial::Spatial;
+use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
 use common::*;
 use serde::Deserialize;
@@ -60,6 +60,7 @@ impl<'a> System<'a> for SensesSystem {
 
         // update sense capabilities
         for (e, provider, senses) in (&entities, &providers, &mut senses).join() {
+            let e = Entity::from(e);
             let prev_hash = senses.debug_hash();
             senses.clear();
 
@@ -68,13 +69,14 @@ impl<'a> System<'a> for SensesSystem {
             // senses.hearing.push(provider.hearing.clone());
 
             if senses.debug_hash() != prev_hash {
-                debug!("senses updated"; E(e), "senses" => ?senses)
+                debug!("senses updated"; e, "senses" => ?senses)
             }
         }
 
         // use senses
         for (e, senses, transform) in (&entities, &mut senses, &transforms).join() {
-            log_scope!(o!(E(e)));
+            let e = Entity::from(e);
+            log_scope!(o!(e));
 
             senses.decay_sensed_entities();
 
@@ -91,7 +93,7 @@ impl<'a> System<'a> for SensesSystem {
             // TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)
 
             spatial
-                .query_in_radius(transform.position, max_radius)
+                .query_in_radius((&transforms).into(), transform.position, max_radius)
                 .filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list
                 .for_each(|(entity, pos, dist)| {
                     let sensed = senses.senses(transform, &pos, dist);

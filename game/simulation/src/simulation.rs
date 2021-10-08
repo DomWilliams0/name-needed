@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::ops::{Add, Deref};
 
 use common::*;
 use resources::Resources;
@@ -8,11 +8,11 @@ use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
-use crate::activity::{ActivityEventSystem, ActivitySystem};
+use crate::activity::ActivitySystem;
 use crate::ai::{AiAction, AiComponent, AiSystem};
 
 use crate::ecs::*;
-use crate::event::{EntityEventQueue, EntityTimers};
+use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
     UiCommand, UiRequest, UiResponsePayload,
@@ -30,6 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
 use crate::spatial::{Spatial, SpatialSystem};
@@ -40,6 +41,7 @@ use crate::{
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
+use std::pin::Pin;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
@@ -59,7 +61,7 @@ static mut TICK: u32 = 0;
 pub struct Tick(u32);
 
 pub struct Simulation<R: Renderer> {
-    ecs_world: EcsWorld,
+    ecs_world: Pin<Box<EcsWorld>>,
     voxel_world: WorldRef,
 
     world_loader: ThreadedWorldLoader,
@@ -93,6 +95,8 @@ pub struct SimulationRef<'s> {
     pub debug_renderers: &'s DebugRenderersState,
 }
 
+pub struct EcsWorldRef(Pin<&'static EcsWorld>);
+
 impl world::WorldContext for WorldContext {
     type AssociatedBlockData = AssociatedBlockData;
 }
@@ -114,13 +118,25 @@ impl<R: Renderer> Simulation<R> {
         ecs_world.insert(definitions);
         register_resources(&mut ecs_world);
 
+        // get a self referential ecs world resource pointing to itself
+        // safety: static lifetime is as long as the game is running, as any system that uses it
+        // lives within in
+        let mut pinned_world = Box::pin(ecs_world);
+        unsafe {
+            let w = Pin::get_unchecked_mut(pinned_world.as_mut());
+            let world_ptr = w as *mut EcsWorld as *const EcsWorld;
+
+            let pinned_ref = Pin::new(&*world_ptr as &'static EcsWorld);
+            w.insert(EcsWorldRef(pinned_ref));
+        }
+
         let debug_renderers = register_debug_renderers()?;
 
         // ensure tick is reset
         reset_tick();
 
         Ok(Self {
-            ecs_world,
+            ecs_world: pinned_world,
             voxel_world,
             world_loader,
             debug_renderers,
@@ -139,9 +155,6 @@ impl<R: Renderer> Simulation<R> {
         increment_tick();
 
         // TODO sort out systems so they all have an ecs_world reference and can keep state
-        // safety: only lives for the duration of this tick
-        let ecs_ref = unsafe { EcsWorldFrameRef::init(&self.ecs_world) };
-        self.ecs_world.insert(ecs_ref);
 
         // TODO limit time/count
         self.apply_world_updates(world_viewer);
@@ -152,13 +165,10 @@ impl<R: Renderer> Simulation<R> {
         // tick game logic
         self.tick_systems();
 
-        // we're about to go mutable, drop this fuzzy ball of unsafeness
-        let _ = self.ecs_world.remove::<EcsWorldFrameRef>();
-
         // per tick maintenance
         // must remove resource from world first so we can use &mut ecs_world
         let mut updates = self.ecs_world.remove::<QueuedUpdates>().unwrap();
-        updates.execute(&mut self.ecs_world);
+        updates.execute(Pin::as_mut(&mut self.ecs_world));
         self.ecs_world.insert(updates);
 
         self.ecs_world.maintain();
@@ -180,7 +190,8 @@ impl<R: Renderer> Simulation<R> {
 
         // choose and tick activity
         AiSystem.run_now(&self.ecs_world);
-        ActivitySystem.run_now(&self.ecs_world);
+        ActivitySystem(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
+        self.ecs_world.resource::<Runtime>().tick();
 
         // follow paths with steering
         PathSteeringSystem.run_now(&self.ecs_world);
@@ -192,7 +203,8 @@ impl<R: Renderer> Simulation<R> {
         MovementFulfilmentSystem.run_now(&self.ecs_world);
 
         // process entity events
-        ActivityEventSystem.run_now(&self.ecs_world);
+        // ActivityEventSystem.run_now(&self.ecs_world);
+        RuntimeSystem.run_now(&self.ecs_world);
 
         // apply physics
         PhysicsSystem.run_now(&self.ecs_world);
@@ -311,7 +323,7 @@ impl<R: Renderer> Simulation<R> {
                     let entity = match self
                         .ecs_world
                         .resource_mut::<SelectedEntity>()
-                        .get(&self.ecs_world)
+                        .get(&*self.ecs_world)
                     {
                         Some(e) => e,
                         None => {
@@ -321,23 +333,20 @@ impl<R: Renderer> Simulation<R> {
                     };
 
                     let command = match divine_command {
-                        DivineInputCommand::Goto(pos) => AiAction::Goto {
-                            target: pos.centred(),
-                            reason: "I said so",
-                        },
+                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
                         DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(*pos),
                     };
 
                     match self.ecs_world.component_mut::<AiComponent>(entity) {
                         Err(e) => warn!("can't issue divine command"; "error" => %e),
-                        Ok(ai) => {
+                        Ok(mut ai) => {
                             // add DSE
                             ai.add_divine_command(command.clone());
                         }
                     }
                 }
                 UiRequest::IssueSocietyCommand(society, command) => {
-                    let job = match command.into_job(&self.ecs_world) {
+                    let job = match command.into_job(&*self.ecs_world) {
                         Ok(job) => job,
                         Err(cmd) => {
                             warn!("failed to issue society command"; "command" => ?cmd);
@@ -366,13 +375,13 @@ impl<R: Renderer> Simulation<R> {
                         .component_mut::<ContainerComponent>(container)
                     {
                         Err(e) => {
-                            warn!("invalid container entity"; "entity" => E(container), "error" => %e);
+                            warn!("invalid container entity"; "entity" => container, "error" => %e);
                             continue;
                         }
-                        Ok(c) => {
+                        Ok(mut c) => {
                             if let Some(owner) = owner {
                                 c.owner = owner;
-                                info!("set container owner"; "container" => E(container), "owner" => owner.map(E))
+                                info!("set container owner"; "container" => container, "owner" => owner)
                             }
 
                             if let Some(communal) = communal {
@@ -381,7 +390,7 @@ impl<R: Renderer> Simulation<R> {
                                     .helpers_containers()
                                     .set_container_communal(container, communal)
                                 {
-                                    warn!("failed to set container society"; "container" => E(container), "society" => ?communal, "error" => %e);
+                                    warn!("failed to set container society"; "container" => container, "society" => ?communal, "error" => %e);
                                 }
                             }
                         }
@@ -392,7 +401,7 @@ impl<R: Renderer> Simulation<R> {
                     info!("executing script"; "path" => %path.display());
                     let result = self
                         .scripting
-                        .eval_path(&path, &self.ecs_world, &self.voxel_world)
+                        .eval_path(&path, &*self.ecs_world, &self.voxel_world)
                         .map(|output| output.into_string());
 
                     if let Err(err) = result.as_ref() {
@@ -426,7 +435,7 @@ impl<R: Renderer> Simulation<R> {
         input: &[InputEvent],
     ) -> R::Target {
         // process input before rendering
-        InputSystem { events: input }.run_now(&self.ecs_world);
+        InputSystem { events: input }.run_now(&*self.ecs_world);
 
         // start frame
         renderer.init(target);
@@ -441,7 +450,7 @@ impl<R: Renderer> Simulation<R> {
                     interpolation: interpolation as f32,
                 };
 
-                render_system.run_now(&self.ecs_world);
+                render_system.run_now(&*self.ecs_world);
             }
             if let Err(e) = renderer.sim_finish() {
                 warn!("render sim_finish() failed"; "error" => %e);
@@ -451,7 +460,7 @@ impl<R: Renderer> Simulation<R> {
         // render debug shapes
         {
             renderer.debug_start();
-            let ecs_world = &self.ecs_world;
+            let ecs_world = &*self.ecs_world;
             let voxel_world = self.voxel_world.borrow();
             let world_loader = &self.world_loader;
 
@@ -500,9 +509,9 @@ impl<R: Renderer> Simulation<R> {
         }
     }
 
-    pub fn as_lite_ref<'a>(&'a self) -> SimulationRefLite<'a> {
+    pub fn as_lite_ref(&self) -> SimulationRefLite {
         SimulationRefLite {
-            ecs: &self.ecs_world,
+            ecs: &*self.ecs_world,
             world: &self.voxel_world,
             loader: &self.world_loader,
         }
@@ -510,7 +519,7 @@ impl<R: Renderer> Simulation<R> {
 
     pub fn as_ref<'a>(&'a self, viewer: &'a WorldViewer) -> SimulationRef<'a> {
         SimulationRef {
-            ecs: &self.ecs_world,
+            ecs: &*self.ecs_world,
             world: &self.voxel_world,
             loader: &self.world_loader,
             viewer,
@@ -570,7 +579,8 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(PlayerSociety::default());
     world.insert(EntityEventQueue::default());
     world.insert(Spatial::default());
-    world.insert(EntityTimers::default());
+    world.insert(RuntimeTimers::default());
+    world.insert(Runtime::default());
 }
 
 fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {
@@ -586,4 +596,19 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<FeatureBoundaryDebugRenderer>()?;
 
     Ok(builder.build())
+}
+
+impl Default for EcsWorldRef {
+    fn default() -> Self {
+        // register manually
+        unreachable!()
+    }
+}
+
+impl Deref for EcsWorldRef {
+    type Target = EcsWorld;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
 }

@@ -1,14 +1,16 @@
-use crate::ecs::{EcsWorld, Entity};
-use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
-use crate::{ComponentWorld, TransformComponent, E};
 use unit::world::WorldPoint;
 
+use crate::ecs::{EcsWorld, Entity, WorldExt};
+use crate::{ComponentWorld, TransformComponent};
+
+use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
+
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtComponents<'w>(&'w mut EcsWorld);
+pub struct EcsExtComponents<'w>(&'w EcsWorld);
 
 impl EcsWorld {
     /// Helper methods to add and remove components for given actions
-    pub fn helpers_comps(&mut self) -> EcsExtComponents {
+    pub fn helpers_comps(&self) -> EcsExtComponents {
         EcsExtComponents(self)
     }
 }
@@ -19,7 +21,7 @@ impl EcsExtComponents<'_> {
     ///
     /// Panics if haulee is not alive
     pub fn begin_haul(
-        &mut self,
+        &self,
         haulee: Entity,
         hauler: Entity,
         hauler_pos: Option<WorldPoint>,
@@ -27,11 +29,8 @@ impl EcsExtComponents<'_> {
     ) {
         debug_assert!(self.is_entity_alive(haulee));
 
-        self.add_now(haulee, HauledItemComponent::new(hauler, haul_type))
-            .unwrap(); // haulee is alive
-
-        self.add_now(haulee, ContainedInComponent::InventoryOf(hauler))
-            .unwrap();
+        let _ = self.add_now(haulee, HauledItemComponent::new(hauler, haul_type));
+        let _ = self.add_now(haulee, ContainedInComponent::InventoryOf(hauler));
 
         // add transform to the haulee if it doesn't already have one
         if let Some(hauler_pos) = hauler_pos {
@@ -63,11 +62,10 @@ impl EcsExtComponents<'_> {
                 let _ = self.remove_now::<ContainedInComponent>(haulee);
             }
             EndHaulBehaviour::KeepEquipped => {
-                let contained_in = self
-                    .component::<ContainedInComponent>(haulee)
-                    .unwrap()
-                    .clone();
-                self.add_to_container(haulee, contained_in);
+                if let Ok(contained_in) = self.component::<ContainedInComponent>(haulee).as_deref()
+                {
+                    self.add_to_container(haulee, contained_in.clone());
+                }
             }
         };
 
@@ -77,18 +75,15 @@ impl EcsExtComponents<'_> {
     /// Removes ContainedInComponent
     pub fn remove_from_container(&mut self, item: Entity) {
         let result = self.remove_now::<ContainedInComponent>(item);
-        debug_assert!(
-            result.is_some(),
-            "{} didnt have contained component",
-            E(item)
-        );
+        debug_assert!(result.is_some(), "{} didnt have contained component", item);
     }
 
-    /// Removes TransformComponent and adds given ContainedInComponent
+    /// Removes TransformComponent and adds given ContainedInComponent.
+    /// Item must still be added to ContainerComponent!!
     pub fn add_to_container(&mut self, item: Entity, container: ContainedInComponent) {
         debug_assert!(self.is_entity_alive(item));
 
         let _ = self.remove_now::<TransformComponent>(item);
-        self.add_now(item, container).unwrap();
+        let _ = self.add_now(item, container);
     }
 }

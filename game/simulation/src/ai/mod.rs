@@ -54,8 +54,7 @@ pub struct SharedBlackboard {
 impl ai::Blackboard for AiBlackboard<'_> {
     #[cfg(feature = "metrics")]
     fn entity(&self) -> String {
-        use crate::entity_pretty;
-        format!("{}", entity_pretty!(self.entity))
+        format!("{}", self.entity)
     }
 }
 

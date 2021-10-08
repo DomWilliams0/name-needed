@@ -2,7 +2,6 @@ use futures::TryFutureExt;
 use std::error::Error;
 use std::process::Stdio;
 use std::time::Duration;
-use testing::{register_tests, TestDeclaration, TEST_NAME_VAR};
 use tokio::process::{Child, Command};
 
 /// Test runner
@@ -12,21 +11,35 @@ struct Args {
     #[argh(switch)]
     graphical: bool,
 
-    // TODO specify single test to run
     /// timeout in seconds per test
     #[argh(option, default = "30")]
     timeout: u32,
+
+    /// only run tests containing this string in their name
+    #[argh(option)]
+    filter: Option<String>,
+
+    /// just collect tests, don't run them
+    #[argh(switch)]
+    dry_run: bool,
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 5)]
 async fn main() {
+    #[cfg(not(feature = "testing"))]
+    {
+        panic!("\"testing\" feature is needed")
+    }
+
+    #[cfg(feature = "testing")]
     if let Err(err) = do_main().await {
         panic!("{}", err)
     }
 }
 
+#[cfg(feature = "testing")]
 async fn do_main() -> Result<(), Box<dyn Error>> {
-    register_tests();
+    testing::register_tests();
 
     let args = argh::from_env::<Args>();
     let renderer = if args.graphical {
@@ -35,10 +48,44 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         Renderer::Lite
     };
 
-    let tests = inventory::iter::<TestDeclaration>
+    let mut tests = inventory::iter::<testing::TestDeclaration>
         .into_iter()
         .collect::<Vec<_>>();
-    eprintln!("running {} tests", tests.len());
+
+    let summary = {
+        let mut s = if let Some(filter) = args.filter {
+            let total_count = tests.len();
+            let filter = filter.to_lowercase();
+            tests.retain(|test| test.name.to_lowercase().contains(&filter));
+            format!(
+                "{}/{} tests matching filter '{}':\n",
+                tests.len(),
+                total_count,
+                filter
+            )
+        } else {
+            format!("{} tests:\n", tests.len())
+        };
+
+        for test in &tests {
+            s.push_str(" - ");
+            s.push_str(test.name);
+            s.push('\n');
+        }
+
+        s.pop(); // last nl
+
+        s
+    };
+    eprintln!("running {}", summary);
+
+    if args.dry_run {
+        return Ok(());
+    }
+
+    if tests.is_empty() {
+        return Err("no tests".into());
+    }
 
     CargoCommand::Build
         .run(renderer)
@@ -47,7 +94,6 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
 
     for test in tests {
         eprintln!("running test {:?}", test.name);
-        // TODO run n in parallel
 
         let mut test_process = CargoCommand::Run { test: test.name }.run(renderer).await?;
         let result_fut = wait_on_process_ref(&mut test_process);
@@ -71,7 +117,7 @@ async fn do_main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    eprintln!("done");
+    eprintln!("successfully ran {}", summary);
     Ok(())
 }
 
@@ -86,6 +132,7 @@ enum Renderer {
     Graphical,
 }
 
+#[cfg(feature = "testing")]
 impl CargoCommand<'_> {
     async fn run(self, renderer: Renderer) -> Result<Child, Box<dyn Error>> {
         let subcmd = match &self {
@@ -95,7 +142,7 @@ impl CargoCommand<'_> {
 
         let mut builder = Command::new(env!("CARGO"));
         if let CargoCommand::Run { test } = self {
-            builder.env(TEST_NAME_VAR, test);
+            builder.env(testing::TEST_NAME_VAR, test);
         }
         builder
             .args(&[
@@ -112,10 +159,13 @@ impl CargoCommand<'_> {
             Renderer::Lite => "lite",
             Renderer::Graphical => "use-sdl",
         };
-        builder
-            .args(&["--features", feature])
-            .spawn()
-            .map_err(Into::into)
+        builder.args(&["--features", feature]);
+
+        if let CargoCommand::Run { .. } = self {
+            builder.args(&["--", "--config", "tests"]);
+        }
+
+        builder.spawn().map_err(Into::into)
     }
 }
 

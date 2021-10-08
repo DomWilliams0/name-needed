@@ -57,7 +57,8 @@ impl<'a> System<'a> for PhysicsSystem {
         for (e, physical, transform, physics, _) in
             (&entities, &physical, &mut transform, &mut physics, !&hauled).join()
         {
-            log_scope!(o!("system" => "physics", E(e)));
+            let e = Entity::from(e);
+            log_scope!(o!("system" => "physics", e));
 
             // update last position for render interpolation
             transform.last_position = transform.position;

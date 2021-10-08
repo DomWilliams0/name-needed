@@ -1,7 +1,6 @@
 use imgui::{im_str, StyleColor};
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::E;
 use simulation::{
     AssociatedBlockData, ComponentWorld, NameComponent, PlayerSociety, Societies, SocietyHandle,
 };
@@ -80,8 +79,9 @@ impl SocietyWindow {
                 .zip(block_selection.single_tile())
             {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
-                    let name = ecs
-                        .component::<NameComponent>(entity)
+                    let name_comp = ecs.component::<NameComponent>(entity).ok();
+                    let name = name_comp
+                        .as_ref()
                         .map(|n| n.0.as_str())
                         .unwrap_or("unnamed"); // TODO another manual name component access
 
@@ -104,8 +104,9 @@ impl SocietyWindow {
 
                     let block_data = w.associated_block_data(target);
                     if let Some(AssociatedBlockData::Container(container)) = block_data {
-                        let container_name = ecs
-                            .component::<NameComponent>(*container)
+                        let name_comp = ecs.component::<NameComponent>(*container);
+                        let container_name = name_comp
+                            .as_ref()
                             .map(|n| n.0.as_str())
                             .unwrap_or("container");
 
@@ -169,7 +170,7 @@ impl SocietyWindow {
                     for reserver in reservers.iter() {
                         context.text_colored(
                             COLOR_BLUE,
-                            ui_str!(in context, "  * Reserved by {}", E(*reserver)),
+                            ui_str!(in context, "  * Reserved by {}", *reserver),
                         );
                     }
                 },

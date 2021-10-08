@@ -1,11 +1,9 @@
 use common::*;
-use presets::{DevGamePreset, EmptyGamePreset, GamePreset};
 use simulation::state::BackendState;
 use simulation::{
-    self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
+    self, AsyncWorkerPool, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
+    Simulation, WorldPosition, WorldViewer,
 };
-
-use crate::presets::ContinuousIntegrationGamePreset;
 
 use crate::scenarios::Scenario;
 use config::ConfigType;
@@ -28,7 +26,6 @@ mod count_allocs {
     static A: AllocCounter<Allocator> = AllocCounter(ALLOCATOR);
 }
 
-mod presets;
 mod scenarios;
 
 #[cfg(feature = "use-sdl")]
@@ -43,9 +40,9 @@ type Renderer = <BackendInit as InitializedSimulationBackend>::Renderer;
 /// 🎵 Nice game without a name 🎵
 #[derive(argh::FromArgs)]
 struct Args {
-    /// game preset
-    #[argh(option)]
-    preset: Option<String>,
+    /// config file name within resources
+    #[argh(option, default = "\"config.ron\".to_owned()")]
+    config: String,
 
     /// directory containing game files
     #[argh(option, default = "PathBuf::from(\".\")")]
@@ -62,9 +59,6 @@ struct Args {
 enum StartError {
     #[error("No such scenario '{0}'")]
     NoSuchScenario(String),
-
-    #[error("No such preset '{0}'")]
-    NoSuchPreset(String),
 }
 
 fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
@@ -100,18 +94,9 @@ fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
     }
 }
 
+#[allow(unused_mut)]
 fn do_main() -> BoxedResult<()> {
     let args = argh::from_env::<Args>();
-
-    let preset: Box<dyn GamePreset<Renderer>> = match args.preset.as_deref() {
-        None | Some("dev") => Box::new(DevGamePreset::<Renderer>::default()),
-        Some("ci") => Box::new(ContinuousIntegrationGamePreset::default()),
-        Some("empty") => Box::new(EmptyGamePreset::default()),
-        Some(other) => return Err(StartError::NoSuchPreset(other.to_owned()).into()),
-    };
-
-    info!("chosen game preset"; "preset" => ?preset.name());
-
     let scenario = resolve_scenario(&args)?;
 
     // start metrics server
@@ -122,16 +107,19 @@ fn do_main() -> BoxedResult<()> {
     let resources = Resources::new(args.directory.canonicalize()?)?;
 
     // load config
-    if let Some(config_file_name) = preset.config_filename() {
-        info!("loading config"; "file" => ?config_file_name);
+    let config_filename = {
+        let mut path = PathBuf::from(args.config);
+        path.set_extension("ron");
+        path.into_os_string()
+    };
+    info!("loading config"; "file" => ?config_filename);
 
-        let resource_path = resources.get_file(config_file_name)?;
-        let file_path = resource_path
-            .file_path()
-            .expect("non file config not yet supported"); // TODO
+    let resource_path = resources.get_file(&*config_filename)?;
+    let file_path = resource_path
+        .file_path()
+        .expect("non file config not yet supported"); // TODO
 
-        config::init(ConfigType::WatchedFile(file_path))?;
-    }
+    config::init(ConfigType::WatchedFile(file_path))?;
 
     // initialize persistent backend
     let mut backend_state = {
@@ -139,9 +127,8 @@ fn do_main() -> BoxedResult<()> {
         BackendState::<Backend>::new(&resources)?
     };
 
-    loop {
-        // create simulation
-        let (simulation, initial_block) = preset.load(resources.clone(), scenario)?;
+    let ret = loop {
+        let (simulation, initial_block) = start::create_simulation(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
         let world_viewer = WorldViewer::with_world(simulation.voxel_world(), initial_block)?;
@@ -176,11 +163,27 @@ fn do_main() -> BoxedResult<()> {
         backend_state.end();
 
         match exit {
+            Exit::Stop | Exit::Restart if cfg!(feature = "testing") => {
+                break Err("test was aborted".into())
+            }
+
+            #[cfg(feature = "testing")]
+            Exit::TestSuccess => break Ok(()),
+
+            #[cfg(feature = "testing")]
+            Exit::TestFailure(err) => break Err(err.into()),
+
             Exit::Stop => break Ok(()),
-            Exit::Abort(err) => break Err(err.into()),
             Exit::Restart => continue,
         }
+    };
+
+    #[cfg(feature = "tests")]
+    {
+        testing::destroy_hook();
     }
+
+    ret
 }
 
 fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {
@@ -260,4 +263,169 @@ fn main() {
     drop(logger_guard);
 
     std::process::exit(exit);
+}
+
+mod start {
+    use super::Renderer;
+    use crate::scenarios::Scenario;
+    use common::*;
+    use config::WorldSource;
+    use resources::Resources;
+    use simulation::{
+        all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
+        PlanetParams, Simulation, SlabLocation, TerrainSourceError, ThreadedWorldLoader,
+        WorldLoader, WorldPosition,
+    };
+    use std::time::Duration;
+
+    /// (new empty simulation, initial block to centre camera on)
+    pub fn create_simulation(
+        resources: Resources,
+        scenario: Scenario,
+    ) -> BoxedResult<(Simulation<Renderer>, WorldPosition)> {
+        // create world loader
+        let mut world_loader = {
+            let thread_count = config::get()
+                .world
+                .worker_threads
+                .unwrap_or_else(|| (num_cpus::get() - 2).max(1));
+            debug!(
+                "using {threads} threads for world loader",
+                threads = thread_count
+            );
+            let pool = AsyncWorkerPool::new(thread_count)?;
+
+            let which_source = config::get().world.source.clone();
+            world_from_source(which_source, pool, &resources.world_gen()?)?
+        };
+
+        let initial_block = load_initial_world(&mut world_loader)?;
+        info!("centring camera on block"; "block" => %initial_block);
+
+        let mut sim = Simulation::new(world_loader, resources)?;
+        init_simulation(&mut sim, scenario)?;
+        Ok((sim, initial_block))
+    }
+
+    fn world_from_source(
+        source: config::WorldSource,
+        pool: AsyncWorkerPool,
+        resources: &resources::WorldGen,
+    ) -> BoxedResult<WorldLoader<simulation::WorldContext>> {
+        Ok(match source {
+            config::WorldSource::Preset(preset) => {
+                debug!("loading world preset"; "preset" => ?preset);
+                let source = presets::from_preset(preset);
+                WorldLoader::new(source, pool)
+            }
+            config::WorldSource::Generate(file) => {
+                debug!("generating world from config"; "path" => %file.display());
+
+                let params = PlanetParams::load_with_only_file(resources, file.as_os_str());
+                let source = params.and_then(|params| {
+                    pool.runtime()
+                        .block_on(async { GeneratedTerrainSource::new(params).await })
+                })?;
+                WorldLoader::new(source, pool)
+            }
+        })
+    }
+
+    fn load_initial_world(
+        world_loader: &mut WorldLoader<simulation::WorldContext>,
+    ) -> BoxedResult<WorldPosition> {
+        let (chunk, slab_depth, chunk_radius, is_preset) = {
+            let cfg = config::get();
+            let (cx, cy) = match cfg.world.source {
+                WorldSource::Preset(_) => (0, 0), // ignore config for preset worlds
+                WorldSource::Generate(_) => cfg.world.initial_chunk,
+            };
+
+            (
+                ChunkLocation(cx, cy),
+                cfg.world.initial_slab_depth as i32,
+                cfg.world.initial_chunk_radius as i32,
+                cfg.world.source.is_preset(),
+            )
+        };
+
+        // request ground level in requested start chunk
+        // TODO middle of requested chunk instead of corner
+        let ground_level = {
+            let block = chunk.get_block(0); // z ignored
+            match world_loader.get_ground_level(block) {
+                Ok(slice) => slice,
+                Err(TerrainSourceError::BlockOutOfBounds(_)) if is_preset => {
+                    // special case, assume preset starts at 0
+                    warn!(
+                        "could not find block {:?} in preset world, assuming ground is at 0",
+                        block
+                    );
+                    0.into()
+                }
+                err => err?,
+            }
+        };
+
+        let ground_slab = ground_level.slab_index();
+
+        debug!(
+            "ground level in {chunk:?} is {ground}",
+            chunk = chunk,
+            ground = ground_level.slice();
+            ground_slab,
+        );
+
+        let initial_block = chunk.get_block(ground_level);
+
+        // request slab range and wait for completion or timeout
+        let (slabs_to_request, slab_count) = all_slabs_in_range(
+            SlabLocation::new(
+                ground_slab - slab_depth,
+                (chunk.x() - chunk_radius, chunk.y() - chunk_radius),
+            ),
+            SlabLocation::new(
+                ground_slab + slab_depth,
+                (chunk.x() + chunk_radius, chunk.y() + chunk_radius),
+            ),
+        );
+
+        debug!(
+            "waiting for world to load {slabs} slabs around chunk {chunk:?} \
+                before initializing simulation",
+            chunk = chunk,
+            slabs = slab_count
+        );
+
+        world_loader.request_slabs_with_count(slabs_to_request, slab_count);
+        let timeout = Duration::from_secs(config::get().world.load_timeout as u64);
+        world_loader.block_for_last_batch_with_bail(timeout, panik::has_panicked)?;
+
+        Ok(initial_block)
+    }
+
+    fn init_simulation(sim: &mut Simulation<Renderer>, scenario: Scenario) -> BoxedResult<()> {
+        let (seed, source) = if let Some(seed) = config::get().simulation.random_seed {
+            (seed, "config")
+        } else {
+            (thread_rng().next_u64(), "randomly generated")
+        };
+
+        random::reseed(seed);
+        info!(
+            "seeding random generator with seed {seed}",
+            seed = seed; "source" => source
+        );
+
+        // create society for player to control
+        let player_society = sim
+            .societies()
+            .new_society("Top Geezers".to_owned())
+            .unwrap();
+        *sim.player_society() = Some(player_society);
+
+        // defer to scenario for entity spawning
+        scenario(&sim.world());
+        Ok(())
+    }
 }

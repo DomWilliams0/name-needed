@@ -29,6 +29,9 @@ strum_macros = "0.19"
 bitflags = "1.2"
 sortedvec = "0.5"
 rbl_circular_buffer = "0.1"
+futures = "0.3"
+cooked-waker = "5.0"
+async-trait = "0.1"
 
 ron = "0.6"
 serde = "1.0"
@@ -40,3 +43,4 @@ rlua = { version = "0.17", optional = true }
 default = []
 metrics = ["ai/logging", "common/metrics"]
 scripting = ["rlua"]
+testing = []

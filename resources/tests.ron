@@ -1,0 +1,35 @@
+Config(
+    display: (
+        resolution: (1280, 720),
+        resizable: false,
+        camera_move_speed: 1.0,
+        initial_zoom: 1.0,
+        camera_zoom_speed: 0.05,
+        initial_view_range: 8,
+        persist_ui: true,
+    ),
+    world: (
+        source: Preset(OneChunkWonder),
+        load_timeout: 30,
+        worker_threads: Some(1),
+        initial_chunk: (0, 0),
+
+        /// keep these low <=8
+        initial_slab_depth: 0,
+        initial_chunk_radius: 1,
+    ),
+    simulation: (
+        random_seed: Some(67853852415423),
+        friction: 0.85,
+        start_delay: 0,
+        // unused
+        spawn_counts: {
+            "humans": 0,
+            "dogs": 0,
+            "food": 0,
+            "bricks": 0,
+        },
+        entity_logging_by_default: true,
+        entity_logging_capacity: 64,
+     ),
+)

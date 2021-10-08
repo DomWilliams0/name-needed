@@ -1,144 +1,126 @@
-use crate::activity::activity::{
-    Activity, ActivityContext, ActivityEventContext, ActivityFinish, ActivityResult,
-};
-use crate::ai::{AiAction, AiComponent};
-use crate::ecs::*;
-use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue, EntityTimers};
-use crate::queued_update::QueuedUpdates;
+use std::pin::Pin;
+
 use common::*;
 
-use crate::activity::{EventUnblockResult, EventUnsubscribeResult};
+use crate::activity::context::ActivityContext;
+use crate::activity::NopActivity;
+use crate::ai::{AiAction, AiComponent};
+use crate::ecs::*;
 
-use crate::activity::activities::NopActivity;
-use crate::activity::event_logging::EntityLoggingComponent;
-use crate::job::{SocietyJobRef, SocietyTask, SocietyTaskResult};
-use crate::simulation::Tick;
-use crate::{Societies, SocietyComponent};
-use std::convert::TryFrom;
+use crate::activity::status::{StatusReceiver, StatusRef};
+use crate::event::EntityEventQueue;
+use crate::job::{SocietyJobRef, SocietyTask};
+use crate::runtime::{Runtime, TaskRef, TaskResult, TimerFuture};
+use crate::{EntityEvent, EntityEventPayload, Societies, SocietyComponent};
 
-pub struct ActivitySystem;
+use std::mem::transmute;
+use std::rc::Rc;
 
-pub struct ActivityEventSystem;
-
-#[derive(Component, EcsComponent)]
+// TODO rename
+#[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
 #[name("activity")]
 pub struct ActivityComponent {
-    current: Box<dyn Activity<EcsWorld>>,
     current_society_task: Option<(SocietyJobRef, SocietyTask)>,
+    /// Set by AI to trigger a new activity
     new_activity: Option<(AiAction, Option<(SocietyJobRef, SocietyTask)>)>,
+    current: Option<ActiveTask>,
+    /// Reused between tasks
+    status: StatusReceiver,
 }
 
-#[derive(Component, EcsComponent, Default)]
-#[storage(NullStorage)]
-#[name("blocking-activity")]
-pub struct BlockingActivityComponent;
+struct ActiveTask {
+    task: TaskRef,
+    description: Box<dyn Display>,
+}
 
-impl<'a> System<'a> for ActivitySystem {
+/// Interrupts current with new activities
+pub struct ActivitySystem<'a>(pub Pin<&'a EcsWorld>);
+
+impl<'a> System<'a> for ActivitySystem<'a> {
     type SystemData = (
+        Read<'a, EntitiesRes>,
+        Read<'a, Runtime>,
+        Write<'a, EntityEventQueue>,
+        Write<'a, Societies>,
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, AiComponent>,
-        ReadStorage<'a, BlockingActivityComponent>,
         WriteStorage<'a, SocietyComponent>,
-        Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
-        Read<'a, QueuedUpdates>,
-        Read<'a, LazyUpdate>,
-        Write<'a, Societies>,
-        Write<'a, EntityEventQueue>,
     );
 
     fn run(
         &mut self,
         (
-            mut activities,
-            mut ai,
-            blocking,
-            society,
             entities,
-            world,
-            updates,
-            comp_updates,
-            mut societies,
+            runtime,
             mut event_queue,
+            mut societies_res,
+            mut activities,
+            mut ais,
+            societies,
         ): Self::SystemData,
     ) {
-        let mut subscriptions = Vec::new(); // TODO reuse allocation in system
-        for (entity, ai, activity, _) in (&entities, &mut ai, &mut activities, !&blocking).join() {
-            log_scope!(o!("system" => "activity", E(entity)));
-            debug!("current activity"; "activity" => &activity.current);
-
-            debug_assert!(subscriptions.is_empty());
-            let mut ctx = ActivityContext::<EcsWorld> {
-                entity,
-                world: &*world,
-                updates: &*updates,
-                subscriptions: &mut subscriptions,
-            };
+        for (e, activity, ai) in (&entities, &mut activities, &mut ais).join() {
+            let e = Entity::from(e);
+            let mut new_activity = None;
 
             if let Some((new_action, new_society_task)) = activity.new_activity.take() {
-                debug!("interrupting activity with new"; "action" => ?new_action);
+                // TODO handle society task
+                debug!("interrupting activity with new"; e, "action" => ?new_action);
 
-                if let Err(e) = activity
-                    .current
-                    .finish(&ActivityFinish::Interrupted, &mut ctx)
-                {
-                    error!("error interrupting current activity"; "activity" => &activity.current, "error" => %e);
+                // cancel current
+                if let Some(task) = activity.current.take() {
+                    task.task.cancel();
+
+                    // unsubscribe from all events from previous activity
+                    event_queue.unsubscribe_all(e);
                 }
-
-                // unsubscribe from all events from previous activity
-                event_queue.unsubscribe_all(entity);
-                comp_updates.remove::<BlockingActivityComponent>(entity);
 
                 // replace current with new activity, dropping the old one
-                activity.current = new_action.into_activity();
+                new_activity = Some(new_action.into_activity());
                 activity.current_society_task = new_society_task;
 
-                // not necessary to manually cancel society reservation here, as the ai interruption
-                // already did
-            }
-
-            // TODO consider allowing consideration of a new activity while doing one, then swapping immediately with no pause
-
-            match activity.current.on_tick(&mut ctx) {
-                ActivityResult::Blocked => {
-                    // subscribe to requested events if any. if no subscriptions are added, the only
-                    // way to unblock will be on activity end
-                    debug!("subscribing to {count} events", count = subscriptions.len());
-                    for sub in &subscriptions {
-                        trace!("subscribing to event"; "subscription" => ?sub);
+            // not necessary to manually cancel society reservation here, as the ai interruption
+            // already did
+            } else {
+                let (finished, result) = match activity.current.as_ref() {
+                    None => (true, None),
+                    Some(task) => {
+                        let result = task.task.result();
+                        (result.is_some(), result)
                     }
-                    event_queue.subscribe(entity, subscriptions.drain(..));
+                };
 
-                    // mark activity as blocked
-                    comp_updates.insert(entity, BlockingActivityComponent::default());
-                    debug!("blocking activity");
-                }
+                if finished {
+                    // current task has finished
+                    if let Some(res) = result.as_ref() {
+                        debug!("activity finished, reverting to nop"; e, "result" => ?res);
 
-                ActivityResult::Ongoing => {
-                    // go again next tick
-                    trace!("activity is ongoing")
-                }
-                ActivityResult::Finished(finish) => {
-                    debug!("finished activity, reverting to nop"; "activity" => &activity.current, "finish" => ?finish);
-
-                    // finish current gracefully
-                    if let Err(e) = activity.current.finish(&finish, &mut ctx) {
-                        error!("error finishing activity"; "activity" => &activity.current, "error" => %e);
+                        // post debug event with activity result
+                        #[cfg(feature = "testing")]
+                        {
+                            use crate::event::EntityEventDebugPayload;
+                            if let Some(current) = activity.current.as_ref() {
+                                event_queue.post(EntityEvent {
+                                    subject: e,
+                                    payload: EntityEventPayload::Debug(
+                                        EntityEventDebugPayload::FinishedActivity {
+                                            description: current.description.to_string(),
+                                            result: res.into(),
+                                        },
+                                    ),
+                                })
+                            }
+                        }
+                    } else {
+                        debug!("activity finished, reverting to nop"; e);
                     }
-
-                    // revert to nop until a new activity is selected
-                    activity.current = Box::new(NopActivity::default());
-
-                    // ensure unblocked and unsubscribed
-                    event_queue.unsubscribe_all(entity);
-                    comp_updates.remove::<BlockingActivityComponent>(entity);
+                    new_activity = Some(Rc::new(NopActivity::default()));
 
                     // interrupt ai and unreserve society task
-                    ai.interrupt_current_action(entity, None, || {
-                        society
-                            .get(entity)
-                            .and_then(|soc| societies.society_by_handle_mut(soc.handle))
+                    ai.interrupt_current_action(e, None, || {
+                        e.get(&societies)
+                            .and_then(|soc| societies_res.society_by_handle_mut(soc.handle))
                             .expect("should have society")
                     });
 
@@ -148,112 +130,78 @@ impl<'a> System<'a> for ActivitySystem {
 
                     // notify society job of completion
                     if let Some((job, task)) = activity.current_society_task.take() {
-                        if let Ok(result) = SocietyTaskResult::try_from(finish) {
-                            job.write().notify_completion(task, result);
+                        if let Some(TaskResult::Finished(finish)) = result {
+                            job.write().notify_completion(task, finish.into());
                         }
                     }
                 }
             }
-        }
 
-        event_queue.log();
-    }
-}
+            // spawn task for new activity
+            if let Some(new_activity) = new_activity {
+                // safety: ecs world is pinned and guaranteed to be valid as long as this system
+                // is being ticked
+                let world = unsafe { transmute::<Pin<&EcsWorld>, Pin<&'static EcsWorld>>(self.0) };
 
-impl<'a> System<'a> for ActivityEventSystem {
-    type SystemData = (
-        Write<'a, EntityEventQueue>,
-        Write<'a, EntityTimers>,
-        WriteStorage<'a, EntityLoggingComponent>,
-        WriteStorage<'a, ActivityComponent>,
-        Read<'a, LazyUpdate>,
-    );
+                let description = new_activity.description();
 
-    fn run(
-        &mut self,
-        (mut events, mut timers, mut logging, mut activities, updates): Self::SystemData,
-    ) {
-        // post events for elapsed timers
-        for (token, subject) in timers.maintain(Tick::fetch()) {
-            events.post(EntityEvent {
-                subject,
-                payload: EntityEventPayload::TimerElapsed(token),
-            });
+                let status_tx = activity.status.updater();
+                let (taskref_tx, taskref_rx) = futures::channel::oneshot::channel();
+                let task = runtime.spawn(taskref_tx, async move {
+                    // recv task ref from runtime
+                    let task = taskref_rx.await.unwrap(); // will not be cancelled
 
-            trace!("entity timer elapsed"; "subject" => E(subject), "token" => ?token);
-        }
+                    // create context
+                    let entity = e.into();
+                    let ctx = ActivityContext::new(
+                        entity,
+                        world,
+                        task,
+                        status_tx,
+                        new_activity.clone(),
+                    );
 
-        events.consume_events(|subscriber, event| {
-            let activity = match activities
-                .get_mut(subscriber) {
-                Some(comp) => comp,
-                None => {
-                    warn!("subscriber is missing activity component"; "subscriber" => E(subscriber), "event" => ?event);
-                    return EventUnsubscribeResult::UnsubscribeAll;
-                }
-            };
+                    let result = new_activity.dew_it(&ctx).await;
+                    match result.as_ref() {
+                        Ok(_) => {
+                            debug!("activity finished"; entity, "activity" => ?new_activity);
+                        }
+                        Err(err) => {
+                            debug!("activity failed"; entity, "activity" => ?new_activity, "err" => %err);
+                        }
+                    };
 
-            log_scope!(o!("subscriber" => E(subscriber)));
+                    result
+                });
 
-            let ctx = ActivityEventContext { subscriber };
-            let (unblock, unsubscribe) = activity.current.on_event(event, &ctx);
-            debug!("event handler result"; "unblock" => ?unblock, "unsubscribe" => ?unsubscribe);
-
-            if let EventUnblockResult::Unblock = unblock {
-                // entity is now unblocked
-                updates.remove::<BlockingActivityComponent>(subscriber);
+                activity.current = Some(ActiveTask { task, description });
             }
-
-            unsubscribe
-        }, |events| {
-
-            // log all events per subject
-            for (subject, events) in events.iter().group_by(|evt| evt.subject).into_iter() {
-                let logging = match logging
-                    .get_mut(subject) {
-                    Some(comp) => comp,
-                    None => continue,
-                };
-
-                logging.log_events(events.map(|e| &e.payload));
-            }
-        });
+        }
     }
 }
 
 impl ActivityComponent {
-    pub fn exertion(&self) -> f32 {
-        self.current.current_subactivity().exertion()
-    }
-
     pub fn interrupt_with_new_activity(
         &mut self,
         action: AiAction,
         society_task: Option<(SocietyJobRef, SocietyTask)>,
-        me: Entity,
-        world: &impl ComponentWorld,
     ) {
         self.new_activity = Some((action, society_task));
-
-        // ensure unblocked
-        world.remove_lazy::<BlockingActivityComponent>(me);
     }
 
-    pub fn current(&self) -> &dyn Activity<EcsWorld> {
-        &*self.current
+    pub fn task(&self) -> Option<&TaskRef> {
+        self.current.as_ref().map(|t| &t.task)
     }
 
-    pub fn current_society_task(&self) -> Option<&(SocietyJobRef, SocietyTask)> {
-        self.current_society_task.as_ref()
+    /// (activity description, current status)
+    pub fn status(&self) -> Option<(&dyn Display, StatusRef)> {
+        self.current
+            .as_ref()
+            .map(|t| (&*t.description, self.status.current()))
     }
-}
 
-impl Default for ActivityComponent {
-    fn default() -> Self {
-        Self {
-            current: Box::new(NopActivity::default()),
-            new_activity: None,
-            current_society_task: None,
-        }
+    /// Exertion of current subactivity
+    pub fn exertion(&self) -> f32 {
+        self.status.current().exertion()
     }
 }

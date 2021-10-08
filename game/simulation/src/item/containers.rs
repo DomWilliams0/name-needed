@@ -3,10 +3,11 @@ use unit::world::WorldPosition;
 
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
+use crate::{Societies, SocietyHandle, TransformComponent};
+
 use crate::item::inventory::HeldEntity;
 use crate::item::ContainerComponent;
 use crate::simulation::AssociatedBlockData;
-use crate::{Societies, SocietyHandle, TransformComponent};
 
 #[derive(Debug, Error)]
 pub enum ContainerError {
@@ -36,11 +37,11 @@ pub enum ContainedInComponent {
 }
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtContainers<'w>(&'w mut EcsWorld);
+pub struct EcsExtContainers<'w>(&'w EcsWorld);
 
 impl EcsWorld {
     /// Helper methods to work with container entities
-    pub fn helpers_containers(&mut self) -> EcsExtContainers {
+    pub fn helpers_containers(&self) -> EcsExtContainers {
         EcsExtContainers(self)
     }
 }
@@ -60,7 +61,7 @@ impl EcsExtContainers<'_> {
         self.add_now(entity, TransformComponent::new(pos.centred()))
             .unwrap();
 
-        debug!("spawned new container entity"; "entity" => E(entity),
+        debug!("spawned new container entity"; "entity" => entity,
             "definition" => definition_name, "pos" => %pos);
 
         let world = self.voxel_world();
@@ -82,7 +83,7 @@ impl EcsExtContainers<'_> {
             }
         };
 
-        debug!("destroying container"; "container" => E(container_entity), "pos" => %pos);
+        debug!("destroying container"; "container" => container_entity, "pos" => %pos);
 
         let mut container = self
             .remove_now::<ContainerComponent>(container_entity)
@@ -114,7 +115,7 @@ impl EcsExtContainers<'_> {
         container_entity: Entity,
         new_society: Option<SocietyHandle>,
     ) -> Result<(), ContainerError> {
-        let container = self
+        let mut container = self
             .component_mut::<ContainerComponent>(container_entity)
             .map_err(|_| ContainerError::BadEntity)?;
 
@@ -160,7 +161,7 @@ impl EcsExtContainers<'_> {
             }
         };
 
-        info!("set container to communal"; "container" => E(container_entity),
+        info!("set container to communal"; "container" => container_entity,
               "society" => ?new_society, "previous" => ?prev_communal);
         Ok(())
     }
@@ -178,8 +179,8 @@ impl ContainedInComponent {
 impl Display for ContainedInComponent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ContainedInComponent::Container(c) => write!(f, "container {}", E(*c)),
-            ContainedInComponent::InventoryOf(e) => write!(f, "inventory of {}", E(*e)),
+            ContainedInComponent::Container(c) => write!(f, "container {}", c),
+            ContainedInComponent::InventoryOf(e) => write!(f, "inventory of {}", e),
         }
     }
 }

@@ -1,10 +1,10 @@
-use crate::activity::HaulTarget;
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
 use crate::job::SocietyTaskResult;
 use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
+use crate::activity::HaulTarget;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -75,7 +75,10 @@ impl SocietyJobImpl for HaulJob {
             debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
 
             // ensure no more
-            assert!(completions.next().is_none(), "single completion expected");
+            assert!(
+                completions.next().is_none(),
+                "single completion expected for non-shareable haul"
+            );
 
             // end job regardless of success or failure
             // TODO depends on error type?
@@ -91,21 +94,24 @@ impl SocietyJobImpl for HaulJob {
             match self.target {
                 HaulTarget::Position(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
-                        Ok(t) => &t.position,
+                        Ok(t) => t.position,
                         Err(err) => {
-                            debug!("hauled item is missing transform"; "item" => E(self.entity));
+                            debug!("hauled item is missing transform"; "item" => self.entity);
                             return Some(SocietyTaskResult::Failure(err.into()));
                         }
                     };
 
-                    if WorldPoint::from(target_pos).is_almost(current_pos, 2.0) {
+                    if WorldPoint::from(target_pos).is_almost(&current_pos, 2.0) {
                         trace!("hauled item arrived at target");
                         return Some(SocietyTaskResult::Success);
                     }
                 }
                 HaulTarget::Container(target_container) => {
                     // check if arrived in the target container
-                    match world.component::<ContainedInComponent>(self.entity) {
+                    match world
+                        .component::<ContainedInComponent>(self.entity)
+                        .as_deref()
+                    {
                         Ok(ContainedInComponent::Container(c)) if *c == target_container => {
                             trace!("hauled item arrived in target container");
                             return Some(SocietyTaskResult::Success);
