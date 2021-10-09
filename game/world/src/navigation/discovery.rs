@@ -285,7 +285,7 @@ impl<'a> AreaDiscovery<'a> {
 
     /// Moves area->block graphs map out of self
     pub fn areas_with_graph(&mut self) -> impl Iterator<Item = (ChunkArea, BlockGraph)> {
-        let block_graphs = std::mem::replace(&mut self.block_graphs, HashMap::new());
+        let block_graphs = std::mem::take(&mut self.block_graphs);
         block_graphs.into_iter()
     }
 

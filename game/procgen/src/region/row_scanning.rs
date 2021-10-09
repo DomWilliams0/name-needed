@@ -163,6 +163,7 @@ fn calculate_regional_diagonals(
 }
 
 impl<const SIZE: usize> BiomeRow<SIZE> {
+    #[cfg(test)]
     #[inline]
     pub fn into_points(
         self,

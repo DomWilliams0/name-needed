@@ -1,6 +1,6 @@
 use crate::scenarios::helpers::spawn_entities_randomly;
 use common::*;
-use simulation::{AiAction, ComponentWorld, EcsWorld, PlayerSociety, WorldPosition};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -220,13 +220,6 @@ mod helpers {
 
         pub fn with_nutrition(self, nutrition: NormalizedFloat) -> Self {
             self.with_condition(nutrition)
-        }
-
-        pub fn with_logging(self) -> Self {
-            self.0
-                .add_now(self.1, EntityLoggingComponent::default())
-                .expect("logging component");
-            self
         }
 
         pub fn thanks(self) -> Entity {

@@ -108,8 +108,7 @@ impl<T: UiGuardable> UiGuard<T> {
 impl<T: UiGuardable> Drop for UiGuard<T> {
     fn drop(&mut self) {
         if let Some(inner) = self.0.take() {
-            // safety: implementation guarantees this is unused
-            let null_ui = unsafe { &*null() };
+            let null_ui = unsafe { &*null() }; // safety: implementation guarantees this is unused
             inner.end(null_ui);
         }
     }

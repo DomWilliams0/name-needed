@@ -30,7 +30,7 @@ pub trait HaulVariant: Sized + 'static {
         &mut self,
         haul: &Haul<Self>,
         ctx: &HookContext,
-        test: TestHelper,
+        _test: TestHelper,
     ) -> HookResult {
         match haul.has_activity_succeeded(ctx) {
             Some(EventResult::Success) => {}
@@ -196,7 +196,7 @@ impl<H: HaulVariant + 'static> Haul<H> {
         variant.validate_tick(self, ctx, test)
     }
 
-    pub fn on_init(test: TestHelper, ctx: &HookContext) -> InitHookResult<Self> {
+    pub fn on_init(_test: TestHelper, ctx: &HookContext) -> InitHookResult<Self> {
         let setup = || -> BoxedResult<Self> {
             let human = ctx.new_human(EntityPosition::Origin)?;
             let item = ctx.new_entity("core_brick_stone", EntityPosition::Far)?;
@@ -364,7 +364,7 @@ impl HaulVariant for PositionToContainer {
 }
 
 impl HaulVariant for PositionToPosition {
-    fn init(ctx: &HookContext) -> BoxedResult<Self> {
+    fn init(_ctx: &HookContext) -> BoxedResult<Self> {
         let a = src_pos();
         let b = tgt_pos();
 
@@ -374,7 +374,7 @@ impl HaulVariant for PositionToPosition {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, _world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
         Ok((
             HaulTarget::Position(self.source),
             HaulTarget::Position(self.target),

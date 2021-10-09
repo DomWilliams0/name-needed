@@ -1,6 +1,6 @@
 use unit::world::WorldPoint;
 
-use crate::ecs::{EcsWorld, Entity, WorldExt};
+use crate::ecs::{EcsWorld, Entity};
 use crate::{ComponentWorld, TransformComponent};
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};

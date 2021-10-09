@@ -54,7 +54,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 self.renderer.sim_entity(&transform, render, physical);
 
                 if selected.is_some() {
-                    self.renderer.sim_selected(&transform, &physical);
+                    self.renderer.sim_selected(&transform, physical);
                 }
             }
         }

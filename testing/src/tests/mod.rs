@@ -1,9 +1,8 @@
 // tests must be registered in lib::register_tests!
 
-use crate::{HookResult, InitHookResult, TestInstance};
-use std::any::Any;
+use crate::{HookResult, InitHookResult};
 use std::cell::RefCell;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::ManuallyDrop;
 
 // ---------- test modules
 pub mod dummy;
@@ -25,14 +24,16 @@ struct TestState {
 
 pub struct TestHelper<'a>(&'a RefCell<TestState>);
 
-impl TestWrapper {
-    pub fn new() -> Self {
+impl Default for TestWrapper {
+    fn default() -> Self {
         Self {
             test: RefCell::new(None),
             state: RefCell::new(TestState::default()),
         }
     }
+}
 
+impl TestWrapper {
     pub fn invoke_init(&self, do_it: impl FnOnce() -> InitHookResult<()>) -> HookResult {
         let mut this = self.test.borrow_mut();
         assert!(this.is_none(), "test init called multiple times");

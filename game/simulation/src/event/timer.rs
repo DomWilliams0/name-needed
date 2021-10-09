@@ -27,10 +27,6 @@ impl<D, T: Token> Timer<D, T> {
         // TODO move this into Tick
         current.value() >= self.end_tick.value()
     }
-
-    pub fn data(&self) -> &D {
-        &self.data
-    }
 }
 
 impl<D, T: Token> Default for Timers<D, T> {
@@ -90,19 +86,6 @@ impl<D, T: Token> Timers<D, T> {
         } else {
             false
         }
-    }
-
-    pub fn has_elapsed(&self, token: T, current: Tick) -> bool {
-        self.timers
-            .iter()
-            .find_map(|t| {
-                if t.token == token {
-                    Some(t.elapsed(current))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(true) // non existent
     }
 }
 

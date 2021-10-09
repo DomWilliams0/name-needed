@@ -185,6 +185,7 @@ impl EntityEventQueue {
         self.maintain()
     }
 
+    #[allow(dead_code)] // used for debugging
     pub fn log(&self) {
         if !logger().is_trace_enabled() {
             return;

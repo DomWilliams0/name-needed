@@ -10,8 +10,8 @@ use crate::ecs::*;
 use crate::activity::status::{StatusReceiver, StatusRef};
 use crate::event::EntityEventQueue;
 use crate::job::{SocietyJobRef, SocietyTask};
-use crate::runtime::{Runtime, TaskRef, TaskResult, TimerFuture};
-use crate::{EntityEvent, EntityEventPayload, Societies, SocietyComponent};
+use crate::runtime::{Runtime, TaskRef, TaskResult};
+use crate::{Societies, SocietyComponent};
 
 use std::mem::transmute;
 use std::rc::Rc;
@@ -100,6 +100,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                         #[cfg(feature = "testing")]
                         {
                             use crate::event::EntityEventDebugPayload;
+                            use crate::{EntityEvent, EntityEventPayload};
                             if let Some(current) = activity.current.as_ref() {
                                 event_queue.post(EntityEvent {
                                     subject: e,
@@ -152,9 +153,8 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     let task = taskref_rx.await.unwrap(); // will not be cancelled
 
                     // create context
-                    let entity = e.into();
                     let ctx = ActivityContext::new(
-                        entity,
+                        e,
                         world,
                         task,
                         status_tx,
@@ -164,10 +164,10 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     let result = new_activity.dew_it(&ctx).await;
                     match result.as_ref() {
                         Ok(_) => {
-                            debug!("activity finished"; entity, "activity" => ?new_activity);
+                            debug!("activity finished"; e, "activity" => ?new_activity);
                         }
                         Err(err) => {
-                            debug!("activity failed"; entity, "activity" => ?new_activity, "err" => %err);
+                            debug!("activity failed"; e, "activity" => ?new_activity, "err" => %err);
                         }
                     };
 

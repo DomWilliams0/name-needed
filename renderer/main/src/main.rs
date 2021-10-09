@@ -1,8 +1,7 @@
 use common::*;
 use simulation::state::BackendState;
 use simulation::{
-    self, AsyncWorkerPool, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
-    Simulation, WorldPosition, WorldViewer,
+    self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
 };
 
 use crate::scenarios::Scenario;
@@ -89,7 +88,7 @@ fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
             let possibilities = scenarios::all_names().collect_vec();
             info!("available scenarios: {:?}", possibilities);
 
-            return Err(StartError::NoSuchScenario(name.to_owned()).into());
+            Err(StartError::NoSuchScenario(name.to_owned()).into())
         }
     }
 }
@@ -273,8 +272,7 @@ mod start {
     use resources::Resources;
     use simulation::{
         all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
-        PlanetParams, Simulation, SlabLocation, TerrainSourceError, ThreadedWorldLoader,
-        WorldLoader, WorldPosition,
+        PlanetParams, Simulation, SlabLocation, TerrainSourceError, WorldLoader, WorldPosition,
     };
     use std::time::Duration;
 
@@ -425,7 +423,7 @@ mod start {
         *sim.player_society() = Some(player_society);
 
         // defer to scenario for entity spawning
-        scenario(&sim.world());
+        scenario(sim.world());
         Ok(())
     }
 }

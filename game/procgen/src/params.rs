@@ -189,6 +189,9 @@ pub struct RenderParams {
     #[structopt(long, default_value = "4")]
     pub gif_fps: u32,
 
+    #[structopt(long)]
+    pub gif_all: bool,
+
     /// Image scale per axis
     #[structopt(long, default_value = "2")]
     pub scale: u32,

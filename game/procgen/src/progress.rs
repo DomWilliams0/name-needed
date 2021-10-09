@@ -3,7 +3,7 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait ProgressTracker {
-    fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration);
+    async fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration);
     fn fini(&mut self);
 }
 
@@ -13,6 +13,7 @@ mod gif {
     use crate::params::{AirLayer, RenderProgressParams};
     use crate::progress::ProgressTracker;
     use crate::{Planet, Render};
+    use async_trait::async_trait;
     use common::*;
     use crossbeam::channel::{unbounded, Sender};
     use std::io::ErrorKind;
@@ -76,10 +77,11 @@ mod gif {
         }
     }
 
+    #[async_trait]
     impl ProgressTracker for GifProgressTracker {
         async fn update(&mut self, step: u32, planet: Planet, climate: &ClimateIteration) {
             let (fps, to_do) = {
-                let params = &planet.inner().params.await;
+                let params = &planet.inner().await.params;
 
                 let fps = params.render.gif_fps;
                 let to_do = if params.render.gif_all {
@@ -99,15 +101,15 @@ mod gif {
             for (layer, wat) in to_render {
                 let mut render = match &self.base {
                     None => {
-                        let mut render = Render::with_planet(planet.clone());
-                        render.draw_continents();
+                        let mut render = Render::with_planet(planet.clone()).await;
+                        render.draw_continents().await;
                         self.base = Some(render.clone());
                         render
                     }
                     Some(base) => base.clone(),
                 };
 
-                render.draw_climate_overlay(climate, layer, wat);
+                render.draw_climate_overlay(climate, layer, wat).await;
                 let mut gif_name = format!("{:?}-{:?}", wat, layer);
                 gif_name.make_ascii_lowercase();
 
@@ -208,8 +210,9 @@ pub use gif::GifProgressTracker;
 
 pub struct NopProgressTracker;
 
+#[async_trait]
 impl ProgressTracker for NopProgressTracker {
-    fn update(&mut self, _: u32, _: Planet, _: &ClimateIteration) {}
+    async fn update(&mut self, _: u32, _: Planet, _: &ClimateIteration) {}
 
     fn fini(&mut self) {}
 }

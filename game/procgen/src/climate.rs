@@ -2,8 +2,7 @@ use std::ops::{AddAssign, DivAssign};
 
 use common::num_traits::real::Real;
 use common::*;
-use grid::dynamic::CoordRange;
-use grid::DynamicGrid;
+use grid::{CoordRange, DynamicGrid};
 
 pub use crate::climate::iteration::ClimateIteration;
 use crate::continent::ContinentMap;
@@ -16,10 +15,10 @@ impl Climate {
     pub fn simulate(
         continents: &ContinentMap,
         params: &PlanetParams,
-        rando: &mut dyn RngCore,
+        _rando: &mut dyn RngCore,
         mut per_step: impl FnMut(u32, &ClimateIteration),
     ) -> Self {
-        let mut iter = ClimateIteration::new(continents, params, rando);
+        let mut iter = ClimateIteration::new(continents, params);
 
         for step in 0..params.climate_iterations {
             per_step(step as u32, &iter);
@@ -151,8 +150,8 @@ mod iteration {
     use crate::{map_range, PlanetParams};
 
     pub struct ClimateIteration<'a> {
-        params: PlanetParams,
-        rando: &'a mut dyn RngCore,
+        params: &'a PlanetParams,
+        // rando: &'a mut dyn RngCore,
         continents: &'a ContinentMap,
         step: usize,
 
@@ -167,6 +166,7 @@ mod iteration {
         pub velocity: Vector3<f64>,
     }
 
+    #[allow(dead_code)] // unused atm
     pub(crate) struct WindParticle {
         pub velocity: Vector3<f32>,
         pub position: Point3<f32>,
@@ -176,14 +176,9 @@ mod iteration {
     impl<'a> ClimateIteration<'a> {
         pub const MAX_WIND_HEIGHT: f64 = 2.0;
 
-        pub fn new(
-            continents: &'a ContinentMap,
-            params: &PlanetParams,
-            rando: &'a mut dyn RngCore,
-        ) -> Self {
+        pub fn new(continents: &'a ContinentMap, params: &'a PlanetParams) -> Self {
             let mut iter = ClimateIteration {
-                params: params.clone(),
-                rando,
+                params,
                 continents,
                 step: 0,
 
@@ -271,7 +266,7 @@ mod iteration {
 
         fn propagate_wind(&mut self) {
             // TODO reuse alloc
-            let mut new_vals = PlanetGrid::<Wind>::new(&self.params);
+            let mut new_vals = PlanetGrid::<Wind>::new(self.params);
             let wind_speed_modifier = self.params.wind_speed_modifier;
             let wind_speed_base = self.params.wind_speed_base;
             let dir_conform = self.params.wind_direction_conformity;
@@ -431,7 +426,7 @@ mod iteration {
             let mut temp_rando = thread_rng();
             let distr = Uniform::new(0.05, 0.15);
 
-            for [x, y, z] in PlanetGrid::<()>::iter_layer_coords(AirLayer::Surface, &self.params) {
+            for [x, y, z] in PlanetGrid::<()>::iter_layer_coords(AirLayer::Surface, self.params) {
                 let temp = &mut temperature.0[[x, y, z]];
                 if *temp > 0.7 {
                     let pressure = &mut air_pressure.0[[x, y, z]];
@@ -515,6 +510,7 @@ mod iteration {
         }
     }
 
+    #[allow(dead_code)] // currently unused
     impl WindParticle {
         fn tile_below(&self) -> [isize; 3] {
             point_to_tile(self.position)
@@ -525,6 +521,7 @@ mod iteration {
         }
     }
 
+    #[allow(dead_code)] // currently unused
     fn point_to_tile(pos: Point3<f32>) -> [isize; 3] {
         [
             pos.x.floor() as isize,

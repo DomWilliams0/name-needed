@@ -2,8 +2,7 @@
 use crate::tests::{TestHelper, TestWrapper};
 use common::BoxedResult;
 use simulation::input::UiCommands;
-use simulation::{EntityEvent, LoggedEntityEvent, SimulationRefLite};
-use std::any::Any;
+use simulation::{EntityEvent, SimulationRefLite};
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::sync::Once;
 
@@ -93,7 +92,7 @@ fn current() -> &'static mut TestInstance {
             .unwrap_or_else(|_| panic!("missing env var {:?}", TEST_NAME_VAR));
         let test = inventory::iter::<TestDeclaration>
             .into_iter()
-            .find(|t| t.name == &name)
+            .find(|t| t.name == name)
             .unwrap_or_else(|| panic!("test with name {:?} not found", name));
 
         let instance = Box::new(TestInstance {
@@ -101,7 +100,7 @@ fn current() -> &'static mut TestInstance {
             init: test.init,
             tick: test.tick,
             destructor: test.destructor,
-            instance: TestWrapper::new(),
+            instance: TestWrapper::default(),
         });
 
         unsafe {

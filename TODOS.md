@@ -1,4 +1,4 @@
-# TODOs (346)
+# TODOs (347)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -41,8 +41,9 @@
    * `// TODO remove overhead of option and default to 0`
    * `// TODO return a result instead of panicking`
    * `// TODO clap AppSettings::AllArgsOverrideSelf`
- * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (5)
+ * [game/procgen/src/planet.rs](game/procgen/src/planet.rs) (6)
    * `// TODO actual error type`
+   * `// TODO this is a future! the climate feature is incomplete and a wip so gonna leave this broken for now`
    * `// TODO could have separate copy of planet params per thread if immutable`
    * `// TODO radius no longer makes sense`
    * `// TODO wrap chunks rather than ignoring those out of range`

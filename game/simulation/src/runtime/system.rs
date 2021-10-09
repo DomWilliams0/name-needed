@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::event::{EntityEventPayload, EntityEventQueue, RuntimeTimers};
+use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::runtime::Runtime;
 use crate::{ActivityComponent, EntityLoggingComponent, Tick};
 use common::*;
@@ -50,7 +50,6 @@ impl<'a> System<'a> for RuntimeSystem {
 
         // consume events
         events.consume_events(|subscriber, evt| {
-            let subscriber = Entity::from(subscriber);
             let task = match activities.get_mut(subscriber.into()) {
                 Some(comp) => {
                     if let Some(task) = comp.task() {

@@ -51,6 +51,7 @@ pub trait InteractiveComponent {
     fn as_debug(&self) -> Option<&dyn Debug>;
 }
 
+#[allow(dead_code)] // currently unused
 pub enum InteractiveResult<'a> {
     NonInteractive,
     Interactive(&'a dyn InteractiveComponent),
@@ -58,6 +59,7 @@ pub enum InteractiveResult<'a> {
 
 pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
+#[allow(dead_code)] // currently unused
 pub type GetInteractiveFn = fn(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult>;
 
 pub struct ComponentEntry {

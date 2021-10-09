@@ -3,9 +3,8 @@ use crate::tests::TestHelper;
 use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::*;
 use simulation::{
-    AiAction, ComponentRefMut, ComponentWorld, ConditionComponent, ContainedInComponent,
-    ContainerComponent, Entity, EntityEventDebugPayload, EntityEventPayload,
-    EntityLoggingComponent, HungerComponent, InventoryComponent, LoggedEntityEvent,
+    AiAction, ComponentRefMut, ComponentWorld, ContainedInComponent, ContainerComponent, Entity,
+    EntityEventDebugPayload, EntityEventPayload, HungerComponent, InventoryComponent,
     PhysicalComponent, TaskResultSummary,
 };
 use unit::space::{length::Length3, volume::Volume};

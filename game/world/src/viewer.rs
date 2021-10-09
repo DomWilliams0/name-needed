@@ -321,6 +321,6 @@ impl Drop for RequestedSlabs<'_> {
 
 impl AsRef<[SlabLocation]> for RequestedSlabs<'_> {
     fn as_ref(&self) -> &[SlabLocation] {
-        &self.0
+        self.0
     }
 }

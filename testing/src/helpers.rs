@@ -1,7 +1,6 @@
 use crate::HookContext;
 use common::BoxedResult;
-use simulation::{ComponentWorld, Entity, EntityLoggingComponent, WorldPosition};
-use std::error::Error;
+use simulation::{ComponentWorld, Entity, EntityLoggingComponent};
 
 pub enum EntityPosition {
     Origin,

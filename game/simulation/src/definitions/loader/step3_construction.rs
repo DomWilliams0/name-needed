@@ -24,7 +24,7 @@ pub fn instantiate(
     // instantiate components
     let instantiated = defs
         .into_iter()
-        .filter_map(|def| match Definition::construct(def, &templates) {
+        .filter_map(|def| match Definition::construct(def, templates) {
             Err(e) => {
                 errors.push(e);
                 None

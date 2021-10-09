@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::hint::unreachable_unchecked;
 use std::iter::repeat_with;
 use std::ops::{Deref, DerefMut, Range};
@@ -8,12 +7,11 @@ use unit::space::length::Length3;
 use unit::space::volume::Volume;
 
 use crate::ecs::*;
-use crate::{SocietyHandle, TransformComponent};
+use crate::SocietyHandle;
 
-use crate::item::containers::ContainedInComponent;
 use crate::item::inventory::equip::EquipSlot;
 use crate::item::inventory::{Container, HeldEntity};
-use crate::item::{HauledItemComponent, ItemFilter, ItemFilterable};
+use crate::item::{ItemFilter, ItemFilterable};
 
 /// Temporary dumb component to hold equip slots and containers. Will eventually be a view on top of
 /// the physical body tree
@@ -367,124 +365,6 @@ impl InventoryComponent {
     fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
         self.equip_slots.iter().filter_map(|e| e.ok())
     }
-
-    /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
-    /// are valid and their capacities accurate
-    /// - held_entities: item->holder
-    #[cfg(debug_assertions)]
-    pub fn validate(
-        &self,
-        holder: Entity,
-        world: &impl ComponentWorld,
-        held_entities: &mut HashMap<Entity, ContainedInComponent>,
-    ) {
-        for e in self.all_equipped_items() {
-            assert!(world.is_entity_alive(e), "item {} is dead", e);
-
-            if let Some(other_holder) =
-                held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
-            {
-                panic!(
-                    "item {} is in the inventory of {} and {}",
-                    e, holder, other_holder,
-                );
-            }
-
-            let has_hauled = world.has_component::<HauledItemComponent>(e);
-            let has_transform = world.has_component::<TransformComponent>(e);
-
-            assert_eq!(
-                has_hauled, has_transform,
-                "equipped item {} is invalid (being hauled = {}, has transform = {})",
-                e, has_hauled, has_transform
-            );
-        }
-
-        for (e, container) in self.containers(world) {
-            if let Some(other_holder) =
-                held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
-            {
-                panic!(
-                    "container {} is in the inventory of {} and {}",
-                    e, holder, other_holder,
-                );
-            }
-
-            validate_container(&container, e, held_entities, world);
-        }
-    }
-}
-
-#[cfg(debug_assertions)]
-fn validate_container(
-    container: &Container,
-    container_entity: Entity,
-    held_entities: &mut HashMap<Entity, ContainedInComponent>,
-    world: &impl ComponentWorld,
-) {
-    for &HeldEntity { entity: e, .. } in container.contents() {
-        assert!(world.is_entity_alive(e), "item {} is dead", e);
-
-        if let Some(other_holder) =
-            held_entities.insert(e, ContainedInComponent::Container(container_entity))
-        {
-            let contained = world.component::<ContainedInComponent>(e).ok();
-            if let Some(contained) = contained {
-                // this container has already been visited in another inventory
-                let holder = contained.entity();
-                assert_eq!(
-                    holder, container_entity,
-                    "item {} found in container {} has invalid ContainedInComponent '{}'",
-                    e, container_entity, *contained
-                );
-            } else {
-                panic!(
-                    "item {} is in the container {} and also {}",
-                    e, container_entity, other_holder,
-                );
-            }
-        }
-
-        assert!(
-            !world.has_component::<TransformComponent>(e),
-            "item {} in container has a transform",
-            e
-        );
-
-        assert!(
-            !world.has_component::<HauledItemComponent>(e),
-            "item {} in container has a hauled component",
-            e
-        );
-
-        let contained = world
-            .component::<ContainedInComponent>(e)
-            .unwrap_or_else(|_| {
-                panic!(
-                    "item {} in container does not have a contained component",
-                    e
-                )
-            });
-
-        let contained = contained.entity();
-        assert_eq!(
-            contained, container_entity,
-            "item {} in container {} has a mismatching contained-in: {}",
-            e, container_entity, contained,
-        );
-
-        let real_capacity: Volume = container
-            .contents()
-            .fold(Volume::new(0), |acc, e| acc + e.volume);
-
-        assert_eq!(
-            real_capacity,
-            container.current_capacity(),
-            "container reports a capacity of {} when it actually is {}",
-            container.current_capacity(),
-            real_capacity
-        );
-    }
 }
 
 impl<'a> FoundSlotMut<'a> {
@@ -597,20 +477,151 @@ impl Debug for FoundSlot<'_> {
     }
 }
 
-impl ContainerComponent {
-    /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
-    /// are valid and their capacities accurate
-    /// - held_entities: item->holder
-    #[cfg(debug_assertions)]
-    pub fn validate(
-        &self,
-        container: Entity,
-        world: &impl ComponentWorld,
-        held_entities: &mut HashMap<Entity, ContainedInComponent>,
-    ) {
-        validate_container(&self.container, container, held_entities, world);
+#[cfg(debug_assertions)]
+mod validation {
+    use crate::item::inventory::HeldEntity;
+    use crate::item::HauledItemComponent;
+    use crate::{
+        ComponentWorld, ContainedInComponent, Container, ContainerComponent, Entity,
+        InventoryComponent, TransformComponent,
+    };
+    use std::collections::HashMap;
+    use unit::space::volume::Volume;
+
+    impl ContainerComponent {
+        /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
+        /// are valid and their capacities accurate
+        /// - held_entities: item->holder
+        pub fn validate(
+            &self,
+            container: Entity,
+            world: &impl ComponentWorld,
+            held_entities: &mut HashMap<Entity, ContainedInComponent>,
+        ) {
+            validate_container(&self.container, container, held_entities, world);
+        }
     }
 
+    impl InventoryComponent {
+        /// Asserts all items dont have transforms, aren't duplicates, are alive, and that containers
+        /// are valid and their capacities accurate
+        /// - held_entities: item->holder
+        pub fn validate(
+            &self,
+            holder: Entity,
+            world: &impl ComponentWorld,
+            held_entities: &mut HashMap<Entity, ContainedInComponent>,
+        ) {
+            for e in self.all_equipped_items() {
+                assert!(world.is_entity_alive(e), "item {} is dead", e);
+
+                if let Some(other_holder) =
+                    held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
+                {
+                    panic!(
+                        "item {} is in the inventory of {} and {}",
+                        e, holder, other_holder,
+                    );
+                }
+
+                let has_hauled = world.has_component::<HauledItemComponent>(e);
+                let has_transform = world.has_component::<TransformComponent>(e);
+
+                assert_eq!(
+                    has_hauled, has_transform,
+                    "equipped item {} is invalid (being hauled = {}, has transform = {})",
+                    e, has_hauled, has_transform
+                );
+            }
+
+            for (e, container) in self.containers(world) {
+                if let Some(other_holder) =
+                    held_entities.insert(e, ContainedInComponent::InventoryOf(holder))
+                {
+                    panic!(
+                        "container {} is in the inventory of {} and {}",
+                        e, holder, other_holder,
+                    );
+                }
+
+                validate_container(&container, e, held_entities, world);
+            }
+        }
+    }
+
+    fn validate_container(
+        container: &Container,
+        container_entity: Entity,
+        held_entities: &mut HashMap<Entity, ContainedInComponent>,
+        world: &impl ComponentWorld,
+    ) {
+        for &HeldEntity { entity: e, .. } in container.contents() {
+            assert!(world.is_entity_alive(e), "item {} is dead", e);
+
+            if let Some(other_holder) =
+                held_entities.insert(e, ContainedInComponent::Container(container_entity))
+            {
+                let contained = world.component::<ContainedInComponent>(e).ok();
+                if let Some(contained) = contained {
+                    // this container has already been visited in another inventory
+                    let holder = contained.entity();
+                    assert_eq!(
+                        holder, container_entity,
+                        "item {} found in container {} has invalid ContainedInComponent '{}'",
+                        e, container_entity, *contained
+                    );
+                } else {
+                    panic!(
+                        "item {} is in the container {} and also {}",
+                        e, container_entity, other_holder,
+                    );
+                }
+            }
+
+            assert!(
+                !world.has_component::<TransformComponent>(e),
+                "item {} in container has a transform",
+                e
+            );
+
+            assert!(
+                !world.has_component::<HauledItemComponent>(e),
+                "item {} in container has a hauled component",
+                e
+            );
+
+            let contained = world
+                .component::<ContainedInComponent>(e)
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "item {} in container does not have a contained component",
+                        e
+                    )
+                });
+
+            let contained = contained.entity();
+            assert_eq!(
+                contained, container_entity,
+                "item {} in container {} has a mismatching contained-in: {}",
+                e, container_entity, contained,
+            );
+
+            let real_capacity: Volume = container
+                .contents()
+                .fold(Volume::new(0), |acc, e| acc + e.volume);
+
+            assert_eq!(
+                real_capacity,
+                container.current_capacity(),
+                "container reports a capacity of {} when it actually is {}",
+                container.current_capacity(),
+                real_capacity
+            );
+        }
+    }
+}
+
+impl ContainerComponent {
     pub fn communal(&self) -> Option<SocietyHandle> {
         self.communal
     }

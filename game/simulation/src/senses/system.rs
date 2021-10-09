@@ -1,6 +1,6 @@
 use crate::ecs::*;
 use crate::senses::sense::{HearingSphere, Sense, VisionCone};
-use crate::spatial::{Spatial, Transforms};
+use crate::spatial::Spatial;
 use crate::TransformComponent;
 use common::*;
 use serde::Deserialize;
@@ -26,7 +26,7 @@ pub struct SensesComponent {
 
 struct SensedEntity {
     entity: Entity,
-    how: Sense,
+    // how: Sense,
     /// Expired when 0
     decay: u8,
 }
@@ -169,7 +169,7 @@ impl SensesComponent {
             // new entity
             self.sensed.push(SensedEntity {
                 entity: e,
-                how,
+                // how,
                 decay: SENSE_DECAY,
             })
         }

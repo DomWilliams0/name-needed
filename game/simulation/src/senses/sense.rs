@@ -74,6 +74,7 @@ impl VisionCone {
 }
 
 impl HearingSphere {
+    #[allow(dead_code)] // currently unused
     pub fn senses(&self, distance: f32) -> bool {
         distance <= self.radius
     }

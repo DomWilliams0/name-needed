@@ -1,11 +1,9 @@
 use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
-use crate::event::timer::TimerToken;
 
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
-use crate::runtime::TaskResult;
-use common::{num_derive::FromPrimitive, num_traits, Display};
+use common::{num_derive::FromPrimitive, num_traits};
 use std::convert::TryInto;
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
@@ -65,7 +63,6 @@ pub enum EntityEventPayload {
 
 #[cfg(feature = "testing")]
 pub mod debug_events {
-
     #[cfg(not(debug_assertions))]
     compile_error!("no testing in release builds!");
 
