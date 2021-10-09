@@ -35,9 +35,12 @@ pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld
 pub use event::{EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
+
+#[cfg(debug_assertions)]
+pub use item::validation::validate_all_inventories;
 pub use item::{
-    validation::validate_all_inventories, ConditionComponent, ContainedInComponent, Container,
-    ContainerComponent, EdibleItemComponent, InventoryComponent, ItemCondition, NameComponent,
+    ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
+    InventoryComponent, ItemCondition, NameComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
