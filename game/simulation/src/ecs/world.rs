@@ -96,10 +96,16 @@ pub struct ComponentRef<'a, T: Component> {
     storage: ReadStorage<'a, T>,
 }
 
+#[derive(Component)]
+struct DummyComponent;
+
+/// Assumed (and checked) to be the same size for all types
+const SPECS_READSTORAGE_SIZE: usize = std::mem::size_of::<ReadStorage<DummyComponent>>();
+
 /// Type-erased component ref
 pub struct ComponentRefErased<'a> {
     /// Original ReadStorage<'a, T>
-    storage: Vec<u8>,
+    storage: [u8; SPECS_READSTORAGE_SIZE],
     /// std::ptr::drop_in_place for storage
     storage_drop: unsafe fn(*mut u8),
     comp: *const (),
@@ -321,6 +327,7 @@ impl<'a, T: Component> ComponentRef<'a, T> {
     pub fn erased(self, as_interactive: AsInteractiveFn) -> ComponentRefErased<'a> {
         let storage_drop = {
             let drop = std::ptr::drop_in_place::<ReadStorage<'a, T>>;
+            // erase type from destructor fn ptr
             unsafe {
                 std::mem::transmute::<unsafe fn(*mut ReadStorage<'a, T>), unsafe fn(*mut u8)>(drop)
             }
@@ -328,19 +335,18 @@ impl<'a, T: Component> ComponentRef<'a, T> {
 
         // copy storage struct into a vec of bytes to erase the type
         let storage = {
-            let storage = ManuallyDrop::new(self.storage);
+            let original_storage = ManuallyDrop::new(self.storage);
+            let readstorage_size = std::mem::size_of::<ReadStorage<'a, T>>();
+            assert_eq!(readstorage_size, SPECS_READSTORAGE_SIZE);
 
-            let mut vec = Vec::new(); // TODO pass in vec to BORROW as param
-            let storage_layout = Layout::new::<ReadStorage<'a, T>>().pad_to_align();
-            vec.resize(storage_layout.size(), 0u8);
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    &*storage as *const ReadStorage<'a, T> as *const u8,
-                    vec.as_mut_ptr(),
-                    std::mem::size_of::<ReadStorage<'a, T>>(),
-                );
-            }
-            vec
+            let mut storage = [0u8; SPECS_READSTORAGE_SIZE];
+            let src_ptr = &*original_storage as *const ReadStorage<'a, T> as *const u8;
+            let src_slice = unsafe {
+                std::slice::from_raw_parts(src_ptr, std::mem::size_of::<ReadStorage<'a, T>>())
+            };
+
+            storage.copy_from_slice(src_slice);
+            storage
         };
 
         let comp = self.comp as *const _ as *const ();
@@ -414,7 +420,6 @@ impl Drop for ComponentRefErased<'_> {
 mod tests {
     use super::*;
     use crate::ecs::*;
-    use unit::world::WorldPoint;
 
     #[derive(Debug, Component, EcsComponent)]
     #[storage(VecStorage)]
@@ -431,7 +436,7 @@ mod tests {
     #[test]
     fn erased_component_ref() {
         let ecs = EcsWorld::new();
-        let magic = 0x12131415_16171819;
+        let magic = 0x1213_1415_1617_1819;
         let entity = ecs
             .create_entity()
             .with(TestInteractiveComponent(magic))

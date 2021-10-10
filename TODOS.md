@@ -1,4 +1,4 @@
-# TODOs (353)
+# TODOs (352)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
@@ -185,9 +185,8 @@
    * `// TODO custom hash? just itself`
  * [game/simulation/src/ecs/tag.rs](game/simulation/src/ecs/tag.rs) (1)
    * `// TODO intern these strings`
- * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
+ * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
-   * `let mut vec = Vec::new(); // TODO pass in vec to BORROW as param`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`
