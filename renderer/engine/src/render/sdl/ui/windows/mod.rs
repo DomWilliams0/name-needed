@@ -27,7 +27,7 @@ trait UiExt {
     fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: impl FnOnce() -> V,
+        value: impl Fn() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     );
@@ -37,7 +37,7 @@ impl UiExt for Ui<'_> {
     fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: impl FnOnce() -> V,
+        value: impl Fn() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     ) {
@@ -51,7 +51,7 @@ impl UiExt for Ui<'_> {
         // label
         self.text_colored(color, key);
 
-        if !matches!(value, Value::MultilineReadonly {..}) {
+        if !matches!(value, Value::MultilineReadonly { .. }) {
             self.same_line_with_spacing(self.calc_text_size(key, false, 0.0)[0], 10.0);
         }
 
@@ -60,7 +60,7 @@ impl UiExt for Ui<'_> {
                 self.text(val);
             }
             Value::Wrapped(val) => {
-                self.text_wrapped(&val);
+                self.text_wrapped(val);
             }
             Value::None(val) => self.text_disabled(val),
             Value::MultilineReadonly {

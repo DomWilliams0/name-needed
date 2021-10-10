@@ -17,10 +17,10 @@ declare_entity_metric!(
 /// Switch, 1 if holding an item matching the filter, otherwise 0
 pub struct HoldingItemConsideration(pub ItemFilter);
 
-/// Find nearby items matching a filter with a higher weight the more and better condition are found
+/// Finds items matching filter nearby, preferring those in better condition
 ///
 /// TODO consider society stores before scanning the local area
-pub struct FindLocalItemConsideration {
+pub struct FindLocalGradedItemConsideration {
     pub filter: ItemFilter,
     pub max_radius: u32,
     /// Max input value to map to 1.0
@@ -57,13 +57,13 @@ impl Consideration<AiContext> for HoldingItemConsideration {
     }
 }
 
-impl Consideration<AiContext> for FindLocalItemConsideration {
+impl Consideration<AiContext> for FindLocalGradedItemConsideration {
     fn curve(&self) -> Curve {
         Curve::Exponential(2.0, -4.0, 0.0, -1.0, 1.0)
     }
 
     fn input(&self) -> <AiContext as Context>::Input {
-        AiInput::CanFindLocally {
+        AiInput::CanFindGradedItems {
             filter: self.filter,
             max_radius: self.max_radius,
             // a tad arbitrary - assumes the average item condition is 0.25 so 4x range would

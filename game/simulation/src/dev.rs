@@ -7,35 +7,36 @@ use unit::world::WorldPosition;
 use crate::activity::HaulTarget;
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity};
-use crate::{
-    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
-    TransformComponent,
-};
-
 use crate::item::{ContainedInComponent, ContainerComponent};
 use crate::job::SocietyJob;
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
 use crate::society::job::HaulJob;
+use crate::{
+    ComponentWorld, InventoryComponent, PhysicalComponent, Societies, SocietyHandle,
+    TransformComponent,
+};
+use std::pin::Pin;
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtDev<'w>(&'w mut EcsWorld);
+pub struct EcsExtDev<'w>(&'w EcsWorld);
 
 impl EcsWorld {
-    pub fn helpers_dev(&mut self) -> EcsExtDev {
+    pub fn helpers_dev(&self) -> EcsExtDev {
         EcsExtDev(self)
     }
 }
 
 impl EcsExtDev<'_> {
-    pub fn give_bag(&mut self, lucky_holder: Entity) {
+    /// Returns the bag
+    pub fn give_bag(&self, lucky_holder: Entity) -> Entity {
         let bag = self
             .build_entity("core_storage_backpack")
             .expect("no backpack")
             .spawn()
             .expect("cant make backpack");
 
-        let inv = self
+        let mut inv = self
             .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
@@ -44,14 +45,16 @@ impl EcsExtDev<'_> {
         inv.give_container(bag);
         self.helpers_comps()
             .add_to_container(bag, ContainedInComponent::InventoryOf(lucky_holder));
+
+        bag
     }
 
     pub fn put_food_in_container(&mut self, food: Entity, lucky_holder: Entity) {
-        let inv = self
+        let mut inv = self
             .component_mut::<InventoryComponent>(lucky_holder)
             .expect("no inventory");
 
-        let (bag, container) = inv.containers_mut(self.0).next().expect("no container");
+        let (bag, mut container) = inv.containers_mut(self.0).next().expect("no container");
 
         let physical = self.component::<PhysicalComponent>(food).expect("bad food");
 
@@ -68,8 +71,28 @@ impl EcsExtDev<'_> {
             .add_to_container(food, ContainedInComponent::Container(bag));
     }
 
+    pub fn put_item_into_container(&mut self, item: Entity, container_entity: Entity) {
+        let mut container = self
+            .component_mut::<ContainerComponent>(container_entity)
+            .expect("bad container");
+
+        let physical = self
+            .component::<PhysicalComponent>(item)
+            .expect("item has no physical");
+
+        info!("putting {} into container {}", item, container_entity);
+
+        container
+            .container
+            .add_with(item, physical.volume, physical.size)
+            .expect("failed to add to container");
+
+        self.helpers_comps()
+            .add_to_container(item, ContainedInComponent::Container(container_entity));
+    }
+
     pub fn follow(&mut self, follower: Entity, followee: Entity) {
-        let ai = self
+        let mut ai = self
             .component_mut::<AiComponent>(follower)
             .expect("no activity");
 
@@ -129,7 +152,7 @@ impl EcsExtDev<'_> {
                 if let Some(AssociatedBlockData::Container(container)) =
                     w.associated_block_data(container_pos)
                 {
-                    let ai = world
+                    let mut ai = world
                         .component_mut::<AiComponent>(hauler)
                         .expect("no activity");
 
@@ -173,21 +196,22 @@ impl EcsExtDev<'_> {
         &mut self,
         wat: &'static str,
         container_pos: WorldPosition,
-        mut f: impl FnMut(&mut EcsWorld, Entity) + 'static,
+        mut f: impl FnMut(Pin<&mut EcsWorld>, Entity) + 'static,
     ) {
-        self.resource::<QueuedUpdates>().queue(wat, move |world| {
-            let w = world.voxel_world();
-            let w = w.borrow();
-            if let Some(AssociatedBlockData::Container(container)) =
-                w.associated_block_data(container_pos)
-            {
-                f(world, *container);
-            } else {
-                panic!("no container");
-            }
+        self.resource::<QueuedUpdates>()
+            .queue(wat, move |mut world| {
+                let w = world.voxel_world();
+                let w = w.borrow();
+                if let Some(AssociatedBlockData::Container(container)) =
+                    w.associated_block_data(container_pos)
+                {
+                    f(world.as_mut(), *container);
+                } else {
+                    panic!("no container");
+                }
 
-            Ok(())
-        });
+                Ok(())
+            });
     }
 
     pub fn haul_to_container_via_divine(
@@ -205,7 +229,7 @@ impl EcsExtDev<'_> {
                     .unwrap()
                     .accessible_position();
 
-                let ai = world
+                let mut ai = world
                     .component_mut::<AiComponent>(hauler)
                     .expect("no activity");
 
@@ -235,15 +259,15 @@ impl EcsExtDev<'_> {
             "queue society haul to container job",
             container_pos,
             move |world, container| {
-                let job = HaulJob::with_target_container(haulee, container, world)
+                let job = HaulJob::with_target_container(haulee, container, &*world)
                     .expect("cant create job");
 
                 world
                     .resource_mut::<Societies>()
-                    .society_by_handle(society)
+                    .society_by_handle_mut(society)
                     .expect("bad society")
                     .jobs_mut()
-                    .submit(SocietyJob::create(world, job));
+                    .submit(SocietyJob::create(&*world, job));
 
                 info!(
                     "adding society job to haul item to container";
@@ -260,7 +284,7 @@ impl EcsExtDev<'_> {
     }
 
     pub fn force_activity(&mut self, slave: Entity, action: AiAction) {
-        let ai = self
+        let mut ai = self
             .component_mut::<AiComponent>(slave)
             .expect("no activity");
 

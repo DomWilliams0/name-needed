@@ -142,7 +142,7 @@ impl Render {
                 let alpha = planet.params.render.overlay_alpha;
                 overlay_img.enumerate_pixels_mut().for_each(|(x, y, p)| {
                     let point = PlanetPoint::new(x as f64 / zoom, y as f64 / zoom);
-                    let (coastline_proximity, elevation, moisture, temperature) =
+                    let (_coastline_proximity, elevation, moisture, temperature) =
                         biomes.sample(point, &planet.continents);
 
                     let value = match overlay {
@@ -184,7 +184,7 @@ impl Render {
     #[cfg(feature = "climate")]
     pub async fn draw_climate_overlay(
         &mut self,
-        climate: &crate::climate::ClimateIteration,
+        climate: &crate::climate::ClimateIteration<'_>,
         layer: AirLayer,
         what: RenderProgressParams,
     ) {
@@ -201,7 +201,7 @@ impl Render {
         match what {
             RenderProgressParams::Temperature => {
                 climate.temperature.iter_average(layer, |coord, val| {
-                    debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
+                    debug_assert!((0.0..=1.0).contains(&val), "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
                 })
@@ -253,7 +253,7 @@ impl Render {
             }
             RenderProgressParams::AirPressure => {
                 climate.air_pressure.iter_average(layer, |coord, val| {
-                    debug_assert!(val >= 0.0 && val <= 1.0, "val={:?}", val);
+                    debug_assert!((0.0..=1.0).contains(&val), "val={:?}", val);
                     let c = color_for_temperature(val as f32);
                     put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
                 });
@@ -424,6 +424,7 @@ impl Render {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 async fn put_pixels_par(
     mut image: RgbaImage,
     per: &(impl Send + Sync + Fn(u32, u32) -> Rgba<u8>),
@@ -463,14 +464,6 @@ async fn put_pixels_par(
 
     // consume them all
     fut.await.unwrap()
-}
-
-fn put_pixel(image: &mut RgbaImage, pos: impl PixelPos, color: impl PixelColor) {
-    let (w, h) = image.dimensions();
-    let (x, y) = pos.pos();
-    debug_assert!(x < w && y < h);
-
-    unsafe { image.unsafe_put_pixel(x, y, color.color()) }
 }
 
 fn put_pixel_scaled(image: &mut RgbaImage, scale: u32, pos: impl PixelPos, color: impl PixelColor) {

@@ -46,7 +46,7 @@ impl<'a> System<'a> for SteeringSystem {
             let result =
                 steer
                     .behaviour
-                    .tick(&transform, bounding_radius, context_map.interests_mut());
+                    .tick(transform, bounding_radius, context_map.interests_mut());
 
             if let SteeringResult::Finished = result {
                 trace!(

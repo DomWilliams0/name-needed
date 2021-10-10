@@ -5,8 +5,8 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
-use crate::item::{HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
-use crate::spatial::Spatial;
+use crate::item::{FoundSlot, HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
+use crate::spatial::{Spatial, Transforms};
 use std::collections::hash_map::Entry;
 use world::block::BlockType;
 
@@ -25,7 +25,8 @@ pub enum AiInput {
     CanUseHeldItem(ItemFilter),
 
     // TODO HasInInventoryGraded - returns number,quality of matches
-    CanFindLocally {
+    // TODO should include check for n free slots anywhere in inventory (not just hands)
+    CanFindGradedItems {
         filter: ItemFilter,
         max_radius: u32,
         max_count: u32,
@@ -54,18 +55,18 @@ impl ai::Input<AiContext> for AiInput {
             AiInput::HasInInventory(filter) => match blackboard.inventory {
                 None => 0.0,
                 Some(inv) => {
-                    if search_inventory_with_cache(blackboard, inv, filter) {
+                    if search_inventory_with_cache(blackboard, inv, filter).is_some() {
                         1.0
                     } else {
                         0.0
                     }
                 }
             },
-            AiInput::CanFindLocally {
+            AiInput::CanFindGradedItems {
                 filter,
                 max_radius,
                 max_count,
-            } => search_local_area_with_cache(blackboard, filter, *max_radius, *max_count),
+            } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
 
             AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
             AiInput::BlockTypeMatches(pos, bt_match) => {
@@ -106,11 +107,11 @@ impl ai::Input<AiContext> for AiInput {
                 }
             }
             AiInput::CanUseHeldItem(filter) => {
-                match blackboard.inventory_search_cache.get(filter) {
-                    Some(found) => {
-                        // resolve found item entity
-                        let inventory = blackboard.inventory.expect("item was already found");
-                        let item = found.get(inventory, blackboard.world);
+                match blackboard.inventory.and_then(|inv| {
+                    search_inventory_with_cache(blackboard, inv, filter).map(|slot| (inv, slot))
+                }) {
+                    Some((inventory, slot)) => {
+                        let item = slot.get(inventory, blackboard.world);
 
                         // check if being hauled
                         let is_hauled = blackboard.world.has_component::<HauledItemComponent>(item);
@@ -134,23 +135,21 @@ fn search_inventory_with_cache<'a>(
     blackboard: &mut AiBlackboard<'a>,
     inventory: &'a InventoryComponent,
     filter: &ItemFilter,
-) -> bool {
+) -> Option<FoundSlot<'a>> {
     let cache_entry = blackboard.inventory_search_cache.entry(*filter);
 
-    let result = match cache_entry {
+    match cache_entry {
         Entry::Vacant(v) => inventory
             .search(filter, blackboard.world)
             .map(|item| *v.insert(item)),
         Entry::Occupied(e) => Some(*e.get()),
-    };
-
-    result.is_some()
+    }
 }
 
 /// (item entity, position, direct distance, item condition)
 pub type LocalAreaSearch = Vec<(Entity, WorldPoint, f32, NormalizedFloat)>;
 
-fn search_local_area_with_cache(
+fn search_local_area_with_cache_graded(
     blackboard: &mut AiBlackboard,
     filter: &ItemFilter,
     max_radius: u32,
@@ -233,7 +232,7 @@ fn search_local_area(
 ) {
     let conditions = world.read_storage::<ConditionComponent>();
 
-    let voxel_world_ref = &*world.read_resource::<WorldRef>();
+    let voxel_world_ref = &*world.resource::<WorldRef>();
     let voxel_world = voxel_world_ref.borrow();
 
     // find the area we are in
@@ -247,13 +246,16 @@ fn search_local_area(
     };
 
     let spatial = world.resource::<Spatial>();
+    let transforms = Transforms::from(world);
     let results = spatial
-        .query_in_radius(self_position.centred(), max_radius)
+        .query_in_radius(transforms, self_position.centred(), max_radius)
         .filter_map(|(entity, pos, dist)| {
             let condition = entity.get(&conditions)?;
 
             // check item filter matches
-            (entity, Some(world)).matches(*filter).as_option()?;
+            if !(entity, Some(world)).matches(*filter) {
+                return None;
+            }
 
             // check this item is accessible
             // TODO use accessible position?
@@ -288,7 +290,7 @@ impl Display for AiInput {
         match self {
             AiInput::Hunger => write!(f, "Hunger"),
             AiInput::HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
-            AiInput::CanFindLocally {
+            AiInput::CanFindGradedItems {
                 filter,
                 max_radius,
                 max_count,

@@ -439,8 +439,8 @@ dependencies = [
  "bumpalo",
  "cgmath",
  "derive_more",
+ "displaydoc",
  "float-cmp",
- "geo",
  "itertools 0.10.0",
  "lazy_static",
  "logging",
@@ -451,7 +451,6 @@ dependencies = [
  "parking_lot",
  "parse-display",
  "rand 0.7.3",
- "rstar",
  "smallvec",
  "thiserror",
 ]
@@ -481,6 +480,12 @@ name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+
+[[package]]
+name = "cooked-waker"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "147be55d677052dabc6b22252d5dd0fd4c29c8c27aa4f2fbef0f94aa003b406f"
 
 [[package]]
 name = "cpuid-bool"
@@ -723,6 +728,17 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "displaydoc"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf95dc3f046b9da4f2d51833c0d3547d8564ef6910f5c1ed130306a75b92886"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2620,12 +2636,15 @@ dependencies = [
  "ahash 0.7.2",
  "ai",
  "arraydeque",
+ "async-trait",
  "bitflags",
  "color",
  "common",
  "config",
+ "cooked-waker",
  "daggy",
  "ecs-derive",
+ "futures",
  "hex-serde",
  "inventory",
  "rbl_circular_buffer",
@@ -2854,10 +2873,12 @@ name = "testing"
 version = "0.1.0"
 dependencies = [
  "argh",
+ "common",
  "futures",
  "inventory",
  "simulation",
  "tokio",
+ "unit",
 ]
 
 [[package]]

@@ -1,11 +1,11 @@
 use common::newtype::AccumulativeInt;
 use common::*;
 
-use crate::activity::ActivityComponent;
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
-use crate::ConditionComponent;
+use crate::simulation::EcsWorldRef;
+use crate::{ActivityComponent, ConditionComponent};
 
 // TODO newtype for Fuel
 pub type Fuel = u16;
@@ -34,6 +34,12 @@ pub struct BeingEatenComponent {
     pub eater: Entity,
 }
 
+#[derive(Error, Debug, Clone)]
+pub enum FoodEatingError {
+    #[error("Food is not equipped by the eater")]
+    NotEquipped,
+}
+
 /// Decreases hunger over time
 pub struct HungerSystem;
 
@@ -49,7 +55,8 @@ impl<'a> System<'a> for HungerSystem {
     fn run(&mut self, (mut hunger, activity): Self::SystemData) {
         for (hunger, activity) in (&mut hunger, &activity).join() {
             // TODO individual metabolism rate
-            // TODO compensate multipliers
+            // TODO elaborate and specify metabolism rate
+            // TODO take into account general movement speed in addition to this
             let metabolism = 1.0;
             let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
 
@@ -62,7 +69,7 @@ impl<'a> System<'a> for HungerSystem {
 impl<'a> System<'a> for EatingSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         Write<'a, EntityEventQueue>,
         WriteStorage<'a, InventoryComponent>,
         ReadStorage<'a, BeingEatenComponent>,
@@ -98,7 +105,7 @@ impl<'a> System<'a> for EatingSystem {
                     Some(comps) => comps,
                     None => {
                         warn!("food eater doesn't have inventory or hunger component"; "eater" => being_eaten.eater);
-                        return Some(Err(()));
+                        return Some(Err(FoodEatingError::NotEquipped));
                     }
                 };
 
@@ -131,7 +138,7 @@ impl<'a> System<'a> for EatingSystem {
                     debug_assert!(delete_result.is_ok());
 
                     // do post event
-                    Some(Ok(()))
+                    Some(Ok(being_eaten.eater))
                 } else {
                     // still eating
                     None
@@ -141,7 +148,7 @@ impl<'a> System<'a> for EatingSystem {
             if let Some(result) = do_eat() {
                 events.post(EntityEvent {
                     subject: item,
-                    payload: EntityEventPayload::BeenEaten(result),
+                    payload: EntityEventPayload::BeenEaten(result.clone()),
                 });
 
                 if result.is_ok() {

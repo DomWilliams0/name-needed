@@ -1,21 +1,6 @@
 #![allow(clippy::type_complexity, clippy::module_inception)]
+#![deny(unused_must_use)]
 
-pub use self::ai::AiAction;
-pub use activity::{ActivityComponent, EntityLoggingComponent};
-pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentWorld, EcsWorld, Entity};
-pub use item::{
-    ConditionComponent, Container, ContainerComponent, EdibleItemComponent, InventoryComponent,
-    ItemCondition, NameComponent,
-};
-pub use needs::HungerComponent;
-pub use path::FollowPathComponent;
-pub use perf::{Perf, PerfAvg, Timing};
-pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
-pub use unit::world::{
-    all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
-    WorldPositionRange,
-};
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
     block::{BlockType, IntoEnumIterator},
@@ -26,6 +11,15 @@ pub use world::{
     presets, BaseVertex, SliceRange,
 };
 
+// Rexports for specialised world types
+pub type WorldRef = world::WorldRef<simulation::WorldContext>;
+pub type World = world::World<simulation::WorldContext>;
+pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
+pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
+pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
+
+pub use self::ai::AiAction;
+pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
 pub use crate::render::{RenderComponent, Renderer, Shape2d};
 pub use crate::simulation::{
@@ -33,15 +27,31 @@ pub use crate::simulation::{
     Tick, WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
+pub use activity::{
+    ActivityComponent, EntityLoggingComponent, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
+};
+pub use definitions::EntityPosition;
+pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
+pub use event::{EntityEvent, EntityEventPayload};
+#[cfg(feature = "testing")]
+pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
-pub use self::simulation::current_tick;
-
-// Rexports for specialised world types
-pub type WorldRef = world::WorldRef<simulation::WorldContext>;
-pub type World = world::World<simulation::WorldContext>;
-pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
-pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
-pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
+#[cfg(debug_assertions)]
+pub use item::validation::validate_all_inventories;
+pub use item::{
+    ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
+    InventoryComponent, ItemCondition, NameComponent,
+};
+pub use needs::HungerComponent;
+pub use path::FollowPathComponent;
+pub use perf::{Perf, PerfAvg, Timing};
+pub use queued_update::QueuedUpdates;
+pub use runtime::Runtime;
+pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use unit::world::{
+    all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
+    WorldPositionRange,
+};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
@@ -61,6 +71,7 @@ mod perf;
 mod physics;
 mod queued_update;
 mod render;
+mod runtime;
 mod scripting;
 mod senses;
 mod simulation;

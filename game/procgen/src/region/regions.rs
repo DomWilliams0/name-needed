@@ -15,7 +15,6 @@ use crate::region::region::{
 };
 
 use crate::region::unit::RegionLocation;
-use crate::region::SlabContinuation;
 use crate::{PlanetParams, PlanetParamsRef};
 use futures::prelude::stream::FuturesUnordered;
 
@@ -27,7 +26,6 @@ use std::ops::{Deref, DerefMut};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use strum_macros::EnumDiscriminants;
-use unit::world::SlabLocation;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParamsRef,
@@ -539,7 +537,10 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
     pub async fn is_region_loaded(&self, region: RegionLocation<SIZE>) -> bool {
         let entry = self.entry_unchecked(region);
         let ro = entry.0.read().await;
-        matches!(&*ro, RegionLoadState::Partially(_) | RegionLoadState::Fully(_))
+        matches!(
+            &*ro,
+            RegionLoadState::Partially(_) | RegionLoadState::Fully(_)
+        )
     }
 
     #[cfg(debug_assertions)]
@@ -548,6 +549,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         region: RegionLocation<SIZE>,
         replacing_feature: &SharedRegionalFeature<SIZE>,
     ) {
+        use unit::world::SlabLocation;
         let region_chunk_bounds = {
             let (min, max) = region.chunk_bounds();
             (min.0..max.0, min.1..max.1)
@@ -568,7 +570,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
             .iter()
             .filter(|(slab, _)| is_in_region(slab))
             .filter_map(|(slab, state)| {
-                if let SlabContinuation::Loaded = state {
+                if let crate::region::SlabContinuation::Loaded = state {
                     Some(*slab)
                 } else {
                     None
@@ -692,19 +694,20 @@ impl<const SIZE: usize, const SIZE_2: usize> Regions<SIZE, SIZE_2> {
         ret
     }
 
-    /// Partially or fully loaded. Region assumed to be valid
-    pub async fn with_loaded_region_mut(
-        &self,
-        region: RegionLocation<SIZE>,
-        dew_it: impl FnOnce(&mut Region<SIZE, SIZE_2>),
-    ) {
-        let entry = self.entry_unchecked(region);
-        let mut guard = entry.0.write().await;
-        match &mut *guard {
-            RegionLoadState::Partially(r) | RegionLoadState::Fully(r) => dew_it(r),
-            _ => {}
-        };
-    }
+    /*    /// Partially or fully loaded. Region assumed to be valid
+        pub async fn with_loaded_region_mut(
+            &self,
+            region: RegionLocation<SIZE>,
+            dew_it: impl FnOnce(&mut Region<SIZE, SIZE_2>),
+        ) {
+            let entry = self.entry_unchecked(region);
+            let mut guard = entry.0.write().await;
+            match &mut *guard {
+                RegionLoadState::Partially(r) | RegionLoadState::Fully(r) => dew_it(r),
+                _ => {}
+            };
+        }
+    */
 }
 
 impl<const SIZE: usize, const SIZE_2: usize> Default for RegionLoadState<SIZE, SIZE_2> {
@@ -769,30 +772,6 @@ impl<const SIZE: usize, const SIZE_2: usize> RegionEntry<SIZE, SIZE_2> {
         }
     }
 
-    /// # Safety
-    /// Must be in the Partially or Fully loaded state
-    async unsafe fn region_ref_with_guard_mut<'a>(
-        &self,
-        mut guard: RwLockWriteGuard<'a, RegionLoadState<SIZE, SIZE_2>>,
-    ) -> LoadedRegionRefMut<'a, SIZE, SIZE_2> {
-        use RegionLoadState::*;
-
-        let region = match &mut *guard {
-            Fully(region) | Partially(region) => &mut *(region as *mut Region<SIZE, SIZE_2>),
-            _ => {
-                if cfg!(debug_assertions) {
-                    panic!("region must be partially or fully loaded to get a reference");
-                }
-                unreachable_unchecked()
-            }
-        };
-
-        LoadedRegionRefMut {
-            _guard: guard,
-            region,
-        }
-    }
-
     async fn upgrade_from_partially_to_fully(
         &self,
     ) -> Result<LoadedRegionRef<'_, SIZE, SIZE_2>, ()> {
@@ -851,17 +830,6 @@ impl<const SIZE: usize, const SIZE_2: usize> Deref for LoadedRegionRefMut<'_, SI
 impl<const SIZE: usize, const SIZE_2: usize> DerefMut for LoadedRegionRefMut<'_, SIZE, SIZE_2> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.region
-    }
-}
-
-impl<'a, const SIZE: usize, const SIZE_2: usize> LoadedRegionRefMut<'a, SIZE, SIZE_2> {
-    pub fn downgrade(self) -> LoadedRegionRef<'a, SIZE, SIZE_2> {
-        let LoadedRegionRefMut { _guard, region } = self;
-
-        LoadedRegionRef {
-            _guard: _guard.downgrade(),
-            region,
-        }
     }
 }
 

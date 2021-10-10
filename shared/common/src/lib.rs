@@ -7,8 +7,9 @@ pub use cgmath::{
     VectorSpace, Zero,
 };
 pub use derive_more;
+pub use displaydoc::Display;
+pub use dynslot::DynSlot;
 pub use float_cmp::ApproxEq;
-pub use geo;
 pub use itertools::*;
 pub use num_derive;
 pub use num_traits;
@@ -16,7 +17,6 @@ pub use ordered_float::{NotNan, OrderedFloat};
 pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
-pub use rstar;
 pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
 
@@ -79,6 +79,7 @@ pub fn truncate<F: cgmath::BaseFloat, V: cgmath::InnerSpace<Scalar = F>>(vec: V,
     }
 }
 
+pub mod dynslot;
 pub mod input;
 pub mod newtype;
 pub mod random;

@@ -33,9 +33,12 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
 
     #[cfg(feature = "hook")]
     pub fn hook_context(&mut self) -> testing::HookContext {
+        use simulation::ComponentWorld;
+        let runtime = self.simulation.world().resource::<simulation::Runtime>();
         testing::HookContext {
             simulation: self.simulation.as_lite_ref(),
             commands: &mut self.sim_ui_commands,
+            events: runtime.event_log(),
         }
     }
 
@@ -109,11 +112,11 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     HookResult::KeepGoing => {}
                     HookResult::TestSuccess => {
                         info!("test finished successfully");
-                        return Some(Exit::Stop);
+                        return Some(Exit::TestSuccess);
                     }
                     HookResult::TestFailure(err) => {
                         error!("test failed: {}", err);
-                        return Some(Exit::Abort(err));
+                        return Some(Exit::TestFailure(err));
                     }
                 }
             }

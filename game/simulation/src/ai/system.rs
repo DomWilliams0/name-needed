@@ -10,7 +10,7 @@ use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::needs::HungerComponent;
-use crate::simulation::Tick;
+use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
 use crate::{EntityLoggingComponent, TransformComponent};
@@ -89,7 +89,7 @@ pub struct AiSystem;
 impl<'a> System<'a> for AiSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldFrameRef>,
+        Read<'a, EcsWorldRef>,
         Read<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,    // optional
@@ -152,7 +152,7 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
-                world: ecs_world,
+                world: &*ecs_world,
                 shared: &mut shared_bb,
             };
 
@@ -210,7 +210,7 @@ impl<'a> System<'a> for AiSystem {
                 ai.current = Some(src);
 
                 // pass on to activity system
-                activity.interrupt_with_new_activity(action, society_task, e, ecs_world);
+                activity.interrupt_with_new_activity(action, society_task);
             }
 
             // job indices are finished with, allow modifications again

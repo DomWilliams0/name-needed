@@ -18,7 +18,7 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
 
     let as_interactive = if interactive {
         quote! {
-            InteractiveResult::Interactive(comp as &dyn InteractiveComponent)
+            InteractiveResult::Interactive(todo!("currently impossible with ComponentRef"))
         }
     } else {
         quote! {

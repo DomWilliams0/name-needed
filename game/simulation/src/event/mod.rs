@@ -7,6 +7,9 @@ pub use subscription::{
     EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
 };
 
+#[cfg(feature = "testing")]
+pub use subscription::debug_events::{EntityEventDebugPayload, TaskResultSummary};
+
 pub mod prelude {
     pub use super::{
         EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType,
@@ -16,4 +19,4 @@ pub mod prelude {
 
 pub use timer::{Timer, TimerToken, Timers, Token};
 
-pub type EntityTimers = Timers<crate::ecs::Entity, TimerToken>;
+pub type RuntimeTimers = Timers<crate::runtime::WeakTaskRef, TimerToken>;

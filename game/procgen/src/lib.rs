@@ -1,4 +1,5 @@
-#![allow(dead_code)]
+#![deny(unused_must_use)]
+
 mod biome;
 mod continent;
 mod params;

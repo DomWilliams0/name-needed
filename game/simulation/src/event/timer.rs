@@ -24,11 +24,8 @@ pub struct TimerToken(u64);
 
 impl<D, T: Token> Timer<D, T> {
     pub fn elapsed(&self, current: Tick) -> bool {
+        // TODO move this into Tick
         current.value() >= self.end_tick.value()
-    }
-
-    pub fn data(&self) -> &D {
-        &self.data
     }
 }
 
@@ -61,11 +58,13 @@ impl<D, T: Token> Timers<D, T> {
             .map(|t| (t.token, t.data))
     }
 
-    pub fn schedule(&mut self, relative_ticks: u32, data: D) -> T {
+    /// Returns (end tick, token)
+    pub fn schedule(&mut self, relative_ticks: u32, data: D) -> (Tick, T) {
         self.schedule_with(Tick::fetch(), relative_ticks, data)
     }
 
-    fn schedule_with(&mut self, current: Tick, relative_ticks: u32, data: D) -> T {
+    /// Returns (end tick, token)
+    fn schedule_with(&mut self, current: Tick, relative_ticks: u32, data: D) -> (Tick, T) {
         let token = self.next_token.increment();
 
         let end_tick = current + relative_ticks;
@@ -75,9 +74,9 @@ impl<D, T: Token> Timers<D, T> {
             data,
         });
 
-        trace!("scheduled timer for {tick}", tick = end_tick.value(); "token" => ?token);
+        trace!("scheduled timer for {tick} (+{n})", tick = end_tick.value(), n = relative_ticks; "token" => ?token);
 
-        token
+        (end_tick, token)
     }
 
     pub fn cancel(&mut self, token: T) -> bool {
@@ -87,14 +86,6 @@ impl<D, T: Token> Timers<D, T> {
         } else {
             false
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.timers.len()
-    }
-
-    pub fn timers(&self) -> impl Iterator<Item = &Timer<D, T>> + '_ {
-        self.timers.iter()
     }
 }
 
@@ -135,10 +126,10 @@ mod tests {
         let mut timers = Timers::<i32, TimerToken>::default();
 
         let now = Tick::with(10);
-        let a = timers.schedule_with(now, 2, 0);
-        let b = timers.schedule_with(now, 4, 1);
-        let d = timers.schedule_with(now, 8, 2);
-        let c = timers.schedule_with(now, 6, 3);
+        let (_, a) = timers.schedule_with(now, 2, 0);
+        let (_, b) = timers.schedule_with(now, 4, 1);
+        let (_, d) = timers.schedule_with(now, 8, 2);
+        let (_, c) = timers.schedule_with(now, 6, 3);
 
         let now = Tick::with(11);
         let finished = timers.maintain(now).collect_vec();
@@ -149,8 +140,8 @@ mod tests {
         assert_eq!(finished, vec![(a, 0), (b, 1)]);
 
         // late to the party
-        let e = timers.schedule_with(now, 15, 4);
-        let f = timers.schedule_with(now, 16, 5);
+        let (_, e) = timers.schedule_with(now, 15, 4);
+        let (_, f) = timers.schedule_with(now, 16, 5);
 
         let now = Tick::with(22);
         let finished = timers.maintain(now).collect_vec();

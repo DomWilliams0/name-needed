@@ -70,7 +70,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         let entity = builder.build().into();
 
         // set position in transform if present
-        if let Ok(transform) = self.world.component_mut::<TransformComponent>(entity) {
+        if let Ok(mut transform) = self.world.component_mut::<TransformComponent>(entity) {
             if let Some(pos) = pos {
                 transform.reset_position(pos.centred())
             } else {

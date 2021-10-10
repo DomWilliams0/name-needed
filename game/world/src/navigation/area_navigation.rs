@@ -226,10 +226,10 @@ impl AreaGraph {
             Some(n) => *n,
             None => {
                 debug_assert!(
-                    self.graph
+                    !self
+                        .graph
                         .node_indices()
-                        .find(|n| self.graph.node_weight(*n).unwrap().0 == area)
-                        .is_none(),
+                        .any(|n| self.graph.node_weight(n).unwrap().0 == area),
                     "node is not in both lookup and graph"
                 );
                 let n = self.graph.add_node(AreaNavNode(area));

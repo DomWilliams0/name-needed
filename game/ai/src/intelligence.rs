@@ -261,9 +261,13 @@ mod tests {
         let mut intelligence = Intelligence::new(dses.into_iter());
 
         // eat wins
-        assert!(
-            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
-        );
+        assert!(matches!(
+            intelligence.choose(&mut blackboard),
+            IntelligentDecision::New {
+                action: TestAction::Eat,
+                ..
+            }
+        ));
         assert!(matches!(
             intelligence.choose(&mut blackboard),
             IntelligentDecision::Unchanged
@@ -274,22 +278,34 @@ mod tests {
             100,
             vec![AiBox::new(EmergencyDse) as AiBox<dyn Dse<TestContext>>].into_iter(),
         );
-        assert!(
-            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
-        );
+        assert!(matches!(
+            intelligence.choose(&mut blackboard),
+            IntelligentDecision::New {
+                action: TestAction::CancelExistence,
+                ..
+            }
+        ));
 
         // pop it, back to original
         intelligence.pop_smarts(&100);
-        assert!(
-            matches!(intelligence.choose(&mut blackboard), IntelligentDecision::New {action: TestAction::Eat, ..})
-        );
+        assert!(matches!(
+            intelligence.choose(&mut blackboard),
+            IntelligentDecision::New {
+                action: TestAction::Eat,
+                ..
+            }
+        ));
 
         // add emergency as stream
         let emergency = Box::new(EmergencyDse);
         let streams = once(emergency.as_ref() as &dyn Dse<TestContext>);
-        assert!(
-            matches!(intelligence.choose_with_stream_dses(&mut blackboard, streams), IntelligentDecision::New {action: TestAction::CancelExistence, ..})
-        );
+        assert!(matches!(
+            intelligence.choose_with_stream_dses(&mut blackboard, streams),
+            IntelligentDecision::New {
+                action: TestAction::CancelExistence,
+                ..
+            }
+        ));
     }
 
     //noinspection DuplicatedCode

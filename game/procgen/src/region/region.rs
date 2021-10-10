@@ -268,7 +268,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
 
         for overflow in overflows.into_iter() {
             let neighbour =
-                match region.try_add_offset_with_params(overflow.offset::<SIZE>(), &params) {
+                match region.try_add_offset_with_params(overflow.offset::<SIZE>(), params) {
                     Some(n) => n,
                     None => continue, // out of bounds, nvm
                 };
@@ -380,9 +380,9 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
     #[cfg(any(test, feature = "benchmarking"))]
     #[inline]
     pub async fn create_for_benchmark(
-        region: RegionLocation<SIZE>,
-        continents: &ContinentMap,
-        params: PlanetParamsRef,
+        _region: RegionLocation<SIZE>,
+        _continents: &ContinentMap,
+        _params: PlanetParamsRef,
     ) -> Self {
         // TODO null params for benchmark
         todo!()
@@ -425,7 +425,7 @@ impl<const SIZE: usize, const SIZE_2: usize> Region<SIZE, SIZE_2> {
         current: &SharedRegionalFeature<SIZE>,
         replacement: &SharedRegionalFeature<SIZE>,
     ) -> bool {
-        if let Some(feature) = self.features.iter_mut().find(|f| Arc::ptr_eq(&current, *f)) {
+        if let Some(feature) = self.features.iter_mut().find(|f| Arc::ptr_eq(current, *f)) {
             // swapadoodledoo
             *feature = replacement.clone();
             true
@@ -640,19 +640,20 @@ impl ChunkDescription {
     pub fn block(&self, block: SliceBlock) -> &BlockHeight {
         self.ground_height.get_unchecked(SliceBlockAsCoord(block))
     }
-
-    /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
-    /// a chunk size of 4:
-    ///
-    /// ```none
-    /// 12  13  14  15
-    /// 8   9   10  11
-    /// 4   5   6   7
-    /// 0   1   2   3
-    /// ```
-    pub(crate) fn blocks(&self) -> &[BlockHeight] {
-        &self.ground_height.array()
-    }
+    /*
+        /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
+        /// a chunk size of 4:
+        ///
+        /// ```none
+        /// 12  13  14  15
+        /// 8   9   10  11
+        /// 4   5   6   7
+        /// 0   1   2   3
+        /// ```
+        pub(crate) fn blocks(&self) -> &[BlockHeight] {
+            self.ground_height.array()
+        }
+    */
 }
 
 impl BlockHeight {

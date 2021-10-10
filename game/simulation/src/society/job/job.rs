@@ -1,10 +1,9 @@
-use crate::activity::ActivityFinish;
 use crate::job::SocietyTask;
 use crate::{EcsWorld, Entity, WorldPosition, WorldPositionRange};
 
 use common::parking_lot::RwLock;
 use common::*;
-use std::convert::TryFrom;
+
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -129,14 +128,11 @@ impl SocietyJob<dyn SocietyJobImpl> {
     }
 }
 
-impl TryFrom<ActivityFinish> for SocietyTaskResult {
-    type Error = ();
-
-    fn try_from(finish: ActivityFinish) -> Result<Self, Self::Error> {
-        match finish {
-            ActivityFinish::Success => Ok(Self::Success),
-            ActivityFinish::Failure(err) => Ok(Self::Failure(err)),
-            ActivityFinish::Interrupted => Err(()),
+impl From<BoxedResult<()>> for SocietyTaskResult {
+    fn from(result: BoxedResult<()>) -> Self {
+        match result {
+            Ok(_) => Self::Success,
+            Err(err) => Self::Failure(err),
         }
     }
 }

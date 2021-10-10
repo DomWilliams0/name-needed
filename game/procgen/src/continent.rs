@@ -1,5 +1,5 @@
 use crate::params::PlanetParamsRef;
-use crate::region::{PlanetPoint, RegionLocation};
+use crate::region::PlanetPoint;
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
@@ -237,87 +237,87 @@ impl ContinentMap {
         scaled * mul
     }
 
-    pub fn discover(&mut self) {
-        // TODO reimplement or add back density if needed
-        todo!();
-        // self.rasterize_land_blobs();
-        // self.discover_density();
-        // self.generate_initial_heightmap();
-    }
+    /*    pub fn discover(&mut self) {
+            // TODO reimplement or add back density if needed
+            todo!();
+            // self.rasterize_land_blobs();
+            // self.discover_density();
+            // self.generate_initial_heightmap();
+        }
 
-    /// Discovers density and scales to 0.0-1.0
-    fn discover_density(&mut self) {
-        let increment = 0.1;
-        let limit = 10.0;
+        /// Discovers density and scales to 0.0-1.0
+        fn discover_density(&mut self) {
+            let increment = 0.1;
+            let limit = 10.0;
 
-        let size = self.params.planet_size as i32;
-        let mut frontier = Vec::with_capacity((size * size / 2) as usize);
-        for (idx, tile) in self.grid.iter().enumerate() {
-            let is_land = tile.is_land();
-            for (n, _) in self.grid.wrapping_neighbours(idx) {
-                let n_tile = &self.grid[n];
-                if is_land == n_tile.is_land() {
-                    continue;
+            let size = self.params.planet_size as i32;
+            let mut frontier = Vec::with_capacity((size * size / 2) as usize);
+            for (idx, tile) in self.grid.iter().enumerate() {
+                let is_land = tile.is_land();
+                for (n, _) in self.grid.wrapping_neighbours(idx) {
+                    let n_tile = &self.grid[n];
+                    if is_land == n_tile.is_land() {
+                        continue;
+                    }
+
+                    // this is border between land and sea
+                    frontier.push((n, increment));
                 }
 
-                // this is border between land and sea
-                frontier.push((n, increment));
-            }
-
-            while let Some((idx, new_val)) = frontier.pop() {
-                let this_tile = &self.grid[idx];
-                let current = this_tile.density.get();
-                if current == 0.0 || new_val < current {
-                    this_tile.density.set(new_val);
-                    for (n, _) in self.grid.wrapping_neighbours(idx) {
-                        let incremented = (new_val + increment).min(limit);
-                        frontier.push((n, incremented));
+                while let Some((idx, new_val)) = frontier.pop() {
+                    let this_tile = &self.grid[idx];
+                    let current = this_tile.density.get();
+                    if current == 0.0 || new_val < current {
+                        this_tile.density.set(new_val);
+                        for (n, _) in self.grid.wrapping_neighbours(idx) {
+                            let incremented = (new_val + increment).min(limit);
+                            frontier.push((n, incremented));
+                        }
                     }
                 }
             }
+
+            // normalize density values between 0 to 1
+            let max_density = self
+                .grid
+                .iter()
+                .map(|tile| OrderedFloat(tile.density.get()))
+                .max()
+                .unwrap() // not empty
+                .0;
+
+            assert!(
+                max_density > 0.0,
+                "all density is 0, world might be too small"
+            );
+
+            debug!("original density limit"; "max" => ?max_density);
+
+            for tile in self.grid.iter_mut() {
+                let val = tile.density.get();
+                let scaled_val = val / (max_density);
+                tile.density.set(scaled_val);
+            }
+
+            // average density with gaussian blur filter
+            apply_gaussian_filter(
+                &mut self.grid,
+                |tile| tile.density.get(),
+                |tile, orig| tile.is_land() == orig.is_land(),
+                |tile, val| tile.density.set(val),
+            )
         }
-
-        // normalize density values between 0 to 1
-        let max_density = self
-            .grid
-            .iter()
-            .map(|tile| OrderedFloat(tile.density.get()))
-            .max()
-            .unwrap() // not empty
-            .0;
-
-        assert!(
-            max_density > 0.0,
-            "all density is 0, world might be too small"
-        );
-
-        debug!("original density limit"; "max" => ?max_density);
-
-        for tile in self.grid.iter_mut() {
-            let val = tile.density.get();
-            let scaled_val = val / (max_density);
-            tile.density.set(scaled_val);
-        }
-
-        // average density with gaussian blur filter
-        apply_gaussian_filter(
-            &mut self.grid,
-            |tile| tile.density.get(),
-            |tile, orig| tile.is_land() == orig.is_land(),
-            |tile, val| tile.density.set(val),
-        )
-    }
-
+    */
     pub fn biome_sampler(&self) -> &BiomeSampler {
         self.biomes
             .as_ref()
             .expect("biome sampler not initialized with init_generator()")
     }
 
-    pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
+    /*  pub fn tile_at(&self, region: RegionLocation) -> &RegionTile {
         let (x, y) = region.xy();
         &self.grid[[x as usize, y as usize, 0]]
-    }
+    }*/
 }
 
 impl Default for RegionTile {
@@ -330,6 +330,7 @@ impl Default for RegionTile {
     }
 }
 
+#[allow(dead_code)] // currently unused
 impl RegionTile {
     pub fn is_land(&self) -> bool {
         self.continent.is_some()
@@ -354,6 +355,7 @@ impl RegionTile {
     }
 }
 
+#[allow(dead_code)] // currently unused
 fn apply_gaussian_filter<T: Default>(
     grid: &mut DynamicGrid<T>,
     mut gimme_value: impl FnMut(&T) -> f64,

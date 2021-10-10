@@ -77,7 +77,7 @@ impl<'a> Slice<'a> {
         unsafe { self.slice.get_unchecked(idx) }
     }
 
-    pub fn to_owned(&self) -> SliceOwned {
+    pub fn to_owned(self) -> SliceOwned {
         let slice = self.slice.try_into().expect("slice is the wrong length");
         SliceOwned {
             slice: Box::new(slice),

@@ -37,11 +37,11 @@ pub enum ContainedInComponent {
 }
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
-pub struct EcsExtContainers<'w>(&'w mut EcsWorld);
+pub struct EcsExtContainers<'w>(&'w EcsWorld);
 
 impl EcsWorld {
     /// Helper methods to work with container entities
-    pub fn helpers_containers(&mut self) -> EcsExtContainers {
+    pub fn helpers_containers(&self) -> EcsExtContainers {
         EcsExtContainers(self)
     }
 }
@@ -115,7 +115,7 @@ impl EcsExtContainers<'_> {
         container_entity: Entity,
         new_society: Option<SocietyHandle>,
     ) -> Result<(), ContainerError> {
-        let container = self
+        let mut container = self
             .component_mut::<ContainerComponent>(container_entity)
             .map_err(|_| ContainerError::BadEntity)?;
 

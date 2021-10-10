@@ -142,4 +142,8 @@ impl Container {
     pub fn current_capacity(&self) -> Volume {
         self.current_volume
     }
+
+    pub fn contains(&self, entity: Entity) -> bool {
+        self.contents.iter().any(|e| e.entity == entity)
+    }
 }

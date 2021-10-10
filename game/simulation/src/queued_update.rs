@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::pin::Pin;
 
 use common::*;
 use unit::world::{WorldPosition, WorldPositionRange};
@@ -20,7 +21,7 @@ pub struct RawQueuedUpdates<Q> {
 
 pub trait QueuedUpdatesImpl: Default {
     /// Returns index of this new update
-    fn queue<F: 'static + FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>>(
+    fn queue<F: 'static + FnOnce(Pin<&mut EcsWorld>) -> Result<(), Box<dyn Error>>>(
         &mut self,
         name: &'static str,
         update: F,
@@ -32,7 +33,7 @@ pub trait QueuedUpdatesImpl: Default {
         &mut self,
         per_name: N,
         per_result: R,
-        world: &mut EcsWorld,
+        world: Pin<&mut EcsWorld>,
     );
 }
 
@@ -45,7 +46,7 @@ impl<Q: Default> Default for RawQueuedUpdates<Q> {
 }
 
 impl<Q: QueuedUpdatesImpl> RawQueuedUpdates<Q> {
-    pub fn queue<F: 'static + FnOnce(&mut EcsWorld) -> Result<(), Box<dyn Error>>>(
+    pub fn queue<F: 'static + FnOnce(Pin<&mut EcsWorld>) -> Result<(), Box<dyn Error>>>(
         &self,
         name: &'static str,
         update: F,
@@ -56,7 +57,7 @@ impl<Q: QueuedUpdatesImpl> RawQueuedUpdates<Q> {
         trace!("queued update #{n} for next tick", n = n; "name" => name)
     }
 
-    pub fn execute(&mut self, world: &mut EcsWorld) {
+    pub fn execute(&mut self, world: Pin<&mut EcsWorld>) {
         let mut inner = self.inner.borrow_mut();
         let n = inner.len();
         if n > 0 {
@@ -107,7 +108,7 @@ mod naive {
     pub struct NaiveImpl(
         Vec<(
             &'static str,
-            Box<dyn FnOnce(&mut EcsWorld) -> BoxedResult<()>>,
+            Box<dyn FnOnce(Pin<&mut EcsWorld>) -> BoxedResult<()>>,
         )>,
     );
 
@@ -118,7 +119,7 @@ mod naive {
     }
 
     impl QueuedUpdatesImpl for NaiveImpl {
-        fn queue<F: 'static + FnOnce(&mut EcsWorld) -> BoxedResult<()>>(
+        fn queue<F: 'static + FnOnce(Pin<&mut EcsWorld>) -> BoxedResult<()>>(
             &mut self,
             name: &'static str,
             update: F,
@@ -136,11 +137,11 @@ mod naive {
             &mut self,
             mut per_name: N,
             mut per_result: R,
-            world: &mut EcsWorld,
+            mut world: Pin<&mut EcsWorld>,
         ) {
             for (name, update) in self.0.drain(..) {
                 per_name(name);
-                per_result(name, update(world));
+                per_result(name, update(world.as_mut()));
             }
         }
     }
@@ -174,7 +175,8 @@ mod tests {
             Err("damn".into())
         });
 
-        updates.execute(&mut ecs);
+        futures::pin_mut!(ecs);
+        updates.execute(ecs.as_mut());
 
         let results = ecs.resource::<Vec<i32>>();
         assert_eq!(results, &vec![123, 456]);

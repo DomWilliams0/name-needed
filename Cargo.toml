@@ -19,7 +19,7 @@ members = [
 	"shared/logging",
 	"shared/unit",
 
-	# ensure this is the last member! so it can be sed'd out in CI
+	# ensure this is the last member! so it can be sed'd out in CI on unsupported OSs
 	"testing",
 ] # end members
 

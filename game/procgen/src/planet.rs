@@ -116,7 +116,7 @@ impl Planet {
             use crate::climate::*;
             use crate::progress::*;
 
-            let planet_ref = self.clone();
+            // let planet_ref = self.clone();
             let mut progress = match cfg!(feature = "bin") {
                 #[cfg(feature = "bin")]
                 true if params.render.create_climate_gif => Box::new(
@@ -135,8 +135,10 @@ impl Planet {
                 &planet.continents,
                 &params,
                 &mut planet_rando,
-                |step, climate| {
-                    progress.update(step, planet_ref.clone(), climate);
+                |_step, _climate| {
+                    // TODO this is a future! the climate feature is incomplete and a wip so gonna leave this broken for now
+                    // progress.update(step, planet_ref.clone(), climate);
+                    unreachable!("climate is experimental and therefore broken")
                 },
             );
 

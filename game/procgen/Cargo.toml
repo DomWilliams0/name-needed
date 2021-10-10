@@ -41,7 +41,7 @@ sha2 = { version = "0.9", optional = true }
 [features]
 default = []
 bin = ["image", "imageproc", "color", "async-trait", "async-scoped", "panik"]
-climate = ["crossbeam"]
+climate = ["crossbeam", "async-trait"]
 cache = ["bincode", "sha2", "geo/use-serde"]
 benchmarking = []
 

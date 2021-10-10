@@ -14,7 +14,9 @@ pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
 
 pub use crate::register_component_template;
 
-pub use self::world::{ComponentGetError, ComponentWorld, EcsWorld, EcsWorldFrameRef, SpecsWorld};
+pub use self::world::{
+    ComponentGetError, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, SpecsWorld,
+};
 
 mod component;
 mod entity;

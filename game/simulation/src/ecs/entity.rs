@@ -30,6 +30,13 @@ impl Deref for Entity {
 }
 
 impl Entity {
+    pub fn has<C: specs::Component, D: Deref<Target = specs::storage::MaskedStorage<C>>>(
+        self,
+        storage: &specs::Storage<C, D>,
+    ) -> bool {
+        storage.contains(self.0)
+    }
+
     pub fn get<'e, C: specs::Component, D: Deref<Target = specs::storage::MaskedStorage<C>>>(
         self,
         storage: &'e specs::Storage<C, D>,

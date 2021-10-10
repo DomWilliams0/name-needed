@@ -212,6 +212,7 @@ impl ComponentRegistry {
         entity: Entity,
     ) -> impl Iterator<Item = (&'static str, Option<&dyn InteractiveComponent>)> + 'a {
         self.map.iter().filter_map(move |(name, funcs)| {
+            todo!("can't have a &dyn InteractiveComponent from a component ref"); // TODO
             (funcs.get_interactive)(world, entity).map(|res| match res {
                 InteractiveResult::NonInteractive => (*name, None),
                 InteractiveResult::Interactive(i) => (*name, Some(i)),

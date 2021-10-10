@@ -216,6 +216,7 @@ impl<const SIZE: usize> RegionalFeatureRaw<dyn Feature, SIZE> {
         RegionalFeature(ptr as *const _)
     }
 
+    #[allow(clippy::needless_lifetimes)] // false positive, you don't knooow me
     pub fn display<'a>(self: &'a Arc<Self>) -> impl Display + 'a {
         let ptr = Arc::as_ptr(self);
 
@@ -449,56 +450,56 @@ impl RegionalFeatureBoundary {
         }
     }
 
-    fn iter_polys(&self, mut per_poly: impl FnMut(&Vec<Coordinate<f64>>)) {
-        match &self.0 {
-            Geometry::Polygon(p) => per_poly(&p.exterior().0),
-            Geometry::MultiPolygon(p) => {
-                for poly in &p.0 {
-                    per_poly(&poly.exterior().0);
-                }
-            }
-            _ => unsafe { unreachable_debug() },
-        }
-    }
-
-    /// Collapse into point cloud
-    #[deprecated]
-    fn collapse(self, extend_me: Option<Vec<Coordinate<f64>>>) -> Vec<Coordinate<f64>> {
-        let extract_points = |p: Polygon<f64>| {
-            let (ext, int) = p.into_inner();
-            if !int.is_empty() {
-                warn!("interior is not empty"; "interiors" => int.len());
-            }
-            ext.0
-        };
-
-        match self.0 {
-            Geometry::Polygon(p) => {
-                let more_points = extract_points(p);
-                match extend_me {
-                    None => more_points,
-                    Some(mut p) => {
-                        p.extend(more_points);
-                        p
+    /*    fn iter_polys(&self, mut per_poly: impl FnMut(&Vec<Coordinate<f64>>)) {
+            match &self.0 {
+                Geometry::Polygon(p) => per_poly(&p.exterior().0),
+                Geometry::MultiPolygon(p) => {
+                    for poly in &p.0 {
+                        per_poly(&poly.exterior().0);
                     }
                 }
+                _ => unsafe { unreachable_debug() },
             }
-            Geometry::MultiPolygon(p) => {
-                let mut points = extend_me;
-                for poly in p.0 {
-                    match points.as_mut() {
-                        None => points = Some(extract_points(poly)),
-                        Some(p) => p.extend(extract_points(poly)),
+        }
+
+        /// Collapse into point cloud
+        #[deprecated]
+        fn collapse(self, extend_me: Option<Vec<Coordinate<f64>>>) -> Vec<Coordinate<f64>> {
+            let extract_points = |p: Polygon<f64>| {
+                let (ext, int) = p.into_inner();
+                if !int.is_empty() {
+                    warn!("interior is not empty"; "interiors" => int.len());
+                }
+                ext.0
+            };
+
+            match self.0 {
+                Geometry::Polygon(p) => {
+                    let more_points = extract_points(p);
+                    match extend_me {
+                        None => more_points,
+                        Some(mut p) => {
+                            p.extend(more_points);
+                            p
+                        }
                     }
                 }
+                Geometry::MultiPolygon(p) => {
+                    let mut points = extend_me;
+                    for poly in p.0 {
+                        match points.as_mut() {
+                            None => points = Some(extract_points(poly)),
+                            Some(p) => p.extend(extract_points(poly)),
+                        }
+                    }
 
-                debug_assert!(points.is_some(), "no polygons?");
-                points.unwrap_or_default()
+                    debug_assert!(points.is_some(), "no polygons?");
+                    points.unwrap_or_default()
+                }
+                _ => unsafe { unreachable_debug() },
             }
-            _ => unsafe { unreachable_debug() },
         }
-    }
-
+    */
     /// Points should be from row scanning, and pre-expanded horizontally.
     ///
     /// * traces boundary as convex hull
