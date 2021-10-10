@@ -156,8 +156,8 @@ impl SelectionWindow {
         let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
         if components_node.is_open() {
             // TODO component-specific widget
-            for (name, interactive) in context.simulation().ecs.all_components_for(details.entity) {
-                let interactive = match interactive {
+            for (name, component) in context.simulation().ecs.all_components_for(details.entity) {
+                let interactive = match component.as_interactive() {
                     None => {
                         // just show name
                         context.text(ui_str!(in context, " - {}", name));

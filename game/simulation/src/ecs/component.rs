@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use common::*;
 
-use crate::ecs::world::SpecsWorld;
+use crate::ecs::world::{ComponentRefErased, SpecsWorld};
 use crate::{EcsWorld, Entity};
 
 #[derive(Debug, Error)]
@@ -63,27 +63,23 @@ pub trait InteractiveComponent {
     fn as_debug(&self) -> Option<&dyn Debug>;
 }
 
-pub enum InteractiveResult<'a> {
-    NonInteractive,
-    Interactive(&'a dyn InteractiveComponent),
-}
-
 pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
-pub type GetInteractiveFn = fn(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult>;
+pub type GetComponentFn = fn(&EcsWorld, Entity) -> Option<ComponentRefErased>;
+pub type AsInteractiveFn = unsafe fn(&()) -> Option<&dyn InteractiveComponent>;
 
 pub struct ComponentEntry {
     pub name: &'static str,
     pub has_comp_fn: HasCompFn,
     pub register_comp_fn: RegisterCompFn,
-    pub get_interactive_fn: GetInteractiveFn,
+    pub get_comp_fn: GetComponentFn,
 }
 
 inventory::collect!(ComponentEntry);
 
 pub struct ComponentFunctions {
     has_comp: HasCompFn,
-    get_interactive: GetInteractiveFn,
+    get_comp: GetComponentFn,
 }
 
 pub struct ComponentRegistry {
@@ -176,7 +172,7 @@ impl ComponentRegistry {
                 comp.name,
                 ComponentFunctions {
                     has_comp: comp.has_comp_fn,
-                    get_interactive: comp.get_interactive_fn,
+                    get_comp: comp.get_comp_fn,
                 },
             );
 
@@ -210,13 +206,9 @@ impl ComponentRegistry {
         &'a self,
         world: &'a EcsWorld,
         entity: Entity,
-    ) -> impl Iterator<Item = (&'static str, Option<&dyn InteractiveComponent>)> + 'a {
+    ) -> impl Iterator<Item = (&'static str, ComponentRefErased)> + 'a {
         self.map.iter().filter_map(move |(name, funcs)| {
-            todo!("can't have a &dyn InteractiveComponent from a component ref"); // TODO
-            (funcs.get_interactive)(world, entity).map(|res| match res {
-                InteractiveResult::NonInteractive => (*name, None),
-                InteractiveResult::Interactive(i) => (*name, Some(i)),
-            })
+            (funcs.get_comp)(world, entity).map(|comp| (*name, comp))
         })
     }
 }

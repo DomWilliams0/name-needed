@@ -177,17 +177,17 @@
    * `// TODO consider using `nested` vecs as an optimization`
  * [game/simulation/src/definitions/mod.rs](game/simulation/src/definitions/mod.rs) (1)
    * `// TODO include which key caused the problem`
- * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (4)
+ * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (3)
    * `// TODO should be a Box<dyn Error>`
    * `/// TODO implement InteractiveComponent for some components`
    * `// TODO perfect hashing`
-   * `todo!("can't have a &dyn InteractiveComponent from a component ref"); // TODO`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
  * [game/simulation/src/ecs/tag.rs](game/simulation/src/ecs/tag.rs) (1)
    * `// TODO intern these strings`
- * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (1)
+ * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
+   * `let mut vec = Vec::new(); // TODO pass in vec to BORROW as param`
  * [game/simulation/src/event/queue.rs](game/simulation/src/event/queue.rs) (2)
    * `// TODO event queue generic over event type`
    * `// TODO track by game tick instead of just number of ops`

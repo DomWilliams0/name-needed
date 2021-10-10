@@ -5,9 +5,7 @@ pub use specs::{
 };
 pub use specs_derive::Component;
 
-pub use component::{
-    ComponentBuildError, ComponentEntry, InteractiveComponent, InteractiveResult, Map, Value,
-};
+pub use component::{ComponentBuildError, ComponentEntry, InteractiveComponent, Map, Value};
 pub use ecs_derive::EcsComponent;
 pub use entity::{Entity, EntityWrapper};
 pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
@@ -15,7 +13,8 @@ pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
 pub use crate::register_component_template;
 
 pub use self::world::{
-    ComponentGetError, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, SpecsWorld,
+    ComponentGetError, ComponentRef, ComponentRefErased, ComponentRefMut, ComponentWorld, EcsWorld,
+    SpecsWorld,
 };
 
 mod component;

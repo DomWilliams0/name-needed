@@ -18,11 +18,12 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
 
     let as_interactive = if interactive {
         quote! {
-            InteractiveResult::Interactive(todo!("currently impossible with ComponentRef"))
+            let actually_self = &*(actually_self as *const () as *const Self);
+            Some(actually_self as &dyn InteractiveComponent)
         }
     } else {
         quote! {
-            InteractiveResult::NonInteractive
+            None
         }
     };
 
@@ -38,10 +39,12 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
                 world.register::<Self>();
             }
 
-            fn get_interactive(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult> {
-                world.component::<Self>(entity)
-                .ok()
-                .map(|comp| #as_interactive)
+            fn get_component(world: &EcsWorld, entity: Entity) -> Option<ComponentRefErased> {
+                world.component::<Self>(entity).ok().map(|comp_ref| comp_ref.erased(Self::as_interactive))
+            }
+
+            unsafe fn as_interactive(actually_self: &()) -> Option<&dyn InteractiveComponent> {
+                #as_interactive
             }
         }
 
@@ -49,7 +52,7 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
             name: #name,
             has_comp_fn: #comp ::has_component,
             register_comp_fn: #comp ::register_component,
-            get_interactive_fn: #comp ::get_interactive,
+            get_comp_fn: #comp ::get_component,
         });
     };
 
