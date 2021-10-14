@@ -9,8 +9,8 @@ Config(
         persist_ui: true,
     ),
     world: (
-        source: Preset(OneChunkWonder),
-        // source: Generate("planet_generation.txt"),
+        //source: Preset(OneChunkWonder),
+        source: Generate("planet_generation.txt"),
         load_timeout: 30,
         worker_threads: None,
         initial_chunk: (33, 512), // near a forest
@@ -24,10 +24,10 @@ Config(
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 1,
-            "dogs": 0,
-            "food": 0,
-            "bricks": 0,
+            "humans": 20,
+            "dogs": 5,
+            "food": 50,
+            "bricks": 20,
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 64,
