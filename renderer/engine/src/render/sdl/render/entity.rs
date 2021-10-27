@@ -2,7 +2,7 @@ use crate::render::sdl::gl::{
     generate_circle_mesh, generate_quad_mesh, AttribType, BufferUsage, Divisor, GlResult,
     InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
 };
-use crate::render::sdl::render::FrameTarget;
+use crate::render::sdl::render::renderer::GlfFrameContext;
 use color::ColorRgb;
 use common::*;
 use resources::Shaders;
@@ -11,7 +11,7 @@ use unit::space::length::{Length, Length2};
 use unit::space::view::ViewPoint;
 use unit::world::WorldPoint;
 
-pub(crate) struct EntityPipeline {
+pub(crate) struct EntityRenderer {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
     entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2)>,
@@ -26,10 +26,7 @@ struct EntityInstance {
 const CIRCLE_VERTEX_COUNT: usize = 40;
 const RECT_VERTEX_COUNT: usize = 6;
 
-/// Vertex position
-type SharedAttribute = [f32; 3];
-
-impl EntityPipeline {
+impl EntityRenderer {
     pub fn new(shaders_res: &Shaders) -> GlResult<Self> {
         let pipeline = InstancedPipeline::new(Program::load(shaders_res, "entity", "rgb")?);
         let indices = Vbo::index_buffer();
@@ -40,7 +37,7 @@ impl EntityPipeline {
             let quad_mesh = generate_quad_mesh();
 
             let vbo = pipeline.shared_vbo.scoped_bind();
-            vbo.buffer_data_uninitialized::<SharedAttribute>(
+            vbo.buffer_data_uninitialized::<[f32; 3]>(
                 CIRCLE_VERTEX_COUNT + quad_mesh.len(),
                 BufferUsage::StaticDraw,
             )?;
@@ -56,7 +53,7 @@ impl EntityPipeline {
                 BufferUsage::StaticDraw,
             )?;
             if let Some(mut indices) = indices.map_write_only::<u16>()? {
-                // circle mesh
+                // circle mesh, no special indices
                 for i in 0..circle_mesh.len() {
                     indices[i] = i as u16;
                 }
@@ -121,7 +118,7 @@ impl EntityPipeline {
         self.entities.push(entity);
     }
 
-    pub fn render_entities(&mut self, frame_target: &mut FrameTarget) -> GlResult<()> {
+    pub fn render_entities(&mut self, frame_ctx: &GlfFrameContext) -> GlResult<()> {
         // sort by shape
         self.entities
             .sort_unstable_by_key(|(_, shape, _, _)| shape.ord());
@@ -157,7 +154,7 @@ impl EntityPipeline {
         }
 
         // these are the same for all entities, so multiply them once on the cpu
-        let proj_view = frame_target.projection * frame_target.view;
+        let proj_view = frame_ctx.projection * frame_ctx.view;
         p.set_uniform_matrix("proj_view\0", proj_view.as_ptr());
 
         let render_data = [

@@ -22,10 +22,10 @@ pub struct DummyBackendInit {
 }
 
 impl Renderer for DummyRenderer {
-    type Target = ();
+    type FrameContext = ();
     type Error = DummyError;
 
-    fn init(&mut self, _target: Self::Target) {}
+    fn init(&mut self, _target: Self::FrameContext) {}
 
     fn sim_start(&mut self) {}
 
@@ -43,7 +43,7 @@ impl Renderer for DummyRenderer {
         Ok(())
     }
 
-    fn deinit(&mut self) -> Self::Target {}
+    fn deinit(&mut self) -> Self::FrameContext {}
 }
 
 impl InitializedSimulationBackend for DummyBackendInit {
