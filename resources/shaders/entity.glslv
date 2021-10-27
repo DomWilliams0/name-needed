@@ -9,11 +9,10 @@ layout(location = 2) in mat4 e_model;
 
 out vec4 rgb;
 
-uniform mat4 proj;
-uniform mat4 view;
+uniform mat4 proj_view;
 
 void main() {
     vec4 v_pos_translated = e_model * vec4(v_pos, 1.0);
-    gl_Position = proj * view * v_pos_translated;
+    gl_Position = proj_view * v_pos_translated;
     rgb = e_color;
 }

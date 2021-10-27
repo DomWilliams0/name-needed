@@ -156,8 +156,9 @@ impl EntityPipeline {
             }
         }
 
-        p.set_uniform_matrix("proj\0", frame_target.proj);
-        p.set_uniform_matrix("view\0", frame_target.view);
+        // these are the same for all entities, so multiply them once on the cpu
+        let proj_view = frame_target.projection * frame_target.view;
+        p.set_uniform_matrix("proj_view\0", proj_view.as_ptr());
 
         let render_data = [
             (Primitive::TriangleStrip, 0, CIRCLE_VERTEX_COUNT),

@@ -72,8 +72,8 @@ impl GlRenderer {
 }
 
 pub struct FrameTarget {
-    pub proj: *const F,
-    pub view: *const F,
+    pub projection: Matrix4,
+    pub view: Matrix4,
     /// Amount to subtract from every entity's z pos, to normalize z around 0
     pub z_offset: f32,
 }
@@ -202,8 +202,8 @@ impl Renderer for GlRenderer {
             }
         }
 
-        program.set_uniform_matrix("proj\0", frame_target.proj);
-        program.set_uniform_matrix("view\0", frame_target.view);
+        let proj_view = frame_target.projection * frame_target.view;
+        program.set_uniform_matrix("proj_view\0", proj_view.as_ptr());
 
         let _no_depth = Capability::DepthTest.scoped_disable();
         vbo.draw_array(Primitive::Lines);

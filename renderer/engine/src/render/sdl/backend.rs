@@ -308,8 +308,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
         // render simulation
         let lower_limit = terrain_range.bottom().slice() as f32;
         let frame_target = FrameTarget {
-            proj: projection.as_ptr(),
-            view: view.as_ptr(),
+            projection,
+            view,
             z_offset: lower_limit,
         };
         let _ = simulation.render(
