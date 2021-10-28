@@ -429,11 +429,11 @@ impl<R: Renderer> Simulation<R> {
     pub fn render(
         &mut self,
         world_viewer: &WorldViewer,
-        target: R::Target,
+        target: R::FrameContext,
         renderer: &mut R,
         interpolation: f64,
         input: &[InputEvent],
-    ) -> R::Target {
+    ) -> R::FrameContext {
         // process input before rendering
         InputSystem { events: input }.run_now(&*self.ecs_world);
 

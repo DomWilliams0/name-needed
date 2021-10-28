@@ -15,7 +15,7 @@ use simulation::{
 
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
-use crate::render::sdl::render::FrameTarget;
+use crate::render::sdl::render::GlfFrameContext;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
@@ -307,14 +307,14 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
         // render simulation
         let lower_limit = terrain_range.bottom().slice() as f32;
-        let frame_target = FrameTarget {
-            proj: projection.as_ptr(),
-            view: view.as_ptr(),
+        let frame_ctx = GlfFrameContext {
+            projection,
+            view,
             z_offset: lower_limit,
         };
         let _ = simulation.render(
             &self.world_viewer,
-            frame_target,
+            frame_ctx,
             &mut self.backend.renderer,
             interpolation,
             &self.backend.sim_input_events,

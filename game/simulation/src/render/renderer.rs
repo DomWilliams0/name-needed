@@ -6,11 +6,11 @@ use crate::transform::PhysicalComponent;
 use crate::{RenderComponent, TransformComponent};
 
 pub trait Renderer {
-    type Target;
+    type FrameContext;
     type Error: Error;
 
     /// Initialize frame rendering
-    fn init(&mut self, target: Self::Target);
+    fn init(&mut self, target: Self::FrameContext);
 
     /// Start rendering simulation
     fn sim_start(&mut self);
@@ -46,7 +46,7 @@ pub trait Renderer {
     }
 
     /// End rendering frame
-    fn deinit(&mut self) -> Self::Target;
+    fn deinit(&mut self) -> Self::FrameContext;
 
     // ----
 
