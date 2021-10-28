@@ -19,7 +19,6 @@ pub use self::world::{
 
 mod component;
 mod entity;
-mod tag;
 mod template;
 mod world;
 mod world_ext;

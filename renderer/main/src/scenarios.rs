@@ -131,12 +131,6 @@ fn log_cutting(ecs: &EcsWorld) {
             .thanks()
     })[0];
 
-    let saw = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
-        helpers::new_entity("core_saw", ecs, pos)
-            .with_condition(NormalizedFloat::one())
-            .thanks()
-    })[0];
-
     if let Some(human) = humans.first().copied() {
         let society = ecs
             .resource_mut::<Societies>()

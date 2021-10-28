@@ -79,6 +79,15 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * etiquette/morality "meters" that vary based on personality and mood. if low, they take things reserved for work items, take other's food, consider items stored inside other people's personal containers
 * specify a limit on job reservations per task, e.g. 2 maximum on sawing a tree trunk
 
+#### Jobs and tools
+* tool requirements for a job
+	* generic search for components/tags e.g. "edged", "sharpness>50"
+* multiple ways for a tool to be considering and used for a job:
+	* hauled next to the work location with the materials
+	* equip from storage on the way to the work location when all materials are available
+	* already held or equipped
+* will need a better way of choosing the best person for a job, currently the first person to consider it will reserve it. possibly a voting phase/stage where each candidate volunteers via AI weight system, then the best candidate is chosen from them
+
 ## World generation
 * better biome generation
 	* each biome should define its own elevation noise params to add to base elevation
