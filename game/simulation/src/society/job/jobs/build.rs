@@ -2,23 +2,31 @@ use crate::ecs::{CachedWorldRef, EcsWorld};
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::SocietyTask;
-use crate::{BlockType, ComponentWorld, InnerWorldRef, WorldPositionRange, WorldRef};
+use crate::{
+    BlockType, ComponentWorld, InnerWorldRef, WorldPosition, WorldPositionRange, WorldRef,
+};
 use common::derive_more::*;
 use common::*;
+use std::hint::unreachable_unchecked;
 
 #[derive(Constructor, Debug)]
-pub struct BreakBlocksJob(WorldPositionRange);
+pub struct BuildBlockJob {
+    // TODO support multiple blocks
+    block: WorldPosition,
+    target_type: BlockType,
+}
 
-impl SocietyJobImpl for BreakBlocksJob {
+impl SocietyJobImpl for BuildBlockJob {
     fn populate_initial_tasks(&self, world: &EcsWorld, out: &mut Vec<SocietyTask>) {
         let voxel_world = world.voxel_world();
         let voxel_world = voxel_world.borrow();
 
-        // only queue blocks that are not air and are reachable
+        // only queue if not already the target block
+        let blocks = WorldPositionRange::with_single(self.block);
         out.extend(
             voxel_world
-                .filter_reachable_blocks_in_range(&self.0, |bt| bt != BlockType::Air)
-                .map(SocietyTask::BreakBlock),
+                .filter_reachable_blocks_in_range(&blocks, |bt| bt != self.target_type)
+                .map(|pos| SocietyTask::Build(pos, self.target_type)),
         );
     }
 
@@ -36,16 +44,16 @@ impl SocietyJobImpl for BreakBlocksJob {
                 // task completed, remove it
                 false
             } else {
-                // check if block is now air for any other reason
+                // check if block is now the target block
                 let world = voxel_world.get();
-                let block_pos = match task {
-                    SocietyTask::BreakBlock(p) => *p,
+                let (block_pos, tgt_bt) = match task {
+                    SocietyTask::Build(p, bt) => (*p, *bt),
                     _ => unreachable!(),
                 };
 
                 !world
                     .block(block_pos)
-                    .map(|b| b.block_type() == BlockType::Air)
+                    .map(|b| b.block_type() == tgt_bt)
                     .unwrap_or(true)
             }
         });
@@ -55,9 +63,8 @@ impl SocietyJobImpl for BreakBlocksJob {
     }
 }
 
-impl Display for BreakBlocksJob {
+impl Display for BuildBlockJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        // TODO add display impl for WorldPositionRange
-        write!(f, "Break {} blocks in range {:?}", self.0.count(), self.0)
+        write!(f, "Build {} at {}", self.target_type, self.block)
     }
 }

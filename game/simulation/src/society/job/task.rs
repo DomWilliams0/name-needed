@@ -1,12 +1,13 @@
 use ai::{Dse, WeightedDse};
 use common::*;
 use unit::world::WorldPosition;
+use world::block::BlockType;
 
 use crate::activity::HaulTarget;
-use crate::ai::dse::{BreakBlockDse, HaulDse};
+use crate::ai::dse::{BreakBlockDse, BuildBlockDse, HaulDse};
 use crate::ai::AiContext;
 use crate::ecs::{EcsWorld, Entity};
-use crate::ComponentWorld;
+use crate::{ComponentWorld, TransformComponent};
 
 use crate::item::HaulableItemComponent;
 
@@ -17,10 +18,18 @@ pub struct HaulSocietyTask {
     pub dst: HaulTarget,
 }
 
-/// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
+/// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob]. These map to DSEs that
+/// are considered separately by the AI
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
+    /// Break the given block
+    // TODO this could be a work item
     BreakBlock(WorldPosition),
+
+    /// Build a block - TODO hacky and oversimplified for now
+    Build(WorldPosition, BlockType),
+
+    /// Haul something.
     /// Boxed as this variant is much larger than the rest
     Haul(Box<HaulSocietyTask>),
 }
@@ -56,6 +65,7 @@ impl SocietyTask {
 
         match self {
             BreakBlock(range) => dse!(BreakBlockDse(*range)),
+            Build(block, bt) => dse!(BuildBlockDse(*block, *bt)),
             Haul(haul) => {
                 let pos = haul.dst.target_position(world)?;
                 let extra_hands = world
@@ -77,6 +87,7 @@ impl SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
+            Build(_, _) => false, // TODO can be shareable
             // TODO some types of hauling will be shareable
             // TODO depends on work item
             Haul(_) => false,
@@ -90,6 +101,8 @@ impl Display for SocietyTask {
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
             Haul(haul) => Display::fmt(haul, f),
+            // TODO include a description field for proper description e.g. "cutting log", "building wall"
+            Build(b, bt) => write!(f, "Build {} at {}", bt, b),
         }
     }
 }

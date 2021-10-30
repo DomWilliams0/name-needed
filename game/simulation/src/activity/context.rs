@@ -5,8 +5,9 @@ use common::*;
 
 use crate::activity::status::Status;
 use crate::activity::subactivity::{
-    BreakBlockError, BreakBlockSubactivity, EatItemError, EatItemSubactivity, EquipSubActivity,
-    GoToSubactivity, GoingToStatus, GotoError, HaulSubactivity, PickupSubactivity,
+    BreakBlockError, BreakBlockSubactivity, BuildBlockError, BuildBlockSubactivity, EatItemError,
+    EatItemSubactivity, EquipSubActivity, GoToSubactivity, GoingToStatus, GotoError,
+    HaulSubactivity, PickupSubactivity,
 };
 use crate::activity::{Activity, EquipItemError, HaulError, HaulTarget, StatusUpdater};
 use crate::ecs::*;
@@ -14,7 +15,8 @@ use crate::event::prelude::*;
 use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::runtime::{TaskRef, TimerFuture};
 use crate::{
-    ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent, WorldPosition,
+    BlockType, ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent,
+    WorldPosition,
 };
 
 use crate::activity::context::EventResult::{Consumed, Unconsumed};
@@ -125,6 +127,17 @@ impl ActivityContext {
     pub async fn break_block(&self, block: WorldPosition) -> Result<(), BreakBlockError> {
         BreakBlockSubactivity::default()
             .break_block(self, block)
+            .await
+    }
+
+    /// Must be close enough
+    pub async fn build_block(
+        &self,
+        block: WorldPosition,
+        bt: BlockType,
+    ) -> Result<(), BuildBlockError> {
+        BuildBlockSubactivity::default()
+            .build_block(self, block, bt)
             .await
     }
 

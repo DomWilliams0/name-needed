@@ -1,6 +1,7 @@
 use specs::storage::InsertResult;
 use std::alloc::Layout;
 use std::any::TypeId;
+use std::hint::unreachable_unchecked;
 use std::mem::ManuallyDrop;
 
 use common::*;
@@ -12,7 +13,7 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{definitions, Entity, WorldRef};
+use crate::{definitions, Entity, InnerWorldRef, WorldRef};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
@@ -24,6 +25,11 @@ pub type SpecsWorld = specs::World;
 pub struct EcsWorld {
     world: SpecsWorld,
     component_registry: ComponentRegistry,
+}
+
+pub struct CachedWorldRef<'a> {
+    ecs: &'a EcsWorld,
+    voxel_world: Option<(WorldRef, InnerWorldRef<'a>)>,
 }
 
 #[derive(Debug, Error)]
@@ -416,6 +422,36 @@ impl Drop for ComponentRefErased<'_> {
     }
 }
 
+impl<'a> CachedWorldRef<'a> {
+    pub fn new(ecs: &'a EcsWorld) -> Self {
+        Self {
+            ecs,
+            voxel_world: None,
+        }
+    }
+
+    pub fn get(&mut self) -> &'_ InnerWorldRef<'a> {
+        if self.voxel_world.is_none() {
+            // init world ref and store
+            let world = self.ecs.voxel_world();
+            let world_ref = world.borrow();
+
+            // safety: ref lives as long as self
+            let world_ref =
+                unsafe { std::mem::transmute::<InnerWorldRef, InnerWorldRef>(world_ref) };
+            self.voxel_world = Some((world, world_ref));
+        }
+
+        match self.voxel_world.as_ref() {
+            Some((_, w)) => w,
+            _ => {
+                // safety: unconditionally initialised
+                unsafe { unreachable_unchecked() }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,5 +510,17 @@ mod tests {
 
         // read storage ref shouldve been dropped, now we can get a mutable ref to it
         let _ = ecs.write_storage::<TestInteractiveComponent>();
+    }
+
+    /// Soundness confirmed by miri
+    #[test]
+    fn cached_world_ref() {
+        let mut ecs = EcsWorld::new();
+        ecs.insert(WorldRef::default());
+
+        let mut lazy = CachedWorldRef::new(&ecs);
+
+        let a = lazy.get();
+        let b = lazy.get();
     }
 }

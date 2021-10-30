@@ -1,17 +1,15 @@
 # Active tasks
 
-* [X] add raw tree trunk entity (pre-placed for now)
-* [X] add simple tags as lightweight non-iterated components
-* [ ] add simple job to saw a tree trunk
-	* [ ] basic "action" concept for each swing/cut
-		* will be a chance to boost stats, get injured etc
-	* [ ] reduce tree trunk size
-	* [ ] drop a log item
-	* [ ] drop a *stack* of log items
-* [ ] add work job for building a single wall block
+* [ ] items
+	* [ ] single log item
+	* [ ] stack of log items that can be drawn from, but not reconstituted
+* [.] building blocks
+	* [X] no materials, single block only, near-instant completion
+	* [ ] require materials
+	* [ ] build progression
+	* [ ] continuable progress after interruption
 	* [ ] define materials in data (wood, stone)
 	* [ ] define wall archetype in data
-	* [ ] job requires n log items
 * [ ] allow multiple concurrent workers
 * [X] chore: replace direct uses of specs Entity with our own wrapper
-* [ ] ui commands to do the jobs
+* [ ] ui commands to build

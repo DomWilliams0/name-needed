@@ -78,6 +78,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * preserve info about completed society jobs/tasks to show in the ui
 * etiquette/morality "meters" that vary based on personality and mood. if low, they take things reserved for work items, take other's food, consider items stored inside other people's personal containers
 * specify a limit on job reservations per task, e.g. 2 maximum on sawing a tree trunk
+* expand concept of "society" to just be a gathering/group of related entities that emits jobs, e.g. family, guild, village
+	* allow multiple societies, e.g. someone has their family and village, a wild animal has its family/herd
 
 #### Jobs and tools
 * tool requirements for a job
@@ -87,6 +89,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* equip from storage on the way to the work location when all materials are available
 	* already held or equipped
 * will need a better way of choosing the best person for a job, currently the first person to consider it will reserve it. possibly a voting phase/stage where each candidate volunteers via AI weight system, then the best candidate is chosen from them
+* personality affects the desiribility of jobs - lazy/weak/injured people dont want to do physical work, selfish people dont want to work on society jobs, only things for themselves
 
 ## World generation
 * better biome generation

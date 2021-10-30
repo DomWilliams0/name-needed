@@ -32,6 +32,7 @@ mod action_to_activity {
                 AiAction::Wander => activity!(WanderActivity::default()),
                 AiAction::Nop => activity!(NopActivity::default()),
                 AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
+                AiAction::GoBuildBlock(pos, bt) => activity!(GoBuildActivity::new(pos, bt)),
                 AiAction::GoEquip(e) => activity!(GoEquipActivity::new(e)),
                 AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::new(item)),
                 AiAction::Goto(target) => activity!(GoToActivity::new(

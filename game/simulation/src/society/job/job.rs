@@ -31,7 +31,7 @@ pub struct SocietyJobRef(Rc<RwLock<SocietyJob>>);
 pub(in crate::society::job) type CompletedTasks<'a> = &'a mut [(SocietyTask, SocietyTaskResult)];
 
 pub trait SocietyJobImpl: Display + Debug {
-    /// [refresh] will be called after this before any tasks are dished out, so this can eagerly add
+    /// [refresh_tasks] will be called after this before any tasks are dished out, so this can eagerly add
     /// tasks without filtering.
     ///
     /// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)

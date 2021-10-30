@@ -1,4 +1,4 @@
-pub use self::world::BreakBlockDse;
+pub use self::world::{BreakBlockDse, BuildBlockDse};
 use ai::{AiBox, Dse};
 pub use dev::ObeyDivineCommandDse;
 pub use food::{EatHeldFoodDse, FindLocalFoodDse};

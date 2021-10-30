@@ -4,6 +4,7 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
+use crate::BlockType;
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -26,6 +27,9 @@ pub enum AiAction {
 
     /// Go break the given block
     GoBreakBlock(WorldPosition),
+
+    /// Go build the given block
+    GoBuildBlock(WorldPosition, BlockType),
 
     /// Follow the entity, keeping to the given distance
     Follow { target: Entity, radius: u8 },
@@ -59,6 +63,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
                 item: *e,
                 dest: *tgt,
             },
+            AiAction::GoBuildBlock(_, _) => return Err(()), // TODO logging of new events
         }))
     }
 }

@@ -13,8 +13,8 @@ pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
 pub use crate::register_component_template;
 
 pub use self::world::{
-    ComponentGetError, ComponentRef, ComponentRefErased, ComponentRefMut, ComponentWorld, EcsWorld,
-    SpecsWorld,
+    CachedWorldRef, ComponentGetError, ComponentRef, ComponentRefErased, ComponentRefMut,
+    ComponentWorld, EcsWorld, SpecsWorld,
 };
 
 mod component;

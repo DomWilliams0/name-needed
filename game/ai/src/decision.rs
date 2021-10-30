@@ -24,6 +24,7 @@ pub enum DecisionWeight {
 }
 
 pub trait Dse<C: Context> {
+    // TODO use a Display impl instead
     fn name(&self) -> &'static str;
     /// TODO pooled vec/slice rather than Vec each time
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;

@@ -8,6 +8,7 @@ use unit::world::WorldPosition;
 use world::block::BlockType;
 
 pub struct BreakBlockDse(pub WorldPosition);
+pub struct BuildBlockDse(pub WorldPosition, pub BlockType);
 
 impl Dse<AiContext> for BreakBlockDse {
     fn name(&self) -> &'static str {
@@ -36,5 +37,29 @@ impl Dse<AiContext> for BreakBlockDse {
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
         AiAction::GoBreakBlock(self.0)
+    }
+}
+
+impl Dse<AiContext> for BuildBlockDse {
+    fn name(&self) -> &'static str {
+        "Build"
+    }
+
+    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
+        vec![
+            AiBox::new(MyProximityToConsideration {
+                target: self.0.centred(),
+                proximity: Proximity::Walkable,
+            }),
+            // assume the emitting job/command has checked the block is valid and buildable
+        ]
+    }
+
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Normal
+    }
+
+    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
+        AiAction::GoBuildBlock(self.0, self.1)
     }
 }

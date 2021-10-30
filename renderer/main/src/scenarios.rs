@@ -1,7 +1,11 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::{ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies};
+use simulation::job::{BuildBlockJob, SocietyJob, SocietyJobRef};
+use simulation::{
+    ActivityComponent, AiAction, BlockType, ComponentWorld, EcsWorld, PlayerSociety, Societies,
+    WorldPosition,
+};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -46,7 +50,7 @@ scenario!(following_dogs);
 scenario!(nop);
 scenario!(wander_and_eat);
 scenario!(haul_to_container);
-scenario!(log_cutting);
+scenario!(building);
 
 fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
@@ -106,7 +110,7 @@ fn wander_and_eat(ecs: &EcsWorld) {
     });
 }
 
-fn log_cutting(ecs: &EcsWorld) {
+fn building(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
     let world = world.borrow();
 
@@ -125,12 +129,6 @@ fn log_cutting(ecs: &EcsWorld) {
             .thanks()
     });
 
-    let trunk = spawn_entities_randomly(&world, 1, Placement::RandomPosAndRot, |pos| {
-        helpers::new_entity("core_tree_trunk", ecs, pos)
-            .with_condition(NormalizedFloat::one())
-            .thanks()
-    })[0];
-
     if let Some(human) = humans.first().copied() {
         let society = ecs
             .resource_mut::<Societies>()
@@ -140,26 +138,14 @@ fn log_cutting(ecs: &EcsWorld) {
             .component_mut::<ActivityComponent>(human)
             .expect("no activity");
 
-        // TODO
-        // let location = {
-        //     let pos = ecs
-        //         .component::<TransformComponent>(trunk)
-        //         .expect("no trunk transform")
-        //         .position;
-        //     // TODO work item should encompass full trunk
-        //     let point = geo::Point::new(pos.x(), pos.y());
-        //     Location::new(point, pos.z())
-        // };
-        // let work_item = society
-        //     .work_items_mut()
-        //     .add(WorkItem::new(location, TreeLogCuttingWorkItem::default()));
-        //
-        // activity.interrupt_with_new_activity(
-        //     AiAction::GoWorkOnWorkItem(work_item),
-        //     None,
-        //     human,
-        //     ecs,
-        // );
+        for z in 1..3 {
+            for y in 3..10 {
+                society.jobs_mut().submit(SocietyJob::create(
+                    ecs,
+                    BuildBlockJob::new((2, y, z).into(), BlockType::WoodenWall),
+                ));
+            }
+        }
     }
 }
 

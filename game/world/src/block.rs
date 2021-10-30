@@ -41,6 +41,10 @@ pub enum BlockType {
     #[display(fmt = "Solid water")]
     SolidWater,
 
+    /// Temporary substitute for something to build
+    #[display(fmt = "Wall")]
+    WoodenWall,
+
     Chest,
 }
 
@@ -161,6 +165,7 @@ impl BlockType {
             BlockType::Stone => ColorRgb::new(106, 106, 117),
             BlockType::Sand => 0xBCA748FF.into(),
             BlockType::SolidWater => 0x3374BCFF.into(),
+            BlockType::WoodenWall => 0x9E8261FF.into(),
             BlockType::Chest => ColorRgb::new(184, 125, 31),
         }
     }
@@ -182,7 +187,7 @@ impl BlockType {
             Dirt | Grass | LightGrass => 40,
             TreeTrunk => 70,
             Stone => 90,
-            Chest => 60,
+            Chest | WoodenWall => 60,
             SolidWater => u8::MAX,
         };
 
