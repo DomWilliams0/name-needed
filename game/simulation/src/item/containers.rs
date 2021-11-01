@@ -1,12 +1,14 @@
 use common::*;
+use unit::space::volume::Volume;
 use unit::world::WorldPosition;
 
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
-use crate::{Societies, SocietyHandle, TransformComponent};
+use crate::{PhysicalComponent, RenderComponent, Societies, SocietyHandle, TransformComponent};
 
 use crate::item::inventory::HeldEntity;
-use crate::item::ContainerComponent;
+use crate::item::stack::ItemStackComponent;
+use crate::item::{ContainerComponent, ItemStack, ItemStackError};
 use crate::simulation::AssociatedBlockData;
 
 #[derive(Debug, Error)]
@@ -25,6 +27,18 @@ pub enum ContainerError {
 
     #[error("No such society with handle {0:?}")]
     BadSociety(SocietyHandle),
+
+    #[error("Item is not stackable: {0}")]
+    NonStackableItem(ComponentGetError),
+
+    #[error("Item is already stacked or in a container")]
+    AlreadyStacked,
+
+    #[error("Entity is not a stack: {0}")]
+    NotAStack(ComponentGetError),
+
+    #[error("Stack error: {0}")]
+    StackError(#[from] ItemStackError),
 }
 
 /// An item is inside a container
@@ -34,6 +48,15 @@ pub enum ContainerError {
 pub enum ContainedInComponent {
     Container(Entity),
     InventoryOf(Entity),
+    StackOf(Entity),
+}
+
+/// An item can be stored inside a homogenous stack
+#[derive(Component, EcsComponent, Clone, Debug)]
+#[name("stackable")]
+#[storage(HashMapStorage)]
+pub struct StackableComponent {
+    max_count: u16,
 }
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
@@ -47,7 +70,7 @@ impl EcsWorld {
 }
 
 impl EcsExtContainers<'_> {
-    pub fn create_container(
+    pub fn create_container_voxel(
         &mut self,
         pos: WorldPosition,
         definition_name: &'static str,
@@ -165,13 +188,146 @@ impl EcsExtContainers<'_> {
               "society" => ?new_society, "previous" => ?prev_communal);
         Ok(())
     }
+
+    /// Creates a new stack at the given entity's location and puts it inside. Item should not be a
+    /// stack, should be stackable, and have a transform. Returns new stack entity
+    pub fn convert_to_stack(&self, item: Entity) -> Result<Entity, ContainerError> {
+        // ensure stackable
+        let stack_size = self
+            .0
+            .component::<StackableComponent>(item)
+            .map_err(ContainerError::NonStackableItem)?
+            .max_count;
+
+        // ensure not already in a stack or container
+        if self.0.component::<ContainedInComponent>(item).is_ok() {
+            return Err(ContainerError::AlreadyStacked);
+        }
+
+        // create stack
+        let stack_container = {
+            let mut builder = self.0.create_entity().with(ItemStackComponent {
+                stack: ItemStack::new(stack_size),
+            });
+
+            macro_rules! copy_component {
+                ($comp:ty) => {
+                    let comp_copy = self
+                        .0
+                        .component::<$comp>(item)
+                        .map(|comp| <$comp>::clone(&comp))
+                        .map_err(ContainerError::NonStackableItem)?;
+                    builder = builder.with(comp_copy);
+                };
+            }
+
+            // copy relevant components
+            copy_component!(TransformComponent);
+            copy_component!(RenderComponent);
+            copy_component!(PhysicalComponent);
+
+            Entity::from(builder.build())
+        };
+
+        let mut physicals = self.0.write_storage::<PhysicalComponent>();
+        let mut stacks = self.0.write_storage::<ItemStackComponent>();
+
+        let item_volume = item.get(&physicals).unwrap().volume; // just copied
+        let (stack_physical, stack) = self
+            .0
+            .components(stack_container, (&mut physicals, &mut stacks))
+            .unwrap(); // just added
+
+        // attempt to put item inside
+        match stack.stack.try_add(item) {
+            Ok(_) => {
+                // success
+                self.on_successful_stack_addition(
+                    stack_container,
+                    stack_physical,
+                    item,
+                    item_volume,
+                );
+            }
+            Err(err) => {
+                warn!("failed to create stack for item"; "err" => %err);
+
+                // destroy redundant stack entity first
+                self.0.kill_entity(stack_container);
+                return Err(ContainerError::StackError(err));
+            }
+        }
+
+        debug!("created stack from item"; "item" => item, "stack" => stack_container);
+        Ok(stack_container)
+    }
+
+    pub fn add_to_stack(&self, stack: Entity, item: Entity) -> Result<(), ContainerError> {
+        // ensure stackable, in the world, not already stacked
+        if let Err(err) = self.0.component::<StackableComponent>(item) {
+            return Err(ContainerError::NonStackableItem(err));
+        }
+
+        if let Err(err) = self.0.component::<TransformComponent>(item) {
+            return Err(ContainerError::NonStackableItem(err));
+        }
+
+        if self.0.component::<ContainedInComponent>(item).is_ok() {
+            return Err(ContainerError::AlreadyStacked);
+        }
+
+        let mut physicals = self.0.write_storage::<PhysicalComponent>();
+        let mut stacks = self.0.write_storage::<ItemStackComponent>();
+
+        let item_volume = item
+            .get(&physicals)
+            .ok_or(ContainerError::NonStackableItem(
+                ComponentGetError::NoSuchComponent(item, "physical"),
+            ))?
+            .volume;
+
+        let (stack_physical, stack_comp) = self
+            .0
+            .components(stack, (&mut physicals, &mut stacks))
+            .ok_or(ContainerError::NotAStack(
+                ComponentGetError::NoSuchComponent(stack, "physical or item stack"),
+            ))?;
+
+        // try to add
+        stack_comp.stack.try_add(item)?;
+
+        // success - remove components
+        self.on_successful_stack_addition(stack, stack_physical, item, item_volume);
+        Ok(())
+    }
+
+    fn on_successful_stack_addition(
+        &self,
+        stack: Entity,
+        stack_physical: &mut PhysicalComponent,
+        item: Entity,
+        item_volume: Volume,
+    ) {
+        // item is no longer in the world
+        let _ = self.0.remove_now::<TransformComponent>(item);
+
+        // item is part of a stack
+        let _ = self.0.add_now(item, ContainedInComponent::StackOf(stack));
+        // TODO post event? does entering a stack count as destructive? the transform is gone at least
+        // TODO unselect item
+
+        // increase item physical volume
+        stack_physical.volume += item_volume;
+    }
 }
 
 impl ContainedInComponent {
-    /// Container or inventory holder
+    /// Container or inventory holder or stack
     pub fn entity(&self) -> Entity {
         match self {
-            ContainedInComponent::Container(e) | ContainedInComponent::InventoryOf(e) => *e,
+            ContainedInComponent::Container(e)
+            | ContainedInComponent::InventoryOf(e)
+            | ContainedInComponent::StackOf(e) => *e,
         }
     }
 }
@@ -181,6 +337,23 @@ impl Display for ContainedInComponent {
         match self {
             ContainedInComponent::Container(c) => write!(f, "container {}", c),
             ContainedInComponent::InventoryOf(e) => write!(f, "inventory of {}", e),
+            ContainedInComponent::StackOf(s) => write!(f, "stack {}", s),
         }
     }
 }
+
+impl<V: Value> ComponentTemplate<V> for StackableComponent {
+    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    where
+        Self: Sized,
+    {
+        let max_count = values.get_int("max_count")?;
+        Ok(Box::new(Self { max_count }))
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+}
+
+register_component_template!("stackable", StackableComponent);

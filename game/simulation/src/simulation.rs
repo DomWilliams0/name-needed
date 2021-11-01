@@ -492,7 +492,7 @@ impl<R: Renderer> Simulation<R> {
                 if let Err(err) = self
                     .ecs_world
                     .helpers_containers()
-                    .create_container(pos, "core_storage_chest")
+                    .create_container_voxel(pos, "core_storage_chest")
                 {
                     error!("failed to create container entity"; "error" => %err);
                 }

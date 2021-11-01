@@ -27,7 +27,7 @@ pub struct InventoryComponent {
 
 /// Inventory of a container
 #[derive(Component, EcsComponent)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 #[name("container")]
 pub struct ContainerComponent {
     pub container: Container,
@@ -605,19 +605,19 @@ mod validation {
                 "item {} in container {} has a mismatching contained-in: {}",
                 e, container_entity, contained,
             );
-
-            let real_capacity: Volume = container
-                .contents()
-                .fold(Volume::new(0), |acc, e| acc + e.volume);
-
-            assert_eq!(
-                real_capacity,
-                container.current_capacity(),
-                "container reports a capacity of {} when it actually is {}",
-                container.current_capacity(),
-                real_capacity
-            );
         }
+
+        let real_capacity: Volume = container
+            .contents()
+            .fold(Volume::new(0), |acc, e| acc + e.volume);
+
+        assert_eq!(
+            real_capacity,
+            container.current_capacity(),
+            "container reports a capacity of {} when it actually is {}",
+            container.current_capacity(),
+            real_capacity
+        );
     }
 }
 

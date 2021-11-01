@@ -1,8 +1,10 @@
 # Active tasks
 
-* [ ] items
-	* [ ] single log item
-	* [ ] stack of log items that can be drawn from, but not reconstituted
+* [.] item stacks
+	* [X] stack of homogenous items
+	* [ ] removal of items from a stack
+	* [ ] show number of items beneath a stack
+	* [ ] inspect a stack's contents in the ui
 * [.] building blocks
 	* [X] no materials, single block only, near-instant completion
 	* [ ] require materials

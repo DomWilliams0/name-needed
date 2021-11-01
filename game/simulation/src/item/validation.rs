@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::ecs::*;
 
+use crate::item::stack::ItemStackComponent;
 use crate::item::{ContainedInComponent, ContainerComponent, InventoryComponent};
 use crate::simulation::EcsWorldRef;
 
@@ -13,10 +14,14 @@ impl<'a> System<'a> for InventoryValidationSystem {
         Read<'a, EcsWorldRef>,
         ReadStorage<'a, InventoryComponent>,
         ReadStorage<'a, ContainerComponent>,
+        ReadStorage<'a, ItemStackComponent>,
         ReadStorage<'a, ContainedInComponent>,
     );
 
-    fn run(&mut self, (entities, ecs_world, invs, containers, contained): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, ecs_world, invs, containers, stacks, contained): Self::SystemData,
+    ) {
         let mut seen_items = HashMap::new();
         for (e, inventory) in (&entities, &invs).join() {
             inventory.validate(e.into(), &**ecs_world, &mut seen_items);
@@ -24,6 +29,10 @@ impl<'a> System<'a> for InventoryValidationSystem {
 
         for (e, container) in (&entities, &containers).join() {
             container.validate(e.into(), &**ecs_world, &mut seen_items);
+        }
+
+        for (e, stack) in (&entities, &stacks).join() {
+            stack.validate(e.into(), &**ecs_world, &mut seen_items);
         }
 
         for (e, contained) in (&entities, contained.maybe()).join() {

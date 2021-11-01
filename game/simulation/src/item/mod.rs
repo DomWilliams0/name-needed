@@ -10,6 +10,7 @@ pub use filter::{ItemFilter, ItemFilterable};
 pub use haul::{
     EndHaulBehaviour, HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent,
 };
+pub use stack::{ItemStack, ItemStackError};
 
 mod component;
 mod condition;
@@ -17,6 +18,7 @@ mod containers;
 mod filter;
 mod haul;
 mod inventory;
+mod stack;
 
 #[cfg(debug_assertions)]
 pub mod validation;

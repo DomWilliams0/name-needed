@@ -129,6 +129,30 @@ fn building(ecs: &EcsWorld) {
             .thanks()
     });
 
+    let bricks = spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("bricks"),
+        Placement::RandomPos,
+        |pos| helpers::new_entity("core_brick_stone", ecs, pos).thanks(),
+    );
+
+    let mut brick_stack = None;
+    for brick in bricks {
+        let res = match brick_stack {
+            None => ecs
+                .helpers_containers()
+                .convert_to_stack(brick)
+                .map(|stack| {
+                    brick_stack = Some(stack);
+                }),
+            Some(stack) => ecs.helpers_containers().add_to_stack(stack, brick),
+        };
+
+        if let Err(err) = res {
+            warn!("failed to stack bricks: {}", err);
+        }
+    }
+
     if let Some(human) = humans.first().copied() {
         let society = ecs
             .resource_mut::<Societies>()

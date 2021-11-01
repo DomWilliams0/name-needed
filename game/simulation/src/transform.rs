@@ -32,7 +32,6 @@ pub struct TransformComponent {
 }
 
 /// Physical attributes of an entity
-// TODO use newtype units for ingame non-SI units
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("physical")]
