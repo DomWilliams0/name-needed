@@ -9,8 +9,8 @@ use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
-    TransformComponent,
+    InventoryComponent, ItemStack, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
+    SocietyComponent, TransformComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -151,6 +151,14 @@ impl SelectionWindow {
                 None,
                 COLOR_GREEN,
             );
+        }
+
+        // item stack contents
+        if let Some(stack) = details.component::<ItemStackComponent>(context) {
+            let node = context.new_tree_node(im_str!("Item stack"), DefaultOpen::Closed);
+            if node.is_open() {
+                self.do_stack(context, &stack);
+            }
         }
 
         let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
@@ -373,6 +381,25 @@ impl SelectionWindow {
             if tree.is_open() {
                 self.do_container(context, &container);
             }
+        }
+    }
+
+    fn do_stack(&mut self, context: &UiContext, stack: &ItemStackComponent) {
+        let (count, limit) = stack.stack.capacity();
+        context.text_colored(
+            COLOR_GREEN,
+            ui_str!(in context, "Capacity {}/{}", count, limit),
+        );
+
+        let ecs = context.simulation().ecs;
+        for (entity, count) in stack.stack.contents() {
+            let name_comp = ecs.component::<NameComponent>(entity);
+            let name = name_comp
+                .as_ref()
+                .map(|n| n.0.as_str())
+                .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
+
+            context.text_wrapped(ui_str!(in context, " - {}x {} ({})", count, name, entity));
         }
     }
 

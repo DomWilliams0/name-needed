@@ -10,7 +10,7 @@ pub use filter::{ItemFilter, ItemFilterable};
 pub use haul::{
     EndHaulBehaviour, HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent,
 };
-pub use stack::{ItemStack, ItemStackError};
+pub use stack::{ItemStack, ItemStackComponent, ItemStackError};
 
 mod component;
 mod condition;

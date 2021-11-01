@@ -4,7 +4,9 @@ use unit::world::WorldPosition;
 
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
-use crate::{PhysicalComponent, RenderComponent, Societies, SocietyHandle, TransformComponent};
+use crate::{
+    NameComponent, PhysicalComponent, RenderComponent, Societies, SocietyHandle, TransformComponent,
+};
 
 use crate::item::inventory::HeldEntity;
 use crate::item::stack::ItemStackComponent;
@@ -225,6 +227,17 @@ impl EcsExtContainers<'_> {
             copy_component!(TransformComponent);
             copy_component!(RenderComponent);
             copy_component!(PhysicalComponent);
+
+            // adjust name
+            let new_name = self
+                .0
+                .component::<NameComponent>(item)
+                .ok()
+                .map(|name| NameComponent(format!("Stack of {}", name.0)));
+
+            if let Some(name) = new_name {
+                builder = builder.with(name);
+            }
 
             Entity::from(builder.build())
         };

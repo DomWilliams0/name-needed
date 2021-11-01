@@ -40,7 +40,7 @@ pub use event::{EntityEventDebugPayload, TaskResultSummary};
 pub use item::validation::validate_all_inventories;
 pub use item::{
     ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
-    InventoryComponent, ItemCondition, NameComponent,
+    InventoryComponent, ItemCondition, ItemStack, ItemStackComponent, NameComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;

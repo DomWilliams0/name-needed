@@ -53,6 +53,15 @@ impl ItemStack {
     pub fn is_full(&self) -> bool {
         self.contents.len() >= self.contents.capacity()
     }
+
+    /// current, limit
+    pub fn capacity(&self) -> (u16, u16) {
+        (self.total_count, self.contents.capacity() as u16)
+    }
+
+    pub fn contents(&self) -> impl Iterator<Item = (Entity, u16)> + '_ {
+        self.contents.iter().map(|e| (e.entity, e.count))
+    }
 }
 #[cfg(debug_assertions)]
 mod validation {
