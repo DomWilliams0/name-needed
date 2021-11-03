@@ -14,6 +14,7 @@ pub struct InputSystem<'a> {
 #[derive(Component, EcsComponent, Default)]
 #[storage(NullStorage)]
 #[name("selected")]
+#[clone(disallow)]
 pub struct SelectedComponent;
 
 /// Resource for selected entity - not guaranteed to be alive

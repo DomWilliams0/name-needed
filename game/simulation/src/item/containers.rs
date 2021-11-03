@@ -47,6 +47,7 @@ pub enum ContainerError {
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[name("contained")]
 #[storage(DenseVecStorage)]
+#[clone(disallow)]
 pub enum ContainedInComponent {
     Container(Entity),
     InventoryOf(Entity),
@@ -208,38 +209,24 @@ impl EcsExtContainers<'_> {
 
         // create stack
         let stack_container = {
-            let mut builder = self.0.create_entity().with(ItemStackComponent {
-                stack: ItemStack::new(stack_size),
-            });
+            let entity = Entity::from(
+                self.0
+                    .create_entity()
+                    .with(ItemStackComponent {
+                        stack: ItemStack::new(stack_size),
+                    })
+                    .build(),
+            );
 
-            macro_rules! copy_component {
-                ($comp:ty) => {
-                    let comp_copy = self
-                        .0
-                        .component::<$comp>(item)
-                        .map(|comp| <$comp>::clone(&comp))
-                        .map_err(ContainerError::NonStackableItem)?;
-                    builder = builder.with(comp_copy);
-                };
+            self.0.copy_components_to(item, entity);
+
+            // adjust stack name, terribly hacky and temporary string manipulation
+            if let Ok(mut name) = self.0.component_mut::<NameComponent>(entity) {
+                // TODO use an enum variant StackOf in NameComponent
+                name.0 = format!("Stack of {}", name.0);
             }
 
-            // copy relevant components
-            copy_component!(TransformComponent);
-            copy_component!(RenderComponent);
-            copy_component!(PhysicalComponent);
-
-            // adjust name
-            let new_name = self
-                .0
-                .component::<NameComponent>(item)
-                .ok()
-                .map(|name| NameComponent(format!("Stack of {}", name.0)));
-
-            if let Some(name) = new_name {
-                builder = builder.with(name);
-            }
-
-            Entity::from(builder.build())
+            entity
         };
 
         let mut physicals = self.0.write_storage::<PhysicalComponent>();

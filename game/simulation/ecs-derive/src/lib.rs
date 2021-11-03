@@ -7,13 +7,19 @@ use syn::*;
 use proc_macro_error::proc_macro_error;
 use syn::DeriveInput;
 
+enum CloneBehaviour {
+    Allow,
+    Disallow,
+}
+
 /// Expects `simulation::ecs::*` to be imported
-#[proc_macro_derive(EcsComponent, attributes(name, interactive))]
+#[proc_macro_derive(EcsComponent, attributes(name, interactive, clone))]
 #[proc_macro_error]
 pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = extract_name(&input);
     let interactive = extract_interactive(&input);
+    let clone = extract_clone_behaviour(&input);
     let comp = input.ident;
 
     let as_interactive = if interactive {
@@ -25,6 +31,22 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
         quote! {
             None
         }
+    };
+
+    let (clone, clone_fn) = match clone {
+        CloneBehaviour::Allow => (
+            quote! {
+                let mut storage = world.write_storage::<Self>();
+                let comp = storage.get(source.into()).cloned();
+                if let Some(comp) = comp {
+                    storage.insert(dest.into(), comp)?;
+                }
+
+                Ok(())
+            },
+            quote! { Some(#comp ::clone_to), },
+        ),
+        CloneBehaviour::Disallow => (quote! { Ok(()) }, quote! { None }),
     };
 
     let result = quote! {
@@ -46,6 +68,10 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
             unsafe fn as_interactive(actually_self: &()) -> Option<&dyn InteractiveComponent> {
                 #as_interactive
             }
+
+            fn clone_to(world: &EcsWorld, source: Entity, dest: Entity) -> Result<(), specs::error::Error> {
+                #clone
+            }
         }
 
         inventory::submit!(ComponentEntry {
@@ -53,6 +79,7 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
             has_comp_fn: #comp ::has_component,
             register_comp_fn: #comp ::register_component,
             get_comp_fn: #comp ::get_component,
+            clone_to_fn: #clone_fn
         });
     };
 
@@ -75,4 +102,20 @@ fn extract_name(item: &DeriveInput) -> String {
 
 fn extract_interactive(item: &DeriveInput) -> bool {
     item.attrs.iter().any(|a| a.path.is_ident("interactive"))
+}
+
+fn extract_clone_behaviour(item: &DeriveInput) -> CloneBehaviour {
+    let span = item.span();
+    let attribute = item.attrs.iter().find(|a| a.path.is_ident("clone"));
+
+    attribute
+        .and_then(|a| a.parse_args::<syn::Ident>().ok())
+        .map(|s| {
+            if s == "disallow" {
+                CloneBehaviour::Disallow
+            } else {
+                abort!(span, "invalid clone attribute for {}", item.ident)
+            }
+        })
+        .unwrap_or(CloneBehaviour::Allow)
 }

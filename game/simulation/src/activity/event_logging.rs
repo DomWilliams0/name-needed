@@ -15,6 +15,7 @@ struct RingBuffer<T>(VecDeque<T>, usize);
 #[derive(Component, EcsComponent)]
 #[storage(HashMapStorage)]
 #[name("entity-logs")]
+#[clone(disallow)]
 pub struct EntityLoggingComponent {
     logs: RingBuffer<TimedLoggedEntityEvent>,
 }

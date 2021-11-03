@@ -67,12 +67,14 @@ pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
 pub type GetComponentFn = fn(&EcsWorld, Entity) -> Option<ComponentRefErased>;
 pub type AsInteractiveFn = unsafe fn(&()) -> Option<&dyn InteractiveComponent>;
+pub type CloneToFn = fn(&EcsWorld, Entity, Entity) -> Result<(), specs::error::Error>;
 
 pub struct ComponentEntry {
     pub name: &'static str,
     pub has_comp_fn: HasCompFn,
     pub register_comp_fn: RegisterCompFn,
     pub get_comp_fn: GetComponentFn,
+    pub clone_to_fn: Option<CloneToFn>,
 }
 
 inventory::collect!(ComponentEntry);
@@ -85,6 +87,7 @@ pub struct ComponentFunctions {
 pub struct ComponentRegistry {
     // TODO perfect hashing
     map: HashMap<&'static str, ComponentFunctions>,
+    cloneables: Vec<CloneToFn>,
 }
 
 impl<V: Value> Map<V> {
@@ -166,8 +169,14 @@ impl<V: Value> IntoIterator for Map<V> {
 impl ComponentRegistry {
     pub fn new(world: &mut SpecsWorld) -> Self {
         let mut map = HashMap::with_capacity(128);
+        let mut cloneables = Vec::with_capacity(64);
         for comp in inventory::iter::<ComponentEntry> {
-            debug!("registering component {:?}", comp.name);
+            let cloneable = if comp.clone_to_fn.is_some() {
+                " (cloneable)"
+            } else {
+                ""
+            };
+            debug!("registering component {:?}{}", comp.name, cloneable);
             let old = map.insert(
                 comp.name,
                 ComponentFunctions {
@@ -181,11 +190,17 @@ impl ComponentRegistry {
             }
 
             (comp.register_comp_fn)(world);
+
+            if let Some(clone_fn) = comp.clone_to_fn {
+                cloneables.push(clone_fn);
+            }
         }
 
         info!("registered {} components", map.len());
         map.shrink_to_fit();
-        ComponentRegistry { map }
+        cloneables.shrink_to_fit();
+
+        ComponentRegistry { map, cloneables }
     }
 
     pub fn has_component(&self, comp: &str, world: &EcsWorld, entity: Entity) -> bool {
@@ -210,5 +225,14 @@ impl ComponentRegistry {
         self.map.iter().filter_map(move |(name, funcs)| {
             (funcs.get_comp)(world, entity).map(|comp| (*name, comp))
         })
+    }
+
+    /// Only components not marked as `#[clone(disallow)]`
+    pub fn copy_components_to(&self, world: &EcsWorld, source: Entity, dest: Entity) {
+        for cloneable in self.cloneables.iter() {
+            if let Err(err) = (cloneable)(world, source, dest) {
+                warn!("failed to copy component: {}", err);
+            }
+        }
     }
 }

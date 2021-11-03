@@ -18,6 +18,7 @@ use crate::item::{ItemFilter, ItemFilterable};
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("inventory")]
+#[clone(disallow)]
 pub struct InventoryComponent {
     equip_slots: Vec<EquipSlot>,
 
@@ -29,6 +30,7 @@ pub struct InventoryComponent {
 #[derive(Component, EcsComponent)]
 #[storage(HashMapStorage)]
 #[name("container")]
+#[clone(disallow)]
 pub struct ContainerComponent {
     pub container: Container,
 

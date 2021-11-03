@@ -9,6 +9,7 @@ use crate::TransformComponent;
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[name("hauling")]
 #[storage(DenseVecStorage)]
+#[clone(disallow)]
 pub struct HauledItemComponent {
     pub hauler: Entity,
     pub haul_type: HaulType,

@@ -21,6 +21,7 @@ use crate::{dse, Societies};
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("ai")]
+#[clone(disallow)]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
     current: Option<DecisionSource<AiContext>>,

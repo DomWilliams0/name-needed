@@ -31,7 +31,7 @@ pub struct EdibleItemComponent {
 }
 
 // TODO add aerodynamic-ness field
-#[derive(Component, EcsComponent, Default, Debug)]
+#[derive(Component, EcsComponent, Default, Debug, Clone)]
 #[storage(NullStorage)]
 #[name("throwable")]
 pub struct ThrowableItemComponent;

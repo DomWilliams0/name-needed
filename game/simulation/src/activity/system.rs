@@ -19,6 +19,7 @@ use std::rc::Rc;
 #[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
 #[name("activity")]
+#[clone(disallow)]
 pub struct ActivityComponent {
     current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     /// Set by AI to trigger a new activity

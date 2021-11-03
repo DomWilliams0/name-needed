@@ -185,6 +185,12 @@ impl EcsWorld {
     ) -> impl Iterator<Item = (&'static str, ComponentRefErased)> {
         self.component_registry.all_components_for(self, entity)
     }
+
+    /// Only components not marked as `#[clone(disallow)]`
+    pub fn copy_components_to(&self, source: Entity, dest: Entity) {
+        self.component_registry
+            .copy_components_to(self, source, dest)
+    }
 }
 
 impl ComponentWorld for EcsWorld {

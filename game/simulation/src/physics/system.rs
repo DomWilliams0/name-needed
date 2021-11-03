@@ -14,6 +14,7 @@ pub struct PhysicsSystem;
 #[derive(Debug, Component, EcsComponent)]
 #[storage(VecStorage)]
 #[name("physics")]
+#[clone(disallow)]
 pub struct PhysicsComponent {
     /// Number of blocks fallen in current fall
     pub fallen: u32,

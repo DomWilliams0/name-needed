@@ -23,6 +23,7 @@ struct StackedEntity {
 #[derive(Component, EcsComponent, Debug)]
 #[name("item-stack")]
 #[storage(DenseVecStorage)]
+#[clone(disallow)]
 pub struct ItemStackComponent {
     pub stack: ItemStack,
 }

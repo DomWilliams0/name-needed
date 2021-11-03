@@ -14,6 +14,7 @@ use crate::{TransformComponent, WorldRef};
 #[derive(Component, EcsComponent)]
 #[storage(VecStorage)]
 #[name("path")]
+#[clone(disallow)]
 pub struct FollowPathComponent {
     path: Option<PathFollowing>,
     follow_speed: NormalizedFloat,
