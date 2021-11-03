@@ -55,19 +55,27 @@ pub struct HaulSubactivity<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum HaulTarget {
-    /// Put in/take from an accessible position
-    // TODO worldpoint
-    Position(WorldPosition),
+pub enum HaulSource {
+    /// Pick up from current location
+    PickUp,
 
-    /// Put in/take out of a container
+    /// Take out of a container
+    Container(Entity),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum HaulTarget {
+    /// Drop on the floor
+    Drop(WorldPoint),
+
+    /// Put in a container
     Container(Entity),
 }
 
 // TODO depends on item size
 const MAX_DISTANCE: f32 = 4.0;
 
-struct StartHaulingStatus(HaulTarget);
+struct StartHaulingStatus(HaulSource);
 
 struct StopHaulingStatus(Option<HaulTarget>);
 
@@ -76,10 +84,10 @@ impl<'a> HaulSubactivity<'a> {
     pub async fn start_hauling(
         ctx: &'a ActivityContext,
         thing: Entity,
-        source: HaulTarget,
+        source: HaulSource,
     ) -> Result<HaulSubactivity<'a>, HaulError> {
         // check distance
-        if let HaulTarget::Position(_) = source {
+        if let HaulSource::PickUp = source {
             match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
                 DistanceCheckResult::NotAvailable => return Err(HaulError::BadItem),
                 DistanceCheckResult::TooFar => return Err(HaulError::TooFar),
@@ -99,7 +107,7 @@ impl<'a> HaulSubactivity<'a> {
             needs_transform: false,
         };
 
-        if let HaulTarget::Container(container) = source {
+        if let HaulSource::Container(container) = source {
             subactivity.needs_transform = true;
 
             queue_container_removal(ctx.world().resource(), thing, container);
@@ -182,17 +190,16 @@ impl<'a> HaulSubactivity<'a> {
                     .component::<TransformComponent>(self.ctx.entity())
                     .map_err(|_| HaulError::BadHauler)?
                     .position;
-                HaulTarget::Position(hauler_pos.floor())
+                HaulTarget::Drop(hauler_pos)
             }
         };
 
         // place haulee back into the world
         let item = self.thing;
         match target {
-            HaulTarget::Position(pos) => {
+            HaulTarget::Drop(pos) => {
                 // drop the item in place
-                // TODO don't always drop item in centre
-                let pos = pos.centred();
+                // TODO add some randomness to drop position
                 let needs_transform = self.needs_transform;
 
                 updates.queue("drop hauled item", move |world| {
@@ -259,54 +266,61 @@ impl<'a> Drop for HaulSubactivity<'a> {
 impl Display for HaulTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            HaulTarget::Position(pos) => Display::fmt(pos, f),
+            HaulTarget::Drop(pos) => Display::fmt(pos, f),
             HaulTarget::Container(container) => write!(f, "container {}", container),
         }
     }
 }
 
-impl HaulTarget {
-    /// Creates from entity's current position or the container it is currently contained in
+impl Display for HaulSource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HaulSource::PickUp => write!(f, "current position"),
+            HaulSource::Container(container) => write!(f, "container {}", container),
+        }
+    }
+}
+
+impl HaulSource {
     pub fn with_entity(entity: Entity, world: &impl ComponentWorld) -> Option<Self> {
         if let Ok(ContainedInComponent::Container(container)) = world.component(entity).as_deref() {
             Some(Self::Container(*container))
-        } else if let Ok(transform) = world.component::<TransformComponent>(entity) {
-            Some(Self::Position(transform.accessible_position()))
+        } else if world.has_component::<TransformComponent>(entity) {
+            Some(Self::PickUp)
         } else {
             None
         }
     }
 
-    pub fn target_position(&self, world: &impl ComponentWorld) -> Option<WorldPoint> {
-        match self {
-            HaulTarget::Position(pos) => Some(pos.centred()),
-            HaulTarget::Container(container) => Self::position_of(world, *container),
-        }
-    }
-
-    pub fn source_position(
+    pub fn location(
         &self,
         world: &impl ComponentWorld,
         item: Entity,
     ) -> Result<WorldPoint, HaulError> {
         match self {
-            HaulTarget::Position(_) => {
-                // get current position instead of possibly outdated source position
-                Self::position_of(world, item).ok_or(HaulError::BadItem)
-            }
-            HaulTarget::Container(container) => {
-                Self::position_of(world, *container).ok_or(HaulError::BadSourceContainer)
+            Self::PickUp => position_of(world, item).ok_or(HaulError::BadItem),
+            Self::Container(container) => {
+                position_of(world, *container).ok_or(HaulError::BadSourceContainer)
             }
         }
     }
+}
 
-    // TODO explicit access side for container, e.g. front of chest
-    fn position_of(world: &impl ComponentWorld, entity: Entity) -> Option<WorldPoint> {
-        world
-            .component::<TransformComponent>(entity)
-            .ok()
-            .map(|transform| transform.position)
+impl HaulTarget {
+    pub fn location(&self, world: &impl ComponentWorld) -> Option<WorldPoint> {
+        match self {
+            HaulTarget::Drop(pos) => Some(*pos),
+            HaulTarget::Container(container) => position_of(world, *container),
+        }
     }
+}
+
+// TODO explicit access side for container, e.g. front of chest
+fn position_of(world: &impl ComponentWorld, entity: Entity) -> Option<WorldPoint> {
+    world
+        .component::<TransformComponent>(entity)
+        .ok()
+        .map(|transform| transform.position)
 }
 
 fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_entity: Entity) {
@@ -496,8 +510,8 @@ impl Status for StartHaulingStatus {
 impl Display for StartHaulingStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            HaulTarget::Position(_) => f.write_str("Picking up item"),
-            HaulTarget::Container(_) => f.write_str("Taking item out of container"),
+            HaulSource::PickUp => f.write_str("Picking up item"),
+            HaulSource::Container(_) => f.write_str("Taking item out of container"),
         }
     }
 }
@@ -505,7 +519,7 @@ impl Display for StartHaulingStatus {
 impl Display for StopHaulingStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            None | Some(HaulTarget::Position(_)) => f.write_str("Dropping item"),
+            None | Some(HaulTarget::Drop(_)) => f.write_str("Dropping item"),
             Some(HaulTarget::Container(_)) => f.write_str("Putting item into container"),
         }
     }

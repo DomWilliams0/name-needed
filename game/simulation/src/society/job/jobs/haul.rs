@@ -1,4 +1,4 @@
-use crate::activity::HaulTarget;
+use crate::activity::{HaulSource, HaulTarget};
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
 use crate::job::SocietyTaskResult;
@@ -9,32 +9,32 @@ use crate::job::job::CompletedTasks;
 use crate::job::task::HaulSocietyTask;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 /// Haul a thing to a position
 // TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container
 #[derive(Debug)]
 pub struct HaulJob {
     entity: Entity,
-    source: HaulTarget,
+    source: HaulSource,
     target: HaulTarget,
 }
 
 impl HaulJob {
     pub fn with_target_position(
         thing: Entity,
-        target: WorldPosition,
+        target: WorldPoint,
         world: &impl ComponentWorld,
     ) -> Option<Self> {
-        let source = HaulTarget::with_entity(thing, world)?;
+        let source = HaulSource::with_entity(thing, world)?;
 
         let world = world.voxel_world();
         let world = world.borrow();
 
         // ensure target is accessible
-        let _accessible = world.area(target).ok()?;
+        let _accessible = world.area(target.floor()).ok()?;
 
-        let target = HaulTarget::Position(target);
+        let target = HaulTarget::Drop(target);
         Some(HaulJob {
             entity: thing,
             source,
@@ -47,7 +47,7 @@ impl HaulJob {
         container: Entity,
         world: &impl ComponentWorld,
     ) -> Option<Self> {
-        let source = HaulTarget::with_entity(thing, world)?;
+        let source = HaulSource::with_entity(thing, world)?;
 
         let target = HaulTarget::Container(container);
         Some(HaulJob {
@@ -95,7 +95,7 @@ impl SocietyJobImpl for HaulJob {
             trace!("item is being hauled");
         } else {
             match self.target {
-                HaulTarget::Position(target_pos) => {
+                HaulTarget::Drop(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => t.position,
                         Err(err) => {
@@ -104,7 +104,7 @@ impl SocietyJobImpl for HaulJob {
                         }
                     };
 
-                    if WorldPoint::from(target_pos).is_almost(&current_pos, 2.0) {
+                    if target_pos.is_almost(&current_pos, 2.0) {
                         trace!("hauled item arrived at target");
                         return Some(SocietyTaskResult::Success);
                     }

@@ -8,7 +8,7 @@ use world::SearchGoal;
 use crate::activity::activity::Activity;
 use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
-use crate::activity::subactivity::GoingToStatus;
+use crate::activity::subactivity::{GoingToStatus, HaulSource};
 use crate::activity::HaulError;
 use crate::{Entity, EntityEvent, HaulTarget};
 
@@ -23,12 +23,12 @@ use crate::event::{EntityEventSubscription, EventSubscription};
 #[derive(Debug, Clone, Display)]
 pub struct GoHaulActivity {
     thing: Entity,
-    source: HaulTarget,
+    source: HaulSource,
     target: HaulTarget,
 }
 
 impl GoHaulActivity {
-    pub fn new(entity: Entity, source: HaulTarget, target: HaulTarget) -> Self {
+    pub fn new(entity: Entity, source: HaulSource, target: HaulTarget) -> Self {
         Self {
             thing: entity,
             source,
@@ -54,7 +54,7 @@ impl Activity for GoHaulActivity {
 
         // go to it
         // TODO arrival radius depends on the size of the item
-        let pos = self.source.source_position(ctx.world(), self.thing)?;
+        let pos = self.source.location(ctx.world(), self.thing)?;
         ctx.go_to(
             pos,
             NormalizedFloat::new(0.8),
@@ -69,7 +69,7 @@ impl Activity for GoHaulActivity {
         // go to destination
         let pos = self
             .target
-            .target_position(ctx.world())
+            .location(ctx.world())
             .ok_or(HaulError::BadTargetContainer)?;
 
         ctx.go_to(

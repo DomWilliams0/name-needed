@@ -28,7 +28,8 @@ pub use crate::simulation::{
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{
-    ActivityComponent, EntityLoggingComponent, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
+    ActivityComponent, EntityLoggingComponent, HaulSource, HaulTarget, LoggedEntityDecision,
+    LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};

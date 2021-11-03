@@ -1,7 +1,7 @@
 pub use activity::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use status::{StatusReceiver, StatusUpdater};
-pub use subactivity::{EquipItemError, HaulError, HaulTarget};
+pub use subactivity::{EquipItemError, HaulError, HaulSource, HaulTarget};
 pub use system::{ActivityComponent, ActivitySystem};
 
 mod activity;

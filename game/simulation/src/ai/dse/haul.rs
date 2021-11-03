@@ -1,4 +1,4 @@
-use crate::activity::HaulTarget;
+use crate::activity::{HaulSource, HaulTarget};
 use crate::ai::consideration::{
     HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
@@ -9,7 +9,7 @@ use unit::world::WorldPoint;
 
 pub struct HaulDse {
     pub thing: Entity,
-    pub src_tgt: (HaulTarget, HaulTarget),
+    pub src_tgt: (HaulSource, HaulTarget),
     pub extra_hands_needed: u16,
 
     /// Position of destination haul target

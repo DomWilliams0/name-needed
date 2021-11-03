@@ -7,14 +7,14 @@ use crate::activity::HaulTarget;
 use crate::ai::dse::{BreakBlockDse, BuildBlockDse, HaulDse};
 use crate::ai::AiContext;
 use crate::ecs::{EcsWorld, Entity};
-use crate::{ComponentWorld, TransformComponent};
+use crate::{ComponentWorld, HaulSource, TransformComponent};
 
 use crate::item::HaulableItemComponent;
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
     pub item: Entity,
-    pub src: HaulTarget,
+    pub src: HaulSource,
     pub dst: HaulTarget,
 }
 
@@ -35,7 +35,7 @@ pub enum SocietyTask {
 }
 
 impl SocietyTask {
-    pub fn haul(item: Entity, src: HaulTarget, dst: HaulTarget) -> Self {
+    pub fn haul(item: Entity, src: HaulSource, dst: HaulTarget) -> Self {
         Self::Haul(Box::new(HaulSocietyTask { item, src, dst }))
     }
 
@@ -67,7 +67,7 @@ impl SocietyTask {
             BreakBlock(range) => dse!(BreakBlockDse(*range)),
             Build(block, bt) => dse!(BuildBlockDse(*block, *bt)),
             Haul(haul) => {
-                let pos = haul.dst.target_position(world)?;
+                let pos = haul.dst.location(world)?;
                 let extra_hands = world
                     .component::<HaulableItemComponent>(haul.item)
                     .ok()

@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
+use crate::activity::{HaulSource, HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
 use crate::ecs::Entity;
 use crate::BlockType;
 
@@ -35,7 +35,7 @@ pub enum AiAction {
     Follow { target: Entity, radius: u8 },
 
     /// Haul the entity from the source to the destination target
-    Haul(Entity, HaulTarget, HaulTarget),
+    Haul(Entity, HaulSource, HaulTarget),
 }
 
 impl Default for AiAction {

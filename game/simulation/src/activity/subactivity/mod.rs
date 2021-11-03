@@ -10,4 +10,4 @@ pub use build_block::{BuildBlockError, BuildBlockSubactivity};
 pub use eat::{EatItemError, EatItemSubactivity};
 pub use equip::{EquipItemError, EquipSubActivity, PickupSubactivity};
 pub use go_to::{GoToSubactivity, GoingToStatus, GotoError};
-pub use haul::{HaulError, HaulSubactivity, HaulTarget};
+pub use haul::{HaulError, HaulSource, HaulSubactivity, HaulTarget};

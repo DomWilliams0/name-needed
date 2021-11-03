@@ -6,7 +6,7 @@ use common::*;
 use crate::activity::status::Status;
 use crate::activity::subactivity::{
     BreakBlockError, BreakBlockSubactivity, BuildBlockError, BuildBlockSubactivity, EatItemError,
-    EatItemSubactivity, EquipSubActivity, GoToSubactivity, GoingToStatus, GotoError,
+    EatItemSubactivity, EquipSubActivity, GoToSubactivity, GoingToStatus, GotoError, HaulSource,
     HaulSubactivity, PickupSubactivity,
 };
 use crate::activity::{Activity, EquipItemError, HaulError, HaulTarget, StatusUpdater};
@@ -160,7 +160,7 @@ impl ActivityContext {
     pub async fn haul(
         &self,
         thing: Entity,
-        source: HaulTarget,
+        source: HaulSource,
     ) -> Result<HaulSubactivity<'_>, HaulError> {
         HaulSubactivity::start_hauling(self, thing, source).await
     }

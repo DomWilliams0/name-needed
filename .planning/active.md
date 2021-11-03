@@ -19,3 +19,4 @@
 * [ ] allow multiple concurrent workers
 * [X] chore: replace direct uses of specs Entity with our own wrapper
 * [ ] ui commands to build
+* [ ] fix ub in dyn ptr comparisons

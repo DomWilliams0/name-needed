@@ -95,7 +95,7 @@ impl SocietyWindow {
 
                         context.issue_request(UiRequest::IssueSocietyCommand(
                             society_handle,
-                            SocietyCommand::HaulToPosition(entity, target),
+                            SocietyCommand::HaulToPosition(entity, target.centred()),
                         ));
                     }
 

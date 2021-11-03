@@ -2,9 +2,9 @@
 //! API for testing
 
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::HaulTarget;
+use crate::activity::{HaulSource, HaulTarget};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{ContainedInComponent, ContainerComponent};
@@ -143,7 +143,7 @@ impl EcsExtDev<'_> {
         hauler: Entity,
         haulee: Entity,
         container_pos: WorldPosition,
-        haul_to: WorldPosition,
+        haul_to: WorldPoint,
     ) {
         self.resource::<QueuedUpdates>()
             .queue("force haul from container", move |world| {
@@ -156,8 +156,8 @@ impl EcsExtDev<'_> {
                         .component_mut::<AiComponent>(hauler)
                         .expect("no activity");
 
-                    let from = HaulTarget::Container(*container);
-                    let to = HaulTarget::Position(haul_to);
+                    let from = HaulSource::Container(*container);
+                    let to = HaulTarget::Drop(haul_to);
 
                     info!(
                         "forcing {hauler} to haul {haulee}",
@@ -233,7 +233,7 @@ impl EcsExtDev<'_> {
                     .component_mut::<AiComponent>(hauler)
                     .expect("no activity");
 
-                let from = HaulTarget::Position(food_pos);
+                let from = HaulSource::PickUp;
                 let to = HaulTarget::Container(container);
 
                 info!(

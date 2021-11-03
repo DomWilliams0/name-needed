@@ -6,6 +6,7 @@ use common::*;
 
 use std::ops::Deref;
 use std::rc::Rc;
+use unit::world::WorldPoint;
 
 /// A high-level society job that produces a number of [SocietyTask]s. Unsized but it lives in an
 /// Rc anyway
@@ -53,7 +54,7 @@ pub trait SocietyJobImpl: Display + Debug {
 #[derive(Debug)]
 pub enum SocietyCommand {
     BreakBlocks(WorldPositionRange),
-    HaulToPosition(Entity, WorldPosition),
+    HaulToPosition(Entity, WorldPoint),
 
     /// (thing, container)
     HaulIntoContainer(Entity, Entity),
