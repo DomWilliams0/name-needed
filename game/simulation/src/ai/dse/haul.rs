@@ -1,9 +1,10 @@
-use crate::activity::{HaulSource, HaulTarget};
+use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::consideration::{
     HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
+use crate::item::ItemFilter;
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use unit::world::WorldPoint;
 
@@ -21,7 +22,7 @@ impl Dse<AiContext> for HaulDse {
         vec![
             AiBox::new(HasExtraHandsForHaulingConsideration(
                 self.extra_hands_needed,
-                self.thing,
+                Some(ItemFilter::SpecificEntity(self.thing)),
             )),
             AiBox::new(MyProximityToConsideration {
                 target: self.destination,
@@ -37,6 +38,6 @@ impl Dse<AiContext> for HaulDse {
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
         let (src, tgt) = self.src_tgt;
-        AiAction::Haul(self.thing, src, tgt)
+        AiAction::Haul(self.thing, src, tgt, HaulPurpose::JustBecause)
     }
 }

@@ -1,15 +1,18 @@
-use crate::job::SocietyTask;
+use crate::job::job::SocietyJobImpl;
+use crate::job::{SocietyJob, SocietyTask};
 use crate::simulation::Tick;
 use crate::society::job::job::SocietyJobRef;
-use crate::{EcsWorld, Entity};
+use crate::{EcsWorld, Entity, SocietyHandle};
 use common::*;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug)] // TODO implement manually
 pub struct SocietyJobList {
     jobs: Vec<SocietyJobRef>,
     reservations: SocietyTaskReservations,
     last_update: Tick,
+    next_handle: SocietyJobHandle,
 
     /// Pretty hacky way to prevent Job indices changing
     no_more_jobs_temporarily: bool,
@@ -38,19 +41,49 @@ pub enum Reservation {
     Unavailable,
 }
 
-impl Default for SocietyJobList {
-    fn default() -> Self {
-        Self {
-            jobs: Vec::with_capacity(64),
-            reservations: SocietyTaskReservations::default(),
-            last_update: Tick::default(),
-            no_more_jobs_temporarily: false,
-        }
+/// Unique job id per society
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub struct SocietyJobHandle {
+    society: SocietyHandle,
+    idx: u32,
+}
+
+impl SocietyJobHandle {
+    pub fn society(self) -> SocietyHandle {
+        self.society
+    }
+}
+
+impl Debug for SocietyJobHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SocietyJobHandle({:?}:{})", self.society, self.idx)
     }
 }
 
 impl SocietyJobList {
-    pub fn submit(&mut self, job: SocietyJobRef) {
+    pub(in crate::society) fn new(society: SocietyHandle) -> Self {
+        Self {
+            jobs: Vec::with_capacity(64),
+            reservations: SocietyTaskReservations::default(),
+            last_update: Tick::default(),
+            next_handle: SocietyJobHandle { society, idx: 0 },
+            no_more_jobs_temporarily: false,
+        }
+    }
+
+    pub fn submit(&mut self, world: &EcsWorld, job: impl SocietyJobImpl + 'static) {
+        let handle = {
+            let this = self.next_handle.clone();
+            self.next_handle.idx += 1;
+            this
+        };
+
+        let job = SocietyJob::create(world, handle, job);
+        self.submit_internal(job)
+    }
+
+    /// Without generic parameter to reduce code size
+    fn submit_internal(&mut self, job: SocietyJobRef) {
         debug!("submitting society job"; "job" => ?job);
         assert!(
             !self.no_more_jobs_temporarily,
@@ -73,7 +106,7 @@ impl SocietyJobList {
             let len_before = self.jobs.len();
             trace!("refreshing {n} jobs", n = len_before);
             self.jobs.retain(|job| {
-                let result = job.write().refresh_tasks(world);
+                let result = job.borrow_mut().refresh_tasks(world);
                 match result {
                     None => true,
                     Some(result) => {
@@ -93,7 +126,7 @@ impl SocietyJobList {
         self.no_more_jobs_temporarily = true;
 
         for (i, job) in self.jobs.iter().enumerate() {
-            let job = job.read();
+            let job = job.borrow();
             // TODO filter jobs for entity
 
             for task in job.tasks() {
@@ -124,8 +157,20 @@ impl SocietyJobList {
         self.no_more_jobs_temporarily = false;
     }
 
+    // TODO use SocietyJobHandle instead of indices
     pub fn by_index(&self, idx: usize) -> Option<SocietyJobRef> {
         self.jobs.get(idx).cloned()
+    }
+
+    pub fn find_job(&self, handle: SocietyJobHandle) -> Option<SocietyJobRef> {
+        if handle.society == self.next_handle.society {
+            self.jobs
+                .iter()
+                .find(|j| j.handle().idx == handle.idx)
+                .cloned()
+        } else {
+            None
+        }
     }
 
     pub fn reservation(&self, entity: Entity) -> Option<&SocietyTask> {
@@ -147,7 +192,7 @@ impl SocietyJobList {
                 continue;
             }
 
-            let job = job.read();
+            let job = job.borrow();
             for task in job.tasks() {
                 // gather all reservations for this task, giving us some beautiful n^2 complexity
                 self.reservations.check_all(task, |e| reservers.push(e));

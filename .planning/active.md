@@ -8,10 +8,11 @@
 * [X] components should declare if they should be copied into/out of stacks
 * [.] building blocks
 	* [X] no materials, single block only, near-instant completion
-	* [ ] require materials
+	* [O] require materials
 		* [ ] check inventory for materials
 		* [ ] check society containers for materials
-		* [ ] check nearby area for materials
+		* [X] check nearby area for materials
+		* [X] reserve materials
 	* [ ] build progression
 	* [ ] continuable progress after interruption
 	* [ ] define materials in data (wood, stone)
@@ -19,4 +20,4 @@
 * [ ] allow multiple concurrent workers
 * [X] chore: replace direct uses of specs Entity with our own wrapper
 * [ ] ui commands to build
-* [ ] fix ub in dyn ptr comparisons
+* [ ] fix HasExtraHandsForHauling returning 1.0 eagerly for any haul task, causing constant churn of activity choice

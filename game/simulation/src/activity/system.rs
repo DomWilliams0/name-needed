@@ -131,7 +131,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     // notify society job of completion
                     if let Some((job, task)) = activity.current_society_task.take() {
                         if let Some(TaskResult::Finished(finish)) = result {
-                            job.write().notify_completion(task, finish.into());
+                            job.borrow_mut().notify_completion(task, finish.into());
                         }
                     }
                 }

@@ -93,6 +93,8 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("render", RenderComponent);

@@ -1,6 +1,7 @@
 use unit::world::WorldPosition;
 
 use crate::definitions::loader::Definition;
+use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 use crate::{ComponentWorld, InnerWorldRef, TransformComponent};
 use common::*;
@@ -25,16 +26,19 @@ pub enum BuilderError {
 #[must_use = "Use spawn() to create the entity"]
 pub struct DefinitionBuilder<'d, W: ComponentWorld> {
     definition: &'d Definition,
+    /// Unnecessary when the temporary DefinitionNameComponent is removed
+    uid: String,
     world: &'d W,
 
     position: Option<Box<dyn EntityPosition>>,
 }
 
 impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
-    pub fn new(definition: &'d Definition, world: &'d W) -> Self {
+    pub fn new(definition: &'d Definition, world: &'d W, uid: &str) -> Self {
         Self {
             definition,
             world,
+            uid: uid.to_owned(),
             position: None,
         }
     }
@@ -61,7 +65,10 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
             None => (None, None),
         };
 
-        let mut builder = self.world.create_entity();
+        let mut builder = self
+            .world
+            .create_entity()
+            .with(DefinitionNameComponent(self.uid));
 
         for comp in self.definition.components() {
             builder = comp.instantiate(builder);

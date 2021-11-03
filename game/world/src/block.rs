@@ -199,6 +199,10 @@ impl BlockType {
         use BlockType::*;
         !matches!(self, Leaves | SolidWater)
     }
+
+    pub fn is_air(self) -> bool {
+        matches!(self, BlockType::Air)
+    }
 }
 
 /// Helper

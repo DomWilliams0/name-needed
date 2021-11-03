@@ -202,10 +202,13 @@ impl InventoryComponent {
     }
 
     pub fn has_equipped(&self, item: Entity) -> bool {
+        self.search_equipped(ItemFilter::SpecificEntity(item), Option::<&EcsWorld>::None)
+    }
+
+    pub fn search_equipped(&self, filter: ItemFilter, world: Option<&impl ComponentWorld>) -> bool {
         self.equip_slots.iter().any(|slot| match slot {
-            EquipSlot::Empty => false,
-            EquipSlot::Occupied(e) => e.entity == item,
-            EquipSlot::Overflow(e) => *e == item,
+            EquipSlot::Occupied(e) => (e.entity, world).matches(filter),
+            _ => false,
         })
     }
 
@@ -649,6 +652,8 @@ impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(InventoryComponent::new(self.equip_slots))
     }
+
+    crate::as_any!();
 }
 
 // TODO this is the same as is used by PhysicalComponent
@@ -680,6 +685,8 @@ impl<V: Value> ComponentTemplate<V> for ContainerComponentTemplate {
             communal: None,
         })
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("inventory", InventoryComponentTemplate);

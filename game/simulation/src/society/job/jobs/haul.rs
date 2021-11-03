@@ -1,7 +1,7 @@
 use crate::activity::{HaulSource, HaulTarget};
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
-use crate::job::SocietyTaskResult;
+use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
@@ -59,7 +59,12 @@ impl HaulJob {
 }
 
 impl SocietyJobImpl for HaulJob {
-    fn populate_initial_tasks(&self, _: &EcsWorld, out: &mut Vec<SocietyTask>) {
+    fn populate_initial_tasks(
+        &self,
+        _: &EcsWorld,
+        out: &mut Vec<SocietyTask>,
+        _: SocietyJobHandle,
+    ) {
         out.push(SocietyTask::haul(self.entity, self.source, self.target));
     }
 

@@ -241,6 +241,8 @@ impl<V: Value> ComponentTemplate<V> for MagicalSenseComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone()).with(SensesComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("senses", MagicalSenseComponent);

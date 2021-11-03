@@ -87,7 +87,7 @@ pub struct ComponentFunctions {
 pub struct ComponentRegistry {
     // TODO perfect hashing
     map: HashMap<&'static str, ComponentFunctions>,
-    cloneables: Vec<CloneToFn>,
+    cloneables: Vec<(&'static str, CloneToFn)>,
 }
 
 impl<V: Value> Map<V> {
@@ -192,7 +192,7 @@ impl ComponentRegistry {
             (comp.register_comp_fn)(world);
 
             if let Some(clone_fn) = comp.clone_to_fn {
-                cloneables.push(clone_fn);
+                cloneables.push((comp.name, clone_fn));
             }
         }
 
@@ -229,9 +229,10 @@ impl ComponentRegistry {
 
     /// Only components not marked as `#[clone(disallow)]`
     pub fn copy_components_to(&self, world: &EcsWorld, source: Entity, dest: Entity) {
-        for cloneable in self.cloneables.iter() {
+        for (name, cloneable) in self.cloneables.iter() {
+            trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
             if let Err(err) = (cloneable)(world, source, dest) {
-                warn!("failed to copy component: {}", err);
+                warn!("failed to copy {}: {}", name, err);
             }
         }
     }

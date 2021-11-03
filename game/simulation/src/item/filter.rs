@@ -1,3 +1,4 @@
+use crate::definitions::DefinitionNameComponent;
 use crate::ecs::Entity;
 use crate::ComponentWorld;
 use common::*;
@@ -7,6 +8,7 @@ pub enum ItemFilter {
     SpecificEntity(Entity),
     Predicate(fn(Entity) -> bool),
     HasComponent(&'static str),
+    MatchesDefinition(&'static str),
     // TODO filters on other fields e.g. mass, size, condition, etc
 }
 
@@ -34,6 +36,13 @@ impl<W: ComponentWorld> ItemFilterable for (Entity, Option<&W>) {
             }
             ItemFilter::Predicate(f) => f(item),
             ItemFilter::HasComponent(comp) => world.unwrap().has_component_by_name(comp, item),
+            ItemFilter::MatchesDefinition(def) => {
+                world
+                    .and_then(|w| w.component::<DefinitionNameComponent>(item).ok())
+                    .unwrap()
+                    .0
+                    == def
+            }
         }
     }
 }
@@ -55,6 +64,7 @@ impl Display for ItemFilter {
             ItemFilter::SpecificEntity(e) => write!(f, "item == {}", e),
             ItemFilter::Predicate(p) => write!(f, "f(item) where f = {:#x}", *p as usize),
             ItemFilter::HasComponent(comp) => write!(f, "item has {:?}", comp),
+            ItemFilter::MatchesDefinition(def) => write!(f, "item is {}", def),
         }
     }
 }

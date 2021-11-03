@@ -51,6 +51,8 @@ impl<V: Value> ComponentTemplate<V> for NameComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for ConditionComponent {
@@ -64,6 +66,8 @@ impl<V: Value> ComponentTemplate<V> for ConditionComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
@@ -79,6 +83,8 @@ impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
@@ -89,6 +95,8 @@ impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(ThrowableItemComponent)
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("name", NameComponent);

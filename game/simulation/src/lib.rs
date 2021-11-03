@@ -28,8 +28,8 @@ pub use crate::simulation::{
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent};
 pub use activity::{
-    ActivityComponent, EntityLoggingComponent, HaulSource, HaulTarget, LoggedEntityDecision,
-    LoggedEntityEvent,
+    ActivityComponent, EntityLoggingComponent, HaulPurpose, HaulSource, HaulTarget,
+    LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
@@ -37,6 +37,7 @@ pub use event::{EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
+pub use build::{Build, StoneBrickWall};
 #[cfg(debug_assertions)]
 pub use item::validation::validate_all_inventories;
 pub use item::{
@@ -56,9 +57,19 @@ pub use unit::world::{
 
 pub const TICKS_PER_SECOND: usize = 20;
 
+#[macro_export]
+macro_rules! as_any {
+    () => {
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    };
+}
+
 mod activity;
 mod ai;
 mod backend;
+mod build;
 mod definitions;
 pub mod dev;
 mod ecs;

@@ -2,7 +2,9 @@ use std::convert::TryInto;
 
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::{HaulSource, HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
+use crate::activity::{
+    HaulPurpose, HaulSource, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
+};
 use crate::ecs::Entity;
 use crate::BlockType;
 
@@ -35,7 +37,7 @@ pub enum AiAction {
     Follow { target: Entity, radius: u8 },
 
     /// Haul the entity from the source to the destination target
-    Haul(Entity, HaulSource, HaulTarget),
+    Haul(Entity, HaulSource, HaulTarget, HaulPurpose),
 }
 
 impl Default for AiAction {
@@ -59,7 +61,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
             AiAction::EatHeldItem(item) => EatHeldItem(*item),
             AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
             AiAction::Follow { target, .. } => Follow(*target),
-            AiAction::Haul(e, _, tgt) => Haul {
+            AiAction::Haul(e, _, tgt, _) => Haul {
                 item: *e,
                 dest: *tgt,
             },

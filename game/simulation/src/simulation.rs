@@ -30,6 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::job::SocietyCommand;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
@@ -228,7 +229,7 @@ impl<R: Renderer> Simulation<R> {
         &self.ecs_world
     }
 
-    pub fn societies(&mut self) -> &mut Societies {
+    pub fn societies_mut(&mut self) -> &mut Societies {
         self.ecs_world.resource_mut()
     }
 
@@ -346,24 +347,23 @@ impl<R: Renderer> Simulation<R> {
                     }
                 }
                 UiRequest::IssueSocietyCommand(society, command) => {
-                    let job = match command.into_job(&*self.ecs_world) {
-                        Ok(job) => job,
-                        Err(cmd) => {
-                            warn!("failed to issue society command"; "command" => ?cmd);
-                            continue;
-                        }
-                    };
-
-                    let society = match self.societies().society_by_handle(society) {
+                    let society = match self
+                        .world()
+                        .resource::<Societies>()
+                        .society_by_handle(society)
+                    {
                         Some(s) => s,
                         None => {
-                            warn!("invalid society while issuing job"; "society" => ?society, "job" => ?job);
+                            warn!("invalid society while issuing command"; "society" => ?society, "command" => ?command);
                             continue;
                         }
                     };
 
-                    debug!("submitting job to society"; "society" => ?society, "job" => ?job);
-                    society.jobs_mut().submit(job);
+                    debug!("submitting command to society"; "society" => ?society, "command" => ?command);
+                    if let Err(command) = command.submit_job_to_society(society, &self.ecs_world) {
+                        warn!("failed to issue society command"; "command" => ?command);
+                        continue;
+                    }
                 }
                 UiRequest::SetContainerOwnership {
                     container,

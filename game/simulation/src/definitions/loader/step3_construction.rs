@@ -1,4 +1,5 @@
 use common::*;
+use std::any::Any;
 
 use crate::definitions::loader::step1_deserialization::{
     DefinitionSource, DefinitionUid, DeserializedDefinition,
@@ -12,7 +13,7 @@ use crate::ecs::ComponentTemplate;
 #[derive(Debug)]
 pub struct Definition {
     source: DefinitionSource,
-    components: Vec<Box<dyn ecs::ComponentTemplate<ValueImpl>>>,
+    components: Vec<(String, Box<dyn ecs::ComponentTemplate<ValueImpl>>)>,
 }
 
 pub fn instantiate(
@@ -41,7 +42,17 @@ pub fn instantiate(
 }
 impl Definition {
     pub fn components(&self) -> impl Iterator<Item = &dyn ComponentTemplate<ValueImpl>> {
-        self.components.iter().map(|c| &**c)
+        self.components.iter().map(|(_, c)| &**c)
+    }
+
+    pub fn find_component(&self, name: &str) -> Option<&dyn Any> {
+        self.components.iter().find_map(|(comp, template)| {
+            if name == comp {
+                Some(template.as_any())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn source(&self) -> DefinitionSource {
@@ -73,11 +84,7 @@ impl Definition {
                     );
                 }
 
-                // bit gross to allocate a vec here just for logging
-                let leftovers = map.keys().collect_vec();
-                if !leftovers.is_empty() {}
-
-                component_templates.push(component_template);
+                component_templates.push((key.as_str().to_owned(), component_template));
             }
 
             Ok((uid, component_templates))

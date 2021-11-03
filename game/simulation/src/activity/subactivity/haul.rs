@@ -3,10 +3,13 @@ use unit::world::WorldPoint;
 
 use crate::activity::context::{ActivityContext, DistanceCheckResult};
 use crate::activity::status::Status;
+use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
+use crate::job::SocietyJobRef;
 use crate::queued_update::QueuedUpdates;
+use crate::society::job::SocietyJobHandle;
 use crate::{
     ComponentWorld, ContainedInComponent, ContainerComponent, EntityEvent, EntityEventPayload,
     InventoryComponent, PhysicalComponent, TransformComponent, WorldPosition,
@@ -71,6 +74,19 @@ pub enum HaulTarget {
     /// Put in a container
     Container(Entity),
 }
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum HaulPurpose {
+    /// No custom behaviour on success
+    JustBecause,
+
+    /// Item should be reserved for a job
+    MaterialGathering(SocietyJobHandle),
+}
+
+// activity is only used on main thread
+unsafe impl Send for HaulPurpose {}
+unsafe impl Sync for HaulPurpose {}
 
 // TODO depends on item size
 const MAX_DISTANCE: f32 = 4.0;
@@ -156,12 +172,32 @@ impl<'a> HaulSubactivity<'a> {
 
     /// If target is a location in the world, assumes we have already walked to it.
     /// This is the non-interrupted entrypoint
-    pub async fn end_haul(&mut self, target: HaulTarget) -> Result<(), HaulError> {
+    pub async fn end_haul(
+        &mut self,
+        target: HaulTarget,
+        purpose: &HaulPurpose,
+    ) -> Result<(), HaulError> {
         self.complete = true;
         self.end_haul_impl_sync(Some(target))?;
 
         if matches!(target, HaulTarget::Container(_)) {
             self.end_haul_impl_async_container(target).await?;
+        }
+
+        match purpose {
+            HaulPurpose::JustBecause => {}
+            HaulPurpose::MaterialGathering(job) => {
+                let thing = self.thing;
+                let job = *job;
+                self.ctx.world().resource::<QueuedUpdates>().queue(
+                    "reserve material",
+                    move |world| {
+                        trace!("reserved material for job"; "material" => thing, "job" => ?job);
+                        let _ = world.add_now(thing, ReservedMaterialComponent { build_job: job });
+                        Ok(())
+                    },
+                );
+            }
         }
 
         Ok(())

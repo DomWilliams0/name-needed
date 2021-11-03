@@ -153,6 +153,7 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
+                society: society_opt.map(|comp| comp.handle),
                 world: &*ecs_world,
                 shared: &mut shared_bb,
             };
@@ -303,6 +304,8 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
         let ai = AiComponent::with_species(&self.species);
         builder.with(ai).with(ActivityComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("intelligence", IntelligenceComponentTemplate);

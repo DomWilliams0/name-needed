@@ -1,9 +1,13 @@
 use crate::job::SocietyTask;
-use crate::{EcsWorld, Entity, WorldPosition, WorldPositionRange};
+use crate::{EcsWorld, Entity, SocietyHandle, WorldPosition, WorldPositionRange};
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 
 use common::parking_lot::RwLock;
 use common::*;
 
+use crate::job::list::SocietyJobHandle;
+use crate::society::Society;
 use std::ops::Deref;
 use std::rc::Rc;
 use unit::world::WorldPoint;
@@ -25,9 +29,8 @@ pub enum SocietyTaskResult {
     Failure(Box<dyn Error>),
 }
 
-#[repr(transparent)]
 #[derive(Clone)]
-pub struct SocietyJobRef(Rc<RwLock<SocietyJob>>);
+pub struct SocietyJobRef(Rc<RefCell<SocietyJob>>, SocietyJobHandle);
 
 pub(in crate::society::job) type CompletedTasks<'a> = &'a mut [(SocietyTask, SocietyTaskResult)];
 
@@ -36,7 +39,12 @@ pub trait SocietyJobImpl: Display + Debug {
     /// tasks without filtering.
     ///
     /// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)
-    fn populate_initial_tasks(&self, world: &EcsWorld, out: &mut Vec<SocietyTask>);
+    fn populate_initial_tasks(
+        &self,
+        world: &EcsWorld,
+        out: &mut Vec<SocietyTask>,
+        this_job: SocietyJobHandle,
+    );
 
     /// Update `tasks` and apply `completions`. Completions are considered owned by this method, as
     /// the underlying container will be cleared on return, so feel free to move results out.
@@ -61,17 +69,19 @@ pub enum SocietyCommand {
 }
 
 impl SocietyCommand {
-    pub fn into_job(self, world: &EcsWorld) -> Result<SocietyJobRef, Self> {
+    pub fn submit_job_to_society(self, society: &Society, world: &EcsWorld) -> Result<(), Self> {
         use self::SocietyCommand::*;
         use crate::job::jobs::*;
 
+        let mut jobs = society.jobs_mut();
+        let jobs = jobs.borrow_mut();
+
         macro_rules! job {
             ($job:expr) => {
-                Ok(SocietyJob::create(world, $job))
+                jobs.submit(world, $job);
             };
         }
 
-        // TODO return a dyn error in result
         match self {
             BreakBlocks(range) => job!(BreakBlocksJob::new(range)),
             HaulToPosition(e, pos) => {
@@ -81,19 +91,28 @@ impl SocietyCommand {
                 job!(HaulJob::with_target_container(e, container, world).ok_or(self)?)
             }
         }
+
+        Ok(())
     }
 }
 
 impl SocietyJob<dyn SocietyJobImpl> {
-    pub fn create(world: &EcsWorld, job: impl SocietyJobImpl + 'static) -> SocietyJobRef {
+    pub(in crate::society) fn create(
+        world: &EcsWorld,
+        handle: SocietyJobHandle,
+        job: impl SocietyJobImpl + 'static,
+    ) -> SocietyJobRef {
         let mut tasks = Vec::new();
-        job.populate_initial_tasks(world, &mut tasks);
+        job.populate_initial_tasks(world, &mut tasks, handle);
 
-        SocietyJobRef(Rc::new(RwLock::new(SocietyJob {
-            tasks,
-            pending_complete: SmallVec::new(),
-            inner: job,
-        })))
+        SocietyJobRef(
+            Rc::new(RefCell::new(SocietyJob {
+                tasks,
+                pending_complete: SmallVec::new(),
+                inner: job,
+            })),
+            handle,
+        )
     }
 
     pub(in crate::society::job) fn refresh_tasks(
@@ -129,6 +148,12 @@ impl SocietyJob<dyn SocietyJobImpl> {
     }
 }
 
+impl SocietyJobRef {
+    pub fn handle(&self) -> SocietyJobHandle {
+        self.1
+    }
+}
+
 impl From<BoxedResult<()>> for SocietyTaskResult {
     fn from(result: BoxedResult<()>) -> Self {
         match result {
@@ -142,9 +167,9 @@ impl Debug for SocietyJobRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "SocietyJob(")?;
 
-        match self.0.try_read() {
-            None => write!(f, "<locked>)"),
-            Some(job) => write!(
+        match self.0.try_borrow() {
+            Err(_) => write!(f, "<locked>)"),
+            Ok(job) => write!(
                 f,
                 "{:?} | {} tasks: {:?})",
                 &job.inner,
@@ -156,7 +181,7 @@ impl Debug for SocietyJobRef {
 }
 
 impl Deref for SocietyJobRef {
-    type Target = Rc<RwLock<SocietyJob>>;
+    type Target = Rc<RefCell<SocietyJob>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -165,9 +190,9 @@ impl Deref for SocietyJobRef {
 
 impl Display for SocietyJobRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self.0.try_read() {
-            None => write!(f, "<locked>)"),
-            Some(job) => write!(f, "{} ({} tasks)", &job.inner, job.tasks.len()),
+        match self.0.try_borrow() {
+            Err(_) => write!(f, "<locked>)"),
+            Ok(job) => write!(f, "{} ({} tasks)", &job.inner, job.tasks.len()),
         }
     }
 }

@@ -63,6 +63,10 @@ impl ItemStack {
     pub fn contents(&self) -> impl Iterator<Item = (Entity, u16)> + '_ {
         self.contents.iter().map(|e| (e.entity, e.count))
     }
+
+    pub fn total_count(&self) -> u16 {
+        self.total_count
+    }
 }
 #[cfg(debug_assertions)]
 mod validation {

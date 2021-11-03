@@ -1,14 +1,27 @@
+use crate::activity::{HaulPurpose, HaulSource};
 use crate::ai::consideration::{
-    BlockTypeMatchesConsideration, MyProximityToConsideration, Proximity,
+    BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
+    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
+use crate::build::BuildMaterial;
+use crate::item::ItemFilter;
+use crate::job::{SocietyJobHandle, SocietyJobRef};
+use crate::HaulTarget;
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use common::OrderedFloat;
 use unit::world::WorldPosition;
 use world::block::BlockType;
 
 pub struct BreakBlockDse(pub WorldPosition);
-pub struct BuildBlockDse(pub WorldPosition, pub BlockType);
+
+pub struct GatherMaterialsDse {
+    pub target: WorldPosition,
+    pub material: BuildMaterial,
+    pub job: SocietyJobHandle,
+    pub extra_hands_for_haul: u16,
+}
 
 impl Dse<AiContext> for BreakBlockDse {
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
@@ -36,14 +49,30 @@ impl Dse<AiContext> for BreakBlockDse {
     }
 }
 
-impl Dse<AiContext> for BuildBlockDse {
+impl GatherMaterialsDse {
+    fn filter(&self) -> ItemFilter {
+        ItemFilter::MatchesDefinition(self.material.definition())
+    }
+}
+
+impl Dse<AiContext> for GatherMaterialsDse {
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
+            AiBox::new(HasExtraHandsForHaulingConsideration(
+                self.extra_hands_for_haul,
+                Some(self.filter()),
+            )),
             AiBox::new(MyProximityToConsideration {
-                target: self.0.centred(),
+                target: self.target.centred(),
                 proximity: Proximity::Walkable,
             }),
-            // assume the emitting job/command has checked the block is valid and buildable
+            // TODO check in inventory
+            AiBox::new(FindLocalGradedItemConsideration {
+                filter: self.filter(),
+                max_radius: 20,
+                normalize_range: 1.0,
+            }),
+            // TODO check society containers
         ]
     }
 
@@ -51,7 +80,27 @@ impl Dse<AiContext> for BuildBlockDse {
         DecisionWeightType::Normal
     }
 
-    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
-        AiAction::GoBuildBlock(self.0, self.1)
+    fn action(
+        &self,
+        blackboard: &mut <AiContext as Context>::Blackboard,
+    ) -> <AiContext as Context>::Action {
+        if let Some((_, found_items)) = blackboard.local_area_search_cache.get(&self.filter()) {
+            // we found some local items, choose the nearest
+            // TODO take the stack size into account too, choose the biggest
+            if let Some((best_item, _, _, _)) = found_items
+                .iter()
+                .min_by_key(|(_, _, distance, _)| OrderedFloat(*distance))
+            {
+                // TODO separate HaulTarget to drop nearby/adjacent
+                return AiAction::Haul(
+                    *best_item,
+                    HaulSource::PickUp,
+                    HaulTarget::Drop(self.target.centred()),
+                    HaulPurpose::MaterialGathering(self.job),
+                );
+            }
+        }
+
+        todo!("gather materials from a different source")
     }
 }

@@ -354,6 +354,8 @@ impl<V: Value> ComponentTemplate<V> for StackableComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("stackable", StackableComponent);

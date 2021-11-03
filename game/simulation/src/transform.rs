@@ -165,6 +165,8 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
             .with(PhysicsComponent::default())
             .with(PhysicalComponent::new(self.volume, self.size))
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("physical", PhysicalComponentTemplate);

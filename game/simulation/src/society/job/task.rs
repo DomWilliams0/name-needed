@@ -4,12 +4,14 @@ use unit::world::WorldPosition;
 use world::block::BlockType;
 
 use crate::activity::HaulTarget;
-use crate::ai::dse::{BreakBlockDse, BuildBlockDse, HaulDse};
+use crate::ai::dse::{BreakBlockDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
+use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
 use crate::{ComponentWorld, HaulSource, TransformComponent};
 
 use crate::item::HaulableItemComponent;
+use crate::job::{SocietyJobHandle, SocietyJobRef};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
@@ -19,15 +21,20 @@ pub struct HaulSocietyTask {
 }
 
 /// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob]. These map to DSEs that
-/// are considered separately by the AI
+/// are each considered separately by the AI
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
     /// Break the given block
     // TODO this could be a work item
     BreakBlock(WorldPosition),
 
-    /// Build a block - TODO hacky and oversimplified for now
-    Build(WorldPosition, BlockType),
+    /// Gather materials for a build at the given position
+    GatherMaterials {
+        target: WorldPosition,
+        material: BuildMaterial,
+        job: SocietyJobHandle,
+        extra_hands_needed_for_haul: u16,
+    },
 
     /// Haul something.
     /// Boxed as this variant is much larger than the rest
@@ -65,7 +72,17 @@ impl SocietyTask {
 
         match self {
             BreakBlock(range) => dse!(BreakBlockDse(*range)),
-            Build(block, bt) => dse!(BuildBlockDse(*block, *bt)),
+            GatherMaterials {
+                target,
+                material,
+                job,
+                extra_hands_needed_for_haul,
+            } => dse!(GatherMaterialsDse {
+                target: *target,
+                material: material.clone(),
+                job: *job,
+                extra_hands_for_haul: *extra_hands_needed_for_haul
+            }),
             Haul(haul) => {
                 let pos = haul.dst.location(world)?;
                 let extra_hands = world
@@ -87,10 +104,10 @@ impl SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
-            Build(_, _) => false, // TODO can be shareable
             // TODO some types of hauling will be shareable
             // TODO depends on work item
             Haul(_) => false,
+            GatherMaterials { .. } => false,
         }
     }
 }
@@ -102,7 +119,7 @@ impl Display for SocietyTask {
             BreakBlock(b) => write!(f, "Break block at {}", b),
             Haul(haul) => Display::fmt(haul, f),
             // TODO include a description field for proper description e.g. "cutting log", "building wall"
-            Build(b, bt) => write!(f, "Build {} at {}", bt, b),
+            GatherMaterials { material, .. } => write!(f, "Gather {:?}", material),
         }
     }
 }
@@ -110,21 +127,5 @@ impl Display for SocietyTask {
 impl Display for HaulSocietyTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Haul {} to {}", self.item, self.dst)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn small_task_struct() {
-        let haul_size = dbg!(std::mem::size_of::<HaulSocietyTask>());
-        let task_size = dbg!(std::mem::size_of::<SocietyTask>());
-
-        assert!(task_size < 32);
-
-        let sz_diff = haul_size as f64 / task_size as f64;
-        assert!(sz_diff > 1.5); // yuge!
     }
 }

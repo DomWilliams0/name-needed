@@ -5,9 +5,9 @@ use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::BoxedResult;
 use simulation::{
     validate_all_inventories, AiAction, BlockType, ComponentWorld, ContainerComponent, EcsWorld,
-    Entity, EntityEventDebugPayload, EntityEventPayload, HaulSource, HaulTarget, QueuedUpdates,
-    TaskResultSummary, TerrainUpdatesRes, TransformComponent, WorldPosition, WorldPositionRange,
-    WorldTerrainUpdate,
+    Entity, EntityEventDebugPayload, EntityEventPayload, HaulPurpose, HaulSource, HaulTarget,
+    QueuedUpdates, TaskResultSummary, TerrainUpdatesRes, TransformComponent, WorldPosition,
+    WorldPositionRange, WorldTerrainUpdate,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -224,9 +224,10 @@ impl<H: HaulVariant + 'static> Haul<H> {
                         }
 
                         // force haul
-                        world
-                            .helpers_dev()
-                            .force_activity(human, AiAction::Haul(item, src, tgt));
+                        world.helpers_dev().force_activity(
+                            human,
+                            AiAction::Haul(item, src, tgt, HaulPurpose::JustBecause),
+                        );
 
                         Ok(())
                     };

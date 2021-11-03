@@ -4,7 +4,7 @@
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::{HaulSource, HaulTarget};
+use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{ContainedInComponent, ContainerComponent};
@@ -167,7 +167,12 @@ impl EcsExtDev<'_> {
                         "target" => %to,
                     );
 
-                    ai.add_divine_command(AiAction::Haul(haulee, from, to));
+                    ai.add_divine_command(AiAction::Haul(
+                        haulee,
+                        from,
+                        to,
+                        HaulPurpose::JustBecause,
+                    ));
 
                     // teehee add the haulee to the container too
                     let phys = world
@@ -244,7 +249,7 @@ impl EcsExtDev<'_> {
                     "target" => %to,
                 );
 
-                ai.add_divine_command(AiAction::Haul(haulee, from, to));
+                ai.add_divine_command(AiAction::Haul(haulee, from, to, HaulPurpose::JustBecause));
             },
         );
     }
@@ -267,7 +272,7 @@ impl EcsExtDev<'_> {
                     .society_by_handle_mut(society)
                     .expect("bad society")
                     .jobs_mut()
-                    .submit(SocietyJob::create(&*world, job));
+                    .submit(&world, job);
 
                 info!(
                     "adding society job to haul item to container";

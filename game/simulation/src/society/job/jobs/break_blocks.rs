@@ -1,6 +1,6 @@
 use crate::ecs::{CachedWorldRef, EcsWorld};
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
-use crate::job::SocietyTaskResult;
+use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::SocietyTask;
 use crate::{BlockType, ComponentWorld, InnerWorldRef, WorldPositionRange, WorldRef};
 use common::derive_more::*;
@@ -10,7 +10,12 @@ use common::*;
 pub struct BreakBlocksJob(WorldPositionRange);
 
 impl SocietyJobImpl for BreakBlocksJob {
-    fn populate_initial_tasks(&self, world: &EcsWorld, out: &mut Vec<SocietyTask>) {
+    fn populate_initial_tasks(
+        &self,
+        world: &EcsWorld,
+        out: &mut Vec<SocietyTask>,
+        _: SocietyJobHandle,
+    ) {
         let voxel_world = world.voxel_world();
         let voxel_world = voxel_world.borrow();
 

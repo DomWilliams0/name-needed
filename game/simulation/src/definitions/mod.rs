@@ -1,8 +1,10 @@
 mod builder;
+mod component;
 mod loader;
 mod registry;
 
 pub use builder::{BuilderError, DefinitionBuilder, EntityPosition};
+pub use component::DefinitionNameComponent;
 pub use loader::{load, Definition, ValueImpl};
 pub use registry::Registry;
 

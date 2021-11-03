@@ -3,6 +3,7 @@ use ai::{Consideration, ConsiderationParameter, Context, Curve};
 use crate::ai::{AiContext, AiInput};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
+use crate::SocietyHandle;
 use common::*;
 
 declare_entity_metric!(HOLD_ITEM, "ai_item_holding", "Is holding an item", "filter");
@@ -17,9 +18,10 @@ declare_entity_metric!(
 /// Switch, 1 if holding an item matching the filter, otherwise 0
 pub struct HoldingItemConsideration(pub ItemFilter);
 
-/// Finds items matching filter nearby, preferring those in better condition
+/// Finds items matching filter nearby, preferring those in better condition if applicable. Will
+/// avoid items reserved by the entity's society
 ///
-/// TODO consider society stores before scanning the local area
+/// TODO consider society stores before scanning the local area? or put society stores in a separate consideration
 pub struct FindLocalGradedItemConsideration {
     pub filter: ItemFilter,
     pub max_radius: u32,
@@ -30,9 +32,9 @@ pub struct FindLocalGradedItemConsideration {
 }
 
 /// 1 if this entity has this number of extra hands available for hauling, or is already hauling
-/// the given entity, else 0
+/// a matching entity, else 0
 // TODO also count currently occupied hands as "available", could drop current item to haul this
-pub struct HasExtraHandsForHaulingConsideration(pub u16, pub Entity);
+pub struct HasExtraHandsForHaulingConsideration(pub u16, pub Option<ItemFilter>);
 
 /// Same as `HoldingItemConsideration` but reduced if the item cannot be used immediately e.g. is
 /// being hauled

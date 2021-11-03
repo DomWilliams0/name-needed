@@ -8,7 +8,7 @@ use world::SearchGoal;
 use crate::activity::activity::Activity;
 use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
-use crate::activity::subactivity::{GoingToStatus, HaulSource};
+use crate::activity::subactivity::{GoingToStatus, HaulPurpose, HaulSource};
 use crate::activity::HaulError;
 use crate::{Entity, EntityEvent, HaulTarget};
 
@@ -25,6 +25,7 @@ pub struct GoHaulActivity {
     thing: Entity,
     source: HaulSource,
     target: HaulTarget,
+    purpose: HaulPurpose,
 }
 
 impl GoHaulActivity {
@@ -33,6 +34,21 @@ impl GoHaulActivity {
             thing: entity,
             source,
             target,
+            purpose: HaulPurpose::JustBecause,
+        }
+    }
+
+    pub fn new_with_purpose(
+        entity: Entity,
+        source: HaulSource,
+        target: HaulTarget,
+        purpose: HaulPurpose,
+    ) -> Self {
+        Self {
+            thing: entity,
+            source,
+            target,
+            purpose,
         }
     }
 }
@@ -81,7 +97,7 @@ impl Activity for GoHaulActivity {
         .await?;
 
         // put it down
-        hauling.end_haul(self.target).await?;
+        hauling.end_haul(self.target, &self.purpose).await?;
         Ok(())
     }
 

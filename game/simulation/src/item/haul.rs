@@ -138,6 +138,8 @@ impl<V: Value> ComponentTemplate<V> for HaulableItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("haulable", HaulableItemComponent);

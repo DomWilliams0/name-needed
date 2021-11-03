@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::job::{BuildBlockJob, SocietyJob, SocietyJobRef};
+use simulation::job::{BuildThingJob, SocietyJob, SocietyJobRef};
 use simulation::{
     ActivityComponent, AiAction, BlockType, ComponentWorld, EcsWorld, PlayerSociety, Societies,
-    WorldPosition,
+    StoneBrickWall, WorldPosition,
 };
 
 pub type Scenario = fn(&EcsWorld);
@@ -163,12 +163,9 @@ fn building(ecs: &EcsWorld) {
             .expect("no activity");
 
         for z in 1..3 {
-            for y in 3..10 {
-                society.jobs_mut().submit(SocietyJob::create(
-                    ecs,
-                    BuildBlockJob::new((2, y, z).into(), BlockType::WoodenWall),
-                ));
-            }
+            society
+                .jobs_mut()
+                .submit(ecs, BuildThingJob::new((2, 2, z).into(), StoneBrickWall));
         }
     }
 }

@@ -1,7 +1,7 @@
 pub use activity::*;
 pub use event_logging::{EntityLoggingComponent, LoggedEntityDecision, LoggedEntityEvent};
 pub use status::{StatusReceiver, StatusUpdater};
-pub use subactivity::{EquipItemError, HaulError, HaulSource, HaulTarget};
+pub use subactivity::{EquipItemError, HaulError, HaulPurpose, HaulSource, HaulTarget};
 pub use system::{ActivityComponent, ActivitySystem};
 
 mod activity;
@@ -43,8 +43,10 @@ mod action_to_activity {
                 AiAction::Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }
-                AiAction::Haul(thing, source, target) => {
-                    activity!(GoHaulActivity::new(thing, source, target))
+                AiAction::Haul(thing, source, target, purpose) => {
+                    activity!(GoHaulActivity::new_with_purpose(
+                        thing, source, target, purpose
+                    ))
                 }
             }
         }

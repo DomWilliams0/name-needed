@@ -199,6 +199,8 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("hunger", HungerComponent);

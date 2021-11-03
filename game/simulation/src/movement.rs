@@ -74,6 +74,8 @@ impl<V: Value> ComponentTemplate<V> for MovementConfigComponent {
             .with(FollowPathComponent::default())
             .with(DesiredMovementComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("movement", MovementConfigComponent);

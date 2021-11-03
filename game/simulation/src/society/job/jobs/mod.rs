@@ -1,5 +1,5 @@
 pub use break_blocks::BreakBlocksJob;
-pub use build::BuildBlockJob;
+pub use build::BuildThingJob;
 pub use haul::HaulJob;
 
 mod break_blocks;

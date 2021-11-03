@@ -23,7 +23,7 @@ impl Society {
         Self {
             name,
             handle,
-            jobs: RefCell::new(Default::default()),
+            jobs: RefCell::new(SocietyJobList::new(handle)),
             containers: HashSet::new(),
         }
     }

@@ -1,5 +1,6 @@
 use crate::definitions::builder::DefinitionBuilder;
 use crate::definitions::{Definition, DefinitionErrorKind};
+use std::any::Any;
 
 use crate::definitions::loader::DefinitionUid;
 use crate::ComponentWorld;
@@ -51,9 +52,15 @@ impl Registry {
         world: &'w W,
     ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
         match self.map.get(uid) {
-            Some(def) => Ok(DefinitionBuilder::new(def, world)),
+            Some(def) => Ok(DefinitionBuilder::new(def, world, uid)),
             None => Err(DefinitionErrorKind::NoSuchDefinition(uid.to_owned())),
         }
+    }
+
+    pub fn lookup_template(&self, uid: &str, component: &str) -> Option<&dyn Any> {
+        self.map
+            .get(uid)
+            .and_then(|def| def.find_component(component))
     }
 }
 #[cfg(test)]

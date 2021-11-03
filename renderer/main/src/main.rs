@@ -417,7 +417,7 @@ mod start {
 
         // create society for player to control
         let player_society = sim
-            .societies()
+            .societies_mut()
             .new_society("Top Geezers".to_owned())
             .unwrap();
         *sim.player_society() = Some(player_society);
