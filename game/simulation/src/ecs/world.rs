@@ -463,7 +463,7 @@ mod tests {
     use super::*;
     use crate::ecs::*;
 
-    #[derive(Debug, Component, EcsComponent)]
+    #[derive(Debug, Component, EcsComponent, Clone)]
     #[storage(VecStorage)]
     #[interactive]
     #[name("awesome")]
