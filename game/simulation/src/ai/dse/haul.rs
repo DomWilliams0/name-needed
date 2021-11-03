@@ -17,10 +17,6 @@ pub struct HaulDse {
 }
 
 impl Dse<AiContext> for HaulDse {
-    fn name(&self) -> &'static str {
-        "Haul"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             AiBox::new(HasExtraHandsForHaulingConsideration(

@@ -11,10 +11,6 @@ pub struct BreakBlockDse(pub WorldPosition);
 pub struct BuildBlockDse(pub WorldPosition, pub BlockType);
 
 impl Dse<AiContext> for BreakBlockDse {
-    fn name(&self) -> &'static str {
-        "Break Block"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             // for now, direct distance
@@ -41,10 +37,6 @@ impl Dse<AiContext> for BreakBlockDse {
 }
 
 impl Dse<AiContext> for BuildBlockDse {
-    fn name(&self) -> &'static str {
-        "Build"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             AiBox::new(MyProximityToConsideration {

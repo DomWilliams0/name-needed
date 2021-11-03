@@ -28,6 +28,11 @@ pub trait Blackboard {
 
 pub type AiBox<T> = Box<T>;
 
+pub(crate) fn pretty_type_name(name: &str) -> &str {
+    let split_idx = name.rfind(':').map(|i| i + 1).unwrap_or(0);
+    &name[split_idx..]
+}
+
 #[cfg(test)]
 mod test_utils {
     use super::*;
@@ -212,5 +217,18 @@ mod test_utils {
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
             TestAction::CancelExistence // sorry
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pretty_type_names() {
+        assert_eq!(pretty_type_name("this::is::my::type::Lmao"), "Lmao");
+        assert_eq!(pretty_type_name("boop"), "boop");
+        assert_eq!(pretty_type_name("malformed:"), "");
+        assert_eq!(pretty_type_name(":malformed"), "malformed");
     }
 }

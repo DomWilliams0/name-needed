@@ -1,6 +1,6 @@
 use common::NormalizedFloat;
 
-use crate::{Context, Input};
+use crate::{pretty_type_name, Context, Input};
 use std::collections::HashMap;
 
 pub enum ConsiderationParameter {
@@ -25,9 +25,9 @@ pub trait Consideration<C: Context> {
         self.consider_input(input)
     }
 
-    // TODO impl Display for considerations instead
     fn name(&self) -> &'static str {
-        pretty_type_name(std::any::type_name::<Self>())
+        let name = pretty_type_name(std::any::type_name::<Self>());
+        name.strip_suffix("Consideration").unwrap_or(name)
     }
 
     #[cfg(feature = "logging")]
@@ -47,11 +47,6 @@ impl ConsiderationParameter {
             }
         }
     }
-}
-
-fn pretty_type_name(name: &str) -> &str {
-    let split_idx = name.rfind(':').map(|i| i + 1).unwrap_or(0);
-    &name[split_idx..]
 }
 
 #[derive(Clone)]
@@ -121,7 +116,6 @@ impl<C: Context> InputCache<C> {
 mod tests {
     use common::{ApproxEq, NormalizedFloat};
 
-    use crate::consideration::pretty_type_name;
     use crate::Curve;
 
     fn assert_eq(curve: Curve, x: f32, y: f32) {
@@ -141,13 +135,5 @@ mod tests {
         let expo = Curve::Exponential(2.0, -4.0, 0.0, -1.0, 1.0);
         assert_eq(expo.clone(), 0.0, 0.0);
         assert_eq(expo, 0.5, 0.75);
-    }
-
-    #[test]
-    fn type_name() {
-        assert_eq!(pretty_type_name("this::is::my::type::Lmao"), "Lmao");
-        assert_eq!(pretty_type_name("boop"), "boop");
-        assert_eq!(pretty_type_name("malformed:"), "");
-        assert_eq!(pretty_type_name(":malformed"), "malformed");
     }
 }
