@@ -255,7 +255,7 @@ impl ActivityContext {
 
             // event is unconsumed
             trace!("handling unhandled event"; "event" => ?evt);
-            match self.activity.on_unhandled_event(evt) {
+            match self.activity.on_unhandled_event(evt, self.entity) {
                 InterruptResult::Continue => continue,
                 InterruptResult::Cancel => {
                     trace!("handler requested cancel");

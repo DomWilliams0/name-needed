@@ -22,7 +22,7 @@ mod wander;
 
 mod activity_trait {
     use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
-    use crate::EntityEvent;
+    use crate::{Entity, EntityEvent};
     use async_trait::async_trait;
     use std::fmt::{Debug, Display};
 
@@ -31,7 +31,8 @@ mod activity_trait {
         fn description(&self) -> Box<dyn Display>;
         async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult;
 
-        fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
+        /// me is the entity with the activity
+        fn on_unhandled_event(&self, event: EntityEvent, me: Entity) -> InterruptResult {
             #![allow(unused_variables)]
             InterruptResult::Continue
         }

@@ -101,8 +101,8 @@ impl Activity for GoHaulActivity {
         Ok(())
     }
 
-    fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
-        if event.subject == self.thing && event.payload.is_destructive() {
+    fn on_unhandled_event(&self, event: EntityEvent, me: Entity) -> InterruptResult {
+        if event.subject == self.thing && event.payload.is_destructive_for(Some(me)) {
             // the expected haul event will be handled before this handler
             debug!("thing has been destroyed, cancelling haul");
             InterruptResult::Cancel

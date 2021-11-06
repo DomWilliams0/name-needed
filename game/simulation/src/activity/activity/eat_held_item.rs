@@ -48,8 +48,8 @@ impl Activity for EatHeldItemActivity {
     }
 
     //noinspection DuplicatedCode
-    fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
-        if event.subject == self.0 && event.payload.is_destructive() {
+    fn on_unhandled_event(&self, event: EntityEvent, me: Entity) -> InterruptResult {
+        if event.subject == self.0 && event.payload.is_destructive_for(Some(me)) {
             debug!("item has been destroyed, cancelling eat");
             InterruptResult::Cancel
         } else {

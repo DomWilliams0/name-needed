@@ -129,26 +129,37 @@ impl EntityEventSubscription {
 }
 
 impl EntityEventPayload {
-    pub fn is_destructive(&self) -> bool {
+    /// doer is the living entity interesting in this one, e.g. the hauler, the eater
+    pub fn is_destructive_for(&self, doer: Option<Entity>) -> bool {
         use EntityEventPayload::*;
-        // only destructive on success
+
         match self {
+            // not destructive if successful and done by the interested entity
+            BeenPickedUp(me, Ok(_)) | BeenEaten(Ok(me)) | Hauled(me, Ok(_))
+                if doer != Some(*me) =>
+            {
+                false
+            }
+
+            // destructive if successful and done by anyone else
             BeenPickedUp(_, Ok(_))
             | BeenEaten(Ok(_))
             | Hauled(_, Ok(_))
             | ExitedContainer(Ok(_))
             | EnteredContainer(Ok(_)) => true,
 
-            Arrived(_, _)
-            | BeenPickedUp(_, Err(_))
+            // not destructive on failure
+            BeenPickedUp(_, Err(_))
             | BeenEaten(Err(_))
             | Hauled(_, Err(_))
             | ExitedContainer(Err(_))
-            | EnteredContainer(Err(_))
-            | HasPickedUp(_)
-            | HasEaten(_)
-            | HasEquipped(_)
-            | BeenEquipped(_) => false,
+            | EnteredContainer(Err(_)) => false,
+
+            // not destructive in any case
+            Arrived(_, _) | HasPickedUp(_) | HasEaten(_) | HasEquipped(_) | BeenEquipped(_) => {
+                false
+            }
+
             #[cfg(test)]
             DummyA | DummyB => false,
             #[cfg(feature = "testing")]
