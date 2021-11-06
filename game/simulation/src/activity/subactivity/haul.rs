@@ -6,7 +6,9 @@ use crate::activity::status::Status;
 use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
+use crate::item::{
+    ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent, HauledItemComponent,
+};
 use crate::job::SocietyJobRef;
 use crate::queued_update::QueuedUpdates;
 use crate::society::job::SocietyJobHandle;
@@ -46,6 +48,12 @@ pub enum HaulError {
 
     #[error("Haul was cancelled")]
     Cancelled,
+
+    #[error("Item is already being hauled by {0}")]
+    AlreadyHauled(Entity),
+
+    #[error("Something change while cancelling the haul, maybe it was picked up by someone else")]
+    AssumptionsChangedDuringAbort,
 }
 
 /// Handles the start (picking up) and finish (putting down), and fixing up components on abort
@@ -239,6 +247,11 @@ impl<'a> HaulSubactivity<'a> {
                 let needs_transform = self.needs_transform;
 
                 updates.queue("drop hauled item", move |world| {
+                    if let Ok(comp) = world.component::<ContainedInComponent>(item) {
+                        // our assumptions have changed, someone else has picked this item up, do nothing!
+                        return Err(HaulError::AlreadyHauled(comp.entity()).into());
+                    }
+
                     if let Ok(mut transform) = world.component_mut::<TransformComponent>(item) {
                         transform.reset_position(pos);
                     } else if needs_transform {
@@ -390,9 +403,11 @@ fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_enti
 fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
     updates.queue("haul item", move |world| {
         let do_haul = || -> Result<(), HaulError> {
-            // check item is alive first, to ensure .insert() succeeds below
-            if !world.is_entity_alive(item) {
-                return Err(HaulError::BadItem);
+            // check item is alive and not being hauled first, to ensure .insert() succeeds below
+            match world.component::<HauledItemComponent>(item) {
+                Ok(hauled) => return Err(HaulError::AlreadyHauled(hauled.hauler)),
+                Err(ComponentGetError::NoSuchEntity(_)) => return Err(HaulError::BadItem),
+                _ => {}
             }
 
             // get item properties
@@ -465,7 +480,10 @@ fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
 fn queue_stop_hauling(updates: &QueuedUpdates, item: Entity, hauler: Entity, interrupted: bool) {
     updates.queue("stop hauling item", move |world| {
         // remove components from item
-        let behaviour = world.helpers_comps().end_haul(item, interrupted);
+        let behaviour = world
+            .helpers_comps()
+            .end_haul(item, hauler, interrupted)
+            .ok_or(HaulError::AssumptionsChangedDuringAbort)?;
 
         let count = match behaviour {
             EndHaulBehaviour::Drop => {

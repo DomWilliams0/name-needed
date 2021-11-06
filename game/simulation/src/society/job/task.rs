@@ -107,7 +107,7 @@ impl SocietyTask {
             // TODO some types of hauling will be shareable
             // TODO depends on work item
             Haul(_) => false,
-            GatherMaterials { .. } => false,
+            GatherMaterials { .. } => true,
         }
     }
 }

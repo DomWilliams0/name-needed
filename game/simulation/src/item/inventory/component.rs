@@ -367,7 +367,7 @@ impl InventoryComponent {
         Some(FoundSlotMut(self, slot))
     }
 
-    fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
+    pub fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
         self.equip_slots.iter().filter_map(|e| e.ok())
     }
 }

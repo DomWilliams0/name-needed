@@ -162,7 +162,7 @@ fn building(ecs: &EcsWorld) {
             .component_mut::<ActivityComponent>(human)
             .expect("no activity");
 
-        for z in 1..3 {
+        for z in 1..2 {
             society
                 .jobs_mut()
                 .submit(ecs, BuildThingJob::new((2, 2, z).into(), StoneBrickWall));

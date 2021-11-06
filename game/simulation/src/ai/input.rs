@@ -1,4 +1,4 @@
-use crate::{ConditionComponent, SocietyComponent, SocietyHandle, WorldRef};
+use crate::{ConditionComponent, ContainedInComponent, SocietyComponent, SocietyHandle, WorldRef};
 use ai::Context;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
@@ -246,6 +246,7 @@ fn search_local_area(
 
     let conditions = world.read_storage::<ConditionComponent>();
     let reservations = world.read_storage::<ReservedMaterialComponent>();
+    let containeds = world.read_storage::<ContainedInComponent>();
 
     let spatial = world.resource::<Spatial>();
     let transforms = Transforms::from(world);
@@ -254,6 +255,11 @@ fn search_local_area(
         .filter_map(|(entity, pos, dist)| {
             // check item filter matches
             if !(entity, Some(world)).matches(*filter) {
+                return None;
+            }
+
+            // ensure the item is not held by someone
+            if entity.has(&containeds) {
                 return None;
             }
 

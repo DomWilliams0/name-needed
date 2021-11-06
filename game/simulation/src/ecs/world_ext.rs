@@ -2,7 +2,7 @@ use unit::world::WorldPoint;
 
 use crate::activity::HaulError;
 use crate::build::ReservedMaterialComponent;
-use crate::ecs::{EcsWorld, Entity};
+use crate::ecs::{EcsWorld, Entity, WorldExt};
 use crate::{ComponentWorld, Societies, TransformComponent};
 use common::*;
 
@@ -49,10 +49,23 @@ impl EcsExtComponents<'_> {
     /// Removes HauledItemComponent and possibly ContainedInComponent, depending on if it was
     /// interrupted and the specified interruption behaviour.
     ///
-    /// Returns actual behaviour done
-    pub fn end_haul(&mut self, haulee: Entity, interrupted: bool) -> EndHaulBehaviour {
+    /// Returns None if the old hauler does not match the given hauler, otherwise the actual behaviour done
+    pub fn end_haul(
+        &mut self,
+        haulee: Entity,
+        hauler: Entity,
+        interrupted: bool,
+    ) -> Option<EndHaulBehaviour> {
+        let mut hauleds = self.0.write_storage::<HauledItemComponent>();
+        if let Some(hauled) = hauleds.get(haulee.into()) {
+            if hauled.hauler != hauler {
+                // something changed, abort the abort
+                return None;
+            }
+        }
+
         // remove haul component unconditionally
-        let hauled = self.remove_now::<HauledItemComponent>(haulee);
+        let hauled = hauleds.remove(haulee.into());
         let behaviour = match (interrupted, hauled) {
             (true, Some(hauled)) => {
                 // interrupted and it was actually being hauled, nice
@@ -73,7 +86,7 @@ impl EcsExtComponents<'_> {
             }
         };
 
-        behaviour
+        Some(behaviour)
     }
 
     /// Removes ContainedInComponent

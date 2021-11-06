@@ -20,4 +20,7 @@
 * [ ] allow multiple concurrent workers
 * [X] chore: replace direct uses of specs Entity with our own wrapper
 * [ ] ui commands to build
-* [ ] fix HasExtraHandsForHauling returning 1.0 eagerly for any haul task, causing constant churn of activity choice
+* [X] fix constant churn of gather materials DSE choice
+* [ ] if multiple people are sharing a gather task, they will keep collecting even after the last one is delivered
+* [ ] allow smooth changing of material gathering target job without dropping the current haul
+* [ ] prioritise material gathering for the most complete job, rather than random/round robin
