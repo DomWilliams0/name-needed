@@ -61,6 +61,7 @@ mod tests {
             position: Default::default(),
             hunger: None,
             inventory: None,
+            society: None,
             inventory_search_cache: Default::default(),
             local_area_search_cache: Default::default(),
             world,
