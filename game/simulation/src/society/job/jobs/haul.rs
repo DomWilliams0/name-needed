@@ -141,6 +141,8 @@ impl SocietyJobImpl for HaulJob {
         // keep single haul task
         None
     }
+
+    crate::as_any_mut!();
 }
 
 fn ensure_item_fits_in_container(

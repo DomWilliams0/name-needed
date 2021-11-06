@@ -192,8 +192,8 @@ impl<'a> HaulSubactivity<'a> {
                 self.ctx.world().resource::<QueuedUpdates>().queue(
                     "reserve material",
                     move |world| {
-                        trace!("reserved material for job"; "material" => thing, "job" => ?job);
-                        let _ = world.add_now(thing, ReservedMaterialComponent { build_job: job });
+                        trace!("reserving material for job"; "material" => thing, "job" => ?job);
+                        world.helpers_comps().reserve_material_for_job(thing, job)?;
                         Ok(())
                     },
                 );

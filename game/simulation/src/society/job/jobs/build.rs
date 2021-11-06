@@ -12,7 +12,7 @@ use crate::{
 use common::*;
 use specs::BitSet;
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub struct BuildThingJob {
     position: WorldPosition,
     build: Box<dyn Build>,
     required_materials: Vec<BuildMaterial>,
-    reserved_materials: Vec<Entity>,
+    reserved_materials: HashSet<Entity>,
     /// Set if any materials are invalid e.g. not haulable
     missing_any_requirements: Cell<bool>,
 
@@ -43,7 +43,7 @@ impl BuildThingJob {
             position: block,
             build: Box::new(build),
             required_materials: materials,
-            reserved_materials: Vec::new(),
+            reserved_materials: HashSet::new(),
             missing_any_requirements: Cell::new(false),
             this_job: Cell::new(None),
         }
@@ -106,19 +106,17 @@ impl BuildThingJob {
             // TODO ensure this doesn't happen, or just handle it properly
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
-            assert!(
-                quantity <= *entry,
-                "too many items reserved, only {} left but got {}",
-                *entry,
-                quantity
-            );
-
-            *entry -= quantity;
+            *entry = entry.saturating_sub(quantity);
         }
 
         // collect the remaining unsatisfied requirements
         remaining_materials.retain(|_, n| *n > 0);
         remaining_materials
+    }
+
+    /// Returns false if already reserved. Entity should have ReservedMaterialComponent
+    pub fn add_reservation(&mut self, reservee: Entity) -> bool {
+        self.reserved_materials.insert(reservee)
     }
 }
 
@@ -203,6 +201,8 @@ impl SocietyJobImpl for BuildThingJob {
 
         None // use number of tasks to determine completion
     }
+
+    crate::as_any_mut!();
 }
 
 impl Display for BuildThingJob {

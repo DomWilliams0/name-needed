@@ -66,6 +66,15 @@ macro_rules! as_any {
     };
 }
 
+#[macro_export]
+macro_rules! as_any_mut {
+    () => {
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+    };
+}
+
 mod activity;
 mod ai;
 mod backend;

@@ -1,5 +1,6 @@
 use crate::job::SocietyTask;
 use crate::{EcsWorld, Entity, SocietyHandle, WorldPosition, WorldPositionRange};
+use std::any::Any;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 
@@ -56,6 +57,8 @@ pub trait SocietyJobImpl: Display + Debug {
         tasks: &mut Vec<SocietyTask>,
         completions: CompletedTasks,
     ) -> Option<SocietyTaskResult>;
+
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 /// Declarative society command that maps to a [SocietyJob]
@@ -143,8 +146,8 @@ impl SocietyJob<dyn SocietyJobImpl> {
         self.pending_complete.push((task, result));
     }
 
-    pub fn inner(&self) -> &dyn SocietyJobImpl {
-        &self.inner
+    pub fn inner_as_any_mut(&mut self) -> &mut dyn Any {
+        self.inner.as_any_mut()
     }
 }
 

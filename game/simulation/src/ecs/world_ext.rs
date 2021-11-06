@@ -1,9 +1,13 @@
 use unit::world::WorldPoint;
 
+use crate::activity::HaulError;
+use crate::build::ReservedMaterialComponent;
 use crate::ecs::{EcsWorld, Entity};
-use crate::{ComponentWorld, TransformComponent};
+use crate::{ComponentWorld, Societies, TransformComponent};
+use common::*;
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
+use crate::job::{BuildThingJob, SocietyJobHandle};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtComponents<'w>(&'w EcsWorld);
@@ -86,4 +90,48 @@ impl EcsExtComponents<'_> {
         let _ = self.remove_now::<TransformComponent>(item);
         let _ = self.add_now(item, container);
     }
+
+    pub fn reserve_material_for_job(
+        &mut self,
+        material: Entity,
+        job: SocietyJobHandle,
+    ) -> Result<(), ReservationError> {
+        // find job in society
+        let societies = self.0.resource::<Societies>();
+        let job_ref = societies
+            .society_by_handle(job.society())
+            .and_then(|society| society.jobs().find_job(job))
+            .ok_or(ReservationError::JobNotFound(job))?;
+
+        // cast job to a build job
+        let mut job_mut = job_ref.borrow_mut();
+        let build_job = job_mut
+            .inner_as_any_mut()
+            .downcast_mut::<BuildThingJob>()
+            .ok_or(ReservationError::InvalidJob(job))?;
+
+        // reserve in job
+        if !build_job.add_reservation(material) {
+            return Err(ReservationError::AlreadyReserved(job, material));
+        }
+
+        // no more failures, now we can add the reservation to the item
+        let _ = self
+            .0
+            .add_now(material, ReservedMaterialComponent { build_job: job });
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ReservationError {
+    #[error("Job used for society job material reservation not found: {0:?}")]
+    JobNotFound(SocietyJobHandle),
+
+    #[error("Job used for society material reservation is not a build job: {0:?}")]
+    InvalidJob(SocietyJobHandle),
+
+    #[error("Material {1} is already reserved for build job {0:?}")]
+    AlreadyReserved(SocietyJobHandle, Entity),
 }

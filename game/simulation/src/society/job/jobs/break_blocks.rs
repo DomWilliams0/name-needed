@@ -58,6 +58,8 @@ impl SocietyJobImpl for BreakBlocksJob {
         // determine job result from number of tasks left
         None
     }
+
+    crate::as_any_mut!();
 }
 
 impl Display for BreakBlocksJob {
