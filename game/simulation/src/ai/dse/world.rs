@@ -1,8 +1,10 @@
 use crate::activity::{HaulPurpose, HaulSource};
 use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
-    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
+    HasExtraHandsForHaulingConsideration, HoldingItemConsideration, MyProximityToConsideration,
+    Proximity,
 };
+use crate::ai::input::AiInput::HasInInventory;
 use crate::ai::input::{BlockTypeMatch, LocalAreaSearch};
 use crate::ai::{AiAction, AiContext};
 use crate::build::BuildMaterial;
@@ -67,7 +69,6 @@ impl Dse<AiContext> for GatherMaterialsDse {
                 target: self.target.centred(),
                 proximity: Proximity::Walkable,
             }),
-            // TODO check in inventory
             AiBox::new(FindLocalGradedItemConsideration {
                 filter: self.filter(),
                 max_radius: 20,

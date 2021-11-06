@@ -18,10 +18,10 @@ declare_entity_metric!(
 /// Switch, 1 if holding an item matching the filter, otherwise 0
 pub struct HoldingItemConsideration(pub ItemFilter);
 
-/// Finds items matching filter nearby, preferring those in better condition if applicable. Will
+/// Finds items matching filter in inventory and nearby, preferring those in better condition if applicable. Will
 /// avoid items reserved by the entity's society
 ///
-/// TODO consider society stores before scanning the local area? or put society stores in a separate consideration
+/// TODO search society stores as well
 pub struct FindLocalGradedItemConsideration {
     pub filter: ItemFilter,
     pub max_radius: u32,

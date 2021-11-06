@@ -9,7 +9,7 @@
 * [.] building blocks
 	* [X] no materials, single block only, near-instant completion
 	* [O] require materials
-		* [ ] check inventory for materials
+		* [X] check inventory for materials
 		* [ ] check society containers for materials
 		* [X] check nearby area for materials
 		* [X] reserve materials

@@ -68,7 +68,15 @@ impl ai::Input<AiContext> for AiInput {
                 filter,
                 max_radius,
                 max_count,
-            } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
+            } => {
+                if let Some(inv) = blackboard.inventory {
+                    if search_inventory_with_cache(blackboard, inv, filter).is_some() {
+                        // found in inventory
+                        return 1.0;
+                    }
+                }
+                search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count)
+            }
 
             AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
             AiInput::BlockTypeMatches(pos, bt_match) => {
