@@ -4,11 +4,8 @@ use unit::world::WorldPosition;
 
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
-use crate::{
-    NameComponent, PhysicalComponent, RenderComponent, Societies, SocietyHandle, TransformComponent,
-};
+use crate::{NameComponent, PhysicalComponent, Societies, SocietyHandle, TransformComponent};
 
-use crate::item::inventory::HeldEntity;
 use crate::item::stack::ItemStackComponent;
 use crate::item::{ContainerComponent, ItemStack, ItemStackError};
 use crate::simulation::AssociatedBlockData;
@@ -84,8 +81,7 @@ impl EcsExtContainers<'_> {
             return Err(ContainerError::BadDefinition);
         }
 
-        self.add_now(entity, TransformComponent::new(pos.centred()))
-            .unwrap();
+        let _ = self.add_now(entity, TransformComponent::new(pos.centred()));
 
         debug!("spawned new container entity"; "entity" => entity,
             "definition" => definition_name, "pos" => %pos);
@@ -110,28 +106,7 @@ impl EcsExtContainers<'_> {
         };
 
         debug!("destroying container"; "container" => container_entity, "pos" => %pos);
-
-        let mut container = self
-            .remove_now::<ContainerComponent>(container_entity)
-            .ok_or(ContainerError::BadEntity)?;
-
-        // remove all items from container
-        let mut rng = thread_rng();
-        for HeldEntity { entity: item, .. } in container.container.remove_all() {
-            self.helpers_comps().remove_from_container(item);
-
-            // scatter items around
-            let scatter_pos = {
-                let offset_x = rng.gen_range(-0.3, 0.3);
-                let offset_y = rng.gen_range(-0.3, 0.3);
-                pos.centred() + (offset_x, offset_y, 0.0)
-            };
-
-            let _ = self.add_now(item, TransformComponent::new(scatter_pos));
-        }
-
-        // destroy container entity
-        self.kill_entity(container_entity);
+        self.0.kill_entity(container_entity);
 
         Ok(())
     }

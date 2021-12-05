@@ -14,7 +14,7 @@ pub use crate::register_component_template;
 
 pub use self::world::{
     CachedWorldRef, ComponentGetError, ComponentRef, ComponentRefErased, ComponentRefMut,
-    ComponentWorld, EcsWorld, SpecsWorld,
+    ComponentWorld, EcsWorld, EntitiesToKill, SpecsWorld,
 };
 
 mod component;

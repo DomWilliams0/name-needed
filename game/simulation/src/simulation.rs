@@ -172,6 +172,7 @@ impl<R: Renderer> Simulation<R> {
         updates.execute(Pin::as_mut(&mut self.ecs_world));
         self.ecs_world.insert(updates);
 
+        self.delete_queued_entities();
         self.ecs_world.maintain();
 
         exit
@@ -215,6 +216,29 @@ impl<R: Renderer> Simulation<R> {
 
         // update spatial
         SpatialSystem.run_now(&self.ecs_world);
+    }
+
+    fn delete_queued_entities(&mut self) {
+        let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
+        if !deathlist_ref.0.is_empty() {
+            // take out of resource so we can get a mutable world ref
+            let deathlist = std::mem::take(&mut deathlist_ref.0);
+
+            let n = deathlist.len();
+            if let Err(err) = self.ecs_world.delete_entities(&deathlist) {
+                error!("failed to kill entities"; "entities" => ?deathlist, "error" => %err);
+            }
+
+            debug!("killed {} entities", n);
+
+            // put it back
+            let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
+            let empty = std::mem::replace(&mut deathlist_ref.0, deathlist);
+            debug_assert!(empty.is_empty());
+            std::mem::forget(empty);
+
+            deathlist_ref.0.clear();
+        }
     }
 
     pub fn voxel_world(&self) -> WorldRef {
@@ -500,9 +524,16 @@ impl<R: Renderer> Simulation<R> {
 
             (BlockType::Chest, _) => {
                 // chest destroyed
-                if let Err(err) = self.ecs_world.helpers_containers().destroy_container(pos) {
-                    error!("failed to destroy container"; "error" => %err);
-                }
+                self.ecs_world.resource::<QueuedUpdates>().queue(
+                    "destroy container",
+                    move |world| match world.helpers_containers().destroy_container(pos) {
+                        Err(err) => {
+                            error!("failed to destroy container"; "error" => %err);
+                            Err(err.into())
+                        }
+                        Ok(()) => Ok(()),
+                    },
+                )
             }
 
             _ => {}
@@ -572,6 +603,7 @@ impl Add<u32> for Tick {
 
 fn register_resources(world: &mut EcsWorld) {
     world.insert(QueuedUpdates::default());
+    world.insert(EntitiesToKill::default());
     world.insert(SelectedEntity::default());
     world.insert(SelectedTiles::default());
     world.insert(TerrainUpdatesRes::default());

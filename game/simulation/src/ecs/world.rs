@@ -13,7 +13,10 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{definitions, Entity, InnerWorldRef, ItemStackComponent, WorldRef};
+use crate::{
+    definitions, Entity, InnerWorldRef, ItemStackComponent, QueuedUpdates, TransformComponent,
+    WorldRef,
+};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
@@ -40,6 +43,10 @@ pub enum ComponentGetError {
     #[error("The entity {} doesn't have the given component '{1}'", *.0)]
     NoSuchComponent(Entity, &'static str),
 }
+
+/// Resource to hold entities to kill
+#[derive(Default)]
+pub struct EntitiesToKill(pub Vec<specs::Entity>);
 
 pub trait ComponentWorld: ContainerResolver + Sized {
     fn component<T: Component>(
@@ -287,24 +294,48 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn kill_entity(&self, entity: Entity) {
-        let entities = self.read_resource::<EntitiesRes>();
+        let mut to_kill = SmallVec::<[specs::Entity; 1]>::new();
+        to_kill.push(entity.into());
+        trace!("killing entity"; entity);
 
         // special case for item stacks, destroy all contained items too
         if let Ok(stack) = self.component::<ItemStackComponent>(entity) {
-            for (e, _) in stack.stack.contents() {
-                // TODO item stacks could hold containers, which will hit the
-                self.kill_entity(e);
+            to_kill.extend(stack.stack.contents().map(|(e, _)| e.into()));
+            trace!("killing item stack contents too"; "stack" => entity, "contents" => ?stack.stack.contents().collect_vec());
+        }
+
+        // scatter items from a container around it
+        if let Ok(container) = self.component::<ContainerComponent>(entity) {
+            // remove all items from container
+            let container_pos = self
+                .component::<TransformComponent>(entity)
+                .map(|t| t.position);
+            match container_pos {
+                Ok(scatter_around) => {
+                    let mut rng = thread_rng();
+                    for item in container.container.contents().map(|e| e.entity) {
+                        self.helpers_comps().remove_from_container(item);
+
+                        // scatter items around
+                        // TODO move item scattering to a utility function
+                        let scatter_pos = {
+                            let offset_x = rng.gen_range(-0.3, 0.3);
+                            let offset_y = rng.gen_range(-0.3, 0.3);
+                            scatter_around + (offset_x, offset_y, 0.0)
+                        };
+
+                        let _ = self.add_now(item, TransformComponent::new(scatter_pos));
+                    }
+                }
+                Err(err) => {
+                    error!("container destroyed with no transform, cannot drop its items"; "err" => %err);
+                }
             }
         }
 
-        if let Ok(container) = self.component::<ContainerComponent>(entity) {
-            // TODO move destroy_containers impl into here
-            unimplemented!("move helpers_containers().destroy_container() impl here")
-        }
-
-        if let Err(e) = entities.delete(entity.into()) {
-            warn!("failed to delete entity"; entity, "error" => %e);
-        }
+        // kill before next maintain
+        let mut deathlist = self.resource_mut::<EntitiesToKill>();
+        deathlist.0.extend(to_kill.into_iter());
     }
 
     fn is_entity_alive(&self, entity: Entity) -> bool {

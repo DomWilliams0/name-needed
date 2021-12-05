@@ -33,4 +33,4 @@
 	* [ ] show NameComponent under entities (selected only?)
 		* [ ] add "unnamed" fallback to component
 	* [ ] show building job info
-* [ ] remove destroy_container() helper and move impl into kill_entity
+* [X] remove destroy_container() helper and move impl into kill_entity
