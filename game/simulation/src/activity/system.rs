@@ -164,6 +164,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     match result.as_ref() {
                         Ok(_) => {
                             debug!("activity finished"; e, "activity" => ?new_activity);
+                            // TODO need to notify society here, as above?
                         }
                         Err(err) => {
                             debug!("activity failed"; e, "activity" => ?new_activity, "err" => %err);

@@ -2,10 +2,9 @@ use crate::job::job::SocietyJobImpl;
 use crate::job::{SocietyJob, SocietyTask};
 use crate::simulation::Tick;
 use crate::society::job::job::SocietyJobRef;
-use crate::{EcsWorld, Entity, SocietyHandle};
+use crate::{EcsWorld, Entity, Societies, SocietyHandle};
 use common::*;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 #[derive(Debug)] // TODO implement manually
 pub struct SocietyJobList {
@@ -52,6 +51,12 @@ impl SocietyJobHandle {
     pub fn society(self) -> SocietyHandle {
         self.society
     }
+
+    pub fn resolve(self, societies: &Societies) -> Option<SocietyJobRef> {
+        societies
+            .society_by_handle(self.society)
+            .and_then(|society| society.jobs().find_job(self))
+    }
 }
 
 impl Debug for SocietyJobHandle {
@@ -73,7 +78,7 @@ impl SocietyJobList {
 
     pub fn submit(&mut self, world: &EcsWorld, job: impl SocietyJobImpl + 'static) {
         let handle = {
-            let this = self.next_handle.clone();
+            let this = self.next_handle;
             self.next_handle.idx += 1;
             this
         };

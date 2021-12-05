@@ -78,10 +78,13 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             if let Some(soc) = societies.society_by_handle(soc) {
                 for job in soc.jobs().iter_all() {
                     let job = job.borrow();
-                    if let Some(build) = job.inner_as_any().downcast_ref::<BuildThingJob>() {
-                        let (pos, target) = build.target_and_position();
-                        self.renderer
-                            .tile_selection(pos, pos, ColorRgb::new(190, 190, 180))
+                    if let Some(build) = job.cast::<BuildThingJob>() {
+                        let details = build.details();
+                        self.renderer.tile_selection(
+                            details.pos,
+                            details.pos,
+                            ColorRgb::new(190, 190, 180),
+                        )
 
                         // TODO show progress and target block with hovering text
                     }

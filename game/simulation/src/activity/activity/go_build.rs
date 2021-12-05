@@ -1,20 +1,19 @@
 use async_trait::async_trait;
 
 use common::*;
-use world::block::BlockType;
 
 use crate::activity::activity::Activity;
 use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
-use crate::WorldPosition;
+use crate::job::{BuildDetails, SocietyJobHandle};
+
 use world::SearchGoal;
 
-/// Building {bt} at {block}
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone)]
 pub struct GoBuildActivity {
-    block: WorldPosition,
-    bt: BlockType,
+    job: SocietyJobHandle,
+    details: BuildDetails,
 }
 
 /// Building
@@ -30,7 +29,7 @@ impl Activity for GoBuildActivity {
     async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
         // walk to the block
         ctx.go_to(
-            self.block.centred(),
+            self.details.pos.centred(),
             NormalizedFloat::new(0.8),
             SearchGoal::Adjacent,
             GoingToStatus::target("block"),
@@ -39,20 +38,27 @@ impl Activity for GoBuildActivity {
 
         // buildy buildy
         ctx.update_status(BuildStatus);
-        ctx.build_block(self.block, self.bt).await?;
+        ctx.build_block(self.job, &self.details).await?;
 
         Ok(())
     }
 }
 
 impl GoBuildActivity {
-    pub fn new(block: WorldPosition, bt: BlockType) -> Self {
-        Self { block, bt }
+    pub fn new(job: SocietyJobHandle, details: BuildDetails) -> Self {
+        Self { job, details }
     }
 }
 
 impl Status for BuildStatus {
+    // TODO depends on build type
     fn exertion(&self) -> f32 {
         1.3
+    }
+}
+
+impl Display for GoBuildActivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Building {:?}", self.details.target)
     }
 }

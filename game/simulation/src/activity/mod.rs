@@ -28,22 +28,24 @@ mod action_to_activity {
                 };
             }
 
+            use AiAction::*;
+
             match self {
-                AiAction::Wander => activity!(WanderActivity::default()),
-                AiAction::Nop => activity!(NopActivity::default()),
-                AiAction::GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
-                AiAction::GoBuildBlock(pos, bt) => activity!(GoBuildActivity::new(pos, bt)),
-                AiAction::GoEquip(e) => activity!(GoEquipActivity::new(e)),
-                AiAction::EatHeldItem(item) => activity!(EatHeldItemActivity::new(item)),
-                AiAction::Goto(target) => activity!(GoToActivity::new(
+                Wander => activity!(WanderActivity::default()),
+                Nop => activity!(NopActivity::default()),
+                GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
+                GoBuild { job, details } => activity!(GoBuildActivity::new(job, details)),
+                GoEquip(e) => activity!(GoEquipActivity::new(e)),
+                EatHeldItem(item) => activity!(EatHeldItemActivity::new(item)),
+                Goto(target) => activity!(GoToActivity::new(
                     target,
                     NormalizedFloat::new(0.8),
                     SearchGoal::Arrive
                 )),
-                AiAction::Follow { target, radius } => {
+                Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }
-                AiAction::Haul(thing, source, target, purpose) => {
+                Haul(thing, source, target, purpose) => {
                     activity!(GoHaulActivity::new_with_purpose(
                         thing, source, target, purpose
                     ))

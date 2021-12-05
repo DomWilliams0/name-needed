@@ -13,7 +13,7 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{definitions, Entity, InnerWorldRef, WorldRef};
+use crate::{definitions, Entity, InnerWorldRef, ItemStackComponent, WorldRef};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
@@ -288,6 +288,20 @@ impl ComponentWorld for EcsWorld {
 
     fn kill_entity(&self, entity: Entity) {
         let entities = self.read_resource::<EntitiesRes>();
+
+        // special case for item stacks, destroy all contained items too
+        if let Ok(stack) = self.component::<ItemStackComponent>(entity) {
+            for (e, _) in stack.stack.contents() {
+                // TODO item stacks could hold containers, which will hit the
+                self.kill_entity(e);
+            }
+        }
+
+        if let Ok(container) = self.component::<ContainerComponent>(entity) {
+            // TODO move destroy_containers impl into here
+            unimplemented!("move helpers_containers().destroy_container() impl here")
+        }
+
         if let Err(e) = entities.delete(entity.into()) {
             warn!("failed to delete entity"; entity, "error" => %e);
         }

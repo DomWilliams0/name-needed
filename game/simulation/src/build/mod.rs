@@ -20,6 +20,7 @@ pub trait Build: Debug {
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>);
 }
 
+/// Reserved for a build job
 #[derive(Component, EcsComponent, Debug)]
 #[storage(HashMapStorage)]
 #[name("reserved-material")]
@@ -27,6 +28,13 @@ pub trait Build: Debug {
 pub struct ReservedMaterialComponent {
     pub build_job: SocietyJobHandle,
 }
+
+/// In the process of being consumed for a build job
+#[derive(Component, EcsComponent, Debug, Default)]
+#[storage(NullStorage)]
+#[name("consumed-material")]
+#[clone(disallow)]
+pub struct ConsumedMaterialForJobComponent;
 
 impl BuildMaterial {
     /// Quantity must be >0

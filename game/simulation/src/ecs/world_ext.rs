@@ -1,7 +1,7 @@
 use unit::world::WorldPoint;
 
 use crate::activity::HaulError;
-use crate::build::ReservedMaterialComponent;
+use crate::build::{ConsumedMaterialForJobComponent, ReservedMaterialComponent};
 use crate::ecs::{EcsWorld, Entity, WorldExt};
 use crate::{ComponentWorld, Societies, TransformComponent};
 use common::*;
@@ -110,17 +110,14 @@ impl EcsExtComponents<'_> {
         job: SocietyJobHandle,
     ) -> Result<(), ReservationError> {
         // find job in society
-        let societies = self.0.resource::<Societies>();
-        let job_ref = societies
-            .society_by_handle(job.society())
-            .and_then(|society| society.jobs().find_job(job))
+        let job_ref = job
+            .resolve(self.0.resource())
             .ok_or(ReservationError::JobNotFound(job))?;
 
         // cast job to a build job
         let mut job_mut = job_ref.borrow_mut();
         let build_job = job_mut
-            .inner_as_any_mut()
-            .downcast_mut::<BuildThingJob>()
+            .cast_mut::<BuildThingJob>()
             .ok_or(ReservationError::InvalidJob(job))?;
 
         // reserve in job
@@ -134,6 +131,27 @@ impl EcsExtComponents<'_> {
             .add_now(material, ReservedMaterialComponent { build_job: job });
 
         Ok(())
+    }
+
+    pub fn consume_materials_for_job(&mut self, materials: &[Entity]) {
+        let mut transforms = self.0.write_storage::<TransformComponent>();
+        let mut consumeds = self.0.write_storage::<ConsumedMaterialForJobComponent>();
+        for material in materials {
+            let material = specs::Entity::from(*material);
+            transforms.remove(material);
+            let _ = consumeds.insert(material, ConsumedMaterialForJobComponent::default());
+        }
+    }
+
+    pub fn unconsume_materials_for_job(&mut self, materials: &[Entity], job_pos: WorldPoint) {
+        let mut transforms = self.0.write_storage::<TransformComponent>();
+        let mut consumeds = self.0.write_storage::<ConsumedMaterialForJobComponent>();
+        for material in materials {
+            let material = specs::Entity::from(*material);
+            // TODO scatter around
+            let _ = transforms.insert(material, TransformComponent::new(job_pos));
+            let _ = consumeds.remove(material);
+        }
     }
 }
 

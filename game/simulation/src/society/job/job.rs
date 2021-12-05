@@ -1,10 +1,9 @@
 use crate::job::SocietyTask;
-use crate::{EcsWorld, Entity, SocietyHandle, WorldPosition, WorldPositionRange};
+use crate::{EcsWorld, Entity, WorldPositionRange};
 use std::any::Any;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 
-use common::parking_lot::RwLock;
 use common::*;
 
 use crate::job::list::SocietyJobHandle;
@@ -82,7 +81,7 @@ impl SocietyCommand {
 
         macro_rules! job {
             ($job:expr) => {
-                jobs.submit(world, $job);
+                jobs.submit(world, $job)
             };
         }
 
@@ -147,12 +146,12 @@ impl SocietyJob<dyn SocietyJobImpl> {
         self.pending_complete.push((task, result));
     }
 
-    pub fn inner_as_any_mut(&mut self) -> &mut dyn Any {
-        self.inner.as_any_mut()
+    pub fn cast<J: SocietyJobImpl + 'static>(&self) -> Option<&J> {
+        self.inner.as_any().downcast_ref()
     }
 
-    pub fn inner_as_any(&self) -> &dyn Any {
-        self.inner.as_any()
+    pub fn cast_mut<J: SocietyJobImpl + 'static>(&mut self) -> Option<&mut J> {
+        self.inner.as_any_mut().downcast_mut()
     }
 }
 

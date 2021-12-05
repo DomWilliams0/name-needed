@@ -136,6 +136,12 @@ mod validation {
             );
 
             assert!(
+                !world.has_component::<ItemStackComponent>(entity),
+                "item {} in stack is a nested stack",
+                entity
+            );
+
+            assert!(
                 !world.has_component::<HauledItemComponent>(entity),
                 "item {} in stack has a hauled component",
                 entity

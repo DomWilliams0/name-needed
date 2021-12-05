@@ -9,17 +9,17 @@ use crate::activity::subactivity::{
     EatItemSubactivity, EquipSubActivity, GoToSubactivity, GoingToStatus, GotoError, HaulSource,
     HaulSubactivity, PickupSubactivity,
 };
-use crate::activity::{Activity, EquipItemError, HaulError, HaulTarget, StatusUpdater};
+use crate::activity::{Activity, EquipItemError, HaulError, StatusUpdater};
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::event::{EntityEventQueue, RuntimeTimers};
 use crate::runtime::{TaskRef, TimerFuture};
 use crate::{
-    BlockType, ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent,
-    WorldPosition,
+    ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent, WorldPosition,
 };
 
 use crate::activity::context::EventResult::{Consumed, Unconsumed};
+use crate::job::{BuildDetails, SocietyJobHandle};
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use unit::world::WorldPoint;
@@ -125,20 +125,16 @@ impl ActivityContext {
 
     /// Must be close enough
     pub async fn break_block(&self, block: WorldPosition) -> Result<(), BreakBlockError> {
-        BreakBlockSubactivity::default()
-            .break_block(self, block)
-            .await
+        BreakBlockSubactivity.break_block(self, block).await
     }
 
     /// Must be close enough
     pub async fn build_block(
         &self,
-        block: WorldPosition,
-        bt: BlockType,
+        job: SocietyJobHandle,
+        details: &BuildDetails,
     ) -> Result<(), BuildBlockError> {
-        BuildBlockSubactivity::default()
-            .build_block(self, block, bt)
-            .await
+        BuildBlockSubactivity.build_block(self, job, details).await
     }
 
     /// Pick up item off the ground, checks if close enough first

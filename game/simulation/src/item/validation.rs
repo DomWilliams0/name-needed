@@ -39,7 +39,7 @@ impl<'a> System<'a> for InventoryValidationSystem {
             let e = Entity::from(e);
             let held_by = seen_items.get(&e);
             assert_eq!(contained.is_some(), held_by.is_some(),
-                       "{} is in invalid contained state (contained = {:?}, seen in inv or container = {:?})",
+                       "{} is in invalid contained state (contained = {:?}, seen in inv, container or stack = {:?})",
                        e,
                        contained,
                        held_by);

@@ -10,14 +10,19 @@ use crate::ai::{AiAction, AiContext};
 use crate::build::BuildMaterial;
 use crate::ecs::*;
 use crate::item::{HauledItemComponent, ItemFilter, ItemFilterable};
-use crate::job::{SocietyJobHandle, SocietyJobRef};
+use crate::job::{BuildDetails, SocietyJobHandle, SocietyJobRef};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use ai::{AiBox, Blackboard, Consideration, Context, DecisionWeightType, Dse};
 use common::OrderedFloat;
 use unit::world::WorldPosition;
 use world::block::BlockType;
 
 pub struct BreakBlockDse(pub WorldPosition);
+
+pub struct BuildDse {
+    pub job: SocietyJobHandle,
+    pub details: BuildDetails,
+}
 
 pub struct GatherMaterialsDse {
     pub target: WorldPosition,
@@ -128,4 +133,28 @@ fn choose_best_item(
     }
 
     None
+}
+
+impl Dse<AiContext> for BuildDse {
+    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
+        vec![
+            // TODO wants to work, can work
+            // TODO has tool
+            AiBox::new(MyProximityToConsideration {
+                target: self.details.pos.centred(),
+                proximity: Proximity::Walkable,
+            }),
+        ]
+    }
+
+    fn weight_type(&self) -> DecisionWeightType {
+        DecisionWeightType::Normal
+    }
+
+    fn action(&self, _blackboard: &mut <AiContext as Context>::Blackboard) -> AiAction {
+        AiAction::GoBuild {
+            job: self.job,
+            details: self.details.clone(),
+        }
+    }
 }

@@ -6,7 +6,7 @@ use crate::activity::{
     HaulPurpose, HaulSource, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
 };
 use crate::ecs::Entity;
-use crate::BlockType;
+use crate::job::{BuildDetails, SocietyJobHandle};
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -30,8 +30,11 @@ pub enum AiAction {
     /// Go break the given block
     GoBreakBlock(WorldPosition),
 
-    /// Go build the given block
-    GoBuildBlock(WorldPosition, BlockType),
+    /// Go work on the given build job, assuming its requirements are already present
+    GoBuild {
+        job: SocietyJobHandle,
+        details: BuildDetails,
+    },
 
     /// Follow the entity, keeping to the given distance
     Follow { target: Entity, radius: u8 },
@@ -50,22 +53,23 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
     type Error = ();
 
     fn try_into(self) -> Result<LoggedEntityEvent, Self::Error> {
-        use LoggedEntityDecision::*;
+        use AiAction as A;
+        use LoggedEntityDecision as B;
         use LoggedEntityEvent::*;
 
         Ok(AiDecision(match self {
-            AiAction::Nop => return Err(()),
-            AiAction::Wander => Wander,
-            AiAction::Goto(target) => Goto(*target),
-            AiAction::GoEquip(item) => GoEquip(*item),
-            AiAction::EatHeldItem(item) => EatHeldItem(*item),
-            AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
-            AiAction::Follow { target, .. } => Follow(*target),
-            AiAction::Haul(e, _, tgt, _) => Haul {
+            A::Nop => return Err(()),
+            A::Wander => B::Wander,
+            A::Goto(target) => B::Goto(*target),
+            A::GoEquip(item) => B::GoEquip(*item),
+            A::EatHeldItem(item) => B::EatHeldItem(*item),
+            A::GoBreakBlock(pos) => B::GoBreakBlock(*pos),
+            A::Follow { target, .. } => B::Follow(*target),
+            A::Haul(e, _, tgt, _) => B::Haul {
                 item: *e,
                 dest: *tgt,
             },
-            AiAction::GoBuildBlock(_, _) => return Err(()), // TODO logging of new events
+            A::GoBuild { .. } => return Err(()), // TODO logging of new events
         }))
     }
 }

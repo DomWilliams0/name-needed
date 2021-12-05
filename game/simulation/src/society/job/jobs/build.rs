@@ -1,4 +1,6 @@
-use crate::build::{Build, BuildMaterial, ReservedMaterialComponent};
+use crate::build::{
+    Build, BuildMaterial, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
+};
 use crate::definitions::{DefinitionNameComponent, Registry};
 use crate::ecs::{EcsWorld, Join, WorldExt};
 use crate::item::HaulableItemComponent;
@@ -6,14 +8,13 @@ use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::{SocietyJobHandle, SocietyTask};
 use crate::{
-    BlockType, ComponentWorld, Entity, InnerWorldRef, ItemStackComponent, TransformComponent,
-    WorldPosition, WorldPositionRange, WorldRef,
+    BlockType, ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition,
+    WorldPositionRange, WorldRef,
 };
 use common::*;
 use specs::BitSet;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU16;
 
 #[derive(Debug)]
 pub struct BuildThingJob {
@@ -27,6 +28,12 @@ pub struct BuildThingJob {
 
     /// Set in first call to [populate_initial_tasks]
     this_job: Cell<Option<SocietyJobHandle>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct BuildDetails {
+    pub pos: WorldPosition,
+    pub target: BlockType,
 }
 
 #[derive(Debug, Error)]
@@ -56,11 +63,12 @@ impl BuildThingJob {
         let job_pos = self.position.centred();
         let reserveds = world.read_storage::<ReservedMaterialComponent>();
         let transforms = world.read_storage::<TransformComponent>();
+        let consumeds = world.read_storage::<ConsumedMaterialForJobComponent>();
 
         // clear out now-invalid reserved materials
         self.reserved_materials.retain(|e| {
-            let unreserve_reason = match world.components(*e, (&reserveds, &transforms)) {
-                Some((reserved, transform)) =>  {
+            let unreserve_reason = match world.components(*e, (&reserveds, transforms.maybe(), consumeds.maybe())) {
+                Some((reserved, Some(transform), None)) =>  {
                     if reserved.build_job != this_job {
                         Some("reservation changed")
                     }
@@ -71,7 +79,11 @@ impl BuildThingJob {
                         None
                     }
                 },
-                None => {
+                Some((reserved, None, Some(_))) => {
+                    // material is still reserved as it's consumed
+                    None
+                }
+                _ => {
                     Some("material is kill")
                 },
             };
@@ -106,6 +118,7 @@ impl BuildThingJob {
             // TODO ensure this doesn't happen, or just handle it properly
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
+            // TODO checked_sub instead, ensure only the exact number is reserved
             *entry = entry.saturating_sub(quantity);
         }
 
@@ -119,8 +132,15 @@ impl BuildThingJob {
         self.reserved_materials.insert(reservee)
     }
 
-    pub fn target_and_position(&self) -> (WorldPosition, BlockType) {
-        (self.position, self.build.output())
+    pub fn reserved_materials(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.reserved_materials.iter().copied()
+    }
+
+    pub fn details(&self) -> BuildDetails {
+        BuildDetails {
+            pos: self.position,
+            target: self.build.output(),
+        }
     }
 }
 
@@ -172,12 +192,22 @@ impl SocietyJobImpl for BuildThingJob {
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        _completions: CompletedTasks,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
         if self.missing_any_requirements.get() {
             return Some(SocietyTaskResult::Failure(
                 BuildThingError::InvalidMaterials.into(),
             ));
+        }
+
+        // ignore completions for gathering, only use for checking the build outcome
+        if let Some((_, result)) = completions
+            .iter_mut()
+            .find(|(t, res)| matches!(t, SocietyTask::Build(_, _)))
+        {
+            // build is complete
+            let result = std::mem::replace(result, SocietyTaskResult::Success);
+            return Some(result);
         }
 
         // TODO dont run this every tick, only when something changes or intermittently
@@ -186,7 +216,8 @@ impl SocietyJobImpl for BuildThingJob {
         tasks.retain(|task| {
             let req = match task {
                 SocietyTask::GatherMaterials { material, .. } => material,
-                _ => return true,
+                SocietyTask::Build(_, _) => return false, // filter out build task at this point, readd after
+                _ => unreachable!(),
             };
 
             if outstanding_requirements.get(req.definition()).is_some() {
@@ -197,10 +228,12 @@ impl SocietyJobImpl for BuildThingJob {
             }
         });
 
-        // TODO need to bother using completions?
-
         if tasks.is_empty() {
-            todo!("all requirements are satisfied")
+            // all gather requirements are satisfied, do the build
+            // TODO some builds could have multiple workers
+
+            let this_job = self.this_job.get().unwrap(); // set unconditionally
+            tasks.push(SocietyTask::Build(this_job, self.details()));
         }
 
         None // use number of tasks to determine completion

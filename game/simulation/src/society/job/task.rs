@@ -4,14 +4,14 @@ use unit::world::WorldPosition;
 use world::block::BlockType;
 
 use crate::activity::HaulTarget;
-use crate::ai::dse::{BreakBlockDse, GatherMaterialsDse, HaulDse};
+use crate::ai::dse::{BreakBlockDse, BuildDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
 use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
 use crate::{ComponentWorld, HaulSource, TransformComponent};
 
 use crate::item::HaulableItemComponent;
-use crate::job::{SocietyJobHandle, SocietyJobRef};
+use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle, SocietyJobRef};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
@@ -27,6 +27,9 @@ pub enum SocietyTask {
     /// Break the given block
     // TODO this could be a work item
     BreakBlock(WorldPosition),
+
+    /// Work on a build job
+    Build(SocietyJobHandle, BuildDetails),
 
     /// Gather materials for a build at the given position
     GatherMaterials {
@@ -72,6 +75,13 @@ impl SocietyTask {
 
         match self {
             BreakBlock(range) => dse!(BreakBlockDse(*range)),
+            Build(job, details) => {
+                // TODO distinct build actions e.g. sawing, wood building, stone building etc
+                dse!(BuildDse {
+                    job: *job,
+                    details: details.clone(),
+                })
+            }
             GatherMaterials {
                 target,
                 material,
@@ -104,6 +114,7 @@ impl SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
+            Build(_, _) => false,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
             Haul(_) => false,
@@ -117,6 +128,7 @@ impl Display for SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
+            Build(_, details) => write!(f, "Build {:?} at {}", details.target, details.pos),
             Haul(haul) => Display::fmt(haul, f),
             // TODO include a description field for proper description e.g. "cutting log", "building wall"
             GatherMaterials { material, .. } => write!(f, "Gather {:?}", material),
