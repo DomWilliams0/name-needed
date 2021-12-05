@@ -58,6 +58,7 @@ pub trait SocietyJobImpl: Display + Debug {
         completions: CompletedTasks,
     ) -> Option<SocietyTaskResult>;
 
+    fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
@@ -148,6 +149,10 @@ impl SocietyJob<dyn SocietyJobImpl> {
 
     pub fn inner_as_any_mut(&mut self) -> &mut dyn Any {
         self.inner.as_any_mut()
+    }
+
+    pub fn inner_as_any(&self) -> &dyn Any {
+        self.inner.as_any()
     }
 }
 

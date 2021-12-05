@@ -31,7 +31,7 @@ pub struct ReservedMaterialComponent {
 impl BuildMaterial {
     /// Quantity must be >0
     pub fn new(definition_name: &'static str, quantity: u16) -> Self {
-        // TODO return option/result instead of assert
+        // TODO use NonZeroU16
         assert!(quantity > 0);
         Self {
             definition_name,

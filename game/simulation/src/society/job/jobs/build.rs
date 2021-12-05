@@ -22,7 +22,7 @@ pub struct BuildThingJob {
     build: Box<dyn Build>,
     required_materials: Vec<BuildMaterial>,
     reserved_materials: HashSet<Entity>,
-    /// Set if any materials are invalid e.g. not haulable
+    /// Set if any material types are invalid e.g. not haulable
     missing_any_requirements: Cell<bool>,
 
     /// Set in first call to [populate_initial_tasks]
@@ -118,6 +118,10 @@ impl BuildThingJob {
     pub fn add_reservation(&mut self, reservee: Entity) -> bool {
         self.reserved_materials.insert(reservee)
     }
+
+    pub fn target_and_position(&self) -> (WorldPosition, BlockType) {
+        (self.position, self.build.output())
+    }
 }
 
 impl SocietyJobImpl for BuildThingJob {
@@ -202,7 +206,7 @@ impl SocietyJobImpl for BuildThingJob {
         None // use number of tasks to determine completion
     }
 
-    crate::as_any_mut!();
+    crate::as_any_impl!();
 }
 
 impl Display for BuildThingJob {

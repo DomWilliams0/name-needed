@@ -11,7 +11,7 @@ use crate::build::BuildMaterial;
 use crate::ecs::*;
 use crate::item::{HauledItemComponent, ItemFilter, ItemFilterable};
 use crate::job::{SocietyJobHandle, SocietyJobRef};
-use crate::HaulTarget;
+use crate::{HaulTarget, ItemStackComponent};
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use common::OrderedFloat;
 use unit::world::WorldPosition;

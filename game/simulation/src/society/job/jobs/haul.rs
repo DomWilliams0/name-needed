@@ -142,7 +142,7 @@ impl SocietyJobImpl for HaulJob {
         None
     }
 
-    crate::as_any_mut!();
+    crate::as_any_impl!();
 }
 
 fn ensure_item_fits_in_container(

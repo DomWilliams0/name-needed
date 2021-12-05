@@ -149,7 +149,7 @@ impl SocietyWindow {
             // TODO preserve finished jobs and tasks for a bit and display them in the ui too
             let jobs = society.jobs();
             let mut job_node = None;
-            jobs.iter_all(
+            jobs.iter_all_filtered(
                 |job| {
                     // TODO use table API when available
                     // close previous node first

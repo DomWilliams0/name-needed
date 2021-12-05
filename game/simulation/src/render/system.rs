@@ -1,9 +1,10 @@
 use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
+use crate::job::BuildThingJob;
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::transform::PhysicalComponent;
-use crate::{Shape2d, SliceRange, TransformComponent};
+use crate::{PlayerSociety, Shape2d, SliceRange, Societies, TransformComponent};
 use color::ColorRgb;
 use common::*;
 use serde::de::Error;
@@ -29,6 +30,8 @@ pub struct RenderSystem<'a, R: Renderer> {
 
 impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
+        Read<'a, PlayerSociety>,
+        Read<'a, Societies>,
         Read<'a, SelectedTiles>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
@@ -36,7 +39,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         ReadStorage<'a, SelectedComponent>,
     );
 
-    fn run(&mut self, (selected_block, transform, render, physical, selected): Self::SystemData) {
+    fn run(
+        &mut self,
+        (player_soc, societies, selected_block, transform, render, physical, selected): Self::SystemData,
+    ) {
+        // render entities
         for (transform, render, physical, selected) in
             (&transform, &render, &physical, selected.maybe()).join()
         {
@@ -59,9 +66,27 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             }
         }
 
+        // render player's world selection
         if let Some((from, to)) = selected_block.bounds() {
             self.renderer
                 .tile_selection(from, to, ColorRgb::new(230, 240, 230));
+        }
+
+        // render build job outlines for player's society
+        // TODO ui in world space will be redone better than this, so ignore inefficiency
+        if let Some(soc) = player_soc.0 {
+            if let Some(soc) = societies.society_by_handle(soc) {
+                for job in soc.jobs().iter_all() {
+                    let job = job.borrow();
+                    if let Some(build) = job.inner_as_any().downcast_ref::<BuildThingJob>() {
+                        let (pos, target) = build.target_and_position();
+                        self.renderer
+                            .tile_selection(pos, pos, ColorRgb::new(190, 190, 180))
+
+                        // TODO show progress and target block with hovering text
+                    }
+                }
+            }
         }
     }
 }

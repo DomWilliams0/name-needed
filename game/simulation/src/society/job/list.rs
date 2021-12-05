@@ -181,7 +181,7 @@ impl SocietyJobList {
     }
 
     /// Quadratic complexity (n total tasks * m total reserved tasks)
-    pub fn iter_all(
+    pub fn iter_all_filtered(
         &self,
         mut job_filter: impl FnMut(&SocietyJobRef) -> bool,
         mut per_task: impl FnMut(&SocietyTask, &SmallVec<[Entity; 3]>),
@@ -201,6 +201,10 @@ impl SocietyJobList {
                 reservers.clear();
             }
         }
+    }
+
+    pub fn iter_all(&self) -> impl Iterator<Item = &SocietyJobRef> + '_ {
+        self.jobs.iter()
     }
 }
 

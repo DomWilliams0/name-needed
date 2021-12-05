@@ -59,7 +59,7 @@ impl SocietyJobImpl for BreakBlocksJob {
         None
     }
 
-    crate::as_any_mut!();
+    crate::as_any_impl!();
 }
 
 impl Display for BreakBlocksJob {
