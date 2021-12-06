@@ -69,6 +69,12 @@ impl EcsWorld {
     }
 }
 
+struct NewEntityBomb<'a> {
+    entity: Entity,
+    kill_me: bool,
+    world: &'a EcsWorld,
+}
+
 impl EcsExtContainers<'_> {
     pub fn create_container_voxel(
         &mut self,
@@ -204,6 +210,13 @@ impl EcsExtContainers<'_> {
             entity
         };
 
+        // kill on failure
+        let mut bomb = NewEntityBomb {
+            entity: stack_container,
+            kill_me: true,
+            world: self.0,
+        };
+
         let mut physicals = self.0.write_storage::<PhysicalComponent>();
         let mut stacks = self.0.write_storage::<ItemStackComponent>();
 
@@ -227,13 +240,13 @@ impl EcsExtContainers<'_> {
             Err(err) => {
                 warn!("failed to create stack for item"; "err" => %err);
 
-                // destroy redundant stack entity first
-                self.0.kill_entity(stack_container);
+                // redundant stack entity will be destroyed on return
                 return Err(ContainerError::StackError(err));
             }
         }
 
         debug!("created stack from item"; "item" => item, "stack" => stack_container);
+        bomb.kill_me = false;
         Ok(stack_container)
     }
 
@@ -293,6 +306,14 @@ impl EcsExtContainers<'_> {
 
         // increase item physical volume
         stack_physical.volume += item_volume;
+    }
+}
+
+impl Drop for NewEntityBomb<'_> {
+    fn drop(&mut self) {
+        if self.kill_me {
+            self.world.kill_entity(self.entity);
+        }
     }
 }
 
