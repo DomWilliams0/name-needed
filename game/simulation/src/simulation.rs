@@ -30,7 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
-use crate::job::SocietyCommand;
+use crate::job::{SocietyCommand, SocietyJobHandle};
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
@@ -43,12 +43,17 @@ use crate::{
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 use std::pin::Pin;
+use std::sync::Arc;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
 #[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
+    BuildJobWip {
+        build: SocietyJobHandle,
+        reserved_materials: Arc<Vec<Entity>>,
+    },
 }
 
 pub struct WorldContext;

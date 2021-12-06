@@ -163,7 +163,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
 * mesh generation on worker thread
 * replace all hashmaps with faster non crypto hashes
-* replace Arcs that don't need weak refs with `triomphe`
+* replace Arcs/Rcs that don't need weak refs with `triomphe`/`counting_pointer`
 * perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * investigate invalidating a slab queued for finalization if terrain updates are applied to it, to avoid doing tons of extra work for nothing. some degree of redundant work is ok though, so the terrain never noticably lags behind player updates and catches up suddenly when all changes are applied together

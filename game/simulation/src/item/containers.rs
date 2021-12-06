@@ -1,4 +1,5 @@
 use common::*;
+use std::num::NonZeroU16;
 use unit::space::volume::Volume;
 use unit::world::WorldPosition;
 
@@ -29,6 +30,9 @@ pub enum ContainerError {
 
     #[error("Item is not stackable: {0}")]
     NonStackableItem(ComponentGetError),
+
+    #[error("Item stackability must be > 0")]
+    InvalidStackSize,
 
     #[error("Item is already stacked or in a container")]
     AlreadyStacked,
@@ -180,8 +184,10 @@ impl EcsExtContainers<'_> {
         let stack_size = self
             .0
             .component::<StackableComponent>(item)
-            .map_err(ContainerError::NonStackableItem)?
-            .max_count;
+            .map_err(ContainerError::NonStackableItem)
+            .and_then(|comp| {
+                NonZeroU16::new(comp.max_count).ok_or(ContainerError::InvalidStackSize)
+            })?;
 
         // ensure not already in a stack or container
         if self.0.component::<ContainedInComponent>(item).is_ok() {

@@ -42,10 +42,14 @@ pub enum BlockType {
     SolidWater,
 
     /// Temporary substitute for something to build
-    #[display(fmt = "Wall")]
-    WoodenWall,
+    #[display(fmt = "Stone wall")]
+    StoneBrickWall,
 
     Chest,
+
+    /// Special block representing a build job in progress
+    // TODO stats vary depending on the build block
+    IncompleteBuild,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -165,8 +169,9 @@ impl BlockType {
             BlockType::Stone => ColorRgb::new(106, 106, 117),
             BlockType::Sand => 0xBCA748FF.into(),
             BlockType::SolidWater => 0x3374BCFF.into(),
-            BlockType::WoodenWall => 0x9E8261FF.into(),
+            BlockType::StoneBrickWall => 0x9E8261FF.into(),
             BlockType::Chest => ColorRgb::new(184, 125, 31),
+            BlockType::IncompleteBuild => 0x3D3D3DFF.into(),
         }
     }
 
@@ -187,7 +192,7 @@ impl BlockType {
             Dirt | Grass | LightGrass => 40,
             TreeTrunk => 70,
             Stone => 90,
-            Chest | WoodenWall => 60,
+            Chest | StoneBrickWall | IncompleteBuild => 60,
             SolidWater => u8::MAX,
         };
 

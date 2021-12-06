@@ -1,5 +1,6 @@
 use crate::ecs::*;
 use common::*;
+use std::num::NonZeroU16;
 
 #[derive(Debug, Error)]
 pub enum ItemStackError {
@@ -29,9 +30,9 @@ pub struct ItemStackComponent {
 }
 
 impl ItemStack {
-    pub fn new(max_size: u16) -> Self {
+    pub fn new(max_size: NonZeroU16) -> Self {
         ItemStack {
-            contents: Vec::with_capacity(max_size as usize),
+            contents: Vec::with_capacity(max_size.get() as usize),
             total_count: 0,
         }
     }
@@ -106,7 +107,7 @@ mod validation {
             "stack is empty and should be collapsed"
         );
 
-        for &StackedEntity { entity, count } in &stack.contents {
+        for &StackedEntity { entity, .. } in &stack.contents {
             assert!(world.is_entity_alive(entity), "item {} is dead", entity);
 
             if let Some(other_holder) =

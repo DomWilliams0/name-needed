@@ -3,6 +3,8 @@ use crate::job::SocietyJobHandle;
 use crate::BlockType;
 use common::*;
 
+mod world_helper;
+
 // TODO organise build module
 
 #[derive(Hash, Clone, Eq, PartialEq)]

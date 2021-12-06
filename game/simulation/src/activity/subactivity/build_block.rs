@@ -1,14 +1,14 @@
 use crate::ecs::ComponentGetError;
-use specs::WorldExt;
+
+use std::sync::Arc;
 
 use crate::activity::context::ActivityContext;
 use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
-use crate::queued_update::QueuedUpdates;
-use crate::{ComponentWorld, Entity, TerrainUpdatesRes, WorldPositionRange, WorldTerrainUpdate};
+
+use crate::{ComponentWorld, Entity};
 use crate::{TransformComponent, WorldPosition};
 use common::*;
 use unit::world::WorldPoint;
-use world::block::BlockType;
 
 #[derive(Debug, Error)]
 pub enum BuildBlockError {
@@ -21,8 +21,8 @@ pub enum BuildBlockError {
         target: WorldPosition,
     },
 
-    #[error("Block is invalid or non-air")]
-    BadBlock,
+    #[error("Failed to set block during completion")]
+    CompletionFailed,
 
     #[error("Job not found in society")]
     JobNotFound(SocietyJobHandle),
@@ -33,13 +33,6 @@ pub enum BuildBlockError {
 
 #[derive(Default)]
 pub struct BuildBlockSubactivity;
-
-struct MaterialsBomb<'a> {
-    materials: Vec<Entity>,
-    completed: bool,
-    ctx: &'a ActivityContext,
-    job_pos: WorldPosition,
-}
 
 impl BuildBlockSubactivity {
     pub async fn build_block(
@@ -63,18 +56,15 @@ impl BuildBlockSubactivity {
             });
         }
 
-        // "consume" materials on start
-        let mut materials = MaterialsBomb {
-            materials: resolve_job(ctx, job)?,
-            completed: false,
-            ctx,
-            job_pos: details.pos,
-        };
+        // collect reserved materials
+        let materials = resolve_job_materials(ctx, job)?;
 
-        queue_material_consumption(ctx.world().resource(), &materials.materials);
-        // TODO consume materials incrementally as progress is made
-
-        // TODO add some in-progress block to the world, instead of just being air while working
+        let helper = ctx
+            .world()
+            .helpers_building()
+            .start_build(details.clone(), job, materials);
+        // wait for that block to appear
+        ctx.yield_now().await;
 
         // TODO progression rate depends on job
         let progress_steps = 8;
@@ -86,37 +76,17 @@ impl BuildBlockSubactivity {
             ctx.wait(progress_rate).await;
         }
 
-        // work is complete
-        materials.completed = true;
-
-        // place the block in the world
-        let world = ctx.world().voxel_world();
-        let world = world.borrow();
-        match world.block(details.pos).map(|b| b.block_type()) {
-            Some(BlockType::Air) => { /* nice */ }
-            Some(current) if current == details.target => {
-                trace!("block is already build target type"; "block" => %details.pos, "type" => ?current);
-            }
-            Some(_) | None => {
-                trace!("cannot build non-air or invalid block"; "block" => %details.pos);
-                return Err(BuildBlockError::BadBlock);
-            }
-        };
-
-        let terrain_updates = ctx.world().resource_mut::<TerrainUpdatesRes>();
-        terrain_updates.push(WorldTerrainUpdate::new(
-            WorldPositionRange::with_single(details.pos),
-            details.target,
-        ));
-
+        helper
+            .end_build(ctx.world())
+            .map_err(|_| BuildBlockError::CompletionFailed)?;
         Ok(())
     }
 }
 
-fn resolve_job(
+fn resolve_job_materials(
     ctx: &ActivityContext,
     job: SocietyJobHandle,
-) -> Result<Vec<Entity>, BuildBlockError> {
+) -> Result<Arc<Vec<Entity>>, BuildBlockError> {
     // find job in society
     let job_ref = job
         .resolve(ctx.world().resource())
@@ -128,45 +98,6 @@ fn resolve_job(
         .cast::<BuildThingJob>()
         .ok_or(BuildBlockError::InvalidJob(job))?;
 
-    Ok(build_job.reserved_materials().map(Into::into).collect())
-}
-
-fn queue_material_consumption(updates: &QueuedUpdates, materials: &[Entity]) {
-    let materials_cloned = Vec::from(materials);
-    updates.queue("consume build materials", move |world| {
-        world
-            .helpers_comps()
-            .consume_materials_for_job(&materials_cloned);
-        Ok(())
-    });
-}
-
-impl Drop for MaterialsBomb<'_> {
-    fn drop(&mut self) {
-        let updates = self.ctx.world().resource::<QueuedUpdates>();
-        let materials = std::mem::take(&mut self.materials);
-
-        if self.completed {
-            debug!("build job was completed, queueing material destruction"; "materials" => ?materials);
-            updates.queue("destroying materials for completed build", |world| {
-                for material in materials {
-                    world.kill_entity(material);
-                }
-
-                Ok(())
-            });
-        } else {
-            debug!("build job was interrupted, dropping unconsumed materials"; "materials" => ?materials);
-            // TODO some materials should be consumed depending on the progress before interrupting
-            // TODO do this on destruction of the in-progress block instead of interrupting
-
-            let job_pos = self.job_pos;
-            updates.queue("dropping materials for interrupted build", move |world| {
-                world
-                    .helpers_comps()
-                    .unconsume_materials_for_job(&materials, job_pos.centred());
-                Ok(())
-            });
-        }
-    }
+    let materials = build_job.reserved_materials().map(Into::into).collect_vec();
+    Ok(Arc::new(materials))
 }

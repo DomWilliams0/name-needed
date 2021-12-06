@@ -9,7 +9,6 @@ use crate::job::SocietyTaskResult;
 use crate::society::job::{SocietyJobHandle, SocietyTask};
 use crate::{
     BlockType, ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition,
-    WorldPositionRange, WorldRef,
 };
 use common::*;
 use specs::BitSet;
@@ -79,7 +78,7 @@ impl BuildThingJob {
                         None
                     }
                 },
-                Some((reserved, None, Some(_))) => {
+                Some((_reserved, None, Some(_))) => {
                     // material is still reserved as it's consumed
                     None
                 }
@@ -165,7 +164,7 @@ impl SocietyJobImpl for BuildThingJob {
                         let haulable = any
                             .downcast_ref::<HaulableItemComponent>()
                             .expect("bad type for haulable template");
-                        info!("{:?} neds {} hands", mat, haulable.extra_hands);
+                        debug!("{:?} needs {} hands", mat, haulable.extra_hands);
                         haulable.extra_hands
                     }
                     None => {
@@ -203,7 +202,7 @@ impl SocietyJobImpl for BuildThingJob {
         // ignore completions for gathering, only use for checking the build outcome
         if let Some((_, result)) = completions
             .iter_mut()
-            .find(|(t, res)| matches!(t, SocietyTask::Build(_, _)))
+            .find(|(t, _)| matches!(t, SocietyTask::Build(_, _)))
         {
             // build is complete
             let result = std::mem::replace(result, SocietyTaskResult::Success);

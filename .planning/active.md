@@ -5,7 +5,7 @@
 	* [ ] split into multiple stacks, or remove single items
 	* [X] inspect a stack's contents in the ui
 * [X] components should declare if they should be copied into/out of stacks
-* [.] building blocks
+* [o] building blocks
 	* [X] no materials, single block only, near-instant completion
 	* [O] require materials
 		* [X] check inventory for materials
@@ -13,7 +13,8 @@
 		* [X] check nearby area for materials
 		* [X] reserve materials
 	* [o] build activity
-	* [ ] build progression block
+	* [.] build progression block
+		* [X] place block during build
 		* [ ] define progress rate in data
 		* [ ] continuable progress after interruption
 		* [ ] drop unconsumed materials on cancel/destruction
@@ -34,3 +35,4 @@
 		* [ ] add "unnamed" fallback to component
 	* [ ] show building job info
 * [X] remove destroy_container() helper and move impl into kill_entity
+* [ ] lua api for building things
