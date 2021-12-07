@@ -3,7 +3,9 @@ use std::f32::consts::PI;
 use color::Color;
 use common::*;
 use resources::Shaders;
-use simulation::{PhysicalComponent, RenderComponent, Renderer, TransformComponent};
+use simulation::{
+    PhysicalComponent, RenderComponent, Renderer, TransformComponent, TransformRenderDescription,
+};
 use unit::world::WorldPoint;
 
 use crate::render::debug::DebugShape;
@@ -104,7 +106,7 @@ impl Renderer for GlRenderer {
 
     fn sim_entity(
         &mut self,
-        transform: &TransformComponent,
+        transform: &TransformRenderDescription,
         render: &RenderComponent,
         physical: &PhysicalComponent,
     ) {
@@ -132,7 +134,11 @@ impl Renderer for GlRenderer {
         ));
     }
 
-    fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
+    fn sim_selected(
+        &mut self,
+        transform: &TransformRenderDescription,
+        physical: &PhysicalComponent,
+    ) {
         // simple underline
         const PAD: f32 = 0.2;
         let radius = (physical.max_dimension().metres() / 2.0) + PAD;

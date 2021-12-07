@@ -3,7 +3,7 @@ use crate::input::{SelectedComponent, SelectedTiles};
 use crate::job::BuildThingJob;
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
-use crate::transform::PhysicalComponent;
+use crate::transform::{PhysicalComponent, TransformRenderDescription};
 use crate::{PlayerSociety, Shape2d, SliceRange, Societies, TransformComponent};
 use color::Color;
 use common::*;
@@ -47,22 +47,24 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         for (transform, render, physical, selected) in
             (&transform, &render, &physical, selected.maybe()).join()
         {
-            if self.slices.contains(transform.slice()) {
-                // make copy to mutate for interpolation
-                let mut transform = transform.clone();
+            if !self.slices.contains(transform.slice()) {
+                continue;
+            }
 
-                transform.position = {
-                    let last_pos: Vector3 = transform.last_position.into();
-                    let curr_pos: Vector3 = transform.position.into();
-                    let lerped = last_pos.lerp(curr_pos, self.interpolation);
-                    lerped.try_into().expect("invalid lerp")
-                };
+            let mut transform_desc = TransformRenderDescription::from(transform);
 
-                self.renderer.sim_entity(&transform, render, physical);
+            // interpolate position
+            transform_desc.position = {
+                let last_pos: Vector3 = transform.last_position.into();
+                let curr_pos: Vector3 = transform.position.into();
+                let lerped = last_pos.lerp(curr_pos, self.interpolation);
+                lerped.try_into().expect("invalid lerp")
+            };
 
-                if selected.is_some() {
-                    self.renderer.sim_selected(&transform, physical);
-                }
+            self.renderer.sim_entity(&transform_desc, render, physical);
+
+            if selected.is_some() {
+                self.renderer.sim_selected(&transform_desc, physical);
             }
         }
 

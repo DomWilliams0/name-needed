@@ -26,7 +26,7 @@ pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
     Tick, WorldContext,
 };
-pub use crate::transform::{PhysicalComponent, TransformComponent};
+pub use crate::transform::{PhysicalComponent, TransformComponent, TransformRenderDescription};
 pub use activity::{
     ActivityComponent, EntityLoggingComponent, HaulPurpose, HaulSource, HaulTarget,
     LoggedEntityDecision, LoggedEntityEvent,

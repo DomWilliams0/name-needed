@@ -31,6 +31,12 @@ pub struct TransformComponent {
     pub velocity: Vector2,
 }
 
+/// Lightweight copy for rendering
+pub struct TransformRenderDescription {
+    pub position: WorldPoint,
+    pub rotation: Basis2,
+}
+
 /// Physical attributes of an entity
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
@@ -117,6 +123,15 @@ impl TransformComponent {
 
     pub fn rotate_to(&mut self, angle: Rad) {
         self.rotation = Basis2::from_angle(angle);
+    }
+}
+
+impl From<&TransformComponent> for TransformRenderDescription {
+    fn from(t: &TransformComponent) -> Self {
+        Self {
+            position: t.position,
+            rotation: t.rotation,
+        }
     }
 }
 
