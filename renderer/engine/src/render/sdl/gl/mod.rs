@@ -7,7 +7,7 @@ use sdl2::video::{GLContext, Window};
 use sdl2::VideoSubsystem;
 
 pub use capability::{Capability, ScopedCapability};
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use resources::ResourceError;
 pub use shader::Program;
@@ -110,9 +110,9 @@ impl Gl {
         Ok(Self { gl_context })
     }
 
-    pub fn set_clear_color(color: ColorRgb) {
-        let [r, g, b]: [f32; 3] = color.into();
-        unsafe { gl::ClearColor(r, g, b, 1.0) }
+    pub fn set_clear_color(color: Color) {
+        let [r, g, b, a]: [f32; 4] = color.into();
+        unsafe { gl::ClearColor(r, g, b, a) }
     }
 
     pub fn clear() {

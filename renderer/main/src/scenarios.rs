@@ -63,7 +63,7 @@ fn following_dogs(ecs: &EcsWorld) {
 
     let all_humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
     });
@@ -94,7 +94,7 @@ fn wander_and_eat(ecs: &EcsWorld) {
     spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         let satiety = NormalizedFloat::new(random::get().gen_range(0.4, 0.5));
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .with_satiety(satiety)
             .thanks()
@@ -124,7 +124,7 @@ fn building(ecs: &EcsWorld) {
 
     let humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
     });
@@ -187,7 +187,7 @@ fn haul_to_container(ecs: &EcsWorld) {
     // our lovely haulers
     spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
     });
@@ -208,7 +208,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use color::{ColorRgb, UniqueRandomColors};
+    use color::{Color, UniqueRandomColors};
     use common::{random, NormalizedFloat, Rng};
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
@@ -222,8 +222,12 @@ mod helpers {
         counts.get(wat).copied().unwrap_or(0)
     }
 
-    pub fn entity_colours() -> UniqueRandomColors {
-        ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap()
+    pub fn entity_colours() -> impl Iterator<Item = Color> {
+        Color::unique_randoms(
+            NormalizedFloat::new(0.65),
+            NormalizedFloat::new(0.4),
+            &mut *random::get(),
+        )
     }
 
     pub struct EntityBuilder<'a>(&'a EcsWorld, Entity);
@@ -246,7 +250,7 @@ mod helpers {
             Self(world, entity)
         }
 
-        pub fn with_color(self, color: ColorRgb) -> Self {
+        pub fn with_color(self, color: Color) -> Self {
             self.0
                 .component_mut::<RenderComponent>(self.1)
                 .map(|mut render| render.color = color)

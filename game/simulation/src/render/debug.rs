@@ -2,7 +2,7 @@ use crate::ecs::EcsWorld;
 use crate::{
     all_slabs_in_range, InnerWorldRef, Renderer, SlabLocation, ThreadedWorldLoader, WorldViewer,
 };
-use color::ColorRgb;
+use color::Color;
 use common::*;
 
 use std::borrow::Cow;
@@ -180,8 +180,8 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         let a = ViewPoint::new_unchecked(1.0, 0.0, 1.0);
         let b = ViewPoint::new_unchecked(0.0, 1.0, 1.0);
 
-        renderer.debug_add_line(origin.into(), a.into(), ColorRgb::new(255, 0, 0));
-        renderer.debug_add_line(origin.into(), b.into(), ColorRgb::new(0, 255, 0));
+        renderer.debug_add_line(origin.into(), a.into(), Color::rgb(255, 0, 0));
+        renderer.debug_add_line(origin.into(), b.into(), Color::rgb(0, 255, 0));
     }
 }
 impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
@@ -214,7 +214,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
                     min + (sz, sz, 0.0),
                     min + (0.0, sz, 0.0),
                 ],
-                ColorRgb::new(5, 5, 240),
+                Color::rgb(5, 5, 240),
             );
 
             // collect unique regions
@@ -235,7 +235,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
                     min + (sz, sz, 0.0),
                     min + (0.0, sz, 0.0),
                 ],
-                ColorRgb::new(5, 240, 5),
+                Color::rgb(5, 240, 5),
             );
         }
     }

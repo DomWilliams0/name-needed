@@ -5,7 +5,7 @@ use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::transform::PhysicalComponent;
 use crate::{PlayerSociety, Shape2d, SliceRange, Societies, TransformComponent};
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use serde::de::Error;
 use std::convert::TryInto;
@@ -18,7 +18,7 @@ pub struct RenderComponent {
     pub shape: Shape2d,
 
     /// Simple color
-    pub color: ColorRgb,
+    pub color: Color,
 }
 
 /// Wrapper for calling generic Renderer in render system
@@ -69,7 +69,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         // render player's world selection
         if let Some((from, to)) = selected_block.bounds() {
             self.renderer
-                .tile_selection(from, to, ColorRgb::new(230, 240, 230));
+                .tile_selection(from, to, Color::rgb(230, 240, 230));
         }
 
         // render build job outlines for player's society
@@ -83,7 +83,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                         self.renderer.tile_selection(
                             details.pos,
                             details.pos,
-                            ColorRgb::new(190, 190, 180),
+                            Color::rgb(190, 190, 180),
                         )
 
                         // TODO show progress and target block with hovering text

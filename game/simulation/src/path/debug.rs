@@ -6,7 +6,7 @@ use crate::render::DebugRenderer;
 use crate::{
     InnerWorldRef, RenderComponent, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer,
 };
-use color::ColorRgb;
+use color::Color;
 
 use std::hash::Hasher;
 
@@ -107,7 +107,7 @@ impl<R: Renderer> DebugRenderer<R> for NavigationAreaDebugRenderer {
                                     ((scaled as f64) / SCALE as f64) as f32
                                 };
 
-                                let color = ColorRgb::new_hsl(unique_color, 0.8, 0.7);
+                                let color = Color::hsl(unique_color, 0.8, 0.7);
                                 let pos = pos
                                     .to_block_position(GlobalSliceIndex::new(slice_idx))
                                     .to_world_point_centered(chunk.pos());

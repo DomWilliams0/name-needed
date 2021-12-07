@@ -1,4 +1,4 @@
-use color::ColorRgb;
+use color::Color;
 use common::*;
 
 use crate::chunk::slab::Slab;
@@ -19,7 +19,7 @@ const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
 const TILE_CORNERS: [(f32, f32); 4] = [(-X, -X), (X, -X), (X, X), (-X, X)];
 
 pub trait BaseVertex: Copy + Debug {
-    fn new(pos: (f32, f32, f32), color: ColorRgb) -> Self;
+    fn new(pos: (f32, f32, f32), color: Color) -> Self;
 }
 
 pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
@@ -47,7 +47,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
                 .opacity()
                 .solid()
             {
-                let color = ColorRgb::new(50, 50, 50);
+                let color = Color::rgb(50, 50, 50);
                 make_corners(block_pos, color, slice_index)
             } else {
                 // render as normal
@@ -78,7 +78,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
                 bottom.opacity().transparent() && below.opacity().solid()
             })
             .for_each(|(i, (_, _))| {
-                let color = ColorRgb::new(70, 70, 70);
+                let color = Color::rgb(70, 70, 70);
                 vertices.extend_from_slice(&make_corners(
                     unflatten_index(i),
                     color,
@@ -101,7 +101,7 @@ fn block_centre(block: SliceBlock) -> (f32, f32) {
 
 fn make_corners_with_ao<V: BaseVertex>(
     block_pos: SliceBlock,
-    color: ColorRgb,
+    color: Color,
     occlusion: &BlockOcclusion,
     slice_index: f32,
 ) -> [V; 6] {
@@ -136,7 +136,7 @@ fn make_corners_with_ao<V: BaseVertex>(
     // safety: all corners have been initialized
     unsafe { corners_to_vertices(block_corners) }
 }
-fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: ColorRgb, slice_index: f32) -> [V; 6] {
+fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: Color, slice_index: f32) -> [V; 6] {
     let (bx, by) = block_centre(block_pos);
 
     let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];

@@ -3,7 +3,7 @@ use crate::render::sdl::gl::{
     InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
 };
 use crate::render::sdl::render::renderer::GlFrameContext;
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use resources::Shaders;
 use simulation::Shape2d;
@@ -14,7 +14,7 @@ use unit::world::WorldPoint;
 pub(crate) struct EntityRenderer {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2, Basis2)>,
+    entities: Vec<(WorldPoint, Shape2d, Color, Length2, Basis2)>,
 }
 
 #[repr(C)]
@@ -114,7 +114,7 @@ impl EntityRenderer {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb, Length2, Basis2)) {
+    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, Color, Length2, Basis2)) {
         self.entities.push(entity);
     }
 

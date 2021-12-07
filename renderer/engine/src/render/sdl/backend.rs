@@ -5,7 +5,7 @@ use sdl2::keyboard::{Keycode, Mod};
 use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
-use color::ColorRgb;
+use color::Color;
 use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
@@ -104,7 +104,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         };
 
         let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
-        Gl::set_clear_color(ColorRgb::new(17, 17, 20));
+        Gl::set_clear_color(Color::rgb(17, 17, 20));
 
         let ui = Ui::new(&window, &video, PERSISTED_UI_PATH.as_ref());
 

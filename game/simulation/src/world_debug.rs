@@ -1,6 +1,6 @@
 use crate::render::DebugRenderer;
 use crate::{EcsWorld, InnerWorldRef, Renderer, ThreadedWorldLoader, WorldViewer};
-use color::ColorRgb;
+use color::Color;
 
 use std::hash::Hasher;
 use unit::world::WorldPoint;
@@ -10,7 +10,7 @@ pub struct FeatureBoundaryDebugRenderer {
     cache: Vec<FeatureLine>,
 }
 
-type FeatureLine = (ColorRgb, WorldPoint, WorldPoint);
+type FeatureLine = (Color, WorldPoint, WorldPoint);
 
 impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
     fn identifier(&self) -> &'static str {
@@ -44,7 +44,7 @@ impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
 struct Frame<'a> {
     cache: &'a mut Vec<FeatureLine>,
     last: Option<(usize, WorldPoint)>,
-    color: ColorRgb,
+    color: Color,
     this_frame_idx: usize,
 }
 
@@ -54,7 +54,7 @@ impl<'a> Frame<'a> {
         Self {
             cache,
             last: None,
-            color: ColorRgb::new(0, 0, 0), // unused default value
+            color: Color::rgb(0, 0, 0), // unused default value
             this_frame_idx,
         }
     }
@@ -78,7 +78,7 @@ impl<'a> Frame<'a> {
             };
 
             let hue = (feat_hash & 0xFFFFFFFF) as f32 / (u32::MAX as f32);
-            self.color = ColorRgb::new_hsl(hue, 0.7, 0.7);
+            self.color = Color::hsl(hue, 0.7, 0.7);
         }
 
         self.last = Some((feat, point));

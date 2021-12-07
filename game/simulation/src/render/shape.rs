@@ -1,4 +1,4 @@
-use color::ColorRgb;
+use color::Color;
 use serde::Deserialize;
 
 #[derive(Debug, Copy, Clone, Deserialize)]
@@ -41,7 +41,7 @@ pub enum RenderHexColor {
     },
 }
 
-impl From<RenderHexColor> for ColorRgb {
+impl From<RenderHexColor> for Color {
     fn from(c: RenderHexColor) -> Self {
         match c {
             RenderHexColor::Hex(i) => {
@@ -49,9 +49,9 @@ impl From<RenderHexColor> for ColorRgb {
                 let int = u32::from_be_bytes(bytes);
                 int.into()
             }
-            RenderHexColor::RgbInt { r, g, b } => Self::new(r, g, b),
-            RenderHexColor::RgbFloat { r, g, b } => Self::new_float(r, g, b),
-            RenderHexColor::Hsl { h, s, l } => Self::new_hsl(h, s, l),
+            RenderHexColor::RgbInt { r, g, b } => Self::rgb(r, g, b),
+            RenderHexColor::RgbFloat { r, g, b } => Self::rgb_f(r, g, b),
+            RenderHexColor::Hsl { h, s, l } => Self::hsl(h, s, l),
         }
     }
 }

@@ -6,7 +6,7 @@ use imageproc::drawing::{draw_filled_rect_mut, draw_line_segment_mut};
 use imageproc::rect::Rect;
 use tokio::time::Duration;
 
-use color::ColorRgb;
+use color::Color;
 use common::num_traits::clamp;
 use common::*;
 use grid::{DynamicGrid, GridImpl};
@@ -59,8 +59,8 @@ impl Render {
         let zoom = params.zoom as f64;
         let image_size = planet_size * params.zoom;
 
-        let sea = ColorRgb::new(44, 114, 161);
-        let land = ColorRgb::new(185, 130, 82);
+        let sea = Color::rgb(44, 114, 161);
+        let land = Color::rgb(185, 130, 82);
 
         let planet_ref = self.planet.clone();
         let fut_image = tokio::spawn(async move {
@@ -104,13 +104,16 @@ impl Render {
             }
 
             if params.draw_continent_polygons {
-                let mut random_colors =
-                    ColorRgb::unique_randoms(0.7, 0.4, &mut thread_rng()).unwrap();
+                let mut random_colors = Color::unique_randoms(
+                    NormalizedFloat::new(0.7),
+                    NormalizedFloat::new(0.4),
+                    &mut thread_rng(),
+                );
 
                 // draw polygon outlines
                 let zoom = zoom as f32;
                 for (_, polygon) in planet.continents.continent_polygons() {
-                    let color = random_colors.next_please();
+                    let color = random_colors.next().unwrap();
                     let coords = {
                         let most = polygon.coords_iter().tuple_windows();
                         let last = polygon.coords_iter().last().unwrap();
@@ -202,8 +205,9 @@ impl Render {
             RenderProgressParams::Temperature => {
                 climate.temperature.iter_average(layer, |coord, val| {
                     debug_assert!((0.0..=1.0).contains(&val), "val={:?}", val);
-                    let c = color_for_temperature(val as f32);
-                    put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
+                    let mut c = color_for_temperature(val as f32);
+                    *c.alpha() = 50;
+                    put_pixel_scaled(&mut overlay, scale, coord, c);
                 })
             }
             RenderProgressParams::Wind => {
@@ -237,13 +241,14 @@ impl Render {
                         AirLayer::High => 0.1,
                     };
 
-                    let color = ColorRgb::new_hsl(direction, 0.6, 0.5);
+                    let mut color = Color::hsl(direction, 0.6, 0.5);
+                    *color.alpha() = opacity;
 
                     draw_line_segment_mut(
                         &mut overlay,
                         (line_start.x * scale, line_start.y * scale),
                         (line_end.x * scale, line_end.y * scale),
-                        Rgba(color.array_with_alpha(opacity)),
+                        Rgba(color.into()),
                     );
 
                     // let magnitude = wind.velocity.magnitude();
@@ -254,8 +259,9 @@ impl Render {
             RenderProgressParams::AirPressure => {
                 climate.air_pressure.iter_average(layer, |coord, val| {
                     debug_assert!((0.0..=1.0).contains(&val), "val={:?}", val);
-                    let c = color_for_temperature(val as f32);
-                    put_pixel_scaled(&mut overlay, scale, coord, c.array_with_alpha(50));
+                    let mut c = color_for_temperature(val as f32);
+                    *c.alpha() = 50;
+                    put_pixel_scaled(&mut overlay, scale, coord, c);
                 });
             }
         };
@@ -389,11 +395,11 @@ impl Render {
                         );
 
                         let (h, s) = block_type.color_hs();
-                        ColorRgb::new_hsl(h, s, l)
+                        Color::hsl(h, s, l)
                     }
                     None => {
                         // hot pink if missing
-                        ColorRgb::new_hsl(0.83, 1.0, 0.7)
+                        Color::hsl(0.83, 1.0, 0.7)
                     }
                 };
 
@@ -478,7 +484,7 @@ fn put_pixel_scaled(image: &mut RgbaImage, scale: u32, pos: impl PixelPos, color
 /// 0=cold, 1=hot
 /// https://gist.github.com/stasikos/06b02d18f570fc1eaa9f
 #[allow(clippy::excessive_precision)]
-fn color_for_temperature(temp: f32) -> ColorRgb {
+fn color_for_temperature(temp: f32) -> Color {
     // scale to kelvin
     let kelvin = (1.0 - temp) * 8000.0;
 
@@ -559,7 +565,7 @@ fn color_for_temperature(temp: f32) -> ColorRgb {
         1.0
     };
 
-    ColorRgb::new_float(r, g, b)
+    Color::rgb_f(r, g, b)
 }
 
 impl PixelPos for [usize; 3] {
@@ -580,9 +586,9 @@ impl PixelPos for (u32, u32) {
     }
 }
 
-impl PixelColor for ColorRgb {
+impl PixelColor for Color {
     fn color(self) -> Rgba<u8> {
-        Rgba(self.array_with_alpha(255))
+        Rgba(self.into())
     }
 }
 

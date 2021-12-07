@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use resources::Shaders;
 use simulation::{PhysicalComponent, RenderComponent, Renderer, TransformComponent};
@@ -138,7 +138,7 @@ impl Renderer for GlRenderer {
         let radius = (physical.max_dimension().metres() / 2.0) + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
-        self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));
+        self.debug_add_line(from, to, Color::rgb(250, 250, 250));
     }
 
     fn sim_finish(&mut self) -> GlResult<()> {
@@ -148,7 +148,7 @@ impl Renderer for GlRenderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: ColorRgb) {
+    fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: Color) {
         // keep z normalized around 0
         let ctx = frame_ctx!(self);
         from.modify_z(|z| z - ctx.z_offset);
@@ -160,7 +160,7 @@ impl Renderer for GlRenderer {
         });
     }
 
-    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: ColorRgb) {
+    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: Color) {
         // TODO add proper support for quads and other debug shapes
         self.debug_add_line(points[0], points[1], color);
         self.debug_add_line(points[1], points[2], color);
@@ -168,7 +168,7 @@ impl Renderer for GlRenderer {
         self.debug_add_line(points[3], points[0], color);
     }
 
-    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: ColorRgb) {
+    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: Color) {
         const SEGMENTS: usize = 30;
 
         (0..SEGMENTS)

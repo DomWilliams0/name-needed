@@ -4,12 +4,12 @@ use crate::render::DebugRenderer;
 
 use crate::senses::SensesComponent;
 use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
-use color::ColorRgb;
+use color::Color;
 use common::cgmath::Rotation;
 use common::*;
 
-const COLOR_VISION: ColorRgb = ColorRgb::new(70, 200, 100);
-const COLOR_HEARING: ColorRgb = ColorRgb::new(180, 200, 80);
+const COLOR_VISION: Color = Color::rgb(70, 200, 100);
+const COLOR_HEARING: Color = Color::rgb(180, 200, 80);
 
 #[derive(Default)]
 pub struct SensesDebugRenderer;
