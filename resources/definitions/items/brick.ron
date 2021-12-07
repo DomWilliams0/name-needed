@@ -5,6 +5,7 @@
       {"name": (
         name: "Stone brick",
       )},
+      {"breakable": ()},
       {"haulable": (
         extra_hands: 1,
       )},
