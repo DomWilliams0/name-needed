@@ -2,7 +2,7 @@ use crate::render::sdl::gl::{
     generate_circle_mesh, generate_quad_mesh, AttribType, BufferUsage, Divisor, GlResult,
     InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
 };
-use crate::render::sdl::render::renderer::GlfFrameContext;
+use crate::render::sdl::render::renderer::GlFrameContext;
 use color::ColorRgb;
 use common::*;
 use resources::Shaders;
@@ -118,7 +118,7 @@ impl EntityRenderer {
         self.entities.push(entity);
     }
 
-    pub fn render_entities(&mut self, frame_ctx: &GlfFrameContext) -> GlResult<()> {
+    pub fn render_entities(&mut self, frame_ctx: &GlFrameContext) -> GlResult<()> {
         // sort by shape
         self.entities
             .sort_unstable_by_key(|(_, shape, _, _, _)| shape.ord());

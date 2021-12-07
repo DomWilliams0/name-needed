@@ -16,7 +16,7 @@ use crate::render::sdl::render::terrain::TerrainRenderer;
 
 pub struct GlRenderer {
     /// Populated between init() and deinit()
-    frame_ctx: Option<GlfFrameContext>,
+    frame_ctx: Option<GlFrameContext>,
     terrain_renderer: TerrainRenderer,
     entity_renderer: EntityRenderer,
 
@@ -24,7 +24,7 @@ pub struct GlRenderer {
     debug_pipeline: Pipeline,
 }
 
-pub struct GlfFrameContext {
+pub struct GlFrameContext {
     pub projection: Matrix4,
     pub view: Matrix4,
 
@@ -93,7 +93,7 @@ macro_rules! frame_ctx {
 }
 
 impl Renderer for GlRenderer {
-    type FrameContext = GlfFrameContext;
+    type FrameContext = GlFrameContext;
     type Error = GlError;
 
     fn init(&mut self, target: Self::FrameContext) {
