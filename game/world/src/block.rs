@@ -169,7 +169,7 @@ impl BlockType {
             BlockType::Stone => ColorRgb::new(106, 106, 117),
             BlockType::Sand => 0xBCA748FF.into(),
             BlockType::SolidWater => 0x3374BCFF.into(),
-            BlockType::StoneBrickWall => 0x9E8261FF.into(),
+            BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
             BlockType::Chest => ColorRgb::new(184, 125, 31),
             BlockType::IncompleteBuild => 0x3D3D3DFF.into(),
         }

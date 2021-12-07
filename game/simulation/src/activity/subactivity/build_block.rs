@@ -57,7 +57,7 @@ impl BuildBlockSubactivity {
         }
 
         // collect reserved materials
-        let materials = resolve_job_materials(ctx, job)?;
+        let (materials, (progress_steps, progress_rate)) = resolve_job(ctx, job)?;
 
         let helper = ctx
             .world()
@@ -65,10 +65,6 @@ impl BuildBlockSubactivity {
             .start_build(details.clone(), job, materials);
         // wait for that block to appear
         ctx.yield_now().await;
-
-        // TODO progression rate depends on job
-        let progress_steps = 8;
-        let progress_rate = 4; // ticks between step
 
         for _ in 0..progress_steps {
             // TODO roll the dice for each step/hit/swing, e.g. injury
@@ -83,10 +79,10 @@ impl BuildBlockSubactivity {
     }
 }
 
-fn resolve_job_materials(
+fn resolve_job(
     ctx: &ActivityContext,
     job: SocietyJobHandle,
-) -> Result<Arc<Vec<Entity>>, BuildBlockError> {
+) -> Result<(Arc<Vec<Entity>>, (u32, u32)), BuildBlockError> {
     // find job in society
     let job_ref = job
         .resolve(ctx.world().resource())
@@ -99,5 +95,6 @@ fn resolve_job_materials(
         .ok_or(BuildBlockError::InvalidJob(job))?;
 
     let materials = build_job.reserved_materials().map(Into::into).collect_vec();
-    Ok(Arc::new(materials))
+    let progression = build_job.build().progression();
+    Ok((Arc::new(materials), progression))
 }

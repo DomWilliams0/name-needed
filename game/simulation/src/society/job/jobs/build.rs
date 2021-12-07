@@ -135,6 +135,10 @@ impl BuildThingJob {
         self.reserved_materials.iter().copied()
     }
 
+    pub fn build(&self) -> &dyn Build {
+        &*self.build
+    }
+
     pub fn details(&self) -> BuildDetails {
         BuildDetails {
             pos: self.position,

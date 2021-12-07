@@ -15,7 +15,7 @@
 	* [o] build activity
 	* [.] build progression block
 		* [X] place block during build
-		* [ ] define progress rate in data
+		* [X] define progress rate per build
 		* [ ] continuable progress after interruption
 		* [ ] drop unconsumed materials on cancel/destruction
 	* [ ] split a stack to reserve only the exact number needed
@@ -36,3 +36,4 @@
 	* [ ] show building job info
 * [X] remove destroy_container() helper and move impl into kill_entity
 * [ ] lua api for building things
+* [ ] define builds in data rather than code

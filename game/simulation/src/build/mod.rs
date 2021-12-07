@@ -18,6 +18,9 @@ pub trait Build: Debug {
     /// Target block
     fn output(&self) -> BlockType;
 
+    /// (number of steps required, ticks to sleep between each step)
+    fn progression(&self) -> (u32, u32);
+
     // TODO can this somehow return an iterator of build materials?
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>);
 }
@@ -68,8 +71,11 @@ pub struct StoneBrickWall;
 
 impl Build for StoneBrickWall {
     fn output(&self) -> BlockType {
-        // TODO stone wall block
-        BlockType::Stone
+        BlockType::StoneBrickWall
+    }
+
+    fn progression(&self) -> (u32, u32) {
+        (20, 4)
     }
 
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>) {
