@@ -116,6 +116,7 @@ fn building(ecs: &EcsWorld) {
 
     let mut colors = helpers::entity_colours();
     let humans = helpers::get_config_count("humans");
+    let food = helpers::get_config_count("food");
 
     let society = ecs
         .resource_mut::<PlayerSociety>()
@@ -127,6 +128,15 @@ fn building(ecs: &EcsWorld) {
             .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
+    });
+
+    let food = spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
+        let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
+        let food = helpers::new_entity("core_food_apple", ecs, pos)
+            .with_nutrition(nutrition)
+            .thanks();
+
+        food
     });
 
     let bricks = spawn_entities_randomly(
