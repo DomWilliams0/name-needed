@@ -79,6 +79,6 @@ impl Build for StoneBrickWall {
     }
 
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>) {
-        materials_out.push(BuildMaterial::new("core_brick_stone", 2))
+        materials_out.push(BuildMaterial::new("core_brick_stone", 6))
     }
 }

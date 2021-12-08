@@ -31,6 +31,9 @@ pub enum ContainerError {
     #[error("Item is not stackable: {0}")]
     NonStackableItem(ComponentGetError),
 
+    #[error("Item is missing critical components for stacking")]
+    MissingComponents,
+
     #[error("Item stackability must be > 0")]
     InvalidStackSize,
 
@@ -172,7 +175,7 @@ impl EcsExtContainers<'_> {
     }
 
     /// Creates a new stack at the given entity's location and puts it inside. Item should not be a
-    /// stack, should be stackable, and have a transform. Returns new stack entity
+    /// stack, should be stackable, and have a transform and physical. Returns new stack entity
     pub fn convert_to_stack(&self, item: Entity) -> Result<Entity, ContainerError> {
         // ensure stackable
         let stack_size = self
@@ -188,14 +191,20 @@ impl EcsExtContainers<'_> {
             return Err(ContainerError::AlreadyStacked);
         }
 
-        // create stack
+        // ensure other necessary components
+        if !self.0.has_component::<TransformComponent>(item)
+            || !self.0.has_component::<PhysicalComponent>(item)
+        {
+            return Err(ContainerError::MissingComponents);
+        }
+
+        // create stack with item already inside
         let stack_container = {
+            let stack = ItemStack::new_with_item(stack_size, item, self.0)?;
             let entity = Entity::from(
                 self.0
                     .create_entity()
-                    .with(ItemStackComponent {
-                        stack: ItemStack::new(stack_size),
-                    })
+                    .with(ItemStackComponent { stack })
                     .build(),
             );
 
@@ -210,9 +219,7 @@ impl EcsExtContainers<'_> {
             entity
         };
 
-        // kill on failure
-        let bomb = EntityBomb::new(stack_container, self.0);
-
+        // sort out components
         let mut physicals = self.0.write_storage::<PhysicalComponent>();
         let mut stacks = self.0.write_storage::<ItemStackComponent>();
 
@@ -222,30 +229,12 @@ impl EcsExtContainers<'_> {
             .components(stack_container, (&mut physicals, &mut stacks))
             .unwrap(); // just added
 
-        // attempt to put item inside
-        match stack.stack.try_add(item) {
-            Ok(_) => {
-                // success
-                self.on_successful_stack_addition(
-                    stack_container,
-                    stack_physical,
-                    item,
-                    item_volume,
-                );
-            }
-            Err(err) => {
-                warn!("failed to create stack for item"; "err" => %err);
-
-                // redundant stack entity will be destroyed on return
-                return Err(ContainerError::StackError(err));
-            }
-        }
-
+        self.on_successful_stack_addition(stack_container, stack_physical, item, item_volume);
         debug!("created stack from item"; "item" => item, "stack" => stack_container);
-        bomb.defuse();
         Ok(stack_container)
     }
 
+    /// Item is checked for homogeneity with the stack
     pub fn add_to_stack(&self, stack: Entity, item: Entity) -> Result<(), ContainerError> {
         // ensure stackable, in the world, not already stacked
         if let Err(err) = self.0.component::<StackableComponent>(item) {
@@ -278,7 +267,7 @@ impl EcsExtContainers<'_> {
             ))?;
 
         // try to add
-        stack_comp.stack.try_add(item)?;
+        stack_comp.stack.try_add(item, self.0)?;
 
         // success - remove components
         self.on_successful_stack_addition(stack, stack_physical, item, item_volume);

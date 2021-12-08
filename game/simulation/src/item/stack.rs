@@ -1,3 +1,4 @@
+use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 use common::*;
 use std::num::NonZeroU16;
@@ -6,14 +7,31 @@ use std::num::NonZeroU16;
 pub enum ItemStackError {
     #[error("Item stack is full")]
     Full,
+
+    #[error("{0} is not homogenous with the rest of the stack")]
+    NotHomogenous(Entity),
+
+    #[error("Cannot calculate homogeneity for {0}")]
+    CantGetHomogeneity(Entity),
 }
 
+/// Defines the criteria for allowing an item into a stack
+#[derive(Debug)]
+struct StackHomogeneity {
+    // TODO use a better way than hacky definition names
+    definition: String,
+}
+
+/// A stack of homogenous entities that are still distinct but stacked together. Examples might
+/// be a stack of arrows holds 10xsteel_arrows, 12xwood_arrows
 #[derive(Debug)]
 pub struct ItemStack {
     contents: Vec<StackedEntity>,
     total_count: u16,
+    homogeneity: StackHomogeneity,
 }
 
+/// A stack of IDENTICAL entities
 #[derive(Debug)] // TODO implement manually e.g. "1xentity"
 struct StackedEntity {
     entity: Entity,
@@ -30,26 +48,44 @@ pub struct ItemStackComponent {
 }
 
 impl ItemStack {
-    pub fn new(max_size: NonZeroU16) -> Self {
-        ItemStack {
+    pub fn new_with_item(
+        max_size: NonZeroU16,
+        first_item: Entity,
+        world: &EcsWorld,
+    ) -> Result<Self, ItemStackError> {
+        let homogeneity = StackHomogeneity::from_entity(first_item, world)
+            .ok_or(ItemStackError::CantGetHomogeneity(first_item))?;
+
+        let mut stack = ItemStack {
             contents: Vec::with_capacity(max_size.get() as usize),
             total_count: 0,
-        }
+            homogeneity,
+        };
+
+        stack.add_internal(first_item, world);
+        Ok(stack)
     }
 
     /// Does not touch any components, ensure they are updated
-    pub fn try_add(&mut self, entity: Entity) -> Result<(), ItemStackError> {
+    pub fn try_add(&mut self, entity: Entity, world: &EcsWorld) -> Result<(), ItemStackError> {
         if self.is_full() {
             Err(ItemStackError::Full)
+        } else if !self.homogeneity.matches(entity, world) {
+            Err(ItemStackError::NotHomogenous(entity))
         } else {
-            // TODO attempt to combine identical entities
-
-            // add distinct item
-            self.contents.push(StackedEntity { entity, count: 1 });
-            self.total_count += 1;
-
-            Ok(())
+            Ok(self.add_internal(entity, world))
         }
+    }
+
+    /// Capacity and homogeneity must have been checked
+    fn add_internal(&mut self, entity: Entity, world: &EcsWorld) {
+        debug_assert!(!self.is_full());
+        debug_assert!(self.homogeneity.matches(entity, world));
+        // TODO attempt to combine identical entities, which will require killing the old copy
+
+        // add distinct item
+        self.contents.push(StackedEntity { entity, count: 1 });
+        self.total_count += 1;
     }
 
     pub fn is_full(&self) -> bool {
@@ -69,6 +105,25 @@ impl ItemStack {
         self.total_count
     }
 }
+
+impl StackHomogeneity {
+    pub fn from_entity(e: Entity, world: &EcsWorld) -> Option<Self> {
+        world
+            .component::<DefinitionNameComponent>(e)
+            .ok()
+            .map(|def| StackHomogeneity {
+                definition: def.0.clone(),
+            })
+    }
+
+    pub fn matches(&self, e: Entity, world: &EcsWorld) -> bool {
+        world
+            .component::<DefinitionNameComponent>(e)
+            .map(|def| self.definition == def.0)
+            .unwrap_or(false)
+    }
+}
+
 #[cfg(debug_assertions)]
 mod validation {
     use super::*;
