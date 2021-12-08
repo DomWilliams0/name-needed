@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use common::*;
 
 use crate::ecs::world::{ComponentRefErased, SpecsWorld};
-use crate::{EcsWorld, Entity};
+use crate::{ComponentWorld, EcsWorld, Entity};
 
 #[derive(Debug, Error)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -67,7 +67,7 @@ pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
 pub type GetComponentFn = fn(&EcsWorld, Entity) -> Option<ComponentRefErased>;
 pub type AsInteractiveFn = unsafe fn(&()) -> Option<&dyn InteractiveComponent>;
-pub type CloneToFn = fn(&EcsWorld, Entity, Entity) -> Result<(), specs::error::Error>;
+pub type CloneToFn = fn(&EcsWorld, Entity, Entity);
 
 pub struct ComponentEntry {
     pub name: &'static str,
@@ -227,13 +227,22 @@ impl ComponentRegistry {
         })
     }
 
+    /// Returns Err if either entity is not alive.
     /// Only components not marked as `#[clone(disallow)]`
-    pub fn copy_components_to(&self, world: &EcsWorld, source: Entity, dest: Entity) {
-        for (name, cloneable) in self.cloneables.iter() {
-            trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
-            if let Err(err) = (cloneable)(world, source, dest) {
-                warn!("failed to copy {}: {}", name, err);
+    pub fn copy_components_to(
+        &self,
+        world: &EcsWorld,
+        source: Entity,
+        dest: Entity,
+    ) -> Result<(), ()> {
+        if world.is_entity_alive(source) && world.is_entity_alive(dest) {
+            for (name, cloneable) in self.cloneables.iter() {
+                trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
+                (cloneable)(world, source, dest);
             }
+            Ok(())
+        } else {
+            Err(())
         }
     }
 }

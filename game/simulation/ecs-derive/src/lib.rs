@@ -39,14 +39,13 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
                 let mut storage = world.write_storage::<Self>();
                 let comp = storage.get(source.into()).cloned();
                 if let Some(comp) = comp {
-                    storage.insert(dest.into(), comp)?;
+                    // assume entity is alive
+                    let _ = storage.insert(dest.into(), comp);
                 }
-
-                Ok(())
             },
             quote! { Some(#comp ::clone_to), },
         ),
-        CloneBehaviour::Disallow => (quote! { Ok(()) }, quote! { None }),
+        CloneBehaviour::Disallow => (quote! {}, quote! { None }),
     };
 
     let result = quote! {
@@ -69,7 +68,7 @@ pub fn ecs_component_derive(input: TokenStream) -> TokenStream {
                 #as_interactive
             }
 
-            fn clone_to(world: &EcsWorld, source: Entity, dest: Entity) -> Result<(), specs::error::Error> {
+            fn clone_to(world: &EcsWorld, source: Entity, dest: Entity) {
                 #clone
             }
         }

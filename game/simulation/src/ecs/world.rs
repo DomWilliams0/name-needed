@@ -196,8 +196,9 @@ impl EcsWorld {
         self.component_registry.all_components_for(self, entity)
     }
 
+    /// Returns Err if either entity is not alive.
     /// Only components not marked as `#[clone(disallow)]`
-    pub fn copy_components_to(&self, source: Entity, dest: Entity) {
+    pub fn copy_components_to(&self, source: Entity, dest: Entity) -> Result<(), ()> {
         self.component_registry
             .copy_components_to(self, source, dest)
     }

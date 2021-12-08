@@ -208,7 +208,7 @@ impl EcsExtContainers<'_> {
                     .build(),
             );
 
-            self.0.copy_components_to(item, entity);
+            self.0.copy_components_to(item, entity).unwrap(); // both entities are definitely alive
 
             // adjust stack name, terribly hacky and temporary string manipulation
             if let Ok(mut name) = self.0.component_mut::<NameComponent>(entity) {
