@@ -107,6 +107,12 @@ impl Gl {
         // enable depth test for everything by default
         Capability::DepthTest.enable();
 
+        // enable blending for alpha
+        unsafe {
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        }
+        Capability::Blend.enable();
+
         Ok(Self { gl_context })
     }
 
