@@ -15,6 +15,12 @@ use specs::BitSet;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
+// TODO build requirement engine for generic material combining
+//      each job owns an instance, lends it to UI for rendering
+//      consumes generic requirements through enum, "is wood", "can cut" etc. use def names for now
+//      reports original requirements (for ui), what's already gathered (for ui), what's remaining (for gather tasks)
+//          emits iterator of BuildMaterials, and an impl Display
+
 #[derive(Debug)]
 pub struct BuildThingJob {
     // TODO support builds spanning multiple blocks/range
@@ -22,17 +28,35 @@ pub struct BuildThingJob {
     build: Box<dyn Build>,
     required_materials: Vec<BuildMaterial>,
     reserved_materials: HashSet<Entity>,
+
+    /// Steps completed so far
+    progress: u32,
+
+    /// Gross temporary way of tracking remaining materials
+    materials_remaining: HashMap<&'static str, u16>,
+
     /// Set if any material types are invalid e.g. not haulable
     missing_any_requirements: Cell<bool>,
 
     /// Set in first call to [populate_initial_tasks]
     this_job: Cell<Option<SocietyJobHandle>>,
+
+    /// Entity representing this job in UI with UiElementComponent, set post spawn
+    ui_element: Option<Entity>,
 }
 
+/// Lightweight struct of end goals for a build, to be used for deciding whether to work on a build.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BuildDetails {
     pub pos: WorldPosition,
     pub target: BlockType,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct BuildProgressDetails {
+    pub total_steps_needed: u32,
+    pub progress_rate: u32,
+    pub steps_completed: u32,
 }
 
 #[derive(Debug, Error)]
@@ -48,15 +72,18 @@ impl BuildThingJob {
         Self {
             position: block,
             build: Box::new(build),
+            progress: 0,
             required_materials: materials,
             reserved_materials: HashSet::new(),
+            materials_remaining: HashMap::new(), // replaced on each call
             missing_any_requirements: Cell::new(false),
             this_job: Cell::new(None),
+            ui_element: None,
         }
     }
 
     // TODO fewer temporary allocations
-    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&str, u16> {
+    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, u16> {
         let this_job = self.this_job.get().unwrap(); // set before this is called
 
         let job_pos = self.position.centred();
@@ -135,15 +162,37 @@ impl BuildThingJob {
         self.reserved_materials.iter().copied()
     }
 
-    pub fn build(&self) -> &dyn Build {
-        &*self.build
-    }
-
     pub fn details(&self) -> BuildDetails {
         BuildDetails {
             pos: self.position,
             target: self.build.output(),
         }
+    }
+
+    pub fn progress(&self) -> BuildProgressDetails {
+        let (total_steps_needed, progress_rate) = self.build.progression();
+        BuildProgressDetails {
+            total_steps_needed,
+            progress_rate,
+            steps_completed: self.progress,
+        }
+    }
+
+    pub fn set_ui_element(&mut self, e: Entity) {
+        assert!(self.ui_element.is_none(), "ui element already set");
+        self.ui_element = Some(e);
+    }
+
+    pub fn remaining_requirements(&self) -> impl Iterator<Item = BuildMaterial> + '_ {
+        self.materials_remaining
+            .iter()
+            .map(|(s, n)| BuildMaterial::new(*s, *n))
+    }
+
+    /// Returns new progress
+    pub fn make_progress(&mut self) -> u32 {
+        self.progress += 1;
+        self.progress
     }
 }
 
@@ -230,6 +279,9 @@ impl SocietyJobImpl for BuildThingJob {
                 false
             }
         });
+
+        // store this to show in the ui
+        self.materials_remaining = outstanding_requirements;
 
         if tasks.is_empty() {
             // all gather requirements are satisfied, do the build

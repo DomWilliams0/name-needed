@@ -1,3 +1,4 @@
+use crate::{ComponentWorld, EcsWorld};
 use common::*;
 use std::ops::{Deref, DerefMut};
 
@@ -14,6 +15,12 @@ pub struct Entity(specs::Entity);
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub struct EntityWrapper(pub specs::world::Index, pub std::num::NonZeroI32);
+
+/// Kills the given entity on drop unless defused
+pub struct EntityBomb<'a> {
+    entity: Entity,
+    world: &'a EcsWorld,
+}
 
 impl Display for EntityWrapper {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -99,6 +106,22 @@ impl From<EntityWrapper> for Entity {
         // safety: see doc comment on EntityWrapper (and unit test below)
         let specs = unsafe { std::mem::transmute::<_, specs::Entity>(e) };
         Self(specs)
+    }
+}
+
+impl<'a> EntityBomb<'a> {
+    pub fn new(entity: Entity, world: &'a EcsWorld) -> Self {
+        Self { entity, world }
+    }
+
+    pub fn defuse(self) {
+        std::mem::forget(self)
+    }
+}
+
+impl Drop for EntityBomb<'_> {
+    fn drop(&mut self) {
+        self.world.kill_entity(self.entity);
     }
 }
 

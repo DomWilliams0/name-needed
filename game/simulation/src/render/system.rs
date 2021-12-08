@@ -1,14 +1,18 @@
-use crate::ecs::*;
-use crate::input::{SelectedComponent, SelectedTiles};
-use crate::job::BuildThingJob;
-use crate::render::renderer::Renderer;
-use crate::render::shape::RenderHexColor;
-use crate::transform::{PhysicalComponent, TransformRenderDescription};
-use crate::{PlayerSociety, Shape2d, SliceRange, Societies, TransformComponent};
+use std::convert::TryInto;
+
+use serde::de::Error;
+
 use color::Color;
 use common::*;
-use serde::de::Error;
-use std::convert::TryInto;
+
+use crate::ecs::*;
+use crate::input::{SelectedComponent, SelectedTiles};
+
+use crate::render::renderer::Renderer;
+use crate::render::shape::RenderHexColor;
+use crate::render::UiElementComponent;
+use crate::transform::{PhysicalComponent, TransformRenderDescription};
+use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -31,17 +35,17 @@ pub struct RenderSystem<'a, R: Renderer> {
 impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         Read<'a, PlayerSociety>,
-        Read<'a, Societies>,
         Read<'a, SelectedTiles>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
         ReadStorage<'a, PhysicalComponent>,
         ReadStorage<'a, SelectedComponent>,
+        ReadStorage<'a, UiElementComponent>,
     );
 
     fn run(
         &mut self,
-        (player_soc, societies, selected_block, transform, render, physical, selected): Self::SystemData,
+        (player_soc, selected_block, transform, render, physical, selected, ui): Self::SystemData,
     ) {
         // render entities
         for (transform, render, physical, selected) in
@@ -74,24 +78,27 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 .tile_selection(from, to, Color::rgb(230, 240, 230));
         }
 
-        // render build job outlines for player's society
-        // TODO ui in world space will be redone better than this, so ignore inefficiency
-        if let Some(soc) = player_soc.0 {
-            if let Some(soc) = societies.society_by_handle(soc) {
-                for job in soc.jobs().iter_all() {
-                    let job = job.borrow();
-                    if let Some(build) = job.cast::<BuildThingJob>() {
-                        let details = build.details();
-                        self.renderer.tile_selection(
-                            details.pos,
-                            details.pos,
-                            Color::rgb(190, 190, 180),
-                        )
-
-                        // TODO show progress and target block with hovering text
-                    }
-                }
+        // render in-game ui elements above entities
+        for (transform, ui, selected) in (&transform, &ui, selected.maybe()).join() {
+            // only render elements for the player's society
+            if player_soc.0 != ui.society() {
+                continue;
             }
+
+            if !self.slices.contains(transform.slice()) {
+                continue;
+            }
+
+            // TODO interpolation needed on ui elements?
+            let mut transform_desc = TransformRenderDescription::from(transform);
+
+            // move up vertically above all visible entities
+            transform_desc
+                .position
+                .modify_z(|z| z + self.slices.size() as f32);
+
+            self.renderer
+                .sim_ui_element(&transform_desc, ui, selected.is_some());
         }
     }
 }

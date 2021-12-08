@@ -1,5 +1,5 @@
 use specs::storage::InsertResult;
-use std::alloc::Layout;
+
 use std::any::TypeId;
 use std::hint::unreachable_unchecked;
 use std::mem::ManuallyDrop;
@@ -13,10 +13,7 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{
-    definitions, Entity, InnerWorldRef, ItemStackComponent, QueuedUpdates, TransformComponent,
-    WorldRef,
-};
+use crate::{definitions, Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
@@ -87,6 +84,12 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     fn is_entity_alive(&self, entity: Entity) -> bool;
 
     // ---
+    fn kill_entities(&self, entities: &[Entity]) {
+        for e in entities {
+            self.kill_entity(*e)
+        }
+    }
+
     fn mk_component_error<T: Component>(&self, entity: Entity) -> ComponentGetError {
         if self.is_entity_alive(entity) {
             ComponentGetError::no_such_component::<T>(entity)
@@ -334,7 +337,7 @@ impl ComponentWorld for EcsWorld {
         }
 
         // kill before next maintain
-        let mut deathlist = self.resource_mut::<EntitiesToKill>();
+        let deathlist = self.resource_mut::<EntitiesToKill>();
         deathlist.0.extend(to_kill.into_iter());
     }
 

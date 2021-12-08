@@ -1,5 +1,5 @@
 use crate::job::job::SocietyJobImpl;
-use crate::job::{SocietyJob, SocietyTask};
+use crate::job::{BuildThingJob, SocietyJob, SocietyTask};
 use crate::simulation::Tick;
 use crate::society::job::job::SocietyJobRef;
 use crate::{EcsWorld, Entity, Societies, SocietyHandle};
@@ -57,6 +57,36 @@ impl SocietyJobHandle {
             .society_by_handle(self.society)
             .and_then(|society| society.jobs().find_job(self))
     }
+
+    pub fn resolve_and_cast<J: SocietyJobImpl + 'static, R>(
+        self,
+        societies: &Societies,
+        do_this: impl FnOnce(&J) -> R,
+    ) -> Option<R> {
+        let job_ref = societies
+            .society_by_handle(self.society)
+            .and_then(|society| society.jobs().find_job(self))?;
+
+        let job = job_ref.borrow();
+        let casted = job.cast::<J>()?;
+
+        Some(do_this(casted))
+    }
+
+    pub fn resolve_and_cast_mut<J: SocietyJobImpl + 'static, R>(
+        self,
+        societies: &Societies,
+        do_this: impl FnOnce(&mut J) -> R,
+    ) -> Option<R> {
+        let job_ref = societies
+            .society_by_handle(self.society)
+            .and_then(|society| society.jobs().find_job(self))?;
+
+        let mut job = job_ref.borrow_mut();
+        let casted = job.cast_mut::<J>()?;
+
+        Some(do_this(casted))
+    }
 }
 
 impl Debug for SocietyJobHandle {
@@ -84,16 +114,27 @@ impl SocietyJobList {
         };
 
         let job = SocietyJob::create(world, handle, job);
-        self.submit_internal(job)
+        self.submit_internal(world, job)
     }
 
     /// Without generic parameter to reduce code size
-    fn submit_internal(&mut self, job: SocietyJobRef) {
+    fn submit_internal(&mut self, world: &EcsWorld, job: SocietyJobRef) {
         debug!("submitting society job"; "job" => ?job);
         assert!(
             !self.no_more_jobs_temporarily,
             "job indices are still held, or allow_jobs_again wasn't called"
         );
+
+        {
+            // TODO special case for build job should be expanded to all jobs needing progress tracking
+            let j = job.borrow();
+            if let Some(build) = j.cast::<BuildThingJob>() {
+                world
+                    .helpers_building()
+                    .create_build(build.details(), job.handle());
+            }
+        }
+
         self.jobs.push(job);
     }
 

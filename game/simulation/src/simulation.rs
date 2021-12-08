@@ -25,12 +25,12 @@ use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{
     AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
-    DebugRenderersState,
+    DebugRenderersState, UiElementPruneSystem,
 };
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
-use crate::job::{SocietyCommand, SocietyJobHandle};
+use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
@@ -210,7 +210,6 @@ impl<R: Renderer> Simulation<R> {
         MovementFulfilmentSystem.run_now(&self.ecs_world);
 
         // process entity events
-        // ActivityEventSystem.run_now(&self.ecs_world);
         RuntimeSystem.run_now(&self.ecs_world);
 
         // apply physics
@@ -221,6 +220,9 @@ impl<R: Renderer> Simulation<R> {
 
         // update spatial
         SpatialSystem.run_now(&self.ecs_world);
+
+        // prune ui elements
+        UiElementPruneSystem.run_now(&self.ecs_world);
     }
 
     fn delete_queued_entities(&mut self) {

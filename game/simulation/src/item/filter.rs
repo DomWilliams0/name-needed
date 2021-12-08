@@ -36,13 +36,10 @@ impl<W: ComponentWorld> ItemFilterable for (Entity, Option<&W>) {
             }
             ItemFilter::Predicate(f) => f(item),
             ItemFilter::HasComponent(comp) => world.unwrap().has_component_by_name(comp, item),
-            ItemFilter::MatchesDefinition(def) => {
-                world
-                    .and_then(|w| w.component::<DefinitionNameComponent>(item).ok())
-                    .unwrap()
-                    .0
-                    == def
-            }
+            ItemFilter::MatchesDefinition(def) => world
+                .and_then(|w| w.component::<DefinitionNameComponent>(item).ok())
+                .map(|comp| comp.0 == def)
+                .unwrap_or(false),
         }
     }
 }

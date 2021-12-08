@@ -1,8 +1,13 @@
 use crate::ecs::*;
-use crate::job::{BuildDetails, SocietyJobHandle};
-use crate::{AssociatedBlockData, QueuedUpdates};
+use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
+use crate::render::UiElementComponent;
+use crate::{QueuedUpdates, TransformComponent};
+
 use common::*;
+
 use std::sync::Arc;
+use unit::space::length::{Length, Length2};
+
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -18,63 +23,78 @@ impl EcsWorld {
 
 pub struct BuildHelper {
     details: BuildDetails,
-    job: SocietyJobHandle,
+    reserved_materials: Arc<Vec<Entity>>,
 }
 
 impl<'w> EcsExtBuild<'w> {
+    pub fn create_build(self, details: BuildDetails, job: SocietyJobHandle) {
+        let pos = details.pos;
+        self.0
+            .resource::<QueuedUpdates>()
+            .queue("create wip build", move |world| {
+                // spawn entity for wip job
+                let wip_size = Length::blocks(1.0);
+                let wip = Entity::from(
+                    world
+                        .create_entity()
+                        .with(TransformComponent::new(pos.centred()))
+                        .with(UiElementComponent {
+                            build_job: job,
+                            size: Length2::new(wip_size, wip_size),
+                        })
+                        .build(),
+                );
+
+                // kill on failure
+                let bomb = EntityBomb::new(wip, &world);
+
+                // register ui entity with job
+                job.resolve_and_cast_mut(world.resource(), |build_job: &mut BuildThingJob| {
+                    trace!("spawned ui element entity for build job"; "ui" => wip, "job" => ?job);
+                    build_job.set_ui_element(wip);
+                })
+                .ok_or("invalid build job")?;
+
+                bomb.defuse();
+                Ok(())
+            });
+    }
+
     pub fn start_build(
         self,
         details: BuildDetails,
-        job: SocietyJobHandle,
-        reserved_materials: Arc<Vec<Entity>>,
+        reserved_materials: Vec<Entity>,
     ) -> BuildHelper {
-        // add special wip block to track progress, and consume materials
-        // TODO should this be an entity instead? it can be rendered differently
-        self.0
-            .resource_mut::<TerrainUpdatesRes>()
-            .push(WorldTerrainUpdate::new(
-                WorldPositionRange::with_single(details.pos),
-                BlockType::IncompleteBuild,
-            ));
-
-        let pos = details.pos;
+        let reserved_materials = Arc::new(reserved_materials);
+        let consumed_materials = reserved_materials.clone();
         self.0
             .resource::<QueuedUpdates>()
             .queue("start wip build", move |world| {
                 // consume materials
                 world
                     .helpers_comps()
-                    .consume_materials_for_job(&reserved_materials);
+                    .consume_materials_for_job(&consumed_materials);
                 // TODO consume materials incrementally as progress is made
-
-                // block update
-                let w = world.voxel_world();
-                let mut w = w.borrow_mut();
-                w.set_associated_block_data(
-                    pos,
-                    AssociatedBlockData::BuildJobWip {
-                        build: job,
-                        reserved_materials,
-                    },
-                );
 
                 Ok(())
             });
 
-        BuildHelper { details, job }
+        BuildHelper {
+            details,
+            reserved_materials,
+        }
     }
 }
 
 impl BuildHelper {
-    pub fn end_build(self, ecs: &EcsWorld) -> Result<(), ()> {
+    pub fn complete_build(self, ecs: &EcsWorld) -> Result<(), ()> {
         let world = ecs.voxel_world();
         let prev_block = {
             let world = world.borrow();
             world.block(self.details.pos).map(|b| b.block_type())
         };
 
-        if let Some(BlockType::IncompleteBuild) = prev_block { /* nice */
-        } else {
+        if !matches!(prev_block, Some(BlockType::Air)) {
             warn!("unexpected block type when finishing build"; "block" => %self.details.pos, "current" => ?prev_block);
             return Err(());
         }
@@ -86,35 +106,18 @@ impl BuildHelper {
                 self.details.target,
             ));
 
-        // remove wip associated data
-        let ass_data = {
-            let mut world = world.borrow_mut();
-            world.remove_associated_block_data(self.details.pos)
-        };
-
-        let materials = match ass_data {
-            Some(AssociatedBlockData::BuildJobWip {
-                reserved_materials,
-                build,
-            }) if build == self.job => reserved_materials,
-            other => {
-                warn!("removed unexpected associated data from newly built block"; "type" => ?self.details.target, "data" => ?other);
-                return Err(());
-            }
-        };
-
         // destroy consumed materials
+        let materials = self.reserved_materials;
         debug!("build job was completed, queueing material destruction"; "materials" => ?*materials);
         ecs.resource::<QueuedUpdates>().queue(
             "destroying materials for completed build",
             move |world| {
-                for material in &*materials {
-                    world.kill_entity(*material);
-                }
-
+                world.kill_entities(&materials);
                 Ok(())
             },
         );
+
+        // wip entity will be killed when the job is destroyed
 
         Ok(())
     }

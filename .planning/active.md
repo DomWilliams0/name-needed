@@ -14,9 +14,10 @@
 		* [X] reserve materials
 	* [o] build activity
 	* [.] build progression block
-		* [X] place block during build
+		* [X] spawn when job is created
+		* [X] remove on completion
 		* [X] define progress rate per build
-		* [ ] continuable progress after interruption
+		* [X] continuable progress after interruption
 		* [ ] drop unconsumed materials on cancel/destruction
 	* [ ] split a stack to reserve only the exact number needed
 	* [ ] define materials in data (wood, stone)
@@ -24,6 +25,7 @@
 * [ ] allow multiple concurrent workers
 * [X] chore: replace direct uses of specs Entity with our own wrapper
 * [ ] ui commands to build
+* [X] show build details in ui
 * [X] fix constant churn of gather materials DSE choice
 * [ ] bug: if multiple people are sharing a gather task, they will keep collecting even after the last one is delivered - panics on extra unexpected delivery
 * [ ] allow smooth changing of material gathering target job without dropping the current haul
@@ -37,3 +39,4 @@
 * [X] remove destroy_container() helper and move impl into kill_entity
 * [ ] lua api for building things
 * [ ] define builds in data rather than code
+* [ ] build material requirement engine

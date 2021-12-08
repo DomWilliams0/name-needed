@@ -1,11 +1,9 @@
 use crate::ecs::ComponentGetError;
 
-use std::sync::Arc;
-
 use crate::activity::context::ActivityContext;
 use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
 
-use crate::{ComponentWorld, Entity};
+use crate::ComponentWorld;
 use crate::{TransformComponent, WorldPosition};
 use common::*;
 use unit::world::WorldPoint;
@@ -24,10 +22,7 @@ pub enum BuildBlockError {
     #[error("Failed to set block during completion")]
     CompletionFailed,
 
-    #[error("Job not found in society")]
-    JobNotFound(SocietyJobHandle),
-
-    #[error("Job is not a build job")]
+    #[error("Job not found or is not a build job")]
     InvalidJob(SocietyJobHandle),
 }
 
@@ -57,44 +52,43 @@ impl BuildBlockSubactivity {
         }
 
         // collect reserved materials
-        let (materials, (progress_steps, progress_rate)) = resolve_job(ctx, job)?;
+        let (materials, progress_details) = job
+            .resolve_and_cast(ctx.world().resource(), |build_job: &BuildThingJob| {
+                let materials = build_job.reserved_materials().map(Into::into).collect_vec();
+                let progress = build_job.progress();
+
+                (materials, progress)
+            })
+            .ok_or(BuildBlockError::InvalidJob(job))?;
 
         let helper = ctx
             .world()
             .helpers_building()
-            .start_build(details.clone(), job, materials);
+            .start_build(details.clone(), materials);
         // wait for that block to appear
         ctx.yield_now().await;
 
-        for _ in 0..progress_steps {
+        loop {
             // TODO roll the dice for each step/hit/swing, e.g. injury
 
-            ctx.wait(progress_rate).await;
+            // need to reresolve the job each time
+            let new_progress = job
+                .resolve_and_cast_mut(ctx.world().resource(), |build_job: &mut BuildThingJob| {
+                    build_job.make_progress()
+                })
+                .ok_or(BuildBlockError::InvalidJob(job))?;
+
+            if new_progress >= progress_details.total_steps_needed {
+                break;
+            }
+
+            // TODO ensure we break out of this wait early if job is finished during
+            ctx.wait(progress_details.progress_rate).await;
         }
 
         helper
-            .end_build(ctx.world())
+            .complete_build(ctx.world())
             .map_err(|_| BuildBlockError::CompletionFailed)?;
         Ok(())
     }
-}
-
-fn resolve_job(
-    ctx: &ActivityContext,
-    job: SocietyJobHandle,
-) -> Result<(Arc<Vec<Entity>>, (u32, u32)), BuildBlockError> {
-    // find job in society
-    let job_ref = job
-        .resolve(ctx.world().resource())
-        .ok_or(BuildBlockError::JobNotFound(job))?;
-
-    // cast job to a build job
-    let job_ref = job_ref.borrow();
-    let build_job = job_ref
-        .cast::<BuildThingJob>()
-        .ok_or(BuildBlockError::InvalidJob(job))?;
-
-    let materials = build_job.reserved_materials().map(Into::into).collect_vec();
-    let progression = build_job.build().progression();
-    Ok((Arc::new(materials), progression))
 }

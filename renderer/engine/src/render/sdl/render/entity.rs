@@ -114,8 +114,15 @@ impl EntityRenderer {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, Color, Length2, Basis2)) {
-        self.entities.push(entity);
+    pub fn add_entity(
+        &mut self,
+        pos: WorldPoint,
+        shape: Shape2d,
+        color: Color,
+        size: Length2,
+        rot: Basis2,
+    ) {
+        self.entities.push((pos, shape, color, size, rot));
     }
 
     pub fn render_entities(&mut self, frame_ctx: &GlFrameContext) -> GlResult<()> {

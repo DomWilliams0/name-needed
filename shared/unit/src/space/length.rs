@@ -1,3 +1,4 @@
+use crate::world::BLOCKS_PER_METRE;
 use common::{derive_more::*, *};
 use std::ops::{Div, DivAssign};
 
@@ -15,18 +16,27 @@ pub struct Length2(Length, Length);
 
 impl Length {
     /// How many in 1 metre
-    const SCALE: f32 = 10.0;
+    const SCALE: u16 = 10;
+
+    /// How many in 1 metre
+    const SCALE_F: f32 = Self::SCALE as f32;
 
     pub const fn new(len: u16) -> Self {
         Self(len)
     }
+
     pub fn metres(self) -> f32 {
-        (self.0 as f32) / Self::SCALE
+        (self.0 as f32) / Self::SCALE_F
+    }
+
+    pub fn blocks(n: f32) -> Self {
+        let l = n * Self::SCALE_F / (BLOCKS_PER_METRE as f32);
+        Self(l as u16)
     }
 }
 
 impl Length3 {
-    pub fn new(x: u16, y: u16, z: u16) -> Self {
+    pub fn new<F: Into<Length>>(x: F, y: F, z: F) -> Self {
         Length3(x.into(), y.into(), z.into())
     }
 
@@ -53,6 +63,10 @@ impl Length3 {
 }
 
 impl Length2 {
+    pub fn new<F: Into<Length>>(x: F, y: F) -> Self {
+        Length2(x.into(), y.into())
+    }
+
     pub const fn x(self) -> Length {
         self.0
     }

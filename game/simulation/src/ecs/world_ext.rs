@@ -1,9 +1,8 @@
 use unit::world::WorldPoint;
 
-use crate::activity::HaulError;
 use crate::build::{ConsumedMaterialForJobComponent, ReservedMaterialComponent};
 use crate::ecs::{EcsWorld, Entity, WorldExt};
-use crate::{ComponentWorld, Societies, TransformComponent};
+use crate::{ComponentWorld, TransformComponent};
 use common::*;
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
@@ -110,18 +109,13 @@ impl EcsExtComponents<'_> {
         job: SocietyJobHandle,
     ) -> Result<(), ReservationError> {
         // find job in society
-        let job_ref = job
-            .resolve(self.0.resource())
-            .ok_or(ReservationError::JobNotFound(job))?;
-
-        // cast job to a build job
-        let mut job_mut = job_ref.borrow_mut();
-        let build_job = job_mut
-            .cast_mut::<BuildThingJob>()
+        let succeeded = job
+            .resolve_and_cast_mut(self.0.resource(), |build_job: &mut BuildThingJob| {
+                build_job.add_reservation(material)
+            })
             .ok_or(ReservationError::InvalidJob(job))?;
 
-        // reserve in job
-        if !build_job.add_reservation(material) {
+        if !succeeded {
             return Err(ReservationError::AlreadyReserved(job, material));
         }
 

@@ -46,10 +46,6 @@ pub enum BlockType {
     StoneBrickWall,
 
     Chest,
-
-    /// Special block representing a build job in progress
-    // TODO stats vary depending on the build block
-    IncompleteBuild,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -171,7 +167,6 @@ impl BlockType {
             BlockType::SolidWater => 0x3374BCFF.into(),
             BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
             BlockType::Chest => Color::rgb(184, 125, 31),
-            BlockType::IncompleteBuild => 0x3D3D3DFF.into(),
         }
     }
 
@@ -192,7 +187,7 @@ impl BlockType {
             Dirt | Grass | LightGrass => 40,
             TreeTrunk => 70,
             Stone => 90,
-            Chest | StoneBrickWall | IncompleteBuild => 60,
+            Chest | StoneBrickWall => 60,
             SolidWater => u8::MAX,
         };
 

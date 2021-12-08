@@ -2,8 +2,9 @@ use color::Color;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
+use crate::render::UiElementComponent;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
-use crate::{RenderComponent, TransformComponent};
+use crate::RenderComponent;
 
 pub trait Renderer {
     type FrameContext;
@@ -23,12 +24,19 @@ pub trait Renderer {
         physical: &PhysicalComponent,
     );
 
-    /// The entity with the given transform is selected, highlight it
+    /// The entity with the given transform is selected, highlight it.
     /// Call in addition to `sim_entity`
     fn sim_selected(
         &mut self,
         transform: &TransformRenderDescription,
         physical: &PhysicalComponent,
+    );
+
+    fn sim_ui_element(
+        &mut self,
+        transform: &TransformRenderDescription,
+        ui: &UiElementComponent,
+        selected: bool,
     );
 
     /// Finish rendering simulation

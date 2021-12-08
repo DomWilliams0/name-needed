@@ -4,8 +4,10 @@ use color::Color;
 use common::*;
 use resources::Shaders;
 use simulation::{
-    PhysicalComponent, RenderComponent, Renderer, TransformComponent, TransformRenderDescription,
+    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
+    UiElementComponent,
 };
+
 use unit::world::WorldPoint;
 
 use crate::render::debug::DebugShape;
@@ -125,13 +127,13 @@ impl Renderer for GlRenderer {
             z
         });
 
-        self.entity_renderer.add_entity((
+        self.entity_renderer.add_entity(
             position,
             render.shape,
             render.color,
             physical.size.into(),
             transform.rotation,
-        ));
+        );
     }
 
     fn sim_selected(
@@ -145,6 +147,27 @@ impl Renderer for GlRenderer {
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
         self.debug_add_line(from, to, Color::rgb(250, 250, 250));
+    }
+
+    fn sim_ui_element(
+        &mut self,
+        transform: &TransformRenderDescription,
+        ui: &UiElementComponent,
+        selected: bool,
+    ) {
+        let color = if selected {
+            Color::rgba(200, 200, 208, 150)
+        } else {
+            Color::rgba(170, 170, 185, 150)
+        };
+
+        self.entity_renderer.add_entity(
+            transform.position,
+            Shape2d::Rect,
+            color,
+            ui.size,
+            Basis2::from_angle(rad(0.0)),
+        );
     }
 
     fn sim_finish(&mut self) -> GlResult<()> {

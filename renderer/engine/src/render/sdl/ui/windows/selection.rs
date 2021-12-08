@@ -1,16 +1,18 @@
 use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 
 use common::*;
 use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
+use simulation::job::BuildThingJob;
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStack, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, TransformComponent,
+    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
+    SocietyComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -36,6 +38,7 @@ struct SelectedEntityDetails<'a> {
 enum EntityType<'a> {
     Living,
     Item(ComponentRef<'a, ConditionComponent>),
+    UiElement(ComponentRef<'a, UiElementComponent>),
 }
 
 #[derive(Debug)]
@@ -43,7 +46,11 @@ enum EntityState {
     Alive,
     Dead,
     Inanimate,
+    UiElement,
 }
+
+/// Oneshot
+struct CommaSeparatedDebugIter<I: Iterator<Item = T>, T: Debug>(RefCell<I>);
 
 impl SelectionWindow {
     pub fn render(&mut self, context: &UiContext) {
@@ -64,8 +71,12 @@ impl SelectionWindow {
                 let transform = ecs.component(e).ok();
                 let name = ecs.component(e).ok();
                 let physical = ecs.component(e).ok();
-                let (ty, state) = match ecs.component::<ConditionComponent>(e) {
-                    Ok(condition) => (EntityType::Item(condition), EntityState::Inanimate),
+                let (ty, state) = match (
+                    ecs.component::<ConditionComponent>(e),
+                    ecs.component::<UiElementComponent>(e),
+                ) {
+                    (_, Ok(ui)) => (EntityType::UiElement(ui), EntityState::UiElement),
+                    (Ok(condition), _) => (EntityType::Item(condition), EntityState::Inanimate),
                     _ => (EntityType::Living, EntityState::Alive),
                 };
 
@@ -200,11 +211,14 @@ impl SelectionWindow {
         if tabbar.is_open() {
             match details.ty {
                 EntityType::Living => self.do_living(context, &details),
-                EntityType::Item(ref condition) => self.do_item(context, &details, &*condition),
+                EntityType::Item(ref condition) => self.do_item(context, &details, condition),
+                EntityType::UiElement(ref ui) => self.do_ui_element(context, ui),
             }
         }
 
-        self.do_logs(context, &details);
+        if !matches!(details.ty, EntityType::UiElement(_)) {
+            self.do_logs(context, &details);
+        }
     }
 
     //noinspection DuplicatedCode
@@ -534,6 +548,53 @@ impl SelectionWindow {
                 entity: details.entity,
                 enabled: req,
             });
+        }
+    }
+
+    fn do_ui_element(&mut self, context: &UiContext, ui: &UiElementComponent) {
+        let tab = context.new_tab(im_str!("Build"));
+        if !tab.is_open() {
+            return;
+        }
+
+        let ecs = context.simulation().ecs;
+
+        let ret = ui
+            .build_job
+            .resolve_and_cast(ecs.resource(), move |build: &BuildThingJob| {
+                let deets = build.details();
+                let progress = build.progress();
+
+                // TODO use the arena for this
+                let reqs = format!(
+                    "{}",
+                    CommaSeparatedDebugIter(RefCell::new(build.remaining_requirements()))
+                );
+
+                context.key_value(
+                    im_str!("Target:"),
+                    || Value::Some(ui_str!(in context, "{}", deets.target)),
+                    None,
+                    COLOR_ORANGE,
+                );
+
+                context.key_value(
+                    im_str!("Requirements:"),
+                    move || Value::Wrapped(ui_str!(in context, "{}", reqs)),
+                    None,
+                    COLOR_ORANGE,
+                );
+
+                context.key_value(
+                    im_str!("Progress:"),
+                    || Value::Some(ui_str!(in context, "{}/{}", progress.steps_completed, progress.total_steps_needed)),
+                    None,
+                    COLOR_ORANGE
+                );
+            });
+
+        if ret.is_none() {
+            return context.text_disabled("Error: invalid job");
         }
     }
 
@@ -928,5 +989,12 @@ impl<'a> SelectedEntityDetails<'a> {
 impl Default for SelectionWindow {
     fn default() -> Self {
         Self { edit_selection: 0 }
+    }
+}
+
+impl<I: Iterator<Item = T>, T: Debug> Display for CommaSeparatedDebugIter<I, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.0.borrow_mut();
+        f.debug_list().entries(&mut *iter).finish()
     }
 }

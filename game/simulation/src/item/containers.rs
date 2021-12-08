@@ -73,12 +73,6 @@ impl EcsWorld {
     }
 }
 
-struct NewEntityBomb<'a> {
-    entity: Entity,
-    kill_me: bool,
-    world: &'a EcsWorld,
-}
-
 impl EcsExtContainers<'_> {
     pub fn create_container_voxel(
         &mut self,
@@ -217,11 +211,7 @@ impl EcsExtContainers<'_> {
         };
 
         // kill on failure
-        let mut bomb = NewEntityBomb {
-            entity: stack_container,
-            kill_me: true,
-            world: self.0,
-        };
+        let bomb = EntityBomb::new(stack_container, self.0);
 
         let mut physicals = self.0.write_storage::<PhysicalComponent>();
         let mut stacks = self.0.write_storage::<ItemStackComponent>();
@@ -252,7 +242,7 @@ impl EcsExtContainers<'_> {
         }
 
         debug!("created stack from item"; "item" => item, "stack" => stack_container);
-        bomb.kill_me = false;
+        bomb.defuse();
         Ok(stack_container)
     }
 
@@ -312,14 +302,6 @@ impl EcsExtContainers<'_> {
 
         // increase item physical volume
         stack_physical.volume += item_volume;
-    }
-}
-
-impl Drop for NewEntityBomb<'_> {
-    fn drop(&mut self) {
-        if self.kill_me {
-            self.world.kill_entity(self.entity);
-        }
     }
 }
 

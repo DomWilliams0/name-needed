@@ -37,7 +37,7 @@ impl UiExt for Ui<'_> {
     fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: impl Fn() -> V,
+        value: impl FnOnce() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     ) {
