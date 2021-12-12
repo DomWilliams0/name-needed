@@ -12,18 +12,19 @@ use crate::WorldPosition;
 
 struct RingBuffer<T>(VecDeque<T>, usize);
 
-#[derive(Component, EcsComponent)]
+#[derive(Component, EcsComponent, Clone)]
 #[storage(HashMapStorage)]
 #[name("entity-logs")]
-#[clone(disallow)]
 pub struct EntityLoggingComponent {
     logs: RingBuffer<TimedLoggedEntityEvent>,
 }
 
+#[derive(Clone)]
 struct TimedLoggedEntityEvent(Tick, LoggedEntityEvent);
 
 /// An event that relates to an entity and is displayed in the ui. All variants relate to THIS entity
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
+#[derive(Clone)]
 pub enum LoggedEntityEvent {
     /// Equipped the given item
     Equipped(Entity),
@@ -36,6 +37,7 @@ pub enum LoggedEntityEvent {
 }
 
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
+#[derive(Clone)]
 pub enum LoggedEntityDecision {
     GoPickup(Cow<'static, str>),
     GoEquip(Entity),
@@ -63,6 +65,12 @@ impl<T> RingBuffer<T> {
     #[cfg(test)]
     fn iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.0.iter()
+    }
+}
+
+impl<T: Clone> Clone for RingBuffer<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1)
     }
 }
 

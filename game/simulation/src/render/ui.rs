@@ -10,6 +10,7 @@ use crate::{QueuedUpdates, Societies};
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(HashMapStorage)]
 #[name("ui-element")]
+#[clone(disallow)]
 pub struct UiElementComponent {
     // TODO generalise when more ui elements are added
     pub build_job: SocietyJobHandle,

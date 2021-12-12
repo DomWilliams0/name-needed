@@ -82,6 +82,7 @@ inventory::collect!(ComponentEntry);
 pub struct ComponentFunctions {
     has_comp: HasCompFn,
     get_comp: GetComponentFn,
+    clone_to_fn: Option<CloneToFn>,
 }
 
 pub struct ComponentRegistry {
@@ -182,6 +183,7 @@ impl ComponentRegistry {
                 ComponentFunctions {
                     has_comp: comp.has_comp_fn,
                     get_comp: comp.get_comp_fn,
+                    clone_to_fn: comp.clone_to_fn,
                 },
             );
 
@@ -244,5 +246,16 @@ impl ComponentRegistry {
         } else {
             Err(())
         }
+    }
+
+    /// Returns the name of the first non-copyable component that this entity has
+    pub fn find_non_copyable(&self, world: &EcsWorld, entity: Entity) -> Option<&str> {
+        self.map.iter().find_map(move |(name, comp)| {
+            if (comp.has_comp)(world, entity) && comp.clone_to_fn.is_none() {
+                Some(*name)
+            } else {
+                None
+            }
+        })
     }
 }

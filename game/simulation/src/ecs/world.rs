@@ -202,6 +202,11 @@ impl EcsWorld {
         self.component_registry
             .copy_components_to(self, source, dest)
     }
+
+    /// Returns the name of the first non-copyable component that this entity has
+    pub fn find_non_copyable(&self, entity: Entity) -> Option<&str> {
+        self.component_registry.find_non_copyable(self, entity)
+    }
 }
 
 impl ComponentWorld for EcsWorld {

@@ -11,10 +11,9 @@ const FALL_SLOWDOWN: f32 = 0.5;
 
 pub struct PhysicsSystem;
 
-#[derive(Debug, Component, EcsComponent)]
+#[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
 #[name("physics")]
-#[clone(disallow)]
 pub struct PhysicsComponent {
     /// Number of blocks fallen in current fall
     pub fallen: u32,
