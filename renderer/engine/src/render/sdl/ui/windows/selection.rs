@@ -399,7 +399,7 @@ impl SelectionWindow {
     }
 
     fn do_stack(&mut self, context: &UiContext, stack: &ItemStackComponent) {
-        let (count, limit) = stack.stack.capacity();
+        let (count, limit) = stack.stack.filled();
         context.text_colored(
             COLOR_GREEN,
             ui_str!(in context, "Capacity {}/{}", count, limit),

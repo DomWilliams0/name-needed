@@ -10,7 +10,10 @@ pub use filter::{ItemFilter, ItemFilterable};
 pub use haul::{
     EndHaulBehaviour, HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent,
 };
-pub use stack::{ItemStack, ItemStackComponent, ItemStackError};
+pub use stack::ItemStackComponent;
+
+pub type ItemStack = stack::ItemStack<crate::EcsWorld>;
+pub type ItemStackError = stack::ItemStackError<crate::Entity>;
 
 mod component;
 mod condition;

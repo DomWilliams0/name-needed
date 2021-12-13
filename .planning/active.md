@@ -1,8 +1,8 @@
 # Active tasks
 
-* [o] item stacks
+* [X] item stacks
 	* [X] stack of homogenous items
-	* [ ] split into multiple stacks, or remove single items
+	* [X] split into multiple stacks, or remove single items
 	* [X] inspect a stack's contents in the ui
 * [X] components should declare if they should be copied into/out of stacks
 * [o] building blocks
@@ -40,3 +40,6 @@
 * [ ] lua api for building things
 * [ ] define builds in data rather than code
 * [ ] build material requirement engine
+* [ ] stacks split into 1 should be "downgraded" into a single item automatically
+* [ ] allow stacks greater than 65535
+* [ ] log entity events for stack operations

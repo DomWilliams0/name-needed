@@ -249,7 +249,7 @@ impl ComponentRegistry {
     }
 
     /// Returns the name of the first non-copyable component that this entity has
-    pub fn find_non_copyable(&self, world: &EcsWorld, entity: Entity) -> Option<&str> {
+    pub fn find_non_copyable(&self, world: &EcsWorld, entity: Entity) -> Option<&'static str> {
         self.map.iter().find_map(move |(name, comp)| {
             if (comp.has_comp)(world, entity) && comp.clone_to_fn.is_none() {
                 Some(*name)

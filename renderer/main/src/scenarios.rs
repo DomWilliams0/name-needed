@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::job::{BuildThingJob, SocietyJob, SocietyJobRef};
+use simulation::job::{BuildThingJob};
 use simulation::{
-    ActivityComponent, AiAction, BlockType, ComponentWorld, EcsWorld, PlayerSociety, Societies,
-    StoneBrickWall, WorldPosition,
+    ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies,
+    StoneBrickWall, TransformComponent, WorldPosition,
 };
 
 pub type Scenario = fn(&EcsWorld);
@@ -130,7 +130,7 @@ fn building(ecs: &EcsWorld) {
             .thanks()
     });
 
-    let food = spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
+    let _food = spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
         let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
         let food = helpers::new_entity("core_food_apple", ecs, pos)
             .with_nutrition(nutrition)
@@ -163,19 +163,29 @@ fn building(ecs: &EcsWorld) {
         }
     }
 
+    if let Some(stack) = brick_stack {
+        let split = ecs
+            .helpers_containers()
+            .split_stack(stack, 2)
+            .expect("split failed");
+
+        let mut transform = ecs
+            .component_mut::<TransformComponent>(split)
+            .expect("no transform");
+        let pos = transform.position;
+        transform.reset_position(pos + (1.0, 1.0, 1.0));
+    }
+
     if let Some(human) = humans.first().copied() {
         let society = ecs
             .resource_mut::<Societies>()
             .society_by_handle(society)
             .expect("bad society");
-        let activity = ecs
-            .component_mut::<ActivityComponent>(human)
-            .expect("no activity");
 
-        for z in 1..2 {
+        for x in 2..5 {
             society
                 .jobs_mut()
-                .submit(ecs, BuildThingJob::new((2, 2, z).into(), StoneBrickWall));
+                .submit(ecs, BuildThingJob::new((x, 2, 1).into(), StoneBrickWall));
         }
     }
 }
@@ -218,7 +228,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use color::{Color, UniqueRandomColors};
+    use color::{Color};
     use common::{random, NormalizedFloat, Rng};
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,

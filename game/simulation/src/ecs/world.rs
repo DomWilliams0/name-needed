@@ -204,7 +204,7 @@ impl EcsWorld {
     }
 
     /// Returns the name of the first non-copyable component that this entity has
-    pub fn find_non_copyable(&self, entity: Entity) -> Option<&str> {
+    pub fn find_non_copyable(&self, entity: Entity) -> Option<&'static str> {
         self.component_registry.find_non_copyable(self, entity)
     }
 }
@@ -426,6 +426,12 @@ impl<'a, T: Component> ComponentRef<'a, T> {
             as_interactive,
             dummy: PhantomData,
         }
+    }
+}
+
+impl<'a, T: Component + Debug> Debug for ComponentRef<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        Debug::fmt(self.comp, f)
     }
 }
 
