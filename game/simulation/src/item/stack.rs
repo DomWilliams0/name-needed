@@ -2,14 +2,12 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::num::NonZeroU16;
 
-
 use common::*;
-
 
 use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 
-use crate::{PhysicalComponent, TransformComponent};
+use crate::PhysicalComponent;
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum ItemStackError<E: Debug + Display + Eq> {
@@ -88,11 +86,17 @@ pub struct StackHomogeneity<W: World> {
     phantom: PhantomData<W>,
 }
 
-#[derive(Debug)] // TODO implement manually
-enum StackedEntity<W: World> {
+#[derive(Debug)] // TODO implement Debug manually
+struct StackedEntity<W: World> {
+    entity: W::Entity,
+    count: StackedEntityCount,
+}
+
+#[derive(Debug, Copy)]
+enum StackedEntityCount {
     /// Non-copyable entity
-    Distinct(W::Entity),
-    Copyable(W::Entity, NonZeroU16),
+    Distinct,
+    Copyable(NonZeroU16),
 }
 
 pub enum StackAdd {
@@ -102,35 +106,33 @@ pub enum StackAdd {
     CollapsedIntoOther,
 }
 
-pub enum StackMigrationOp<W: World> {
-    MoveDistinct(W::Entity),
-    Move(W::Entity, NonZeroU16),
-    Copy(W::Entity, NonZeroU16),
+#[derive(Copy)]
+pub struct StackMigrationOp<W: World> {
+    pub item: W::Entity,
+    pub ty: StackMigrationType,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum StackMigrationType {
+    MoveDistinct,
+    Move(NonZeroU16),
+    Copy(NonZeroU16),
 }
 
 const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 
 impl<W: World> Clone for StackMigrationOp<W> {
     fn clone(&self) -> Self {
-        match self {
-            StackMigrationOp::MoveDistinct(e) => StackMigrationOp::MoveDistinct(*e),
-            StackMigrationOp::Move(e, n) => StackMigrationOp::Move(*e, *n),
-            StackMigrationOp::Copy(e, n) => StackMigrationOp::Copy(*e, *n),
+        Self {
+            item: self.item,
+            ty: self.ty,
         }
     }
 }
 
-impl<W: World> Copy for StackMigrationOp<W> {}
-
 impl<W: World> PartialEq for StackMigrationOp<W> {
     fn eq(&self, other: &Self) -> bool {
-        use StackMigrationOp::*;
-        match (*self, *other) {
-            (MoveDistinct(a), MoveDistinct(b)) if a == b => true,
-            (Move(a, n), Move(b, m)) if a == b && n == m => true,
-            (Copy(a, n), Copy(b, m)) if a == b && n == m => true,
-            _ => false,
-        }
+        self.item == other.item && self.ty == other.ty
     }
 }
 
@@ -195,15 +197,20 @@ impl<W: World> ItemStack<W> {
 
         let copyable = copyability.is_copyable();
         let collapse_into = if copyable {
-            self
-                .contents
-                .iter_mut()
-                .find(|stacked| matches!(stacked, StackedEntity::Copyable(candidate, _) if world.is_identical(entity, *candidate)))
+            self.contents.iter_mut().find(|stacked| {
+                matches!(stacked.count, StackedEntityCount::Copyable(_))
+                    && world.is_identical(entity, stacked.entity)
+            })
         } else {
             None
         };
 
-        let add = if let Some(StackedEntity::Copyable(collapsed_into, count)) = collapse_into {
+        let add = if let Some(StackedEntity {
+            count: StackedEntityCount::Copyable(count),
+            entity: collapsed_into,
+            ..
+        }) = collapse_into
+        {
             // combine with identical entity
             // TODO spill over to a new stack instead of failing
             *count = NonZeroU16::new(count.get() + 1)
@@ -211,10 +218,13 @@ impl<W: World> ItemStack<W> {
             StackAdd::CollapsedIntoOther
         } else {
             // add distinct item
-            self.contents.push_back(if copyable {
-                StackedEntity::Copyable(entity, ONE)
-            } else {
-                StackedEntity::Distinct(entity)
+            self.contents.push_back(StackedEntity {
+                entity,
+                count: if copyable {
+                    StackedEntityCount::Copyable(ONE)
+                } else {
+                    StackedEntityCount::Distinct
+                },
             });
 
             StackAdd::Distinct
@@ -246,44 +256,44 @@ impl<W: World> ItemStack<W> {
         debug_assert!(ops_out.is_empty());
 
         let mut remaining = n.get();
+        let mut final_copy = None;
         for stacked in self.contents.iter_mut() {
             if remaining == 0 {
                 break;
             } else {
-                let op = match stacked {
-                    StackedEntity::Distinct(e) => {
+                let op = match &mut stacked.count {
+                    StackedEntityCount::Distinct => {
                         // move single item
                         remaining -= 1;
-                        StackMigrationOp::MoveDistinct(*e)
+                        StackMigrationType::MoveDistinct
                     }
-                    StackedEntity::Copyable(e, n) if remaining < n.get() => {
+                    StackedEntityCount::Copyable(n) if remaining < n.get() => {
                         // remove part of the stack
                         *n = NonZeroU16::new(n.get() - remaining).unwrap(); // checked already
                         let to_take = NonZeroU16::new(remaining).unwrap(); // checked already
+                        final_copy = Some(StackedEntity {
+                            entity: stacked.entity,
+                            count: StackedEntityCount::Copyable(to_take),
+                        });
                         remaining = 0;
-                        StackMigrationOp::Copy(*e, to_take)
+                        StackMigrationType::Copy(to_take)
                     }
-                    StackedEntity::Copyable(e, n) => {
+                    StackedEntityCount::Copyable(n) => {
                         // move whole stack
                         debug_assert!(remaining >= n.get());
                         remaining -= n.get();
-                        StackMigrationOp::Move(*e, *n)
+                        StackMigrationType::Move(*n)
                     }
                 };
 
-                ops_out.push(op);
+                ops_out.push(StackMigrationOp {
+                    item: stacked.entity,
+                    ty: op,
+                });
             }
         }
 
-        let last_copy = ops_out.last().and_then(|op| {
-            if let StackMigrationOp::Copy(e, n) = op {
-                Some(StackedEntity::Copyable(*e, *n))
-            } else {
-                None
-            }
-        });
-
-        let move_count = if last_copy.is_some() {
+        let move_count = if final_copy.is_some() {
             ops_out.len() - 1
         } else {
             ops_out.len()
@@ -295,16 +305,9 @@ impl<W: World> ItemStack<W> {
         for popped in self
             .contents
             .drain(..move_count)
-            .chain(last_copy.into_iter())
+            .chain(final_copy.into_iter())
         {
-            let popped_entity = popped.entity();
-            debug_assert!(
-                ops_out.iter().any(|op| matches!(op,
-                        StackMigrationOp::Move(e, _)
-                        | StackMigrationOp::MoveDistinct(e)
-                        | StackMigrationOp::Copy(e, _) if *e == popped_entity)),
-                "bad pop"
-            );
+            debug_assert!(ops_out.iter().any(|op| op.item == popped.entity), "bad pop");
 
             new_stack.contents.push_back(popped);
         }
@@ -312,21 +315,16 @@ impl<W: World> ItemStack<W> {
         new_stack.total_count = n.get();
         self.total_count -= n.get();
 
-        // TODO update volume properly
-
         Ok(Some(new_stack))
     }
 
     pub fn replace_entity(&mut self, orig: W::Entity, replacement: W::Entity) -> bool {
-        if let Some(stacked) = self.contents.iter_mut().find_map(|stacked| {
-            let e = stacked.entity_mut();
-            if *e == orig {
-                Some(e)
-            } else {
-                None
-            }
-        }) {
-            *stacked = replacement;
+        if let Some(stacked) = self
+            .contents
+            .iter_mut()
+            .find(|stacked| stacked.entity == orig)
+        {
+            stacked.entity = replacement;
             true
         } else {
             false
@@ -343,7 +341,7 @@ impl<W: World> ItemStack<W> {
     }
 
     pub fn contents(&self) -> impl Iterator<Item = (W::Entity, NonZeroU16)> + '_ {
-        self.contents.iter().map(|e| e.entity_and_count())
+        self.contents.iter().map(|e| (e.entity, e.count()))
     }
 
     pub fn total_count(&self) -> u16 {
@@ -364,30 +362,29 @@ impl<W: World> Clone for StackHomogeneity<W> {
     }
 }
 
+impl Clone for StackedEntityCount {
+    fn clone(&self) -> Self {
+        match self {
+            StackedEntityCount::Distinct => StackedEntityCount::Distinct,
+            StackedEntityCount::Copyable(n) => StackedEntityCount::Copyable(*n),
+        }
+    }
+}
+
+impl<W: World> Clone for StackedEntity<W> {
+    fn clone(&self) -> Self {
+        Self {
+            entity: self.entity,
+            count: self.count,
+        }
+    }
+}
+
 impl<W: World> StackedEntity<W> {
-    fn entity_and_count(&self) -> (W::Entity, NonZeroU16) {
-        match self {
-            StackedEntity::Distinct(e) => (*e, ONE),
-            StackedEntity::Copyable(e, n) => (*e, *n),
-        }
-    }
-
-    fn entity(&self) -> W::Entity {
-        match self {
-            StackedEntity::Distinct(e) | StackedEntity::Copyable(e, _) => *e,
-        }
-    }
-
-    fn entity_mut(&mut self) -> &mut W::Entity {
-        match self {
-            StackedEntity::Distinct(e) | StackedEntity::Copyable(e, _) => e,
-        }
-    }
-
     fn count(&self) -> NonZeroU16 {
-        match self {
-            StackedEntity::Distinct(_) => ONE,
-            StackedEntity::Copyable(_, n) => *n,
+        match self.count {
+            StackedEntityCount::Distinct => ONE,
+            StackedEntityCount::Copyable(n) => n,
         }
     }
 }
@@ -497,14 +494,14 @@ mod validation {
             acc + (vol * count.get())
         });
 
-        // TODO assert_eq!(
-        //     real_volume, calc_volume,
-        //     "stack volume is wrong, should be {} but is {}",
-        //     calc_volume, real_volume
-        // );
+        assert_eq!(
+            real_volume, calc_volume,
+            "stack volume is wrong, should be {} but is {}",
+            calc_volume, real_volume
+        );
 
         for stacked_entity in &stack.contents {
-            let (entity, _) = stacked_entity.entity_and_count();
+            let entity = stacked_entity.entity;
 
             assert!(world.is_entity_alive(entity), "item {} is dead", entity);
 
@@ -567,26 +564,24 @@ mod validation {
 
 impl<W: World> Debug for StackMigrationOp<W> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            StackMigrationOp::MoveDistinct(e) => write!(f, "move {}", e),
-            StackMigrationOp::Move(e, n) => write!(f, "move {}x{}", n, e),
-            StackMigrationOp::Copy(e, n) => write!(f, "copy {}x{}", n, e),
+        match self.ty {
+            StackMigrationType::MoveDistinct => write!(f, "move {}", self.item),
+            StackMigrationType::Move(n) => write!(f, "move {}x{}", n, self.item),
+            StackMigrationType::Copy(n) => write!(f, "copy {}x{}", n, self.item),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-
-    use StackMigrationOp::*;
+    use StackMigrationType::*;
 
     use super::*;
 
     // items are u32s.
     // 2 classes of stacks: even and odd (homogeneity).
     // items are identical if they're equal % 100, e.g. 1 == 101 == 102
-    // items % 100 >= 50 are NOT copyable i.e. they are distinct items
+    // items % 100 >= 50 are NOT copyable i.e. they are distinct items.
 
     #[derive(Default)]
     struct TestWorld;
@@ -677,18 +672,16 @@ mod tests {
         > {
             let mut ops = SmallVec::<[_; 1]>::new();
             self.stack
-                .split_off(
-                    NonZeroU16::new(n).expect("bad split count"),
-                    &mut ops,
-                )
+                .split_off(NonZeroU16::new(n).expect("bad split count"), &mut ops)
                 .map(|stack| (stack, ops.into_vec()))
         }
 
         fn split_off(
             &mut self,
             n: u16,
-        ) -> Result<Vec<StackMigrationOp<TestWorld>>, ItemStackError<u32>> {
-            self.split_off_full(n).map(|(_, ops)| ops)
+        ) -> Result<Vec<(u32, StackMigrationType)>, ItemStackError<u32>> {
+            self.split_off_full(n)
+                .map(|(_, ops)| ops.into_iter().map(|op| (op.item, op.ty)).collect_vec())
         }
     }
 
@@ -749,10 +742,10 @@ mod tests {
         let mut stack = TestStack::new_with(&[51, 3, 5]);
         assert_eq!(stack.contents(), vec![(51, 1), (3, 1), (5, 1)]);
 
-        assert_eq!(stack.split_off(1), Ok(vec![MoveDistinct(51)]));
+        assert_eq!(stack.split_off(1), Ok(vec![(51, MoveDistinct)]));
         assert_eq!(stack.contents(), vec![(3, 1), (5, 1)]);
 
-        assert_eq!(stack.split_off(1), Ok(vec![Move(3, ONE)]));
+        assert_eq!(stack.split_off(1), Ok(vec![(3, Move(ONE))]));
 
         assert!(stack.split_off(5).is_err());
     }
@@ -764,13 +757,13 @@ mod tests {
 
         assert_eq!(
             stack.split_off(2),
-            Ok(vec![Copy(2, NonZeroU16::new(2).unwrap())])
+            Ok(vec![(2, Copy(NonZeroU16::new(2).unwrap()))])
         );
         assert_eq!(stack.contents(), vec![(2, 1), (4, 2), (6, 1)]);
 
         assert_eq!(
             stack.split_off(3),
-            Ok(vec![Move(2, ONE), Move(4, NonZeroU16::new(2).unwrap())])
+            Ok(vec![(2, Move(ONE)), (4, Move(NonZeroU16::new(2).unwrap()))])
         );
         assert_eq!(stack.contents(), vec![(6, 1)]);
     }

@@ -7,7 +7,7 @@ use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
 use crate::{NameComponent, PhysicalComponent, Societies, SocietyHandle, TransformComponent};
 
-use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackMigrationOp};
+use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackMigrationType};
 use crate::item::{ContainerComponent, ItemStack, ItemStackError};
 use crate::simulation::AssociatedBlockData;
 
@@ -177,6 +177,7 @@ impl EcsExtContainers<'_> {
             let transforms = self.read_storage::<TransformComponent>();
 
             let (stackable, _, _) = self
+                .0
                 .components(item, (&stackables, &physicals, &transforms))
                 .ok_or(ItemStackError::NotStackable(item))?;
 
@@ -211,8 +212,6 @@ impl EcsExtContainers<'_> {
 
         // sort out components
         let physicals = self.0.read_storage::<PhysicalComponent>();
-        let mut stacks = self.0.write_storage::<ItemStackComponent>();
-
         let item_volume = item.get(&physicals).unwrap().volume; // just copied
 
         self.on_successful_stack_addition(
@@ -302,18 +301,27 @@ impl EcsExtContainers<'_> {
         self.on_stack_creation(stack_entity);
 
         // move items over
+        let mut moved_total_volume = Volume::new(0);
         trace!("stack split operations"; "from" => stack_entity, "to" => new_stack, "ops" => ?ops);
         let mut entity_replacements = SmallVec::<[_; 4]>::new();
         for op in ops {
-            match op {
-                StackMigrationOp::MoveDistinct(item) | StackMigrationOp::Move(item, _) => {
+            let n = match op.ty {
+                StackMigrationType::MoveDistinct => {
                     let _ = self
                         .0
-                        .add_now(item, ContainedInComponent::StackOf(new_stack));
+                        .add_now(op.item, ContainedInComponent::StackOf(new_stack));
+                    1
                 }
-                StackMigrationOp::Copy(original, _) => {
+                StackMigrationType::Move(n) => {
+                    let _ = self
+                        .0
+                        .add_now(op.item, ContainedInComponent::StackOf(new_stack));
+                    n.get()
+                }
+                StackMigrationType::Copy(n) => {
+                    let orig_item = op.item;
                     let new_item = Entity::from(self.0.create_entity().build());
-                    self.0.copy_components_to(original, new_item).unwrap(); // both entities are definitely alive
+                    self.0.copy_components_to(orig_item, new_item).unwrap(); // both entities are definitely alive
 
                     // update its contained stack
                     let _ = self
@@ -321,15 +329,37 @@ impl EcsExtContainers<'_> {
                         .add_now(new_item, ContainedInComponent::StackOf(new_stack));
 
                     // replace entity in the src stack
-                    entity_replacements.push((original, new_item));
+                    entity_replacements.push((orig_item, new_item));
+
+                    n.get()
                 }
-            }
+            };
+
+            let item_phys = self
+                .0
+                .component::<PhysicalComponent>(op.item)
+                .expect("item should have physical");
+
+            let total_volume = Volume::new(item_phys.volume.get() * n);
+            moved_total_volume += total_volume;
         }
 
         let mut stack = self
             .0
             .component_mut::<ItemStackComponent>(new_stack)
             .unwrap(); // is definitely a stack
+
+        // tweak volumes
+        let mut physicals = self.0.write_storage::<PhysicalComponent>();
+
+        let src_phys = stack_entity.get_mut(&mut physicals).unwrap(); // definitely present
+        src_phys.volume -= moved_total_volume;
+        trace!("reduced source stack volume"; "stack" => stack_entity, "volume" => ?src_phys.volume);
+        debug_assert!(src_phys.volume.get() > 0);
+
+        let dst_phys = new_stack.get_mut(&mut physicals).unwrap(); // definitely present
+        dst_phys.volume = moved_total_volume;
+        trace!("set destination stack volume"; "stack" => new_stack, "volume" => ?dst_phys.volume);
 
         for (orig, replacement) in entity_replacements {
             if !stack.stack.replace_entity(orig, replacement) {

@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::job::{BuildThingJob};
+use simulation::job::BuildThingJob;
 use simulation::{
-    ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies,
-    StoneBrickWall, TransformComponent, WorldPosition,
+    ActivityComponent, ComponentWorld, EcsWorld, PlayerSociety, Societies, StoneBrickWall,
+    TransformComponent, WorldPosition,
 };
 
 pub type Scenario = fn(&EcsWorld);
@@ -228,7 +228,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use color::{Color};
+    use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
