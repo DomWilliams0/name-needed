@@ -34,6 +34,8 @@ bincode = "1.3"
 [features]
 default = ["common/log-to-file", "panik/use-slog", "common/binary", "scripting"]
 use-sdl = ["sdl2", "sdl2-sys", "gl", "imgui-sdl2", "imgui-opengl-renderer", "imgui"]
+procgen = ["simulation/procgen"]
+metrics = ["simulation/metrics"]
 lite = []
 gl-trace-log = []
 scripting = ["simulation/scripting"]

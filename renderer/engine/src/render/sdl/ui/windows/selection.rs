@@ -637,6 +637,7 @@ impl SelectionWindow {
         }
 
         // generation
+        #[cfg(feature = "procgen")]
         {
             let tab = context.new_tab(im_str!("Generation"));
             if tab.is_open() {
@@ -833,6 +834,7 @@ impl SelectionWindow {
         }
     }
 
+    #[cfg(feature = "procgen")]
     fn do_generation(&mut self, context: &UiContext, selection: &SelectedTiles) {
         let loader = context.simulation().loader;
 

@@ -1,8 +1,7 @@
 use common::*;
+use engine::simulation;
 use simulation::state::BackendState;
-use simulation::{
-    self, Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer,
-};
+use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
 
 use crate::scenarios::Scenario;
 use config::ConfigType;
@@ -269,11 +268,11 @@ mod start {
     use crate::scenarios::Scenario;
     use common::*;
     use config::WorldSource;
-    use resources::Resources;
-    use simulation::{
-        all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, GeneratedTerrainSource,
-        PlanetParams, Simulation, SlabLocation, TerrainSourceError, WorldLoader, WorldPosition,
+    use engine::simulation::{
+        self, all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, Simulation,
+        SlabLocation, TerrainSourceError, WorldLoader, WorldPosition,
     };
+    use resources::Resources;
     use std::time::Duration;
 
     /// (new empty simulation, initial block to centre camera on)
@@ -316,15 +315,21 @@ mod start {
                 let source = presets::from_preset(preset);
                 WorldLoader::new(source, pool)
             }
+            #[cfg(feature = "procgen")]
             config::WorldSource::Generate(file) => {
                 debug!("generating world from config"; "path" => %file.display());
 
+                use simulation::{GeneratedTerrainSource, PlanetParams};
                 let params = PlanetParams::load_with_only_file(resources, file.as_os_str());
                 let source = params.and_then(|params| {
                     pool.runtime()
                         .block_on(async { GeneratedTerrainSource::new(params).await })
                 })?;
                 WorldLoader::new(source, pool)
+            }
+            #[cfg(not(feature = "procgen"))]
+            config::WorldSource::Generate(_) => {
+                unreachable!("procgen feature disabled")
             }
         })
     }

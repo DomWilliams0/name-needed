@@ -11,3 +11,6 @@ pub use lite::{DummyBackendInit, DummyBackendPersistent};
 
 mod engine;
 pub use crate::engine::Engine;
+
+// reexport
+pub use simulation;

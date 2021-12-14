@@ -5,11 +5,14 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams,
-        TerrainSourceError, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, TerrainSourceError, TerrainUpdatesRes, WorldLoader,
+        WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };
+
+#[cfg(feature = "procgen")]
+pub use world::loader::{GeneratedTerrainSource, PlanetParams};
 
 // Rexports for specialised world types
 pub type WorldRef = world::WorldRef<simulation::WorldContext>;

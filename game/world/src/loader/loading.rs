@@ -11,9 +11,9 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::{ContiguousChunkIterator, WorldChangeEvent};
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
-use crate::loader::terrain_source::BlockDetails;
 use crate::loader::{
-    AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
+    terrain_source, AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch,
+    WorldTerrainUpdate,
 };
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::FutureExt;
@@ -473,13 +473,18 @@ impl<C: WorldContext> WorldLoader<C> {
         self.pool.runtime().block_on(fut)
     }
 
-    pub fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
+    #[cfg(feature = "procgen")]
+    pub fn query_block(&self, block: WorldPosition) -> Option<terrain_source::BlockDetails> {
         let fut = self.source.query_block(block);
         self.pool.runtime().block_on(fut)
     }
 
     pub fn is_generated(&self) -> bool {
-        matches!(self.source, TerrainSource::Generated(_))
+        #[cfg(feature = "procgen")]
+        return matches!(self.source, TerrainSource::Generated(_));
+
+        #[cfg(not(feature = "procgen"))]
+        false
     }
 
     /// Nop if any mutexes cannot be taken immediately

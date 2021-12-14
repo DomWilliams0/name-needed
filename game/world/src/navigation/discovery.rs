@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::*;
-use unit::world::{BlockCoord, SlabIndex, SLAB_SIZE};
+use unit::world::{BlockCoord, SlabIndex, SlabPositionAsCoord, SLAB_SIZE};
 use unit::world::{LocalSliceIndex, RangePosition, SlabPosition, CHUNK_SIZE};
 
 use crate::block::Block;
@@ -11,7 +11,6 @@ use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
 use grid::{grid_declare, GridImpl};
-use procgen::SlabPositionAsCoord;
 use std::ops::Deref;
 
 grid_declare!(struct AreaDiscoveryGrid<AreaDiscoveryGridImpl, AreaDiscoveryGridBlock>,

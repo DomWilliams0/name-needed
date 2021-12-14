@@ -1,6 +1,6 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid, SlabPositionAsCoord};
+use crate::{GeneratedBlock, PlanetParams, SlabGrid};
 use common::*;
 
 use crate::region::region::SlabContinuations;
@@ -8,7 +8,9 @@ use grid::GridImpl;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use unit::world::{ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition};
+use unit::world::{
+    ChunkLocation, RangePosition, SlabLocation, SlabPosition, SlabPositionAsCoord, WorldPosition,
+};
 
 /// Rasterizable object that places blocks within a slab, possibly leaking over the edge into other
 /// slabs. In case of seepage, the subfeature is queued as a continuation for the neighbour slab.
