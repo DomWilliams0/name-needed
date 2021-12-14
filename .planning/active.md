@@ -34,7 +34,7 @@
 	* [ ] render a string anywhere in the world through Renderer trait
 	* [ ] show number of items underneath a stack
 	* [ ] show NameComponent under entities (selected only?)
-		* [ ] add "unnamed" fallback to component
+		* [X] add "unnamed" fallback to component
 	* [ ] show building job info
 * [X] remove destroy_container() helper and move impl into kill_entity
 * [ ] lua api for building things

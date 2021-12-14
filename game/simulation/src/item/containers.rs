@@ -374,8 +374,7 @@ impl EcsExtContainers<'_> {
     fn on_stack_creation(&self, stack: Entity) {
         // adjust stack name, terribly hacky and temporary string manipulation
         if let Ok(mut name) = self.0.component_mut::<NameComponent>(stack) {
-            // TODO use an enum variant StackOf in NameComponent
-            name.0 = format!("Stack of {}", name.0);
+            name.make_stack();
         }
     }
 

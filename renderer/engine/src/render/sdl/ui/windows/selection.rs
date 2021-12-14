@@ -11,8 +11,8 @@ use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, TransformComponent, UiElementComponent,
+    InventoryComponent, ItemStackComponent, PhysicalComponent, Societies, SocietyComponent,
+    TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -29,7 +29,7 @@ pub struct SelectionWindow {
 
 struct SelectedEntityDetails<'a> {
     entity: Entity,
-    name: Option<ComponentRef<'a, NameComponent>>,
+    name: &'a dyn Display,
     transform: Option<ComponentRef<'a, TransformComponent>>,
     physical: Option<ComponentRef<'a, PhysicalComponent>>,
     ty: EntityType<'a>,
@@ -69,7 +69,7 @@ impl SelectionWindow {
         let (e, details, state) = match ecs.resource::<SelectedEntity>().get_unchecked() {
             Some(e) if ecs.is_entity_alive(e) => {
                 let transform = ecs.component(e).ok();
-                let name = ecs.component(e).ok();
+                let name = ecs.name(e);
                 let physical = ecs.component(e).ok();
                 let (ty, state) = match (
                     ecs.component::<ConditionComponent>(e),
@@ -125,13 +125,7 @@ impl SelectionWindow {
 
         context.key_value(
             im_str!("Name:"),
-            || {
-                details
-                    .name
-                    .as_ref()
-                    .map(|n| ui_str!(in context, "{}", n.0))
-                    .ok_or("Unnamed")
-            },
+            || ui_str!(in context, "{}", details.name),
             None,
             COLOR_GREEN,
         );
@@ -381,14 +375,8 @@ impl SelectionWindow {
         );
 
         for (i, (e, container)) in inventory.containers(ecs).enumerate() {
-            let name_comp = ecs.component::<NameComponent>(e);
-            let name = name_comp
-                .as_ref()
-                .map(|n| n.0.as_str())
-                .unwrap_or("unnamed");
-
             let tree = context.new_tree_node(
-                ui_str!(in context, "#{}: {}##container", i+1, name),
+                ui_str!(in context, "#{}: {}##container", i+1, ecs.name(e)),
                 DefaultOpen::Closed,
             );
 
@@ -407,13 +395,9 @@ impl SelectionWindow {
 
         let ecs = context.simulation().ecs;
         for (entity, count) in stack.stack.contents() {
-            let name_comp = ecs.component::<NameComponent>(entity);
-            let name = name_comp
-                .as_ref()
-                .map(|n| n.0.as_str())
-                .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
-
-            context.text_wrapped(ui_str!(in context, " - {}x {} ({})", count, name, entity));
+            context.text_wrapped(
+                ui_str!(in context, " - {}x {} ({})", count, ecs.name(entity), entity),
+            );
         }
     }
 
@@ -427,14 +411,8 @@ impl SelectionWindow {
 
         let ecs = context.simulation().ecs;
         for entity in container.contents() {
-            let name_comp = ecs.component::<NameComponent>(entity.entity);
-            let name = name_comp
-                .as_ref()
-                .map(|n| n.0.as_str())
-                .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
-
             context.text_wrapped(
-                ui_str!(in context, " - {} ({}, vol {})", name, entity.entity, entity.volume),
+                ui_str!(in context, " - {} ({}, vol {})", ecs.name(entity.entity), entity.entity, entity.volume),
             );
         }
     }
@@ -753,11 +731,7 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         match *data {
             AssociatedBlockData::Container(container_entity) => {
-                let name_comp = ecs.component::<NameComponent>(container_entity).ok();
-                let name = name_comp
-                    .as_ref()
-                    .map(|c| c.0.as_str())
-                    .unwrap_or("Unnamed");
+                let name = ecs.name(container_entity);
 
                 context.key_value(
                     im_str!("Name:"),

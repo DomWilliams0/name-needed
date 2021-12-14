@@ -1,9 +1,7 @@
 use imgui::{im_str, StyleColor};
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::{
-    AssociatedBlockData, ComponentWorld, NameComponent, PlayerSociety, Societies, SocietyHandle,
-};
+use simulation::{AssociatedBlockData, ComponentWorld, PlayerSociety, Societies, SocietyHandle};
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
@@ -79,12 +77,7 @@ impl SocietyWindow {
                 .zip(block_selection.single_tile())
             {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
-                    let name_comp = ecs.component::<NameComponent>(entity).ok();
-                    let name = name_comp
-                        .as_ref()
-                        .map(|n| n.0.as_str())
-                        .unwrap_or("unnamed"); // TODO another manual name component access
-
+                    let name = ecs.name(entity);
                     any_buttons = true;
                     if context.button(
                         ui_str!(in context, "Haul {} to {}", name, target),
@@ -104,12 +97,7 @@ impl SocietyWindow {
 
                     let block_data = w.associated_block_data(target);
                     if let Some(AssociatedBlockData::Container(container)) = block_data {
-                        let name_comp = ecs.component::<NameComponent>(*container);
-                        let container_name = name_comp
-                            .as_ref()
-                            .map(|n| n.0.as_str())
-                            .unwrap_or("container");
-
+                        let container_name = ecs.name_or_default(*container, &"container");
                         if context.button(
                             ui_str!(in context, "Haul {} into {}", name, container_name),
                             [0.0, 0.0],
