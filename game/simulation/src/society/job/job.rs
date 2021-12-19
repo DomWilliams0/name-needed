@@ -40,7 +40,7 @@ pub trait SocietyJobImpl: Display + Debug {
     ///
     /// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)
     fn populate_initial_tasks(
-        &self,
+        &mut self,
         world: &EcsWorld,
         out: &mut Vec<SocietyTask>,
         this_job: SocietyJobHandle,
@@ -103,7 +103,7 @@ impl SocietyJob<dyn SocietyJobImpl> {
     pub(in crate::society) fn create(
         world: &EcsWorld,
         handle: SocietyJobHandle,
-        job: impl SocietyJobImpl + 'static,
+        mut job: impl SocietyJobImpl + 'static,
     ) -> SocietyJobRef {
         let mut tasks = Vec::new();
         job.populate_initial_tasks(world, &mut tasks, handle);

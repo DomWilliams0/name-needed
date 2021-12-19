@@ -60,7 +60,7 @@ impl HaulJob {
 
 impl SocietyJobImpl for HaulJob {
     fn populate_initial_tasks(
-        &self,
+        &mut self,
         _: &EcsWorld,
         out: &mut Vec<SocietyTask>,
         _: SocietyJobHandle,

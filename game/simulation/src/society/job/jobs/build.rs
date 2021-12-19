@@ -12,7 +12,7 @@ use crate::{
 };
 use common::*;
 use specs::BitSet;
-use std::cell::Cell;
+
 use std::collections::{HashMap, HashSet};
 
 // TODO build requirement engine for generic material combining
@@ -29,6 +29,9 @@ pub struct BuildThingJob {
     required_materials: Vec<BuildMaterial>,
     reserved_materials: HashSet<Entity>,
 
+    /// Cache of extra hands needed for hauling each material
+    hands_needed: HashMap<&'static str, u16>,
+
     /// Steps completed so far
     progress: u32,
 
@@ -36,10 +39,10 @@ pub struct BuildThingJob {
     materials_remaining: HashMap<&'static str, u16>,
 
     /// Set if any material types are invalid e.g. not haulable
-    missing_any_requirements: Cell<bool>,
+    missing_any_requirements: bool,
 
     /// Set in first call to [populate_initial_tasks]
-    this_job: Cell<Option<SocietyJobHandle>>,
+    this_job: Option<SocietyJobHandle>,
 
     /// Entity representing this job in UI with UiElementComponent, set post spawn
     ui_element: Option<Entity>,
@@ -69,22 +72,24 @@ impl BuildThingJob {
     pub fn new(block: WorldPosition, build: impl Build + 'static) -> Self {
         let mut materials = Vec::new();
         build.materials(&mut materials);
+        let count = materials.len();
         Self {
             position: block,
             build: Box::new(build),
             progress: 0,
             required_materials: materials,
+            hands_needed: HashMap::with_capacity(count),
             reserved_materials: HashSet::new(),
             materials_remaining: HashMap::new(), // replaced on each call
-            missing_any_requirements: Cell::new(false),
-            this_job: Cell::new(None),
+            missing_any_requirements: false,
+            this_job: None,
             ui_element: None,
         }
     }
 
     // TODO fewer temporary allocations
     fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, u16> {
-        let this_job = self.this_job.get().unwrap(); // set before this is called
+        let this_job = self.this_job.unwrap(); // set before this is called
 
         let job_pos = self.position.centred();
         let reserveds = world.read_storage::<ReservedMaterialComponent>();
@@ -198,35 +203,41 @@ impl BuildThingJob {
 
 impl SocietyJobImpl for BuildThingJob {
     fn populate_initial_tasks(
-        &self,
+        &mut self,
         world: &EcsWorld,
         out: &mut Vec<SocietyTask>,
         this_job: SocietyJobHandle,
     ) {
-        self.this_job.set(Some(this_job));
+        self.this_job = Some(this_job);
 
         // TODO allow "building" of a non-air block, and automatically emit a break task first?
         //  maybe that should be at a higher level than this
 
-        // gather materials first
-        out.extend(self.required_materials.iter().cloned().flat_map(|mat| {
-            let extra_hands = {
-                let definitions = world.resource::<Registry>();
-                match definitions.lookup_template(mat.definition(), "haulable") {
-                    Some(any) => {
-                        let haulable = any
-                            .downcast_ref::<HaulableItemComponent>()
-                            .expect("bad type for haulable template");
-                        debug!("{:?} needs {} hands", mat, haulable.extra_hands);
-                        haulable.extra_hands
-                    }
-                    None => {
-                        // TODO job is destined to fail...
-                        warn!("build material is not haulable"; "material" => ?mat);
-                        return None;
-                    }
+        // preprocess materials to get hands needed for hauling
+        let definitions = world.resource::<Registry>();
+        for mat in self.required_materials.iter() {
+            let hands = match definitions.lookup_template(mat.definition(), "haulable") {
+                Some(any) => {
+                    let haulable = any
+                        .downcast_ref::<HaulableItemComponent>()
+                        .expect("bad type for haulable template");
+                    debug!("{:?} needs {} hands", mat, haulable.extra_hands);
+                    haulable.extra_hands
+                }
+                None => {
+                    // TODO job is destined to fail...
+                    warn!("build material is not haulable"; "material" => ?mat);
+                    self.missing_any_requirements = true;
+                    return;
                 }
             };
+
+            self.hands_needed.insert(mat.definition(), hands);
+        }
+
+        // gather materials first
+        out.extend(self.required_materials.iter().cloned().flat_map(|mat| {
+            let extra_hands = *self.hands_needed.get(mat.definition()).unwrap(); // just inserted
 
             Some(SocietyTask::GatherMaterials {
                 target: self.position,
@@ -236,8 +247,7 @@ impl SocietyJobImpl for BuildThingJob {
             })
         }));
 
-        self.missing_any_requirements
-            .set(out.len() != self.required_materials.len());
+        self.missing_any_requirements = out.len() != self.required_materials.len();
     }
 
     fn refresh_tasks(
@@ -246,7 +256,7 @@ impl SocietyJobImpl for BuildThingJob {
         tasks: &mut Vec<SocietyTask>,
         completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
-        if self.missing_any_requirements.get() {
+        if self.missing_any_requirements {
             return Some(SocietyTaskResult::Failure(
                 BuildThingError::InvalidMaterials.into(),
             ));
@@ -265,20 +275,22 @@ impl SocietyJobImpl for BuildThingJob {
         // TODO dont run this every tick, only when something changes or intermittently
         let outstanding_requirements = self.check_materials(world);
 
-        tasks.retain(|task| {
-            let req = match task {
-                SocietyTask::GatherMaterials { material, .. } => material,
-                SocietyTask::Build(_, _) => return false, // filter out build task at this point, readd after
-                _ => unreachable!(),
+        // recreate tasks for outstanding materials
+        // TODO this changes the order
+        tasks.clear();
+        let this_job = self.this_job.unwrap(); // set unconditionally
+        for (def, count) in outstanding_requirements.iter() {
+            let extra_hands = *self.hands_needed.get(*def).unwrap(); // already inserted
+
+            let task = SocietyTask::GatherMaterials {
+                target: self.position,
+                material: BuildMaterial::new(*def, *count),
+                job: this_job,
+                extra_hands_needed_for_haul: extra_hands,
             };
 
-            if outstanding_requirements.get(req.definition()).is_some() {
-                true
-            } else {
-                trace!("removing completed requirement"; "material" => ?req);
-                false
-            }
-        });
+            tasks.push(task);
+        }
 
         // store this to show in the ui
         self.materials_remaining = outstanding_requirements;
@@ -287,7 +299,7 @@ impl SocietyJobImpl for BuildThingJob {
             // all gather requirements are satisfied, do the build
             // TODO some builds could have multiple workers
 
-            let this_job = self.this_job.get().unwrap(); // set unconditionally
+            let this_job = self.this_job.unwrap(); // set unconditionally
             tasks.push(SocietyTask::Build(this_job, self.details()));
         }
 

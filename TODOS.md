@@ -1,4 +1,4 @@
-# TODOs (387)
+# TODOs (389)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -117,8 +117,9 @@
    * `// TODO arrival radius depends on the size of the item`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (3)
+ * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (4)
    * `// TODO ensure component refs cant be held across awaits`
+   * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
  * [game/simulation/src/activity/subactivity/break_block.rs](game/simulation/src/activity/subactivity/break_block.rs) (3)
@@ -323,7 +324,7 @@
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
- * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
+ * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (11)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
    * `// TODO fewer temporary allocations`
@@ -332,6 +333,7 @@
    * `// TODO allow "building" of a non-air block, and automatically emit a break task first?`
    * `// TODO job is destined to fail...`
    * `// TODO dont run this every tick, only when something changes or intermittently`
+   * `// TODO this changes the order`
    * `// TODO some builds could have multiple workers`
    * `// TODO better display impl for builds`
  * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)

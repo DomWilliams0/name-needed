@@ -11,7 +11,7 @@ pub struct BreakBlocksJob(WorldPositionRange);
 
 impl SocietyJobImpl for BreakBlocksJob {
     fn populate_initial_tasks(
-        &self,
+        &mut self,
         world: &EcsWorld,
         out: &mut Vec<SocietyTask>,
         _: SocietyJobHandle,
