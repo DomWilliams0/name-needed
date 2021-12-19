@@ -11,8 +11,8 @@ use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackM
 use crate::item::{ContainerComponent, ItemStack, ItemStackError};
 use crate::simulation::AssociatedBlockData;
 
-#[derive(Debug, Error)]
-pub enum ContainerError {
+#[derive(Debug, Error, Clone)]
+pub enum ContainersError {
     #[error("Definition error: {0}")]
     Definition(#[from] DefinitionErrorKind),
 
@@ -54,7 +54,7 @@ pub enum ContainedInComponent {
 #[name("stackable")]
 #[storage(HashMapStorage)]
 pub struct StackableComponent {
-    max_count: u16,
+    pub max_count: u16,
 }
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
@@ -72,11 +72,11 @@ impl EcsExtContainers<'_> {
         &mut self,
         pos: WorldPosition,
         definition_name: &'static str,
-    ) -> Result<(), ContainerError> {
+    ) -> Result<(), ContainersError> {
         let entity = self.build_entity(definition_name)?.spawn()?;
 
         if !self.has_component::<ContainerComponent>(entity) {
-            return Err(ContainerError::BadDefinition);
+            return Err(ContainersError::BadDefinition);
         }
 
         let _ = self.add_now(entity, TransformComponent::new(pos.centred()));
@@ -92,14 +92,14 @@ impl EcsExtContainers<'_> {
         Ok(())
     }
 
-    pub fn destroy_container(&mut self, pos: WorldPosition) -> Result<(), ContainerError> {
+    pub fn destroy_container(&mut self, pos: WorldPosition) -> Result<(), ContainersError> {
         let world = self.voxel_world();
         let container_entity = match world.borrow_mut().remove_associated_block_data(pos) {
             Some(AssociatedBlockData::Container(e)) => e,
             other => {
                 error!("destroyed container does not have proper associated entity";
                                 "position" => %pos, "data" => ?other);
-                return Err(ContainerError::BadEntity);
+                return Err(ContainersError::BadEntity);
             }
         };
 
@@ -113,10 +113,10 @@ impl EcsExtContainers<'_> {
         &mut self,
         container_entity: Entity,
         new_society: Option<SocietyHandle>,
-    ) -> Result<(), ContainerError> {
+    ) -> Result<(), ContainersError> {
         let mut container = self
             .component_mut::<ContainerComponent>(container_entity)
-            .map_err(|_| ContainerError::BadEntity)?;
+            .map_err(|_| ContainersError::BadEntity)?;
 
         let prev_communal = match (container.communal(), new_society) {
             (prev, Some(society)) => {
@@ -124,7 +124,7 @@ impl EcsExtContainers<'_> {
                 let society = self
                     .resource_mut::<Societies>()
                     .society_by_handle_mut(society)
-                    .ok_or(ContainerError::BadSociety(society))?;
+                    .ok_or(ContainersError::BadSociety(society))?;
 
                 // update container first
                 let prev_communal = container.make_communal(new_society);
@@ -141,7 +141,7 @@ impl EcsExtContainers<'_> {
                 let society = self
                     .resource_mut::<Societies>()
                     .society_by_handle_mut(prev)
-                    .ok_or(ContainerError::BadSociety(prev))?;
+                    .ok_or(ContainersError::BadSociety(prev))?;
 
                 // remove from society
                 let result = society.remove_communal_container(container_entity, self.0);
@@ -167,7 +167,7 @@ impl EcsExtContainers<'_> {
 
     /// Creates a new stack at the given entity's location and puts it inside. Item should not be a
     /// stack, should be stackable, and have a transform and physical. Returns new stack entity
-    pub fn convert_to_stack(&self, item: Entity) -> Result<Entity, ContainerError> {
+    pub fn convert_to_stack(&self, item: Entity) -> Result<Entity, ContainersError> {
         let stack_size;
 
         {
@@ -230,7 +230,7 @@ impl EcsExtContainers<'_> {
     }
 
     /// Item is checked for homogeneity with the stack
-    pub fn add_to_stack(&self, stack: Entity, item: Entity) -> Result<(), ContainerError> {
+    pub fn add_to_stack(&self, stack: Entity, item: Entity) -> Result<(), ContainersError> {
         let copyability = EntityCopyability::for_entity(self.0, item);
 
         let stackables = self.read_storage::<StackableComponent>();
@@ -257,7 +257,7 @@ impl EcsExtContainers<'_> {
         let (stack_physical, stack_comp) = self
             .0
             .components(stack, (&mut physicals, &mut stacks))
-            .ok_or(ContainerError::NotAStack(stack))?;
+            .ok_or(ContainersError::NotAStack(stack))?;
 
         // try to add
         let added = stack_comp.stack.try_add(item, copyability, self.0)?;
@@ -270,8 +270,8 @@ impl EcsExtContainers<'_> {
     }
 
     /// Returns the split stack, which may be the same as the given stack
-    pub fn split_stack(&self, stack_entity: Entity, n: u16) -> Result<Entity, ContainerError> {
-        let n = NonZeroU16::new(n).ok_or(ContainerError::ZeroStackSplit)?;
+    pub fn split_stack(&self, stack_entity: Entity, n: u16) -> Result<Entity, ContainersError> {
+        let n = NonZeroU16::new(n).ok_or(ContainersError::ZeroStackSplit)?;
 
         // calculate ops for moving items to new stack
         let mut ops = SmallVec::<[_; 8]>::new();
@@ -279,7 +279,7 @@ impl EcsExtContainers<'_> {
             let mut src_stack = self
                 .0
                 .component_mut::<ItemStackComponent>(stack_entity)
-                .map_err(|_| ContainerError::NotAStack(stack_entity))?;
+                .map_err(|_| ContainersError::NotAStack(stack_entity))?;
 
             match src_stack.stack.split_off(n, &mut ops)? {
                 Some(stack) => stack,

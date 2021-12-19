@@ -3,13 +3,14 @@ use unit::world::WorldPoint;
 
 use crate::activity::context::{ActivityContext, DistanceCheckResult};
 use crate::activity::status::Status;
-use crate::build::ReservedMaterialComponent;
+
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::item::{
-    ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent, HauledItemComponent,
+    ContainerError, ContainersError, EndHaulBehaviour, HaulType, HaulableItemComponent,
+    HauledItemComponent,
 };
-use crate::job::SocietyJobRef;
+
 use crate::queued_update::QueuedUpdates;
 use crate::society::job::SocietyJobHandle;
 use crate::{
@@ -30,6 +31,12 @@ pub enum HaulError {
 
     #[error("Item is not valid, haulable or physical")]
     BadItem,
+
+    #[error("Split item stack doesn't match original stack properties")]
+    BadStackSplit,
+
+    #[error("Failed to split item stack: {0}")]
+    StackSplit(#[from] ContainersError),
 
     #[error("Invalid source container entity for haul")]
     BadSourceContainer,
@@ -69,6 +76,9 @@ pub struct HaulSubactivity<'a> {
 pub enum HaulSource {
     /// Pick up from current location
     PickUp,
+
+    /// Take an amount of items from an item stack
+    PickUpSplitStack(u16),
 
     /// Take out of a container
     Container(Entity),
@@ -111,7 +121,7 @@ impl<'a> HaulSubactivity<'a> {
         source: HaulSource,
     ) -> Result<HaulSubactivity<'a>, HaulError> {
         // check distance
-        if let HaulSource::PickUp = source {
+        if matches!(source, HaulSource::PickUp | HaulSource::PickUpSplitStack(_)) {
             match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
                 DistanceCheckResult::NotAvailable => return Err(HaulError::BadItem),
                 DistanceCheckResult::TooFar => return Err(HaulError::TooFar),
@@ -156,21 +166,30 @@ impl<'a> HaulSubactivity<'a> {
         }
 
         // start hauling, which will give the item a transform on success
-        queue_haul_pickup(ctx.world().resource(), ctx.entity(), thing);
+        queue_haul_pickup(ctx.world(), ctx.entity(), thing, source);
 
         // wait for event and ensure the haul succeeded
-        ctx.subscribe_to_specific_until(thing, EntityEventType::Hauled, |evt| match evt {
-            EntityEventPayload::Hauled(hauler, result) => {
-                if hauler != ctx.entity() {
-                    // someone else picked it up
-                    return Err(EntityEventPayload::Hauled(hauler, result));
+        if let HaulSource::PickUpSplitStack(_) = source {
+            ctx.subscribe_to_specific_until(thing, EntityEventType::HauledButSplit, |evt| match evt
+            {
+                EntityEventPayload::HauledButSplit {
+                    hauler,
+                    result,
+                    split_stack,
+                } if hauler == ctx.entity() => {
+                    subactivity.thing = split_stack;
+                    Ok(result)
                 }
-                Ok(result)
-            }
-            // calling activity can handle other destructive events
-            _ => Err(evt),
-        })
-        .await
+                _ => Err(evt),
+            })
+            .await
+        } else {
+            ctx.subscribe_to_specific_until(thing, EntityEventType::Hauled, |evt| match evt {
+                EntityEventPayload::Hauled(hauler, result) if hauler == ctx.entity() => Ok(result),
+                _ => Err(evt),
+            })
+            .await
+        }
         .unwrap_or(Err(HaulError::Cancelled))?;
 
         // defuse bomb, we have a transform now
@@ -324,7 +343,7 @@ impl Display for HaulTarget {
 impl Display for HaulSource {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            HaulSource::PickUp => write!(f, "current position"),
+            HaulSource::PickUp | HaulSource::PickUpSplitStack(_) => write!(f, "current position"),
             HaulSource::Container(container) => write!(f, "container {}", container),
         }
     }
@@ -347,7 +366,9 @@ impl HaulSource {
         item: Entity,
     ) -> Result<WorldPoint, HaulError> {
         match self {
-            Self::PickUp => position_of(world, item).ok_or(HaulError::BadItem),
+            Self::PickUp | Self::PickUpSplitStack(_) => {
+                position_of(world, item).ok_or(HaulError::BadItem)
+            }
             Self::Container(container) => {
                 position_of(world, *container).ok_or(HaulError::BadSourceContainer)
             }
@@ -400,81 +421,137 @@ fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_enti
     });
 }
 
-fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
-    updates.queue("haul item", move |world| {
-        let do_haul = || -> Result<(), HaulError> {
-            // check item is alive and not being hauled first, to ensure .insert() succeeds below
-            match world.component::<HauledItemComponent>(item) {
-                Ok(hauled) => return Err(HaulError::AlreadyHauled(hauled.hauler)),
-                Err(ComponentGetError::NoSuchEntity(_)) => return Err(HaulError::BadItem),
-                _ => {}
-            }
-
-            // get item properties
-            let (extra_hands, volume, size) = {
-                let haulables = world.read_storage::<HaulableItemComponent>();
-                let physicals = world.read_storage::<PhysicalComponent>();
-                match world.components(item, (&haulables, &physicals)) {
-                    Some((haulable, physical)) => {
-                        (haulable.extra_hands, physical.volume, physical.size)
-                    }
-                    None => {
-                        warn!("item is not haulable"; "item" => item);
-                        return Err(HaulError::BadItem);
-                    }
+fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: HaulSource) {
+    world
+        .resource::<QueuedUpdates>()
+        .queue("haul item", move |world| {
+            let mut split_item_stack = None;
+            let mut do_haul = || -> Result<(), HaulError> {
+                // check item is alive and not being hauled first, to ensure .insert() succeeds below
+                match world.component::<HauledItemComponent>(item) {
+                    Ok(hauled) => return Err(HaulError::AlreadyHauled(hauled.hauler)),
+                    Err(ComponentGetError::NoSuchEntity(_)) => return Err(HaulError::BadItem),
+                    _ => {}
                 }
+
+                // get item properties
+                let (extra_hands, mut volume, mut size) = {
+                    let haulables = world.read_storage::<HaulableItemComponent>();
+                    let physicals = world.read_storage::<PhysicalComponent>();
+                    match world.components(item, (&haulables, &physicals)) {
+                        Some((haulable, physical)) => {
+                            (haulable.extra_hands, physical.volume, physical.size)
+                        }
+                        None => {
+                            warn!("item is not haulable"; "item" => item);
+                            return Err(HaulError::BadItem);
+                        }
+                    }
+                };
+
+                debug!(
+                    "{entity} wants to haul {item} which needs {extra_hands} extra hands",
+                    entity = hauler,
+                    item = item,
+                    extra_hands = extra_hands
+                );
+
+                // ensure hauler has space
+                let slots = {
+                    let mut inventory = world
+                        .component_mut::<InventoryComponent>(hauler)
+                        .map_err(|_| HaulError::NoInventory)?;
+
+                    // ensure hauler has enough free hands
+                     inventory
+                        .get_hauling_slots_unbound(extra_hands)
+                        .ok_or(HaulError::NotEnoughFreeHands)?
+                };
+
+                // get hauler position if needed
+                let hauler_pos = {
+                    let transforms = world.read_storage::<TransformComponent>();
+                    if item.has(&transforms) {
+                        // not needed, item already has a transform
+                        None
+                    } else {
+                        let transform = hauler.get(&transforms).ok_or(HaulError::BadHauler)?;
+                        Some(transform.position)
+                    }
+                };
+
+
+                // split stack if necessary
+                let item = if let HaulSource::PickUpSplitStack(n) = source {
+                    let split_stack = world.helpers_containers().split_stack(item, n)?;
+                    // TODO remerge stack on failure?
+
+                    // validate
+                    let (split_extra_hands, split_volume, split_size) = {
+                        let haulables = world.read_storage::<HaulableItemComponent>();
+                        let physicals = world.read_storage::<PhysicalComponent>();
+                        match world.components(split_stack, (&haulables, &physicals)) {
+                            Some((haulable, physical)) => {
+                                (haulable.extra_hands, physical.volume, physical.size)
+                            }
+                            None => {
+                                warn!("split stack is not haulable"; "item" => item);
+                                return Err(HaulError::BadItem);
+                            }
+                        }
+                    };
+
+                    if split_extra_hands != extra_hands {
+                        warn!("split stack needs {split} extra hands, but original stack needed {orig}",
+                        split = split_extra_hands, orig = extra_hands);
+                        return Err(HaulError::BadStackSplit);
+                    }
+
+                    // warn but allow change in physical size
+                    if split_size != size {
+                        warn!("split stack physical size changed"; "split" => ?split_size, "orig" => ?size);
+                    }
+
+                    volume = split_volume;
+                    size = split_size;
+                    split_item_stack = Some(split_stack);
+                    split_stack
+                } else {item};
+
+                // everything has been checked, no more errors past this point
+
+                // fill equip slots
+                let mut inventory = world
+                    .component_mut::<InventoryComponent>(hauler)
+                    .map_err(|_| HaulError::NoInventory)?;
+                let mut slots = slots.upgrade(&mut inventory).expect("inventory changed unexpectedly");
+                slots.fill(item, volume, size);
+
+                // add components
+                world
+                    .helpers_comps()
+                    .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
+
+                Ok(())
             };
 
-            debug!(
-                "{entity} wants to haul {item} which needs {extra_hands} extra hands",
-                entity = hauler,
-                item = item,
-                extra_hands = extra_hands
-            );
-
-            // get hauler inventory
-            let mut inventory = world
-                .component_mut::<InventoryComponent>(hauler)
-                .map_err(|_| HaulError::NoInventory)?;
-
-            // ensure hauler has enough free hands
-            let mut slots = inventory
-                .get_hauling_slots(extra_hands)
-                .ok_or(HaulError::NotEnoughFreeHands)?;
-
-            // get hauler position if needed
-            let hauler_pos = {
-                let transforms = world.read_storage::<TransformComponent>();
-                if item.has(&transforms) {
-                    // not needed, item already has a transform
-                    None
-                } else {
-                    let transform = hauler.get(&transforms).ok_or(HaulError::BadHauler)?;
-                    Some(transform.position)
+            let result = do_haul();
+            let payload = if let Some(new_stack) = split_item_stack {
+                EntityEventPayload::HauledButSplit {
+                    hauler,
+                    split_stack: new_stack,
+                    result
                 }
+            } else {
+                EntityEventPayload::Hauled(hauler, result)
             };
-
-            // everything has been checked, no more errors past this point
-
-            // fill equip slots
-            slots.fill(item, volume, size);
-
-            // add components
-            world
-                .helpers_comps()
-                .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
+            world.post_event(EntityEvent {
+                subject: item,
+                payload,
+            });
 
             Ok(())
-        };
-
-        let result = do_haul();
-        world.post_event(EntityEvent {
-            subject: item,
-            payload: EntityEventPayload::Hauled(hauler, result),
         });
-
-        Ok(())
-    });
 }
 
 fn queue_stop_hauling(updates: &QueuedUpdates, item: Entity, hauler: Entity, interrupted: bool) {
@@ -565,6 +642,7 @@ impl Display for StartHaulingStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.0 {
             HaulSource::PickUp => f.write_str("Picking up item"),
+            HaulSource::PickUpSplitStack(_) => f.write_str("Picking up items from stack"),
             HaulSource::Container(_) => f.write_str("Taking item out of container"),
         }
     }

@@ -11,7 +11,7 @@ pub trait EntityPosition {
     fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPosition, Option<Deg>), BuilderError>;
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum BuilderError {
     #[error("No position specified for entity that requires a transform")]
     MissingPosition,

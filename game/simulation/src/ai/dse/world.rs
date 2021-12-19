@@ -1,19 +1,19 @@
 use crate::activity::{HaulPurpose, HaulSource};
 use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
-    HasExtraHandsForHaulingConsideration, HoldingItemConsideration, MyProximityToConsideration,
-    Proximity,
+    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
-use crate::ai::input::AiInput::HasInInventory;
-use crate::ai::input::{BlockTypeMatch, LocalAreaSearch};
+
+use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
 use crate::build::BuildMaterial;
 use crate::ecs::*;
-use crate::item::{HauledItemComponent, ItemFilter, ItemFilterable};
-use crate::job::{BuildDetails, SocietyJobHandle, SocietyJobRef};
+use crate::item::{ItemFilter, ItemFilterable};
+use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{AiBox, Blackboard, Consideration, Context, DecisionWeightType, Dse};
+use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use common::OrderedFloat;
+
 use unit::world::WorldPosition;
 use world::block::BlockType;
 
@@ -93,46 +93,62 @@ impl Dse<AiContext> for GatherMaterialsDse {
     ) -> <AiContext as Context>::Action {
         // if we are already hauling a matching item, choose that
 
-        if let Some(best_item) = choose_best_item(blackboard, self.filter()) {
+        if let Some((best_item, source)) = self.choose_best_item(blackboard) {
             // TODO separate HaulTarget to drop nearby/adjacent
-            return AiAction::Haul(
-                best_item,
-                HaulSource::PickUp,
-                HaulTarget::Drop(self.target.centred()),
-                HaulPurpose::MaterialGathering(self.job),
-            );
+            let (tgt, purpose) = self.mk_action();
+            return AiAction::Haul(best_item, source, tgt, purpose);
         }
 
         todo!("gather materials from a different source")
     }
 }
 
-fn choose_best_item(
-    blackboard: &<AiContext as Context>::Blackboard,
-    filter: ItemFilter,
-) -> Option<Entity> {
-    // if we are already hauling a matching item, choose that
-    let inventory = blackboard.inventory.unwrap(); // definitely has an inventory by now
-    for equipped in inventory.all_equipped_items() {
-        if (equipped, Some(blackboard.world)).matches(filter) {
-            // haul this
-            return Some(equipped);
-        }
+impl GatherMaterialsDse {
+    fn mk_action(&self) -> (HaulTarget, HaulPurpose) {
+        (
+            HaulTarget::Drop(self.target.centred()),
+            HaulPurpose::MaterialGathering(self.job),
+        )
     }
 
-    if let Some((_, found_items)) = blackboard.local_area_search_cache.get(&filter) {
-        // choose the nearest out of found local items
-        // TODO take the stack size into account too, choose the biggest
-        if let Some(found) = found_items
-            .iter()
-            .min_by_key(|(_, _, distance, _)| OrderedFloat(*distance))
-            .map(|(e, _, _, _)| *e)
-        {
-            return Some(found);
+    fn choose_best_item(
+        &self,
+        blackboard: &<AiContext as Context>::Blackboard,
+    ) -> Option<(Entity, HaulSource)> {
+        let filter = self.filter();
+        if let AiAction::Haul(haulee, source, tgt, purpose) = blackboard.ai.last_action() {
+            let (expected_tgt, expected_purpose) = self.mk_action();
+            if expected_tgt == *tgt
+                && expected_purpose == *purpose
+                && (*haulee, Some(blackboard.world)).matches(filter)
+            {
+                // keep hauling current thing
+                return Some((*haulee, *source));
+            }
         }
-    }
 
-    None
+        if let Some((_, found_items)) = blackboard.local_area_search_cache.get(&filter) {
+            // choose the nearest out of found local items
+            // TODO take the stack size into account too, choose the biggest
+            if let Some(found) = found_items
+                .iter()
+                .min_by_key(|(_, _, distance, _)| OrderedFloat(*distance))
+                .map(|(e, _, _, _)| *e)
+            {
+                let src = match blackboard.world.component::<ItemStackComponent>(found) {
+                    Ok(stack) => {
+                        // only take as much of the stack as is needed
+                        let n = self.material.quantity().min(stack.stack.total_count());
+                        HaulSource::PickUpSplitStack(n)
+                    }
+                    _ => HaulSource::PickUp,
+                };
+                return Some((found, src));
+            }
+        }
+
+        None
+    }
 }
 
 impl Dse<AiContext> for BuildDse {

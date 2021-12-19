@@ -161,21 +161,22 @@ fn building(ecs: &EcsWorld) {
 
         if let Err(err) = res {
             warn!("failed to stack bricks: {}", err);
+            brick_stack = None;
         }
     }
 
-    if let Some(stack) = brick_stack {
-        let split = ecs
-            .helpers_containers()
-            .split_stack(stack, 2)
-            .expect("split failed");
-
-        let mut transform = ecs
-            .component_mut::<TransformComponent>(split)
-            .expect("no transform");
-        let pos = transform.position;
-        transform.reset_position(pos + (1.0, 1.0, 1.0));
-    }
+    // if let Some(stack) = brick_stack {
+    //     let split = ecs
+    //         .helpers_containers()
+    //         .split_stack(stack, 2)
+    //         .expect("split failed");
+    //
+    //     let mut transform = ecs
+    //         .component_mut::<TransformComponent>(split)
+    //         .expect("no transform");
+    //     let pos = transform.position;
+    //     transform.reset_position(pos + (1.0, 1.0, 1.0));
+    // }
 
     if let Some(human) = humans.first().copied() {
         let society = ecs
@@ -183,10 +184,11 @@ fn building(ecs: &EcsWorld) {
             .society_by_handle(society)
             .expect("bad society");
 
-        for x in 2..5 {
+        for (x, y) in [(2, 2), (2, 8), (3, 4)] {
             society
                 .jobs_mut()
-                .submit(ecs, BuildThingJob::new((x, 2, 1).into(), StoneBrickWall));
+                .submit(ecs, BuildThingJob::new((x, y, 1).into(), StoneBrickWall));
+            break; // just one for now
         }
     }
 }

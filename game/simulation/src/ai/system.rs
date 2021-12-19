@@ -50,6 +50,10 @@ impl AiComponent {
         self.intelligence.pop_smarts(&AdditionalDse::DivineCommand);
     }
 
+    pub fn last_action(&self) -> &AiAction {
+        self.intelligence.last_action()
+    }
+
     pub fn clear_last_action(&mut self) {
         self.intelligence.clear_last_action();
     }
@@ -154,6 +158,7 @@ impl<'a> System<'a> for AiSystem {
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
                 society: society_opt.map(|comp| comp.handle),
+                ai,
                 world: &*ecs_world,
                 shared: &mut shared_bb,
             };

@@ -53,7 +53,13 @@ pub struct ContainerComponentTemplate {
     size: Length3,
 }
 
+/// Mutable reference to contiguous empty slots in an inventory. Lifetime ensures inventory cannot
+/// be modified while this is held
 pub struct EquipSlots<'a>(&'a mut [EquipSlot]);
+
+/// [EquipSlots] but no lifetime connected to any particular inventory. Caller must ensure the
+/// inventory is not modified before this is applied
+pub struct EquipSlotsUnbound(Range<usize>);
 
 /// Slot reference with lifetime to enforce no modification while this is held.
 #[derive(Clone, Copy)]
@@ -102,6 +108,12 @@ impl InventoryComponent {
 
             EquipSlots(slots)
         })
+    }
+
+    /// Get `extra_hands` consecutive slots
+    pub fn get_hauling_slots_unbound(&mut self, extra_hands: u16) -> Option<EquipSlotsUnbound> {
+        self.find_hauling_slot_range(extra_hands)
+            .map(EquipSlotsUnbound)
     }
 
     pub fn has_hauling_slots(&self, extra_hands: u16) -> bool {
@@ -468,6 +480,16 @@ impl<'a> EquipSlots<'a> {
             debug_assert!(e.is_empty());
             *e = EquipSlot::Overflow(entity)
         });
+    }
+}
+
+impl EquipSlotsUnbound {
+    /// Checks slots are valid and empty
+    pub fn upgrade(self, inv: &mut InventoryComponent) -> Option<EquipSlots> {
+        inv.equip_slots
+            .get_mut(self.0)
+            .filter(|slots| slots.iter().all(|s| s.is_empty()))
+            .map(EquipSlots)
     }
 }
 

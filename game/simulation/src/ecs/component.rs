@@ -6,7 +6,7 @@ use common::*;
 use crate::ecs::world::{ComponentRefErased, SpecsWorld};
 use crate::{ComponentWorld, EcsWorld, Entity};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum ComponentBuildError {
     #[error("Component is not buildable")]

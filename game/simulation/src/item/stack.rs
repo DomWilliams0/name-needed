@@ -9,8 +9,8 @@ use crate::ecs::*;
 
 use crate::PhysicalComponent;
 
-#[derive(Debug, Error, Eq, PartialEq)]
-pub enum ItemStackError<E: Debug + Display + Eq> {
+#[derive(Debug, Error, Eq, PartialEq, Clone)]
+pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
     #[error("Item stack is full")]
     Full,
 
