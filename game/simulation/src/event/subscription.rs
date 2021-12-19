@@ -136,7 +136,7 @@ impl EntityEventPayload {
         match self {
             // not destructive if successful and done by the interested entity
             BeenPickedUp(me, Ok(_)) | BeenEaten(Ok(me)) | Hauled(me, Ok(_))
-                if doer != Some(*me) =>
+                if doer == Some(*me) =>
             {
                 false
             }
@@ -190,6 +190,59 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             DummyA | DummyB => Err(()),
             #[cfg(feature = "testing")]
             Debug(_) => Err(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn destructive_event() {
+        let world = EcsWorld::new();
+        let item = Entity::from(world.create_entity().build());
+        let holder = Entity::from(world.create_entity().build());
+        let other = Entity::from(world.create_entity().build());
+
+        let non_destructive = vec![
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::Hauled(holder, Ok(())),
+            },
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::BeenEaten(Ok(holder)),
+            },
+        ];
+
+        let destructive = vec![
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::Hauled(other, Ok(())),
+            },
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::BeenEaten(Ok(other)),
+            },
+        ];
+
+        for e in non_destructive {
+            assert!(
+                !e.payload.is_destructive_for(Some(holder)),
+                "event should be non destructive for {}: {:?}",
+                holder,
+                e
+            );
+        }
+
+        for e in destructive {
+            assert!(
+                e.payload.is_destructive_for(Some(holder)),
+                "event should be destructive for {}: {:?}",
+                holder,
+                e
+            );
         }
     }
 }

@@ -1,4 +1,4 @@
-# TODOs (386)
+# TODOs (387)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -133,10 +133,11 @@
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (1)
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
- * [game/simulation/src/activity/subactivity/haul.rs](game/simulation/src/activity/subactivity/haul.rs) (5)
+ * [game/simulation/src/activity/subactivity/haul.rs](game/simulation/src/activity/subactivity/haul.rs) (6)
    * `// TODO depends on item size`
    * `// TODO add some randomness to drop position`
    * `// TODO explicit access side for container, e.g. front of chest`
+   * `// TODO remerge stack on failure?`
    * `// TODO depends on weight of item`
    * `// TODO depends on weight of item`
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
