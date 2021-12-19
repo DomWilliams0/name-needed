@@ -72,6 +72,7 @@ impl ai::Input<AiContext> for AiInput {
                 if let Some(inv) = blackboard.inventory {
                     if search_inventory_with_cache(blackboard, inv, filter).is_some() {
                         // found in inventory
+                        trace!("matching item found in inventory"; "filter" => ?filter);
                         return 1.0;
                     }
                 }

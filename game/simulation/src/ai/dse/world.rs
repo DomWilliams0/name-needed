@@ -95,8 +95,12 @@ impl Dse<AiContext> for GatherMaterialsDse {
 
         if let Some((best_item, source)) = self.choose_best_item(blackboard) {
             // TODO separate HaulTarget to drop nearby/adjacent
-            let (tgt, purpose) = self.mk_action();
-            return AiAction::Haul(best_item, source, tgt, purpose);
+            return AiAction::Haul(
+                best_item,
+                source,
+                HaulTarget::Drop(self.target.centred()),
+                HaulPurpose::MaterialGathering(self.job),
+            );
         }
 
         todo!("gather materials from a different source")
@@ -104,25 +108,14 @@ impl Dse<AiContext> for GatherMaterialsDse {
 }
 
 impl GatherMaterialsDse {
-    fn mk_action(&self) -> (HaulTarget, HaulPurpose) {
-        (
-            HaulTarget::Drop(self.target.centred()),
-            HaulPurpose::MaterialGathering(self.job),
-        )
-    }
-
     fn choose_best_item(
         &self,
         blackboard: &<AiContext as Context>::Blackboard,
     ) -> Option<(Entity, HaulSource)> {
         let filter = self.filter();
-        if let AiAction::Haul(haulee, source, tgt, purpose) = blackboard.ai.last_action() {
-            let (expected_tgt, expected_purpose) = self.mk_action();
-            if expected_tgt == *tgt
-                && expected_purpose == *purpose
-                && (*haulee, Some(blackboard.world)).matches(filter)
-            {
-                // keep hauling current thing
+        if let AiAction::Haul(haulee, source, ..) = blackboard.ai.last_action() {
+            if (*haulee, Some(blackboard.world)).matches(filter) {
+                // use this thing in inventory for hauling
                 return Some((*haulee, *source));
             }
         }

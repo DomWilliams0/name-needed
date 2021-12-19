@@ -179,6 +179,48 @@ impl ActivityContext {
 
     /// Prefer using other helpers than direct event subscription e.g. [go_to].
     ///
+    /// Subscribes to the given subscriptions, runs the filter against each event until it returns
+    /// false, then unsubscribes from the given event
+    pub async fn subscribe_to_many_until(
+        &self,
+        subject: Entity,
+        subscriptions: impl Iterator<Item = EntityEventType>,
+        mut filter: impl FnMut(EntityEventPayload) -> EventResult,
+    ) {
+        let subscriptions = subscriptions
+            .map(|ty| EntityEventSubscription {
+                subject,
+                subscription: EventSubscription::Specific(ty),
+            })
+            .collect::<SmallVec<[_; 4]>>();
+
+        // register subscription
+        let evts = self.world.resource_mut::<EntityEventQueue>();
+        evts.subscribe(self.entity, subscriptions.iter().copied());
+
+        self.consume_events(|mut evt| {
+            if evt.subject == subject {
+                match filter(evt.payload) {
+                    EventResult::Consumed => GenericEventResult::Consumed,
+                    EventResult::Unconsumed(payload) => {
+                        evt.payload = payload;
+                        GenericEventResult::Unconsumed(evt)
+                    }
+                }
+            } else {
+                GenericEventResult::Unconsumed(evt)
+            }
+        })
+        .await;
+
+        // unsubscribe
+        for sub in subscriptions {
+            evts.unsubscribe(self.entity, sub);
+        }
+    }
+
+    /// Prefer using other helpers than direct event subscription e.g. [go_to].
+    ///
     /// Subscribes to the given subscription, runs the filter against each event until it returns
     /// false, then unsubscribes from the given event
     pub async fn subscribe_to_until(
@@ -240,7 +282,7 @@ impl ActivityContext {
         final_result
     }
 
-    /// Hangs in event loop running filter against all of them until unconsumed is returned
+    /// Hangs in event loop running filter against all of them until consumed is returned
     pub async fn consume_events(&self, mut filter: impl FnMut(EntityEvent) -> GenericEventResult) {
         loop {
             let evt = self.next_event().await;

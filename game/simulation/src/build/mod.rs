@@ -55,6 +55,7 @@ impl BuildMaterial {
     pub fn definition(&self) -> &'static str {
         self.definition_name
     }
+
     pub fn quantity(&self) -> u16 {
         self.quantity
     }

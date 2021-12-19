@@ -39,16 +39,12 @@ pub enum EntityEventPayload {
     /// Entity (subject) has equipped the given item entity that was already in their inventory
     HasEquipped(Entity),
 
-    /// Item entity (subject) has been picked up for hauling by the given hauler
+    /// Item entity (subject) has been picked up for hauling by the given hauler (.0)
     Hauled(Entity, Result<(), HaulError>),
 
-    /// Item stack entity (subject) was split and then that split stack (split_stack) has been
-    /// picked up for hauling by the given hauler
-    HauledButSplit {
-        hauler: Entity,
-        split_stack: Entity,
-        result: Result<(), HaulError>,
-    },
+    /// Item stack entity (subject) was split and then that split stack (Ok(split_stack)) has been
+    /// picked up for hauling by the given hauler (.0)
+    HauledButSplit(Entity, Result<Entity, HaulError>),
 
     /// Item entity has been removed from the given container
     ExitedContainer(Result<Entity, HaulError>),
@@ -146,7 +142,7 @@ impl EntityEventPayload {
             BeenPickedUp(me, Ok(_))
             | BeenEaten(Ok(me))
             | Hauled(me, Ok(_))
-            | HauledButSplit { hauler: me, .. }
+            | HauledButSplit(me, _)
                 if doer == Some(*me) =>
             {
                 false
@@ -156,7 +152,7 @@ impl EntityEventPayload {
             BeenPickedUp(_, Ok(_))
             | BeenEaten(Ok(_))
             | Hauled(_, Ok(_))
-            | HauledButSplit { result: Ok(_), .. }
+            | HauledButSplit(_, Ok(_))
             | ExitedContainer(Ok(_))
             | EnteredContainer(Ok(_)) => true,
 
@@ -164,7 +160,7 @@ impl EntityEventPayload {
             BeenPickedUp(_, Err(_))
             | BeenEaten(Err(_))
             | Hauled(_, Err(_))
-            | HauledButSplit { result: Err(_), .. }
+            | HauledButSplit(_, Err(_))
             | ExitedContainer(Err(_))
             | EnteredContainer(Err(_)) => false,
 
@@ -197,7 +193,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             | Arrived(_, _)
             | BeenEquipped(_)
             | Hauled(_, _)
-            | HauledButSplit { .. }
+            | HauledButSplit(_, _)
             | ExitedContainer(_)
             | EnteredContainer(_) => Err(()),
             #[cfg(test)]

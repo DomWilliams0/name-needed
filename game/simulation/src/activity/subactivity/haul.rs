@@ -1,7 +1,8 @@
 use common::*;
+use std::array::IntoIter;
 use unit::world::WorldPoint;
 
-use crate::activity::context::{ActivityContext, DistanceCheckResult};
+use crate::activity::context::{ActivityContext, DistanceCheckResult, EventResult};
 use crate::activity::status::Status;
 
 use crate::ecs::*;
@@ -15,7 +16,7 @@ use crate::queued_update::QueuedUpdates;
 use crate::society::job::SocietyJobHandle;
 use crate::{
     ComponentWorld, ContainedInComponent, ContainerComponent, EntityEvent, EntityEventPayload,
-    InventoryComponent, PhysicalComponent, TransformComponent, WorldPosition,
+    InventoryComponent, PhysicalComponent, TransformComponent,
 };
 
 #[derive(Debug, Error, Clone)]
@@ -169,28 +170,32 @@ impl<'a> HaulSubactivity<'a> {
         queue_haul_pickup(ctx.world(), ctx.entity(), thing, source);
 
         // wait for event and ensure the haul succeeded
-        if let HaulSource::PickUpSplitStack(_) = source {
-            ctx.subscribe_to_specific_until(thing, EntityEventType::HauledButSplit, |evt| match evt
-            {
-                EntityEventPayload::HauledButSplit {
-                    hauler,
-                    result,
-                    split_stack,
-                } if hauler == ctx.entity() => {
-                    subactivity.thing = split_stack;
-                    Ok(result)
+        let mut the_result = None;
+        ctx.subscribe_to_many_until(
+            thing,
+            IntoIter::new([EntityEventType::HauledButSplit, EntityEventType::Hauled]),
+            |evt| match evt {
+                EntityEventPayload::Hauled(hauler, result) if hauler == ctx.entity() => {
+                    the_result = Some(result);
+                    EventResult::Consumed
                 }
-                _ => Err(evt),
-            })
-            .await
-        } else {
-            ctx.subscribe_to_specific_until(thing, EntityEventType::Hauled, |evt| match evt {
-                EntityEventPayload::Hauled(hauler, result) if hauler == ctx.entity() => Ok(result),
-                _ => Err(evt),
-            })
-            .await
-        }
-        .unwrap_or(Err(HaulError::Cancelled))?;
+                EntityEventPayload::HauledButSplit(hauler, result) if hauler == ctx.entity() => {
+                    let result = match result {
+                        Ok(split_stack) => {
+                            subactivity.thing = split_stack;
+                            Ok(())
+                        }
+                        Err(err) => Err(err),
+                    };
+                    the_result = Some(result);
+                    EventResult::Consumed
+                }
+                _ => EventResult::Unconsumed(evt),
+            },
+        )
+        .await;
+
+        the_result.unwrap_or(Err(HaulError::Cancelled))?;
 
         // defuse bomb, we have a transform now
         subactivity.needs_transform = false;
@@ -425,8 +430,7 @@ fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: Hau
     world
         .resource::<QueuedUpdates>()
         .queue("haul item", move |world| {
-            let mut split_item_stack = None;
-            let mut do_haul = || -> Result<(), HaulError> {
+            let do_haul = || -> Result<Option<Entity>, HaulError> {
                 // check item is alive and not being hauled first, to ensure .insert() succeeds below
                 match world.component::<HauledItemComponent>(item) {
                     Ok(hauled) => return Err(HaulError::AlreadyHauled(hauled.hauler)),
@@ -482,6 +486,7 @@ fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: Hau
 
 
                 // split stack if necessary
+                let mut split_stack_entity = None;
                 let item = if let HaulSource::PickUpSplitStack(n) = source {
                     let split_stack = world.helpers_containers().split_stack(item, n)?;
                     // TODO remerge stack on failure?
@@ -514,7 +519,7 @@ fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: Hau
 
                     volume = split_volume;
                     size = split_size;
-                    split_item_stack = Some(split_stack);
+                    split_stack_entity = Some(split_stack);
                     split_stack
                 } else {item};
 
@@ -532,18 +537,16 @@ fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: Hau
                     .helpers_comps()
                     .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
 
-                Ok(())
+                Ok(split_stack_entity)
             };
 
             let result = do_haul();
-            let payload = if let Some(new_stack) = split_item_stack {
-                EntityEventPayload::HauledButSplit {
-                    hauler,
-                    split_stack: new_stack,
-                    result
-                }
-            } else {
-                EntityEventPayload::Hauled(hauler, result)
+            let payload = match (source, result) {
+                (HaulSource::PickUpSplitStack(_), Ok(Some(stack)))=>EntityEventPayload::HauledButSplit(hauler, Ok(stack)),
+                (HaulSource::PickUpSplitStack(_), Ok(None))=> unreachable!(),
+                (HaulSource::PickUpSplitStack(_), Err(err))=>EntityEventPayload::HauledButSplit(hauler, Err(err)),
+                (_, result) =>EntityEventPayload::Hauled(hauler, result.map(|_| ())),
+
             };
             world.post_event(EntityEvent {
                 subject: item,

@@ -188,7 +188,6 @@ fn building(ecs: &EcsWorld) {
             society
                 .jobs_mut()
                 .submit(ecs, BuildThingJob::new((x, y, 1).into(), StoneBrickWall));
-            break; // just one for now
         }
     }
 }
