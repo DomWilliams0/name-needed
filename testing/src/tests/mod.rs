@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 
 // ---------- test modules
+pub mod build;
 pub mod dummy;
 pub mod equip_with_pickup;
 pub mod haul;

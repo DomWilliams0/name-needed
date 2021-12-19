@@ -142,6 +142,7 @@ pub fn tick_hook(ctx: &HookContext) -> HookResult {
 pub fn register_tests() {
     use tests::*;
 
+    build::register();
     dummy::register();
     equip_with_pickup::register();
     haul::register();

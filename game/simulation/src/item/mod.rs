@@ -5,7 +5,7 @@ pub use component::{
     ConditionComponent, EdibleItemComponent, NameComponent, ThrowableItemComponent,
 };
 pub use condition::{ItemCondition, ItemConditionGrade};
-pub use containers::{ContainedInComponent, ContainersError};
+pub use containers::{ContainedInComponent, ContainersError, StackableComponent};
 pub use filter::{ItemFilter, ItemFilterable};
 pub use haul::{
     EndHaulBehaviour, HaulSystem, HaulType, HaulableItemComponent, HauledItemComponent,

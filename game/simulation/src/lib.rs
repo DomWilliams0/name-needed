@@ -40,12 +40,13 @@ pub use event::{EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
-pub use build::{Build, StoneBrickWall};
+pub use build::{Build, BuildMaterial, StoneBrickWall};
 #[cfg(debug_assertions)]
 pub use item::validation::validate_all_inventories;
 pub use item::{
-    ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
-    InventoryComponent, ItemCondition, ItemStack, ItemStackComponent, NameComponent,
+    ConditionComponent, ContainedInComponent, Container, ContainerComponent, ContainersError,
+    EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
+    ItemStackError, NameComponent, StackableComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;

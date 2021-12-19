@@ -28,7 +28,7 @@ pub struct AiComponent {
 }
 
 impl AiComponent {
-    fn with_species(species: &Species) -> Self {
+    pub fn with_species(species: &Species) -> Self {
         let intelligence = match species {
             Species::Human => Intelligence::new(human_dses()),
             Species::Dog => Intelligence::new(dog_dses()),

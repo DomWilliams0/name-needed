@@ -29,7 +29,8 @@ impl Consideration<AiContext> for HungerConsideration {
 #[cfg(test)]
 mod tests {
     use crate::ai::consideration::HungerConsideration;
-    use crate::ai::{AiBlackboard, SharedBlackboard};
+    use crate::ai::system::Species;
+    use crate::ai::{AiBlackboard, AiComponent, SharedBlackboard};
     use crate::ecs::Builder;
     use crate::{ComponentWorld, EcsWorld, WorldPosition};
     use ai::{Consideration, InputCache};
@@ -49,6 +50,7 @@ mod tests {
 
     fn dummy_blackboard() -> (AiBlackboard<'static>, NoLeaksGuard) {
         let world = Box::leak(Box::new(EcsWorld::new()));
+        let ai = Box::leak(Box::new(AiComponent::with_species(&Species::Human)));
         let shared = Box::leak(Box::new(SharedBlackboard {
             area_link_cache: Default::default(),
         }));
@@ -62,6 +64,7 @@ mod tests {
             hunger: None,
             inventory: None,
             society: None,
+            ai,
             inventory_search_cache: Default::default(),
             local_area_search_cache: Default::default(),
             world,
