@@ -11,12 +11,13 @@ use common::num_traits::clamp;
 use common::*;
 use grid::{DynamicGrid, GridImpl};
 use unit::world::{
-    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, CHUNK_SIZE, SLAB_SIZE,
+    ChunkLocation, LocalSliceIndex, SlabLocation, SlabPosition, SlabPositionAsCoord, CHUNK_SIZE,
+    SLAB_SIZE,
 };
 
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
 use crate::region::{PlanetPoint, RegionLocation, CHUNKS_PER_REGION_SIDE};
-use crate::{map_range, Planet, SlabPositionAsCoord};
+use crate::{map_range, Planet};
 
 #[derive(Clone)]
 pub struct Render {
