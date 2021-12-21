@@ -69,7 +69,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
                 item: *e,
                 dest: *tgt,
             },
-            A::GoBuild { .. } => return Err(()), // TODO logging of new events
+            A::GoBuild { details, .. } => B::GoBuild(details.clone()),
         }))
     }
 }

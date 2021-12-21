@@ -7,6 +7,7 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::ecs::*;
+use crate::job::BuildDetails;
 use crate::simulation::Tick;
 use crate::WorldPosition;
 
@@ -47,6 +48,7 @@ pub enum LoggedEntityDecision {
     GoBreakBlock(WorldPosition),
     Follow(Entity),
     Haul { item: Entity, dest: HaulTarget },
+    GoBuild(BuildDetails),
 }
 
 impl<T> RingBuffer<T> {
@@ -129,6 +131,7 @@ impl Display for LoggedEntityEvent {
                     GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
                     Follow(e) => write!(f, "follow {}", e),
                     Haul { item, dest } => write!(f, "haul {} to {}", item, dest),
+                    GoBuild(details) => write!(f, "build {} at {}", details.target, details.pos),
                 }
             }
         }

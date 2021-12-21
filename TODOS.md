@@ -1,4 +1,4 @@
-# TODOs (388)
+# TODOs (387)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -143,9 +143,8 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `// TODO handle society task`
    * `// TODO need to notify society here, as above?`
- * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
-   * `A::GoBuild { .. } => return Err(()), // TODO logging of new events`
  * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
    * `/// TODO search society stores as well`
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
