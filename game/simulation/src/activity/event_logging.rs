@@ -7,6 +7,7 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::ecs::*;
+use crate::event::DeathReason;
 use crate::job::BuildDetails;
 use crate::simulation::Tick;
 use crate::WorldPosition;
@@ -35,6 +36,8 @@ pub enum LoggedEntityEvent {
     PickedUp(Entity),
     /// Made a decision to do something
     AiDecision(LoggedEntityDecision),
+    /// Died
+    Died(DeathReason),
 }
 
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
@@ -119,6 +122,7 @@ impl Display for LoggedEntityEvent {
             Equipped(e) => write!(f, "equipped {}", e),
             Eaten(e) => write!(f, "ate {}", e),
             PickedUp(e) => write!(f, "picked up {}", e),
+            Died(reason) => write!(f, "died because {}", reason),
 
             AiDecision(decision) => {
                 write!(f, "decided to ")?;

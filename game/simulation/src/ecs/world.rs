@@ -6,7 +6,7 @@ use std::mem::ManuallyDrop;
 
 use common::*;
 
-use crate::event::{EntityEvent, EntityEventQueue};
+use crate::event::{DeathReason, EntityEvent, EntityEventQueue};
 
 use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
 use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
@@ -46,7 +46,10 @@ pub enum ComponentGetError {
 
 /// Resource to hold entities to kill
 #[derive(Default)]
-pub struct EntitiesToKill(pub Vec<specs::Entity>);
+pub struct EntitiesToKill {
+    entities: Vec<specs::Entity>,
+    reasons: Vec<DeathReason>,
+}
 
 pub trait ComponentWorld: ContainerResolver + Sized {
     fn component<T: Component>(
@@ -83,13 +86,13 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     /// > You have to make sure that no component storage is borrowed during the building!
     fn create_entity(&self) -> EntityBuilder;
 
-    fn kill_entity(&self, entity: Entity);
+    fn kill_entity(&self, entity: Entity, reason: DeathReason);
     fn is_entity_alive(&self, entity: Entity) -> bool;
 
     // ---
-    fn kill_entities(&self, entities: &[Entity]) {
+    fn kill_entities(&self, entities: &[Entity], reason: DeathReason) {
         for e in entities {
-            self.kill_entity(*e)
+            self.kill_entity(*e, reason)
         }
     }
 
@@ -115,6 +118,47 @@ pub trait ComponentWorld: ContainerResolver + Sized {
 
     fn name(&self, e: Entity) -> &dyn Display {
         self.name_or_default(e, &"Unnamed")
+    }
+}
+
+impl EntitiesToKill {
+    pub fn add(&mut self, entity: Entity, reason: DeathReason) {
+        self.entities.push(entity.into());
+        self.reasons.push(reason);
+    }
+
+    pub fn add_many(&mut self, entities: impl Iterator<Item = (Entity, DeathReason)>) {
+        if let Some(n) = entities.size_hint().1 {
+            self.entities.reserve(n);
+            self.reasons.reserve(n);
+        }
+
+        for (entity, reason) in entities {
+            self.entities.push(entity.into());
+            self.reasons.push(reason);
+        }
+    }
+
+    pub fn replace_entities(&mut self, replacement: Vec<specs::Entity>) -> Vec<specs::Entity> {
+        std::mem::replace(&mut self.entities, replacement)
+    }
+
+    pub fn count(&self) -> usize {
+        debug_assert_eq!(self.entities.len(), self.reasons.len());
+        self.entities.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.entities.clear();
+        self.reasons.clear();
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Entity, DeathReason)> + '_ {
+        self.entities
+            .iter()
+            .copied()
+            .map(Entity::from)
+            .zip(self.reasons.iter().copied())
     }
 }
 
@@ -316,14 +360,19 @@ impl ComponentWorld for EcsWorld {
         WorldExt::create_entity_unchecked(&self.world)
     }
 
-    fn kill_entity(&self, entity: Entity) {
-        let mut to_kill = SmallVec::<[specs::Entity; 1]>::new();
-        to_kill.push(entity.into());
+    fn kill_entity(&self, entity: Entity, reason: DeathReason) {
+        let mut to_kill = SmallVec::<[(Entity, DeathReason); 1]>::new();
+        to_kill.push((entity, reason));
         trace!("killing entity"; entity);
 
         // special case for item stacks, destroy all contained items too
         if let Ok(stack) = self.component::<ItemStackComponent>(entity) {
-            to_kill.extend(stack.stack.contents().map(|(e, _)| e.into()));
+            to_kill.extend(
+                stack
+                    .stack
+                    .contents()
+                    .map(|(e, _)| (e, DeathReason::ParentStackDestroyed)),
+            );
             trace!("killing item stack contents too"; "stack" => entity, "contents" => ?stack.stack.contents().collect_vec());
         }
 
@@ -358,7 +407,7 @@ impl ComponentWorld for EcsWorld {
 
         // kill before next maintain
         let deathlist = self.resource_mut::<EntitiesToKill>();
-        deathlist.0.extend(to_kill.into_iter());
+        deathlist.add_many(to_kill.into_iter());
     }
 
     fn is_entity_alive(&self, entity: Entity) -> bool {

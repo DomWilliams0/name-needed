@@ -1,3 +1,4 @@
+use crate::event::DeathReason;
 use crate::{ComponentWorld, EcsWorld};
 use common::*;
 use std::ops::{Deref, DerefMut};
@@ -20,6 +21,7 @@ pub struct EntityWrapper(pub specs::world::Index, pub std::num::NonZeroI32);
 pub struct EntityBomb<'a> {
     entity: Entity,
     world: &'a EcsWorld,
+    death_reason: DeathReason,
 }
 
 impl Display for EntityWrapper {
@@ -110,8 +112,12 @@ impl From<EntityWrapper> for Entity {
 }
 
 impl<'a> EntityBomb<'a> {
-    pub fn new(entity: Entity, world: &'a EcsWorld) -> Self {
-        Self { entity, world }
+    pub fn new(entity: Entity, world: &'a EcsWorld, death_reason: DeathReason) -> Self {
+        Self {
+            entity,
+            world,
+            death_reason,
+        }
     }
 
     pub fn defuse(self) {
@@ -121,7 +127,7 @@ impl<'a> EntityBomb<'a> {
 
 impl Drop for EntityBomb<'_> {
     fn drop(&mut self) {
-        self.world.kill_entity(self.entity);
+        self.world.kill_entity(self.entity, self.death_reason);
     }
 }
 

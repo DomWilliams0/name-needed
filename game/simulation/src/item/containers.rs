@@ -5,6 +5,7 @@ use unit::world::WorldPosition;
 
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
+use crate::event::DeathReason;
 use crate::{NameComponent, PhysicalComponent, Societies, SocietyHandle, TransformComponent};
 
 use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackMigrationType};
@@ -92,7 +93,11 @@ impl EcsExtContainers<'_> {
         Ok(())
     }
 
-    pub fn destroy_container(&mut self, pos: WorldPosition) -> Result<(), ContainersError> {
+    pub fn destroy_container(
+        &mut self,
+        pos: WorldPosition,
+        reason: DeathReason,
+    ) -> Result<(), ContainersError> {
         let world = self.voxel_world();
         let container_entity = match world.borrow_mut().remove_associated_block_data(pos) {
             Some(AssociatedBlockData::Container(e)) => e,
@@ -104,7 +109,7 @@ impl EcsExtContainers<'_> {
         };
 
         debug!("destroying container"; "container" => container_entity, "pos" => %pos);
-        self.0.kill_entity(container_entity);
+        self.0.kill_entity(container_entity, reason);
 
         Ok(())
     }
@@ -401,7 +406,8 @@ impl EcsExtContainers<'_> {
             }
             StackAdd::CollapsedIntoOther => {
                 // item is identical to another, destroy
-                self.0.kill_entity(item);
+                self.0
+                    .kill_entity(item, DeathReason::CollapsedIntoIdenticalInStack);
                 // TODO post event? could do it in kill_entity
             }
         }

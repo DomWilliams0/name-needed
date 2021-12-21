@@ -12,7 +12,7 @@ use crate::activity::ActivitySystem;
 use crate::ai::{AiAction, AiComponent, AiSystem};
 
 use crate::ecs::*;
-use crate::event::{EntityEventQueue, RuntimeTimers};
+use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
     UiCommand, UiRequest, UiResponsePayload,
@@ -38,7 +38,8 @@ use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, EntityLoggingComponent, Exit, ThreadedWorldLoader, WorldRef, WorldViewer,
+    definitions, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
+    ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
@@ -227,24 +228,31 @@ impl<R: Renderer> Simulation<R> {
 
     fn delete_queued_entities(&mut self) {
         let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
-        if !deathlist_ref.0.is_empty() {
+        let n = deathlist_ref.count();
+        if n > 0 {
             // take out of resource so we can get a mutable world ref
-            let deathlist = std::mem::take(&mut deathlist_ref.0);
+            let deathlist = deathlist_ref.replace_entities(Vec::new());
 
-            let n = deathlist.len();
             if let Err(err) = self.ecs_world.delete_entities(&deathlist) {
                 error!("failed to kill entities"; "entities" => ?deathlist, "error" => %err);
             }
 
-            debug!("killed {} entities", n);
-
             // put it back
             let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
-            let empty = std::mem::replace(&mut deathlist_ref.0, deathlist);
+            let empty = deathlist_ref.replace_entities(deathlist);
             debug_assert!(empty.is_empty());
             std::mem::forget(empty);
 
-            deathlist_ref.0.clear();
+            // post events
+            let event_queue = self.ecs_world.resource_mut::<EntityEventQueue>();
+            event_queue.post_multiple(deathlist_ref.iter().map(|(e, reason)| EntityEvent {
+                subject: e,
+                payload: EntityEventPayload::Died(reason),
+            }));
+
+            debug!("killed {} entities", n);
+
+            deathlist_ref.clear();
         }
     }
 
@@ -533,7 +541,10 @@ impl<R: Renderer> Simulation<R> {
                 // chest destroyed
                 self.ecs_world.resource::<QueuedUpdates>().queue(
                     "destroy container",
-                    move |world| match world.helpers_containers().destroy_container(pos) {
+                    move |world| match world
+                        .helpers_containers()
+                        .destroy_container(pos, DeathReason::BlockDestroyed)
+                    {
                         Err(err) => {
                             error!("failed to destroy container"; "error" => %err);
                             Err(err.into())

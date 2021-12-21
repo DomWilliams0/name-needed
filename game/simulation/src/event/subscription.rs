@@ -3,7 +3,7 @@ use crate::ecs::*;
 
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
-use common::{num_derive::FromPrimitive, num_traits};
+use common::{num_derive::FromPrimitive, num_traits, Display};
 use std::convert::TryInto;
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
@@ -52,6 +52,9 @@ pub enum EntityEventPayload {
     /// Item entity has been inserted into the given container
     EnteredContainer(Result<Entity, HaulError>),
 
+    /// Entity died for the given reason
+    Died(DeathReason),
+
     /// Debug event needed for tests only
     #[cfg(feature = "testing")]
     Debug(crate::event::subscription::debug_events::EntityEventDebugPayload),
@@ -63,6 +66,25 @@ pub enum EntityEventPayload {
     #[doc(hidden)]
     #[cfg(test)]
     DummyB,
+}
+
+// display: "because ..."
+#[derive(Copy, Clone, Debug, Display)]
+pub enum DeathReason {
+    /// of unknown reasons
+    Unknown,
+
+    /// it was used in a build
+    CompletedBuild,
+
+    /// the containing item stack was destroyed
+    ParentStackDestroyed,
+
+    /// the block was destroyed
+    BlockDestroyed,
+
+    /// it was collapsed into an identical item stack
+    CollapsedIntoIdenticalInStack,
 }
 
 #[cfg(feature = "testing")]
@@ -169,6 +191,9 @@ impl EntityEventPayload {
                 false
             }
 
+            // always destructive
+            Died(_) => true,
+
             #[cfg(test)]
             DummyA | DummyB => false,
             #[cfg(feature = "testing")]
@@ -188,6 +213,7 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasEquipped(e) => Ok(E::Equipped(*e)),
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
+            Died(reason) => Ok(E::Died(*reason)),
             BeenEaten(_)
             | BeenPickedUp(_, _)
             | Arrived(_, _)

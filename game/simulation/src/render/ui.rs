@@ -2,6 +2,7 @@ use common::*;
 use unit::space::length::Length2;
 
 use crate::ecs::*;
+use crate::event::DeathReason;
 use crate::job::SocietyJobHandle;
 use crate::SocietyHandle;
 use crate::{QueuedUpdates, Societies};
@@ -49,7 +50,7 @@ impl<'a> System<'a> for UiElementPruneSystem {
         if !expired.is_empty() {
             debug!("killing {} ui elements for expired jobs", expired.len(); "dying" => ?expired);
             updates.queue("kill expired job ui elements", move |world| {
-                world.kill_entities(&expired);
+                world.kill_entities(&expired, DeathReason::Unknown);
                 Ok(())
             })
         }

@@ -8,6 +8,7 @@ use common::*;
 use std::sync::Arc;
 use unit::space::length::{Length, Length2};
 
+use crate::event::DeathReason;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -46,7 +47,7 @@ impl<'w> EcsExtBuild<'w> {
                 );
 
                 // kill on failure
-                let bomb = EntityBomb::new(wip, &world);
+                let bomb = EntityBomb::new(wip, &world, DeathReason::Unknown);
 
                 // register ui entity with job
                 job.resolve_and_cast_mut(world.resource(), |build_job: &mut BuildThingJob| {
@@ -112,7 +113,7 @@ impl BuildHelper {
         ecs.resource::<QueuedUpdates>().queue(
             "destroying materials for completed build",
             move |world| {
-                world.kill_entities(&materials);
+                world.kill_entities(&materials, DeathReason::CompletedBuild);
                 Ok(())
             },
         );
