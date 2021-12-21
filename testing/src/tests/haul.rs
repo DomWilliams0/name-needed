@@ -4,10 +4,10 @@ use crate::tests::TestHelper;
 use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::BoxedResult;
 use simulation::{
-    validate_all_inventories, AiAction, BlockType, ComponentWorld, ContainerComponent, EcsWorld,
-    Entity, EntityEventDebugPayload, EntityEventPayload, HaulPurpose, HaulSource, HaulTarget,
-    QueuedUpdates, TaskResultSummary, TerrainUpdatesRes, TransformComponent, WorldPosition,
-    WorldPositionRange, WorldTerrainUpdate,
+    validate_all_inventories, AiAction, BlockType, ComponentWorld, ContainerComponent, DeathReason,
+    EcsWorld, Entity, EntityEventDebugPayload, EntityEventPayload, HaulPurpose, HaulSource,
+    HaulTarget, QueuedUpdates, TaskResultSummary, TerrainUpdatesRes, TransformComponent,
+    WorldPosition, WorldPositionRange, WorldTerrainUpdate,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -406,7 +406,9 @@ impl HaulVariant for RemoveItemDuring {
                 if test.current_tick() == 15 {
                     assert!(!self.killed_item);
                     self.killed_item = true;
-                    ctx.simulation.ecs.kill_entity(haul.item);
+                    ctx.simulation
+                        .ecs
+                        .kill_entity(haul.item, DeathReason::Unknown);
                 }
             }
         }

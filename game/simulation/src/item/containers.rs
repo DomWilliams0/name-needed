@@ -6,7 +6,10 @@ use unit::world::WorldPosition;
 use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
 use crate::event::DeathReason;
-use crate::{NameComponent, PhysicalComponent, Societies, SocietyHandle, TransformComponent};
+use crate::{
+    EntityEvent, EntityEventPayload, NameComponent, PhysicalComponent, Societies, SocietyHandle,
+    TransformComponent,
+};
 
 use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackMigrationType};
 use crate::item::{ContainerComponent, ItemStack, ItemStackError};
@@ -347,6 +350,11 @@ impl EcsExtContainers<'_> {
 
             let total_volume = Volume::new(item_phys.volume.get() * n);
             moved_total_volume += total_volume;
+
+            self.0.post_event(EntityEvent {
+                subject: op.item,
+                payload: EntityEventPayload::JoinedStack(new_stack),
+            });
         }
 
         let mut stack = self
@@ -392,6 +400,11 @@ impl EcsExtContainers<'_> {
         item: Entity,
         item_volume: Volume,
     ) {
+        self.0.post_event(EntityEvent {
+            subject: item,
+            payload: EntityEventPayload::JoinedStack(stack),
+        });
+
         match add {
             StackAdd::Distinct => {
                 // item is no longer free in the world
@@ -401,14 +414,12 @@ impl EcsExtContainers<'_> {
                 let prev = self.0.add_now(item, ContainedInComponent::StackOf(stack));
                 debug_assert!(matches!(prev, Ok(None)), "already had ContainedInComponent");
 
-                // TODO post event? does entering a stack count as destructive? the transform is gone at least
                 // TODO unselect item
             }
             StackAdd::CollapsedIntoOther => {
                 // item is identical to another, destroy
                 self.0
                     .kill_entity(item, DeathReason::CollapsedIntoIdenticalInStack);
-                // TODO post event? could do it in kill_entity
             }
         }
 

@@ -1,4 +1,4 @@
-# TODOs (387)
+# TODOs (385)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -229,10 +229,8 @@
    * `// TODO drinkable`
    * `// TODO splatterable (after throw, if walked on)`
    * `// TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)`
- * [game/simulation/src/item/containers.rs](game/simulation/src/item/containers.rs) (3)
-   * `// TODO post event? does entering a stack count as destructive? the transform is gone at least`
+ * [game/simulation/src/item/containers.rs](game/simulation/src/item/containers.rs) (1)
    * `// TODO unselect item`
-   * `// TODO post event? could do it in kill_entity`
  * [game/simulation/src/item/filter.rs](game/simulation/src/item/filter.rs) (1)
    * `// TODO filters on other fields e.g. mass, size, condition, etc`
  * [game/simulation/src/item/haul.rs](game/simulation/src/item/haul.rs) (6)

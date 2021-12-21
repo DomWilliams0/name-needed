@@ -52,6 +52,9 @@ pub enum EntityEventPayload {
     /// Item entity has been inserted into the given container
     EnteredContainer(Result<Entity, HaulError>),
 
+    /// Item entity (subject) has been added to the given stack entity
+    JoinedStack(Entity),
+
     /// Entity died for the given reason
     Died(DeathReason),
 
@@ -68,8 +71,9 @@ pub enum EntityEventPayload {
     DummyB,
 }
 
-// display: "because ..."
+#[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
 #[derive(Copy, Clone, Debug, Display)]
+// display: "because ..."
 pub enum DeathReason {
     /// of unknown reasons
     Unknown,
@@ -192,7 +196,7 @@ impl EntityEventPayload {
             }
 
             // always destructive
-            Died(_) => true,
+            JoinedStack(_) | Died(_) => true,
 
             #[cfg(test)]
             DummyA | DummyB => false,
@@ -221,7 +225,8 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             | Hauled(_, _)
             | HauledButSplit(_, _)
             | ExitedContainer(_)
-            | EnteredContainer(_) => Err(()),
+            | EnteredContainer(_)
+            | JoinedStack(_) => Err(()),
             #[cfg(test)]
             DummyA | DummyB => Err(()),
             #[cfg(feature = "testing")]

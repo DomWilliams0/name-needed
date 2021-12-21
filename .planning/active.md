@@ -43,5 +43,5 @@
 * [ ] build material requirement engine
 * [ ] stacks split into 1 should be "downgraded" into a single item automatically
 * [ ] allow stacks greater than 65535
-* [ ] log entity events for stack operations
+* [X] log entity events for stack operations
 * [ ] fix sdl2 building on ci
