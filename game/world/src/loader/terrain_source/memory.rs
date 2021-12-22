@@ -93,7 +93,7 @@ impl MemoryTerrainSource {
             .get(&block.into())
             .and_then(|terrain| {
                 let block = BlockPosition::from(block);
-                terrain.find_accessible_block(block.into(), None, None)
+                terrain.find_ground_level(block.into(), None, None)
             })
             .map(|block| block.z())
             .ok_or(TerrainSourceError::BlockOutOfBounds(block))

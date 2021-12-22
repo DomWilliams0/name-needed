@@ -197,7 +197,7 @@ impl BlockType {
     /// TODO very temporary "walkability" for block types
     pub fn can_be_walked_on(self) -> bool {
         use BlockType::*;
-        !matches!(self, Leaves | SolidWater)
+        !matches!(self, Air | Leaves | SolidWater)
     }
 
     pub fn is_air(self) -> bool {
