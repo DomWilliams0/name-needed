@@ -165,30 +165,17 @@ fn building(ecs: &EcsWorld) {
         }
     }
 
-    // if let Some(stack) = brick_stack {
-    //     let split = ecs
-    //         .helpers_containers()
-    //         .split_stack(stack, 2)
-    //         .expect("split failed");
-    //
-    //     let mut transform = ecs
-    //         .component_mut::<TransformComponent>(split)
-    //         .expect("no transform");
-    //     let pos = transform.position;
-    //     transform.reset_position(pos + (1.0, 1.0, 1.0));
-    // }
+    let society = ecs
+        .resource_mut::<Societies>()
+        .society_by_handle(society)
+        .expect("bad society");
 
-    if let Some(human) = humans.first().copied() {
-        let society = ecs
-            .resource_mut::<Societies>()
-            .society_by_handle(society)
-            .expect("bad society");
+    for _ in 0..8 {
+        let pos = helpers::random_walkable_pos(&world);
 
-        for (x, y) in [(2, 2), (2, 8), (3, 4)] {
-            society
-                .jobs_mut()
-                .submit(ecs, BuildThingJob::new((x, y, 1).into(), StoneBrickWall));
-        }
+        society
+            .jobs_mut()
+            .submit(ecs, BuildThingJob::new(pos, StoneBrickWall));
     }
 }
 
