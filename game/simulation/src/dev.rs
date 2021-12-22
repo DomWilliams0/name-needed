@@ -8,7 +8,7 @@ use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{ContainedInComponent, ContainerComponent};
-use crate::job::SocietyJob;
+
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
 use crate::society::job::HaulJob;
@@ -229,7 +229,7 @@ impl EcsExtDev<'_> {
             "force haul to container",
             container_pos,
             move |world, container| {
-                let food_pos = world
+                let _food_pos = world
                     .component::<TransformComponent>(haulee)
                     .unwrap()
                     .accessible_position();

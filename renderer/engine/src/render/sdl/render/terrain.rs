@@ -13,6 +13,7 @@ use crate::render::sdl::gl::{
 use cgmath::Matrix;
 use resources::Shaders;
 
+#[allow(unused)]
 #[derive(Debug, Copy, Clone)]
 pub struct WorldVertex {
     pos: [f32; 3],

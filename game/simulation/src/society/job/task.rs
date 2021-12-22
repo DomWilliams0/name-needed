@@ -1,17 +1,16 @@
 use ai::{Dse, WeightedDse};
 use common::*;
 use unit::world::WorldPosition;
-use world::block::BlockType;
 
 use crate::activity::HaulTarget;
 use crate::ai::dse::{BreakBlockDse, BuildDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
 use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
-use crate::{ComponentWorld, HaulSource, TransformComponent};
+use crate::{ComponentWorld, HaulSource};
 
 use crate::item::HaulableItemComponent;
-use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle, SocietyJobRef};
+use crate::job::{BuildDetails, SocietyJobHandle, SocietyJobRef};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {

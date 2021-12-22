@@ -21,7 +21,7 @@ use crate::render::sdl::ui::windows::{
 };
 use crate::ui_str;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct SelectionWindow {
     /// Index into [BlockType::into_enum_iter]
     edit_selection: usize,
@@ -574,6 +574,8 @@ impl SelectionWindow {
         if ret.is_none() {
             return context.text_disabled("Error: invalid job");
         }
+
+        // TODO other job tabs
     }
 
     fn world_selection(&mut self, context: &UiContext) {
@@ -959,12 +961,6 @@ impl<'a> SelectedEntityDetails<'a> {
         ctx: &'a UiContext,
     ) -> Option<ComponentRef<'a, T>> {
         ctx.simulation().ecs.component(self.entity).ok()
-    }
-}
-
-impl Default for SelectionWindow {
-    fn default() -> Self {
-        Self { edit_selection: 0 }
     }
 }
 

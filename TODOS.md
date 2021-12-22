@@ -1,4 +1,4 @@
-# TODOs (382)
+# TODOs (383)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -467,7 +467,7 @@
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (8)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO component-specific widget`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
@@ -475,6 +475,7 @@
    * `// TODO persist logs after entity is dead`
    * `// TODO switch to table API when available`
    * `// TODO use the arena for this`
+   * `// TODO other job tabs`
    * `// TODO proper way of checking if an entity is living`
  * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (2)
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`

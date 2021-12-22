@@ -2,7 +2,7 @@ use crate::ecs::{CachedWorldRef, EcsWorld};
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::SocietyTask;
-use crate::{BlockType, ComponentWorld, InnerWorldRef, WorldPositionRange, WorldRef};
+use crate::{BlockType, ComponentWorld, WorldPositionRange};
 use common::derive_more::*;
 use common::*;
 

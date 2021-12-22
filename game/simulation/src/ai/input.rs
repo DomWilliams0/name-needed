@@ -1,4 +1,4 @@
-use crate::{ConditionComponent, ContainedInComponent, SocietyComponent, SocietyHandle, WorldRef};
+use crate::{ConditionComponent, ContainedInComponent, SocietyHandle, WorldRef};
 use ai::Context;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};

@@ -3,10 +3,7 @@ use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
-use simulation::{
-    ActivityComponent, ComponentWorld, EcsWorld, Entity, PlayerSociety, Societies, StoneBrickWall,
-    TransformComponent, WorldPosition,
-};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies, StoneBrickWall};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -124,7 +121,7 @@ fn building(ecs: &EcsWorld) {
         .0
         .expect("no player society");
 
-    let humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
+    let _humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()

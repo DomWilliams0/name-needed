@@ -29,15 +29,6 @@ pub struct GoHaulActivity {
 }
 
 impl GoHaulActivity {
-    pub fn new(entity: Entity, source: HaulSource, target: HaulTarget) -> Self {
-        Self {
-            thing: entity,
-            source,
-            target,
-            purpose: HaulPurpose::JustBecause,
-        }
-    }
-
     pub fn new_with_purpose(
         entity: Entity,
         source: HaulSource,

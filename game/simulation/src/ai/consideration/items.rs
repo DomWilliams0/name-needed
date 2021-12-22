@@ -1,9 +1,9 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
 
 use crate::ai::{AiContext, AiInput};
-use crate::ecs::Entity;
+
 use crate::item::ItemFilter;
-use crate::SocietyHandle;
+
 use common::*;
 
 declare_entity_metric!(HOLD_ITEM, "ai_item_holding", "Is holding an item", "filter");
