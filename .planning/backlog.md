@@ -54,7 +54,10 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * inventory window (separate from debug window) to show items in person's inventory/container in a nice way
 * common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
+	* retain entity logs after death for a time
 * reflection-like api on components to do actions per-component in ui
+* in-world text rendering
+	* show entity names, item stack sizes, build job info...
 
 ## Entity behaviour
 * ai incentive to choose the same action as last tick
@@ -90,6 +93,30 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* already held or equipped
 * will need a better way of choosing the best person for a job, currently the first person to consider it will reserve it. possibly a voting phase/stage where each candidate volunteers via AI weight system, then the best candidate is chosen from them
 * personality affects the desiribility of jobs - lazy/weak/injured people dont want to do physical work, selfish people dont want to work on society jobs, only things for themselves
+
+##### Building
+* search communal society containers for materials
+* ui inputs for the player to request builds
+	* lua api for building too
+* build cancellation by player
+	* drop unconsumed materials
+* generic build material requirement engine - consumes generic requirements (not definition names), reports original reqs, tracks remaining reqs
+* more data oriented
+	* define builds and their required materials in data
+	* dont use definition names for materials, rather generic descriptions so it can be loose
+* allow multiple concurrent builders
+	* bug: if multiple people are sharing a gather task, they will keep collecting even after the last one is delivered - panics on extra unexpected delivery
+* allow smooth changing of material gathering target job without dropping the current haul
+* prioritise material gathering for the most complete job, rather than random/round robin
+* better handle a build job being set in a non-air position
+
+
+### Item stacks
+* automatically downgrade a stack split into 1 to a single item
+* allow overflow into stacks bigger than 65k
+* implement actual item comparisons for collapsing identical items into a single stack (e.g. 16xarrow)
+
+
 
 ## World generation
 * better biome generation
