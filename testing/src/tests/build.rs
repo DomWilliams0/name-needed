@@ -10,6 +10,7 @@ use simulation::{
 };
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::num::NonZeroU16;
 use std::rc::Rc;
 use unit::world::WorldPosition;
 
@@ -37,7 +38,10 @@ impl Build for TestBrickWall {
     }
 
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>) {
-        materials_out.push(BuildMaterial::new("core_brick_stone", BRICKS_PER_WALL))
+        materials_out.push(BuildMaterial::new(
+            "core_brick_stone",
+            NonZeroU16::new(BRICKS_PER_WALL).unwrap(),
+        ))
     }
 }
 
