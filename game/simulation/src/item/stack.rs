@@ -14,8 +14,8 @@ pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
     #[error("Item stack is full")]
     Full,
 
-    #[error("{0} is not homogenous with the rest of the stack")]
-    NotHomogenous(E),
+    #[error("{0} is not homogeneous with the rest of the stack")]
+    NotHomogeneous(E),
 
     #[error("{0} is not stackable, missing stackable/physical/transform component")]
     NotStackable(E),
@@ -39,7 +39,7 @@ pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
     Overflow(E),
 }
 
-/// A homogenous stack of items
+/// A homogeneous stack of items
 #[derive(Component, EcsComponent)]
 #[name("item-stack")]
 #[storage(DenseVecStorage)]
@@ -54,7 +54,7 @@ pub trait World {
     type Copyability: Copyability;
 
     fn homogeneity_for(&self, e: Self::Entity) -> Option<Self::Homogeneity>;
-    fn is_homogenous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool;
+    fn is_homogeneous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool;
 
     /// For combining
     fn is_identical(&self, a: Self::Entity, b: Self::Entity) -> bool;
@@ -67,7 +67,7 @@ pub trait Copyability {
     fn not_copyable_component(&self) -> Option<&'static str>;
 }
 
-/// A stack of homogenous entities that are still distinct but stacked together. Examples might
+/// A stack of homogeneous entities that are still distinct but stacked together. Examples might
 /// be a stack of arrows holds 10xsteel_arrows, 12xwood_arrows
 #[derive(Debug)]
 pub struct ItemStack<W: World> {
@@ -178,8 +178,8 @@ impl<W: World> ItemStack<W> {
     ) -> Result<StackAdd, ItemStackError<W::Entity>> {
         if self.is_full() {
             Err(ItemStackError::Full)
-        } else if !world.is_homogenous(entity, &self.homogeneity) {
-            Err(ItemStackError::NotHomogenous(entity))
+        } else if !world.is_homogeneous(entity, &self.homogeneity) {
+            Err(ItemStackError::NotHomogeneous(entity))
         } else {
             self.add_internal(entity, copyability, world)
         }
@@ -193,7 +193,7 @@ impl<W: World> ItemStack<W> {
         world: &W,
     ) -> Result<StackAdd, ItemStackError<W::Entity>> {
         debug_assert!(!self.is_full());
-        debug_assert!(world.is_homogenous(entity, &self.homogeneity));
+        debug_assert!(world.is_homogeneous(entity, &self.homogeneity));
 
         let copyable = copyability.is_copyable();
         let collapse_into = if copyable {
@@ -425,7 +425,7 @@ impl World for EcsWorld {
             })
     }
 
-    fn is_homogenous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool {
+    fn is_homogeneous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool {
         self.component::<DefinitionNameComponent>(e)
             .map(|def| homogeneity.definition == def.0)
             .unwrap_or(false)
@@ -610,7 +610,7 @@ mod tests {
             Some(e % 2 == 0)
         }
 
-        fn is_homogenous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool {
+        fn is_homogeneous(&self, e: Self::Entity, homogeneity: &Self::Homogeneity) -> bool {
             let this = self.homogeneity_for(e).unwrap();
             this == *homogeneity
         }
@@ -628,7 +628,7 @@ mod tests {
     impl TestStack {
         fn new(first_item: u32, cap: u16) -> Self {
             let world = TestWorld::default();
-            let mut stack = ItemStack::new_with_item(
+            let stack = ItemStack::new_with_item(
                 NonZeroU16::new(cap).unwrap(),
                 first_item,
                 is_copyable(first_item),
@@ -719,13 +719,13 @@ mod tests {
         let mut odd_stack = TestStack::new(1, 10);
         assert!(matches!(
             odd_stack.add(2),
-            Err(ItemStackError::NotHomogenous(_))
+            Err(ItemStackError::NotHomogeneous(_))
         ));
 
         let mut even_stack = TestStack::new(2, 10);
         assert!(matches!(
             even_stack.add(5),
-            Err(ItemStackError::NotHomogenous(_))
+            Err(ItemStackError::NotHomogeneous(_))
         ));
     }
 

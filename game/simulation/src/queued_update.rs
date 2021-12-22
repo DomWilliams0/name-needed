@@ -155,7 +155,7 @@ mod tests {
     fn do_basic<Q: QueuedUpdatesImpl>() {
         let mut updates = RawQueuedUpdates::<Q>::default();
 
-        let mut ecs = {
+        let ecs = {
             let mut world = EcsWorld::new();
             world.insert(Vec::<i32>::new());
             world

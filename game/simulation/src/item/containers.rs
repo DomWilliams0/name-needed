@@ -53,7 +53,7 @@ pub enum ContainedInComponent {
     StackOf(Entity),
 }
 
-/// An item can be stored inside a homogenous stack
+/// An item can be stored inside a homogeneous stack
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[name("stackable")]
 #[storage(HashMapStorage)]
