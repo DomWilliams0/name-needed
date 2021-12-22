@@ -11,6 +11,7 @@ use crate::physics::PhysicsComponent;
 #[derive(Copy, Clone, Default, Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("desired-movement")]
+#[clone(disallow)]
 pub struct DesiredMovementComponent(pub ContextMap);
 
 /// Converts *desired* movement from context steering map to *practical* movement.
@@ -49,6 +50,7 @@ impl<'a> System<'a> for MovementFulfilmentSystem {
 #[derive(Clone, Component, EcsComponent, Debug)]
 #[storage(DenseVecStorage)]
 #[name("movement-cfg")]
+#[clone(disallow)]
 pub struct MovementConfigComponent {
     pub max_speed: f32,
     pub acceleration: f32,
@@ -72,6 +74,8 @@ impl<V: Value> ComponentTemplate<V> for MovementConfigComponent {
             .with(FollowPathComponent::default())
             .with(DesiredMovementComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("movement", MovementConfigComponent);

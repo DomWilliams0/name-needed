@@ -2,6 +2,7 @@ use crate::ecs::*;
 use crate::simulation::Tick;
 use crate::{PhysicalComponent, TransformComponent};
 use common::*;
+use std::borrow::Cow;
 use unit::world::WorldPoint;
 
 // TODO reimplement with octree
@@ -59,17 +60,8 @@ impl Spatial {
         radius: f32,
     ) -> impl Iterator<Item = (Entity, WorldPoint, f32)> {
         let transforms = match transforms {
-            Transforms::Storage(storage) => storage,
-            Transforms::World(w) => {
-                let transforms = &w.read_storage();
-                // safety: storage definitely lives as long as this function
-                unsafe {
-                    std::mem::transmute::<
-                        &ReadStorage<TransformComponent>,
-                        &ReadStorage<TransformComponent>,
-                    >(transforms)
-                }
-            }
+            Transforms::Storage(storage) => Cow::Borrowed(storage),
+            Transforms::World(w) => Cow::Owned(w.read_storage()),
         };
 
         // awful allocation only acceptable because this is an awful temporary brute force implementation

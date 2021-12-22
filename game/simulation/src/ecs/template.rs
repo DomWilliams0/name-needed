@@ -1,6 +1,7 @@
 pub use crate::definitions::ValueImpl;
 use crate::ecs::*;
 use common::Debug;
+use std::any::Any;
 
 pub trait ComponentTemplate<V: Value>: Debug {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
@@ -8,6 +9,8 @@ pub trait ComponentTemplate<V: Value>: Debug {
         Self: Sized;
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b>;
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Clone)]

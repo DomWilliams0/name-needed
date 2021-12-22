@@ -21,6 +21,7 @@ const BASE_EAT_RATE: Fuel = 5;
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("hunger")]
+#[clone(disallow)]
 pub struct HungerComponent {
     current_fuel: AccumulativeInt<Fuel>,
     max_fuel: Fuel,
@@ -30,6 +31,7 @@ pub struct HungerComponent {
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("being-eaten")]
+#[clone(disallow)]
 pub struct BeingEatenComponent {
     pub eater: Entity,
 }
@@ -197,6 +199,8 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("hunger", HungerComponent);

@@ -1,12 +1,13 @@
 use common::*;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Debug, Error)]
 #[error("Error loading resource from {0:?}: {1}")]
 pub struct ResourceError(pub PathBuf, #[source] pub ResourceErrorKind);
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum ResourceErrorKind {
     #[error("No such directory {0}")]
     MissingDirectory(PathBuf),
@@ -21,5 +22,5 @@ pub enum ResourceErrorKind {
     InvalidPath,
 
     #[error("Failed to read resource: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[source] Arc<std::io::Error>), // Arc for cloning...
 }

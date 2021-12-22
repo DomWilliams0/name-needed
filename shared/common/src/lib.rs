@@ -13,11 +13,11 @@ pub use float_cmp::ApproxEq;
 pub use itertools::*;
 pub use num_derive;
 pub use num_traits;
-pub use ordered_float::OrderedFloat;
+pub use ordered_float::{NotNan, OrderedFloat};
 pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
-pub use smallvec::*;
+pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
 
 pub use lazy_static::lazy_static;

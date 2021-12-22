@@ -1,6 +1,6 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid, SlabPositionAsCoord};
+use crate::{GeneratedBlock, PlanetParams, SlabGrid};
 use common::*;
 
 use crate::region::region::SlabContinuations;
@@ -8,7 +8,9 @@ use grid::GridImpl;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use unit::world::{ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition};
+use unit::world::{
+    ChunkLocation, RangePosition, SlabLocation, SlabPosition, SlabPositionAsCoord, WorldPosition,
+};
 
 /// Rasterizable object that places blocks within a slab, possibly leaking over the edge into other
 /// slabs. In case of seepage, the subfeature is queued as a continuation for the neighbour slab.
@@ -23,15 +25,14 @@ pub trait Subfeature: Send + Debug {
 #[derive(Clone)]
 pub struct SharedSubfeature(Arc<tokio::sync::Mutex<SubfeatureInner>>);
 
-pub struct SubfeatureInner {
+pub struct SubfeatureInner<F: ?Sized + Subfeature = dyn Subfeature> {
     /// A slab is added when this subfeature has been applied to it
     completed: SmallVec<[SlabLocation; 9]>,
 
     /// Root block in starting slab - all neighbours are relative to this slab
     root: WorldPosition,
 
-    // TODO inline dyn subfeature or use pooled allocation
-    subfeature: Box<dyn Subfeature>,
+    subfeature: F,
 }
 
 pub enum SlabContinuation {
@@ -117,7 +118,7 @@ impl SubfeatureInner {
 
     pub fn register_applied_slab(&mut self, slab: SlabLocation) {
         if self.has_already_applied_to(slab) {
-            warn!("reregistering slab in subfeature as complete"; slab, &*self);
+            warn!("reregistering slab in subfeature as complete"; slab, self as &Self);
         } else {
             self.completed.push(slab);
         }
@@ -180,7 +181,7 @@ impl SharedSubfeature {
         Self(Arc::new(tokio::sync::Mutex::new(SubfeatureInner {
             completed: SmallVec::new(),
             root,
-            subfeature: Box::new(subfeature),
+            subfeature,
         })))
     }
 
@@ -300,10 +301,10 @@ impl Debug for SubfeatureInner {
         write!(
             f,
             "Subfeature({:?}, completed={:?}, root={:?})",
-            self.subfeature, self.completed, self.root
+            &self.subfeature, self.completed, self.root
         )
     }
 }
 
-slog_kv_debug!(SubfeatureInner, "subfeature");
+slog_kv_debug!(&SubfeatureInner, "subfeature");
 slog_kv_debug!(SharedSubfeature, "subfeature");

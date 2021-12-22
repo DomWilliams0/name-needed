@@ -21,13 +21,14 @@ use crate::{dse, Societies};
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("ai")]
+#[clone(disallow)]
 pub struct AiComponent {
     intelligence: ai::Intelligence<AiContext>,
     current: Option<DecisionSource<AiContext>>,
 }
 
 impl AiComponent {
-    fn with_species(species: &Species) -> Self {
+    pub fn with_species(species: &Species) -> Self {
         let intelligence = match species {
             Species::Human => Intelligence::new(human_dses()),
             Species::Dog => Intelligence::new(dog_dses()),
@@ -49,15 +50,20 @@ impl AiComponent {
         self.intelligence.pop_smarts(&AdditionalDse::DivineCommand);
     }
 
+    pub fn last_action(&self) -> &AiAction {
+        self.intelligence.last_action()
+    }
+
     pub fn clear_last_action(&mut self) {
         self.intelligence.clear_last_action();
     }
 
+    /// Panics if society is None if current action is a streamed source
     pub fn interrupt_current_action<'a>(
         &mut self,
         this_entity: Entity,
         new_src: Option<&DecisionSource<AiContext>>,
-        society_fn: impl FnOnce() -> &'a mut Society,
+        society: Option<&'a Society>,
     ) {
         if let Some(interrupted_source) = self.current.take() {
             match interrupted_source {
@@ -71,7 +77,8 @@ impl AiComponent {
                         // interrupting society task with a new society task, no need to manually cancel
                     } else {
                         // society task interrupted by a non-society task, so manual cancellation is needed
-                        let society = society_fn();
+                        let society =
+                            society.expect("streamed DSEs expected to come from a society only");
                         society.jobs_mut().reservations_mut().cancel(this_entity);
                     }
                 }
@@ -88,7 +95,7 @@ impl<'a> System<'a> for AiSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldRef>,
-        Write<'a, Societies>,
+        Read<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
@@ -103,7 +110,7 @@ impl<'a> System<'a> for AiSystem {
         (
             entities,
             ecs_world,
-            mut societies,
+            societies,
             transform,
             hunger,
             inventory,
@@ -119,7 +126,7 @@ impl<'a> System<'a> for AiSystem {
             return;
         }
 
-        let societies: &mut Societies = &mut *societies;
+        let ecs_world: &EcsWorld = &*ecs_world;
 
         let mut shared_bb = SharedBlackboard {
             area_link_cache: HashMap::new(),
@@ -150,6 +157,8 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
+                society: society_opt.map(|comp| comp.handle),
+                ai,
                 world: &*ecs_world,
                 shared: &mut shared_bb,
             };
@@ -162,8 +171,8 @@ impl<'a> System<'a> for AiSystem {
             // TODO provide READ ONLY DSEs to ai intelligence
             // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             // TODO fix eventually false assumption that all stream DSEs come from a society
-            let mut society = society_opt.and_then(|comp| comp.resolve(societies));
-            let extra_dses = self.collect_society_tasks(e, tick, society.as_mut(), &ecs_world);
+            let society = society_opt.and_then(|comp| comp.resolve(&*societies));
+            let extra_dses = self.collect_society_tasks(e, tick, society, ecs_world);
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_, _, dse)| &**dse);
@@ -176,17 +185,12 @@ impl<'a> System<'a> for AiSystem {
                 trace!("activity action"; "action" => ?action);
 
                 // register interruption
-                ai.interrupt_current_action(e, Some(&src), || {
-                    society
-                        .as_mut()
-                        .expect("streamed DSEs expected to come from a society only")
-                });
+                ai.interrupt_current_action(e, Some(&src), society);
 
                 let society_task = if let DecisionSource::Stream(i) = src {
                     // a society task was chosen, reserve it
-                    let society = society
-                        .as_mut()
-                        .expect("streamed DSEs expected to come from a society only");
+                    let society =
+                        society.expect("streamed DSEs expected to come from a society only");
 
                     let (task, job_idx, _) = &extra_dses[i];
                     let mut jobs = society.jobs_mut();
@@ -231,7 +235,7 @@ impl AiSystem {
         &self,
         entity: Entity,
         this_tick: Tick,
-        society: Option<&mut &mut Society>,
+        society: Option<&Society>,
         ecs_world: &EcsWorld,
     ) -> Vec<(SocietyTask, JobIndex, Box<dyn Dse<AiContext>>)> {
         let mut extra_dses = Vec::new();
@@ -240,6 +244,8 @@ impl AiSystem {
             trace!("considering tasks for society"; "society" => ?society);
 
             let mut applicable_tasks = Vec::new(); // TODO reuse allocation
+
+            // TODO collect jobs from society directly, which can filter them from the applicable work items too
             let mut jobs = society.jobs_mut();
             jobs.filter_applicable_tasks(entity, this_tick, ecs_world, &mut applicable_tasks);
 
@@ -303,6 +309,8 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
         let ai = AiComponent::with_species(&self.species);
         builder.with(ai).with(ActivityComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("intelligence", IntelligenceComponentTemplate);

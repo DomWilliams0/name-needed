@@ -330,18 +330,19 @@ impl Default for RegionTile {
     }
 }
 
+#[allow(dead_code)] // currently unused
 impl RegionTile {
-    /*   pub fn is_land(&self) -> bool {
-            self.continent.is_some()
-        }
-    */
+    pub fn is_land(&self) -> bool {
+        self.continent.is_some()
+    }
+
     /// density is not really Sync
     #[cfg(feature = "bin")]
     pub unsafe fn density(&self) -> f64 {
         self.density.get()
     }
 
-    /*    pub fn height(&self) -> f64 {
+    pub fn height(&self) -> f64 {
         self.height
     }
 
@@ -351,7 +352,7 @@ impl RegionTile {
         } else {
             0.0
         }
-    }*/
+    }
 }
 
 #[allow(dead_code)] // currently unused

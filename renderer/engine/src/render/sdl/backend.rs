@@ -5,7 +5,7 @@ use sdl2::keyboard::{Keycode, Mod};
 use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
-use color::ColorRgb;
+use color::Color;
 use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
@@ -15,7 +15,7 @@ use simulation::{
 
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
-use crate::render::sdl::render::GlfFrameContext;
+use crate::render::sdl::render::GlFrameContext;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
@@ -104,7 +104,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         };
 
         let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
-        Gl::set_clear_color(ColorRgb::new(17, 17, 20));
+        Gl::set_clear_color(Color::rgb(17, 17, 20));
 
         let ui = Ui::new(&window, &video, PERSISTED_UI_PATH.as_ref());
 
@@ -307,7 +307,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
         // render simulation
         let lower_limit = terrain_range.bottom().slice() as f32;
-        let frame_ctx = GlfFrameContext {
+        let frame_ctx = GlFrameContext {
             projection,
             view,
             z_offset: lower_limit,

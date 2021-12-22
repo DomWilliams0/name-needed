@@ -4,19 +4,20 @@ use crate::tests::TestHelper;
 use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 use common::BoxedResult;
 use simulation::{
-    validate_all_inventories, AiAction, BlockType, ComponentWorld, ContainerComponent, EcsWorld,
-    Entity, EntityEventDebugPayload, EntityEventPayload, HaulTarget, QueuedUpdates,
-    TaskResultSummary, TerrainUpdatesRes, TransformComponent, WorldPosition, WorldPositionRange,
-    WorldTerrainUpdate,
+    validate_all_inventories, AiAction, BlockType, ComponentWorld, ContainerComponent, DeathReason,
+    EcsWorld, Entity, EntityEventDebugPayload, EntityEventPayload, HaulPurpose, HaulSource,
+    HaulTarget, QueuedUpdates, TaskResultSummary, TerrainUpdatesRes, TransformComponent,
+    WorldPosition, WorldPositionRange, WorldTerrainUpdate,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use unit::world::WorldPoint;
 
 pub struct Haul<H> {
     hauler: Entity,
     item: Entity,
     /// Populated on second game tick
-    src_tgt: Rc<RefCell<Option<(HaulTarget, HaulTarget)>>>,
+    src_tgt: Rc<RefCell<Option<(HaulSource, HaulTarget)>>>,
     variant: Rc<RefCell<H>>,
 }
 
@@ -24,7 +25,7 @@ pub trait HaulVariant: Sized + 'static {
     fn init(ctx: &HookContext) -> BoxedResult<Self>;
 
     /// Run as queued update after 1st game tick to allow containers to be initialised
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)>;
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)>;
 
     fn validate_tick(
         &mut self,
@@ -43,14 +44,14 @@ pub trait HaulVariant: Sized + 'static {
         let (src, tgt) = haul.src_tgt.borrow().expect("haul targets not populated");
 
         match tgt {
-            HaulTarget::Position(expected_pos) => {
+            HaulTarget::Drop(expected_pos) => {
                 let pos = ctx
                     .simulation
                     .ecs
                     .component::<TransformComponent>(haul.item)
                     .expect("item has no transform");
                 assert!(
-                    pos.position.is_almost(&expected_pos.centred(), 1.0),
+                    pos.position.is_almost(&expected_pos, 1.0),
                     "item is not at destination haul position"
                 );
             }
@@ -68,7 +69,7 @@ pub trait HaulVariant: Sized + 'static {
             }
         }
 
-        if let HaulTarget::Container(e) = src {
+        if let HaulSource::Container(e) = src {
             let container = ctx
                 .simulation
                 .ecs
@@ -96,21 +97,21 @@ pub struct ContainerToContainer {
 #[derive(Copy, Clone)]
 pub struct ContainerToPosition {
     chest_a: WorldPosition,
-    target: WorldPosition,
+    target: WorldPoint,
 }
 
 /// Haul from a position to a container
 #[derive(Copy, Clone)]
 pub struct PositionToContainer {
-    source: WorldPosition,
+    source: WorldPoint,
     chest_b: WorldPosition,
 }
 
 /// Haul between positions
 #[derive(Copy, Clone)]
 pub struct PositionToPosition {
-    source: WorldPosition,
-    target: WorldPosition,
+    source: WorldPoint,
+    target: WorldPoint,
 }
 
 /// Haul between positions but the item is killed during the haul
@@ -218,21 +219,15 @@ impl<H: HaulVariant + 'static> Haul<H> {
                         *src_tgt_clone.borrow_mut() = Some((src, tgt));
 
                         // put item in src location
-                        match src {
-                            HaulTarget::Position(pos) => {
-                                let mut transform =
-                                    world.component_mut::<TransformComponent>(item)?;
-                                transform.reset_position(pos.centred());
-                            }
-                            HaulTarget::Container(c) => {
-                                world.helpers_dev().put_item_into_container(item, c);
-                            }
+                        if let HaulSource::Container(c) = src {
+                            world.helpers_dev().put_item_into_container(item, c);
                         }
 
                         // force haul
-                        world
-                            .helpers_dev()
-                            .force_activity(human, AiAction::Haul(item, src, tgt));
+                        world.helpers_dev().force_activity(
+                            human,
+                            AiAction::Haul(item, src, tgt, HaulPurpose::JustBecause),
+                        );
 
                         Ok(())
                     };
@@ -283,19 +278,19 @@ mod helpers {
     }
 
     pub fn create_chest_1(ctx: &HookContext) -> WorldPosition {
-        create_chest(ctx, src_pos())
+        create_chest(ctx, src_pos().floor())
     }
 
     pub fn create_chest_2(ctx: &HookContext) -> WorldPosition {
-        create_chest(ctx, tgt_pos())
+        create_chest(ctx, tgt_pos().floor())
     }
 
-    pub fn src_pos() -> WorldPosition {
-        (4, 2, 1).into()
+    pub fn src_pos() -> WorldPoint {
+        WorldPosition::from((4, 2, 1)).into()
     }
 
-    pub fn tgt_pos() -> WorldPosition {
-        (1, 12, 1).into()
+    pub fn tgt_pos() -> WorldPoint {
+        WorldPosition::from((1, 12, 1)).into()
     }
 
     pub fn resolve_chest(world: &EcsWorld, container: WorldPosition) -> BoxedResult<Entity> {
@@ -321,11 +316,11 @@ impl HaulVariant for ContainerToContainer {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         let a = resolve_chest(world, self.chest_a)?;
         let b = resolve_chest(world, self.chest_b)?;
 
-        Ok((HaulTarget::Container(a), HaulTarget::Container(b)))
+        Ok((HaulSource::Container(a), HaulTarget::Container(b)))
     }
 }
 
@@ -340,9 +335,9 @@ impl HaulVariant for ContainerToPosition {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         let a = resolve_chest(world, self.chest_a)?;
-        Ok((HaulTarget::Container(a), HaulTarget::Position(self.target)))
+        Ok((HaulSource::Container(a), HaulTarget::Drop(self.target)))
     }
 }
 
@@ -357,9 +352,9 @@ impl HaulVariant for PositionToContainer {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         let b = resolve_chest(world, self.chest_b)?;
-        Ok((HaulTarget::Position(self.source), HaulTarget::Container(b)))
+        Ok((HaulSource::PickUp, HaulTarget::Container(b)))
     }
 }
 
@@ -374,11 +369,8 @@ impl HaulVariant for PositionToPosition {
         })
     }
 
-    fn src_tgt(&mut self, _world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
-        Ok((
-            HaulTarget::Position(self.source),
-            HaulTarget::Position(self.target),
-        ))
+    fn src_tgt(&mut self, _world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
+        Ok((HaulSource::PickUp, HaulTarget::Drop(self.target)))
     }
 }
 
@@ -390,7 +382,7 @@ impl HaulVariant for RemoveItemDuring {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         self.nested.src_tgt(world)
     }
 
@@ -414,7 +406,9 @@ impl HaulVariant for RemoveItemDuring {
                 if test.current_tick() == 15 {
                     assert!(!self.killed_item);
                     self.killed_item = true;
-                    ctx.simulation.ecs.kill_entity(haul.item);
+                    ctx.simulation
+                        .ecs
+                        .kill_entity(haul.item, DeathReason::Unknown);
                 }
             }
         }
@@ -431,7 +425,7 @@ impl HaulVariant for RemoveSourceContainerDuring {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         self.nested.src_tgt(world)
     }
 
@@ -471,7 +465,7 @@ impl HaulVariant for RemoveTargetContainerDuring {
         })
     }
 
-    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulTarget, HaulTarget)> {
+    fn src_tgt(&mut self, world: &mut EcsWorld) -> BoxedResult<(HaulSource, HaulTarget)> {
         self.nested.src_tgt(world)
     }
 

@@ -1,15 +1,19 @@
 use common::derive_more::*;
+use std::fmt::{Display, Formatter};
 
 use crate::ecs::*;
 use crate::item::condition::ItemCondition;
 use crate::needs::Fuel;
 
 /// An entity with a displayable name
-#[derive(Component, EcsComponent, Constructor, Clone, Debug)]
+#[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("name")]
-// TODO smol string
-pub struct NameComponent(pub String);
+// TODO smol string and/or cow and/or pool common strings
+pub enum NameComponent {
+    Normal(String),
+    StackOf(String),
+}
 
 /// Condition/durability of an entity, e.g. a tool or food
 #[derive(Component, EcsComponent, Constructor, Clone, Debug)]
@@ -31,7 +35,7 @@ pub struct EdibleItemComponent {
 }
 
 // TODO add aerodynamic-ness field
-#[derive(Component, EcsComponent, Default, Debug)]
+#[derive(Component, EcsComponent, Default, Debug, Clone)]
 #[storage(NullStorage)]
 #[name("throwable")]
 pub struct ThrowableItemComponent;
@@ -40,17 +44,39 @@ pub struct ThrowableItemComponent;
 // TODO splatterable (after throw, if walked on)
 // TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)
 
+impl NameComponent {
+    pub fn make_stack(&mut self) {
+        match self {
+            NameComponent::Normal(name) => {
+                *self = NameComponent::StackOf(std::mem::take(name));
+            }
+            NameComponent::StackOf(_) => {}
+        }
+    }
+}
+
+impl Display for NameComponent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NameComponent::Normal(name) => Display::fmt(name, f),
+            NameComponent::StackOf(name) => write!(f, "Stack of {}", name),
+        }
+    }
+}
+
 impl<V: Value> ComponentTemplate<V> for NameComponent {
     fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self(values.get_string("name")?)))
+        Ok(Box::new(Self::Normal(values.get_string("name")?)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for ConditionComponent {
@@ -64,6 +90,8 @@ impl<V: Value> ComponentTemplate<V> for ConditionComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
@@ -79,6 +107,8 @@ impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
@@ -89,6 +119,8 @@ impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(ThrowableItemComponent)
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("name", NameComponent);

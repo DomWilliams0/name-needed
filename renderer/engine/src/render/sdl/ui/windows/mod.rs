@@ -9,6 +9,7 @@ pub(crate) use debug_renderer::DebugWindow;
 pub(crate) use perf::PerformanceWindow;
 pub(crate) use selection::SelectionWindow;
 pub(crate) use society::SocietyWindow;
+use std::mem::ManuallyDrop;
 
 enum Value<'a> {
     Hide,
@@ -36,7 +37,7 @@ impl UiExt for Ui<'_> {
     fn key_value<'a, V: Into<Value<'a>>>(
         &'a self,
         key: &ImStr,
-        value: impl Fn() -> V,
+        value: impl FnOnce() -> V,
         tooltip: Option<&ImStr>,
         color: [f32; 4],
     ) {
@@ -127,7 +128,11 @@ unsafe fn with_fake_owned_imstr(imstr: &ImStr, f: impl FnOnce(&mut ImString)) {
     let str = imstr.to_str();
     let mut buf = {
         // fake an owned string around the immutable buffer
-        let mut string = String::from_raw_parts(str.as_ptr() as *mut _, str.len(), str.len());
+        let mut string = ManuallyDrop::new(String::from_raw_parts(
+            str.as_ptr() as *mut _,
+            str.len(),
+            str.len(),
+        ));
 
         // fake vec reference to inner vec
         let vec_ref = string.as_mut_vec();
@@ -135,17 +140,11 @@ unsafe fn with_fake_owned_imstr(imstr: &ImStr, f: impl FnOnce(&mut ImString)) {
         // fake owned inner vec
         let vec_copy: Vec<u8> = std::mem::transmute_copy(vec_ref);
 
-        // forget fake owned string
-        std::mem::forget(string);
-
         // fake ImString thinks it owns its vec
-        ImString::from_utf8_with_nul_unchecked(vec_copy)
+        ManuallyDrop::new(ImString::from_utf8_with_nul_unchecked(vec_copy))
     };
 
-    f(&mut buf);
-
-    // forget fake owned string
-    std::mem::forget(buf);
+    f(&mut buf)
 }
 
 #[cfg(test)]

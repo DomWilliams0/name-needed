@@ -1,24 +1,53 @@
-use crate::activity::HaulTarget;
 use ai::{Dse, WeightedDse};
 use common::*;
 use unit::world::WorldPosition;
 
-use crate::ai::dse::{BreakBlockDse, HaulDse};
+use crate::activity::HaulTarget;
+use crate::ai::dse::{BreakBlockDse, BuildDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
+use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
-use crate::ComponentWorld;
+use crate::{ComponentWorld, HaulSource};
 
 use crate::item::HaulableItemComponent;
+use crate::job::{BuildDetails, SocietyJobHandle, SocietyJobRef};
 
-/// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob].
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+pub struct HaulSocietyTask {
+    pub item: Entity,
+    pub src: HaulSource,
+    pub dst: HaulTarget,
+}
+
+/// Lightweight, atomic, reservable, agnostic of the owning [SocietyJob]. These map to DSEs that
+/// are each considered separately by the AI
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
+    /// Break the given block
+    // TODO this could be a work item
     BreakBlock(WorldPosition),
-    Haul(Entity, HaulTarget, HaulTarget),
-    // TODO PlaceBlocks(block type, at position)
+
+    /// Work on a build job
+    Build(SocietyJobHandle, BuildDetails),
+
+    /// Gather materials for a build at the given position
+    GatherMaterials {
+        target: WorldPosition,
+        material: BuildMaterial,
+        job: SocietyJobHandle,
+        extra_hands_needed_for_haul: u16,
+    },
+
+    /// Haul something.
+    /// Boxed as this variant is much larger than the rest
+    Haul(Box<HaulSocietyTask>),
 }
 
 impl SocietyTask {
+    pub fn haul(item: Entity, src: HaulSource, dst: HaulTarget) -> Self {
+        Self::Haul(Box::new(HaulSocietyTask { item, src, dst }))
+    }
+
     // TODO temporary box allocation is gross, use dynstack for dses
     /// More reservations = lower weight
     pub fn as_dse(
@@ -45,16 +74,34 @@ impl SocietyTask {
 
         match self {
             BreakBlock(range) => dse!(BreakBlockDse(*range)),
-            Haul(e, src, tgt) => {
-                let pos = tgt.target_position(world)?;
+            Build(job, details) => {
+                // TODO distinct build actions e.g. sawing, wood building, stone building etc
+                dse!(BuildDse {
+                    job: *job,
+                    details: details.clone(),
+                })
+            }
+            GatherMaterials {
+                target,
+                material,
+                job,
+                extra_hands_needed_for_haul,
+            } => dse!(GatherMaterialsDse {
+                target: *target,
+                material: material.clone(),
+                job: *job,
+                extra_hands_for_haul: *extra_hands_needed_for_haul
+            }),
+            Haul(haul) => {
+                let pos = haul.dst.location(world)?;
                 let extra_hands = world
-                    .component::<HaulableItemComponent>(*e)
+                    .component::<HaulableItemComponent>(haul.item)
                     .ok()
                     .map(|comp| comp.extra_hands)?;
 
                 dse!(HaulDse {
-                    thing: *e,
-                    src_tgt: (*src, *tgt),
+                    thing: haul.item,
+                    src_tgt: (haul.src, haul.dst),
                     extra_hands_needed: extra_hands,
                     destination: pos,
                 })
@@ -66,8 +113,11 @@ impl SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(_) => true,
+            Build(_, _) => false,
             // TODO some types of hauling will be shareable
-            Haul(_, _, _) => false,
+            // TODO depends on work item
+            Haul(_) => false,
+            GatherMaterials { .. } => true,
         }
     }
 }
@@ -77,7 +127,16 @@ impl Display for SocietyTask {
         use SocietyTask::*;
         match self {
             BreakBlock(b) => write!(f, "Break block at {}", b),
-            Haul(e, _, tgt) => write!(f, "Haul {} to {}", e, tgt),
+            Build(_, details) => write!(f, "Build {:?} at {}", details.target, details.pos),
+            Haul(haul) => Display::fmt(haul, f),
+            // TODO include a description field for proper description e.g. "cutting log", "building wall"
+            GatherMaterials { material, .. } => write!(f, "Gather {:?}", material),
         }
+    }
+}
+
+impl Display for HaulSocietyTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Haul {} to {}", self.item, self.dst)
     }
 }

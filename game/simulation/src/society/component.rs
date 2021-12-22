@@ -4,7 +4,7 @@ use crate::society::Society;
 use crate::Societies;
 use common::*;
 
-#[derive(Component, EcsComponent)]
+#[derive(Component, EcsComponent, Clone)]
 #[storage(DenseVecStorage)]
 #[name("society")]
 pub struct SocietyComponent {
@@ -17,8 +17,8 @@ impl SocietyComponent {
     }
 
     /// Logs a warning if society is not found
-    pub fn resolve<'s>(&self, societies: &'s mut Societies) -> Option<&'s mut Society> {
-        societies.society_by_handle_mut(self.handle).or_else(|| {
+    pub fn resolve<'s>(&self, societies: &'s Societies) -> Option<&'s Society> {
+        societies.society_by_handle(self.handle).or_else(|| {
             warn!("bad society handle in component"; "handle" => ?self.handle);
             None
         })

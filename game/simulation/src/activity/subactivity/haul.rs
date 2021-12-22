@@ -1,15 +1,22 @@
 use common::*;
+use std::array::IntoIter;
 use unit::world::WorldPoint;
 
-use crate::activity::context::{ActivityContext, DistanceCheckResult};
+use crate::activity::context::{ActivityContext, DistanceCheckResult, EventResult};
 use crate::activity::status::Status;
+
 use crate::ecs::*;
 use crate::event::prelude::*;
-use crate::item::{ContainerError, EndHaulBehaviour, HaulType, HaulableItemComponent};
+use crate::item::{
+    ContainerError, ContainersError, EndHaulBehaviour, HaulType, HaulableItemComponent,
+    HauledItemComponent,
+};
+
 use crate::queued_update::QueuedUpdates;
+use crate::society::job::SocietyJobHandle;
 use crate::{
     ComponentWorld, ContainedInComponent, ContainerComponent, EntityEvent, EntityEventPayload,
-    InventoryComponent, PhysicalComponent, TransformComponent, WorldPosition,
+    InventoryComponent, PhysicalComponent, TransformComponent,
 };
 
 #[derive(Debug, Error, Clone)]
@@ -25,6 +32,12 @@ pub enum HaulError {
 
     #[error("Item is not valid, haulable or physical")]
     BadItem,
+
+    #[error("Split item stack doesn't match original stack properties")]
+    BadStackSplit,
+
+    #[error("Failed to split item stack: {0}")]
+    StackSplit(#[from] ContainersError),
 
     #[error("Invalid source container entity for haul")]
     BadSourceContainer,
@@ -43,6 +56,12 @@ pub enum HaulError {
 
     #[error("Haul was cancelled")]
     Cancelled,
+
+    #[error("Item is already being hauled by {0}")]
+    AlreadyHauled(Entity),
+
+    #[error("Something change while cancelling the haul, maybe it was picked up by someone else")]
+    AssumptionsChangedDuringAbort,
 }
 
 /// Handles the start (picking up) and finish (putting down), and fixing up components on abort
@@ -55,19 +74,43 @@ pub struct HaulSubactivity<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum HaulTarget {
-    /// Put in/take from an accessible position
-    // TODO worldpoint
-    Position(WorldPosition),
+pub enum HaulSource {
+    /// Pick up from current location
+    PickUp,
 
-    /// Put in/take out of a container
+    /// Take an amount of items from an item stack
+    PickUpSplitStack(u16),
+
+    /// Take out of a container
     Container(Entity),
 }
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum HaulTarget {
+    /// Drop on the floor
+    Drop(WorldPoint),
+
+    /// Put in a container
+    Container(Entity),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum HaulPurpose {
+    /// No custom behaviour on success
+    JustBecause,
+
+    /// Item should be reserved for a job
+    MaterialGathering(SocietyJobHandle),
+}
+
+// activity is only used on main thread
+unsafe impl Send for HaulPurpose {}
+unsafe impl Sync for HaulPurpose {}
 
 // TODO depends on item size
 const MAX_DISTANCE: f32 = 4.0;
 
-struct StartHaulingStatus(HaulTarget);
+struct StartHaulingStatus(HaulSource);
 
 struct StopHaulingStatus(Option<HaulTarget>);
 
@@ -76,10 +119,10 @@ impl<'a> HaulSubactivity<'a> {
     pub async fn start_hauling(
         ctx: &'a ActivityContext,
         thing: Entity,
-        source: HaulTarget,
+        source: HaulSource,
     ) -> Result<HaulSubactivity<'a>, HaulError> {
         // check distance
-        if let HaulTarget::Position(_) = source {
+        if matches!(source, HaulSource::PickUp | HaulSource::PickUpSplitStack(_)) {
             match ctx.check_entity_distance(thing, MAX_DISTANCE.powi(2)) {
                 DistanceCheckResult::NotAvailable => return Err(HaulError::BadItem),
                 DistanceCheckResult::TooFar => return Err(HaulError::TooFar),
@@ -99,7 +142,7 @@ impl<'a> HaulSubactivity<'a> {
             needs_transform: false,
         };
 
-        if let HaulTarget::Container(container) = source {
+        if let HaulSource::Container(container) = source {
             subactivity.needs_transform = true;
 
             queue_container_removal(ctx.world().resource(), thing, container);
@@ -124,22 +167,35 @@ impl<'a> HaulSubactivity<'a> {
         }
 
         // start hauling, which will give the item a transform on success
-        queue_haul_pickup(ctx.world().resource(), ctx.entity(), thing);
+        queue_haul_pickup(ctx.world(), ctx.entity(), thing, source);
 
         // wait for event and ensure the haul succeeded
-        ctx.subscribe_to_specific_until(thing, EntityEventType::Hauled, |evt| match evt {
-            EntityEventPayload::Hauled(hauler, result) => {
-                if hauler != ctx.entity() {
-                    // someone else picked it up
-                    return Err(EntityEventPayload::Hauled(hauler, result));
+        let mut the_result = None;
+        ctx.subscribe_to_many_until(
+            thing,
+            IntoIter::new([EntityEventType::HauledButSplit, EntityEventType::Hauled]),
+            |evt| match evt {
+                EntityEventPayload::Hauled(hauler, result) if hauler == ctx.entity() => {
+                    the_result = Some(result);
+                    EventResult::Consumed
                 }
-                Ok(result)
-            }
-            // calling activity can handle other destructive events
-            _ => Err(evt),
-        })
-        .await
-        .unwrap_or(Err(HaulError::Cancelled))?;
+                EntityEventPayload::HauledButSplit(hauler, result) if hauler == ctx.entity() => {
+                    let result = match result {
+                        Ok(split_stack) => {
+                            subactivity.thing = split_stack;
+                            Ok(())
+                        }
+                        Err(err) => Err(err),
+                    };
+                    the_result = Some(result);
+                    EventResult::Consumed
+                }
+                _ => EventResult::Unconsumed(evt),
+            },
+        )
+        .await;
+
+        the_result.unwrap_or(Err(HaulError::Cancelled))?;
 
         // defuse bomb, we have a transform now
         subactivity.needs_transform = false;
@@ -148,12 +204,32 @@ impl<'a> HaulSubactivity<'a> {
 
     /// If target is a location in the world, assumes we have already walked to it.
     /// This is the non-interrupted entrypoint
-    pub async fn end_haul(&mut self, target: HaulTarget) -> Result<(), HaulError> {
+    pub async fn end_haul(
+        &mut self,
+        target: HaulTarget,
+        purpose: &HaulPurpose,
+    ) -> Result<(), HaulError> {
         self.complete = true;
         self.end_haul_impl_sync(Some(target))?;
 
         if matches!(target, HaulTarget::Container(_)) {
             self.end_haul_impl_async_container(target).await?;
+        }
+
+        match purpose {
+            HaulPurpose::JustBecause => {}
+            HaulPurpose::MaterialGathering(job) => {
+                let thing = self.thing;
+                let job = *job;
+                self.ctx.world().resource::<QueuedUpdates>().queue(
+                    "reserve material",
+                    move |world| {
+                        trace!("reserving material for job"; "material" => thing, "job" => ?job);
+                        world.helpers_comps().reserve_material_for_job(thing, job)?;
+                        Ok(())
+                    },
+                );
+            }
         }
 
         Ok(())
@@ -182,20 +258,24 @@ impl<'a> HaulSubactivity<'a> {
                     .component::<TransformComponent>(self.ctx.entity())
                     .map_err(|_| HaulError::BadHauler)?
                     .position;
-                HaulTarget::Position(hauler_pos.floor())
+                HaulTarget::Drop(hauler_pos)
             }
         };
 
         // place haulee back into the world
         let item = self.thing;
         match target {
-            HaulTarget::Position(pos) => {
+            HaulTarget::Drop(pos) => {
                 // drop the item in place
-                // TODO don't always drop item in centre
-                let pos = pos.centred();
+                // TODO add some randomness to drop position
                 let needs_transform = self.needs_transform;
 
                 updates.queue("drop hauled item", move |world| {
+                    if let Ok(comp) = world.component::<ContainedInComponent>(item) {
+                        // our assumptions have changed, someone else has picked this item up, do nothing!
+                        return Err(HaulError::AlreadyHauled(comp.entity()).into());
+                    }
+
                     if let Ok(mut transform) = world.component_mut::<TransformComponent>(item) {
                         transform.reset_position(pos);
                     } else if needs_transform {
@@ -259,54 +339,63 @@ impl<'a> Drop for HaulSubactivity<'a> {
 impl Display for HaulTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            HaulTarget::Position(pos) => Display::fmt(pos, f),
+            HaulTarget::Drop(pos) => Display::fmt(pos, f),
             HaulTarget::Container(container) => write!(f, "container {}", container),
         }
     }
 }
 
-impl HaulTarget {
-    /// Creates from entity's current position or the container it is currently contained in
+impl Display for HaulSource {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HaulSource::PickUp | HaulSource::PickUpSplitStack(_) => write!(f, "current position"),
+            HaulSource::Container(container) => write!(f, "container {}", container),
+        }
+    }
+}
+
+impl HaulSource {
     pub fn with_entity(entity: Entity, world: &impl ComponentWorld) -> Option<Self> {
         if let Ok(ContainedInComponent::Container(container)) = world.component(entity).as_deref() {
             Some(Self::Container(*container))
-        } else if let Ok(transform) = world.component::<TransformComponent>(entity) {
-            Some(Self::Position(transform.accessible_position()))
+        } else if world.has_component::<TransformComponent>(entity) {
+            Some(Self::PickUp)
         } else {
             None
         }
     }
 
-    pub fn target_position(&self, world: &impl ComponentWorld) -> Option<WorldPoint> {
-        match self {
-            HaulTarget::Position(pos) => Some(pos.centred()),
-            HaulTarget::Container(container) => Self::position_of(world, *container),
-        }
-    }
-
-    pub fn source_position(
+    pub fn location(
         &self,
         world: &impl ComponentWorld,
         item: Entity,
     ) -> Result<WorldPoint, HaulError> {
         match self {
-            HaulTarget::Position(_) => {
-                // get current position instead of possibly outdated source position
-                Self::position_of(world, item).ok_or(HaulError::BadItem)
+            Self::PickUp | Self::PickUpSplitStack(_) => {
+                position_of(world, item).ok_or(HaulError::BadItem)
             }
-            HaulTarget::Container(container) => {
-                Self::position_of(world, *container).ok_or(HaulError::BadSourceContainer)
+            Self::Container(container) => {
+                position_of(world, *container).ok_or(HaulError::BadSourceContainer)
             }
         }
     }
+}
 
-    // TODO explicit access side for container, e.g. front of chest
-    fn position_of(world: &impl ComponentWorld, entity: Entity) -> Option<WorldPoint> {
-        world
-            .component::<TransformComponent>(entity)
-            .ok()
-            .map(|transform| transform.position)
+impl HaulTarget {
+    pub fn location(&self, world: &impl ComponentWorld) -> Option<WorldPoint> {
+        match self {
+            HaulTarget::Drop(pos) => Some(*pos),
+            HaulTarget::Container(container) => position_of(world, *container),
+        }
     }
+}
+
+// TODO explicit access side for container, e.g. front of chest
+fn position_of(world: &impl ComponentWorld, entity: Entity) -> Option<WorldPoint> {
+    world
+        .component::<TransformComponent>(entity)
+        .ok()
+        .map(|transform| transform.position)
 }
 
 fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_entity: Entity) {
@@ -337,85 +426,144 @@ fn queue_container_removal(updates: &QueuedUpdates, item: Entity, container_enti
     });
 }
 
-fn queue_haul_pickup(updates: &QueuedUpdates, hauler: Entity, item: Entity) {
-    updates.queue("haul item", move |world| {
-        let do_haul = || -> Result<(), HaulError> {
-            // check item is alive first, to ensure .insert() succeeds below
-            if !world.is_entity_alive(item) {
-                return Err(HaulError::BadItem);
-            }
-
-            // get item properties
-            let (extra_hands, volume, size) = {
-                let haulables = world.read_storage::<HaulableItemComponent>();
-                let physicals = world.read_storage::<PhysicalComponent>();
-                match world.components(item, (&haulables, &physicals)) {
-                    Some((haulable, physical)) => {
-                        (haulable.extra_hands, physical.volume, physical.size)
-                    }
-                    None => {
-                        warn!("item is not haulable"; "item" => item);
-                        return Err(HaulError::BadItem);
-                    }
+fn queue_haul_pickup(world: &EcsWorld, hauler: Entity, item: Entity, source: HaulSource) {
+    world
+        .resource::<QueuedUpdates>()
+        .queue("haul item", move |world| {
+            let do_haul = || -> Result<Option<Entity>, HaulError> {
+                // check item is alive and not being hauled first, to ensure .insert() succeeds below
+                match world.component::<HauledItemComponent>(item) {
+                    Ok(hauled) => return Err(HaulError::AlreadyHauled(hauled.hauler)),
+                    Err(ComponentGetError::NoSuchEntity(_)) => return Err(HaulError::BadItem),
+                    _ => {}
                 }
+
+                // get item properties
+                let (extra_hands, mut volume, mut size) = {
+                    let haulables = world.read_storage::<HaulableItemComponent>();
+                    let physicals = world.read_storage::<PhysicalComponent>();
+                    match world.components(item, (&haulables, &physicals)) {
+                        Some((haulable, physical)) => {
+                            (haulable.extra_hands, physical.volume, physical.size)
+                        }
+                        None => {
+                            warn!("item is not haulable"; "item" => item);
+                            return Err(HaulError::BadItem);
+                        }
+                    }
+                };
+
+                debug!(
+                    "{entity} wants to haul {item} which needs {extra_hands} extra hands",
+                    entity = hauler,
+                    item = item,
+                    extra_hands = extra_hands
+                );
+
+                // ensure hauler has space
+                let slots = {
+                    let mut inventory = world
+                        .component_mut::<InventoryComponent>(hauler)
+                        .map_err(|_| HaulError::NoInventory)?;
+
+                    // ensure hauler has enough free hands
+                     inventory
+                        .get_hauling_slots_unbound(extra_hands)
+                        .ok_or(HaulError::NotEnoughFreeHands)?
+                };
+
+                // get hauler position if needed
+                let hauler_pos = {
+                    let transforms = world.read_storage::<TransformComponent>();
+                    if item.has(&transforms) {
+                        // not needed, item already has a transform
+                        None
+                    } else {
+                        let transform = hauler.get(&transforms).ok_or(HaulError::BadHauler)?;
+                        Some(transform.position)
+                    }
+                };
+
+
+                // split stack if necessary
+                let mut split_stack_entity = None;
+                let item = if let HaulSource::PickUpSplitStack(n) = source {
+                    let split_stack = world.helpers_containers().split_stack(item, n)?;
+                    // TODO remerge stack on failure?
+
+                    // validate
+                    let (split_extra_hands, split_volume, split_size) = {
+                        let haulables = world.read_storage::<HaulableItemComponent>();
+                        let physicals = world.read_storage::<PhysicalComponent>();
+                        match world.components(split_stack, (&haulables, &physicals)) {
+                            Some((haulable, physical)) => {
+                                (haulable.extra_hands, physical.volume, physical.size)
+                            }
+                            None => {
+                                warn!("split stack is not haulable"; "item" => item);
+                                return Err(HaulError::BadItem);
+                            }
+                        }
+                    };
+
+                    if split_extra_hands != extra_hands {
+                        warn!("split stack needs {split} extra hands, but original stack needed {orig}",
+                        split = split_extra_hands, orig = extra_hands);
+                        return Err(HaulError::BadStackSplit);
+                    }
+
+                    // warn but allow change in physical size
+                    if split_size != size {
+                        warn!("split stack physical size changed"; "split" => ?split_size, "orig" => ?size);
+                    }
+
+                    volume = split_volume;
+                    size = split_size;
+                    split_stack_entity = Some(split_stack);
+                    split_stack
+                } else {item};
+
+                // everything has been checked, no more errors past this point
+
+                // fill equip slots
+                let mut inventory = world
+                    .component_mut::<InventoryComponent>(hauler)
+                    .map_err(|_| HaulError::NoInventory)?;
+                let mut slots = slots.upgrade(&mut inventory).expect("inventory changed unexpectedly");
+                slots.fill(item, volume, size);
+
+                // add components
+                world
+                    .helpers_comps()
+                    .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
+
+                Ok(split_stack_entity)
             };
 
-            debug!(
-                "{entity} wants to haul {item} which needs {extra_hands} extra hands",
-                entity = hauler,
-                item = item,
-                extra_hands = extra_hands
-            );
+            let result = do_haul();
+            let payload = match (source, result) {
+                (HaulSource::PickUpSplitStack(_), Ok(Some(stack)))=>EntityEventPayload::HauledButSplit(hauler, Ok(stack)),
+                (HaulSource::PickUpSplitStack(_), Ok(None))=> unreachable!(),
+                (HaulSource::PickUpSplitStack(_), Err(err))=>EntityEventPayload::HauledButSplit(hauler, Err(err)),
+                (_, result) =>EntityEventPayload::Hauled(hauler, result.map(|_| ())),
 
-            // get hauler inventory
-            let mut inventory = world
-                .component_mut::<InventoryComponent>(hauler)
-                .map_err(|_| HaulError::NoInventory)?;
-
-            // ensure hauler has enough free hands
-            let mut slots = inventory
-                .get_hauling_slots(extra_hands)
-                .ok_or(HaulError::NotEnoughFreeHands)?;
-
-            // get hauler position if needed
-            let hauler_pos = {
-                let transforms = world.read_storage::<TransformComponent>();
-                if item.has(&transforms) {
-                    // not needed, item already has a transform
-                    None
-                } else {
-                    let transform = hauler.get(&transforms).ok_or(HaulError::BadHauler)?;
-                    Some(transform.position)
-                }
             };
-
-            // everything has been checked, no more errors past this point
-
-            // fill equip slots
-            slots.fill(item, volume, size);
-
-            // add components
-            world
-                .helpers_comps()
-                .begin_haul(item, hauler, hauler_pos, HaulType::CarryAlone);
+            world.post_event(EntityEvent {
+                subject: item,
+                payload,
+            });
 
             Ok(())
-        };
-
-        let result = do_haul();
-        world.post_event(EntityEvent {
-            subject: item,
-            payload: EntityEventPayload::Hauled(hauler, result),
         });
-
-        Ok(())
-    });
 }
 
 fn queue_stop_hauling(updates: &QueuedUpdates, item: Entity, hauler: Entity, interrupted: bool) {
     updates.queue("stop hauling item", move |world| {
         // remove components from item
-        let behaviour = world.helpers_comps().end_haul(item, interrupted);
+        let behaviour = world
+            .helpers_comps()
+            .end_haul(item, hauler, interrupted)
+            .ok_or(HaulError::AssumptionsChangedDuringAbort)?;
 
         let count = match behaviour {
             EndHaulBehaviour::Drop => {
@@ -496,8 +644,9 @@ impl Status for StartHaulingStatus {
 impl Display for StartHaulingStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            HaulTarget::Position(_) => f.write_str("Picking up item"),
-            HaulTarget::Container(_) => f.write_str("Taking item out of container"),
+            HaulSource::PickUp => f.write_str("Picking up item"),
+            HaulSource::PickUpSplitStack(_) => f.write_str("Picking up items from stack"),
+            HaulSource::Container(_) => f.write_str("Taking item out of container"),
         }
     }
 }
@@ -505,7 +654,7 @@ impl Display for StartHaulingStatus {
 impl Display for StopHaulingStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            None | Some(HaulTarget::Position(_)) => f.write_str("Dropping item"),
+            None | Some(HaulTarget::Drop(_)) => f.write_str("Dropping item"),
             Some(HaulTarget::Container(_)) => f.write_str("Putting item into container"),
         }
     }

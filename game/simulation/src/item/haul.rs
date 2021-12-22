@@ -9,6 +9,7 @@ use crate::TransformComponent;
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[name("hauling")]
 #[storage(DenseVecStorage)]
+#[clone(disallow)]
 pub struct HauledItemComponent {
     pub hauler: Entity,
     pub haul_type: HaulType,
@@ -80,7 +81,8 @@ impl<'a> System<'a> for HaulSystem {
             .join()
             .zip(new_positions.drain(..))
         {
-            // TODO this is awful and should be generalised to a part of the physics system e.g. relative positioned entity
+            // TODO this is awful and should be generalised with a separate transform child/parent component
+            // TODO also update rotation when hauling
             if std::mem::take(&mut hauled.first_time) {
                 // first tick, move directly
                 transform.reset_position(new_pos)
@@ -136,6 +138,8 @@ impl<V: Value> ComponentTemplate<V> for HaulableItemComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("haulable", HaulableItemComponent);

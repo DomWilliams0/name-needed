@@ -631,6 +631,30 @@ impl RawChunkTerrain {
         start_from: Option<GlobalSliceIndex>,
         end_at: Option<GlobalSliceIndex>,
     ) -> Option<BlockPosition> {
+        self.find_from_top(pos, start_from, end_at, |above, below| {
+            above.walkable() && below.block_type().can_be_walked_on()
+        })
+    }
+
+    pub fn find_ground_level(
+        &self,
+        pos: SliceBlock,
+        start_from: Option<GlobalSliceIndex>,
+        end_at: Option<GlobalSliceIndex>,
+    ) -> Option<BlockPosition> {
+        self.find_from_top(pos, start_from, end_at, |above, below| {
+            above.block_type().is_air() && !below.block_type().is_air()
+        })
+    }
+
+    /// Filter is passed (above block, below block)
+    fn find_from_top(
+        &self,
+        pos: SliceBlock,
+        start_from: Option<GlobalSliceIndex>,
+        end_at: Option<GlobalSliceIndex>,
+        mut filter: impl FnMut(Block, Block) -> bool,
+    ) -> Option<BlockPosition> {
         let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
         let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
 
@@ -640,9 +664,7 @@ impl RawChunkTerrain {
             .skip_while(|(s, _)| *s > start_from)
             .take_while(|(s, _)| *s >= end_at)
             .tuple_windows()
-            .find(|((_, above), (_, below))| {
-                above[pos].walkable() && below[pos].block_type().can_be_walked_on()
-            })
+            .find(|((_, above), (_, below))| filter(above[pos], below[pos]))
             .map(|((z, _), _)| pos.to_block_position(z))
     }
 

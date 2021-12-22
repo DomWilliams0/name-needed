@@ -1,4 +1,4 @@
-use color::ColorRgb;
+use color::Color;
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::BlockOcclusion;
@@ -40,6 +40,10 @@ pub enum BlockType {
     Sand,
     #[display(fmt = "Solid water")]
     SolidWater,
+
+    /// Temporary substitute for something to build
+    #[display(fmt = "Stone wall")]
+    StoneBrickWall,
 
     Chest,
 }
@@ -150,18 +154,19 @@ impl Default for Block {
 
 // TODO define these in data
 impl BlockType {
-    pub fn color(self) -> ColorRgb {
+    pub fn color(self) -> Color {
         match self {
-            BlockType::Air => ColorRgb::new(0, 0, 0),
-            BlockType::Dirt => ColorRgb::new(86, 38, 23),
-            BlockType::Grass => ColorRgb::new(49, 152, 56),
-            BlockType::LightGrass => ColorRgb::new(91, 152, 51),
-            BlockType::Leaves => ColorRgb::new(49, 132, 2),
-            BlockType::TreeTrunk => ColorRgb::new(79, 52, 16),
-            BlockType::Stone => ColorRgb::new(106, 106, 117),
+            BlockType::Air => Color::rgb(0, 0, 0),
+            BlockType::Dirt => Color::rgb(86, 38, 23),
+            BlockType::Grass => Color::rgb(49, 152, 56),
+            BlockType::LightGrass => Color::rgb(91, 152, 51),
+            BlockType::Leaves => Color::rgb(49, 132, 2),
+            BlockType::TreeTrunk => Color::rgb(79, 52, 16),
+            BlockType::Stone => Color::rgb(106, 106, 117),
             BlockType::Sand => 0xBCA748FF.into(),
             BlockType::SolidWater => 0x3374BCFF.into(),
-            BlockType::Chest => ColorRgb::new(184, 125, 31),
+            BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
+            BlockType::Chest => Color::rgb(184, 125, 31),
         }
     }
 
@@ -182,7 +187,7 @@ impl BlockType {
             Dirt | Grass | LightGrass => 40,
             TreeTrunk => 70,
             Stone => 90,
-            Chest => 60,
+            Chest | StoneBrickWall => 60,
             SolidWater => u8::MAX,
         };
 
@@ -192,7 +197,11 @@ impl BlockType {
     /// TODO very temporary "walkability" for block types
     pub fn can_be_walked_on(self) -> bool {
         use BlockType::*;
-        !matches!(self, Leaves | SolidWater)
+        !matches!(self, Air | Leaves | SolidWater)
+    }
+
+    pub fn is_air(self) -> bool {
+        matches!(self, BlockType::Air)
     }
 }
 

@@ -1,8 +1,10 @@
 mod builder;
+mod component;
 mod loader;
 mod registry;
 
 pub use builder::{BuilderError, DefinitionBuilder, EntityPosition};
+pub use component::DefinitionNameComponent;
 pub use loader::{load, Definition, ValueImpl};
 pub use registry::Registry;
 
@@ -17,7 +19,7 @@ use common::*;
 #[error("Error loading definition {0}: {1}")]
 pub struct DefinitionError(pub DefinitionSource, pub DefinitionErrorKind);
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum DefinitionErrorKind {
     #[error("Failed to read definition file: {0}")]
     Resource(#[from] resources::ResourceErrorKind),

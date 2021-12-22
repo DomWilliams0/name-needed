@@ -3,7 +3,7 @@ use crate::ecs::*;
 
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
-use common::{num_derive::FromPrimitive, num_traits};
+use common::{num_derive::FromPrimitive, num_traits, Display};
 use std::convert::TryInto;
 use strum_macros::EnumDiscriminants;
 use unit::world::WorldPoint;
@@ -39,14 +39,24 @@ pub enum EntityEventPayload {
     /// Entity (subject) has equipped the given item entity that was already in their inventory
     HasEquipped(Entity),
 
-    /// Item entity (subject) has been picked up for hauling by the given hauler
+    /// Item entity (subject) has been picked up for hauling by the given hauler (.0)
     Hauled(Entity, Result<(), HaulError>),
+
+    /// Item stack entity (subject) was split and then that split stack (Ok(split_stack)) has been
+    /// picked up for hauling by the given hauler (.0)
+    HauledButSplit(Entity, Result<Entity, HaulError>),
 
     /// Item entity has been removed from the given container
     ExitedContainer(Result<Entity, HaulError>),
 
     /// Item entity has been inserted into the given container
     EnteredContainer(Result<Entity, HaulError>),
+
+    /// Item entity (subject) has been added to the given stack entity
+    JoinedStack(Entity),
+
+    /// Entity died for the given reason
+    Died(DeathReason),
 
     /// Debug event needed for tests only
     #[cfg(feature = "testing")]
@@ -59,6 +69,26 @@ pub enum EntityEventPayload {
     #[doc(hidden)]
     #[cfg(test)]
     DummyB,
+}
+
+#[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
+#[derive(Copy, Clone, Debug, Display)]
+// display: "because ..."
+pub enum DeathReason {
+    /// of unknown reasons
+    Unknown,
+
+    /// it was used in a build
+    CompletedBuild,
+
+    /// the containing item stack was destroyed
+    ParentStackDestroyed,
+
+    /// the block was destroyed
+    BlockDestroyed,
+
+    /// it was collapsed into an identical item stack
+    CollapsedIntoIdenticalInStack,
 }
 
 #[cfg(feature = "testing")]
@@ -129,26 +159,45 @@ impl EntityEventSubscription {
 }
 
 impl EntityEventPayload {
-    pub fn is_destructive(&self) -> bool {
+    /// doer is the living entity interesting in this one, e.g. the hauler, the eater
+    pub fn is_destructive_for(&self, doer: Option<Entity>) -> bool {
         use EntityEventPayload::*;
-        // only destructive on success
+
         match self {
+            // not destructive if successful and done by the interested entity
+            BeenPickedUp(me, Ok(_))
+            | BeenEaten(Ok(me))
+            | Hauled(me, Ok(_))
+            | HauledButSplit(me, _)
+                if doer == Some(*me) =>
+            {
+                false
+            }
+
+            // destructive if successful and done by anyone else
             BeenPickedUp(_, Ok(_))
             | BeenEaten(Ok(_))
             | Hauled(_, Ok(_))
+            | HauledButSplit(_, Ok(_))
             | ExitedContainer(Ok(_))
             | EnteredContainer(Ok(_)) => true,
 
-            Arrived(_, _)
-            | BeenPickedUp(_, Err(_))
+            // not destructive on failure
+            BeenPickedUp(_, Err(_))
             | BeenEaten(Err(_))
             | Hauled(_, Err(_))
+            | HauledButSplit(_, Err(_))
             | ExitedContainer(Err(_))
-            | EnteredContainer(Err(_))
-            | HasPickedUp(_)
-            | HasEaten(_)
-            | HasEquipped(_)
-            | BeenEquipped(_) => false,
+            | EnteredContainer(Err(_)) => false,
+
+            // not destructive in any case
+            Arrived(_, _) | HasPickedUp(_) | HasEaten(_) | HasEquipped(_) | BeenEquipped(_) => {
+                false
+            }
+
+            // always destructive
+            JoinedStack(_) | Died(_) => true,
+
             #[cfg(test)]
             DummyA | DummyB => false,
             #[cfg(feature = "testing")]
@@ -168,17 +217,73 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasEquipped(e) => Ok(E::Equipped(*e)),
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
+            Died(reason) => Ok(E::Died(*reason)),
             BeenEaten(_)
             | BeenPickedUp(_, _)
             | Arrived(_, _)
             | BeenEquipped(_)
             | Hauled(_, _)
+            | HauledButSplit(_, _)
             | ExitedContainer(_)
-            | EnteredContainer(_) => Err(()),
+            | EnteredContainer(_)
+            | JoinedStack(_) => Err(()),
             #[cfg(test)]
             DummyA | DummyB => Err(()),
             #[cfg(feature = "testing")]
             Debug(_) => Err(()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn destructive_event() {
+        let world = EcsWorld::new();
+        let item = Entity::from(world.create_entity().build());
+        let holder = Entity::from(world.create_entity().build());
+        let other = Entity::from(world.create_entity().build());
+
+        let non_destructive = vec![
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::Hauled(holder, Ok(())),
+            },
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::BeenEaten(Ok(holder)),
+            },
+        ];
+
+        let destructive = vec![
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::Hauled(other, Ok(())),
+            },
+            EntityEvent {
+                subject: item,
+                payload: EntityEventPayload::BeenEaten(Ok(other)),
+            },
+        ];
+
+        for e in non_destructive {
+            assert!(
+                !e.payload.is_destructive_for(Some(holder)),
+                "event should be non destructive for {}: {:?}",
+                holder,
+                e
+            );
+        }
+
+        for e in destructive {
+            assert!(
+                e.payload.is_destructive_for(Some(holder)),
+                "event should be destructive for {}: {:?}",
+                holder,
+                e
+            );
         }
     }
 }

@@ -7,22 +7,26 @@ use common::*;
 use unit::world::WorldPoint;
 
 use crate::ecs::*;
+use crate::event::DeathReason;
+use crate::job::BuildDetails;
 use crate::simulation::Tick;
 use crate::WorldPosition;
 
 struct RingBuffer<T>(VecDeque<T>, usize);
 
-#[derive(Component, EcsComponent)]
+#[derive(Component, EcsComponent, Clone)]
 #[storage(HashMapStorage)]
 #[name("entity-logs")]
 pub struct EntityLoggingComponent {
     logs: RingBuffer<TimedLoggedEntityEvent>,
 }
 
+#[derive(Clone)]
 struct TimedLoggedEntityEvent(Tick, LoggedEntityEvent);
 
 /// An event that relates to an entity and is displayed in the ui. All variants relate to THIS entity
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
+#[derive(Clone)]
 pub enum LoggedEntityEvent {
     /// Equipped the given item
     Equipped(Entity),
@@ -32,9 +36,12 @@ pub enum LoggedEntityEvent {
     PickedUp(Entity),
     /// Made a decision to do something
     AiDecision(LoggedEntityDecision),
+    /// Died
+    Died(DeathReason),
 }
 
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
+#[derive(Clone)]
 pub enum LoggedEntityDecision {
     GoPickup(Cow<'static, str>),
     GoEquip(Entity),
@@ -44,6 +51,7 @@ pub enum LoggedEntityDecision {
     GoBreakBlock(WorldPosition),
     Follow(Entity),
     Haul { item: Entity, dest: HaulTarget },
+    GoBuild(BuildDetails),
 }
 
 impl<T> RingBuffer<T> {
@@ -62,6 +70,12 @@ impl<T> RingBuffer<T> {
     #[cfg(test)]
     fn iter(&self) -> impl Iterator<Item = &T> + '_ {
         self.0.iter()
+    }
+}
+
+impl<T: Clone> Clone for RingBuffer<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1)
     }
 }
 
@@ -108,6 +122,7 @@ impl Display for LoggedEntityEvent {
             Equipped(e) => write!(f, "equipped {}", e),
             Eaten(e) => write!(f, "ate {}", e),
             PickedUp(e) => write!(f, "picked up {}", e),
+            Died(reason) => write!(f, "died because {}", reason),
 
             AiDecision(decision) => {
                 write!(f, "decided to ")?;
@@ -120,6 +135,7 @@ impl Display for LoggedEntityEvent {
                     GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
                     Follow(e) => write!(f, "follow {}", e),
                     Haul { item, dest } => write!(f, "haul {} to {}", item, dest),
+                    GoBuild(details) => write!(f, "build {} at {}", details.target, details.pos),
                 }
             }
         }

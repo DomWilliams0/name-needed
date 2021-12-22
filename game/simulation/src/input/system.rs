@@ -3,8 +3,9 @@ use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
 use crate::input::{InputEvent, SelectType, WorldColumn};
-use crate::WorldRef;
-use crate::{RenderComponent, TransformComponent};
+use crate::spatial::{Spatial, Transforms};
+use crate::TransformComponent;
+use crate::{UiElementComponent, WorldRef};
 
 pub struct InputSystem<'a> {
     pub events: &'a [InputEvent],
@@ -14,6 +15,7 @@ pub struct InputSystem<'a> {
 #[derive(Component, EcsComponent, Default)]
 #[storage(NullStorage)]
 #[name("selected")]
+#[clone(disallow)]
 pub struct SelectedComponent;
 
 /// Resource for selected entity - not guaranteed to be alive
@@ -30,16 +32,17 @@ impl<'a> System<'a> for InputSystem<'a> {
     type SystemData = (
         Read<'a, WorldRef>,
         Read<'a, EntitiesRes>,
+        Read<'a, Spatial>,
         Write<'a, SelectedEntity>,
         Write<'a, SelectedTiles>,
         WriteStorage<'a, SelectedComponent>,
         ReadStorage<'a, TransformComponent>,
-        ReadStorage<'a, RenderComponent>,
+        ReadStorage<'a, UiElementComponent>,
     );
 
     fn run(
         &mut self,
-        (world, entities, mut selected, mut selected_block, mut selecteds, transform, render): Self::SystemData,
+        (world, entities, spatial, mut selected, mut selected_block, mut selecteds, transform, ui): Self::SystemData,
     ) {
         let resolve_walkable_pos = |select_pos: &WorldColumn| {
             let world = (*world).borrow();
@@ -48,16 +51,24 @@ impl<'a> System<'a> for InputSystem<'a> {
 
         let resolve_entity = |select_pos: &WorldColumn| {
             resolve_walkable_pos(select_pos).and_then(|point| {
-                // TODO spatial query rather than checking every entity ever
                 // TODO multiple clicks in the same place should iterate through all entities in selection range
 
-                const SELECT_THRESHOLD: f32 = 1.25;
-                (&entities, &transform, &render)
+                const RADIUS: f32 = 1.25;
+
+                // prioritise ui elements first
+                // TODO spatial lookup for ui elements too
+                let ui_elem = (&entities, &transform, &ui)
                     .join()
-                    .find(|(_, transform, _)| {
-                        transform.position.is_almost(&point, SELECT_THRESHOLD)
-                    }) // just choose the first in range for now
-                    .map(|(e, _, _)| e.into())
+                    .find(|(_, transform, _)| transform.position.is_almost(&point, RADIUS))
+                    .map(|(e, _, _)| e.into());
+
+                // fallack to looking for normal entities
+                ui_elem.or_else(|| {
+                    spatial
+                        .query_in_radius(Transforms::Storage(&transform), point, RADIUS)
+                        .next()
+                        .map(|(e, _, _)| e)
+                })
             })
         };
 

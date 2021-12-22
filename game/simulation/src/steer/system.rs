@@ -12,6 +12,7 @@ use crate::{TransformComponent, WorldRef};
 #[derive(Default, Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("steering")]
+#[clone(disallow)]
 pub struct SteeringComponent {
     pub behaviour: SteeringBehaviour,
 }

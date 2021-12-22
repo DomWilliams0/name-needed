@@ -4,7 +4,8 @@ mod timer;
 
 pub use queue::EntityEventQueue;
 pub use subscription::{
-    EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType, EventSubscription,
+    DeathReason, EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType,
+    EventSubscription,
 };
 
 #[cfg(feature = "testing")]

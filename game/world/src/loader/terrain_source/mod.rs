@@ -1,7 +1,20 @@
+use crate::chunk::slab::Slab;
+use crate::loader::WorldTerrainUpdate;
+use common::parking_lot::RwLock;
 use common::*;
+use std::collections::HashSet;
+use std::sync::Arc;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
 };
+
+#[cfg(feature = "procgen")]
+mod generate;
+#[cfg(feature = "procgen")]
+pub use generate::GeneratedTerrainSource;
+
+mod memory;
+pub use memory::MemoryTerrainSource;
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -30,20 +43,22 @@ pub enum TerrainSourceError {
 #[derive(Clone)]
 pub enum TerrainSource {
     Memory(Arc<RwLock<MemoryTerrainSource>>),
+    #[cfg(feature = "procgen")]
     Generated(GeneratedTerrainSource),
 }
 
 unsafe impl Send for TerrainSource {}
 unsafe impl Sync for TerrainSource {}
 
+#[cfg(feature = "procgen")]
 pub struct BlockDetails {
-    pub biome_choices: SmallVec<[(BiomeType, f32); 4]>,
+    pub biome_choices: SmallVec<[(procgen::BiomeType, f32); 4]>,
     pub coastal_proximity: f64,
     pub base_elevation: f64,
     pub moisture: f64,
     pub temperature: f64,
     /// (region location, dirty string representation of features affecting this block)
-    pub region: Option<(RegionLocation, SmallVec<[String; 4]>)>,
+    pub region: Option<(procgen::RegionLocation, SmallVec<[String; 4]>)>,
 }
 
 impl From<MemoryTerrainSource> for TerrainSource {
@@ -52,6 +67,7 @@ impl From<MemoryTerrainSource> for TerrainSource {
     }
 }
 
+#[cfg(feature = "procgen")]
 impl From<GeneratedTerrainSource> for TerrainSource {
     fn from(src: GeneratedTerrainSource) -> Self {
         Self::Generated(src)
@@ -62,6 +78,7 @@ impl TerrainSource {
     pub async fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
         match self {
             TerrainSource::Memory(_) => {}
+            #[cfg(feature = "procgen")]
             TerrainSource::Generated(src) => src.planet().prepare_for_chunks(range).await,
         }
     }
@@ -69,6 +86,7 @@ impl TerrainSource {
     pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
         match self {
             TerrainSource::Memory(src) => src.read().get_slab_copy(slab),
+            #[cfg(feature = "procgen")]
             TerrainSource::Generated(src) => src.load_slab(slab).await,
         }
     }
@@ -80,6 +98,7 @@ impl TerrainSource {
     ) -> Result<GlobalSliceIndex, TerrainSourceError> {
         match self {
             TerrainSource::Memory(src) => src.read().get_ground_level(block),
+            #[cfg(feature = "procgen")]
             TerrainSource::Generated(src) => src
                 .get_ground_level(block)
                 .await
@@ -87,6 +106,7 @@ impl TerrainSource {
         }
     }
 
+    #[cfg(feature = "procgen")]
     pub async fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
         match self {
             TerrainSource::Memory(_) => None,
@@ -114,10 +134,11 @@ impl TerrainSource {
         &self,
         chunks: impl Iterator<Item = ChunkLocation>,
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        per_point: impl FnMut(u64, WorldPosition),
+        per_point: impl FnMut(usize, WorldPosition),
     ) {
         match self {
             TerrainSource::Memory(_) => {}
+            #[cfg(feature = "procgen")]
             TerrainSource::Generated(planet) => {
                 planet
                     .planet()
@@ -130,6 +151,7 @@ impl TerrainSource {
     pub async fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
         match self {
             TerrainSource::Memory(_) => {}
+            #[cfg(feature = "procgen")]
             TerrainSource::Generated(planet) => {
                 let len_before = out.len();
                 planet
@@ -154,18 +176,6 @@ impl TerrainSource {
         }
     }
 }
-
-mod generate;
-mod memory;
-use crate::chunk::slab::Slab;
-use common::parking_lot::RwLock;
-pub use generate::GeneratedTerrainSource;
-pub use memory::MemoryTerrainSource;
-
-use crate::loader::WorldTerrainUpdate;
-use procgen::{BiomeType, RegionLocation};
-use std::collections::HashSet;
-use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {

@@ -41,6 +41,7 @@ rlua = { version = "0.17", optional = true }
 
 [features]
 default = []
+procgen = ["world/procgen"]
 metrics = ["ai/logging", "common/metrics"]
 scripting = ["rlua"]
 testing = []

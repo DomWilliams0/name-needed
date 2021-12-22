@@ -12,7 +12,7 @@ config = { path = "../../shared/config" }
 common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 grid = { path = "../../shared/grid" }
-procgen = { path = "../procgen", default-features = false, features = ["cache"] } # no bin
+procgen = { path = "../procgen", default-features = false, features = ["cache"], optional = true } # no bin
 
 petgraph = "0.5"
 nd_iter = "0.0"

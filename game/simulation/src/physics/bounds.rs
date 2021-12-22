@@ -146,19 +146,19 @@ mod tests {
     #[test]
     fn count() {
         // within a single block
-        let bounds = Bounds::from_radius((0.5, 0.5, 0.0).into(), 0.4, 0.2);
+        let bounds = Bounds::from_radius(WorldPoint::new_unchecked(0.5, 0.5, 0.0), 0.4, 0.2);
         assert_eq!(bounds.into_range().count(), 1);
 
         // just over the boundary in x axis
-        let bounds = Bounds::from_radius((0.3, 0.5, 0.0).into(), 0.4, 0.2);
+        let bounds = Bounds::from_radius(WorldPoint::new_unchecked(0.3, 0.5, 0.0), 0.4, 0.2);
         assert_eq!(bounds.into_range().count(), 2);
 
         // just over the boundary in y axis too
-        let bounds = Bounds::from_radius((0.3, 0.3, 0.0).into(), 0.4, 0.4);
+        let bounds = Bounds::from_radius(WorldPoint::new_unchecked(0.3, 0.3, 0.0), 0.4, 0.4);
         assert_eq!(bounds.into_range().count(), 4);
 
         // huge
-        let bounds = Bounds::from_radius((10.0, 10.0, 5.0).into(), 3.2, 3.2);
+        let bounds = Bounds::from_radius(WorldPoint::new_unchecked(10.0, 10.0, 5.0), 3.2, 3.2);
         assert_eq!(bounds.into_range().count(), 8 * 8);
     }
 }

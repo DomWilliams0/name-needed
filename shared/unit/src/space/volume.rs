@@ -23,3 +23,9 @@ impl Display for Volume {
         Display::fmt(&self.0, f)
     }
 }
+
+impl Volume {
+    pub fn get(self) -> u16 {
+        self.0
+    }
+}

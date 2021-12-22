@@ -8,7 +8,7 @@ use world::SearchGoal;
 use crate::activity::activity::Activity;
 use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
 
-use crate::activity::subactivity::GoingToStatus;
+use crate::activity::subactivity::{GoingToStatus, HaulPurpose, HaulSource};
 use crate::activity::HaulError;
 use crate::{Entity, EntityEvent, HaulTarget};
 
@@ -23,16 +23,23 @@ use crate::event::{EntityEventSubscription, EventSubscription};
 #[derive(Debug, Clone, Display)]
 pub struct GoHaulActivity {
     thing: Entity,
-    source: HaulTarget,
+    source: HaulSource,
     target: HaulTarget,
+    purpose: HaulPurpose,
 }
 
 impl GoHaulActivity {
-    pub fn new(entity: Entity, source: HaulTarget, target: HaulTarget) -> Self {
+    pub fn new_with_purpose(
+        entity: Entity,
+        source: HaulSource,
+        target: HaulTarget,
+        purpose: HaulPurpose,
+    ) -> Self {
         Self {
             thing: entity,
             source,
             target,
+            purpose,
         }
     }
 }
@@ -54,7 +61,7 @@ impl Activity for GoHaulActivity {
 
         // go to it
         // TODO arrival radius depends on the size of the item
-        let pos = self.source.source_position(ctx.world(), self.thing)?;
+        let pos = self.source.location(ctx.world(), self.thing)?;
         ctx.go_to(
             pos,
             NormalizedFloat::new(0.8),
@@ -69,7 +76,7 @@ impl Activity for GoHaulActivity {
         // go to destination
         let pos = self
             .target
-            .target_position(ctx.world())
+            .location(ctx.world())
             .ok_or(HaulError::BadTargetContainer)?;
 
         ctx.go_to(
@@ -81,14 +88,14 @@ impl Activity for GoHaulActivity {
         .await?;
 
         // put it down
-        hauling.end_haul(self.target).await?;
+        hauling.end_haul(self.target, &self.purpose).await?;
         Ok(())
     }
 
-    fn on_unhandled_event(&self, event: EntityEvent) -> InterruptResult {
-        if event.subject == self.thing && event.payload.is_destructive() {
+    fn on_unhandled_event(&self, event: EntityEvent, me: Entity) -> InterruptResult {
+        if event.subject == self.thing && event.payload.is_destructive_for(Some(me)) {
             // the expected haul event will be handled before this handler
-            debug!("thing has been destroyed, cancelling haul");
+            debug!("thing has been destroyed, cancelling haul"; "event" => ?event, "me" => me);
             InterruptResult::Cancel
         } else {
             InterruptResult::Continue

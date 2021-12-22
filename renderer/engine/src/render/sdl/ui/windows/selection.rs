@@ -1,16 +1,18 @@
 use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable};
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 
 use common::*;
 use simulation::input::{
     BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
 };
+use simulation::job::BuildThingJob;
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, NameComponent, PhysicalComponent, Societies, SocietyComponent,
-    TransformComponent,
+    InventoryComponent, ItemStackComponent, PhysicalComponent, Societies, SocietyComponent,
+    TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -19,7 +21,7 @@ use crate::render::sdl::ui::windows::{
 };
 use crate::ui_str;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct SelectionWindow {
     /// Index into [BlockType::into_enum_iter]
     edit_selection: usize,
@@ -27,7 +29,7 @@ pub struct SelectionWindow {
 
 struct SelectedEntityDetails<'a> {
     entity: Entity,
-    name: Option<ComponentRef<'a, NameComponent>>,
+    name: &'a dyn Display,
     transform: Option<ComponentRef<'a, TransformComponent>>,
     physical: Option<ComponentRef<'a, PhysicalComponent>>,
     ty: EntityType<'a>,
@@ -36,6 +38,7 @@ struct SelectedEntityDetails<'a> {
 enum EntityType<'a> {
     Living,
     Item(ComponentRef<'a, ConditionComponent>),
+    UiElement(ComponentRef<'a, UiElementComponent>),
 }
 
 #[derive(Debug)]
@@ -43,7 +46,11 @@ enum EntityState {
     Alive,
     Dead,
     Inanimate,
+    UiElement,
 }
+
+/// Oneshot
+struct CommaSeparatedDebugIter<I: Iterator<Item = T>, T: Debug>(RefCell<I>);
 
 impl SelectionWindow {
     pub fn render(&mut self, context: &UiContext) {
@@ -62,10 +69,14 @@ impl SelectionWindow {
         let (e, details, state) = match ecs.resource::<SelectedEntity>().get_unchecked() {
             Some(e) if ecs.is_entity_alive(e) => {
                 let transform = ecs.component(e).ok();
-                let name = ecs.component(e).ok();
+                let name = ecs.name(e);
                 let physical = ecs.component(e).ok();
-                let (ty, state) = match ecs.component::<ConditionComponent>(e) {
-                    Ok(condition) => (EntityType::Item(condition), EntityState::Inanimate),
+                let (ty, state) = match (
+                    ecs.component::<ConditionComponent>(e),
+                    ecs.component::<UiElementComponent>(e),
+                ) {
+                    (_, Ok(ui)) => (EntityType::UiElement(ui), EntityState::UiElement),
+                    (Ok(condition), _) => (EntityType::Item(condition), EntityState::Inanimate),
                     _ => (EntityType::Living, EntityState::Alive),
                 };
 
@@ -114,13 +125,7 @@ impl SelectionWindow {
 
         context.key_value(
             im_str!("Name:"),
-            || {
-                details
-                    .name
-                    .as_ref()
-                    .map(|n| ui_str!(in context, "{}", n.0))
-                    .ok_or("Unnamed")
-            },
+            || ui_str!(in context, "{}", details.name),
             None,
             COLOR_GREEN,
         );
@@ -153,11 +158,46 @@ impl SelectionWindow {
             );
         }
 
+        // item stack contents
+        if let Some(stack) = details.component::<ItemStackComponent>(context) {
+            let node = context.new_tree_node(im_str!("Item stack"), DefaultOpen::Closed);
+            if node.is_open() {
+                self.do_stack(context, &stack);
+            }
+        }
+
         let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
         if components_node.is_open() {
             // TODO component-specific widget
-            for component in context.simulation().ecs.all_components_for(details.entity) {
-                context.text(ui_str!(in context, " - {}", component));
+            for (name, component) in context.simulation().ecs.all_components_for(details.entity) {
+                let interactive = match component.as_interactive() {
+                    None => {
+                        // just show name
+                        context.text(ui_str!(in context, " - {}", name));
+                        continue;
+                    }
+                    Some(i) => i,
+                };
+
+                // nice tree node
+                let title = ui_str!(in context, "{}", name);
+                let node = context.new_tree_node(title, DefaultOpen::Closed);
+                if !node.is_open() {
+                    continue;
+                }
+
+                context.key_value(
+                    im_str!("Summary"),
+                    || {
+                        if let Some(dbg) = interactive.as_debug() {
+                            Value::Wrapped(ui_str!(in context, "{:?}", dbg))
+                        } else {
+                            Value::None("Not implemented")
+                        }
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
             }
         }
 
@@ -165,11 +205,14 @@ impl SelectionWindow {
         if tabbar.is_open() {
             match details.ty {
                 EntityType::Living => self.do_living(context, &details),
-                EntityType::Item(ref condition) => self.do_item(context, &details, &*condition),
+                EntityType::Item(ref condition) => self.do_item(context, &details, condition),
+                EntityType::UiElement(ref ui) => self.do_ui_element(context, ui),
             }
         }
 
-        self.do_logs(context, &details);
+        if !matches!(details.ty, EntityType::UiElement(_)) {
+            self.do_logs(context, &details);
+        }
     }
 
     //noinspection DuplicatedCode
@@ -332,20 +375,29 @@ impl SelectionWindow {
         );
 
         for (i, (e, container)) in inventory.containers(ecs).enumerate() {
-            let name_comp = ecs.component::<NameComponent>(e);
-            let name = name_comp
-                .as_ref()
-                .map(|n| n.0.as_str())
-                .unwrap_or("unnamed");
-
             let tree = context.new_tree_node(
-                ui_str!(in context, "#{}: {}##container", i+1, name),
+                ui_str!(in context, "#{}: {}##container", i+1, ecs.name(e)),
                 DefaultOpen::Closed,
             );
 
             if tree.is_open() {
                 self.do_container(context, &container);
             }
+        }
+    }
+
+    fn do_stack(&mut self, context: &UiContext, stack: &ItemStackComponent) {
+        let (count, limit) = stack.stack.filled();
+        context.text_colored(
+            COLOR_GREEN,
+            ui_str!(in context, "Capacity {}/{}", count, limit),
+        );
+
+        let ecs = context.simulation().ecs;
+        for (entity, count) in stack.stack.contents() {
+            context.text_wrapped(
+                ui_str!(in context, " - {}x {} ({})", count, ecs.name(entity), entity),
+            );
         }
     }
 
@@ -359,14 +411,8 @@ impl SelectionWindow {
 
         let ecs = context.simulation().ecs;
         for entity in container.contents() {
-            let name_comp = ecs.component::<NameComponent>(entity.entity);
-            let name = name_comp
-                .as_ref()
-                .map(|n| n.0.as_str())
-                .unwrap_or("unnamed"); // TODO stop writing "unnamed" everywhere
-
             context.text_wrapped(
-                ui_str!(in context, " - {} ({}, vol {})", name, entity.entity, entity.volume),
+                ui_str!(in context, " - {} ({}, vol {})", ecs.name(entity.entity), entity.entity, entity.volume),
             );
         }
     }
@@ -483,6 +529,55 @@ impl SelectionWindow {
         }
     }
 
+    fn do_ui_element(&mut self, context: &UiContext, ui: &UiElementComponent) {
+        let tab = context.new_tab(im_str!("Build"));
+        if !tab.is_open() {
+            return;
+        }
+
+        let ecs = context.simulation().ecs;
+
+        let ret = ui
+            .build_job
+            .resolve_and_cast(ecs.resource(), move |build: &BuildThingJob| {
+                let deets = build.details();
+                let progress = build.progress();
+
+                // TODO use the arena for this
+                let reqs = format!(
+                    "{}",
+                    CommaSeparatedDebugIter(RefCell::new(build.remaining_requirements()))
+                );
+
+                context.key_value(
+                    im_str!("Target:"),
+                    || Value::Some(ui_str!(in context, "{}", deets.target)),
+                    None,
+                    COLOR_ORANGE,
+                );
+
+                context.key_value(
+                    im_str!("Requirements:"),
+                    move || Value::Wrapped(ui_str!(in context, "{}", reqs)),
+                    None,
+                    COLOR_ORANGE,
+                );
+
+                context.key_value(
+                    im_str!("Progress:"),
+                    || Value::Some(ui_str!(in context, "{}/{}", progress.steps_completed, progress.total_steps_needed)),
+                    None,
+                    COLOR_ORANGE
+                );
+            });
+
+        if ret.is_none() {
+            return context.text_disabled("Error: invalid job");
+        }
+
+        // TODO other job tabs
+    }
+
     fn world_selection(&mut self, context: &UiContext) {
         let tab = context.new_tab(im_str!("World"));
         if !tab.is_open() {
@@ -544,6 +639,7 @@ impl SelectionWindow {
         }
 
         // generation
+        #[cfg(feature = "procgen")]
         {
             let tab = context.new_tab(im_str!("Generation"));
             if tab.is_open() {
@@ -638,11 +734,7 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         match *data {
             AssociatedBlockData::Container(container_entity) => {
-                let name_comp = ecs.component::<NameComponent>(container_entity).ok();
-                let name = name_comp
-                    .as_ref()
-                    .map(|c| c.0.as_str())
-                    .unwrap_or("Unnamed");
+                let name = ecs.name(container_entity);
 
                 context.key_value(
                     im_str!("Name:"),
@@ -744,6 +836,7 @@ impl SelectionWindow {
         }
     }
 
+    #[cfg(feature = "procgen")]
     fn do_generation(&mut self, context: &UiContext, selection: &SelectedTiles) {
         let loader = context.simulation().loader;
 
@@ -871,8 +964,9 @@ impl<'a> SelectedEntityDetails<'a> {
     }
 }
 
-impl Default for SelectionWindow {
-    fn default() -> Self {
-        Self { edit_selection: 0 }
+impl<I: Iterator<Item = T>, T: Debug> Display for CommaSeparatedDebugIter<I, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.0.borrow_mut();
+        f.debug_list().entries(&mut *iter).finish()
     }
 }

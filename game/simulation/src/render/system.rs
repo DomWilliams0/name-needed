@@ -1,13 +1,18 @@
+use std::convert::TryInto;
+
+use serde::de::Error;
+
+use color::Color;
+use common::*;
+
 use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
+
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
-use crate::transform::PhysicalComponent;
-use crate::{Shape2d, SliceRange, TransformComponent};
-use color::ColorRgb;
-use common::*;
-use serde::de::Error;
-use std::convert::TryInto;
+use crate::render::UiElementComponent;
+use crate::transform::{PhysicalComponent, TransformRenderDescription};
+use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -17,7 +22,7 @@ pub struct RenderComponent {
     pub shape: Shape2d,
 
     /// Simple color
-    pub color: ColorRgb,
+    pub color: Color,
 }
 
 /// Wrapper for calling generic Renderer in render system
@@ -29,39 +34,71 @@ pub struct RenderSystem<'a, R: Renderer> {
 
 impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
+        Read<'a, PlayerSociety>,
         Read<'a, SelectedTiles>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
         ReadStorage<'a, PhysicalComponent>,
         ReadStorage<'a, SelectedComponent>,
+        ReadStorage<'a, UiElementComponent>,
     );
 
-    fn run(&mut self, (selected_block, transform, render, physical, selected): Self::SystemData) {
+    fn run(
+        &mut self,
+        (player_soc, selected_block, transform, render, physical, selected, ui): Self::SystemData,
+    ) {
+        // render entities
         for (transform, render, physical, selected) in
             (&transform, &render, &physical, selected.maybe()).join()
         {
-            if self.slices.contains(transform.slice()) {
-                // make copy to mutate for interpolation
-                let mut transform = transform.clone();
+            if !self.slices.contains(transform.slice()) {
+                continue;
+            }
 
-                transform.position = {
-                    let last_pos: Vector3 = transform.last_position.into();
-                    let curr_pos: Vector3 = transform.position.into();
-                    let lerped = last_pos.lerp(curr_pos, self.interpolation);
-                    lerped.try_into().expect("invalid lerp")
-                };
+            let mut transform_desc = TransformRenderDescription::from(transform);
 
-                self.renderer.sim_entity(&transform, render, physical);
+            // interpolate position
+            transform_desc.position = {
+                let last_pos: Vector3 = transform.last_position.into();
+                let curr_pos: Vector3 = transform.position.into();
+                let lerped = last_pos.lerp(curr_pos, self.interpolation);
+                lerped.try_into().expect("invalid lerp")
+            };
 
-                if selected.is_some() {
-                    self.renderer.sim_selected(&transform, physical);
-                }
+            self.renderer.sim_entity(&transform_desc, render, physical);
+
+            if selected.is_some() {
+                self.renderer.sim_selected(&transform_desc, physical);
             }
         }
 
+        // render player's world selection
         if let Some((from, to)) = selected_block.bounds() {
             self.renderer
-                .tile_selection(from, to, ColorRgb::new(230, 240, 230));
+                .tile_selection(from, to, Color::rgb(230, 240, 230));
+        }
+
+        // render in-game ui elements above entities
+        for (transform, ui, selected) in (&transform, &ui, selected.maybe()).join() {
+            // only render elements for the player's society
+            if player_soc.0 != ui.society() {
+                continue;
+            }
+
+            if !self.slices.contains(transform.slice()) {
+                continue;
+            }
+
+            // TODO interpolation needed on ui elements?
+            let mut transform_desc = TransformRenderDescription::from(transform);
+
+            // move up vertically above all visible entities
+            transform_desc
+                .position
+                .modify_z(|z| z + self.slices.size() as f32);
+
+            self.renderer
+                .sim_ui_element(&transform_desc, ui, selected.is_some());
         }
     }
 }
@@ -93,6 +130,8 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("render", RenderComponent);

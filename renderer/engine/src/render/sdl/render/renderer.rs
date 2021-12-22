@@ -1,9 +1,13 @@
 use std::f32::consts::PI;
 
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use resources::Shaders;
-use simulation::{PhysicalComponent, RenderComponent, Renderer, TransformComponent};
+use simulation::{
+    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
+    UiElementComponent,
+};
+
 use unit::world::WorldPoint;
 
 use crate::render::debug::DebugShape;
@@ -16,7 +20,7 @@ use crate::render::sdl::render::terrain::TerrainRenderer;
 
 pub struct GlRenderer {
     /// Populated between init() and deinit()
-    frame_ctx: Option<GlfFrameContext>,
+    frame_ctx: Option<GlFrameContext>,
     terrain_renderer: TerrainRenderer,
     entity_renderer: EntityRenderer,
 
@@ -24,7 +28,7 @@ pub struct GlRenderer {
     debug_pipeline: Pipeline,
 }
 
-pub struct GlfFrameContext {
+pub struct GlFrameContext {
     pub projection: Matrix4,
     pub view: Matrix4,
 
@@ -92,8 +96,22 @@ macro_rules! frame_ctx {
     };
 }
 
+impl GlFrameContext {
+    fn normalize_entity_z(&self, pos: &mut WorldPoint) {
+        pos.modify_z(|mut z| {
+            // tweak z position to keep normalized around 0
+            z -= self.z_offset;
+
+            // ...plus a tiny amount to always render above the terrain, not in it
+            z += 0.001;
+
+            z
+        });
+    }
+}
+
 impl Renderer for GlRenderer {
-    type FrameContext = GlfFrameContext;
+    type FrameContext = GlFrameContext;
     type Error = GlError;
 
     fn init(&mut self, target: Self::FrameContext) {
@@ -104,7 +122,7 @@ impl Renderer for GlRenderer {
 
     fn sim_entity(
         &mut self,
-        transform: &TransformComponent,
+        transform: &TransformRenderDescription,
         render: &RenderComponent,
         physical: &PhysicalComponent,
     ) {
@@ -112,32 +130,52 @@ impl Renderer for GlRenderer {
         let mut position = transform.position;
 
         // TODO render head at head height, not the ground
+        ctx.normalize_entity_z(&mut position);
 
-        position.modify_z(|mut z| {
-            // tweak z position to keep normalized around 0
-            z -= ctx.z_offset;
-
-            // ...plus a tiny amount to always render above the terrain, not in it
-            z += 0.001;
-
-            z
-        });
-
-        self.entity_renderer.add_entity((
+        self.entity_renderer.add_entity(
             position,
             render.shape,
             render.color,
             physical.size.into(),
-        ));
+            transform.rotation,
+        );
     }
 
-    fn sim_selected(&mut self, transform: &TransformComponent, physical: &PhysicalComponent) {
+    fn sim_selected(
+        &mut self,
+        transform: &TransformRenderDescription,
+        physical: &PhysicalComponent,
+    ) {
         // simple underline
         const PAD: f32 = 0.2;
         let radius = (physical.max_dimension().metres() / 2.0) + PAD;
         let from = transform.position + -Vector2::new(radius, radius);
         let to = from + Vector2::new(radius * 2.0, 0.0);
-        self.debug_add_line(from, to, ColorRgb::new(250, 250, 250));
+        self.debug_add_line(from, to, Color::rgb(250, 250, 250));
+    }
+
+    fn sim_ui_element(
+        &mut self,
+        transform: &TransformRenderDescription,
+        ui: &UiElementComponent,
+        selected: bool,
+    ) {
+        let color = if selected {
+            Color::rgba(200, 200, 208, 150)
+        } else {
+            Color::rgba(170, 170, 185, 150)
+        };
+
+        let mut pos = transform.position;
+        frame_ctx!(self).normalize_entity_z(&mut pos);
+
+        self.entity_renderer.add_entity(
+            pos,
+            Shape2d::Rect,
+            color,
+            ui.size,
+            Basis2::from_angle(rad(0.0)),
+        );
     }
 
     fn sim_finish(&mut self) -> GlResult<()> {
@@ -147,7 +185,7 @@ impl Renderer for GlRenderer {
 
     fn debug_start(&mut self) {}
 
-    fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: ColorRgb) {
+    fn debug_add_line(&mut self, mut from: WorldPoint, mut to: WorldPoint, color: Color) {
         // keep z normalized around 0
         let ctx = frame_ctx!(self);
         from.modify_z(|z| z - ctx.z_offset);
@@ -159,7 +197,7 @@ impl Renderer for GlRenderer {
         });
     }
 
-    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: ColorRgb) {
+    fn debug_add_quad(&mut self, points: [WorldPoint; 4], color: Color) {
         // TODO add proper support for quads and other debug shapes
         self.debug_add_line(points[0], points[1], color);
         self.debug_add_line(points[1], points[2], color);
@@ -167,7 +205,7 @@ impl Renderer for GlRenderer {
         self.debug_add_line(points[3], points[0], color);
     }
 
-    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: ColorRgb) {
+    fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: Color) {
         const SEGMENTS: usize = 30;
 
         (0..SEGMENTS)

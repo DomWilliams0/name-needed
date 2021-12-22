@@ -2,8 +2,11 @@ use std::convert::TryInto;
 
 use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::{HaulTarget, LoggedEntityDecision, LoggedEntityEvent};
+use crate::activity::{
+    HaulPurpose, HaulSource, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
+};
 use crate::ecs::Entity;
+use crate::job::{BuildDetails, SocietyJobHandle};
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -27,11 +30,17 @@ pub enum AiAction {
     /// Go break the given block
     GoBreakBlock(WorldPosition),
 
+    /// Go work on the given build job, assuming its requirements are already present
+    GoBuild {
+        job: SocietyJobHandle,
+        details: BuildDetails,
+    },
+
     /// Follow the entity, keeping to the given distance
     Follow { target: Entity, radius: u8 },
 
     /// Haul the entity from the source to the destination target
-    Haul(Entity, HaulTarget, HaulTarget),
+    Haul(Entity, HaulSource, HaulTarget, HaulPurpose),
 }
 
 impl Default for AiAction {
@@ -44,21 +53,23 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
     type Error = ();
 
     fn try_into(self) -> Result<LoggedEntityEvent, Self::Error> {
-        use LoggedEntityDecision::*;
+        use AiAction as A;
+        use LoggedEntityDecision as B;
         use LoggedEntityEvent::*;
 
         Ok(AiDecision(match self {
-            AiAction::Nop => return Err(()),
-            AiAction::Wander => Wander,
-            AiAction::Goto(target) => Goto(*target),
-            AiAction::GoEquip(item) => GoEquip(*item),
-            AiAction::EatHeldItem(item) => EatHeldItem(*item),
-            AiAction::GoBreakBlock(pos) => GoBreakBlock(*pos),
-            AiAction::Follow { target, .. } => Follow(*target),
-            AiAction::Haul(e, _, tgt) => Haul {
+            A::Nop => return Err(()),
+            A::Wander => B::Wander,
+            A::Goto(target) => B::Goto(*target),
+            A::GoEquip(item) => B::GoEquip(*item),
+            A::EatHeldItem(item) => B::EatHeldItem(*item),
+            A::GoBreakBlock(pos) => B::GoBreakBlock(*pos),
+            A::Follow { target, .. } => B::Follow(*target),
+            A::Haul(e, _, tgt, _) => B::Haul {
                 item: *e,
                 dest: *tgt,
             },
+            A::GoBuild { details, .. } => B::GoBuild(details.clone()),
         }))
     }
 }

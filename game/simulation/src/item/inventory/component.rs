@@ -18,6 +18,7 @@ use crate::item::{ItemFilter, ItemFilterable};
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
 #[name("inventory")]
+#[clone(disallow)]
 pub struct InventoryComponent {
     equip_slots: Vec<EquipSlot>,
 
@@ -27,8 +28,9 @@ pub struct InventoryComponent {
 
 /// Inventory of a container
 #[derive(Component, EcsComponent)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 #[name("container")]
+#[clone(disallow)]
 pub struct ContainerComponent {
     pub container: Container,
 
@@ -51,7 +53,13 @@ pub struct ContainerComponentTemplate {
     size: Length3,
 }
 
+/// Mutable reference to contiguous empty slots in an inventory. Lifetime ensures inventory cannot
+/// be modified while this is held
 pub struct EquipSlots<'a>(&'a mut [EquipSlot]);
+
+/// [EquipSlots] but no lifetime connected to any particular inventory. Caller must ensure the
+/// inventory is not modified before this is applied
+pub struct EquipSlotsUnbound(Range<usize>);
 
 /// Slot reference with lifetime to enforce no modification while this is held.
 #[derive(Clone, Copy)]
@@ -100,6 +108,12 @@ impl InventoryComponent {
 
             EquipSlots(slots)
         })
+    }
+
+    /// Get `extra_hands` consecutive slots
+    pub fn get_hauling_slots_unbound(&mut self, extra_hands: u16) -> Option<EquipSlotsUnbound> {
+        self.find_hauling_slot_range(extra_hands)
+            .map(EquipSlotsUnbound)
     }
 
     pub fn has_hauling_slots(&self, extra_hands: u16) -> bool {
@@ -200,10 +214,13 @@ impl InventoryComponent {
     }
 
     pub fn has_equipped(&self, item: Entity) -> bool {
+        self.search_equipped(ItemFilter::SpecificEntity(item), Option::<&EcsWorld>::None)
+    }
+
+    pub fn search_equipped(&self, filter: ItemFilter, world: Option<&impl ComponentWorld>) -> bool {
         self.equip_slots.iter().any(|slot| match slot {
-            EquipSlot::Empty => false,
-            EquipSlot::Occupied(e) => e.entity == item,
-            EquipSlot::Overflow(e) => *e == item,
+            EquipSlot::Occupied(e) => (e.entity, world).matches(filter),
+            _ => false,
         })
     }
 
@@ -362,7 +379,7 @@ impl InventoryComponent {
         Some(FoundSlotMut(self, slot))
     }
 
-    fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
+    pub fn all_equipped_items(&self) -> impl Iterator<Item = Entity> + '_ {
         self.equip_slots.iter().filter_map(|e| e.ok())
     }
 }
@@ -463,6 +480,16 @@ impl<'a> EquipSlots<'a> {
             debug_assert!(e.is_empty());
             *e = EquipSlot::Overflow(entity)
         });
+    }
+}
+
+impl EquipSlotsUnbound {
+    /// Checks slots are valid and empty
+    pub fn upgrade(self, inv: &mut InventoryComponent) -> Option<EquipSlots> {
+        inv.equip_slots
+            .get_mut(self.0)
+            .filter(|slots| slots.iter().all(|s| s.is_empty()))
+            .map(EquipSlots)
     }
 }
 
@@ -605,19 +632,19 @@ mod validation {
                 "item {} in container {} has a mismatching contained-in: {}",
                 e, container_entity, contained,
             );
-
-            let real_capacity: Volume = container
-                .contents()
-                .fold(Volume::new(0), |acc, e| acc + e.volume);
-
-            assert_eq!(
-                real_capacity,
-                container.current_capacity(),
-                "container reports a capacity of {} when it actually is {}",
-                container.current_capacity(),
-                real_capacity
-            );
         }
+
+        let real_capacity: Volume = container
+            .contents()
+            .fold(Volume::new(0), |acc, e| acc + e.volume);
+
+        assert_eq!(
+            real_capacity,
+            container.current_capacity(),
+            "container reports a capacity of {} when it actually is {}",
+            container.current_capacity(),
+            real_capacity
+        );
     }
 }
 
@@ -647,6 +674,8 @@ impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(InventoryComponent::new(self.equip_slots))
     }
+
+    crate::as_any!();
 }
 
 // TODO this is the same as is used by PhysicalComponent
@@ -678,6 +707,8 @@ impl<V: Value> ComponentTemplate<V> for ContainerComponentTemplate {
             communal: None,
         })
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("inventory", InventoryComponentTemplate);

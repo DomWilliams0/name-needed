@@ -5,10 +5,6 @@ use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 pub struct ObeyDivineCommandDse(pub AiAction);
 
 impl Dse<AiContext> for ObeyDivineCommandDse {
-    fn name(&self) -> &'static str {
-        "Dev - obey divine command"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![AiBox::new(ConstantConsideration(1.0))]
     }

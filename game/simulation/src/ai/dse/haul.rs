@@ -1,13 +1,16 @@
-use crate::activity::HaulTarget;
-use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
+use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
+use crate::ai::consideration::{
+    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
+};
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
+use crate::item::ItemFilter;
 use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
 use unit::world::WorldPoint;
 
 pub struct HaulDse {
     pub thing: Entity,
-    pub src_tgt: (HaulTarget, HaulTarget),
+    pub src_tgt: (HaulSource, HaulTarget),
     pub extra_hands_needed: u16,
 
     /// Position of destination haul target
@@ -15,20 +18,17 @@ pub struct HaulDse {
 }
 
 impl Dse<AiContext> for HaulDse {
-    fn name(&self) -> &'static str {
-        "Haul"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             AiBox::new(HasExtraHandsForHaulingConsideration(
                 self.extra_hands_needed,
-                self.thing,
+                Some(ItemFilter::SpecificEntity(self.thing)),
             )),
             AiBox::new(MyProximityToConsideration {
-                target: self.destination.floor(),
-                max_distance: 5000.0, // squared
+                target: self.destination,
+                proximity: Proximity::Walkable,
             }),
+            // TODO consider distance to source too
         ]
     }
 
@@ -38,6 +38,6 @@ impl Dse<AiContext> for HaulDse {
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
         let (src, tgt) = self.src_tgt;
-        AiAction::Haul(self.thing, src, tgt)
+        AiAction::Haul(self.thing, src, tgt, HaulPurpose::JustBecause)
     }
 }

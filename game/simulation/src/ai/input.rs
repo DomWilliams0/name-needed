@@ -1,9 +1,10 @@
-use crate::{ConditionComponent, WorldRef};
+use crate::{ConditionComponent, ContainedInComponent, SocietyHandle, WorldRef};
 use ai::Context;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
+use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::item::{FoundSlot, HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
 use crate::spatial::{Spatial, Transforms};
@@ -18,8 +19,9 @@ pub enum AiInput {
     /// Switch, 1=has at least 1 matching filter, 0=none
     HasInInventory(ItemFilter),
 
-    /// Has n extra hands available for hauling the given entity. 1 if already hauling
-    HasExtraHandsForHauling(u16, Entity),
+    /// Has n extra hands available for hauling the given entity. 1 if already hauling one matching
+    /// the filter
+    HasExtraHandsForHauling(u16, Option<ItemFilter>),
 
     /// Switch, 0=item is unusable e.g. being hauled, 1=usable immediately
     CanUseHeldItem(ItemFilter),
@@ -34,8 +36,8 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
-    /// Distance squared to given pos. Can't be WorldPoint because needs to be Hash
-    MyDistance2To(WorldPosition),
+    /// Distance squared to given pos
+    MyDistance2To(WorldPoint),
 
     BlockTypeMatches(WorldPosition, BlockTypeMatch),
 }
@@ -66,12 +68,18 @@ impl ai::Input<AiContext> for AiInput {
                 filter,
                 max_radius,
                 max_count,
-            } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
-
-            AiInput::MyDistance2To(pos) => {
-                let target = pos.centred();
-                blackboard.position.distance2(target)
+            } => {
+                if let Some(inv) = blackboard.inventory {
+                    if search_inventory_with_cache(blackboard, inv, filter).is_some() {
+                        // found in inventory
+                        trace!("matching item found in inventory"; "filter" => ?filter);
+                        return 1.0;
+                    }
+                }
+                search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count)
             }
+
+            AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
             AiInput::BlockTypeMatches(pos, bt_match) => {
                 let world = blackboard.world.voxel_world();
                 let block_type = world
@@ -86,20 +94,17 @@ impl ai::Input<AiContext> for AiInput {
                 }
             }
             AiInput::HasExtraHandsForHauling(n, e) => {
-                if blackboard
-                    .world
-                    .component::<HauledItemComponent>(*e)
-                    .map(|comp| comp.hauler == blackboard.entity)
-                    .unwrap_or(false)
-                {
-                    // already being hauled by this entity
-                    return 1.0;
+                if let Some(filter) = e {
+                    if let Some(inventory) = blackboard.inventory {
+                        if inventory.search_equipped(*filter, Some(blackboard.world)) {
+                            // already being hauled by this entity
+                            return 1.0;
+                        }
+                    }
                 }
 
                 let can_haul = blackboard
-                    .world
-                    .component::<InventoryComponent>(blackboard.entity)
-                    .ok()
+                    .inventory
                     .map(|inv| inv.has_hauling_slots(*n))
                     .unwrap_or(false);
 
@@ -165,6 +170,7 @@ fn search_local_area_with_cache_graded(
         Entry::Vacant(v) => {
             let mut results = Vec::new();
             search_local_area(
+                blackboard.society,
                 blackboard.accessible_position,
                 blackboard.world,
                 blackboard.shared,
@@ -190,6 +196,7 @@ fn search_local_area_with_cache_graded(
                 // TODO old results are a subset of new results, should reuse
                 results_mut.clear();
                 search_local_area(
+                    blackboard.society,
                     blackboard.accessible_position,
                     blackboard.world,
                     blackboard.shared,
@@ -224,8 +231,8 @@ fn search_local_area_with_cache_graded(
     }
 }
 
-/// Searches for entities with a `ConditionComponent` only
 fn search_local_area(
+    my_society: Option<SocietyHandle>,
     self_position: WorldPosition,
     world: &EcsWorld,
     shared_bb: &mut SharedBlackboard,
@@ -233,8 +240,6 @@ fn search_local_area(
     max_radius: f32,
     output: &mut LocalAreaSearch,
 ) {
-    let conditions = world.read_storage::<ConditionComponent>();
-
     let voxel_world_ref = &*world.resource::<WorldRef>();
     let voxel_world = voxel_world_ref.borrow();
 
@@ -248,16 +253,33 @@ fn search_local_area(
         }
     };
 
+    let conditions = world.read_storage::<ConditionComponent>();
+    let reservations = world.read_storage::<ReservedMaterialComponent>();
+    let containeds = world.read_storage::<ContainedInComponent>();
+
     let spatial = world.resource::<Spatial>();
     let transforms = Transforms::from(world);
     let results = spatial
         .query_in_radius(transforms, self_position.centred(), max_radius)
         .filter_map(|(entity, pos, dist)| {
-            let condition = entity.get(&conditions)?;
-
             // check item filter matches
             if !(entity, Some(world)).matches(*filter) {
                 return None;
+            }
+
+            // ensure the item is not held by someone
+            if entity.has(&containeds) {
+                return None;
+            }
+
+            // check if this item is reserved by our society
+            if let Some(my_society) = my_society {
+                if let Some(reserved) = reservations.get(entity.into()) {
+                    if reserved.build_job.society() == my_society {
+                        // dont bother considering
+                        return None;
+                    }
+                }
             }
 
             // check this item is accessible
@@ -282,7 +304,12 @@ fn search_local_area(
                     .or_insert_with(|| voxel_world.area_path_exists(self_area, item_area));
             }
 
-            reachable.as_some((entity, pos, dist, condition.0.value()))
+            let condition = entity
+                .get(&conditions)
+                .map(|comp| comp.0.value())
+                .unwrap_or_else(NormalizedFloat::one);
+
+            reachable.as_some((entity, pos, dist, condition))
         });
 
     output.extend(results);

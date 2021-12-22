@@ -65,6 +65,8 @@ mod tests {
         fn instantiate<'b>(&self, _: EntityBuilder<'b>) -> EntityBuilder<'b> {
             unimplemented!()
         }
+
+        crate::as_any!();
     }
 
     crate::register_component_template!("TESTcomp", TestComponentTemplate);

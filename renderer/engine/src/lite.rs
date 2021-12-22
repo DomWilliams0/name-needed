@@ -5,7 +5,8 @@ use resources::Resources;
 use simulation::input::{UiCommand, UiCommands, UiRequest};
 use simulation::{
     Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,
-    RenderComponent, Renderer, Simulation, TransformComponent, WorldViewer,
+    RenderComponent, Renderer, Simulation, TransformRenderDescription, UiElementComponent,
+    WorldViewer,
 };
 use unit::world::WorldPosition;
 
@@ -31,13 +32,26 @@ impl Renderer for DummyRenderer {
 
     fn sim_entity(
         &mut self,
-        _transform: &TransformComponent,
+        _transform: &TransformRenderDescription,
         _render: &RenderComponent,
         _physical: &PhysicalComponent,
     ) {
     }
 
-    fn sim_selected(&mut self, _transform: &TransformComponent, _physical: &PhysicalComponent) {}
+    fn sim_selected(
+        &mut self,
+        _transform: &TransformRenderDescription,
+        _physical: &PhysicalComponent,
+    ) {
+    }
+
+    fn sim_ui_element(
+        &mut self,
+        _transform: &TransformRenderDescription,
+        _ui: &UiElementComponent,
+        _selected: bool,
+    ) {
+    }
 
     fn sim_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())

@@ -64,8 +64,9 @@ impl<T: Saturating + Copy> SubAssign<T> for Proportion<T> {
 pub struct NormalizedFloat(f32);
 
 impl NormalizedFloat {
+    /// Panics if not 0..=1
     pub fn new(f: f32) -> Self {
-        debug_assert!(
+        assert!(
             (0.0..=1.0).contains(&f),
             "{} out of range for normalized float",
             f

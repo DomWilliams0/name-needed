@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use color::ColorRgb;
+use color::Color;
 use common::*;
 use simulation::{BaseVertex, WorldViewer};
 use unit::space::view::ViewPoint;
@@ -13,6 +13,7 @@ use crate::render::sdl::gl::{
 use cgmath::Matrix;
 use resources::Shaders;
 
+#[allow(unused)]
 #[derive(Debug, Copy, Clone)]
 pub struct WorldVertex {
     pos: [f32; 3],
@@ -20,7 +21,7 @@ pub struct WorldVertex {
 }
 
 impl BaseVertex for WorldVertex {
-    fn new(pos: (f32, f32, f32), color: ColorRgb) -> Self {
+    fn new(pos: (f32, f32, f32), color: Color) -> Self {
         Self {
             pos: [pos.0, pos.1, pos.2],
             color: color.into(),

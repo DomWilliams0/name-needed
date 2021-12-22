@@ -18,10 +18,6 @@ const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
 const FOOD_MAX_RADIUS: u32 = 20;
 
 impl Dse<AiContext> for EatHeldFoodDse {
-    fn name(&self) -> &'static str {
-        "Use Held Item - Food"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             AiBox::new(HungerConsideration),
@@ -51,10 +47,6 @@ impl Dse<AiContext> for EatHeldFoodDse {
 }
 
 impl Dse<AiContext> for FindLocalFoodDse {
-    fn name(&self) -> &'static str {
-        "Find Local Item - Food"
-    }
-
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
         vec![
             AiBox::new(HungerConsideration),

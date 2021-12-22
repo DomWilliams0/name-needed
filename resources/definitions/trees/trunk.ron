@@ -1,0 +1,18 @@
+[
+  (
+    uid: "core_tree_trunk",
+    components: [
+      {"name": (name: "Tree trunk")},
+      {"render": (
+        color: "8B7923",
+        shape: "Rect",
+      )},
+      {"breakable": ()},
+      {"physical": (
+        // TODO tree trunk size depends on the tree it came from
+        size: [60, 8, 8],
+        volume: 10_000,
+      )},
+    ],
+  ),
+]

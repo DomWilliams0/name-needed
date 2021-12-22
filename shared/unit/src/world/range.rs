@@ -267,7 +267,7 @@ impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::world::{WorldPointRange, WorldPositionRange};
+    use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
     use common::ApproxEq;
 
     #[test]
@@ -278,7 +278,10 @@ mod tests {
         let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (1, 1, 0));
         assert_eq!(range.count(), 2 * 2);
 
-        let range = WorldPointRange::with_inclusive_range((0.0, 0.0, 0.0), (0.5, 1.2, 0.0));
+        let range = WorldPointRange::with_inclusive_range(
+            WorldPoint::new_unchecked(0.0, 0.0, 0.0),
+            WorldPoint::new_unchecked(0.5, 1.2, 0.0),
+        );
         let x = range.count();
         assert!(x.approx_eq(0.5 * 1.2, (0.00001, 2)));
     }

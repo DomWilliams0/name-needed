@@ -5,6 +5,7 @@ use std::ffi::OsStr;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use walkdir::WalkDir;
 
 /// Represents a directory
@@ -130,7 +131,7 @@ impl ReadResource for (File, Mmap, Rc<Path>) {
             let mapped = unsafe { Mmap::map(&f) };
             mapped.map(|m| (f, m, path.0.as_path().into())) // keep file alive
         })
-        .map_err(|e| ResourceError(path.0.to_path_buf(), ResourceErrorKind::Io(e)))
+        .map_err(|e| ResourceError(path.0.to_path_buf(), ResourceErrorKind::Io(Arc::new(e))))
     }
 }
 
@@ -138,7 +139,7 @@ impl ReadResource for String {
     fn read_resource(path: impl AsRef<ResourcePath>) -> Result<Self, ResourceError> {
         let path = path.as_ref();
         std::fs::read_to_string(&path.0)
-            .map_err(|e| ResourceError(path.0.to_path_buf(), ResourceErrorKind::Io(e)))
+            .map_err(|e| ResourceError(path.0.to_path_buf(), ResourceErrorKind::Io(Arc::new(e))))
     }
 }
 

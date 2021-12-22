@@ -31,8 +31,13 @@ pub struct TransformComponent {
     pub velocity: Vector2,
 }
 
+/// Lightweight copy for rendering
+pub struct TransformRenderDescription {
+    pub position: WorldPoint,
+    pub rotation: Basis2,
+}
+
 /// Physical attributes of an entity
-// TODO use newtype units for ingame non-SI units
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("physical")]
@@ -59,18 +64,18 @@ impl TransformComponent {
         self.last_position = new_position;
     }
 
-    pub const fn slice(&self) -> i32 {
+    pub fn slice(&self) -> i32 {
         // cant use position.slice() because not const
         self.position.z() as i32
     }
 
-    pub const fn x(&self) -> f32 {
+    pub fn x(&self) -> f32 {
         self.position.x()
     }
-    pub const fn y(&self) -> f32 {
+    pub fn y(&self) -> f32 {
         self.position.y()
     }
-    pub const fn z(&self) -> f32 {
+    pub fn z(&self) -> f32 {
         self.position.z()
     }
 
@@ -121,6 +126,15 @@ impl TransformComponent {
     }
 }
 
+impl From<&TransformComponent> for TransformRenderDescription {
+    fn from(t: &TransformComponent) -> Self {
+        Self {
+            position: t.position,
+            rotation: t.rotation,
+        }
+    }
+}
+
 impl PhysicalComponent {
     pub fn new(volume: Volume, size: Length3) -> Self {
         PhysicalComponent { volume, size }
@@ -166,6 +180,8 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
             .with(PhysicsComponent::default())
             .with(PhysicalComponent::new(self.volume, self.size))
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("physical", PhysicalComponentTemplate);

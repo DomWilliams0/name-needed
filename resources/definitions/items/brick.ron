@@ -5,8 +5,12 @@
       {"name": (
         name: "Stone brick",
       )},
+      {"breakable": ()},
       {"haulable": (
         extra_hands: 1,
+      )},
+      {"stackable": (
+        max_count: 10,
       )},
       {"render": (
         color: "4c4c4c",

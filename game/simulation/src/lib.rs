@@ -5,11 +5,14 @@
 pub use world::{
     block::{BlockType, IntoEnumIterator},
     loader::{
-        AsyncWorkerPool, BlockForAllError, GeneratedTerrainSource, PlanetParams,
-        TerrainSourceError, TerrainUpdatesRes, WorldLoader, WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, TerrainSourceError, TerrainUpdatesRes, WorldLoader,
+        WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };
+
+#[cfg(feature = "procgen")]
+pub use world::loader::{GeneratedTerrainSource, PlanetParams};
 
 // Rexports for specialised world types
 pub type WorldRef = world::WorldRef<simulation::WorldContext>;
@@ -21,26 +24,29 @@ pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
 pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
-pub use crate::render::{RenderComponent, Renderer, Shape2d};
+pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
     Tick, WorldContext,
 };
-pub use crate::transform::{PhysicalComponent, TransformComponent};
+pub use crate::transform::{PhysicalComponent, TransformComponent, TransformRenderDescription};
 pub use activity::{
-    ActivityComponent, EntityLoggingComponent, HaulTarget, LoggedEntityDecision, LoggedEntityEvent,
+    ActivityComponent, EntityLoggingComponent, HaulPurpose, HaulSource, HaulTarget,
+    LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
 pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
-pub use event::{EntityEvent, EntityEventPayload};
+pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
+pub use build::{Build, BuildMaterial, StoneBrickWall};
 #[cfg(debug_assertions)]
 pub use item::validation::validate_all_inventories;
 pub use item::{
-    ConditionComponent, ContainedInComponent, Container, ContainerComponent, EdibleItemComponent,
-    InventoryComponent, ItemCondition, NameComponent,
+    ConditionComponent, ContainedInComponent, Container, ContainerComponent, ContainersError,
+    EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
+    ItemStackError, NameComponent, StackableComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
@@ -55,9 +61,32 @@ pub use unit::world::{
 
 pub const TICKS_PER_SECOND: usize = 20;
 
+#[macro_export]
+macro_rules! as_any {
+    () => {
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! as_any_impl {
+    () => {
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    };
+}
+
 mod activity;
 mod ai;
 mod backend;
+mod build;
 mod definitions;
 pub mod dev;
 mod ecs;

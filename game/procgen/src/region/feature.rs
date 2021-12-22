@@ -24,16 +24,19 @@ use std::hash::Hasher;
 use std::hint::unreachable_unchecked;
 use std::ops::Deref;
 
-/// Feature discovered during region initialization
-pub struct RegionalFeature<const SIZE: usize> {
+/// Feature discovered during region initialization.
+/// Generic param should be `dyn Feature`, but can't use defaults and const params at the same
+/// time :(
+pub struct RegionalFeatureRaw<F: ?Sized + Feature, const SIZE: usize> {
     /// NON ASYNC MUTEX, do not hold this across .awaits!!
     inner: parking_lot::RwLock<RegionalFeatureInner<SIZE>>,
 
-    // TODO make this struct a dst and store trait object inline without extra indirection
-    feature: Mutex<Box<dyn Feature>>,
-
     typeid: TypeId,
+    feature: Mutex<F>,
 }
+
+/// Typedef to get around needing to specify dummy generic parameter
+pub type RegionalFeature<const SIZE: usize> = RegionalFeatureRaw<dyn Feature, SIZE>;
 
 struct RegionalFeatureInner<const SIZE: usize> {
     /// 2d bounds around feature, only applies to slabs within this polygon
@@ -81,7 +84,7 @@ pub struct ApplyFeatureContext<'a> {
     pub subfeatures_tx: tokio::sync::mpsc::UnboundedSender<SharedSubfeature>,
 }
 
-impl<const SIZE: usize> RegionalFeature<SIZE> {
+impl<const SIZE: usize> RegionalFeatureRaw<dyn Feature, SIZE> {
     pub fn new<F: Feature + 'static>(
         bounding: RegionalFeatureBoundary,
         z_range: FeatureZRange,
@@ -96,15 +99,15 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
         let area = bounding.unsigned_area();
         let name = feature.name();
 
-        let arc = Arc::new(RegionalFeature {
+        let arc = Arc::new(RegionalFeatureRaw {
             inner: parking_lot::RwLock::new(RegionalFeatureInner {
                 bounding,
                 z_range,
                 regions: Vec::new(),
             }),
-            feature: Mutex::new(Box::new(feature)),
+            feature: Mutex::new(feature),
             typeid: TypeId::of::<F>(),
-        });
+        }) as Arc<RegionalFeature<SIZE>>;
 
         debug!("creating new regional feature"; "centroid" => ?centroid, "area" => ?area, "type" => name,
         "feature" => ?arc.ptr_debug(), "original range" => ?z_range, "extended range" => ?extended_z_range);
@@ -181,7 +184,7 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
             // TODO this only serves as an assert - revisit the need to merge non-rasterised features
             let mut other_feature = other.feature.lock().await;
             let mut this_feature = self.feature.lock().await;
-            merged = this_feature.merge_with(&mut **other_feature);
+            merged = this_feature.merge_with(&mut *other_feature);
         }
 
         if !merged {
@@ -237,8 +240,8 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
     }
 
     /// Unique opaque value per feature
-    pub fn unique_id(self: &Arc<Self>) -> u64 {
-        Arc::as_ptr(self) as u64
+    pub fn unique_id(self: &Arc<Self>) -> usize {
+        Arc::as_ptr(self) as *const () as usize
     }
 
     /// Assumes [applies_to] has already been checked for slab. Pretty expensive, and panics
@@ -301,7 +304,7 @@ impl<const SIZE: usize> RegionalFeature<SIZE> {
     }
 }
 
-impl<const SIZE: usize> Drop for RegionalFeature<SIZE> {
+impl<F: ?Sized + Feature, const SIZE: usize> Drop for RegionalFeatureRaw<F, SIZE> {
     fn drop(&mut self) {
         let ptr = self as *mut _;
         trace!("dropping feature {:?} @ {:?}", self, ptr);
@@ -367,7 +370,7 @@ fn slab_rando_seed(slab: SlabLocation, planet_seed: u64) -> u64 {
     hasher.finish()
 }
 
-impl<const SIZE: usize> Debug for RegionalFeature<SIZE> {
+impl<F: ?Sized + Feature, const SIZE: usize> Debug for RegionalFeatureRaw<F, SIZE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let inner = self.inner.try_read();
         let feature = self.feature.try_lock().ok();
@@ -388,7 +391,7 @@ impl<const SIZE: usize> Debug for RegionalFeature<SIZE> {
         match feature {
             Some(feature) => {
                 dbg.field("name", &feature.name());
-                dbg.field("feature", &*feature);
+                dbg.field("feature", &feature);
             }
             None => {
                 dbg.field("feature", &"<locked>");

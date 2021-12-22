@@ -15,6 +15,7 @@ const SENSE_DECAY: u8 = 40;
 #[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
 #[name("senses")]
+#[clone(disallow)]
 pub struct SensesComponent {
     pub vision: ArrayVec<VisionCone, 1>,
     pub hearing: ArrayVec<HearingSphere, 1>,
@@ -36,6 +37,7 @@ struct SensedEntity {
 #[derive(Component, EcsComponent, Debug, Clone)]
 #[name("magical-senses")]
 #[storage(DenseVecStorage)]
+#[clone(disallow)]
 pub struct MagicalSenseComponent {
     pub vision: VisionCone,
     // pub hearing: HearingSphere,
@@ -239,6 +241,8 @@ impl<V: Value> ComponentTemplate<V> for MagicalSenseComponent {
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
         builder.with(self.clone()).with(SensesComponent::default())
     }
+
+    crate::as_any!();
 }
 
 register_component_template!("senses", MagicalSenseComponent);

@@ -1,3 +1,4 @@
+pub use self::grid::*;
 pub use block_position::*;
 pub use chunk_location::*;
 pub use range::*;
@@ -24,6 +25,7 @@ pub const SLAB_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(32);
 
 mod block_position;
 mod chunk_location;
+mod grid;
 mod range;
 mod slab_index;
 mod slab_location;

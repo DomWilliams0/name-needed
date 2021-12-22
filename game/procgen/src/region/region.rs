@@ -12,7 +12,9 @@ pub use ::unit::world::{
 };
 use common::*;
 use grid::{grid_declare, GridImpl};
-use unit::world::{BlockPosition, SlabLocation, SlabPosition};
+use unit::world::{
+    BlockPosition, SlabLocation, SlabPosition, SlabPositionAsCoord, SliceBlockAsCoord,
+};
 
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
@@ -27,9 +29,7 @@ use crate::region::row_scanning::RegionNeighbour;
 use crate::region::subfeature::SlabContinuation;
 use crate::region::unit::PlanetPoint;
 use crate::region::RegionalFeature;
-use crate::{
-    map_range, region::unit::RegionLocation, SlabGrid, SlabPositionAsCoord, SliceBlockAsCoord,
-};
+use crate::{map_range, region::unit::RegionLocation, SlabGrid};
 
 /// Each pixel in the continent map is a region. Each region is a 2d grid of chunks.
 ///

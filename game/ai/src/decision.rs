@@ -1,7 +1,7 @@
 use common::*;
 
 use crate::consideration::InputCache;
-use crate::{AiBox, Consideration, Context};
+use crate::{pretty_type_name, AiBox, Consideration, Context};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DecisionWeightType {
@@ -24,11 +24,15 @@ pub enum DecisionWeight {
 }
 
 pub trait Dse<C: Context> {
-    fn name(&self) -> &'static str;
     /// TODO pooled vec/slice rather than Vec each time
     fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;
     fn weight_type(&self) -> DecisionWeightType;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
+
+    fn name(&self) -> &'static str {
+        let name = pretty_type_name(std::any::type_name::<Self>());
+        name.strip_suffix("Dse").unwrap_or(name)
+    }
 
     fn weight(&self) -> DecisionWeight {
         DecisionWeight::Plain(self.weight_type())

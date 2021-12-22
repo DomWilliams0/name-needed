@@ -1,38 +1,40 @@
+use crate::activity::{HaulSource, HaulTarget};
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
-use crate::job::SocietyTaskResult;
+use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
 
-use crate::activity::HaulTarget;
+use crate::job::job::CompletedTasks;
+use crate::job::task::HaulSocietyTask;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
 use common::*;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 /// Haul a thing to a position
 // TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container
 #[derive(Debug)]
 pub struct HaulJob {
     entity: Entity,
-    source: HaulTarget,
+    source: HaulSource,
     target: HaulTarget,
 }
 
 impl HaulJob {
     pub fn with_target_position(
         thing: Entity,
-        target: WorldPosition,
+        target: WorldPoint,
         world: &impl ComponentWorld,
     ) -> Option<Self> {
-        let source = HaulTarget::with_entity(thing, world)?;
+        let source = HaulSource::with_entity(thing, world)?;
 
         let world = world.voxel_world();
         let world = world.borrow();
 
         // ensure target is accessible
-        let _accessible = world.area(target).ok()?;
+        let _accessible = world.area(target.floor()).ok()?;
 
-        let target = HaulTarget::Position(target);
+        let target = HaulTarget::Drop(target);
         Some(HaulJob {
             entity: thing,
             source,
@@ -45,7 +47,7 @@ impl HaulJob {
         container: Entity,
         world: &impl ComponentWorld,
     ) -> Option<Self> {
-        let source = HaulTarget::with_entity(thing, world)?;
+        let source = HaulSource::with_entity(thing, world)?;
 
         let target = HaulTarget::Container(container);
         Some(HaulJob {
@@ -57,31 +59,37 @@ impl HaulJob {
 }
 
 impl SocietyJobImpl for HaulJob {
-    fn populate_initial_tasks(&self, _: &EcsWorld, out: &mut Vec<SocietyTask>) {
-        out.push(SocietyTask::Haul(self.entity, self.source, self.target));
+    fn populate_initial_tasks(
+        &mut self,
+        _: &EcsWorld,
+        out: &mut Vec<SocietyTask>,
+        _: SocietyJobHandle,
+    ) {
+        out.push(SocietyTask::haul(self.entity, self.source, self.target));
     }
 
     fn refresh_tasks(
         &mut self,
         world: &EcsWorld,
         tasks: &mut Vec<SocietyTask>,
-        mut completions: std::vec::Drain<(SocietyTask, SocietyTaskResult)>,
+        completions: CompletedTasks,
     ) -> Option<SocietyTaskResult> {
         debug_assert!(tasks.len() <= 1);
 
-        // apply completion
-        if let Some((task, result)) = completions.next() {
-            debug!("haul task completed"; "task" => ?task, "result" => ?result);
-            debug_assert_eq!(tasks.get(0).cloned(), Some(task), "unexpected completion");
+        assert!(
+            completions.len() <= 1,
+            "single completion expected but got {}",
+            completions.len()
+        );
 
-            // ensure no more
-            assert!(
-                completions.next().is_none(),
-                "single completion expected for non-shareable haul"
-            );
+        // apply completion
+        if let Some((task, result)) = completions.get_mut(0) {
+            debug!("haul task completed"; "task" => ?task, "result" => ?result);
+            debug_assert_eq!(tasks.get(0), Some(&*task), "unexpected completion");
 
             // end job regardless of success or failure
             // TODO depends on error type?
+            let result = std::mem::replace(result, SocietyTaskResult::Success);
             return Some(result);
         }
 
@@ -92,7 +100,7 @@ impl SocietyJobImpl for HaulJob {
             trace!("item is being hauled");
         } else {
             match self.target {
-                HaulTarget::Position(target_pos) => {
+                HaulTarget::Drop(target_pos) => {
                     let current_pos = match world.component::<TransformComponent>(self.entity) {
                         Ok(t) => t.position,
                         Err(err) => {
@@ -101,7 +109,7 @@ impl SocietyJobImpl for HaulJob {
                         }
                     };
 
-                    if WorldPoint::from(target_pos).is_almost(&current_pos, 2.0) {
+                    if target_pos.is_almost(&current_pos, 2.0) {
                         trace!("hauled item arrived at target");
                         return Some(SocietyTaskResult::Success);
                     }
@@ -133,6 +141,8 @@ impl SocietyJobImpl for HaulJob {
         // keep single haul task
         None
     }
+
+    crate::as_any_impl!();
 }
 
 fn ensure_item_fits_in_container(
@@ -156,7 +166,11 @@ impl Display for HaulJob {
         write!(
             f,
             "{}",
-            SocietyTask::Haul(self.entity, self.source, self.target)
+            HaulSocietyTask {
+                item: self.entity,
+                src: self.source,
+                dst: self.target,
+            },
         )
     }
 }

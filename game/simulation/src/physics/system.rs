@@ -11,7 +11,7 @@ const FALL_SLOWDOWN: f32 = 0.5;
 
 pub struct PhysicsSystem;
 
-#[derive(Debug, Component, EcsComponent)]
+#[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
 #[name("physics")]
 pub struct PhysicsComponent {

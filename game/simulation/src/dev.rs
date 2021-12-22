@@ -2,13 +2,13 @@
 //! API for testing
 
 use common::*;
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
 
-use crate::activity::HaulTarget;
+use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::{AiAction, AiComponent};
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{ContainedInComponent, ContainerComponent};
-use crate::job::SocietyJob;
+
 use crate::queued_update::QueuedUpdates;
 use crate::simulation::AssociatedBlockData;
 use crate::society::job::HaulJob;
@@ -143,7 +143,7 @@ impl EcsExtDev<'_> {
         hauler: Entity,
         haulee: Entity,
         container_pos: WorldPosition,
-        haul_to: WorldPosition,
+        haul_to: WorldPoint,
     ) {
         self.resource::<QueuedUpdates>()
             .queue("force haul from container", move |world| {
@@ -156,8 +156,8 @@ impl EcsExtDev<'_> {
                         .component_mut::<AiComponent>(hauler)
                         .expect("no activity");
 
-                    let from = HaulTarget::Container(*container);
-                    let to = HaulTarget::Position(haul_to);
+                    let from = HaulSource::Container(*container);
+                    let to = HaulTarget::Drop(haul_to);
 
                     info!(
                         "forcing {hauler} to haul {haulee}",
@@ -167,7 +167,12 @@ impl EcsExtDev<'_> {
                         "target" => %to,
                     );
 
-                    ai.add_divine_command(AiAction::Haul(haulee, from, to));
+                    ai.add_divine_command(AiAction::Haul(
+                        haulee,
+                        from,
+                        to,
+                        HaulPurpose::JustBecause,
+                    ));
 
                     // teehee add the haulee to the container too
                     let phys = world
@@ -198,19 +203,20 @@ impl EcsExtDev<'_> {
         container_pos: WorldPosition,
         mut f: impl FnMut(Pin<&mut EcsWorld>, Entity) + 'static,
     ) {
-        self.resource::<QueuedUpdates>().queue(wat, move |world| {
-            let w = world.voxel_world();
-            let w = w.borrow();
-            if let Some(AssociatedBlockData::Container(container)) =
-                w.associated_block_data(container_pos)
-            {
-                f(world, *container);
-            } else {
-                panic!("no container");
-            }
+        self.resource::<QueuedUpdates>()
+            .queue(wat, move |mut world| {
+                let w = world.voxel_world();
+                let w = w.borrow();
+                if let Some(AssociatedBlockData::Container(container)) =
+                    w.associated_block_data(container_pos)
+                {
+                    f(world.as_mut(), *container);
+                } else {
+                    panic!("no container");
+                }
 
-            Ok(())
-        });
+                Ok(())
+            });
     }
 
     pub fn haul_to_container_via_divine(
@@ -223,7 +229,7 @@ impl EcsExtDev<'_> {
             "force haul to container",
             container_pos,
             move |world, container| {
-                let food_pos = world
+                let _food_pos = world
                     .component::<TransformComponent>(haulee)
                     .unwrap()
                     .accessible_position();
@@ -232,7 +238,7 @@ impl EcsExtDev<'_> {
                     .component_mut::<AiComponent>(hauler)
                     .expect("no activity");
 
-                let from = HaulTarget::Position(food_pos);
+                let from = HaulSource::PickUp;
                 let to = HaulTarget::Container(container);
 
                 info!(
@@ -243,7 +249,7 @@ impl EcsExtDev<'_> {
                     "target" => %to,
                 );
 
-                ai.add_divine_command(AiAction::Haul(haulee, from, to));
+                ai.add_divine_command(AiAction::Haul(haulee, from, to, HaulPurpose::JustBecause));
             },
         );
     }
@@ -266,7 +272,7 @@ impl EcsExtDev<'_> {
                     .society_by_handle_mut(society)
                     .expect("bad society")
                     .jobs_mut()
-                    .submit(SocietyJob::create(&*world, job));
+                    .submit(&world, job);
 
                 info!(
                     "adding society job to haul item to container";

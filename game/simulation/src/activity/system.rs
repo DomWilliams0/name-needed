@@ -16,10 +16,10 @@ use crate::{Societies, SocietyComponent};
 use std::mem::transmute;
 use std::rc::Rc;
 
-// TODO rename
 #[derive(Component, EcsComponent, Default)]
 #[storage(DenseVecStorage)]
 #[name("activity")]
+#[clone(disallow)]
 pub struct ActivityComponent {
     current_society_task: Option<(SocietyJobRef, SocietyTask)>,
     /// Set by AI to trigger a new activity
@@ -42,10 +42,10 @@ impl<'a> System<'a> for ActivitySystem<'a> {
         Read<'a, EntitiesRes>,
         Read<'a, Runtime>,
         Write<'a, EntityEventQueue>,
-        Write<'a, Societies>,
+        Read<'a, Societies>,
         WriteStorage<'a, ActivityComponent>,
         WriteStorage<'a, AiComponent>,
-        WriteStorage<'a, SocietyComponent>,
+        ReadStorage<'a, SocietyComponent>,
     );
 
     fn run(
@@ -54,7 +54,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
             entities,
             runtime,
             mut event_queue,
-            mut societies_res,
+            societies_res,
             mut activities,
             mut ais,
             societies,
@@ -119,11 +119,10 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     new_activity = Some(Rc::new(NopActivity::default()));
 
                     // interrupt ai and unreserve society task
-                    ai.interrupt_current_action(e, None, || {
-                        e.get(&societies)
-                            .and_then(|soc| societies_res.society_by_handle_mut(soc.handle))
-                            .expect("should have society")
-                    });
+                    let society = e
+                        .get(&societies)
+                        .and_then(|soc| societies_res.society_by_handle(soc.handle));
+                    ai.interrupt_current_action(e, None, society);
 
                     // next tick ai should return a new decision rather than unchanged to avoid
                     // infinite Nop loops
@@ -132,7 +131,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     // notify society job of completion
                     if let Some((job, task)) = activity.current_society_task.take() {
                         if let Some(TaskResult::Finished(finish)) = result {
-                            job.write().notify_completion(task, finish.into());
+                            job.borrow_mut().notify_completion(task, finish.into());
                         }
                     }
                 }
@@ -165,6 +164,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     match result.as_ref() {
                         Ok(_) => {
                             debug!("activity finished"; e, "activity" => ?new_activity);
+                            // TODO need to notify society here, as above?
                         }
                         Err(err) => {
                             debug!("activity failed"; e, "activity" => ?new_activity, "err" => %err);

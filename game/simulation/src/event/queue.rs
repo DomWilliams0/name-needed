@@ -65,6 +65,14 @@ impl EntityEventQueue {
         self.events.push(event);
     }
 
+    pub fn post_multiple(&mut self, events: impl Iterator<Item = EntityEvent>) {
+        let len_before = self.events.len();
+        self.events.extend(events);
+
+        let n = self.events.len() - len_before;
+        debug!("posting {} events", n; "events" => ?&self.events[len_before..]);
+    }
+
     pub fn unsubscribe_all(&mut self, subscriber: Entity) {
         let mut removals = 0;
         self.subscriptions

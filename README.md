@@ -12,6 +12,11 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 22 Dec 2021: <em>Material gathering for simple build jobs, with homogenous item stacking. The build job (translucent square) requires 6 stone bricks, which are brought over in a stack of 5, then 1. The blue circle then uses these gathered materials to build a stone wall.</em>
+<p style="margin: auto">
+    <img src=".screenshots/simple-material-gathering.gif" width="500"/>
+</p>
+
 * 08 Oct 2021: <em>Major overhaul of activities (go pick this up, go break this block, etc) to use a custom async runtime for long running tasks, rather than manually implementing state machines. Activities are now much easier to write and maintain.</em>
 
 * 16 May 2021: <em>Simple Lua scripting API.</em>

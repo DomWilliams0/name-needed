@@ -2,8 +2,8 @@ use crate::render::sdl::gl::{
     generate_circle_mesh, generate_quad_mesh, AttribType, BufferUsage, Divisor, GlResult,
     InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
 };
-use crate::render::sdl::render::renderer::GlfFrameContext;
-use color::ColorRgb;
+use crate::render::sdl::render::renderer::GlFrameContext;
+use color::Color;
 use common::*;
 use resources::Shaders;
 use simulation::Shape2d;
@@ -14,7 +14,7 @@ use unit::world::WorldPoint;
 pub(crate) struct EntityRenderer {
     pipeline: InstancedPipeline,
     indices_vbo: Vbo,
-    entities: Vec<(WorldPoint, Shape2d, ColorRgb, Length2)>,
+    entities: Vec<(WorldPoint, Shape2d, Color, Length2, Basis2)>,
 }
 
 #[repr(C)]
@@ -114,14 +114,21 @@ impl EntityRenderer {
         })
     }
 
-    pub fn add_entity(&mut self, entity: (WorldPoint, Shape2d, ColorRgb, Length2)) {
-        self.entities.push(entity);
+    pub fn add_entity(
+        &mut self,
+        pos: WorldPoint,
+        shape: Shape2d,
+        color: Color,
+        size: Length2,
+        rot: Basis2,
+    ) {
+        self.entities.push((pos, shape, color, size, rot));
     }
 
-    pub fn render_entities(&mut self, frame_ctx: &GlfFrameContext) -> GlResult<()> {
+    pub fn render_entities(&mut self, frame_ctx: &GlFrameContext) -> GlResult<()> {
         // sort by shape
         self.entities
-            .sort_unstable_by_key(|(_, shape, _, _)| shape.ord());
+            .sort_unstable_by_key(|(_, shape, _, _, _)| shape.ord());
 
         let p = self.pipeline.program.scoped_bind();
         let _vao = self.pipeline.vao.scoped_bind();
@@ -138,7 +145,7 @@ impl EntityRenderer {
         if let Some(mut mapped) = vbo.map_write_only::<EntityInstance>()? {
             // TODO cursor interface in ScopedMap
 
-            for (i, (pos, _, color, size)) in self.entities.iter().enumerate() {
+            for (i, (pos, _, color, size, rot)) in self.entities.iter().enumerate() {
                 let pos = ViewPoint::from(*pos);
                 mapped[i].color = (*color).into();
 
@@ -147,8 +154,10 @@ impl EntityRenderer {
                     let scale = |len: Length| len.metres() / 2.0;
                     Matrix4::from_nonuniform_scale(scale(x), scale(y), 1.0)
                 };
+                let rot = Matrix4::from(*rot.as_ref());
+                let pos = Matrix4::from_translation(pos.into());
 
-                let model = Matrix4::from_translation(pos.into()) * scale;
+                let model = pos * rot * scale; // order is important
                 mapped[i].model = model.into();
             }
         }
@@ -165,7 +174,7 @@ impl EntityRenderer {
         for (i, grouped) in self
             .entities
             .iter()
-            .group_by(|(_, shape, _, _)| shape.ord())
+            .group_by(|(_, shape, _, _, _)| shape.ord())
             .into_iter()
         {
             let (primitive, start_ptr, element_count) = render_data[i];

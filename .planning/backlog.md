@@ -54,26 +54,69 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * inventory window (separate from debug window) to show items in person's inventory/container in a nice way
 * common widget for an entity's identifier, e.g. show clickable name, mouse over for EX:Y id and useful state, click to select
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
+	* retain entity logs after death for a time
 * reflection-like api on components to do actions per-component in ui
+* in-world text rendering
+	* show entity names, item stack sizes, build job info...
 
 ## Entity behaviour
+* ai incentive to choose the same action as last tick
+* (sub)activities take an amount of ticks to complete
+* be able to block subactivities for a number of ticks, show progress bar up until end tick - work items?
+* food/drink vessels and wastage
+* define ai in definitions with a collection of "features"/tags/capabilities rather than raw DSEs/behaviours
+* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
+* if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
+* revamp hauling to add different methods
+	* carrying (add a new TransformChild component)
+	* dragging/pushing
+* add check for space anywhere in inventory before deciding to go pick something up, instead of going there and failing immediately
+
+### Society-oriented behaviours
 * more society level jobs
 	* place blocks, destroying what's currently there (DAG for dependencies)
 	* place walls (hollow rectangle)
 		* specify wall thickness and height
-* ai incentive to choose the same action as last tick
 * ai filtering at the job level on high-level requirements before considering all its subtasks
-* (sub)activities take an amount of ticks to complete
-* be able to block subactivities for a number of ticks, show progress bar up until end tick
-* food/drink vessels and wastage
-* consider defining AI in definitions with a collection of "features" rather than raw DSEs/behaviours
-* if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
-* if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
 * preserve info about completed society jobs/tasks to show in the ui
-* revamp hauling to add different methods
-	* carrying (add a new TransformChild component)
-	* dragging/pushing
-* [ ] add check for space anywhere in inventory before deciding to go pick something up, instead of going there and failing immediately
+* etiquette/morality "meters" that vary based on personality and mood. if low, they take things reserved for work items, take other's food, consider items stored inside other people's personal containers
+* specify a limit on job reservations per task, e.g. 2 maximum on sawing a tree trunk
+* expand concept of "society" to just be a gathering/group of related entities that emits jobs, e.g. family, guild, village
+	* allow multiple societies, e.g. someone has their family and village, a wild animal has its family/herd
+
+#### Jobs and tools
+* tool requirements for a job
+	* generic search for components/tags e.g. "edged", "sharpness>50"
+* multiple ways for a tool to be considering and used for a job:
+	* hauled next to the work location with the materials
+	* equip from storage on the way to the work location when all materials are available
+	* already held or equipped
+* will need a better way of choosing the best person for a job, currently the first person to consider it will reserve it. possibly a voting phase/stage where each candidate volunteers via AI weight system, then the best candidate is chosen from them
+* personality affects the desiribility of jobs - lazy/weak/injured people dont want to do physical work, selfish people dont want to work on society jobs, only things for themselves
+
+##### Building
+* search communal society containers for materials
+* ui inputs for the player to request builds
+	* lua api for building too
+* build cancellation by player
+	* drop unconsumed materials
+* generic build material requirement engine - consumes generic requirements (not definition names), reports original reqs, tracks remaining reqs
+* more data oriented
+	* define builds and their required materials in data
+	* dont use definition names for materials, rather generic descriptions so it can be loose
+* allow multiple concurrent builders
+	* bug: if multiple people are sharing a gather task, they will keep collecting even after the last one is delivered - panics on extra unexpected delivery
+* allow smooth changing of material gathering target job without dropping the current haul
+* prioritise material gathering for the most complete job, rather than random/round robin
+* better handle a build job being set in a non-air position
+
+
+### Item stacks
+* automatically downgrade a stack split into 1 to a single item
+* allow overflow into stacks bigger than 65k
+* implement actual item comparisons for collapsing identical items into a single stack (e.g. 16xarrow)
+
+
 
 ## World generation
 * better biome generation
@@ -147,7 +190,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * remove unneeded Debug impls/cfg_attr them to speed up compilation
 * mesh generation on worker thread
 * replace all hashmaps with faster non crypto hashes
-* replace Arcs that don't need weak refs with `triomphe`
+* replace Arcs/Rcs that don't need weak refs with `triomphe`/`counting_pointer`
 * perfect hashing for component name lookup
 * terrain finalizer should not propogate to neighbours if single block changes arent on boundary
 * investigate invalidating a slab queued for finalization if terrain updates are applied to it, to avoid doing tons of extra work for nothing. some degree of redundant work is ok though, so the terrain never noticably lags behind player updates and catches up suddenly when all changes are applied together
@@ -222,6 +265,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* voxel world access
 	* autorun scripts in a dir on startup
 	* port scenarios from rust to scripts
+* saving and loading should use its own entity id/referencing (calculated during save) so that on load new entities are spawned starting from generation 1 again. this might be critical for long running games to ensure the monotonic id+generation count doesn't exceed the max
 
 ## Entity diversity
 * animal species

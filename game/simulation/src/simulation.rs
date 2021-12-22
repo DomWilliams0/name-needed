@@ -12,7 +12,7 @@ use crate::activity::ActivitySystem;
 use crate::ai::{AiAction, AiComponent, AiSystem};
 
 use crate::ecs::*;
-use crate::event::{EntityEventQueue, RuntimeTimers};
+use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
     UiCommand, UiRequest, UiResponsePayload,
@@ -25,11 +25,12 @@ use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
 use crate::render::{
     AxesDebugRenderer, ChunkBoundariesDebugRenderer, DebugRendererError, DebugRenderers,
-    DebugRenderersState,
+    DebugRenderersState, UiElementPruneSystem,
 };
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::PlayerSociety;
@@ -37,17 +38,23 @@ use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, EntityLoggingComponent, Exit, ThreadedWorldLoader, WorldRef, WorldViewer,
+    definitions, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
+    ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 use std::pin::Pin;
+use std::sync::Arc;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
 #[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
+    BuildJobWip {
+        build: SocietyJobHandle,
+        reserved_materials: Arc<Vec<Entity>>,
+    },
 }
 
 pub struct WorldContext;
@@ -171,6 +178,7 @@ impl<R: Renderer> Simulation<R> {
         updates.execute(Pin::as_mut(&mut self.ecs_world));
         self.ecs_world.insert(updates);
 
+        self.delete_queued_entities();
         self.ecs_world.maintain();
 
         exit
@@ -203,7 +211,6 @@ impl<R: Renderer> Simulation<R> {
         MovementFulfilmentSystem.run_now(&self.ecs_world);
 
         // process entity events
-        // ActivityEventSystem.run_now(&self.ecs_world);
         RuntimeSystem.run_now(&self.ecs_world);
 
         // apply physics
@@ -214,6 +221,39 @@ impl<R: Renderer> Simulation<R> {
 
         // update spatial
         SpatialSystem.run_now(&self.ecs_world);
+
+        // prune ui elements
+        UiElementPruneSystem.run_now(&self.ecs_world);
+    }
+
+    fn delete_queued_entities(&mut self) {
+        let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
+        let n = deathlist_ref.count();
+        if n > 0 {
+            // take out of resource so we can get a mutable world ref
+            let deathlist = deathlist_ref.replace_entities(Vec::new());
+
+            if let Err(err) = self.ecs_world.delete_entities(&deathlist) {
+                error!("failed to kill entities"; "entities" => ?deathlist, "error" => %err);
+            }
+
+            // put it back
+            let deathlist_ref = self.ecs_world.resource_mut::<EntitiesToKill>();
+            let empty = deathlist_ref.replace_entities(deathlist);
+            debug_assert!(empty.is_empty());
+            std::mem::forget(empty);
+
+            // post events
+            let event_queue = self.ecs_world.resource_mut::<EntityEventQueue>();
+            event_queue.post_multiple(deathlist_ref.iter().map(|(e, reason)| EntityEvent {
+                subject: e,
+                payload: EntityEventPayload::Died(reason),
+            }));
+
+            debug!("killed {} entities", n);
+
+            deathlist_ref.clear();
+        }
     }
 
     pub fn voxel_world(&self) -> WorldRef {
@@ -228,7 +268,7 @@ impl<R: Renderer> Simulation<R> {
         &self.ecs_world
     }
 
-    pub fn societies(&mut self) -> &mut Societies {
+    pub fn societies_mut(&mut self) -> &mut Societies {
         self.ecs_world.resource_mut()
     }
 
@@ -346,24 +386,23 @@ impl<R: Renderer> Simulation<R> {
                     }
                 }
                 UiRequest::IssueSocietyCommand(society, command) => {
-                    let job = match command.into_job(&*self.ecs_world) {
-                        Ok(job) => job,
-                        Err(cmd) => {
-                            warn!("failed to issue society command"; "command" => ?cmd);
-                            continue;
-                        }
-                    };
-
-                    let society = match self.societies().society_by_handle_mut(society) {
+                    let society = match self
+                        .world()
+                        .resource::<Societies>()
+                        .society_by_handle(society)
+                    {
                         Some(s) => s,
                         None => {
-                            warn!("invalid society while issuing job"; "society" => ?society, "job" => ?job);
+                            warn!("invalid society while issuing command"; "society" => ?society, "command" => ?command);
                             continue;
                         }
                     };
 
-                    debug!("submitting job to society"; "society" => ?society, "job" => ?job);
-                    society.jobs_mut().submit(job);
+                    debug!("submitting command to society"; "society" => ?society, "command" => ?command);
+                    if let Err(command) = command.submit_job_to_society(society, &self.ecs_world) {
+                        warn!("failed to issue society command"; "command" => ?command);
+                        continue;
+                    }
                 }
                 UiRequest::SetContainerOwnership {
                     container,
@@ -492,7 +531,7 @@ impl<R: Renderer> Simulation<R> {
                 if let Err(err) = self
                     .ecs_world
                     .helpers_containers()
-                    .create_container(pos, "core_storage_chest")
+                    .create_container_voxel(pos, "core_storage_chest")
                 {
                     error!("failed to create container entity"; "error" => %err);
                 }
@@ -500,9 +539,19 @@ impl<R: Renderer> Simulation<R> {
 
             (BlockType::Chest, _) => {
                 // chest destroyed
-                if let Err(err) = self.ecs_world.helpers_containers().destroy_container(pos) {
-                    error!("failed to destroy container"; "error" => %err);
-                }
+                self.ecs_world.resource::<QueuedUpdates>().queue(
+                    "destroy container",
+                    move |world| match world
+                        .helpers_containers()
+                        .destroy_container(pos, DeathReason::BlockDestroyed)
+                    {
+                        Err(err) => {
+                            error!("failed to destroy container"; "error" => %err);
+                            Err(err.into())
+                        }
+                        Ok(()) => Ok(()),
+                    },
+                )
             }
 
             _ => {}
@@ -572,6 +621,7 @@ impl Add<u32> for Tick {
 
 fn register_resources(world: &mut EcsWorld) {
     world.insert(QueuedUpdates::default());
+    world.insert(EntitiesToKill::default());
     world.insert(SelectedEntity::default());
     world.insert(SelectedTiles::default());
     world.insert(TerrainUpdatesRes::default());

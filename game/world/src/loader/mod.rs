@@ -1,9 +1,9 @@
 pub use batch::UpdateBatch;
 pub use loading::{BlockForAllError, LoadedSlab, WorldLoader};
-pub use procgen::PlanetParams;
-pub use terrain_source::{
-    BlockDetails, GeneratedTerrainSource, MemoryTerrainSource, TerrainSource, TerrainSourceError,
-};
+#[cfg(feature = "procgen")]
+pub use {procgen::PlanetParams, terrain_source::GeneratedTerrainSource};
+
+pub use terrain_source::{MemoryTerrainSource, TerrainSource, TerrainSourceError};
 pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, TerrainUpdatesRes, WorldTerrainUpdate};
 pub use worker_pool::AsyncWorkerPool;
 

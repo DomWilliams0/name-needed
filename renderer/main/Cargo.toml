@@ -10,7 +10,6 @@ default-run = "main"
 [dependencies]
 engine = { path = "../engine" }
 
-simulation = { path = "../../game/simulation" }
 resources = { path = "../../game/resources" }
 testing = {path = "../../testing", optional = true}
 
@@ -25,9 +24,10 @@ inventory = "0.1"
 argh = "0.1"
 
 [features]
-default = ["use-sdl"]
+default = ["use-sdl", "procgen"]
+procgen = ["engine/procgen"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 count-allocs = ["alloc_counter"]
-metrics = ["simulation/metrics"]
+metrics = ["engine/metrics"]
 tests = ["engine/hook", "testing"]

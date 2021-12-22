@@ -1,6 +1,9 @@
-use crate::scenarios::helpers::spawn_entities_randomly;
+#![allow(dead_code)]
+use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 use common::*;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety};
+use engine::simulation;
+use simulation::job::BuildThingJob;
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies, StoneBrickWall};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -45,6 +48,7 @@ scenario!(following_dogs);
 scenario!(nop);
 scenario!(wander_and_eat);
 scenario!(haul_to_container);
+scenario!(building);
 
 fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
@@ -55,14 +59,14 @@ fn following_dogs(ecs: &EcsWorld) {
 
     let mut colors = helpers::entity_colours();
 
-    let all_humans = spawn_entities_randomly(&world, humans, |pos| {
+    let all_humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
     });
 
-    spawn_entities_randomly(&world, dogs, |pos| {
+    spawn_entities_randomly(&world, dogs, Placement::RandomPos, |pos| {
         let mut rand_althor = random::get();
         let human = all_humans
             .choose(&mut *rand_althor)
@@ -85,16 +89,16 @@ fn wander_and_eat(ecs: &EcsWorld) {
     let humans = helpers::get_config_count("humans");
     let food = helpers::get_config_count("food");
 
-    spawn_entities_randomly(&world, humans, |pos| {
+    spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         let satiety = NormalizedFloat::new(random::get().gen_range(0.4, 0.5));
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .with_satiety(satiety)
             .thanks()
     });
 
-    spawn_entities_randomly(&world, food, |pos| {
+    spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
         let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
         let food = helpers::new_entity("core_food_apple", ecs, pos)
             .with_nutrition(nutrition)
@@ -102,6 +106,74 @@ fn wander_and_eat(ecs: &EcsWorld) {
 
         food
     });
+}
+
+fn building(ecs: &EcsWorld) {
+    let world = ecs.voxel_world();
+    let world = world.borrow();
+
+    let mut colors = helpers::entity_colours();
+    let humans = helpers::get_config_count("humans");
+    let food = helpers::get_config_count("food");
+
+    let society = ecs
+        .resource_mut::<PlayerSociety>()
+        .0
+        .expect("no player society");
+
+    let _humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
+        helpers::new_entity("core_living_human", ecs, pos)
+            .with_color(colors.next().unwrap())
+            .with_player_society()
+            .thanks()
+    });
+
+    let _food = spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
+        let nutrition = NormalizedFloat::new(random::get().gen_range(0.6, 1.0));
+        let food = helpers::new_entity("core_food_apple", ecs, pos)
+            .with_nutrition(nutrition)
+            .thanks();
+
+        food
+    });
+
+    let bricks = spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("bricks"),
+        Placement::RandomPos,
+        |pos| helpers::new_entity("core_brick_stone", ecs, pos).thanks(),
+    );
+
+    let mut brick_stack = None;
+    for brick in bricks {
+        let res = match brick_stack {
+            None => ecs
+                .helpers_containers()
+                .convert_to_stack(brick)
+                .map(|stack| {
+                    brick_stack = Some(stack);
+                }),
+            Some(stack) => ecs.helpers_containers().add_to_stack(stack, brick),
+        };
+
+        if let Err(err) = res {
+            warn!("failed to stack bricks: {}", err);
+            brick_stack = None;
+        }
+    }
+
+    let society = ecs
+        .resource_mut::<Societies>()
+        .society_by_handle(society)
+        .expect("bad society");
+
+    for _ in 0..8 {
+        let pos = helpers::random_walkable_pos(&world);
+
+        society
+            .jobs_mut()
+            .submit(ecs, BuildThingJob::new(pos, StoneBrickWall));
+    }
 }
 
 fn haul_to_container(ecs: &EcsWorld) {
@@ -119,18 +191,18 @@ fn haul_to_container(ecs: &EcsWorld) {
         .expect("no player society");
 
     // our lovely haulers
-    spawn_entities_randomly(&world, humans, |pos| {
+    spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
-            .with_color(colors.next_please())
+            .with_color(colors.next().unwrap())
             .with_player_society()
             .thanks()
     });
 
-    let food = spawn_entities_randomly(&world, food, |pos| {
+    let food = spawn_entities_randomly(&world, food, Placement::RandomPos, |pos| {
         helpers::new_entity("core_food_apple", ecs, pos).thanks()
     });
 
-    let bricks = spawn_entities_randomly(&world, bricks, |pos| {
+    let bricks = spawn_entities_randomly(&world, bricks, Placement::RandomPos, |pos| {
         helpers::new_entity("core_brick_stone", ecs, pos).thanks()
     });
 
@@ -142,8 +214,9 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use color::{ColorRgb, UniqueRandomColors};
-    use common::{random, NormalizedFloat};
+    use color::Color;
+    use common::{random, NormalizedFloat, Rng};
+    use engine::simulation;
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
         EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
@@ -156,11 +229,21 @@ mod helpers {
         counts.get(wat).copied().unwrap_or(0)
     }
 
-    pub fn entity_colours() -> UniqueRandomColors {
-        ColorRgb::unique_randoms(0.65, 0.4, &mut *random::get()).unwrap()
+    pub fn entity_colours() -> impl Iterator<Item = Color> {
+        Color::unique_randoms(
+            NormalizedFloat::new(0.65),
+            NormalizedFloat::new(0.4),
+            &mut *random::get(),
+        )
     }
 
     pub struct EntityBuilder<'a>(&'a EcsWorld, Entity);
+
+    pub enum Placement {
+        RandomPos,
+        RandomPosAndRot,
+        // TODO random pos offset away from the voxel centre
+    }
 
     impl<'a> EntityBuilder<'a> {
         fn new(definition: &str, pos: impl EntityPosition + 'static, world: &'a EcsWorld) -> Self {
@@ -174,7 +257,7 @@ mod helpers {
             Self(world, entity)
         }
 
-        pub fn with_color(self, color: ColorRgb) -> Self {
+        pub fn with_color(self, color: Color) -> Self {
             self.0
                 .component_mut::<RenderComponent>(self.1)
                 .map(|mut render| render.color = color)
@@ -249,13 +332,17 @@ mod helpers {
     pub fn spawn_entities_randomly(
         world: &InnerWorldRef,
         count: usize,
-        mut per: impl FnMut(WorldPosition) -> Entity,
+        placement: Placement,
+        mut per: impl FnMut((WorldPosition, f32)) -> Entity,
     ) -> Vec<Entity> {
         (0..count)
             .map(|_| {
                 let pos = random_walkable_pos(world);
-
-                per(pos)
+                let rot = match placement {
+                    Placement::RandomPos => 0.0,
+                    Placement::RandomPosAndRot => random::get().gen_range(0.0f32, 360.0),
+                };
+                per((pos, rot))
             })
             .collect()
     }

@@ -1,4 +1,7 @@
 use crate::society::society::Society;
+use common::Formatter;
+use std::fmt::Debug;
+use std::num::NonZeroU32;
 
 // TODO keep society registry sorted by handle for quick lookup
 
@@ -12,8 +15,9 @@ pub struct Societies {
 #[derive(Default, Clone)]
 pub struct PlayerSociety(pub Option<SocietyHandle>);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct SocietyHandle(u32);
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[repr(transparent)]
+pub struct SocietyHandle(NonZeroU32);
 
 macro_rules! ensure_handle {
     ($soc:expr, $handle:expr) => {{
@@ -31,12 +35,12 @@ macro_rules! ensure_handle {
 
 impl Societies {
     pub fn new_society(&mut self, name: String) -> Option<SocietyHandle> {
-        if self.society_by_name_mut(&name).is_some() {
+        if self.society_by_name(&name).is_some() {
             return None;
         }
 
         let handle = self.next_handle;
-        self.next_handle.0 += 1;
+        self.next_handle.0 = unsafe { NonZeroU32::new_unchecked(self.next_handle.0.get() + 1) };
 
         let society = Society::with_name(handle, name);
         self.registry.push((handle, society));
@@ -44,9 +48,9 @@ impl Societies {
         Some(handle)
     }
 
-    pub fn society_by_name_mut(&mut self, name: &str) -> Option<&mut Society> {
+    pub fn society_by_name(&mut self, name: &str) -> Option<&Society> {
         self.registry
-            .iter_mut()
+            .iter()
             .find(|(_, s)| s.name() == name)
             .map(|(handle, society)| ensure_handle!(society, *handle))
     }
@@ -72,7 +76,7 @@ impl Default for Societies {
     fn default() -> Self {
         Self {
             registry: Vec::with_capacity(8),
-            next_handle: SocietyHandle(100),
+            next_handle: SocietyHandle(unsafe { NonZeroU32::new_unchecked(100) }),
         }
     }
 }
@@ -80,5 +84,11 @@ impl Default for Societies {
 impl PartialEq<SocietyHandle> for PlayerSociety {
     fn eq(&self, other: &SocietyHandle) -> bool {
         self.0.map(|me| me == *other).unwrap_or(false)
+    }
+}
+
+impl Debug for SocietyHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SocietyHandle({})", self.0)
     }
 }

@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use common::derive_more::IntoIterator;
 use common::*;
 
-use crate::ecs::world::SpecsWorld;
-use crate::{EcsWorld, Entity};
+use crate::ecs::world::{ComponentRefErased, SpecsWorld};
+use crate::{ComponentWorld, EcsWorld, Entity};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum ComponentBuildError {
     #[error("Component is not buildable")]
@@ -31,9 +30,18 @@ pub enum ComponentBuildError {
     // TODO should be a Box<dyn Error>
     #[error("Template error: {0}")]
     TemplateSpecific(String),
+
+    #[error("Expected lowercase string but got {0:?}")]
+    NotLowercase(String),
+
+    #[error("Percentage should be 0-100 but is {0}")]
+    BadPercentage(i64),
+
+    #[error("Unexpected tag value {0:?}")]
+    UnexpectedTagValue(String),
 }
 
-#[derive(Debug, IntoIterator)]
+#[derive(Debug)]
 pub struct Map<V: Value> {
     map: HashMap<String, V>,
 }
@@ -42,6 +50,10 @@ pub trait Value: Debug {
     fn into_int(self) -> Result<i64, ComponentBuildError>;
     fn into_float(self) -> Result<f64, ComponentBuildError>;
     fn into_string(self) -> Result<String, ComponentBuildError>;
+    fn into_unit(self) -> Result<(), ComponentBuildError>;
+
+    fn as_unit(&self) -> Result<(), ComponentBuildError>;
+    fn as_int(&self) -> Result<i64, ComponentBuildError>;
     fn into_type<T: serde::de::DeserializeOwned>(self) -> Result<T, ComponentBuildError>;
 }
 
@@ -51,32 +63,32 @@ pub trait InteractiveComponent {
     fn as_debug(&self) -> Option<&dyn Debug>;
 }
 
-#[allow(dead_code)] // currently unused
-pub enum InteractiveResult<'a> {
-    NonInteractive,
-    Interactive(&'a dyn InteractiveComponent),
-}
-
 pub type HasCompFn = fn(&EcsWorld, Entity) -> bool;
 pub type RegisterCompFn = fn(&mut SpecsWorld);
-#[allow(dead_code)] // currently unused
-pub type GetInteractiveFn = fn(world: &EcsWorld, entity: Entity) -> Option<InteractiveResult>;
+pub type GetComponentFn = fn(&EcsWorld, Entity) -> Option<ComponentRefErased>;
+pub type AsInteractiveFn = unsafe fn(&()) -> Option<&dyn InteractiveComponent>;
+pub type CloneToFn = fn(&EcsWorld, Entity, Entity);
 
 pub struct ComponentEntry {
     pub name: &'static str,
     pub has_comp_fn: HasCompFn,
     pub register_comp_fn: RegisterCompFn,
+    pub get_comp_fn: GetComponentFn,
+    pub clone_to_fn: Option<CloneToFn>,
 }
 
 inventory::collect!(ComponentEntry);
 
 pub struct ComponentFunctions {
     has_comp: HasCompFn,
+    get_comp: GetComponentFn,
+    clone_to_fn: Option<CloneToFn>,
 }
 
 pub struct ComponentRegistry {
     // TODO perfect hashing
     map: HashMap<&'static str, ComponentFunctions>,
+    cloneables: Vec<(&'static str, CloneToFn)>,
 }
 
 impl<V: Value> Map<V> {
@@ -133,17 +145,45 @@ impl<V: Value> Map<V> {
     pub fn len(&self) -> usize {
         self.map.len()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &V)> + '_ {
+        self.map.iter()
+    }
+
+    /// Only use for free-form structures where all keys are valid
+    pub fn take(&mut self) -> Self {
+        Self {
+            map: std::mem::take(&mut self.map),
+        }
+    }
+}
+
+impl<V: Value> IntoIterator for Map<V> {
+    type Item = (String, V);
+    type IntoIter = std::collections::hash_map::IntoIter<String, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.into_iter()
+    }
 }
 
 impl ComponentRegistry {
     pub fn new(world: &mut SpecsWorld) -> Self {
         let mut map = HashMap::with_capacity(128);
+        let mut cloneables = Vec::with_capacity(64);
         for comp in inventory::iter::<ComponentEntry> {
-            debug!("registering component {:?}", comp.name);
+            let cloneable = if comp.clone_to_fn.is_some() {
+                " (cloneable)"
+            } else {
+                ""
+            };
+            debug!("registering component {:?}{}", comp.name, cloneable);
             let old = map.insert(
                 comp.name,
                 ComponentFunctions {
                     has_comp: comp.has_comp_fn,
+                    get_comp: comp.get_comp_fn,
+                    clone_to_fn: comp.clone_to_fn,
                 },
             );
 
@@ -152,11 +192,17 @@ impl ComponentRegistry {
             }
 
             (comp.register_comp_fn)(world);
+
+            if let Some(clone_fn) = comp.clone_to_fn {
+                cloneables.push((comp.name, clone_fn));
+            }
         }
 
         info!("registered {} components", map.len());
         map.shrink_to_fit();
-        ComponentRegistry { map }
+        cloneables.shrink_to_fit();
+
+        ComponentRegistry { map, cloneables }
     }
 
     pub fn has_component(&self, comp: &str, world: &EcsWorld, entity: Entity) -> bool {
@@ -177,9 +223,35 @@ impl ComponentRegistry {
         &'a self,
         world: &'a EcsWorld,
         entity: Entity,
-    ) -> impl Iterator<Item = &'static str> + 'a {
+    ) -> impl Iterator<Item = (&'static str, ComponentRefErased)> + 'a {
         self.map.iter().filter_map(move |(name, funcs)| {
-            if (funcs.has_comp)(world, entity) {
+            (funcs.get_comp)(world, entity).map(|comp| (*name, comp))
+        })
+    }
+
+    /// Returns Err if either entity is not alive.
+    /// Only components not marked as `#[clone(disallow)]`
+    pub fn copy_components_to(
+        &self,
+        world: &EcsWorld,
+        source: Entity,
+        dest: Entity,
+    ) -> Result<(), ()> {
+        if world.is_entity_alive(source) && world.is_entity_alive(dest) {
+            for (name, cloneable) in self.cloneables.iter() {
+                trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
+                (cloneable)(world, source, dest);
+            }
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    /// Returns the name of the first non-copyable component that this entity has
+    pub fn find_non_copyable(&self, world: &EcsWorld, entity: Entity) -> Option<&'static str> {
+        self.map.iter().find_map(move |(name, comp)| {
+            if (comp.has_comp)(world, entity) && comp.clone_to_fn.is_none() {
                 Some(*name)
             } else {
                 None

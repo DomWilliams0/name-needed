@@ -2,7 +2,7 @@ use crate::ecs::EcsWorld;
 use crate::{
     all_slabs_in_range, InnerWorldRef, Renderer, SlabLocation, ThreadedWorldLoader, WorldViewer,
 };
-use color::ColorRgb;
+use color::Color;
 use common::*;
 
 use std::borrow::Cow;
@@ -10,7 +10,6 @@ use std::ffi::CStr;
 use std::ops::DerefMut;
 use unit::space::view::ViewPoint;
 use unit::world::{WorldPoint, CHUNK_SIZE};
-use world::RegionLocation;
 
 pub trait DebugRenderer<R: Renderer> {
     fn identifier(&self) -> &'static str;
@@ -180,10 +179,11 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
         let a = ViewPoint::new_unchecked(1.0, 0.0, 1.0);
         let b = ViewPoint::new_unchecked(0.0, 1.0, 1.0);
 
-        renderer.debug_add_line(origin.into(), a.into(), ColorRgb::new(255, 0, 0));
-        renderer.debug_add_line(origin.into(), b.into(), ColorRgb::new(0, 255, 0));
+        renderer.debug_add_line(origin.into(), a.into(), Color::rgb(255, 0, 0));
+        renderer.debug_add_line(origin.into(), b.into(), Color::rgb(0, 255, 0));
     }
 }
+
 impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
     fn identifier(&self) -> &'static str {
         "chunk boundaries"
@@ -201,7 +201,8 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
         _: &EcsWorld,
         viewer: &WorldViewer,
     ) {
-        let mut seen_regions = SmallVec::<[RegionLocation; 4]>::new();
+        #[cfg(feature = "procgen")]
+        let mut seen_regions = SmallVec::<[world::RegionLocation; 4]>::new();
 
         let (from, to) = viewer.chunk_range();
         for slab in all_slabs_in_range(SlabLocation::new(0, from), SlabLocation::new(0, to)).0 {
@@ -214,20 +215,22 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
                     min + (sz, sz, 0.0),
                     min + (0.0, sz, 0.0),
                 ],
-                ColorRgb::new(5, 5, 240),
+                Color::rgb(5, 5, 240),
             );
 
             // collect unique regions
-            if let Some(region) = RegionLocation::try_from_chunk(slab.chunk) {
+            #[cfg(feature = "procgen")]
+            if let Some(region) = world::RegionLocation::try_from_chunk(slab.chunk) {
                 if !seen_regions.contains(&region) {
                     seen_regions.push(region)
                 };
             }
         }
 
+        #[cfg(feature = "procgen")]
         for region in seen_regions.into_iter() {
             let min = WorldPoint::from(region.chunk_bounds().0.get_block(0));
-            let sz = (RegionLocation::chunks_per_side() * CHUNK_SIZE.as_usize()) as f32;
+            let sz = (world::RegionLocation::chunks_per_side() * CHUNK_SIZE.as_usize()) as f32;
             renderer.debug_add_quad(
                 [
                     min,
@@ -235,7 +238,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
                     min + (sz, sz, 0.0),
                     min + (0.0, sz, 0.0),
                 ],
-                ColorRgb::new(5, 240, 5),
+                Color::rgb(5, 240, 5),
             );
         }
     }

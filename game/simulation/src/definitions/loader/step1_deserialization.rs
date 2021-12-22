@@ -14,6 +14,7 @@ use crate::definitions::loader::step2_preprocessing::ProcessedComponents;
 use crate::definitions::{DefinitionError, DefinitionErrorKind};
 use crate::ecs;
 use crate::ecs::ComponentBuildError;
+use serde::de::Error;
 
 pub type DefinitionUid = String;
 
@@ -179,6 +180,30 @@ impl ecs::Value for ron::Value {
 
     fn into_string(self) -> Result<String, ComponentBuildError> {
         self.into_type()
+    }
+
+    fn into_unit(self) -> Result<(), ComponentBuildError> {
+        self.into_type()
+    }
+
+    fn as_unit(&self) -> Result<(), ComponentBuildError> {
+        if let ron::Value::Unit = self {
+            Ok(())
+        } else {
+            Err(ComponentBuildError::Deserialize(ron::Error::custom(
+                "not a unit type",
+            )))
+        }
+    }
+
+    fn as_int(&self) -> Result<i64, ComponentBuildError> {
+        if let ron::Value::Number(ron::Number::Integer(i)) = self {
+            Ok(*i)
+        } else {
+            Err(ComponentBuildError::Deserialize(ron::Error::custom(
+                "not an integer",
+            )))
+        }
     }
 
     fn into_type<T: serde::de::DeserializeOwned>(self) -> Result<T, ComponentBuildError> {
