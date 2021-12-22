@@ -131,7 +131,11 @@ impl GatherMaterialsDse {
                 let src = match blackboard.world.component::<ItemStackComponent>(found) {
                     Ok(stack) => {
                         // only take as much of the stack as is needed
-                        let n = self.material.quantity().min(stack.stack.total_count());
+                        let n = self
+                            .material
+                            .quantity()
+                            .get()
+                            .min(stack.stack.total_count());
                         HaulSource::PickUpSplitStack(n)
                     }
                     _ => HaulSource::PickUp,

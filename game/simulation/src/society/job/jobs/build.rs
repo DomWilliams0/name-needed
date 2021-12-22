@@ -14,6 +14,7 @@ use common::*;
 use specs::BitSet;
 
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU16;
 
 // TODO build requirement engine for generic material combining
 //      each job owns an instance, lends it to UI for rendering
@@ -36,7 +37,7 @@ pub struct BuildThingJob {
     progress: u32,
 
     /// Gross temporary way of tracking remaining materials
-    materials_remaining: HashMap<&'static str, u16>,
+    materials_remaining: HashMap<&'static str, NonZeroU16>,
 
     /// Set if any material types are invalid e.g. not haulable
     missing_any_requirements: bool,
@@ -88,7 +89,7 @@ impl BuildThingJob {
     }
 
     // TODO fewer temporary allocations
-    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, u16> {
+    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, NonZeroU16> {
         let this_job = self.this_job.unwrap(); // set before this is called
 
         let job_pos = self.position.centred();
@@ -131,7 +132,7 @@ impl BuildThingJob {
         let mut remaining_materials = self
             .required_materials
             .iter()
-            .map(|mat| (mat.definition(), mat.quantity()))
+            .map(|mat| (mat.definition(), mat.quantity().get()))
             .collect::<HashMap<_, _>>();
 
         let reservations_bitset = self
@@ -149,13 +150,19 @@ impl BuildThingJob {
             // TODO ensure this doesn't happen, or just handle it properly
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
-            // TODO checked_sub instead, ensure only the exact number is reserved
-            *entry = entry.saturating_sub(quantity);
+            *entry = entry.checked_sub(quantity).unwrap_or_else(|| {
+                panic!(
+                    "tried to over-reserve {}/{} of remaining requirement '{}'",
+                    quantity, *entry, def.0
+                )
+            });
         }
 
         // collect the remaining unsatisfied requirements
-        remaining_materials.retain(|_, n| *n > 0);
         remaining_materials
+            .iter()
+            .filter_map(|(def, n)| NonZeroU16::new(*n).map(|n| (*def, n)))
+            .collect()
     }
 
     /// Returns false if already reserved. Entity should have ReservedMaterialComponent

@@ -10,7 +10,7 @@
         extra_hands: 1,
       )},
       {"stackable": (
-        max_count: 32,
+        max_count: 10,
       )},
       {"render": (
         color: "4c4c4c",

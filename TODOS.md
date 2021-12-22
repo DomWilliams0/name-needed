@@ -1,4 +1,4 @@
-# TODOs (385)
+# TODOs (382)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -179,11 +179,10 @@
    * `// TODO dont return a new vec of boxes, have some dignity`
    * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
- * [game/simulation/src/build/mod.rs](game/simulation/src/build/mod.rs) (4)
-   * `// TODO organise build module`
-   * `// TODO flexible list of reqs based on components`
+ * [game/simulation/src/build/builds.rs](game/simulation/src/build/builds.rs) (1)
    * `// TODO can this somehow return an iterator of build materials?`
-   * `// TODO use NonZeroU16`
+ * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
+   * `// TODO flexible list of reqs based on components`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
    * `// TODO consume materials incrementally as progress is made`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
@@ -320,12 +319,11 @@
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
- * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (11)
+ * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
    * `// TODO fewer temporary allocations`
    * `// TODO ensure this doesn't happen, or just handle it properly`
-   * `// TODO checked_sub instead, ensure only the exact number is reserved`
    * `// TODO allow "building" of a non-air block, and automatically emit a break task first?`
    * `// TODO job is destined to fail...`
    * `// TODO dont run this every tick, only when something changes or intermittently`

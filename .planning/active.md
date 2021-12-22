@@ -20,7 +20,6 @@
 		* [X] continuable progress after interruption
 		* [~] drop unconsumed materials on cancel/destruction
 	* [X] split a stack to reserve only the exact number needed
-		* [ ] check before destroying all reserved materials
 	* [~] define materials in data (wood, stone)
 	* [~] define wall archetype in data
 * [~] allow multiple concurrent workers
