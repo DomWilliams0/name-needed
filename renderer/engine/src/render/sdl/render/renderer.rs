@@ -96,6 +96,20 @@ macro_rules! frame_ctx {
     };
 }
 
+impl GlFrameContext {
+    fn normalize_entity_z(&self, pos: &mut WorldPoint) {
+        pos.modify_z(|mut z| {
+            // tweak z position to keep normalized around 0
+            z -= self.z_offset;
+
+            // ...plus a tiny amount to always render above the terrain, not in it
+            z += 0.001;
+
+            z
+        });
+    }
+}
+
 impl Renderer for GlRenderer {
     type FrameContext = GlFrameContext;
     type Error = GlError;
@@ -116,16 +130,7 @@ impl Renderer for GlRenderer {
         let mut position = transform.position;
 
         // TODO render head at head height, not the ground
-
-        position.modify_z(|mut z| {
-            // tweak z position to keep normalized around 0
-            z -= ctx.z_offset;
-
-            // ...plus a tiny amount to always render above the terrain, not in it
-            z += 0.001;
-
-            z
-        });
+        ctx.normalize_entity_z(&mut position);
 
         self.entity_renderer.add_entity(
             position,
@@ -161,8 +166,11 @@ impl Renderer for GlRenderer {
             Color::rgba(170, 170, 185, 150)
         };
 
+        let mut pos = transform.position;
+        frame_ctx!(self).normalize_entity_z(&mut pos);
+
         self.entity_renderer.add_entity(
-            transform.position,
+            pos,
             Shape2d::Rect,
             color,
             ui.size,
