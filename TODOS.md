@@ -1,4 +1,4 @@
-# TODOs (383)
+# TODOs (384)
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
@@ -319,11 +319,12 @@
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
- * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
+ * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (11)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
    * `// TODO fewer temporary allocations`
    * `// TODO ensure this doesn't happen, or just handle it properly`
+   * `// TODO avoid this case`
    * `// TODO allow "building" of a non-air block, and automatically emit a break task first?`
    * `// TODO job is destined to fail...`
    * `// TODO dont run this every tick, only when something changes or intermittently`

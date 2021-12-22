@@ -151,10 +151,12 @@ impl BuildThingJob {
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
             *entry = entry.checked_sub(quantity).unwrap_or_else(|| {
-                panic!(
+                warn!(
                     "tried to over-reserve {}/{} of remaining requirement '{}'",
                     quantity, *entry, def.0
-                )
+                );
+                // TODO avoid this case
+                0
             });
         }
 
