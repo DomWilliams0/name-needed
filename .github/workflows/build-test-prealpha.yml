@@ -53,16 +53,20 @@ jobs:
     if: needs.build_and_test.result != 'failure' && !contains(github.event.head_commit.message, 'skip-ci-release') && github.ref == 'refs/heads/develop'
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # keep testing other platforms if one fails
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest ]
         include:
           - os: ubuntu-latest
             suffix: ""
             platform: "linux"
+            zip_suffix: "tar.gz"
+            content_type: "application/gzip"
           - os: windows-latest
             suffix: ".exe"
             platform: "windows"
+            zip_suffix: "zip"
+            content_type: "application/zip"
 
     steps:
       - name: Checkout code
@@ -74,18 +78,15 @@ jobs:
           toolchain: stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
 
       - name: Build release
+        id: build-release
         run: |
-          ./.build/build-release.sh "${{ matrix.suffix }}"
+          TARGET=$(./.build/build-release.sh "${{ matrix.suffix }}" "${{ matrix.platform }}")
+          echo "::set-output name=TARGET::$TARGET"
         shell: bash
-
-      - name: Package release
-        uses: papeloto/action-zip@v1
-        with:
-          files: name-needed/name-needed
-          dest: nn-${{ matrix.platform }}.zip
-          recursive: false
 
       - name: Upload release
         uses: actions/upload-release-asset@v1
@@ -93,9 +94,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: nn-${{ matrix.platform }}.zip
-          asset_name: nn-pre-alpha-${{ github.run_number}}-${{ matrix.platform }}.zip
-          asset_content_type: application/zip
+          asset_path: ${{ steps.build-release.outputs.TARGET }}
+          asset_name: nn-pre-alpha-${{ github.run_number}}-${{ matrix.platform }}.${{ matrix.zip_suffix }}
+          asset_content_type: ${{ matrix.content_type }}
 
   create_release:
     name: Create pre-alpha release

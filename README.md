@@ -1,6 +1,6 @@
 # name-needed
 
-![Build Status](https://img.shields.io/github/workflow/status/DomWilliams0/name-needed/Build%20and%20test)
+![Build status](https://img.shields.io/github/workflow/status/DomWilliams0/name-needed/Build,%20test,%20release%20pre-alpha?label=build)
 [![Devlog](https://img.shields.io/badge/devlog-domwillia.ms-orange)](https://domwillia.ms)
 [![Lines](https://tokei.rs/b1/github/DomWilliams0/name-needed)](https://github.com/XAMPPRocky/tokei)
 [![Files](https://tokei.rs/b1/github/DomWilliams0/name-needed?category=files)](https://github.com/XAMPPRocky/tokei)
@@ -44,11 +44,11 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Building/downloading
 
-The engine uses SDL2 and OpenGL, and is developed primarily on Linux, although it seems to work fine on Windows too.
+The engine uses SDL2 and OpenGL 3.3, and is developed primarily on Linux, although it seems to work fine on Windows too. macOS is not yet supported due to its depreciation of OpenGL.
 
-See the [releases](https://github.com/DomWilliams0/name-needed/releases) page for prebuilt binaries - occasionally the main `develop` branch is built and published there. Simply download, unzip and run the binary in that directory.
+See the [releases](https://github.com/DomWilliams0/name-needed/releases) page for prebuilt binaries - occasionally the main `develop` branch is built and published there. Download the archive for your platform, unzip and run the `name-needed` binary in that directory. On Linux, you will need to install SDL2 through your distribution's package manager first.
 
-Otherwise you can build it with `cargo build --release` (debug builds are *really* slow). If you don't have SDL2 installed, the [bundled](https://github.com/Rust-SDL2/rust-sdl2/blob/ed465322d137e207b03403a6f452d176ef9efda0/README.md#bundled-feature) feature of SDL can download and compile it for you (requires a C compiler).
+Otherwise you can build it with `cargo build --release` (debug builds are *really* slow). Ensure SDL2 is installed.
 
 I use the latest stable Rust toolchain and the newest fanciest language features, so no promises for a Minimal Supported Rust Version.
 

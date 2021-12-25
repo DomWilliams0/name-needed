@@ -1,4 +1,6 @@
-# TODOs (384)
+# TODOs (385)
+ * [.build/build-release.sh](.build/build-release.sh) (1)
+   * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
