@@ -28,7 +28,7 @@ impl Shader {
         let src = res
             .get_file(&*file_name)
             .and_then(String::read_resource)
-            .map_err(GlError::LoadingShader)?;
+            .map_err(GlError::LoadingResource)?;
 
         Self::from_source(&src, shader_type)
     }

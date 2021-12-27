@@ -1,4 +1,4 @@
-# TODOs (385)
+# TODOs (388)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -459,13 +459,17 @@
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
    * `// TODO cache`
+ * [renderer/engine/src/render/sdl/gl/mod.rs](renderer/engine/src/render/sdl/gl/mod.rs) (2)
+   * `// TODO proper errors`
+   * `#[error("TODO temporary: {0}")]`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO smallvec`
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
- * [renderer/engine/src/render/sdl/render/renderer.rs](renderer/engine/src/render/sdl/render/renderer.rs) (3)
+ * [renderer/engine/src/render/sdl/render/renderer.rs](renderer/engine/src/render/sdl/render/renderer.rs) (4)
    * `// TODO render head at head height, not the ground`
+   * `// TODO temporary font testing`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)

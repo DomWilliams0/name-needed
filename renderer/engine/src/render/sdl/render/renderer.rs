@@ -1,13 +1,12 @@
+use color::Color;
 use std::f32::consts::PI;
 
-use color::Color;
 use common::*;
-use resources::Shaders;
+use resources::{ReadResource, ResourceContainer, Resources, Shaders};
 use simulation::{
-    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
-    UiElementComponent,
+    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformComponent,
+    TransformRenderDescription, UiElementComponent,
 };
-
 use unit::world::WorldPoint;
 
 use crate::render::debug::DebugShape;
@@ -17,12 +16,14 @@ use crate::render::sdl::gl::{
 };
 use crate::render::sdl::render::entity::EntityRenderer;
 use crate::render::sdl::render::terrain::TerrainRenderer;
+use crate::render::sdl::render::text::TextRenderer;
 
 pub struct GlRenderer {
     /// Populated between init() and deinit()
     frame_ctx: Option<GlFrameContext>,
     terrain_renderer: TerrainRenderer,
     entity_renderer: EntityRenderer,
+    text_renderer: TextRenderer,
 
     debug_shapes: Vec<DebugShape>,
     debug_pipeline: Pipeline,
@@ -43,15 +44,19 @@ pub struct DebugVertex {
 }
 
 impl GlRenderer {
-    pub fn new(shaders_res: &Shaders) -> GlResult<Self> {
-        let terrain = TerrainRenderer::new(shaders_res)?;
+    pub fn new(resources: &Resources) -> GlResult<Self> {
+        let shaders_res = resources.shaders().map_err(GlError::LoadingResource)?;
+        let fonts_res = resources.fonts().map_err(GlError::LoadingResource)?;
+
+        let terrain = TerrainRenderer::new(&shaders_res)?;
+        let text_renderer = TextRenderer::new(&shaders_res, &fonts_res)?;
 
         // smooth lines look nice globally
         Capability::LineSmooth.enable();
 
         // init debug lines pipeline
         let debug_pipeline = {
-            let pipeline = Pipeline::new(Program::load(shaders_res, "debug", "rgb")?);
+            let pipeline = Pipeline::new(Program::load(&shaders_res, "debug", "rgb")?);
 
             let vao = pipeline.vao.scoped_bind();
             let _vbo = pipeline.vbo.scoped_bind();
@@ -69,9 +74,10 @@ impl GlRenderer {
         Ok(Self {
             terrain_renderer: terrain,
             frame_ctx: None,
+            text_renderer,
             debug_shapes: Vec::new(),
             debug_pipeline,
-            entity_renderer: EntityRenderer::new(shaders_res)?,
+            entity_renderer: EntityRenderer::new(&shaders_res)?,
         })
     }
     pub fn terrain(&self) -> &TerrainRenderer {
@@ -180,7 +186,10 @@ impl Renderer for GlRenderer {
 
     fn sim_finish(&mut self) -> GlResult<()> {
         let ctx = self.frame_ctx.as_ref().unwrap();
-        self.entity_renderer.render_entities(ctx)
+        self.entity_renderer.render_entities(ctx)?;
+
+        // TODO temporary font testing
+        self.text_renderer.render_test()
     }
 
     fn debug_start(&mut self) {}
@@ -222,6 +231,10 @@ impl Renderer for GlRenderer {
             .for_each(|(from, to)| {
                 self.debug_add_line(from, to, color);
             });
+    }
+
+    fn debug_text(&mut self, centre: WorldPoint, text: &str) {
+        todo!()
     }
 
     fn debug_finish(&mut self) -> GlResult<()> {

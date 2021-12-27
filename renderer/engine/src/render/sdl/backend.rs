@@ -114,10 +114,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             .map_err(SdlBackendError::Sdl)?;
 
         let events = sdl.event_pump().map_err(SdlBackendError::Sdl)?;
-        let renderer = {
-            let shaders = resources.shaders().map_err(SdlBackendError::Resources)?;
-            GlRenderer::new(&shaders)?
-        };
+        let renderer = GlRenderer::new(resources)?;
         let camera = Camera::new(w as i32, h as i32);
 
         Ok(Self {

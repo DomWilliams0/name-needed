@@ -27,8 +27,15 @@ pub struct Gl {
 
 #[derive(Debug, Error)]
 pub enum GlError {
-    #[error("Failed to load shader: {0}")]
-    LoadingShader(#[from] ResourceError),
+    #[error("Failed to load resource: {0}")]
+    LoadingResource(#[from] ResourceError),
+
+    #[error("Invalid font")]
+    InvalidFont,
+
+    // TODO proper errors
+    #[error("TODO temporary: {0}")]
+    Temporary(#[from] Box<dyn Error>),
 
     #[error("Failed to compile shader: {0}")]
     CompilingShader(String),

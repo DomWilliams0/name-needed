@@ -143,6 +143,14 @@ impl ReadResource for String {
     }
 }
 
+impl ReadResource for Vec<u8> {
+    fn read_resource(path: impl AsRef<ResourcePath>) -> Result<Self, ResourceError> {
+        let path = path.as_ref();
+        std::fs::read(&path.0)
+            .map_err(|e| ResourceError(path.0.to_path_buf(), ResourceErrorKind::Io(Arc::new(e))))
+    }
+}
+
 /// Declares a directory but not where it is in the hierarchy (see [child])
 #[macro_export]
 macro_rules! resources {

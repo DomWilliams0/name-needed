@@ -53,6 +53,8 @@ pub trait Renderer {
     #[allow(unused_variables)]
     fn debug_add_circle(&mut self, centre: WorldPoint, radius: f32, color: Color) {}
 
+    fn debug_text(&mut self, centre: WorldPoint, text: &str);
+
     fn debug_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
