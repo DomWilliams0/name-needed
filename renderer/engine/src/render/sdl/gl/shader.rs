@@ -143,18 +143,19 @@ impl Drop for Program {
 }
 
 impl Bindable for Program {
-    unsafe fn bind(&self) {
-        gl::UseProgram(self.0);
+    fn bind(&self) {
+        unsafe { gl::UseProgram(self.0) }
     }
 
-    unsafe fn unbind(&self) {
-        gl::UseProgram(0);
+    fn unbind(&self) {
+        unsafe { gl::UseProgram(0) }
     }
 }
 
 impl ScopedBind<'_, Program> {
     /// Name must be null terminated
     pub fn set_uniform_matrix(&self, name: &'static str, matrix: *const F) {
+        // TODO cache uniform locations
         assert_eq!(
             name.chars().last(),
             Some('\0'),
@@ -174,5 +175,16 @@ impl ScopedBind<'_, Program> {
                 warn!("failed to set uniform"; "uniform" => name, "error" => %e);
             }
         }
+    }
+
+    /// Name must be null terminated
+    pub fn bind_frag_data_location(&self, color: u32, name: &str) -> GlResult<()> {
+        assert_eq!(
+            name.chars().last(),
+            Some('\0'),
+            "name must be null terminated"
+        );
+
+        unsafe { errchk!(gl::BindFragDataLocation(self.0, color, name.as_ptr() as _)) }
     }
 }

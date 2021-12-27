@@ -2,10 +2,10 @@ use color::Color;
 use std::f32::consts::PI;
 
 use common::*;
-use resources::{ReadResource, ResourceContainer, Resources, Shaders};
+use resources::Resources;
 use simulation::{
-    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformComponent,
-    TransformRenderDescription, UiElementComponent,
+    PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
+    UiElementComponent,
 };
 use unit::world::WorldPoint;
 
@@ -189,7 +189,13 @@ impl Renderer for GlRenderer {
         self.entity_renderer.render_entities(ctx)?;
 
         // TODO temporary font testing
-        self.text_renderer.render_test()
+        let invert = Matrix4::new(
+            1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        );
+        let scale = Matrix4::from_scale(1.0 / 64.0); // screen scale in camera
+        let transform = invert * scale * ctx.projection;
+
+        self.text_renderer.render_test(&transform)
     }
 
     fn debug_start(&mut self) {}

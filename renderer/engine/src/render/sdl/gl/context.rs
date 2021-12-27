@@ -49,6 +49,12 @@ impl Gl {
     pub fn set_viewport(width: i32, height: i32) {
         unsafe { gl::Viewport(0, 0, width, height) }
     }
+
+    pub fn max_texture_size() -> u32 {
+        let mut value = 0;
+        unsafe { gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut value) };
+        value as u32
+    }
 }
 
 extern "system" fn on_debug_message(

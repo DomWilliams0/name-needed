@@ -1,4 +1,4 @@
-# TODOs (389)
+# TODOs (391)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -462,9 +462,10 @@
  * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
    * `// TODO proper errors`
    * `#[error("TODO temporary: {0}")]`
- * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (2)
+ * [renderer/engine/src/render/sdl/gl/shader.rs](renderer/engine/src/render/sdl/gl/shader.rs) (1)
+   * `// TODO cache uniform locations`
+ * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO dont bother unbinding?`
-   * `// TODO smallvec`
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
@@ -473,6 +474,9 @@
    * `// TODO temporary font testing`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
+ * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (2)
+   * `// TODO normalised color`
+   * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)

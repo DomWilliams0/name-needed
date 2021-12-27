@@ -3,6 +3,7 @@ mod context;
 mod error;
 mod pipeline;
 mod shader;
+mod texture;
 mod vertex;
 
 pub use capability::{Capability, ScopedCapability};
@@ -15,3 +16,4 @@ pub use vertex::{
 pub use context::Gl;
 pub use error::{GlError, GlResult};
 pub use pipeline::{InstancedPipeline, Pipeline};
+pub use texture::Texture;
