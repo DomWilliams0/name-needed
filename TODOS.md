@@ -1,4 +1,4 @@
-# TODOs (388)
+# TODOs (389)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -459,10 +459,11 @@
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
    * `// TODO cache`
- * [renderer/engine/src/render/sdl/gl/mod.rs](renderer/engine/src/render/sdl/gl/mod.rs) (2)
+ * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
    * `// TODO proper errors`
    * `#[error("TODO temporary: {0}")]`
- * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
+ * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (2)
+   * `// TODO dont bother unbinding?`
    * `// TODO smallvec`
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`

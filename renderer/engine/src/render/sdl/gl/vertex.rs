@@ -9,6 +9,8 @@ use common::*;
 use crate::errchk;
 use crate::render::sdl::gl::{GlError, GlResult};
 
+// TODO dont bother unbinding?
+
 #[derive(Copy, Clone)]
 pub enum AttribType {
     Float32,
@@ -75,18 +77,18 @@ pub struct Vao(GLuint);
 
 impl Vao {
     pub fn new() -> Self {
+        let mut vao = 0;
         unsafe {
-            let mut vao = 0;
-            gl::GenVertexArrays(1, &mut vao as *mut GLuint);
-            Self(vao)
+            gl::GenVertexArrays(1, &mut vao);
         }
+        Self(vao)
     }
 }
 
 impl Drop for Vao {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteVertexArrays(1, &self.0 as *const _);
+            gl::DeleteVertexArrays(1, &self.0);
         }
     }
 }
@@ -137,14 +139,15 @@ pub struct Vbo {
 
 impl Vbo {
     fn new(bind: VboBind) -> Self {
+        let mut obj = 0;
         unsafe {
-            let mut obj = 0;
             gl::GenBuffers(1, &mut obj as *mut GLuint);
-            Self {
-                obj,
-                len: Cell::new(0),
-                bind,
-            }
+        }
+
+        Self {
+            obj,
+            len: Cell::new(0),
+            bind,
         }
     }
 
