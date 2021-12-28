@@ -3,12 +3,16 @@ use crate::render::sdl::gl::{
     Primitive, Program, ScopedBindable, Texture, Vao, Vbo,
 };
 
+use crate::render::sdl::render::GlFrameContext;
 use common::*;
 use glyph_brush::ab_glyph::{point, FontVec, Rect};
 use glyph_brush::{
-    BrushAction, BrushError, GlyphBrush, GlyphBrushBuilder, GlyphVertex, Section, Text,
+    BrushAction, BrushError, BuiltInLineBreaker, GlyphBrush, GlyphBrushBuilder, GlyphVertex,
+    HorizontalAlign, Layout, Section, Text, VerticalAlign,
 };
 use resources::{ReadResource, ResourceContainer};
+use unit::space::view::ViewPoint;
+use unit::world::WorldPosition;
 
 pub struct TextRenderer {
     glyph_brush: GlyphBrush<Vertex, VertexExtra, FontVec>,
@@ -39,7 +43,7 @@ struct VertexExtra {}
 impl TextRenderer {
     pub fn new(shaders_res: &resources::Shaders, fonts_res: &resources::Fonts) -> GlResult<Self> {
         let font = {
-            let path = fonts_res.get_file("PrStart.ttf")?;
+            let path = fonts_res.get_file("ProggyClean.ttf")?;
             trace!("loading font from {}", path.resource_path().display());
             let bytes = Vec::<u8>::read_resource(path)?;
             FontVec::try_from_vec(bytes).map_err(|_| GlError::InvalidFont)?
@@ -108,54 +112,92 @@ impl TextRenderer {
         })
     }
 
-    pub fn render_test(&mut self, transform: &Matrix4) -> GlResult<()> {
-        self.glyph_brush.queue(
-            Section::<VertexExtra>::new()
-                .add_text(Text::default().with_text("NICE!"))
-                .with_screen_position((10.0, 4.0)),
-        );
+    pub fn render_test(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
+        const RESOLUTION: f32 = 64.0;
+        const FONT_SIZE: f32 = 4.0;
 
-        let texture = self.texture.borrow();
-        let action = self.glyph_brush.process_queued(
-            |rect, tex_data| unsafe {
-                let texture = texture.bind();
-                if let Err(err) =
-                    texture.sub_image(rect.min, [rect.width(), rect.height()], tex_data)
-                {
-                    error!("failed to update font texture: {}", err);
-                }
-            },
-            to_vertex,
-        );
+        let invert = Matrix4::from([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let scale = Matrix4::from_scale(1.0 / (FONT_SIZE * RESOLUTION));
+        let transform = ctx.projection * ctx.view * invert * scale;
 
-        match action {
-            Err(BrushError::TextureTooSmall { suggested, .. }) => {
-                let max_image_dimension = Gl::max_texture_size();
-
-                let (new_width, new_height) = if (suggested.0 > max_image_dimension
-                    || suggested.1 > max_image_dimension)
-                    && (self.glyph_brush.texture_dimensions().0 < max_image_dimension
-                        || self.glyph_brush.texture_dimensions().1 < max_image_dimension)
-                {
-                    (max_image_dimension, max_image_dimension)
-                } else {
-                    suggested
+        for og_x in (0..=18).step_by(8) {
+            for og_y in (-4..=18).step_by(2) {
+                let pos = WorldPosition::from((og_x, og_y, 0));
+                let view_point = ViewPoint::from(pos.centred().floored());
+                let (x, y) = {
+                    let (x, y, _) = view_point.xyz();
+                    (x * FONT_SIZE * RESOLUTION, -y * FONT_SIZE * RESOLUTION)
                 };
-                trace!("resizing text glyph texture"; "size" => ?(new_width, new_height));
 
-                self.texture = Texture::new_2d(new_width, new_height)?;
-                self.glyph_brush.resize_texture(new_width, new_height);
+                self.glyph_brush.queue(
+                    Section::<VertexExtra>::new()
+                        .add_text(
+                            Text::default()
+                                .with_text(&format!("({}, {})", og_x, og_y))
+                                .with_scale(RESOLUTION),
+                        )
+                        .with_screen_position((x, y))
+                        .with_layout(Layout::SingleLine {
+                            line_breaker: BuiltInLineBreaker::default(),
+                            h_align: HorizontalAlign::Left,
+                            v_align: VerticalAlign::Bottom,
+                        }),
+                );
             }
-            Ok(BrushAction::Draw(verts)) => {
-                debug!("draw {n} text verticies", n = verts.len());
+        }
 
-                let _vao = self.vao.scoped_bind();
-                let vbo = self.vbo.scoped_bind();
-                vbo.buffer_data(&verts, BufferUsage::StreamDraw)?;
-                self.vertex_count = verts.len();
+        loop {
+            let texture = self.texture.borrow();
+            let action = self.glyph_brush.process_queued(
+                |rect, tex_data| {
+                    let texture = texture.bind();
+                    if let Err(err) =
+                        texture.sub_image(rect.min, [rect.width(), rect.height()], tex_data)
+                    {
+                        error!("failed to update font texture: {}", err);
+                    }
+                },
+                to_vertex,
+            );
+
+            match action {
+                Err(BrushError::TextureTooSmall { suggested, .. }) => {
+                    let max_image_dimension = Gl::max_texture_size();
+
+                    let (new_width, new_height) = if (suggested.0 > max_image_dimension
+                        || suggested.1 > max_image_dimension)
+                        && (self.glyph_brush.texture_dimensions().0 < max_image_dimension
+                            || self.glyph_brush.texture_dimensions().1 < max_image_dimension)
+                    {
+                        (max_image_dimension, max_image_dimension)
+                    } else {
+                        suggested
+                    };
+                    trace!("resizing text glyph texture"; "size" => ?(new_width, new_height));
+
+                    self.texture = Texture::new_2d(new_width, new_height)?;
+                    self.glyph_brush.resize_texture(new_width, new_height);
+                    continue; // try again
+                }
+                Ok(BrushAction::Draw(verts)) => {
+                    debug!("draw {n} text verticies", n = verts.len());
+
+                    let _vao = self.vao.scoped_bind();
+                    let vbo = self.vbo.scoped_bind();
+                    vbo.buffer_data(&verts, BufferUsage::StreamDraw)?;
+                    self.vertex_count = verts.len();
+                }
+
+                Ok(BrushAction::ReDraw) => {}
             }
 
-            Ok(BrushAction::ReDraw) => {}
+            // only loop on error
+            break;
         }
 
         {

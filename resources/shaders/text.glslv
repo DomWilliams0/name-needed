@@ -1,19 +1,12 @@
 #version 330 core
 
-const mat4 INVERT_Y_AXIS = mat4(
-    vec4(1.0, 0.0, 0.0, 0.0),
-    vec4(0.0, -1.0, 0.0, 0.0),
-    vec4(0.0, 0.0, 1.0, 0.0),
-    vec4(0.0, 0.0, 0.0, 1.0)
-);
-
-uniform mat4 transform;
-
 layout (location = 0) in vec3 left_top;
 layout (location = 1) in vec2 right_bottom;
 layout (location = 2) in vec2 tex_left_top;
 layout (location = 3) in vec2 tex_right_bottom;
 layout (location = 4) in vec4 color;
+
+uniform mat4 transform;
 
 out vec2 f_tex_pos;
 out vec4 f_color;
@@ -45,5 +38,5 @@ void main() {
     }
 
     f_color = color;
-    gl_Position =  transform * vec4(pos, left_top.z, 1.0);
+    gl_Position = transform * vec4(pos, left_top.z, 1.0);
 }

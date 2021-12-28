@@ -189,13 +189,7 @@ impl Renderer for GlRenderer {
         self.entity_renderer.render_entities(ctx)?;
 
         // TODO temporary font testing
-        let invert = Matrix4::new(
-            1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-        );
-        let scale = Matrix4::from_scale(1.0 / 64.0); // screen scale in camera
-        let transform = invert * scale * ctx.projection;
-
-        self.text_renderer.render_test(&transform)
+        self.text_renderer.render_test(ctx)
     }
 
     fn debug_start(&mut self) {}
