@@ -186,10 +186,12 @@ impl Renderer for GlRenderer {
 
     fn sim_finish(&mut self) -> GlResult<()> {
         let ctx = self.frame_ctx.as_ref().unwrap();
+
+        // entities
         self.entity_renderer.render_entities(ctx)?;
 
-        // TODO temporary font testing
-        self.text_renderer.render_test(ctx)
+        // in-world text
+        self.text_renderer.render_text(ctx)
     }
 
     fn debug_start(&mut self) {}
@@ -234,7 +236,7 @@ impl Renderer for GlRenderer {
     }
 
     fn debug_text(&mut self, centre: WorldPoint, text: &str) {
-        todo!()
+        self.text_renderer.queue_text(centre, text)
     }
 
     fn debug_finish(&mut self) -> GlResult<()> {

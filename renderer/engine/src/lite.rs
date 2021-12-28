@@ -8,7 +8,7 @@ use simulation::{
     RenderComponent, Renderer, Simulation, TransformRenderDescription, UiElementComponent,
     WorldViewer,
 };
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
 
 pub struct DummyRenderer;
 
@@ -56,6 +56,8 @@ impl Renderer for DummyRenderer {
     fn sim_finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+
+    fn debug_text(&mut self, _centre: WorldPoint, _text: &str) {}
 
     fn deinit(&mut self) -> Self::FrameContext {}
 }

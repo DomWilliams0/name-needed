@@ -6,6 +6,7 @@ pub use specs::{
 pub use specs_derive::Component;
 
 pub use component::{ComponentBuildError, ComponentEntry, InteractiveComponent, Map, Value};
+pub use debug::{EntityIdDebugRenderer, EntityNameDebugRenderer};
 pub use ecs_derive::EcsComponent;
 pub use entity::{Entity, EntityBomb, EntityWrapper};
 pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
@@ -18,6 +19,7 @@ pub use self::world::{
 };
 
 mod component;
+mod debug;
 mod entity;
 mod template;
 mod world;

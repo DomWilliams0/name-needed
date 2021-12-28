@@ -12,7 +12,10 @@ use glyph_brush::{
 };
 use resources::{ReadResource, ResourceContainer};
 use unit::space::view::ViewPoint;
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
+
+const RESOLUTION: f32 = 64.0;
+const FONT_SIZE: f32 = 4.0;
 
 pub struct TextRenderer {
     glyph_brush: GlyphBrush<Vertex, VertexExtra, FontVec>,
@@ -49,7 +52,9 @@ impl TextRenderer {
             FontVec::try_from_vec(bytes).map_err(|_| GlError::InvalidFont)?
         };
 
-        let glyph_brush = GlyphBrushBuilder::using_font(font).build();
+        let glyph_brush = GlyphBrushBuilder::using_font(font)
+            .initial_cache_size((512, 512))
+            .build();
 
         let texture = {
             let (w, h) = glyph_brush.texture_dimensions();
@@ -112,44 +117,35 @@ impl TextRenderer {
         })
     }
 
-    pub fn render_test(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
-        const RESOLUTION: f32 = 64.0;
-        const FONT_SIZE: f32 = 4.0;
+    pub fn queue_text(&mut self, centre: WorldPoint, text: &str) {
+        let view_point = ViewPoint::from(centre);
 
-        let invert = Matrix4::from([
+        let (x, y) = {
+            let (x, y, _) = view_point.xyz();
+            (x * FONT_SIZE * RESOLUTION, -y * FONT_SIZE * RESOLUTION)
+        };
+
+        self.glyph_brush.queue(
+            Section::<VertexExtra>::new()
+                .add_text(Text::default().with_text(text).with_scale(RESOLUTION))
+                .with_screen_position((x, y))
+                .with_layout(
+                    Layout::default_wrap()
+                        .h_align(HorizontalAlign::Center)
+                        .v_align(VerticalAlign::Center),
+                ),
+        );
+    }
+
+    pub fn render_text(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
+        let invert_y_axis = Matrix4::from([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, -1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]);
         let scale = Matrix4::from_scale(1.0 / (FONT_SIZE * RESOLUTION));
-        let transform = ctx.projection * ctx.view * invert * scale;
-
-        for og_x in (0..=18).step_by(8) {
-            for og_y in (-4..=18).step_by(2) {
-                let pos = WorldPosition::from((og_x, og_y, 0));
-                let view_point = ViewPoint::from(pos.centred().floored());
-                let (x, y) = {
-                    let (x, y, _) = view_point.xyz();
-                    (x * FONT_SIZE * RESOLUTION, -y * FONT_SIZE * RESOLUTION)
-                };
-
-                self.glyph_brush.queue(
-                    Section::<VertexExtra>::new()
-                        .add_text(
-                            Text::default()
-                                .with_text(&format!("({}, {})", og_x, og_y))
-                                .with_scale(RESOLUTION),
-                        )
-                        .with_screen_position((x, y))
-                        .with_layout(Layout::SingleLine {
-                            line_breaker: BuiltInLineBreaker::default(),
-                            h_align: HorizontalAlign::Left,
-                            v_align: VerticalAlign::Bottom,
-                        }),
-                );
-            }
-        }
+        let transform = ctx.projection * ctx.view * invert_y_axis * scale;
 
         loop {
             let texture = self.texture.borrow();
@@ -178,14 +174,14 @@ impl TextRenderer {
                     } else {
                         suggested
                     };
-                    trace!("resizing text glyph texture"; "size" => ?(new_width, new_height));
+                    debug!("resizing text glyph texture"; "size" => ?(new_width, new_height));
 
                     self.texture = Texture::new_2d(new_width, new_height)?;
                     self.glyph_brush.resize_texture(new_width, new_height);
                     continue; // try again
                 }
                 Ok(BrushAction::Draw(verts)) => {
-                    debug!("draw {n} text verticies", n = verts.len());
+                    trace!("draw {n} new text vertices", n = verts.len());
 
                     let _vao = self.vao.scoped_bind();
                     let vbo = self.vbo.scoped_bind();
@@ -200,7 +196,7 @@ impl TextRenderer {
             break;
         }
 
-        {
+        if self.vertex_count > 0 {
             let _vao = self.vao.scoped_bind();
             let prog = self.program.scoped_bind();
             let vbo = self.vbo.scoped_bind();

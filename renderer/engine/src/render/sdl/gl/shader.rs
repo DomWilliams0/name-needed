@@ -1,4 +1,5 @@
 use gl::types::*;
+use std::cell::RefCell;
 
 use common::*;
 
@@ -14,6 +15,11 @@ pub enum ShaderType {
     Vertex,
     Fragment,
 }
+
+pub struct Program(GLuint, RefCell<UniformCache>);
+
+#[derive(Default)]
+struct UniformCache(ArrayVec<(&'static str, GLint), 3>);
 
 impl Shader {
     pub fn load(res: &Shaders, name: &str, shader_type: ShaderType) -> GlResult<Self> {
@@ -90,8 +96,6 @@ impl Drop for Shader {
     }
 }
 
-pub struct Program(GLuint);
-
 impl Program {
     pub fn load(res: &Shaders, vertex: &str, fragment: &str) -> GlResult<Self> {
         let vertex = Shader::load(res, vertex, ShaderType::Vertex)?;
@@ -111,25 +115,46 @@ impl Program {
 
     fn with_shaders(shaders: &[Shader]) -> GlResult<Self> {
         unsafe {
-            let program = Program(errchk!(gl::CreateProgram())?);
+            let program = errchk!(gl::CreateProgram())?;
             for shader in shaders {
-                gl::AttachShader(program.0, shader.0);
+                gl::AttachShader(program, shader.0);
             }
-            gl::LinkProgram(program.0);
+            gl::LinkProgram(program);
 
             let mut status = 0;
-            gl::GetProgramiv(program.0, gl::LINK_STATUS, &mut status as *mut _);
+            gl::GetProgramiv(program, gl::LINK_STATUS, &mut status as *mut _);
             if status as GLboolean == gl::FALSE {
                 Err(GlError::LinkingProgram)
             } else {
-                gl::ProgramParameteri(program.0, gl::PROGRAM_SEPARABLE, gl::TRUE as GLint);
+                gl::ProgramParameteri(program, gl::PROGRAM_SEPARABLE, gl::TRUE as GLint);
 
                 for shader in shaders {
-                    gl::DetachShader(program.0, shader.0);
+                    gl::DetachShader(program, shader.0);
                 }
-
-                Ok(program)
+                Ok(Program(program, Default::default()))
             }
+        }
+    }
+}
+
+impl UniformCache {
+    /// Name must be null terminated
+    fn resolve(&mut self, program: GLuint, name: &'static str) -> GlResult<GLint> {
+        if let Some((_, i)) = self.0.iter().find(|(s, _)| name == *s) {
+            return Ok(*i);
+        }
+
+        ensure_null_terminated(name);
+
+        let location = unsafe { gl::GetUniformLocation(program, name.as_ptr() as *const _) };
+        if location == -1 {
+            Err(GlError::UnknownUniform(name))
+        } else {
+            if self.0.is_full() {
+                self.0.swap_remove(0);
+            }
+            self.0.push((name, location));
+            Ok(location)
         }
     }
 }
@@ -152,39 +177,26 @@ impl Bindable for Program {
     }
 }
 
+fn ensure_null_terminated(s: &str) {
+    assert_eq!(s.chars().last(), Some('\0'), "name must be null terminated");
+}
+
 impl ScopedBind<'_, Program> {
     /// Name must be null terminated
     pub fn set_uniform_matrix(&self, name: &'static str, matrix: *const F) {
-        // TODO cache uniform locations
-        assert_eq!(
-            name.chars().last(),
-            Some('\0'),
-            "name must be null terminated"
-        );
-        unsafe {
-            let do_set = || -> GlResult<()> {
-                let location = gl::GetUniformLocation(self.0, name.as_ptr() as *const _);
-                if location == -1 {
-                    Err(GlError::UnknownUniform(name))
-                } else {
-                    errchk!(gl::UniformMatrix4fv(location, 1, gl::FALSE, matrix))
-                }
-            };
+        let mut cache = self.1.borrow_mut();
+        let result = cache.resolve(self.0, name).and_then(|location| unsafe {
+            errchk!(gl::UniformMatrix4fv(location, 1, gl::FALSE, matrix))
+        });
 
-            if let Err(e) = do_set() {
-                warn!("failed to set uniform"; "uniform" => name, "error" => %e);
-            }
+        if let Err(e) = result {
+            warn!("failed to set uniform"; "uniform" => name, "error" => %e);
         }
     }
 
     /// Name must be null terminated
     pub fn bind_frag_data_location(&self, color: u32, name: &str) -> GlResult<()> {
-        assert_eq!(
-            name.chars().last(),
-            Some('\0'),
-            "name must be null terminated"
-        );
-
+        ensure_null_terminated(name);
         unsafe { errchk!(gl::BindFragDataLocation(self.0, color, name.as_ptr() as _)) }
     }
 }

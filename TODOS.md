@@ -1,4 +1,4 @@
-# TODOs (391)
+# TODOs (389)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -462,16 +462,13 @@
  * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
    * `// TODO proper errors`
    * `#[error("TODO temporary: {0}")]`
- * [renderer/engine/src/render/sdl/gl/shader.rs](renderer/engine/src/render/sdl/gl/shader.rs) (1)
-   * `// TODO cache uniform locations`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
    * `// TODO dont bother unbinding?`
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
- * [renderer/engine/src/render/sdl/render/renderer.rs](renderer/engine/src/render/sdl/render/renderer.rs) (4)
+ * [renderer/engine/src/render/sdl/render/renderer.rs](renderer/engine/src/render/sdl/render/renderer.rs) (3)
    * `// TODO render head at head height, not the ground`
-   * `// TODO temporary font testing`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
  * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (2)

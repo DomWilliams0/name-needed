@@ -644,6 +644,8 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<NavigationAreaDebugRenderer>()?;
     builder.register::<SensesDebugRenderer>()?;
     builder.register::<FeatureBoundaryDebugRenderer>()?;
+    builder.register::<EntityIdDebugRenderer>()?;
+    builder.register::<EntityNameDebugRenderer>()?;
 
     Ok(builder.build())
 }

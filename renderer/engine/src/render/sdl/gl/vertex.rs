@@ -295,7 +295,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         vertex_count: usize,
         instance_count: usize,
     ) -> GlResult<()> {
-        if first + vertex_count >= self.len.get() {
+        if first + vertex_count > self.len.get() {
             return Err(GlError::BufferTooSmall {
                 real_len: self.len.get(),
                 requested_len: first + vertex_count,
