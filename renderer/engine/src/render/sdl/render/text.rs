@@ -16,6 +16,7 @@ use unit::world::{WorldPoint, WorldPosition};
 
 const RESOLUTION: f32 = 64.0;
 const FONT_SIZE: f32 = 4.0;
+const WORD_WRAP: f32 = 1.6;
 
 pub struct TextRenderer {
     glyph_brush: GlyphBrush<Vertex, VertexExtra, FontVec>,
@@ -129,6 +130,7 @@ impl TextRenderer {
             Section::<VertexExtra>::new()
                 .add_text(Text::default().with_text(text).with_scale(RESOLUTION))
                 .with_screen_position((x, y))
+                .with_bounds((WORD_WRAP * FONT_SIZE * RESOLUTION, f32::INFINITY))
                 .with_layout(
                     Layout::default_wrap()
                         .h_align(HorizontalAlign::Center)
