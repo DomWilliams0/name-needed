@@ -19,6 +19,8 @@ pub struct Camera {
 
 const SCREEN_SCALE: f32 = 64.0;
 
+// TODO cache projectction+view matrices if camera isn't moving
+
 impl Camera {
     pub fn new(width: i32, height: i32) -> Self {
         let mut cam = Self {
@@ -41,7 +43,7 @@ impl Camera {
 
     pub(crate) fn set_centre(&mut self, centre: impl Into<ViewPoint>) {
         let (x, y, _) = centre.into().xyz();
-        self.pos = Point2::new(x, y) - (self.window_size / 2.0 / SCREEN_SCALE);
+        self.pos = Point2::new(x, y) - ((self.window_size / 2.0 / SCREEN_SCALE) * self.zoom);
         self.last_extrapolated_pos = self.pos;
     }
 

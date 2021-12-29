@@ -1,4 +1,4 @@
-# TODOs (389)
+# TODOs (390)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -455,7 +455,8 @@
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (3)
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (4)
+   * `// TODO cache projectction+view matrices if camera isn't moving`
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
    * `// TODO cache`
