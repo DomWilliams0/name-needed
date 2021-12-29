@@ -20,7 +20,7 @@ impl SocietyWindow {
         }
 
         let ecs = context.simulation().ecs;
-        let society_handle = match ecs.resource::<PlayerSociety>().0 {
+        let society_handle = match ecs.resource::<PlayerSociety>().get() {
             None => {
                 context.text_disabled("You don't control a society");
                 return;

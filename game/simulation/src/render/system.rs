@@ -81,7 +81,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         // render in-game ui elements above entities
         for (transform, ui, selected) in (&transform, &ui, selected.maybe()).join() {
             // only render elements for the player's society
-            if player_soc.0 != ui.society() {
+            if !ui.society().map(|soc| *player_soc == soc).unwrap_or(true) {
                 continue;
             }
 

@@ -118,7 +118,7 @@ fn building(ecs: &EcsWorld) {
 
     let society = ecs
         .resource_mut::<PlayerSociety>()
-        .0
+        .get()
         .expect("no player society");
 
     let _humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
@@ -187,7 +187,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 
     let society = ecs
         .resource_mut::<PlayerSociety>()
-        .0
+        .get()
         .expect("no player society");
 
     // our lovely haulers
@@ -278,7 +278,7 @@ mod helpers {
             let player_society = self
                 .0
                 .resource::<PlayerSociety>()
-                .0
+                .get()
                 .expect("no player society");
             self.with_society(player_society)
         }

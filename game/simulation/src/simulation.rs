@@ -272,8 +272,8 @@ impl<R: Renderer> Simulation<R> {
         self.ecs_world.resource_mut()
     }
 
-    pub fn player_society(&mut self) -> &mut Option<SocietyHandle> {
-        &mut self.ecs_world.resource_mut::<PlayerSociety>().0
+    pub fn set_player_society(&mut self, soc: SocietyHandle) {
+        self.ecs_world.insert(PlayerSociety::with_society(soc));
     }
 
     fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
