@@ -206,6 +206,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * investigate thousands of occlusion updates for empty all-air slabs
 	* completely solid slabs (air, stone, etc) should be treated as a special case
 * switch away from `async_trait` when a non boxing impl is available
+* `rusttype` has a lot of arc abuse and temporary allocations - port to `ab_glyph`?
 
 ### Memory usage
 * CoW terrain slabs

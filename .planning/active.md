@@ -9,4 +9,5 @@
 * [X] optimisation: cache uniform locations
 * [X] camera zoom should not affect text size
 * [X] tidy text rendering code and with less temporary allocs
-* [ ] centre text
+* [X] centre text
+* [ ] actually use text for entities

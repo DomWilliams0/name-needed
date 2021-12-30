@@ -96,8 +96,6 @@ impl TextRenderer {
             (x * FONT_SIZE * RESOLUTION, -y * FONT_SIZE * RESOLUTION)
         };
 
-        // TODO centre string
-
         // safety: font lives as long as we are rendering
         let font: &'static Font<'static> = unsafe { std::mem::transmute(&self.font) };
         self.word_boundaries.push(self.glyphs.len());
@@ -110,16 +108,30 @@ impl TextRenderer {
             self.word_boundaries.drain(..).tuple_windows()
         };
         let zoom = 1.0 / ctx.zoom;
+
+        let half_height = {
+            // for centring
+            let scale = Scale::uniform(RESOLUTION);
+            self.font.v_metrics(scale).line_gap / 2.0
+        };
+
         for (start, end) in words {
             let word: &mut [PositionedGlyph] = &mut self.glyphs[start..end];
             debug_assert!(!word.is_empty(), "zero len string not allowed");
+
+            let half_width = {
+                // for centring
+                let first = &word[0].position();
+                let last = &word[word.len() - 1].position();
+                (last.x - first.x) / 2.0
+            };
 
             let offset = {
                 let first = &mut word[0];
                 let pos_orig = first.position();
                 let pos_new = Point {
-                    x: pos_orig.x * zoom,
-                    y: pos_orig.y * zoom,
+                    x: (pos_orig.x * zoom) - half_width,
+                    y: (pos_orig.y * zoom) + half_height,
                 };
 
                 first.set_position(pos_new);
