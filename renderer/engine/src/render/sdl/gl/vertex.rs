@@ -268,25 +268,24 @@ impl<'a> ScopedBind<'a, Vbo> {
 
     pub fn buffer_data_uninitialized<T: Sized>(
         &self,
-        len: usize,
+        count: usize,
         usage: BufferUsage,
     ) -> GlResult<()> {
-        unsafe {
-            let count = len;
-            let len = std::mem::size_of::<T>() * len;
+        let len = std::mem::size_of::<T>() * count;
 
+        unsafe {
             errchk!(gl::BufferData(
                 self.bind.into(),
                 len as isize,
                 null(),
                 usage.into(),
             ))?;
-
-            self.len.set(len);
-            self.count.set(count);
-            self.usage.set(Some(usage));
-            Ok(())
         }
+
+        self.len.set(len);
+        self.count.set(count);
+        self.usage.set(Some(usage));
+        Ok(())
     }
 
     pub fn draw_array(&self, primitive: Primitive) {

@@ -8,5 +8,5 @@
     * [X] line wrapping
 * [X] optimisation: cache uniform locations
 * [X] camera zoom should not affect text size
-* [ ] tidy text rendering code and with less temporary allocs
+* [X] tidy text rendering code and with less temporary allocs
 * [ ] centre text

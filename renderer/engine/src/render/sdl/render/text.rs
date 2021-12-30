@@ -1,6 +1,6 @@
 use crate::render::sdl::gl::{
-    AttribType, Bindable, BufferUsage, Capability, GlError, GlResult, Normalized, Primitive,
-    Program, ScopedBindable, Texture, Vao, Vbo,
+    AttribType, BufferUsage, Capability, GlError, GlResult, Normalized, Primitive, Program,
+    ScopedBindable, Texture, Vao, Vbo,
 };
 
 use crate::render::sdl::render::GlFrameContext;
@@ -8,7 +8,7 @@ use color::Color;
 use common::*;
 use resources::{ReadResource, ResourceContainer};
 use rusttype::gpu_cache::CacheBuilder;
-use rusttype::{vector, Font, Point, PositionedGlyph, Rect, Scale};
+use rusttype::{vector, Font, Point, PositionedGlyph, Scale};
 use unit::space::view::ViewPoint;
 use unit::world::WorldPoint;
 
@@ -54,7 +54,6 @@ impl TextRenderer {
             .build();
 
         let texture = Texture::new_2d(cache_size, cache_size)?;
-
         let program = Program::load(shaders_res, "text", "tex")?;
 
         let vao = Vao::new();
@@ -86,8 +85,11 @@ impl TextRenderer {
     }
 
     pub fn queue_text(&mut self, centre: WorldPoint, text: &str) {
-        let view_point = ViewPoint::from(centre);
+        if text.is_empty() {
+            return;
+        }
 
+        let view_point = ViewPoint::from(centre);
         let scale = Scale::uniform(RESOLUTION);
         let (x, y) = {
             let (x, y, _) = view_point.xyz();
@@ -96,44 +98,21 @@ impl TextRenderer {
 
         // TODO centre string
 
+        // safety: font lives as long as we are rendering
         let font: &'static Font<'static> = unsafe { std::mem::transmute(&self.font) };
-        let start = Point { x, y };
-        let glyphs = font.glyphs_for(text.chars()).scan((None, 0.0), |state, g| {
-            let (last, x) = state;
-            let g = g.scaled(scale);
-            if let Some(last) = *last {
-                *x += font.pair_kerning(scale, last, g.id());
-            }
-            let w = g.h_metrics().advance_width;
-            let next = g.positioned(start + vector(*x, 0.0));
-            *last = Some(next.id());
-            *x += w;
-            Some(next)
-        });
-
         self.word_boundaries.push(self.glyphs.len());
-        self.glyphs.extend(glyphs);
+        self.glyphs.extend(font.layout(text, scale, Point { x, y }));
     }
 
-    pub fn render_text(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
-        // TODO comptime this matrix multiplication
-        let invert_y_axis = Matrix4::from([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]);
-        let scale = Matrix4::from_scale(1.0 / (FONT_SIZE * RESOLUTION));
-        let transform = ctx.text_transform * invert_y_axis * scale;
-
+    fn queue_all_glyphs(&mut self, ctx: &GlFrameContext) {
         let words = {
             self.word_boundaries.push(self.glyphs.len());
             self.word_boundaries.drain(..).tuple_windows()
         };
         let zoom = 1.0 / ctx.zoom;
         for (start, end) in words {
-            // TODO ensure non zero len
-            let word = &mut self.glyphs[start..end];
+            let word: &mut [PositionedGlyph] = &mut self.glyphs[start..end];
+            debug_assert!(!word.is_empty(), "zero len string not allowed");
 
             let offset = {
                 let first = &mut word[0];
@@ -155,34 +134,72 @@ impl TextRenderer {
         for g in self.glyphs.iter_mut() {
             self.cache.queue_glyph(0, g.clone());
         }
+    }
 
-        let texture = self.texture.borrow();
+    pub fn render_text(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
+        self.queue_all_glyphs(ctx);
+
+        let transform = {
+            const SCALE: f32 = 1.0 / (FONT_SIZE * RESOLUTION);
+            let invert_y_axis_and_scale = Matrix4::from([
+                [SCALE, 0.0, 0.0, 0.0],
+                [0.0, -SCALE, 0.0, 0.0],
+                [0.0, 0.0, SCALE, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]);
+            ctx.text_transform * invert_y_axis_and_scale
+        };
+
         let mut uploads = 0;
-        let result = self.cache.cache_queued(|rect, data| {
-            let texture = texture.bind();
-            if let Err(err) = texture.sub_image(
-                [rect.min.x, rect.min.y],
-                [rect.width(), rect.height()],
-                data,
-            ) {
-                error!("failed to update font texture: {}", err);
-            } else {
-                uploads += 1;
+        loop {
+            let texture = self.texture.borrow();
+            let result = self.cache.cache_queued(|rect, data| {
+                let texture = texture.bind();
+                if let Err(err) = texture.sub_image(
+                    [rect.min.x, rect.min.y],
+                    [rect.width(), rect.height()],
+                    data,
+                ) {
+                    error!("failed to update font texture: {}", err);
+                } else {
+                    uploads += 1;
+                }
+            });
+
+            match result {
+                Err(err) => {
+                    let (w, h) = {
+                        let (w, h) = self.cache.dimensions();
+                        (w * 2, h * 2)
+                    };
+                    warn!("font cache error, increasing size"; "err" => %err, "new_size" => ?(w,h));
+                    self.cache
+                        .to_builder()
+                        .dimensions(w, h)
+                        .rebuild(&mut self.cache);
+                    self.texture = Texture::new_2d(w, h)?;
+                }
+                Ok(_) => break,
             }
-        });
+        }
 
         if uploads > 0 {
             debug!("uploaded {n} glyphs to gpu", n = uploads)
         }
 
-        match result {
-            // TODO resize cache
-            Err(err) => panic!("text fail {}", err),
-            Ok(_) => {}
+        if self.glyphs.is_empty() {
+            // no glyphs, nothing to do
+            return Ok(());
         }
 
-        // TODO reuse alloc
-        let mut vertices = vec![];
+        let _vao = self.vao.scoped_bind();
+        let prog = self.program.scoped_bind();
+        let vbo = self.vbo.scoped_bind();
+
+        let vertex_count = self.glyphs.len() * 6;
+        vbo.buffer_data_uninitialized::<Vertex>(vertex_count, BufferUsage::StreamDraw)?;
+        let mut vertices = vbo.map_write_only()?.unwrap(); // checked to be not empty
+        let mut i = 0;
 
         for glyph in &self.glyphs {
             let (uv_rect, screen_rect) = match self.cache.rect_for(0, glyph) {
@@ -191,58 +208,52 @@ impl TextRenderer {
                 no => panic!("damn {:?}", no),
             };
 
+            // TODO customise text colour
+            // TODO use instances or indices?
             let pos_min = (screen_rect.min.x as f32, screen_rect.min.y as f32);
             let pos_max = (screen_rect.max.x as f32, screen_rect.max.y as f32);
-            // TODO text colour
-            // TODO use instances?
             let colour = u32::from(Color::rgba(255, 255, 255, 255));
-            vertices.extend([
-                Vertex {
-                    pixel_pos: [pos_min.0 as f32, pos_max.1 as f32],
-                    tex_coords: [uv_rect.min.x, uv_rect.max.y],
-                    colour,
-                },
-                Vertex {
-                    pixel_pos: [pos_min.0 as f32, pos_min.1 as f32],
-                    tex_coords: [uv_rect.min.x, uv_rect.min.y],
-                    colour,
-                },
-                Vertex {
-                    pixel_pos: [pos_max.0 as f32, pos_min.1 as f32],
-                    tex_coords: [uv_rect.max.x, uv_rect.min.y],
-                    colour,
-                },
-                Vertex {
-                    pixel_pos: [pos_max.0 as f32, pos_min.1 as f32],
-                    tex_coords: [uv_rect.max.x, uv_rect.min.y],
-                    colour,
-                },
-                Vertex {
-                    pixel_pos: [pos_max.0 as f32, pos_max.1 as f32],
-                    tex_coords: [uv_rect.max.x, uv_rect.max.y],
-                    colour,
-                },
-                Vertex {
-                    pixel_pos: [pos_min.0 as f32, pos_max.1 as f32],
-                    tex_coords: [uv_rect.min.x, uv_rect.max.y],
-                    colour,
-                },
-            ]);
+
+            vertices[i] = Vertex {
+                pixel_pos: [pos_min.0, pos_max.1],
+                tex_coords: [uv_rect.min.x, uv_rect.max.y],
+                colour,
+            };
+            vertices[i + 1] = Vertex {
+                pixel_pos: [pos_min.0, pos_min.1],
+                tex_coords: [uv_rect.min.x, uv_rect.min.y],
+                colour,
+            };
+            vertices[i + 2] = Vertex {
+                pixel_pos: [pos_max.0, pos_min.1],
+                tex_coords: [uv_rect.max.x, uv_rect.min.y],
+                colour,
+            };
+            vertices[i + 3] = Vertex {
+                pixel_pos: [pos_max.0, pos_min.1],
+                tex_coords: [uv_rect.max.x, uv_rect.min.y],
+                colour,
+            };
+            vertices[i + 4] = Vertex {
+                pixel_pos: [pos_max.0, pos_max.1],
+                tex_coords: [uv_rect.max.x, uv_rect.max.y],
+                colour,
+            };
+            vertices[i + 5] = Vertex {
+                pixel_pos: [pos_min.0, pos_max.1],
+                tex_coords: [uv_rect.min.x, uv_rect.max.y],
+                colour,
+            };
+            i += 6;
         }
+
+        debug_assert_eq!(i, vertex_count);
 
         self.glyphs.clear();
 
-        {
-            let _vao = self.vao.scoped_bind();
-            let prog = self.program.scoped_bind();
-            let vbo = self.vbo.scoped_bind();
-
-            let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead
-            prog.set_uniform_matrix("transform\0", transform.as_ptr());
-            vbo.buffer_data(&vertices, BufferUsage::StreamDraw)?;
-            vbo.draw_array(Primitive::Triangles);
-        }
-
+        let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead
+        prog.set_uniform_matrix("transform\0", transform.as_ptr());
+        vbo.draw_array(Primitive::Triangles);
         Ok(())
     }
 }
