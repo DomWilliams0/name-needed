@@ -1,4 +1,4 @@
-# TODOs (397)
+# TODOs (396)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -472,8 +472,7 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (9)
-   * `// TODO normalised color`
+ * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (8)
    * `// TODO centre string`
    * `// TODO comptime this matrix multiplication`
    * `// TODO ensure non zero len`

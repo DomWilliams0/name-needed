@@ -4,6 +4,7 @@ use crate::render::sdl::gl::{
 };
 
 use crate::render::sdl::render::GlFrameContext;
+use color::Color;
 use common::*;
 use resources::{ReadResource, ResourceContainer};
 use rusttype::gpu_cache::CacheBuilder;
@@ -34,7 +35,7 @@ pub struct TextRenderer {
 struct Vertex {
     pixel_pos: [f32; 2],
     tex_coords: [f32; 2],
-    colour: [f32; 4],
+    colour: u32,
 }
 
 impl TextRenderer {
@@ -68,9 +69,8 @@ impl TextRenderer {
             vao.vertex_attribs()
                 .add(2, AttribType::Float32, Normalized::FixedPoint)
                 .add(2, AttribType::Float32, Normalized::FixedPoint)
-                .add(4, AttribType::Float32, Normalized::FixedPoint)
+                .add(4, AttribType::UByte, Normalized::Normalized)
                 .build()?;
-            // TODO normalised color
         }
 
         Ok(Self {
@@ -195,7 +195,7 @@ impl TextRenderer {
             let pos_max = (screen_rect.max.x as f32, screen_rect.max.y as f32);
             // TODO text colour
             // TODO use instances?
-            let colour = [1.0, 1.0, 1.0, 1.0];
+            let colour = u32::from(Color::rgba(255, 255, 255, 255));
             vertices.extend([
                 Vertex {
                     pixel_pos: [pos_min.0 as f32, pos_max.1 as f32],
