@@ -7,4 +7,6 @@
 	* [X] fix lite renderer
     * [X] line wrapping
 * [X] optimisation: cache uniform locations
-* [ ] camera zoom should not affect text size
+* [X] camera zoom should not affect text size
+* [ ] tidy text rendering code and with less temporary allocs
+* [ ] centre text

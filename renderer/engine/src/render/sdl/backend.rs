@@ -288,14 +288,16 @@ impl InitializedSimulationBackend for SdlBackendInit {
         Gl::clear();
 
         // calculate projection and view matrices
+        self.camera.update_interpolation(interpolation);
         let projection = self.camera.projection_matrix();
 
-        // position camera a fixed distance above the top of the terrain
-        const CAMERA_Z_OFFSET: f32 = 20.0;
         let terrain_range = self.world_viewer.terrain_range();
-        let view = self
-            .camera
-            .view_matrix(interpolation, terrain_range.size() as f32 + CAMERA_Z_OFFSET);
+        let camera_z = {
+            // position camera a fixed distance above the top of the terrain
+            const CAMERA_Z_OFFSET: f32 = 20.0;
+            terrain_range.size() as f32 + CAMERA_Z_OFFSET
+        };
+        let view = self.camera.view_matrix(camera_z);
 
         // render world
         self.renderer
@@ -306,6 +308,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
         let lower_limit = terrain_range.bottom().slice() as f32;
         let frame_ctx = GlFrameContext {
             projection,
+            text_transform: self.camera.scaled_text_transform_matrix(camera_z),
+            zoom: self.camera.zoom(),
             view,
             z_offset: lower_limit,
         };

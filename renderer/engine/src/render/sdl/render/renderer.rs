@@ -7,7 +7,7 @@ use simulation::{
     PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
     UiElementComponent,
 };
-use unit::world::WorldPoint;
+use unit::world::{WorldPoint, WorldPosition};
 
 use crate::render::debug::DebugShape;
 use crate::render::sdl::gl::{
@@ -32,9 +32,12 @@ pub struct GlRenderer {
 pub struct GlFrameContext {
     pub projection: Matrix4,
     pub view: Matrix4,
+    /// proj*view for text
+    pub text_transform: Matrix4,
 
     /// Amount to subtract from every entity's z pos, to normalize z around 0
     pub z_offset: f32,
+    pub zoom: f32,
 }
 
 #[repr(C)]

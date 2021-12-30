@@ -122,10 +122,42 @@ impl Camera {
         Point3::new(pos.x, pos.y, z)
     }
 
-    pub fn view_matrix(&mut self, interpolation: f64, z: f32) -> Matrix4 {
-        let pos = self.position(interpolation, z);
+    /// Call before getting view matrix
+    pub fn update_interpolation(&mut self, interpolation: f64) {
+        let pos = self.position(interpolation, 0.0);
         self.last_extrapolated_pos = Point2::new(pos.x, pos.y);
+    }
+
+    pub fn view_matrix(&self, z: f32) -> Matrix4 {
+        let pos = Point3 {
+            x: self.last_extrapolated_pos.x,
+            y: self.last_extrapolated_pos.y,
+            z,
+        };
         Matrix4::look_to_rh(pos, -AXIS_UP, AXIS_FWD)
+    }
+
+    /// Proj*view for text that's in the world but rendered at the same size regardless of zoom
+    pub fn scaled_text_transform_matrix(&self, z: f32) -> Matrix4 {
+        const ZOOM: f32 = 1.0 / SCREEN_SCALE;
+
+        let proj = ortho(
+            0.0,
+            ZOOM * self.window_size.x,
+            0.0,
+            ZOOM * self.window_size.y,
+            0.0,
+            100.0,
+        );
+
+        let pos = Point3 {
+            x: self.last_extrapolated_pos.x,
+            y: self.last_extrapolated_pos.y,
+            z,
+        };
+        let view = Matrix4::look_to_rh(pos / self.zoom, -AXIS_UP, AXIS_FWD);
+
+        proj * view
     }
 
     pub fn projection_matrix(&self) -> Matrix4 {
@@ -139,6 +171,10 @@ impl Camera {
             0.0,
             100.0,
         )
+    }
+
+    pub fn zoom(&self) -> f32 {
+        self.zoom
     }
 
     /// Returns (x, y) in world scale

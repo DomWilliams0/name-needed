@@ -1,4 +1,4 @@
-# TODOs (392)
+# TODOs (397)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -472,10 +472,15 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (4)
+ * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (9)
    * `// TODO normalised color`
+   * `// TODO centre string`
+   * `// TODO comptime this matrix multiplication`
+   * `// TODO ensure non zero len`
    * `// TODO resize cache`
-   * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
+   * `// TODO reuse alloc`
+   * `// TODO text colour`
+   * `// TODO use instances?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`

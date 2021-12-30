@@ -47,19 +47,6 @@ impl Texture {
     pub fn borrow(&self) -> BorrowedTexture {
         BorrowedTexture(self.0)
     }
-
-    pub fn clear(&self) -> GlResult<()> {
-        self.bind();
-        unsafe {
-            errchk!(gl::ClearTexImage(
-                self.0,
-                0, // LOD
-                gl::RED,
-                gl::UNSIGNED_BYTE,
-                [12_u8].as_ptr() as _,
-            ))
-        }
-    }
 }
 
 impl BorrowedTexture {
@@ -93,6 +80,18 @@ impl BoundTexture<'_> {
                 gl::RED,
                 gl::UNSIGNED_BYTE,
                 ptr as _,
+            ))
+        }
+    }
+
+    pub fn clear(&self) -> GlResult<()> {
+        unsafe {
+            errchk!(gl::ClearTexImage(
+                self.0,
+                0, // LOD
+                gl::RED,
+                gl::UNSIGNED_BYTE,
+                null() as *const _,
             ))
         }
     }

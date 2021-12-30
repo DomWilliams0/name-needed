@@ -1,48 +1,41 @@
 use crate::render::sdl::gl::{
-    AttribType, Bindable, BufferUsage, Capability, Divisor, Gl, GlError, GlResult, Normalized,
-    Primitive, Program, ScopedBindable, Texture, Vao, Vbo,
+    AttribType, Bindable, BufferUsage, Capability, GlError, GlResult, Normalized, Primitive,
+    Program, ScopedBindable, Texture, Vao, Vbo,
 };
 
 use crate::render::sdl::render::GlFrameContext;
 use common::*;
-use glyph_brush::ab_glyph::{point, FontVec, Rect};
-use glyph_brush::{
-    BrushAction, BrushError, BuiltInLineBreaker, GlyphBrush, GlyphBrushBuilder, GlyphVertex,
-    HorizontalAlign, Layout, Section, Text, VerticalAlign,
-};
 use resources::{ReadResource, ResourceContainer};
+use rusttype::gpu_cache::CacheBuilder;
+use rusttype::{vector, Font, Point, PositionedGlyph, Rect, Scale};
 use unit::space::view::ViewPoint;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 const RESOLUTION: f32 = 64.0;
 const FONT_SIZE: f32 = 4.0;
 const WORD_WRAP: f32 = 1.6;
 
 pub struct TextRenderer {
-    glyph_brush: GlyphBrush<Vertex, VertexExtra, FontVec>,
+    font: rusttype::Font<'static>,
+    cache: rusttype::gpu_cache::Cache<'static>,
+
+    glyphs: Vec<PositionedGlyph<'static>>,
+    word_boundaries: Vec<usize>,
+
     texture: Texture,
 
     program: Program,
     vao: Vao,
     vbo: Vbo,
-
-    vertex_count: usize,
 }
 
-#[repr(C, packed)]
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
+#[repr(C)]
 struct Vertex {
-    left_top: [f32; 3],
-    right_bottom: [f32; 2],
-
-    tex_left_top: [f32; 2],
-    tex_right_bottom: [f32; 2],
-
-    color: [f32; 4],
+    pixel_pos: [f32; 2],
+    tex_coords: [f32; 2],
+    colour: [f32; 4],
 }
-
-#[derive(Copy, Clone, Hash, PartialEq, Default)]
-struct VertexExtra {}
 
 impl TextRenderer {
     pub fn new(shaders_res: &resources::Shaders, fonts_res: &resources::Fonts) -> GlResult<Self> {
@@ -50,17 +43,16 @@ impl TextRenderer {
             let path = fonts_res.get_file("ProggyClean.ttf")?;
             trace!("loading font from {}", path.resource_path().display());
             let bytes = Vec::<u8>::read_resource(path)?;
-            FontVec::try_from_vec(bytes).map_err(|_| GlError::InvalidFont)?
+            Font::try_from_vec(bytes).ok_or(GlError::InvalidFont)?
         };
 
-        let glyph_brush = GlyphBrushBuilder::using_font(font)
-            .initial_cache_size((512, 512))
+        let cache_size = 512;
+        let cache = CacheBuilder::default()
+            .dimensions(cache_size, cache_size)
+            .position_tolerance(2.0) // ignore positions for caching
             .build();
 
-        let texture = {
-            let (w, h) = glyph_brush.texture_dimensions();
-            Texture::new_2d(w, h)?
-        };
+        let texture = Texture::new_2d(cache_size, cache_size)?;
 
         let program = Program::load(shaders_res, "text", "tex")?;
 
@@ -74,72 +66,57 @@ impl TextRenderer {
             program.bind_frag_data_location(0, "out_color\0")?;
 
             vao.vertex_attribs()
-                .add_instanced(
-                    3,
-                    AttribType::Float32,
-                    Normalized::FixedPoint,
-                    Divisor::PerInstances(1),
-                ) // left_top
-                .add_instanced(
-                    2,
-                    AttribType::Float32,
-                    Normalized::FixedPoint,
-                    Divisor::PerInstances(1),
-                ) // right_bottom
-                .add_instanced(
-                    2,
-                    AttribType::Float32,
-                    Normalized::FixedPoint,
-                    Divisor::PerInstances(1),
-                ) // tex_left_top
-                .add_instanced(
-                    2,
-                    AttribType::Float32,
-                    Normalized::FixedPoint,
-                    Divisor::PerInstances(1),
-                ) // tex_right_bottom
-                .add_instanced(
-                    4,
-                    AttribType::Float32,
-                    Normalized::FixedPoint,
-                    Divisor::PerInstances(1),
-                ) // color
+                .add(2, AttribType::Float32, Normalized::FixedPoint)
+                .add(2, AttribType::Float32, Normalized::FixedPoint)
+                .add(4, AttribType::Float32, Normalized::FixedPoint)
                 .build()?;
             // TODO normalised color
         }
 
         Ok(Self {
             program,
-            glyph_brush,
+            font,
+            cache,
+            glyphs: Vec::with_capacity(128),
+            word_boundaries: Vec::with_capacity(32),
             texture,
             vao,
             vbo,
-            vertex_count: 0,
         })
     }
 
     pub fn queue_text(&mut self, centre: WorldPoint, text: &str) {
         let view_point = ViewPoint::from(centre);
 
+        let scale = Scale::uniform(RESOLUTION);
         let (x, y) = {
             let (x, y, _) = view_point.xyz();
             (x * FONT_SIZE * RESOLUTION, -y * FONT_SIZE * RESOLUTION)
         };
 
-        self.glyph_brush.queue(
-            Section::<VertexExtra>::new()
-                .add_text(Text::default().with_text(text).with_scale(RESOLUTION))
-                .with_screen_position((x, y))
-                .with_bounds((WORD_WRAP * FONT_SIZE * RESOLUTION, f32::INFINITY))
-                .with_layout(
-                    Layout::default_wrap()
-                        .h_align(HorizontalAlign::Center)
-                        .v_align(VerticalAlign::Center),
-                ),
-        );
+        // TODO centre string
+
+        let font: &'static Font<'static> = unsafe { std::mem::transmute(&self.font) };
+        let start = Point { x, y };
+        let glyphs = font.glyphs_for(text.chars()).scan((None, 0.0), |state, g| {
+            let (last, x) = state;
+            let g = g.scaled(scale);
+            if let Some(last) = *last {
+                *x += font.pair_kerning(scale, last, g.id());
+            }
+            let w = g.h_metrics().advance_width;
+            let next = g.positioned(start + vector(*x, 0.0));
+            *last = Some(next.id());
+            *x += w;
+            Some(next)
+        });
+
+        self.word_boundaries.push(self.glyphs.len());
+        self.glyphs.extend(glyphs);
     }
 
     pub fn render_text(&mut self, ctx: &GlFrameContext) -> GlResult<()> {
+        // TODO comptime this matrix multiplication
         let invert_y_axis = Matrix4::from([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, -1.0, 0.0, 0.0],
@@ -147,113 +124,125 @@ impl TextRenderer {
             [0.0, 0.0, 0.0, 1.0],
         ]);
         let scale = Matrix4::from_scale(1.0 / (FONT_SIZE * RESOLUTION));
-        let transform = ctx.projection * ctx.view * invert_y_axis * scale;
+        let transform = ctx.text_transform * invert_y_axis * scale;
 
-        loop {
-            let texture = self.texture.borrow();
-            let action = self.glyph_brush.process_queued(
-                |rect, tex_data| {
-                    let texture = texture.bind();
-                    if let Err(err) =
-                        texture.sub_image(rect.min, [rect.width(), rect.height()], tex_data)
-                    {
-                        error!("failed to update font texture: {}", err);
-                    }
-                },
-                to_vertex,
-            );
+        let words = {
+            self.word_boundaries.push(self.glyphs.len());
+            self.word_boundaries.drain(..).tuple_windows()
+        };
+        let zoom = 1.0 / ctx.zoom;
+        for (start, end) in words {
+            // TODO ensure non zero len
+            let word = &mut self.glyphs[start..end];
 
-            match action {
-                Err(BrushError::TextureTooSmall { suggested, .. }) => {
-                    let max_image_dimension = Gl::max_texture_size();
+            let offset = {
+                let first = &mut word[0];
+                let pos_orig = first.position();
+                let pos_new = Point {
+                    x: pos_orig.x * zoom,
+                    y: pos_orig.y * zoom,
+                };
 
-                    let (new_width, new_height) = if (suggested.0 > max_image_dimension
-                        || suggested.1 > max_image_dimension)
-                        && (self.glyph_brush.texture_dimensions().0 < max_image_dimension
-                            || self.glyph_brush.texture_dimensions().1 < max_image_dimension)
-                    {
-                        (max_image_dimension, max_image_dimension)
-                    } else {
-                        suggested
-                    };
-                    debug!("resizing text glyph texture"; "size" => ?(new_width, new_height));
+                first.set_position(pos_new);
 
-                    self.texture = Texture::new_2d(new_width, new_height)?;
-                    self.glyph_brush.resize_texture(new_width, new_height);
-                    continue; // try again
-                }
-                Ok(BrushAction::Draw(verts)) => {
-                    trace!("draw {n} new text vertices", n = verts.len());
+                pos_new - pos_orig
+            };
 
-                    let _vao = self.vao.scoped_bind();
-                    let vbo = self.vbo.scoped_bind();
-                    vbo.buffer_data(&verts, BufferUsage::StreamDraw)?;
-                    self.vertex_count = verts.len();
-                }
-
-                Ok(BrushAction::ReDraw) => {}
+            for g in &mut word[1..] {
+                g.set_position(g.position() + offset);
             }
-
-            // only loop on error
-            break;
+        }
+        for g in self.glyphs.iter_mut() {
+            self.cache.queue_glyph(0, g.clone());
         }
 
-        if self.vertex_count > 0 {
+        let texture = self.texture.borrow();
+        let mut uploads = 0;
+        let result = self.cache.cache_queued(|rect, data| {
+            let texture = texture.bind();
+            if let Err(err) = texture.sub_image(
+                [rect.min.x, rect.min.y],
+                [rect.width(), rect.height()],
+                data,
+            ) {
+                error!("failed to update font texture: {}", err);
+            } else {
+                uploads += 1;
+            }
+        });
+
+        if uploads > 0 {
+            debug!("uploaded {n} glyphs to gpu", n = uploads)
+        }
+
+        match result {
+            // TODO resize cache
+            Err(err) => panic!("text fail {}", err),
+            Ok(_) => {}
+        }
+
+        // TODO reuse alloc
+        let mut vertices = vec![];
+
+        for glyph in &self.glyphs {
+            let (uv_rect, screen_rect) = match self.cache.rect_for(0, glyph) {
+                Ok(Some(r)) => r,
+                Ok(None) => continue,
+                no => panic!("damn {:?}", no),
+            };
+
+            let pos_min = (screen_rect.min.x as f32, screen_rect.min.y as f32);
+            let pos_max = (screen_rect.max.x as f32, screen_rect.max.y as f32);
+            // TODO text colour
+            // TODO use instances?
+            let colour = [1.0, 1.0, 1.0, 1.0];
+            vertices.extend([
+                Vertex {
+                    pixel_pos: [pos_min.0 as f32, pos_max.1 as f32],
+                    tex_coords: [uv_rect.min.x, uv_rect.max.y],
+                    colour,
+                },
+                Vertex {
+                    pixel_pos: [pos_min.0 as f32, pos_min.1 as f32],
+                    tex_coords: [uv_rect.min.x, uv_rect.min.y],
+                    colour,
+                },
+                Vertex {
+                    pixel_pos: [pos_max.0 as f32, pos_min.1 as f32],
+                    tex_coords: [uv_rect.max.x, uv_rect.min.y],
+                    colour,
+                },
+                Vertex {
+                    pixel_pos: [pos_max.0 as f32, pos_min.1 as f32],
+                    tex_coords: [uv_rect.max.x, uv_rect.min.y],
+                    colour,
+                },
+                Vertex {
+                    pixel_pos: [pos_max.0 as f32, pos_max.1 as f32],
+                    tex_coords: [uv_rect.max.x, uv_rect.max.y],
+                    colour,
+                },
+                Vertex {
+                    pixel_pos: [pos_min.0 as f32, pos_max.1 as f32],
+                    tex_coords: [uv_rect.min.x, uv_rect.max.y],
+                    colour,
+                },
+            ]);
+        }
+
+        self.glyphs.clear();
+
+        {
             let _vao = self.vao.scoped_bind();
             let prog = self.program.scoped_bind();
             let vbo = self.vbo.scoped_bind();
 
             let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead
             prog.set_uniform_matrix("transform\0", transform.as_ptr());
-            vbo.draw_array_instanced(Primitive::TriangleStrip, 0, 4, self.vertex_count)?;
+            vbo.buffer_data(&vertices, BufferUsage::StreamDraw)?;
+            vbo.draw_array(Primitive::Triangles);
         }
 
         Ok(())
-    }
-}
-
-fn to_vertex(
-    GlyphVertex {
-        mut tex_coords,
-        pixel_coords,
-        bounds,
-        ..
-    }: GlyphVertex<VertexExtra>,
-) -> Vertex {
-    let gl_bounds = bounds;
-
-    let mut gl_rect = Rect {
-        min: point(pixel_coords.min.x as f32, pixel_coords.min.y as f32),
-        max: point(pixel_coords.max.x as f32, pixel_coords.max.y as f32),
-    };
-
-    // handle overlapping bounds, modify uv_rect to preserve texture aspect
-    if gl_rect.max.x > gl_bounds.max.x {
-        let old_width = gl_rect.width();
-        gl_rect.max.x = gl_bounds.max.x;
-        tex_coords.max.x = tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
-    }
-    if gl_rect.min.x < gl_bounds.min.x {
-        let old_width = gl_rect.width();
-        gl_rect.min.x = gl_bounds.min.x;
-        tex_coords.min.x = tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
-    }
-    if gl_rect.max.y > gl_bounds.max.y {
-        let old_height = gl_rect.height();
-        gl_rect.max.y = gl_bounds.max.y;
-        tex_coords.max.y = tex_coords.min.y + tex_coords.height() * gl_rect.height() / old_height;
-    }
-    if gl_rect.min.y < gl_bounds.min.y {
-        let old_height = gl_rect.height();
-        gl_rect.min.y = gl_bounds.min.y;
-        tex_coords.min.y = tex_coords.max.y - tex_coords.height() * gl_rect.height() / old_height;
-    }
-
-    Vertex {
-        left_top: [gl_rect.min.x, gl_rect.max.y, 0.0],
-        right_bottom: [gl_rect.max.x, gl_rect.min.y],
-        tex_left_top: [tex_coords.min.x, tex_coords.max.y],
-        tex_right_bottom: [tex_coords.max.x, tex_coords.min.y],
-        color: [1.0, 1.0, 1.0, 1.0],
     }
 }
