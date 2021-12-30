@@ -133,6 +133,9 @@ pub struct Vbo {
     /// Bytes
     len: Cell<usize>,
 
+    /// Vertices
+    count: Cell<usize>,
+
     bind: VboBind,
     usage: Cell<Option<BufferUsage>>,
 }
@@ -147,6 +150,7 @@ impl Vbo {
         Self {
             obj,
             len: Cell::new(0),
+            count: Cell::new(0),
             bind,
             usage: Cell::new(None),
         }
@@ -234,6 +238,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         }
 
         self.len.set(new_len);
+        self.count.set(buf.len());
         self.usage.set(Some(usage));
         Ok(())
     }
@@ -267,6 +272,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         usage: BufferUsage,
     ) -> GlResult<()> {
         unsafe {
+            let count = len;
             let len = std::mem::size_of::<T>() * len;
 
             errchk!(gl::BufferData(
@@ -277,6 +283,7 @@ impl<'a> ScopedBind<'a, Vbo> {
             ))?;
 
             self.len.set(len);
+            self.count.set(count);
             self.usage.set(Some(usage));
             Ok(())
         }
@@ -284,7 +291,7 @@ impl<'a> ScopedBind<'a, Vbo> {
 
     pub fn draw_array(&self, primitive: Primitive) {
         unsafe {
-            gl::DrawArrays(primitive.into(), 0, self.len.get() as GLint);
+            gl::DrawArrays(primitive.into(), 0, self.count.get() as GLint);
         }
     }
 
@@ -295,9 +302,9 @@ impl<'a> ScopedBind<'a, Vbo> {
         vertex_count: usize,
         instance_count: usize,
     ) -> GlResult<()> {
-        if first + vertex_count > self.len.get() {
+        if first + vertex_count > self.count.get() {
             return Err(GlError::BufferTooSmall {
-                real_len: self.len.get(),
+                real_len: self.count.get(),
                 requested_len: first + vertex_count,
             });
         }
@@ -340,6 +347,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         unsafe {
             let sizeof = std::mem::size_of::<T>();
             let count = self.len.get() / sizeof;
+            debug_assert_eq!(count, self.count.get());
             debug_assert_eq!(self.len.get() % sizeof, 0);
 
             let ptr = errchk!(gl::MapBuffer(self.bind.into(), gl::WRITE_ONLY))? as *mut T;
