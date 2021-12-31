@@ -15,5 +15,5 @@
 * [ ] random human name generation
 * [X] always show stack size, human name
 * [ ] show more detail when entity is selected, or mouse is near
-* [ ] remove obsolete entity name debug renderer
-* [ ] ensure entity id debug renderer is always visible
+* [X] remove obsolete entity name debug renderer
+* [X] ensure entity id debug renderer is always visible
