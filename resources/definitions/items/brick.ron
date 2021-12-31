@@ -2,8 +2,8 @@
   (
     uid: "core_brick_stone",
     components: [
-      {"name": (
-        name: "Stone brick",
+      {"kind": (
+        singular: "Stone brick",
       )},
       {"breakable": ()},
       {"haulable": (

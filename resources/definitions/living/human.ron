@@ -2,7 +2,7 @@
   (
     uid: "core_living_human",
     components: [
-      {"name": (name: "Human")},
+      {"kind": (singular: "Human")},
       {"render": (
         color: (r: 0.2, g: 0.5, b: 0.8),
         shape: "Circle",

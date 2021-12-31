@@ -1,9 +1,7 @@
 pub use self::inventory::{
     Container, ContainerComponent, ContainerError, ContainerResolver, FoundSlot, InventoryComponent,
 };
-pub use component::{
-    ConditionComponent, EdibleItemComponent, NameComponent, ThrowableItemComponent,
-};
+pub use component::{ConditionComponent, EdibleItemComponent, ThrowableItemComponent};
 pub use condition::{ItemCondition, ItemConditionGrade};
 pub use containers::{ContainedInComponent, ContainersError, StackableComponent};
 pub use filter::{ItemFilter, ItemFilterable};

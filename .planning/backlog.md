@@ -207,6 +207,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* completely solid slabs (air, stone, etc) should be treated as a special case
 * switch away from `async_trait` when a non boxing impl is available
 * `rusttype` has a lot of arc abuse and temporary allocations - port to `ab_glyph`?
+* ensure commonly held components like transform are always used in their entirety in systems, if
+    not then split into smaller components. e.g. transform pos+rot in rendering
 
 ### Memory usage
 * CoW terrain slabs

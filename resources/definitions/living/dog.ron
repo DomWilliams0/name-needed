@@ -2,7 +2,7 @@
   (
     uid: "core_living_dog",
     components: [
-      {"name": (name: "Dog")},
+      {"kind": (singular: "Dog")},
       {"render": (
         color: "8B4513",
         shape: "Circle",

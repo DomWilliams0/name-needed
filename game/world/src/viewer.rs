@@ -65,6 +65,7 @@ impl SliceRange {
         Self::from_bounds_unchecked(GlobalSliceIndex::bottom(), GlobalSliceIndex::top())
     }
 
+    #[inline]
     pub fn contains<S: Into<GlobalSliceIndex>>(self, slice: S) -> bool {
         let slice = slice.into();
         self.as_range().contains(&slice.slice())

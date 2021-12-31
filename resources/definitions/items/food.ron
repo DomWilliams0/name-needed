@@ -2,8 +2,8 @@
   (
     uid: "core_food_apple",
     components: [
-      {"name": (
-        name: "Apple",
+      {"kind": (
+        singular: "Apple",
       )},
       {"breakable": ()},
       {"haulable": (

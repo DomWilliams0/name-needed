@@ -12,7 +12,7 @@ use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::render::UiElementComponent;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
-use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
+use crate::{ItemStackComponent, PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -36,20 +36,45 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         Read<'a, PlayerSociety>,
         Read<'a, SelectedTiles>,
+        Read<'a, EntitiesRes>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
         ReadStorage<'a, PhysicalComponent>,
         ReadStorage<'a, SelectedComponent>,
+        WriteStorage<'a, DisplayComponent>,
         ReadStorage<'a, UiElementComponent>,
+        ReadStorage<'a, ItemStackComponent>,
+        ReadStorage<'a, KindComponent>,
+        ReadStorage<'a, NameComponent>,
     );
 
     fn run(
         &mut self,
-        (player_soc, selected_block, transform, render, physical, selected, ui): Self::SystemData,
+        (
+            player_soc,
+            selected_block,
+            entities,
+            transform,
+            render,
+            physical,
+            selected,
+            mut display,
+            ui,
+            stack,
+            kind,
+            name,
+        ): Self::SystemData,
     ) {
         // render entities
-        for (transform, render, physical, selected) in
-            (&transform, &render, &physical, selected.maybe()).join()
+        for (e, transform, render, physical, display, selected) in (
+            &entities,
+            &transform,
+            &render,
+            &physical,
+            (&mut display).maybe(),
+            (&selected).maybe(),
+        )
+            .join()
         {
             if !self.slices.contains(transform.slice()) {
                 continue;
@@ -69,6 +94,14 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 
             if selected.is_some() {
                 self.renderer.sim_selected(&transform_desc, physical);
+            }
+
+            if let Some(display) = display {
+                // TODO ignore none case
+                let text = display
+                    .render(|| (e, &stack, &kind, &name))
+                    .unwrap_or("GONE");
+                self.renderer.debug_text(transform_desc.position, text);
             }
         }
 

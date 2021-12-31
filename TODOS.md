@@ -1,4 +1,4 @@
-# TODOs (391)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -203,6 +203,17 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
+ * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (10)
+   * `// TODO smol string and/or cow and/or pool common strings`
+   * `// TODO evict display component cache periodically`
+   * `// TODO smolstr to use the slack space`
+   * `// TODO reuse string storage when switching back to prepared`
+   * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
+   * `// TODO reuse vec`
+   * `// TODO vary when selected/near mouse`
+   * `// TODO can replacing all components be done better? or just occasionally`
+   * `// TODO reuse alloc`
+   * `// TODO`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
    * `// TODO move item scattering to a utility function`
@@ -221,8 +232,7 @@
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
-   * `// TODO smol string and/or cow and/or pool common strings`
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
@@ -290,9 +300,11 @@
    * `// TODO perfect use case for a per-tick arena allocator`
    * `// TODO dynstack impl`
    * `// TODO try to use a slog scope here`
- * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
+ * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (2)
+   * `// TODO take dyn Display instead`
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (2)
+ * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (3)
+   * `// TODO ignore none case`
    * `// TODO interpolation needed on ui elements?`
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/render/ui.rs](game/simulation/src/render/ui.rs) (1)
@@ -497,8 +509,9 @@
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
    * `// TODO middle of requested chunk instead of corner`
- * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (2)
    * `// TODO random pos offset away from the voxel centre`
+   * `// TODO actually generate name`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)

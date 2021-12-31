@@ -1,8 +1,9 @@
+use crate::ecs::name::KindComponent;
 use crate::ecs::*;
 use crate::render::DebugRenderer;
 use crate::{
-    InnerWorldRef, ItemStackComponent, NameComponent, Renderer, ThreadedWorldLoader,
-    TransformComponent, WorldViewer,
+    InnerWorldRef, ItemStackComponent, Renderer, ThreadedWorldLoader, TransformComponent,
+    WorldViewer,
 };
 use std::fmt::Write;
 use unit::world::WorldPoint;
@@ -70,7 +71,7 @@ impl<R: Renderer> DebugRenderer<R> for EntityNameDebugRenderer {
     ) {
         type Query<'a> = (
             ReadStorage<'a, TransformComponent>,
-            ReadStorage<'a, NameComponent>,
+            ReadStorage<'a, KindComponent>,
             ReadStorage<'a, ItemStackComponent>,
         );
 
@@ -85,9 +86,9 @@ impl<R: Renderer> DebugRenderer<R> for EntityNameDebugRenderer {
             self.0.clear();
 
             let _ = write!(&mut self.0, "{}", name);
-            if let (NameComponent::StackOf(_), Some(stack)) = (name, stack_opt) {
-                let _ = write!(&mut self.0, " x{}", stack.stack.total_count());
-            }
+            // if let (LabelComponent::StackOf(_), Some(stack)) = (name, stack_opt) {
+            //     let _ = write!(&mut self.0, " x{}", stack.stack.total_count());
+            // }
 
             let pos = transform.position - WorldPoint::new_unchecked(PAD, PAD, 0.0);
             renderer.debug_text(pos, &self.0);

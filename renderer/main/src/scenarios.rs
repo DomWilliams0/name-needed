@@ -63,6 +63,7 @@ fn following_dogs(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -94,6 +95,7 @@ fn wander_and_eat(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .with_satiety(satiety)
             .thanks()
     });
@@ -125,6 +127,7 @@ fn building(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -195,6 +198,7 @@ fn haul_to_container(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -214,6 +218,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
+    use crate::simulation::NameComponent;
     use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use engine::simulation;
@@ -289,6 +294,13 @@ mod helpers {
                 .map(|mut hunger| hunger.set_satiety(satiety))
                 .expect("hunger component");
 
+            self
+        }
+
+        pub fn with_name(self) -> Self {
+            // TODO actually generate name
+            let name = "Ken";
+            let _ = self.0.add_now(self.1, NameComponent::new(name.to_owned()));
             self
         }
 

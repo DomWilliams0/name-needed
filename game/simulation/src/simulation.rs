@@ -224,6 +224,9 @@ impl<R: Renderer> Simulation<R> {
 
         // prune ui elements
         UiElementPruneSystem.run_now(&self.ecs_world);
+
+        // update display text for rendering
+        DisplayTextSystem.run_now(&self.ecs_world);
     }
 
     fn delete_queued_entities(&mut self) {

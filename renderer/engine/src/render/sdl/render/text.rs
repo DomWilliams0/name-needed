@@ -8,7 +8,7 @@ use color::Color;
 use common::*;
 use resources::{ReadResource, ResourceContainer};
 use rusttype::gpu_cache::CacheBuilder;
-use rusttype::{vector, Font, Point, PositionedGlyph, Scale};
+use rusttype::{Font, Point, PositionedGlyph, Scale};
 use unit::space::view::ViewPoint;
 use unit::world::WorldPoint;
 
@@ -259,7 +259,7 @@ impl TextRenderer {
             i += 6;
         }
 
-        debug_assert_eq!(i, vertex_count);
+        debug_assert!(i <= vertex_count);
 
         self.glyphs.clear();
 

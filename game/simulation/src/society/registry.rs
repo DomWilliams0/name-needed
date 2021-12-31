@@ -102,6 +102,18 @@ impl PartialEq<SocietyHandle> for PlayerSociety {
     }
 }
 
+impl PartialEq<Option<SocietyHandle>> for PlayerSociety {
+    fn eq(&self, other: &Option<SocietyHandle>) -> bool {
+        if let Visibility::All = self.visibility {
+            true
+        } else if let Some((me, other)) = self.own.zip(*other) {
+            me == other
+        } else {
+            false
+        }
+    }
+}
+
 impl PlayerSociety {
     pub fn with_society(soc: SocietyHandle) -> Self {
         Self {

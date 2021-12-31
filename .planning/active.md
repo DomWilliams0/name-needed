@@ -10,4 +10,10 @@
 * [X] camera zoom should not affect text size
 * [X] tidy text rendering code and with less temporary allocs
 * [X] centre text
-* [ ] actually use text for entities
+* [X] separate Name and Label components
+* [ ] label specifies plural
+* [ ] random human name generation
+* [X] always show stack size, human name
+* [ ] show more detail when entity is selected, or mouse is near
+* [ ] remove obsolete entity name debug renderer
+* [ ] ensure entity id debug renderer is always visible

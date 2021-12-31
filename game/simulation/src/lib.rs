@@ -35,7 +35,10 @@ pub use activity::{
     LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
+pub use ecs::{
+    Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity, KindComponent,
+    NameComponent,
+};
 pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
@@ -46,7 +49,7 @@ pub use item::validation::validate_all_inventories;
 pub use item::{
     ConditionComponent, ContainedInComponent, Container, ContainerComponent, ContainersError,
     EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
-    ItemStackError, NameComponent, StackableComponent,
+    ItemStackError, StackableComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;

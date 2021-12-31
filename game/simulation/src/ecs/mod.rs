@@ -9,6 +9,7 @@ pub use component::{ComponentBuildError, ComponentEntry, InteractiveComponent, M
 pub use debug::{EntityIdDebugRenderer, EntityNameDebugRenderer};
 pub use ecs_derive::EcsComponent;
 pub use entity::{Entity, EntityBomb, EntityWrapper};
+pub use name::{DisplayComponent, DisplayTextSystem, KindComponent, NameComponent};
 pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
 
 pub use crate::register_component_template;
@@ -21,6 +22,7 @@ pub use self::world::{
 mod component;
 mod debug;
 mod entity;
+mod name;
 mod template;
 mod world;
 mod world_ext;
