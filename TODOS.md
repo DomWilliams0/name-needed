@@ -1,4 +1,4 @@
-# TODOs (403)
+# TODOs (401)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -203,14 +203,13 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
- * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (9)
+ * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (8)
    * `// TODO smol string and/or cow and/or pool common strings`
    * `// TODO smolstr to use the slack space`
    * `// TODO reuse string storage when switching back to prepared`
    * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
    * `// TODO reuse allocs`
    * `// TODO can replacing all components be done better? or just occasionally`
-   * `// TODO reuse alloc`
    * `// TODO use plural`
    * `// TODO`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
@@ -304,8 +303,7 @@
  * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (2)
    * `// TODO take dyn Display instead`
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
- * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (3)
-   * `// TODO ignore none case`
+ * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (2)
    * `// TODO interpolation needed on ui elements?`
    * `// TODO when shape2d variants are units, ron just gets "Unit" and fails to parse it`
  * [game/simulation/src/render/ui.rs](game/simulation/src/render/ui.rs) (1)

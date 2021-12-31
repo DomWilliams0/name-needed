@@ -19,4 +19,4 @@
 * [X] ensure entity id debug renderer is always visible
 * [ ] render text at proper in-world z
 * [ ] show name in ui, update kind label
-* [ ] fewer temporary allocs in display system
+* [X] fewer temporary allocs in display system

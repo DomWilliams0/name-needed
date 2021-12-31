@@ -49,7 +49,12 @@ enum PreparedDisplay {
 
 const HOVER_RADIUS: f32 = 2.0;
 
-pub struct DisplayTextSystem;
+#[derive(Default)]
+pub struct DisplayTextSystem {
+    preparation: HashMap<specs::Entity, PreparedDisplay>,
+    nearby_cache: HashSet<specs::Entity>,
+    removal_cache: Vec<specs::Entity>,
+}
 
 impl<'a> System<'a> for DisplayTextSystem {
     type SystemData = (
@@ -83,24 +88,23 @@ impl<'a> System<'a> for DisplayTextSystem {
         // TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?
         // TODO reuse allocs
 
-        let mut new_displays = HashMap::new();
-
         for (e, _, society) in (&entities, &name, (&society).maybe()).join() {
             // always display name for named society members
             if *player_soc == society.map(|soc| soc.handle) {
-                new_displays.insert(e, PreparedDisplay::Name);
+                self.preparation.insert(e, PreparedDisplay::Name);
             }
         }
 
         // show more info for entities close to the mouse
-        let nearby = spatial
-            .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
-            .map(|(e, _, _)| e)
-            .take(32)
-            .collect::<HashSet<_>>();
+        self.nearby_cache.extend(
+            spatial
+                .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
+                .map(|(e, _, _)| specs::Entity::from(e))
+                .take(32),
+        );
 
         for (e, stack, selected) in (&entities, (&stack).maybe(), (&selected).maybe()).join() {
-            let more_info = selected.is_some() || nearby.contains(&e.into());
+            let more_info = selected.is_some() || self.nearby_cache.contains(&e);
 
             let prep = match stack {
                 Some(stack) => {
@@ -125,12 +129,12 @@ impl<'a> System<'a> for DisplayTextSystem {
                 }
             };
 
-            new_displays.insert(e, prep);
+            self.preparation.insert(e, prep);
         }
 
         // apply changes
         // TODO can replacing all components be done better? or just occasionally
-        for (e, ty) in new_displays.iter() {
+        for (e, ty) in self.preparation.iter() {
             let entry = display.entry(*e).unwrap(); // wont be wrong gen
             let content = DisplayContent::Prepared(Some(*ty));
             match entry {
@@ -143,36 +147,38 @@ impl<'a> System<'a> for DisplayTextSystem {
 
         // periodic cleanup
         let tick = Tick::fetch();
-        if tick.value() % 50 == 0 {
+        if tick.value() % 200 == 0 {
             // remove unneeded display components
-            // TODO reuse alloc
-            let to_remove = (&entities, &display)
-                .join()
-                .filter_map(|(e, _)| {
-                    if !new_displays.contains_key(&e) {
-                        Some(e)
-                    } else {
-                        None
-                    }
-                })
-                .collect_vec();
-
-            for e in &to_remove {
-                let _ = display.remove(*e);
+            let mut removal = std::mem::take(&mut self.removal_cache);
+            removal.extend((&entities, &display).join().filter_map(|(e, _)| {
+                if !self.preparation.contains_key(&e) {
+                    Some(e)
+                } else {
+                    None
+                }
+            }));
+            let n = removal.len();
+            for e in removal.drain(..) {
+                let _ = display.remove(e);
             }
-
-            let n = to_remove.len();
             trace!("removed {n} unneeded DisplayComponents", n = n);
+
+            let empty = std::mem::replace(&mut self.removal_cache, removal);
+            debug_assert!(empty.is_empty());
+            std::mem::forget(empty);
         } else {
             // just nop them
             let mut display_restricted = display.restrict_mut();
             for (e, mut display) in (&entities, &mut display_restricted).join() {
-                if !new_displays.contains_key(&e) {
+                if !self.preparation.contains_key(&e) {
                     let display = display.get_mut_unchecked();
                     display.content = DisplayContent::Prepared(None);
                 }
             }
         }
+
+        self.nearby_cache.clear();
+        self.preparation.clear();
     }
 }
 

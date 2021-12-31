@@ -94,9 +94,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
                 self.renderer.sim_selected(&transform_desc, physical);
             }
 
-            if let Some(display) = display {
-                // TODO ignore none case
-                let text = display.render(|| (e, &kind, &name)).unwrap_or("GONE");
+            if let Some(text) = display.and_then(|d| d.render(|| (e, &kind, &name))) {
                 self.renderer.debug_text(transform_desc.position, text);
             }
         }

@@ -82,6 +82,9 @@ pub struct Simulation<R: Renderer> {
 
     debug_renderers: DebugRenderers<R>,
     scripting: ScriptingContext,
+
+    /// One off system that caches some allocations
+    display_text_system: DisplayTextSystem,
 }
 
 /// A little bundle of references to the game state without the generic [Renderer] param
@@ -150,6 +153,7 @@ impl<R: Renderer> Simulation<R> {
             terrain_changes: HashSet::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
             scripting: ScriptingContext::new()?,
+            display_text_system: DisplayTextSystem::default(),
         })
     }
 
@@ -243,7 +247,7 @@ impl<R: Renderer> Simulation<R> {
         UiElementPruneSystem.run_now(&self.ecs_world);
 
         // update display text for rendering
-        DisplayTextSystem.run_now(&self.ecs_world);
+        self.display_text_system.run_now(&self.ecs_world);
     }
 
     fn delete_queued_entities(&mut self) {
