@@ -12,8 +12,8 @@ use rusttype::{Font, Point, PositionedGlyph, Scale};
 use unit::space::view::ViewPoint;
 use unit::world::WorldPoint;
 
-const RESOLUTION: f32 = 64.0;
-const FONT_SIZE: f32 = 4.0;
+const RESOLUTION: f32 = 128.0;
+const FONT_SIZE: f32 = 5.0;
 const WORD_WRAP: f32 = 1.6;
 
 pub struct TextRenderer {
