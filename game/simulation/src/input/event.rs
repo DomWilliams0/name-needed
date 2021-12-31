@@ -5,6 +5,7 @@ use crate::InnerWorldRef;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldColumn {
+    // TODO NotNan these
     /// Must be non-NaN and finite
     pub x: f32,
     /// Must be non-NaN and finite
@@ -19,6 +20,10 @@ pub enum InputEvent {
     /// (_, from ,to)
     Select(SelectType, WorldColumn, WorldColumn),
 }
+
+/// Resource for current mouse location in WORLD SPACE
+#[derive(Default)]
+pub struct MouseLocation(pub WorldPoint);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SelectType {

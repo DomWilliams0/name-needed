@@ -1,13 +1,11 @@
-use crate::ecs::name::KindComponent;
 use crate::ecs::*;
+
 use crate::render::DebugRenderer;
 use crate::society::SocietyVisibility;
 use crate::{
-    InnerWorldRef, ItemStackComponent, PlayerSociety, Renderer, ThreadedWorldLoader,
-    TransformComponent, WorldViewer,
+    InnerWorldRef, PlayerSociety, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer,
 };
 use std::fmt::Write;
-use unit::world::WorldPoint;
 
 #[derive(Default)]
 pub struct EntityIdDebugRenderer(String);

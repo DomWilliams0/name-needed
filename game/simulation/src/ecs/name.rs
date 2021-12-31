@@ -2,8 +2,10 @@ use crate::ecs::*;
 use crate::{ItemStackComponent, PlayerSociety, SocietyComponent, Tick, TransformComponent};
 use common::*;
 
+use crate::input::{MouseLocation, SelectedComponent};
+use crate::spatial::{Spatial, Transforms};
 use specs::storage::StorageEntry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::hint::unreachable_unchecked;
 
@@ -45,43 +47,85 @@ enum PreparedDisplay {
     Name,
 }
 
+const HOVER_RADIUS: f32 = 2.0;
+
 pub struct DisplayTextSystem;
 
 impl<'a> System<'a> for DisplayTextSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, PlayerSociety>,
+        Read<'a, Spatial>,
+        Read<'a, MouseLocation>,
+        ReadStorage<'a, TransformComponent>,
+        ReadStorage<'a, SelectedComponent>,
         ReadStorage<'a, SocietyComponent>,
         ReadStorage<'a, NameComponent>,
-        ReadStorage<'a, KindComponent>,
         ReadStorage<'a, ItemStackComponent>,
         WriteStorage<'a, DisplayComponent>,
     );
 
     fn run(
         &mut self,
-        (entities, player_soc, society, name, kind, stack, mut display): Self::SystemData,
+        (
+            entities,
+            player_soc,
+            spatial,
+            mouse,
+            transforms,
+            selected,
+            society,
+            name,
+            stack,
+            mut display,
+        ): Self::SystemData,
     ) {
         // TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?
+        // TODO reuse allocs
 
-        // TODO reuse vec
         let mut new_displays = HashMap::new();
 
-        for (e, _, society) in (&entities, &name, society.maybe()).join() {
+        for (e, _, society) in (&entities, &name, (&society).maybe()).join() {
             // always display name for named society members
             if *player_soc == society.map(|soc| soc.handle) {
                 new_displays.insert(e, PreparedDisplay::Name);
             }
         }
 
-        // TODO vary when selected/near mouse
+        // show more info for entities close to the mouse
+        let nearby = spatial
+            .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
+            .map(|(e, _, _)| e)
+            .take(32)
+            .collect::<HashSet<_>>();
 
-        for (e, stack) in (&entities, &stack).join() {
-            // display item stack count
-            let count = stack.stack.total_count();
-            if count > 1 {
-                new_displays.insert(e, PreparedDisplay::ItemStackCount(count));
-            }
+        for (e, stack, selected) in (&entities, (&stack).maybe(), (&selected).maybe()).join() {
+            let more_info = selected.is_some() || nearby.contains(&e.into());
+
+            let prep = match stack {
+                Some(stack) => {
+                    match stack.stack.total_count() {
+                        n if n <= 1 => continue,
+                        n if more_info => {
+                            // show type as well as count
+                            PreparedDisplay::ItemStackFull(n)
+                        }
+                        n => {
+                            // just stack count
+                            PreparedDisplay::ItemStackCount(n)
+                        }
+                    }
+                }
+                None => {
+                    if more_info {
+                        PreparedDisplay::Kind
+                    } else {
+                        continue;
+                    }
+                }
+            };
+
+            new_displays.insert(e, prep);
         }
 
         // apply changes
@@ -137,7 +181,6 @@ impl DisplayComponent {
         'a,
         F: Fn() -> (
             specs::Entity,
-            &'a ReadStorage<'a, ItemStackComponent>,
             &'a ReadStorage<'a, KindComponent>,
             &'a ReadStorage<'a, NameComponent>,
         ),
@@ -151,30 +194,23 @@ impl DisplayComponent {
                 None => return None,
             };
 
-            let (e, stacks, kinds, names) = fetch();
-            let error = |comp: &'static str| -> ! {
-                panic!(
-                    "{} doesn't have a {} component but expected it in DisplayComponent",
-                    Entity::from(e),
-                    comp
-                )
-            };
-
+            let (e, kinds, names) = fetch();
             let rendered = match prep {
                 PreparedDisplay::ItemStackCount(n) => {
                     format!("x{}", n)
                 }
                 PreparedDisplay::ItemStackFull(n) => {
-                    let stack = stacks.get(e).unwrap_or_else(|| error("item stack"));
-                    todo!("full stack")
+                    let kind = kinds.get(e)?;
+                    // TODO use plural
+                    format!("{} x{}", kind.0, n)
                 }
                 PreparedDisplay::Kind => {
-                    let kind = kinds.get(e).unwrap_or_else(|| error("kind"));
-                    format!("{}", kind.0)
+                    let kind = kinds.get(e)?;
+                    kind.0.to_string()
                 }
                 PreparedDisplay::Name => {
-                    let name = names.get(e).unwrap_or_else(|| error("name"));
-                    format!("{}", name.0)
+                    let name = names.get(e)?;
+                    name.0.to_string()
                 }
             };
 

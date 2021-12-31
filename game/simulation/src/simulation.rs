@@ -3,7 +3,7 @@ use std::ops::{Add, Deref};
 use common::*;
 use resources::Resources;
 use strum_macros::EnumDiscriminants;
-use unit::world::WorldPositionRange;
+use unit::world::{WorldPoint, WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
@@ -14,8 +14,8 @@ use crate::ai::{AiAction, AiComponent, AiSystem};
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    UiCommand, UiRequest, UiResponsePayload,
+    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntity,
+    SelectedTiles, UiCommand, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -38,7 +38,7 @@ use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
+    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
     ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
@@ -157,6 +157,7 @@ impl<R: Renderer> Simulation<R> {
         &mut self,
         commands: impl Iterator<Item = UiCommand>,
         world_viewer: &mut WorldViewer,
+        backend_data: &BackendData,
     ) -> Option<Exit> {
         // update tick
         increment_tick();
@@ -165,6 +166,22 @@ impl<R: Renderer> Simulation<R> {
 
         // TODO limit time/count
         self.apply_world_updates(world_viewer);
+
+        // process backend input
+        if let Some((x, y)) = backend_data.mouse_position {
+            let z = {
+                let w = self.voxel_world.borrow();
+                let range = world_viewer.entity_range();
+                let start_from = WorldPosition::new(*x as i32, *y as i32, range.top());
+                match w.find_accessible_block_in_column_with_range(start_from, Some(range.bottom()))
+                {
+                    Some(pos) => pos.2,
+                    None => range.bottom(),
+                }
+            };
+            let pos = WorldPoint::new(*x, *y, z.slice() as f32).unwrap(); // not nan
+            self.ecs_world.insert(MouseLocation(pos));
+        }
 
         // apply player inputs
         let exit = self.process_ui_commands(commands);
@@ -637,6 +654,7 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(Spatial::default());
     world.insert(RuntimeTimers::default());
     world.insert(Runtime::default());
+    world.insert(MouseLocation::default());
 }
 
 fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {

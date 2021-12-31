@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -208,10 +208,10 @@
    * `// TODO smolstr to use the slack space`
    * `// TODO reuse string storage when switching back to prepared`
    * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
-   * `// TODO reuse vec`
-   * `// TODO vary when selected/near mouse`
+   * `// TODO reuse allocs`
    * `// TODO can replacing all components be done better? or just occasionally`
    * `// TODO reuse alloc`
+   * `// TODO use plural`
    * `// TODO`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
@@ -227,6 +227,8 @@
    * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
+ * [game/simulation/src/input/event.rs](game/simulation/src/input/event.rs) (1)
+   * `// TODO NotNan these`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`

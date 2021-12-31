@@ -23,7 +23,9 @@ pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 
 pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
-pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
+pub use crate::backend::{
+    state, BackendData, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
+};
 pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,

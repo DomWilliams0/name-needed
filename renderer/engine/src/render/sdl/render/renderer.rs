@@ -7,7 +7,7 @@ use simulation::{
     PhysicalComponent, RenderComponent, Renderer, Shape2d, TransformRenderDescription,
     UiElementComponent,
 };
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 use crate::render::debug::DebugShape;
 use crate::render::sdl::gl::{

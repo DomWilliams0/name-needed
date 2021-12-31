@@ -9,8 +9,8 @@ use color::Color;
 use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
-    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, Simulation,
-    WorldViewer,
+    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
+    Simulation, WorldViewer,
 };
 
 use crate::render::sdl::camera::Camera;
@@ -159,7 +159,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         self.ui.on_start(commands_out);
     }
 
-    fn consume_events(&mut self, commands: &mut UiCommands) {
+    fn consume_events(&mut self, commands: &mut UiCommands) -> BackendData {
         // take event pump out of self, to be replaced at the end of the tick
         let mut events = match self.sdl_events.take() {
             Some(e) => e,
@@ -255,10 +255,24 @@ impl InitializedSimulationBackend for SdlBackendInit {
             };
         }
 
+        let mouse_state = MouseState::new(&events);
+
         // put back event pump like we never took it
         let none = std::mem::replace(&mut self.sdl_events, Some(events));
         debug_assert!(none.is_none());
         std::mem::forget(none);
+
+        let mouse_position = {
+            let (x, y) = self
+                .camera
+                .screen_to_world((mouse_state.x(), mouse_state.y()));
+
+            let x = NotNan::new(x).ok();
+            let y = NotNan::new(y).ok();
+            x.zip(y)
+        };
+
+        BackendData { mouse_position }
     }
 
     fn tick(&mut self) {

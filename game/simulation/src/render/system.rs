@@ -12,7 +12,7 @@ use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::render::UiElementComponent;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
-use crate::{ItemStackComponent, PlayerSociety, Shape2d, SliceRange, TransformComponent};
+use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
 #[derive(Debug, Clone, Component, EcsComponent)]
 #[storage(VecStorage)]
@@ -43,7 +43,6 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         ReadStorage<'a, SelectedComponent>,
         WriteStorage<'a, DisplayComponent>,
         ReadStorage<'a, UiElementComponent>,
-        ReadStorage<'a, ItemStackComponent>,
         ReadStorage<'a, KindComponent>,
         ReadStorage<'a, NameComponent>,
     );
@@ -60,7 +59,6 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             selected,
             mut display,
             ui,
-            stack,
             kind,
             name,
         ): Self::SystemData,
@@ -98,9 +96,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 
             if let Some(display) = display {
                 // TODO ignore none case
-                let text = display
-                    .render(|| (e, &stack, &kind, &name))
-                    .unwrap_or("GONE");
+                let text = display.render(|| (e, &kind, &name)).unwrap_or("GONE");
                 self.renderer.debug_text(transform_desc.position, text);
             }
         }
