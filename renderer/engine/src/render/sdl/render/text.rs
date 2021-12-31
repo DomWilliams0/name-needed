@@ -112,7 +112,8 @@ impl TextRenderer {
         let half_height = {
             // for centring
             let scale = Scale::uniform(RESOLUTION);
-            self.font.v_metrics(scale).line_gap / 2.0
+            let v_metrics = self.font.v_metrics(scale);
+            (v_metrics.ascent + v_metrics.descent) / 2.0
         };
 
         for (start, end) in words {
@@ -121,9 +122,16 @@ impl TextRenderer {
 
             let half_width = {
                 // for centring
-                let first = &word[0].position();
-                let last = &word[word.len() - 1].position();
-                (last.x - first.x) / 2.0
+                let first = {
+                    let g = &word[0];
+                    let width = g
+                        .pixel_bounding_box()
+                        .map(|bb| bb.width() as f32)
+                        .unwrap_or(0.0);
+                    g.position().x - width
+                };
+                let last = &word[word.len() - 1].position().x;
+                (last - first) / 2.0
             };
 
             let offset = {

@@ -239,7 +239,7 @@ impl Renderer for GlRenderer {
     }
 
     fn debug_text(&mut self, centre: WorldPoint, text: &str) {
-        self.text_renderer.queue_text(centre, text)
+        self.text_renderer.queue_text(centre, text);
     }
 
     fn debug_finish(&mut self) -> GlResult<()> {
