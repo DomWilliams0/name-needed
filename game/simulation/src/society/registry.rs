@@ -15,11 +15,11 @@ pub struct Societies {
 #[derive(Default, Clone)]
 pub struct PlayerSociety {
     own: Option<SocietyHandle>,
-    visibility: Visibility,
+    visibility: SocietyVisibility,
 }
 
 #[derive(Copy, Clone)]
-enum Visibility {
+pub enum SocietyVisibility {
     All,
     JustOwn,
 }
@@ -92,7 +92,7 @@ impl Default for Societies {
 
 impl PartialEq<SocietyHandle> for PlayerSociety {
     fn eq(&self, other: &SocietyHandle) -> bool {
-        if let Visibility::All = self.visibility {
+        if let SocietyVisibility::All = self.visibility {
             true
         } else if let Some(me) = self.own {
             me == *other
@@ -104,7 +104,7 @@ impl PartialEq<SocietyHandle> for PlayerSociety {
 
 impl PartialEq<Option<SocietyHandle>> for PlayerSociety {
     fn eq(&self, other: &Option<SocietyHandle>) -> bool {
-        if let Visibility::All = self.visibility {
+        if let SocietyVisibility::All = self.visibility {
             true
         } else if let Some((me, other)) = self.own.zip(*other) {
             me == other
@@ -126,9 +126,13 @@ impl PlayerSociety {
     pub fn get(&self) -> Option<SocietyHandle> {
         self.own
     }
+
+    pub fn set_visibility(&mut self, vis: SocietyVisibility) {
+        self.visibility = vis
+    }
 }
 
-impl Default for Visibility {
+impl Default for SocietyVisibility {
     fn default() -> Self {
         Self::JustOwn
     }

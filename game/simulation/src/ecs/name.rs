@@ -15,13 +15,12 @@ use std::hint::unreachable_unchecked;
 #[name("kind")]
 pub struct KindComponent(String);
 
-/// A birth name for a living thing e.g. "Steve"
+/// A name for a living thing e.g. "Steve"
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(HashMapStorage)]
 #[name("name")]
 pub struct NameComponent(String);
 
-// TODO evict display component cache periodically
 /// Caches the display string rendered on each entity
 #[derive(Component, EcsComponent, Clone)]
 #[storage(DenseVecStorage)]

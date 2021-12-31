@@ -338,11 +338,14 @@ impl<R: Renderer> Simulation<R> {
             let (req, resp) = cmd.consume();
             match req {
                 UiRequest::DisableAllDebugRenderers => {
-                    self.debug_renderers.disable_all();
+                    self.debug_renderers.disable_all(&self.ecs_world);
                 }
 
                 UiRequest::SetDebugRendererEnabled { ident, enabled } => {
-                    if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
+                    if let Err(e) =
+                        self.debug_renderers
+                            .set_enabled(ident, enabled, &self.ecs_world)
+                    {
                         warn!("failed to set debug renderer state"; "error" => %e);
                     }
                 }
@@ -648,6 +651,7 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<SensesDebugRenderer>()?;
     builder.register::<FeatureBoundaryDebugRenderer>()?;
     builder.register::<EntityIdDebugRenderer>()?;
+    builder.register::<AllSocietyVisibilityDebugRenderer>()?;
 
     Ok(builder.build())
 }

@@ -17,3 +17,5 @@
 * [ ] show more detail when entity is selected, or mouse is near
 * [X] remove obsolete entity name debug renderer
 * [X] ensure entity id debug renderer is always visible
+* [ ] render text at proper in-world z
+* [ ] show name in ui, update kind label

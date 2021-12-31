@@ -25,6 +25,9 @@ pub trait DebugRenderer<R: Renderer> {
         ecs_world: &EcsWorld,
         viewer: &WorldViewer,
     );
+
+    #[allow(unused_variables)]
+    fn on_toggle(&mut self, enabled: bool, world: &EcsWorld) {}
 }
 
 pub struct DebugRenderers<R: Renderer> {
@@ -103,22 +106,25 @@ impl<R: Renderer> DebugRenderers<R> {
         DebugRenderersBuilder(Vec::with_capacity(64))
     }
 
-    pub fn disable_all(&mut self) {
-        self.renderers
-            .iter_mut()
-            .for_each(|(_, enabled, _)| *enabled = false);
+    pub fn disable_all(&mut self, world: &EcsWorld) {
+        self.renderers.iter_mut().for_each(|(_, enabled, r)| {
+            *enabled = false;
+            r.on_toggle(false, world);
+        });
     }
 
     pub fn set_enabled(
         &mut self,
         identifier: Cow<'static, str>,
         enabled: bool,
+        world: &EcsWorld,
     ) -> Result<(), DebugRendererError> {
         self.renderers
             .iter_mut()
             .find(|(i, _, _)| *i == identifier)
-            .map(|(_, e, _)| {
+            .map(|(_, e, r)| {
                 *e = enabled;
+                r.on_toggle(enabled, world);
                 debug!("toggled debug renderer"; "renderer" => %identifier, "enabled" => enabled);
             })
             .ok_or(DebugRendererError::NoSuchRenderer(identifier))

@@ -1,9 +1,10 @@
 use crate::ecs::name::KindComponent;
 use crate::ecs::*;
 use crate::render::DebugRenderer;
+use crate::society::SocietyVisibility;
 use crate::{
-    InnerWorldRef, ItemStackComponent, Renderer, ThreadedWorldLoader, TransformComponent,
-    WorldViewer,
+    InnerWorldRef, ItemStackComponent, PlayerSociety, Renderer, ThreadedWorldLoader,
+    TransformComponent, WorldViewer,
 };
 use std::fmt::Write;
 use unit::world::WorldPoint;
@@ -12,7 +13,7 @@ use unit::world::WorldPoint;
 pub struct EntityIdDebugRenderer(String);
 
 #[derive(Default)]
-pub struct EntityNameDebugRenderer(String);
+pub struct AllSocietyVisibilityDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
     fn identifier(&self) -> &'static str {
@@ -51,5 +52,34 @@ impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
             pos.modify_y(|y| y + OFFSET);
             renderer.debug_text(pos, &self.0);
         }
+    }
+}
+
+impl<R: Renderer> DebugRenderer<R> for AllSocietyVisibilityDebugRenderer {
+    fn identifier(&self) -> &'static str {
+        "all societies"
+    }
+
+    fn name(&self) -> &'static str {
+        "All societies\0"
+    }
+
+    fn render(
+        &mut self,
+        _: &mut R,
+        _: &InnerWorldRef,
+        _: &ThreadedWorldLoader,
+        _: &EcsWorld,
+        _: &WorldViewer,
+    ) {
+    }
+
+    fn on_toggle(&mut self, enabled: bool, world: &EcsWorld) {
+        let soc = world.resource_mut::<PlayerSociety>();
+        soc.set_visibility(if enabled {
+            SocietyVisibility::All
+        } else {
+            SocietyVisibility::JustOwn
+        });
     }
 }
