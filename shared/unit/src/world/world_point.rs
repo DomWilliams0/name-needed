@@ -119,7 +119,7 @@ impl WorldPoint {
 
     /// Panics if new value is not finite
     pub fn modify_x(&mut self, f: impl FnOnce(f32) -> f32) {
-        let new_x = f(self.2.into_inner());
+        let new_x = f(self.0.into_inner());
         self.0 = not_nan(new_x).expect("new value is not finite");
     }
 }
