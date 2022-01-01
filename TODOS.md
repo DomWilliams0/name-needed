@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (400)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -203,10 +203,9 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
- * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (8)
+ * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (7)
    * `// TODO smol string and/or cow and/or pool common strings`
    * `// TODO smolstr to use the slack space`
-   * `// TODO reuse string storage when switching back to prepared`
    * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
    * `// TODO reuse allocs`
    * `// TODO can replacing all components be done better? or just occasionally`

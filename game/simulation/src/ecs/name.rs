@@ -39,12 +39,15 @@ pub struct DisplayComponent {
 #[derive(Clone)]
 enum DisplayContent {
     Prepared(Option<PreparedDisplay>),
-    // TODO smolstr to use the slack space
-    // TODO reuse string storage when switching back to prepared
-    Rendered(String),
+    Rendered {
+        // TODO smolstr to use the slack space
+        string: String,
+        /// For comparisons to avoid redundant string rendering
+        prep: PreparedDisplay,
+    },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 enum PreparedDisplay {
     /// Stack count only
     ItemStackCount(u16),
@@ -60,7 +63,7 @@ enum PreparedDisplay {
     BuildProgress(BlockType, BuildProgress),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 enum BuildProgress {
     MaterialsNeeded,
     /// Percentage
@@ -188,11 +191,21 @@ impl<'a> System<'a> for DisplayTextSystem {
         // TODO can replacing all components be done better? or just occasionally
         for (e, ty) in self.preparation.iter() {
             let entry = display.entry(*e).unwrap(); // wont be wrong gen
-            let content = DisplayContent::Prepared(Some(*ty));
             match entry {
-                StorageEntry::Occupied(mut e) => e.get_mut().content = content,
+                StorageEntry::Occupied(mut e) => {
+                    // if prepared with the same again, don't bother rendering an identical string
+                    let skip = match e.get().content {
+                        DisplayContent::Rendered { prep, .. } => prep == *ty,
+                        _ => false,
+                    };
+                    if !skip {
+                        e.get_mut().content = DisplayContent::Prepared(Some(*ty));
+                    }
+                }
                 StorageEntry::Vacant(e) => {
-                    e.insert(DisplayComponent { content });
+                    e.insert(DisplayComponent {
+                        content: DisplayContent::Prepared(Some(*ty)),
+                    });
                 }
             }
         }
@@ -248,11 +261,9 @@ impl DisplayComponent {
     ) -> Option<&str> {
         if let DisplayContent::Prepared(prep) = &self.content {
             let prep = match prep {
-                Some(prep) => prep,
+                Some(prep) => *prep,
                 None => return None,
             };
-
-            // TODO compare to prev
 
             let (e, kinds, names) = fetch();
             let mut string = String::new();
@@ -276,7 +287,7 @@ impl DisplayComponent {
                 PreparedDisplay::BuildProgressLight(prog) => {
                     let percent = match prog {
                         BuildProgress::MaterialsNeeded => 0,
-                        BuildProgress::Building(p) => *p,
+                        BuildProgress::Building(p) => p,
                     };
                     write!(&mut string, "{}%", percent)
                 }
@@ -288,11 +299,11 @@ impl DisplayComponent {
                 },
             };
 
-            self.content = DisplayContent::Rendered(string);
+            self.content = DisplayContent::Rendered { string, prep };
         }
 
         match &self.content {
-            DisplayContent::Rendered(s) => Some(s),
+            DisplayContent::Rendered { string, .. } => Some(string),
             _ => {
                 debug_assert!(false);
                 // safety: unconditionally rendered by now
