@@ -289,8 +289,12 @@ impl<'a> ScopedBind<'a, Vbo> {
     }
 
     pub fn draw_array(&self, primitive: Primitive) {
+        self.draw_array_with_count(primitive, self.count.get())
+    }
+
+    pub fn draw_array_with_count(&self, primitive: Primitive, count: usize) {
         unsafe {
-            gl::DrawArrays(primitive.into(), 0, self.count.get() as GLint);
+            gl::DrawArrays(primitive.into(), 0, count as GLint);
         }
     }
 

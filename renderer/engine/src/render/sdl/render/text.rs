@@ -267,13 +267,11 @@ impl TextRenderer {
             i += 6;
         }
 
-        debug_assert!(i <= vertex_count);
-
         self.glyphs.clear();
 
         let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead
         prog.set_uniform_matrix("transform\0", transform.as_ptr());
-        vbo.draw_array(Primitive::Triangles);
+        vbo.draw_array_with_count(Primitive::Triangles, i);
         Ok(())
     }
 }
