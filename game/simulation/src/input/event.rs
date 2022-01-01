@@ -1,3 +1,4 @@
+use common::NotNan;
 use unit::world::{WorldPoint, WorldPosition};
 use world::SliceRange;
 
@@ -5,11 +6,8 @@ use crate::InnerWorldRef;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WorldColumn {
-    // TODO NotNan these
-    /// Must be non-NaN and finite
-    pub x: f32,
-    /// Must be non-NaN and finite
-    pub y: f32,
+    pub x: NotNan<f32>,
+    pub y: NotNan<f32>,
     pub slice_range: SliceRange,
 }
 
@@ -66,7 +64,7 @@ impl WorldColumn {
             .find_accessible_block_in_column_with_range(block, Some(self.slice_range.bottom()))
             .map(|WorldPosition(_, _, z)| {
                 // only use z from result, keep input precision
-                WorldPoint::new_unchecked(self.x, self.y, z.slice() as f32)
+                WorldPoint::new_unchecked(*self.x, *self.y, z.slice() as f32)
             })
     }
 }

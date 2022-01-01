@@ -444,14 +444,14 @@ impl SdlBackendInit {
         x: i32,
         y: i32,
     ) -> Option<(SelectType, WorldColumn)> {
-        Selection::select_type(button).map(|select| {
+        Selection::select_type(button).and_then(|select| {
             let (wx, wy) = self.camera.screen_to_world((x, y));
             let col = WorldColumn {
-                x: wx,
-                y: wy,
+                x: NotNan::new(wx).ok()?,
+                y: NotNan::new(wy).ok()?,
                 slice_range: self.world_viewer.entity_range(),
             };
-            (select, col)
+            Some((select, col))
         })
     }
 }

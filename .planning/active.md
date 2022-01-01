@@ -23,3 +23,4 @@
 * [X] fewer temporary allocs in display system
 * [X] bug: kind overrides name on highlight
 * [X] update kind for stacks
+* [ ] click multiple times to cycle through entities in range

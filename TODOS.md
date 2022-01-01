@@ -1,4 +1,4 @@
-# TODOs (398)
+# TODOs (397)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -223,8 +223,6 @@
    * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/event.rs](game/simulation/src/input/event.rs) (1)
-   * `// TODO NotNan these`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
