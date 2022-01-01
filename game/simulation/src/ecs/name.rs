@@ -5,6 +5,7 @@ use crate::{
 };
 use common::*;
 
+use crate::build::ReservedMaterialComponent;
 use crate::input::{MouseLocation, SelectedComponent};
 use crate::job::BuildThingJob;
 use crate::spatial::{Spatial, Transforms};
@@ -97,6 +98,7 @@ impl<'a> System<'a> for DisplayTextSystem {
         ReadStorage<'a, ItemStackComponent>,
         ReadStorage<'a, UiElementComponent>,
         WriteStorage<'a, DisplayComponent>,
+        ReadStorage<'a, ReservedMaterialComponent>,
     );
 
     fn run(
@@ -114,10 +116,10 @@ impl<'a> System<'a> for DisplayTextSystem {
             stack,
             ui,
             mut display,
+            reserved,
         ): Self::SystemData,
     ) {
         // TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?
-        // TODO reuse allocs
 
         for (e, _, society) in (&entities, &name, (&society).maybe()).join() {
             // always display name for named society members
@@ -133,11 +135,12 @@ impl<'a> System<'a> for DisplayTextSystem {
             .take(8)
             .collect::<ArrayVec<_, 8>>();
 
-        for (e, ui, stack, selected) in (
+        for (e, ui, stack, selected, _) in (
             &entities,
             (&ui).maybe(),
             (&stack).maybe(),
             (&selected).maybe(),
+            !(&reserved),
         )
             .join()
         {
@@ -276,7 +279,6 @@ impl DisplayComponent {
                 }
                 PreparedDisplay::ItemStackFull(n) => {
                     let kind = kinds.get(e)?;
-                    // TODO use plural
                     write!(&mut string, "{} x{}", kind.0, n)
                 }
                 PreparedDisplay::Kind => {

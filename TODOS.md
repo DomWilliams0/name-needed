@@ -1,4 +1,4 @@
-# TODOs (400)
+# TODOs (398)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -203,13 +203,11 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
- * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (7)
+ * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (5)
    * `// TODO smol string and/or cow and/or pool common strings`
    * `// TODO smolstr to use the slack space`
    * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
-   * `// TODO reuse allocs`
    * `// TODO can replacing all components be done better? or just occasionally`
-   * `// TODO use plural`
    * `// TODO use plural`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
