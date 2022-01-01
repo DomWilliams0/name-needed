@@ -80,7 +80,6 @@ const HOVER_RADIUS: f32 = 2.0;
 #[derive(Default)]
 pub struct DisplayTextSystem {
     preparation: HashMap<specs::Entity, PreparedDisplay>,
-    nearby_cache: HashSet<specs::Entity>,
     removal_cache: Vec<specs::Entity>,
 }
 
@@ -128,12 +127,11 @@ impl<'a> System<'a> for DisplayTextSystem {
         }
 
         // show more info for entities close to the mouse
-        self.nearby_cache.extend(
-            spatial
-                .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
-                .map(|(e, _, _)| specs::Entity::from(e))
-                .take(32),
-        );
+        let nearby = spatial
+            .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
+            .map(|(e, _, _)| specs::Entity::from(e))
+            .take(8)
+            .collect::<ArrayVec<_, 8>>();
 
         for (e, ui, stack, selected) in (
             &entities,
@@ -143,7 +141,7 @@ impl<'a> System<'a> for DisplayTextSystem {
         )
             .join()
         {
-            let more_info = selected.is_some() || self.nearby_cache.contains(&e);
+            let more_info = selected.is_some() || nearby.contains(&e);
 
             let prep = if let Some(stack) = stack {
                 match stack.stack.total_count() {
@@ -189,6 +187,7 @@ impl<'a> System<'a> for DisplayTextSystem {
                 }
             };
 
+            // dont overwrite
             self.preparation.entry(e).or_insert(prep);
         }
 
@@ -247,7 +246,6 @@ impl<'a> System<'a> for DisplayTextSystem {
             }
         }
 
-        self.nearby_cache.clear();
         self.preparation.clear();
     }
 }
