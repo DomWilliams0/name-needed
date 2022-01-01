@@ -246,13 +246,13 @@ impl KindComponent {
     }
 }
 
-impl NameComponent {
-    pub fn name(&self) -> &str {
-        &self.0
+impl Display for KindComponent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
-impl Display for KindComponent {
+impl Display for NameComponent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)
     }

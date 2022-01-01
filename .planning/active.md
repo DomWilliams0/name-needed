@@ -10,13 +10,16 @@
 * [X] camera zoom should not affect text size
 * [X] tidy text rendering code and with less temporary allocs
 * [X] centre text
-* [X] separate Name and Label components
+* [X] separate Name and Kind components
 * [ ] label specifies plural
-* [ ] random human name generation
+* [.] random human name generation
 * [X] always show stack size, human name
 * [X] show more detail when entity is selected, or mouse is near
+    * [ ] show build material %, completion %
 * [X] remove obsolete entity name debug renderer
 * [X] ensure entity id debug renderer is always visible
-* [ ] render text at proper in-world z
-* [ ] show name in ui, update kind label
+* [~] render text at proper in-world z
+* [X] show name in ui, update kind label
 * [X] fewer temporary allocs in display system
+* [ ] bug: kind overrides name on highlight
+* [ ] update kind for stacks

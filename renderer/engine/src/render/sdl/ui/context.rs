@@ -1,11 +1,12 @@
 use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
-use simulation::{PerfAvg, SimulationRef};
+use simulation::{ComponentRef, ComponentWorld, Entity, KindComponent, PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use imgui::{
     ImStr, TabBar, TabBarFlags, TabBarToken, TabItem, TabItemToken, TreeNode, TreeNodeToken, Ui,
 };
 use std::cell::RefCell;
+use std::fmt::{Display, Formatter};
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 
@@ -30,6 +31,12 @@ pub struct UiGuard<T: UiGuardable>(Option<T>);
 pub enum DefaultOpen {
     Closed,
     Open,
+}
+
+pub enum EntityDesc<'a> {
+    Kind(ComponentRef<'a, KindComponent>),
+    Overridden(&'a dyn Display),
+    Fallback(Entity),
 }
 
 impl<'a> UiContext<'a> {
@@ -96,6 +103,34 @@ impl<'a> UiContext<'a> {
                 .default_open(matches!(open, DefaultOpen::Open))
                 .push(self.ui),
         )
+    }
+
+    pub fn description(&self, e: Entity) -> EntityDesc {
+        match self.simulation.ecs.component::<KindComponent>(e) {
+            Ok(comp) => EntityDesc::Kind(comp),
+            Err(_) => EntityDesc::Fallback(e),
+        }
+    }
+}
+
+impl Display for EntityDesc<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display = match self {
+            EntityDesc::Kind(kind) => &**kind as &dyn Display,
+            EntityDesc::Overridden(d) => d,
+            EntityDesc::Fallback(e) => e as &dyn Display,
+        };
+
+        Display::fmt(display, f)
+    }
+}
+
+impl<'a> EntityDesc<'a> {
+    pub fn with_fallback(mut self, fallback: &'a dyn Display) -> Self {
+        match self {
+            EntityDesc::Fallback(_) => EntityDesc::Overridden(fallback),
+            other => other,
+        }
     }
 }
 

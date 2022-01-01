@@ -11,11 +11,11 @@ use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStackComponent, PhysicalComponent, Societies, SocietyComponent,
-    TransformComponent, UiElementComponent,
+    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
+    SocietyComponent, TransformComponent, UiElementComponent,
 };
 
-use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
+use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
 use crate::render::sdl::ui::windows::{
     with_fake_owned_imstr, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
 };
@@ -29,7 +29,6 @@ pub struct SelectionWindow {
 
 struct SelectedEntityDetails<'a> {
     entity: Entity,
-    name: &'a dyn Display,
     transform: Option<ComponentRef<'a, TransformComponent>>,
     physical: Option<ComponentRef<'a, PhysicalComponent>>,
     ty: EntityType<'a>,
@@ -69,7 +68,6 @@ impl SelectionWindow {
         let (e, details, state) = match ecs.resource::<SelectedEntity>().get_unchecked() {
             Some(e) if ecs.is_entity_alive(e) => {
                 let transform = ecs.component(e).ok();
-                let name = ecs.name(e);
                 let physical = ecs.component(e).ok();
                 let (ty, state) = match (
                     ecs.component::<ConditionComponent>(e),
@@ -84,7 +82,6 @@ impl SelectionWindow {
                     e,
                     Some(SelectedEntityDetails {
                         entity: e,
-                        name,
                         transform,
                         physical,
                         ty,
@@ -123,12 +120,25 @@ impl SelectionWindow {
         };
         debug_assert!(!matches!(state, EntityState::Dead));
 
-        context.key_value(
-            im_str!("Name:"),
-            || ui_str!(in context, "{}", details.name),
-            None,
-            COLOR_GREEN,
-        );
+        if let Ok(name) = ecs.component::<NameComponent>(details.entity) {
+            context.key_value(
+                im_str!("Name:"),
+                || ui_str!(in context, "{}", *name),
+                None,
+                COLOR_GREEN,
+            );
+        }
+
+        let kind = context.description(details.entity);
+        if !matches!(kind, EntityDesc::Fallback(_)) {
+            context.key_value(
+                im_str!("Kind:"),
+                || ui_str!(in context, "{}", kind),
+                None,
+                COLOR_GREEN,
+            );
+        }
+
         context.key_value(
             im_str!("Position:"),
             || {
@@ -376,7 +386,7 @@ impl SelectionWindow {
 
         for (i, (e, container)) in inventory.containers(ecs).enumerate() {
             let tree = context.new_tree_node(
-                ui_str!(in context, "#{}: {}##container", i+1, ecs.name(e)),
+                ui_str!(in context, "#{}: {}##container", i+1, context.description(e)),
                 DefaultOpen::Closed,
             );
 
@@ -396,7 +406,7 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         for (entity, count) in stack.stack.contents() {
             context.text_wrapped(
-                ui_str!(in context, " - {}x {} ({})", count, ecs.name(entity), entity),
+                ui_str!(in context, " - {}x {} ({})", count, context.description(entity), entity),
             );
         }
     }
@@ -412,7 +422,7 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         for entity in container.contents() {
             context.text_wrapped(
-                ui_str!(in context, " - {} ({}, vol {})", ecs.name(entity.entity), entity.entity, entity.volume),
+                ui_str!(in context, " - {} ({}, vol {})", context.description(entity.entity), entity.entity, entity.volume),
             );
         }
     }
@@ -734,11 +744,11 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
         match *data {
             AssociatedBlockData::Container(container_entity) => {
-                let name = ecs.name(container_entity);
+                let kind = context.description(container_entity);
 
                 context.key_value(
-                    im_str!("Name:"),
-                    || ui_str!(in context, "{}", name),
+                    im_str!("Kind:"),
+                    || ui_str!(in context, "{}", kind),
                     None,
                     COLOR_ORANGE,
                 );

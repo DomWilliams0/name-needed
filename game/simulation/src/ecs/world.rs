@@ -106,17 +106,6 @@ pub trait ComponentWorld: ContainerResolver + Sized {
         let queue = self.resource_mut::<EntityEventQueue>();
         queue.post(event)
     }
-
-    fn name_or_default<'a>(&'a self, e: Entity, default: &'a dyn Display) -> &'a dyn Display {
-        match self.component::<KindComponent>(e) {
-            Ok(comp) => comp.comp,
-            Err(_) => default,
-        }
-    }
-
-    fn name(&self, e: Entity) -> &dyn Display {
-        self.name_or_default(e, &"Unnamed")
-    }
 }
 
 impl EntitiesToKill {

@@ -77,10 +77,10 @@ impl SocietyWindow {
                 .zip(block_selection.single_tile())
             {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
-                    let name = ecs.name(entity);
+                    let desc = context.description(entity);
                     any_buttons = true;
                     if context.button(
-                        ui_str!(in context, "Haul {} to {}", name, target),
+                        ui_str!(in context, "Haul {} to {}", desc, target),
                         [0.0, 0.0],
                     ) {
                         // hopefully this gets the accessible air above the block
@@ -97,9 +97,10 @@ impl SocietyWindow {
 
                     let block_data = w.associated_block_data(target);
                     if let Some(AssociatedBlockData::Container(container)) = block_data {
-                        let container_name = ecs.name_or_default(*container, &"container");
+                        let container_name =
+                            context.description(*container).with_fallback(&"container");
                         if context.button(
-                            ui_str!(in context, "Haul {} into {}", name, container_name),
+                            ui_str!(in context, "Haul {} into {}", desc, container_name),
                             [0.0, 0.0],
                         ) {
                             context.issue_request(UiRequest::IssueSocietyCommand(
