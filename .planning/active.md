@@ -22,4 +22,4 @@
 * [X] show name in ui, update kind label
 * [X] fewer temporary allocs in display system
 * [X] bug: kind overrides name on highlight
-* [ ] update kind for stacks
+* [X] update kind for stacks

@@ -20,7 +20,12 @@ use std::hint::unreachable_unchecked;
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("kind")]
-pub struct KindComponent(String);
+pub struct KindComponent(String, Option<KindModifier>);
+
+#[derive(Clone, Debug)]
+enum KindModifier {
+    Stack,
+}
 
 /// A name for a living thing e.g. "Steve"
 #[derive(Component, EcsComponent, Clone, Debug)]
@@ -321,13 +326,23 @@ impl NameComponent {
 
 impl KindComponent {
     pub fn make_stack(&mut self) {
-        // TODO
+        self.1 = Some(KindModifier::Stack);
     }
 }
 
 impl Display for KindComponent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
+        match self.1 {
+            // TODO use plural
+            Some(KindModifier::Stack) => {
+                write!(f, "Stack of ")?;
+                self.0
+                    .chars()
+                    .flat_map(|c| c.to_lowercase())
+                    .try_for_each(|c| f.write_char(c))
+            }
+            None => Display::fmt(&self.0, f),
+        }
     }
 }
 
@@ -342,7 +357,7 @@ impl<V: Value> ComponentTemplate<V> for KindComponent {
     where
         Self: Sized,
     {
-        Ok(Box::new(Self(values.get_string("singular")?)))
+        Ok(Box::new(Self(values.get_string("singular")?, None)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

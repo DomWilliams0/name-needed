@@ -210,7 +210,7 @@
    * `// TODO reuse allocs`
    * `// TODO can replacing all components be done better? or just occasionally`
    * `// TODO use plural`
-   * `// TODO`
+   * `// TODO use plural`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
    * `// TODO move item scattering to a utility function`
