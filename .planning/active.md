@@ -15,7 +15,7 @@
 * [.] random human name generation
 * [X] always show stack size, human name
 * [X] show more detail when entity is selected, or mouse is near
-    * [ ] show build material %, completion %
+    * [X] show build material %, completion %
 * [X] remove obsolete entity name debug renderer
 * [X] ensure entity id debug renderer is always visible
 * [~] render text at proper in-world z

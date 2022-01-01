@@ -1,12 +1,17 @@
 use crate::ecs::*;
-use crate::{ItemStackComponent, PlayerSociety, SocietyComponent, Tick, TransformComponent};
+use crate::{
+    ItemStackComponent, PlayerSociety, Societies, SocietyComponent, Tick, TransformComponent,
+    UiElementComponent,
+};
 use common::*;
 
 use crate::input::{MouseLocation, SelectedComponent};
+use crate::job::BuildThingJob;
 use crate::spatial::{Spatial, Transforms};
+use ::world::block::BlockType;
 use specs::storage::StorageEntry;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Write};
 use std::hint::unreachable_unchecked;
 
 // TODO smol string and/or cow and/or pool common strings
@@ -41,10 +46,25 @@ enum DisplayContent {
 
 #[derive(Clone, Copy)]
 enum PreparedDisplay {
+    /// Stack count only
     ItemStackCount(u16),
+    /// Stack count and item kind
     ItemStackFull(u16),
+    /// Just kind
     Kind,
+    /// Just name
     Name,
+    /// Just build progress percentage
+    BuildProgressLight(BuildProgress),
+    /// Build target and progress percentage
+    BuildProgress(BlockType, BuildProgress),
+}
+
+#[derive(Clone, Copy)]
+enum BuildProgress {
+    MaterialsNeeded,
+    /// Percentage
+    Building(u8),
 }
 
 const HOVER_RADIUS: f32 = 2.0;
@@ -62,11 +82,13 @@ impl<'a> System<'a> for DisplayTextSystem {
         Read<'a, PlayerSociety>,
         Read<'a, Spatial>,
         Read<'a, MouseLocation>,
+        Read<'a, Societies>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, SelectedComponent>,
         ReadStorage<'a, SocietyComponent>,
         ReadStorage<'a, NameComponent>,
         ReadStorage<'a, ItemStackComponent>,
+        ReadStorage<'a, UiElementComponent>,
         WriteStorage<'a, DisplayComponent>,
     );
 
@@ -77,11 +99,13 @@ impl<'a> System<'a> for DisplayTextSystem {
             player_soc,
             spatial,
             mouse,
+            societies,
             transforms,
             selected,
             society,
             name,
             stack,
+            ui,
             mut display,
         ): Self::SystemData,
     ) {
@@ -103,29 +127,57 @@ impl<'a> System<'a> for DisplayTextSystem {
                 .take(32),
         );
 
-        for (e, stack, selected) in (&entities, (&stack).maybe(), (&selected).maybe()).join() {
+        for (e, ui, stack, selected) in (
+            &entities,
+            (&ui).maybe(),
+            (&stack).maybe(),
+            (&selected).maybe(),
+        )
+            .join()
+        {
             let more_info = selected.is_some() || self.nearby_cache.contains(&e);
 
-            let prep = match stack {
-                Some(stack) => {
-                    match stack.stack.total_count() {
-                        n if n <= 1 => continue,
-                        n if more_info => {
-                            // show type as well as count
-                            PreparedDisplay::ItemStackFull(n)
-                        }
-                        n => {
-                            // just stack count
-                            PreparedDisplay::ItemStackCount(n)
-                        }
+            let prep = if let Some(stack) = stack {
+                match stack.stack.total_count() {
+                    n if n <= 1 => continue,
+                    n if more_info => {
+                        // show type as well as count
+                        PreparedDisplay::ItemStackFull(n)
+                    }
+                    n => {
+                        // just stack count
+                        PreparedDisplay::ItemStackCount(n)
                     }
                 }
-                None => {
-                    if more_info {
-                        PreparedDisplay::Kind
-                    } else {
-                        continue;
-                    }
+            } else if let Some(ui) = ui {
+                let prep = ui
+                    .build_job
+                    .resolve_and_cast(&societies, |build: &BuildThingJob| {
+                        let progress = if build.remaining_requirements().next().is_none() {
+                            let prog = build.progress();
+                            let percent = (prog.steps_completed * 200 + prog.total_steps_needed)
+                                / (prog.total_steps_needed * 2);
+                            BuildProgress::Building(percent as u8)
+                        } else {
+                            BuildProgress::MaterialsNeeded
+                        };
+
+                        if more_info {
+                            PreparedDisplay::BuildProgress(build.details().target, progress)
+                        } else {
+                            PreparedDisplay::BuildProgressLight(progress)
+                        }
+                    });
+
+                match prep {
+                    Some(prog) => prog,
+                    _ => continue,
+                }
+            } else {
+                if more_info {
+                    PreparedDisplay::Kind
+                } else {
+                    continue;
                 }
             };
 
@@ -200,27 +252,43 @@ impl DisplayComponent {
                 None => return None,
             };
 
+            // TODO compare to prev
+
             let (e, kinds, names) = fetch();
-            let rendered = match prep {
+            let mut string = String::new();
+            let _ = match prep {
                 PreparedDisplay::ItemStackCount(n) => {
-                    format!("x{}", n)
+                    write!(&mut string, "x{}", n)
                 }
                 PreparedDisplay::ItemStackFull(n) => {
                     let kind = kinds.get(e)?;
                     // TODO use plural
-                    format!("{} x{}", kind.0, n)
+                    write!(&mut string, "{} x{}", kind.0, n)
                 }
                 PreparedDisplay::Kind => {
                     let kind = kinds.get(e)?;
-                    kind.0.to_string()
+                    string.write_str(&kind.0)
                 }
                 PreparedDisplay::Name => {
                     let name = names.get(e)?;
-                    name.0.to_string()
+                    string.write_str(&name.0)
                 }
+                PreparedDisplay::BuildProgressLight(prog) => {
+                    let percent = match prog {
+                        BuildProgress::MaterialsNeeded => 0,
+                        BuildProgress::Building(p) => *p,
+                    };
+                    write!(&mut string, "{}%", percent)
+                }
+                PreparedDisplay::BuildProgress(target, prog) => match prog {
+                    BuildProgress::MaterialsNeeded => {
+                        write!(&mut string, "{} (incomplete)", target)
+                    }
+                    BuildProgress::Building(p) => write!(&mut string, "{} ({}%)", target, p),
+                },
             };
 
-            self.content = DisplayContent::Rendered(rendered);
+            self.content = DisplayContent::Rendered(string);
         }
 
         match &self.content {

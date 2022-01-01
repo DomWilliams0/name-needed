@@ -106,7 +106,15 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         }
 
         // render in-game ui elements above entities
-        for (transform, ui, selected) in (&transform, &ui, selected.maybe()).join() {
+        for (e, transform, ui, display, selected) in (
+            &entities,
+            &transform,
+            &ui,
+            (&mut display).maybe(),
+            selected.maybe(),
+        )
+            .join()
+        {
             // only render elements for the player's society
             if !ui.society().map(|soc| *player_soc == soc).unwrap_or(true) {
                 continue;
@@ -126,6 +134,10 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 
             self.renderer
                 .sim_ui_element(&transform_desc, ui, selected.is_some());
+
+            if let Some(text) = display.and_then(|d| d.render(|| (e, &kind, &name))) {
+                self.renderer.debug_text(transform_desc.position, text);
+            }
         }
     }
 }
