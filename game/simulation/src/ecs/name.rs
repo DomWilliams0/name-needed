@@ -129,7 +129,7 @@ impl<'a> System<'a> for DisplayTextSystem {
                 }
             };
 
-            self.preparation.insert(e, prep);
+            self.preparation.entry(e).or_insert(prep);
         }
 
         // apply changes

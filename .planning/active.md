@@ -21,5 +21,5 @@
 * [~] render text at proper in-world z
 * [X] show name in ui, update kind label
 * [X] fewer temporary allocs in display system
-* [ ] bug: kind overrides name on highlight
+* [X] bug: kind overrides name on highlight
 * [ ] update kind for stacks
