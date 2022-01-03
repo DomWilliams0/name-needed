@@ -33,7 +33,7 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
-use crate::society::PlayerSociety;
+use crate::society::{NameGeneration, PlayerSociety};
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
@@ -126,7 +126,7 @@ impl<R: Renderer> Simulation<R> {
         let mut ecs_world = EcsWorld::new();
         ecs_world.insert(voxel_world.clone());
         ecs_world.insert(definitions);
-        register_resources(&mut ecs_world);
+        register_resources(&mut ecs_world, resources)?;
 
         // get a self referential ecs world resource pointing to itself
         // safety: static lifetime is as long as the game is running, as any system that uses it
@@ -646,7 +646,7 @@ impl Add<u32> for Tick {
     }
 }
 
-fn register_resources(world: &mut EcsWorld) {
+fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult<()> {
     world.insert(QueuedUpdates::default());
     world.insert(EntitiesToKill::default());
     world.insert(SelectedEntity::default());
@@ -659,6 +659,9 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(RuntimeTimers::default());
     world.insert(Runtime::default());
     world.insert(MouseLocation::default());
+    world.insert(NameGeneration::load(&resources)?);
+
+    Ok(())
 }
 
 fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {

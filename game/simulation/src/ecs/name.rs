@@ -11,7 +11,7 @@ use crate::job::BuildThingJob;
 use crate::spatial::{Spatial, Transforms};
 use ::world::block::BlockType;
 use specs::storage::StorageEntry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
 use std::hint::unreachable_unchecked;
 
@@ -182,12 +182,10 @@ impl<'a> System<'a> for DisplayTextSystem {
                     Some(prog) => prog,
                     _ => continue,
                 }
+            } else if more_info {
+                PreparedDisplay::Kind
             } else {
-                if more_info {
-                    PreparedDisplay::Kind
-                } else {
-                    continue;
-                }
+                continue;
             };
 
             // dont overwrite

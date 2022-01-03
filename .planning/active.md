@@ -12,7 +12,7 @@
 * [X] centre text
 * [X] separate Name and Kind components
 * [ ] label specifies plural
-* [.] random human name generation
+* [X] random human name generation
 * [X] always show stack size, human name
 * [X] show more detail when entity is selected, or mouse is near
     * [X] show build material %, completion %
@@ -24,3 +24,4 @@
 * [X] bug: kind overrides name on highlight
 * [X] update kind for stacks
 * [ ] click multiple times to cycle through entities in range
+* [ ] fix overlapping display strings e.g. collision resolution

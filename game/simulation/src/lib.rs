@@ -58,7 +58,7 @@ pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
-pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use society::{job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,

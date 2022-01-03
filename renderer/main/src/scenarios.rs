@@ -222,6 +222,7 @@ mod helpers {
     use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use engine::simulation;
+    use engine::simulation::NameGeneration;
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
         EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
@@ -298,8 +299,8 @@ mod helpers {
         }
 
         pub fn with_name(self) -> Self {
-            // TODO actually generate name
-            let name = "Ken";
+            let mut rng = random::get();
+            let name = self.0.resource::<NameGeneration>().generate(&mut *rng);
             let _ = self.0.add_now(self.1, NameComponent::new(name.to_owned()));
             self
         }

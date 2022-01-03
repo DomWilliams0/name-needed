@@ -1,4 +1,4 @@
-# TODOs (397)
+# TODOs (398)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -14,6 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
+   * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
    * `// TODO dont use a String here, return useful info`
    * `// TODO make poles more moist`
@@ -357,6 +359,8 @@
    * `// TODO some types of hauling will be shareable`
    * `// TODO depends on work item`
    * `// TODO include a description field for proper description e.g. "cutting log", "building wall"`
+ * [game/simulation/src/society/names.rs](game/simulation/src/society/names.rs) (1)
+   * `// TODO name generation per society`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
@@ -503,9 +507,8 @@
    * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
    * `// TODO middle of requested chunk instead of corner`
- * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (2)
+ * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
    * `// TODO random pos offset away from the voxel centre`
-   * `// TODO actually generate name`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)

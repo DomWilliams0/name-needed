@@ -2,6 +2,7 @@
 
 members = [
 	"game/ai",
+	"game/markov",
 	"game/procgen",
 	"game/resources",
 	"game/simulation",
