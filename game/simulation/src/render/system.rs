@@ -4,6 +4,7 @@ use serde::de::Error;
 
 use color::Color;
 use common::*;
+use unit::world::BLOCKS_PER_METRE;
 
 use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
@@ -95,6 +96,10 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             }
 
             if let Some(text) = display.and_then(|d| d.render(|| (e, &kind, &name))) {
+                // render a bit below the entity
+                transform_desc.position.modify_y(|y| {
+                    y - (physical.size.xy_max().metres() * 0.5 * BLOCKS_PER_METRE as f32)
+                });
                 self.renderer.debug_text(transform_desc.position, text);
             }
         }
