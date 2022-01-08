@@ -56,8 +56,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
 	* retain entity logs after death for a time
 * reflection-like api on components to do actions per-component in ui
-* in-world text rendering
-	* show entity names, item stack sizes, build job info...
+* fix overlapping in-world display strings e.g. collision resolution
+* KindComponent should specify plural for stacked labels
 
 ## Entity behaviour
 * ai incentive to choose the same action as last tick

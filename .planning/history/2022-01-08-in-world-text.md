@@ -11,7 +11,7 @@
 * [X] tidy text rendering code and with less temporary allocs
 * [X] centre text
 * [X] separate Name and Kind components
-* [ ] label specifies plural
+* [~] label specifies plural
 * [X] random human name generation
 * [X] always show stack size, human name
 * [X] show more detail when entity is selected, or mouse is near
@@ -23,5 +23,5 @@
 * [X] fewer temporary allocs in display system
 * [X] bug: kind overrides name on highlight
 * [X] update kind for stacks
-* [ ] click multiple times to cycle through entities in range
-* [ ] fix overlapping display strings e.g. collision resolution
+* [~] click multiple times to cycle through entities in range
+* [~] fix overlapping display strings e.g. collision resolution
