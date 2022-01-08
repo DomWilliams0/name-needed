@@ -14,7 +14,7 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 * 08 Jan 2022: <em>In-world text labels to show entity types and names, job progress and item stack information.</em>
 <p style="margin: auto">
-    <img src=".screenshots/stack-split-labelled.gif"/>
+    <img src=".screenshots/stack-split-labelled.gif" width="500"/>
     <img src=".screenshots/busy-with-labels.gif" width="500"/>
 </p>
 
