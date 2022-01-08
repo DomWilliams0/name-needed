@@ -52,6 +52,10 @@ impl Length3 {
         self.2
     }
 
+    pub fn xy_max(self) -> Length {
+        self.x().max(self.y())
+    }
+
     /// Does `other` fit into `self`
     pub fn fits(self, other: Self) -> bool {
         // checks the diagonal of `other` (the item) is not longer than that of `self` (the container)

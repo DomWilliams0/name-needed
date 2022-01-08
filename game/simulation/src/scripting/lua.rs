@@ -162,7 +162,7 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
         let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
 
         let society = state.ecs.resource::<PlayerSociety>();
-        Ok(society.0)
+        Ok(society.get())
     });
 
     Ok(())

@@ -56,8 +56,8 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * add filtering to entity log view i.e. show/hide ai decisions, path finding, item operations, etc
 	* retain entity logs after death for a time
 * reflection-like api on components to do actions per-component in ui
-* in-world text rendering
-	* show entity names, item stack sizes, build job info...
+* fix overlapping in-world display strings e.g. collision resolution
+* KindComponent should specify plural for stacked labels
 
 ## Entity behaviour
 * ai incentive to choose the same action as last tick
@@ -206,6 +206,9 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * investigate thousands of occlusion updates for empty all-air slabs
 	* completely solid slabs (air, stone, etc) should be treated as a special case
 * switch away from `async_trait` when a non boxing impl is available
+* `rusttype` has a lot of arc abuse and temporary allocations - port to `ab_glyph`?
+* ensure commonly held components like transform are always used in their entirety in systems, if
+    not then split into smaller components. e.g. transform pos+rot in rendering
 
 ### Memory usage
 * CoW terrain slabs

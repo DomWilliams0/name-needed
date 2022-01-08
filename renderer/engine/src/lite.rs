@@ -4,11 +4,11 @@ use common::*;
 use resources::Resources;
 use simulation::input::{UiCommand, UiCommands, UiRequest};
 use simulation::{
-    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, PhysicalComponent,
-    RenderComponent, Renderer, Simulation, TransformRenderDescription, UiElementComponent,
-    WorldViewer,
+    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
+    PhysicalComponent, RenderComponent, Renderer, Simulation, TransformRenderDescription,
+    UiElementComponent, WorldViewer,
 };
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint, WorldPosition};
 
 pub struct DummyRenderer;
 
@@ -57,6 +57,8 @@ impl Renderer for DummyRenderer {
         Ok(())
     }
 
+    fn debug_text(&mut self, _centre: WorldPoint, _text: &str) {}
+
     fn deinit(&mut self) -> Self::FrameContext {}
 }
 
@@ -66,10 +68,12 @@ impl InitializedSimulationBackend for DummyBackendInit {
 
     fn start(&mut self, _commands_out: &mut UiCommands) {}
 
-    fn consume_events(&mut self, commands: &mut UiCommands) {
+    fn consume_events(&mut self, commands: &mut UiCommands) -> BackendData {
         if Instant::now() > self.end_time {
             commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
         }
+
+        BackendData::default()
     }
 
     fn tick(&mut self) {}

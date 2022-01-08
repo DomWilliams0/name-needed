@@ -1,7 +1,8 @@
 use crate::render::sdl::gl::{
-    generate_circle_mesh, generate_quad_mesh, AttribType, BufferUsage, Divisor, GlResult,
-    InstancedPipeline, Normalized, Primitive, Program, ScopedBindable, Vbo,
+    AttribType, BufferUsage, Divisor, GlResult, InstancedPipeline, Normalized, Primitive, Program,
+    ScopedBindable, Vbo,
 };
+use crate::render::sdl::render::mesh::{generate_circle_mesh, generate_quad_mesh};
 use crate::render::sdl::render::renderer::GlFrameContext;
 use color::Color;
 use common::*;
@@ -33,7 +34,7 @@ impl EntityRenderer {
         let vao = pipeline.vao.scoped_bind();
 
         {
-            let circle_mesh = generate_circle_mesh(CIRCLE_VERTEX_COUNT);
+            let circle_mesh = generate_circle_mesh::<CIRCLE_VERTEX_COUNT>();
             let quad_mesh = generate_quad_mesh();
 
             let vbo = pipeline.shared_vbo.scoped_bind();

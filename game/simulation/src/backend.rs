@@ -1,7 +1,7 @@
 use crate::input::UiCommands;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation, WorldViewer};
-use common::Error;
+use common::{Error, NotNan};
 use resources::Resources;
 use unit::world::WorldPosition;
 
@@ -19,6 +19,13 @@ pub enum Exit {
     TestFailure(String),
 }
 
+/// Populated by backend events
+#[derive(Default)]
+pub struct BackendData {
+    /// Mouse position in WORLD SPACE
+    pub mouse_position: Option<(NotNan<f32>, NotNan<f32>)>,
+}
+
 pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
@@ -26,7 +33,7 @@ pub trait InitializedSimulationBackend: Sized {
     /// Called once per game (re)start. Outputs commands before the game properly starts
     fn start(&mut self, commands_out: &mut UiCommands);
 
-    fn consume_events(&mut self, commands: &mut UiCommands);
+    fn consume_events(&mut self, commands: &mut UiCommands) -> BackendData;
 
     fn tick(&mut self);
 

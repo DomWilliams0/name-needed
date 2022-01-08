@@ -1,0 +1,12 @@
+[package]
+name = "markov"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "markov"
+
+[dependencies]
+resources = { path = "../resources" }
+lzma-rs = "0.2"
+smol_str = { version = "0.1", default-features = false }

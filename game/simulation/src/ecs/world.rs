@@ -13,15 +13,13 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{
-    definitions, Entity, InnerWorldRef, ItemStackComponent, NameComponent, TransformComponent,
-    WorldRef,
-};
+use crate::{definitions, Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 
+use crate::ecs::name::KindComponent;
 use std::ops::{Deref, DerefMut};
 
 pub type SpecsWorld = specs::World;
@@ -107,17 +105,6 @@ pub trait ComponentWorld: ContainerResolver + Sized {
     fn post_event(&self, event: EntityEvent) {
         let queue = self.resource_mut::<EntityEventQueue>();
         queue.post(event)
-    }
-
-    fn name_or_default<'a>(&'a self, e: Entity, default: &'a dyn Display) -> &'a dyn Display {
-        match self.component::<NameComponent>(e) {
-            Ok(comp) => comp.comp,
-            Err(_) => default,
-        }
-    }
-
-    fn name(&self, e: Entity) -> &dyn Display {
-        self.name_or_default(e, &"Unnamed")
     }
 }
 

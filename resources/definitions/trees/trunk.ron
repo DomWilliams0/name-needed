@@ -2,7 +2,7 @@
   (
     uid: "core_tree_trunk",
     components: [
-      {"name": (name: "Tree trunk")},
+      {"kind": (singular: "Tree trunk")},
       {"render": (
         color: "8B7923",
         shape: "Rect",

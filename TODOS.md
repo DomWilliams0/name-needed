@@ -1,4 +1,4 @@
-# TODOs (385)
+# TODOs (398)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -14,6 +14,8 @@
    * `// TODO reuse allocation`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO reuse allocation`
+ * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
+   * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
    * `// TODO dont use a String here, return useful info`
    * `// TODO make poles more moist`
@@ -203,6 +205,12 @@
    * `// TODO perfect hashing`
  * [game/simulation/src/ecs/entity.rs](game/simulation/src/ecs/entity.rs) (1)
    * `// TODO custom hash? just itself`
+ * [game/simulation/src/ecs/name.rs](game/simulation/src/ecs/name.rs) (5)
+   * `// TODO smol string and/or cow and/or pool common strings`
+   * `// TODO smolstr to use the slack space`
+   * `// TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?`
+   * `// TODO can replacing all components be done better? or just occasionally`
+   * `// TODO use plural`
  * [game/simulation/src/ecs/world.rs](game/simulation/src/ecs/world.rs) (2)
    * `// TODO specs lazy updates allocs a Box for each action - when our QueuedUpdates uses an arena swap this out to use that instead`
    * `// TODO move item scattering to a utility function`
@@ -221,8 +229,7 @@
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
    * `// TODO select multiple entities`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (8)
-   * `// TODO smol string and/or cow and/or pool common strings`
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
@@ -290,7 +297,8 @@
    * `// TODO perfect use case for a per-tick arena allocator`
    * `// TODO dynstack impl`
    * `// TODO try to use a slog scope here`
- * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (1)
+ * [game/simulation/src/render/renderer.rs](game/simulation/src/render/renderer.rs) (2)
+   * `// TODO take dyn Display instead`
    * `// TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh`
  * [game/simulation/src/render/system.rs](game/simulation/src/render/system.rs) (2)
    * `// TODO interpolation needed on ui elements?`
@@ -351,6 +359,8 @@
    * `// TODO some types of hauling will be shareable`
    * `// TODO depends on work item`
    * `// TODO include a description field for proper description e.g. "cutting log", "building wall"`
+ * [game/simulation/src/society/names.rs](game/simulation/src/society/names.rs) (1)
+   * `// TODO name generation per society`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
  * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
@@ -455,12 +465,16 @@
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (3)
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (4)
+   * `// TODO cache projectction+view matrices if camera isn't moving`
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
    * `// TODO cache`
+ * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
+   * `// TODO proper errors`
+   * `#[error("TODO temporary: {0}")]`
  * [renderer/engine/src/render/sdl/gl/vertex.rs](renderer/engine/src/render/sdl/gl/vertex.rs) (1)
-   * `// TODO smallvec`
+   * `// TODO dont bother unbinding?`
  * [renderer/engine/src/render/sdl/render/entity.rs](renderer/engine/src/render/sdl/render/entity.rs) (2)
    * `// TODO use buffersubdata to reuse allocation if len <=`
    * `// TODO cursor interface in ScopedMap`
@@ -468,6 +482,10 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
+ * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (3)
+   * `// TODO customise text colour`
+   * `// TODO use instances or indices?`
+   * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)

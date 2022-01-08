@@ -10,6 +10,7 @@ resources!(Resources, "resources");
 resources!(Definitions, "definitions");
 resources!(WorldGen, "worldgen");
 resources!(Shaders, "shaders");
+resources!(Fonts, "fonts");
 
 impl Resources {
     pub fn new(game_dir: impl AsRef<Path>) -> Result<Self, ResourceError> {
@@ -25,6 +26,7 @@ impl Resources {
     child!(definitions, Definitions);
     child!(world_gen, WorldGen);
     child!(shaders, Shaders);
+    child!(fonts, Fonts);
 }
 
 fn get_dir<R: AsRef<Path>, D: AsRef<Path>>(root: R, dir: D) -> Result<PathBuf, ResourceError> {

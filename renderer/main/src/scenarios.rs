@@ -63,6 +63,7 @@ fn following_dogs(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -94,6 +95,7 @@ fn wander_and_eat(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .with_satiety(satiety)
             .thanks()
     });
@@ -118,13 +120,14 @@ fn building(ecs: &EcsWorld) {
 
     let society = ecs
         .resource_mut::<PlayerSociety>()
-        .0
+        .get()
         .expect("no player society");
 
     let _humans = spawn_entities_randomly(&world, humans, Placement::RandomPos, |pos| {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -187,7 +190,7 @@ fn haul_to_container(ecs: &EcsWorld) {
 
     let society = ecs
         .resource_mut::<PlayerSociety>()
-        .0
+        .get()
         .expect("no player society");
 
     // our lovely haulers
@@ -195,6 +198,7 @@ fn haul_to_container(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_name()
             .thanks()
     });
 
@@ -214,9 +218,11 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
+    use crate::simulation::NameComponent;
     use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use engine::simulation;
+    use engine::simulation::NameGeneration;
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
         EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
@@ -278,7 +284,7 @@ mod helpers {
             let player_society = self
                 .0
                 .resource::<PlayerSociety>()
-                .0
+                .get()
                 .expect("no player society");
             self.with_society(player_society)
         }
@@ -289,6 +295,13 @@ mod helpers {
                 .map(|mut hunger| hunger.set_satiety(satiety))
                 .expect("hunger component");
 
+            self
+        }
+
+        pub fn with_name(self) -> Self {
+            let mut rng = random::get();
+            let name = self.0.resource::<NameGeneration>().generate(&mut *rng);
+            let _ = self.0.add_now(self.1, NameComponent::new(name.to_owned()));
             self
         }
 

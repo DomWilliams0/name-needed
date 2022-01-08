@@ -23,7 +23,9 @@ pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 
 pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
-pub use crate::backend::{state, Exit, InitializedSimulationBackend, PersistentSimulationBackend};
+pub use crate::backend::{
+    state, BackendData, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
+};
 pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
@@ -35,7 +37,10 @@ pub use activity::{
     LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
-pub use ecs::{Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity};
+pub use ecs::{
+    Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity, KindComponent,
+    NameComponent,
+};
 pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
@@ -46,14 +51,14 @@ pub use item::validation::validate_all_inventories;
 pub use item::{
     ConditionComponent, ContainedInComponent, Container, ContainerComponent, ContainersError,
     EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
-    ItemStackError, NameComponent, StackableComponent,
+    ItemStackError, StackableComponent,
 };
 pub use needs::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
-pub use society::{job, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use society::{job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,

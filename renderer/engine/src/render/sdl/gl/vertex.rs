@@ -21,6 +21,7 @@ pub enum Normalized {
     Normalized,
 }
 
+#[derive(Copy, Clone)]
 pub enum Divisor {
     /// glVertexAttribDivisor(0)
     PerVertex,
@@ -75,29 +76,29 @@ pub struct Vao(GLuint);
 
 impl Vao {
     pub fn new() -> Self {
+        let mut vao = 0;
         unsafe {
-            let mut vao = 0;
-            gl::GenVertexArrays(1, &mut vao as *mut GLuint);
-            Self(vao)
+            gl::GenVertexArrays(1, &mut vao);
         }
+        Self(vao)
     }
 }
 
 impl Drop for Vao {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteVertexArrays(1, &self.0 as *const _);
+            gl::DeleteVertexArrays(1, &self.0);
         }
     }
 }
 
 impl Bindable for Vao {
-    unsafe fn bind(&self) {
-        gl::BindVertexArray(self.0);
+    fn bind(&self) {
+        unsafe { gl::BindVertexArray(self.0) }
     }
 
-    unsafe fn unbind(&self) {
-        gl::BindVertexArray(0);
+    fn unbind(&self) {
+        unsafe { gl::BindVertexArray(0) }
     }
 }
 
@@ -132,19 +133,26 @@ pub struct Vbo {
     /// Bytes
     len: Cell<usize>,
 
+    /// Vertices
+    count: Cell<usize>,
+
     bind: VboBind,
+    usage: Cell<Option<BufferUsage>>,
 }
 
 impl Vbo {
     fn new(bind: VboBind) -> Self {
+        let mut obj = 0;
         unsafe {
-            let mut obj = 0;
             gl::GenBuffers(1, &mut obj as *mut GLuint);
-            Self {
-                obj,
-                len: Cell::new(0),
-                bind,
-            }
+        }
+
+        Self {
+            obj,
+            len: Cell::new(0),
+            count: Cell::new(0),
+            bind,
+            usage: Cell::new(None),
         }
     }
 
@@ -166,15 +174,16 @@ impl Drop for Vbo {
 }
 
 impl Bindable for Vbo {
-    unsafe fn bind(&self) {
-        gl::BindBuffer(self.bind.into(), self.obj);
+    fn bind(&self) {
+        unsafe { gl::BindBuffer(self.bind.into(), self.obj) }
     }
 
-    unsafe fn unbind(&self) {
-        gl::BindBuffer(self.bind.into(), 0);
+    fn unbind(&self) {
+        unsafe { gl::BindBuffer(self.bind.into(), 0) }
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum BufferUsage {
     StaticDraw,
     DynamicDraw,
@@ -210,18 +219,28 @@ impl From<Primitive> for GLenum {
 
 impl<'a> ScopedBind<'a, Vbo> {
     pub fn buffer_data<T: Sized>(&self, buf: &[T], usage: BufferUsage) -> GlResult<()> {
-        unsafe {
-            let ptr = if buf.is_empty() { null() } else { buf.as_ptr() };
-            let len = std::mem::size_of::<T>() * buf.len();
+        let ptr = if buf.is_empty() { null() } else { buf.as_ptr() };
+        let new_len = std::mem::size_of::<T>() * buf.len();
+        let cur_len = self.len.get();
+        let could_reuse = {
+            let cur_usage = self.usage.get();
+            cur_usage.is_none() || cur_usage == Some(usage)
+        };
 
-            errchk!(gl::BufferData(
-                self.bind.into(),
-                len as isize,
-                ptr as *const _,
-                usage.into(),
-            ))
-            .map(|_| self.len.set(len))
+        unsafe {
+            errchk!(if could_reuse && cur_len >= new_len {
+                // reuse existing buffer
+                gl::BufferSubData(self.bind.into(), 0, new_len as _, ptr as _)
+            } else {
+                // allocate new buffer
+                gl::BufferData(self.bind.into(), new_len as _, ptr as _, usage.into())
+            })?;
         }
+
+        self.len.set(new_len);
+        self.count.set(buf.len());
+        self.usage.set(Some(usage));
+        Ok(())
     }
 
     pub fn buffer_sub_data<T: Sized>(&self, offset: usize, buf: &[T]) -> GlResult<()> {
@@ -249,29 +268,36 @@ impl<'a> ScopedBind<'a, Vbo> {
 
     pub fn buffer_data_uninitialized<T: Sized>(
         &self,
-        len: usize,
+        count: usize,
         usage: BufferUsage,
     ) -> GlResult<()> {
-        unsafe {
-            let len = std::mem::size_of::<T>() * len;
+        let len = std::mem::size_of::<T>() * count;
 
+        unsafe {
             errchk!(gl::BufferData(
                 self.bind.into(),
                 len as isize,
                 null(),
                 usage.into(),
-            ))
-            .map(|_| self.len.set(len))
+            ))?;
         }
+
+        self.len.set(len);
+        self.count.set(count);
+        self.usage.set(Some(usage));
+        Ok(())
     }
 
     pub fn draw_array(&self, primitive: Primitive) {
+        self.draw_array_with_count(primitive, self.count.get())
+    }
+
+    pub fn draw_array_with_count(&self, primitive: Primitive, count: usize) {
         unsafe {
-            gl::DrawArrays(primitive.into(), 0, self.len.get() as GLint);
+            gl::DrawArrays(primitive.into(), 0, count as GLint);
         }
     }
 
-    /*
     pub fn draw_array_instanced(
         &self,
         primitive: Primitive,
@@ -279,9 +305,9 @@ impl<'a> ScopedBind<'a, Vbo> {
         vertex_count: usize,
         instance_count: usize,
     ) -> GlResult<()> {
-        if first + vertex_count >= self.len.get() {
+        if first + vertex_count > self.count.get() {
             return Err(GlError::BufferTooSmall {
-                real_len: self.len.get(),
+                real_len: self.count.get(),
                 requested_len: first + vertex_count,
             });
         }
@@ -294,7 +320,6 @@ impl<'a> ScopedBind<'a, Vbo> {
             ))
         }
     }
-    */
 
     /// Assumes indices are u16
     pub fn draw_elements_instanced(
@@ -325,6 +350,7 @@ impl<'a> ScopedBind<'a, Vbo> {
         unsafe {
             let sizeof = std::mem::size_of::<T>();
             let count = self.len.get() / sizeof;
+            debug_assert_eq!(count, self.count.get());
             debug_assert_eq!(self.len.get() % sizeof, 0);
 
             let ptr = errchk!(gl::MapBuffer(self.bind.into(), gl::WRITE_ONLY))? as *mut T;
@@ -347,21 +373,22 @@ impl<'a> ScopedBind<'a, Vbo> {
 }
 
 pub trait Bindable {
-    unsafe fn bind(&self);
-    unsafe fn unbind(&self);
+    fn bind(&self);
+    fn unbind(&self);
 }
 
 pub struct ScopedBind<'a, T: Bindable>(&'a T);
 
 impl<'a, T: Bindable> ScopedBind<'a, T> {
     fn new(obj: &'a T) -> Self {
-        unsafe { obj.bind() };
+        obj.bind();
         Self(obj)
     }
 }
 impl<'a, T: Bindable> Drop for ScopedBind<'a, T> {
     fn drop(&mut self) {
-        unsafe { self.0.unbind() };
+        // TODO dont bother unbinding?
+        self.0.unbind();
     }
 }
 
@@ -382,8 +409,7 @@ pub trait ScopedBindable: Bindable + Sized {
 impl<T: Bindable> ScopedBindable for T {}
 
 pub struct SimpleVertexAttribBuilder {
-    // TODO smallvec
-    attribs: Vec<(u32, AttribType, Normalized)>,
+    attribs: Vec<(u32, AttribType, Normalized, Option<Divisor>)>,
 }
 
 impl SimpleVertexAttribBuilder {
@@ -394,7 +420,19 @@ impl SimpleVertexAttribBuilder {
     }
 
     pub fn add(mut self, size: u32, attrib_type: AttribType, normalized: Normalized) -> Self {
-        self.attribs.push((size, attrib_type, normalized));
+        self.attribs.push((size, attrib_type, normalized, None));
+        self
+    }
+
+    pub fn add_instanced(
+        mut self,
+        size: u32,
+        attrib_type: AttribType,
+        normalized: Normalized,
+        divisor: Divisor,
+    ) -> Self {
+        self.attribs
+            .push((size, attrib_type, normalized, Some(divisor)));
         self
     }
 
@@ -402,11 +440,11 @@ impl SimpleVertexAttribBuilder {
         let stride: u32 = self
             .attribs
             .iter()
-            .map(|(count, atype, _)| atype.byte_size(*count))
+            .map(|(count, atype, _, _)| atype.byte_size(*count))
             .sum();
         let mut offset = 0;
 
-        for (i, &(count, atype, normalized)) in self.attribs.iter().enumerate() {
+        for (i, &(count, atype, normalized, divisor)) in self.attribs.iter().enumerate() {
             let normalized = if let Normalized::Normalized = normalized {
                 gl::TRUE
             } else {
@@ -416,15 +454,18 @@ impl SimpleVertexAttribBuilder {
 
             unsafe {
                 gl::EnableVertexAttribArray(index);
-                gl::VertexAttribPointer(
+                errchk!(gl::VertexAttribPointer(
                     index,
                     count as GLint,
                     atype.into(),
                     normalized,
                     stride as GLint,
                     offset as *const _,
-                );
-                errchk!(())?
+                ))?;
+
+                if let Some(div) = divisor {
+                    gl::VertexAttribDivisor(index, div.into());
+                }
             }
             offset += atype.byte_size(count);
         }
@@ -478,15 +519,14 @@ impl ManualVertexAttribBuilder {
 
                 gl::EnableVertexAttribArray(index);
                 gl::VertexAttribDivisor(index, divisor);
-                gl::VertexAttribPointer(
+                errchk!(gl::VertexAttribPointer(
                     index,
                     4,
                     AttribType::Float32.into(),
                     normalized.into(),
                     stride as GLint,
                     offset as *const _,
-                );
-                errchk!(())?;
+                ))?;
             }
 
             errchk!(self)
@@ -517,8 +557,7 @@ impl<T> DerefMut for ScopedMapMut<T> {
 impl<T> Drop for ScopedMapMut<T> {
     fn drop(&mut self) {
         unsafe {
-            gl::UnmapBuffer(self.bind.into());
-            if let Err(e) = errchk!(()) {
+            if let Err(e) = errchk!(gl::UnmapBuffer(self.bind.into())) {
                 warn!("glUnmapBuffer failed"; "error" => %e);
             }
         }

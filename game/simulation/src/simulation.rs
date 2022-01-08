@@ -3,7 +3,7 @@ use std::ops::{Add, Deref};
 use common::*;
 use resources::Resources;
 use strum_macros::EnumDiscriminants;
-use unit::world::WorldPositionRange;
+use unit::world::{WorldPoint, WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
@@ -14,8 +14,8 @@ use crate::ai::{AiAction, AiComponent, AiSystem};
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, SelectedEntity, SelectedTiles,
-    UiCommand, UiRequest, UiResponsePayload,
+    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntity,
+    SelectedTiles, UiCommand, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -33,12 +33,12 @@ use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
-use crate::society::PlayerSociety;
+use crate::society::{NameGeneration, PlayerSociety};
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
+    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
     ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
@@ -82,6 +82,9 @@ pub struct Simulation<R: Renderer> {
 
     debug_renderers: DebugRenderers<R>,
     scripting: ScriptingContext,
+
+    /// One off system that caches some allocations
+    display_text_system: DisplayTextSystem,
 }
 
 /// A little bundle of references to the game state without the generic [Renderer] param
@@ -123,7 +126,7 @@ impl<R: Renderer> Simulation<R> {
         let mut ecs_world = EcsWorld::new();
         ecs_world.insert(voxel_world.clone());
         ecs_world.insert(definitions);
-        register_resources(&mut ecs_world);
+        register_resources(&mut ecs_world, resources)?;
 
         // get a self referential ecs world resource pointing to itself
         // safety: static lifetime is as long as the game is running, as any system that uses it
@@ -150,6 +153,7 @@ impl<R: Renderer> Simulation<R> {
             terrain_changes: HashSet::with_capacity(1024),
             change_events: Vec::with_capacity(1024),
             scripting: ScriptingContext::new()?,
+            display_text_system: DisplayTextSystem::default(),
         })
     }
 
@@ -157,6 +161,7 @@ impl<R: Renderer> Simulation<R> {
         &mut self,
         commands: impl Iterator<Item = UiCommand>,
         world_viewer: &mut WorldViewer,
+        backend_data: &BackendData,
     ) -> Option<Exit> {
         // update tick
         increment_tick();
@@ -165,6 +170,22 @@ impl<R: Renderer> Simulation<R> {
 
         // TODO limit time/count
         self.apply_world_updates(world_viewer);
+
+        // process backend input
+        if let Some((x, y)) = backend_data.mouse_position {
+            let z = {
+                let w = self.voxel_world.borrow();
+                let range = world_viewer.entity_range();
+                let start_from = WorldPosition::new(*x as i32, *y as i32, range.top());
+                match w.find_accessible_block_in_column_with_range(start_from, Some(range.bottom()))
+                {
+                    Some(pos) => pos.2,
+                    None => range.bottom(),
+                }
+            };
+            let pos = WorldPoint::new(*x, *y, z.slice() as f32).unwrap(); // not nan
+            self.ecs_world.insert(MouseLocation(pos));
+        }
 
         // apply player inputs
         let exit = self.process_ui_commands(commands);
@@ -224,6 +245,9 @@ impl<R: Renderer> Simulation<R> {
 
         // prune ui elements
         UiElementPruneSystem.run_now(&self.ecs_world);
+
+        // update display text for rendering
+        self.display_text_system.run_now(&self.ecs_world);
     }
 
     fn delete_queued_entities(&mut self) {
@@ -272,8 +296,8 @@ impl<R: Renderer> Simulation<R> {
         self.ecs_world.resource_mut()
     }
 
-    pub fn player_society(&mut self) -> &mut Option<SocietyHandle> {
-        &mut self.ecs_world.resource_mut::<PlayerSociety>().0
+    pub fn set_player_society(&mut self, soc: SocietyHandle) {
+        self.ecs_world.insert(PlayerSociety::with_society(soc));
     }
 
     fn apply_world_updates(&mut self, world_viewer: &mut WorldViewer) {
@@ -335,11 +359,14 @@ impl<R: Renderer> Simulation<R> {
             let (req, resp) = cmd.consume();
             match req {
                 UiRequest::DisableAllDebugRenderers => {
-                    self.debug_renderers.disable_all();
+                    self.debug_renderers.disable_all(&self.ecs_world);
                 }
 
                 UiRequest::SetDebugRendererEnabled { ident, enabled } => {
-                    if let Err(e) = self.debug_renderers.set_enabled(ident, enabled) {
+                    if let Err(e) =
+                        self.debug_renderers
+                            .set_enabled(ident, enabled, &self.ecs_world)
+                    {
                         warn!("failed to set debug renderer state"; "error" => %e);
                     }
                 }
@@ -619,7 +646,7 @@ impl Add<u32> for Tick {
     }
 }
 
-fn register_resources(world: &mut EcsWorld) {
+fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult<()> {
     world.insert(QueuedUpdates::default());
     world.insert(EntitiesToKill::default());
     world.insert(SelectedEntity::default());
@@ -631,6 +658,10 @@ fn register_resources(world: &mut EcsWorld) {
     world.insert(Spatial::default());
     world.insert(RuntimeTimers::default());
     world.insert(Runtime::default());
+    world.insert(MouseLocation::default());
+    world.insert(NameGeneration::load(&resources)?);
+
+    Ok(())
 }
 
 fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRendererError> {
@@ -644,6 +675,8 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<NavigationAreaDebugRenderer>()?;
     builder.register::<SensesDebugRenderer>()?;
     builder.register::<FeatureBoundaryDebugRenderer>()?;
+    builder.register::<EntityIdDebugRenderer>()?;
+    builder.register::<AllSocietyVisibilityDebugRenderer>()?;
 
     Ok(builder.build())
 }

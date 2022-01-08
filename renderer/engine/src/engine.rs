@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use common::*;
 use simulation::input::UiCommands;
-use simulation::{self, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation};
+use simulation::{
+    self, BackendData, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation,
+};
 
 pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
     backend: &'b mut B,
@@ -65,13 +67,13 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                 break Exit::Stop;
             }
 
-            self.backend.consume_events(&mut self.sim_ui_commands);
+            let backend_data = self.backend.consume_events(&mut self.sim_ui_commands);
 
             #[cfg(not(feature = "lite"))]
             for action in game_loop.actions() {
                 match action {
                     gameloop::FrameAction::Tick => {
-                        exit = self.tick();
+                        exit = self.tick(&backend_data);
                     }
                     gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
                 }
@@ -80,7 +82,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             #[cfg(feature = "lite")]
             {
                 // tick as fast as possible
-                exit = self.tick();
+                exit = self.tick(&backend_data);
             }
 
             if let Some(exit) = exit {
@@ -90,7 +92,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         }
     }
 
-    fn tick(&mut self) -> Option<Exit> {
+    fn tick(&mut self, backend_data: &BackendData) -> Option<Exit> {
         trace!("tick");
         let exit = {
             let _timer = self.perf.tick.time();
@@ -98,7 +100,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             let world_viewer = self.backend.world_viewer();
 
             let commands = self.sim_ui_commands.drain(..);
-            self.simulation.tick(commands, world_viewer)
+            self.simulation.tick(commands, world_viewer, backend_data)
         };
 
         self.backend.tick();

@@ -9,8 +9,8 @@ use color::Color;
 use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
-    Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend, Simulation,
-    WorldViewer,
+    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
+    Simulation, WorldViewer,
 };
 
 use crate::render::sdl::camera::Camera;
@@ -114,10 +114,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             .map_err(SdlBackendError::Sdl)?;
 
         let events = sdl.event_pump().map_err(SdlBackendError::Sdl)?;
-        let renderer = {
-            let shaders = resources.shaders().map_err(SdlBackendError::Resources)?;
-            GlRenderer::new(&shaders)?
-        };
+        let renderer = GlRenderer::new(resources)?;
         let camera = Camera::new(w as i32, h as i32);
 
         Ok(Self {
@@ -162,7 +159,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         self.ui.on_start(commands_out);
     }
 
-    fn consume_events(&mut self, commands: &mut UiCommands) {
+    fn consume_events(&mut self, commands: &mut UiCommands) -> BackendData {
         // take event pump out of self, to be replaced at the end of the tick
         let mut events = match self.sdl_events.take() {
             Some(e) => e,
@@ -258,10 +255,24 @@ impl InitializedSimulationBackend for SdlBackendInit {
             };
         }
 
+        let mouse_state = MouseState::new(&events);
+
         // put back event pump like we never took it
         let none = std::mem::replace(&mut self.sdl_events, Some(events));
         debug_assert!(none.is_none());
         std::mem::forget(none);
+
+        let mouse_position = {
+            let (x, y) = self
+                .camera
+                .screen_to_world((mouse_state.x(), mouse_state.y()));
+
+            let x = NotNan::new(x).ok();
+            let y = NotNan::new(y).ok();
+            x.zip(y)
+        };
+
+        BackendData { mouse_position }
     }
 
     fn tick(&mut self) {
@@ -291,14 +302,16 @@ impl InitializedSimulationBackend for SdlBackendInit {
         Gl::clear();
 
         // calculate projection and view matrices
+        self.camera.update_interpolation(interpolation);
         let projection = self.camera.projection_matrix();
 
-        // position camera a fixed distance above the top of the terrain
-        const CAMERA_Z_OFFSET: f32 = 20.0;
         let terrain_range = self.world_viewer.terrain_range();
-        let view = self
-            .camera
-            .view_matrix(interpolation, terrain_range.size() as f32 + CAMERA_Z_OFFSET);
+        let camera_z = {
+            // position camera a fixed distance above the top of the terrain
+            const CAMERA_Z_OFFSET: f32 = 20.0;
+            terrain_range.size() as f32 + CAMERA_Z_OFFSET
+        };
+        let view = self.camera.view_matrix(camera_z);
 
         // render world
         self.renderer
@@ -309,6 +322,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
         let lower_limit = terrain_range.bottom().slice() as f32;
         let frame_ctx = GlFrameContext {
             projection,
+            text_transform: self.camera.scaled_text_transform_matrix(camera_z),
+            zoom: self.camera.zoom(),
             view,
             z_offset: lower_limit,
         };
@@ -429,14 +444,14 @@ impl SdlBackendInit {
         x: i32,
         y: i32,
     ) -> Option<(SelectType, WorldColumn)> {
-        Selection::select_type(button).map(|select| {
+        Selection::select_type(button).and_then(|select| {
             let (wx, wy) = self.camera.screen_to_world((x, y));
             let col = WorldColumn {
-                x: wx,
-                y: wy,
+                x: NotNan::new(wx).ok()?,
+                y: NotNan::new(wy).ok()?,
                 slice_range: self.world_viewer.entity_range(),
             };
-            (select, col)
+            Some((select, col))
         })
     }
 }

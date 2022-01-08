@@ -7,7 +7,7 @@ use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
 use crate::event::DeathReason;
 use crate::{
-    EntityEvent, EntityEventPayload, NameComponent, PhysicalComponent, Societies, SocietyHandle,
+    EntityEvent, EntityEventPayload, PhysicalComponent, Societies, SocietyHandle,
     TransformComponent,
 };
 
@@ -386,7 +386,7 @@ impl EcsExtContainers<'_> {
 
     fn on_stack_creation(&self, stack: Entity) {
         // adjust stack name, terribly hacky and temporary string manipulation
-        if let Ok(mut name) = self.0.component_mut::<NameComponent>(stack) {
+        if let Ok(mut name) = self.0.component_mut::<KindComponent>(stack) {
             name.make_stack();
         }
     }

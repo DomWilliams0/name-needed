@@ -4,6 +4,7 @@ use serde::de::Error;
 
 use color::Color;
 use common::*;
+use unit::world::BLOCKS_PER_METRE;
 
 use crate::ecs::*;
 use crate::input::{SelectedComponent, SelectedTiles};
@@ -36,20 +37,43 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         Read<'a, PlayerSociety>,
         Read<'a, SelectedTiles>,
+        Read<'a, EntitiesRes>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
         ReadStorage<'a, PhysicalComponent>,
         ReadStorage<'a, SelectedComponent>,
+        WriteStorage<'a, DisplayComponent>,
         ReadStorage<'a, UiElementComponent>,
+        ReadStorage<'a, KindComponent>,
+        ReadStorage<'a, NameComponent>,
     );
 
     fn run(
         &mut self,
-        (player_soc, selected_block, transform, render, physical, selected, ui): Self::SystemData,
+        (
+            player_soc,
+            selected_block,
+            entities,
+            transform,
+            render,
+            physical,
+            selected,
+            mut display,
+            ui,
+            kind,
+            name,
+        ): Self::SystemData,
     ) {
         // render entities
-        for (transform, render, physical, selected) in
-            (&transform, &render, &physical, selected.maybe()).join()
+        for (e, transform, render, physical, display, selected) in (
+            &entities,
+            &transform,
+            &render,
+            &physical,
+            (&mut display).maybe(),
+            (&selected).maybe(),
+        )
+            .join()
         {
             if !self.slices.contains(transform.slice()) {
                 continue;
@@ -70,6 +94,14 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             if selected.is_some() {
                 self.renderer.sim_selected(&transform_desc, physical);
             }
+
+            if let Some(text) = display.and_then(|d| d.render(|| (e, &kind, &name))) {
+                // render a bit below the entity
+                transform_desc.position.modify_y(|y| {
+                    y - (physical.size.xy_max().metres() * 0.5 * BLOCKS_PER_METRE as f32)
+                });
+                self.renderer.debug_text(transform_desc.position, text);
+            }
         }
 
         // render player's world selection
@@ -79,9 +111,17 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         }
 
         // render in-game ui elements above entities
-        for (transform, ui, selected) in (&transform, &ui, selected.maybe()).join() {
+        for (e, transform, ui, display, selected) in (
+            &entities,
+            &transform,
+            &ui,
+            (&mut display).maybe(),
+            selected.maybe(),
+        )
+            .join()
+        {
             // only render elements for the player's society
-            if player_soc.0 != ui.society() {
+            if !ui.society().map(|soc| *player_soc == soc).unwrap_or(true) {
                 continue;
             }
 
@@ -99,6 +139,10 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 
             self.renderer
                 .sim_ui_element(&transform_desc, ui, selected.is_some());
+
+            if let Some(text) = display.and_then(|d| d.render(|| (e, &kind, &name))) {
+                self.renderer.debug_text(transform_desc.position, text);
+            }
         }
     }
 }

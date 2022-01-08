@@ -425,7 +425,8 @@ mod start {
             .societies_mut()
             .new_society("Top Geezers".to_owned())
             .unwrap();
-        *sim.player_society() = Some(player_society);
+
+        sim.set_player_society(player_society);
 
         // defer to scenario for entity spawning
         scenario(sim.world());

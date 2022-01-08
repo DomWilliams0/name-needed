@@ -80,13 +80,14 @@ impl<'a> GoToSubactivity<'a> {
             })
             .await;
 
-        self.complete = true;
-
-        match goto_result {
-            None => Err(GotoError::Cancelled),
+        let result = match goto_result {
+            None => return Err(GotoError::Cancelled),
             Some(Ok(_)) => Ok(()),
             Some(Err(err)) => Err(err.into()),
-        }
+        };
+
+        self.complete = true;
+        result
     }
 }
 

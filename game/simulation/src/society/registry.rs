@@ -13,7 +13,16 @@ pub struct Societies {
 
 /// World resource to represent the player's "home" society that they control
 #[derive(Default, Clone)]
-pub struct PlayerSociety(pub Option<SocietyHandle>);
+pub struct PlayerSociety {
+    own: Option<SocietyHandle>,
+    visibility: SocietyVisibility,
+}
+
+#[derive(Copy, Clone)]
+pub enum SocietyVisibility {
+    All,
+    JustOwn,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(transparent)]
@@ -83,7 +92,49 @@ impl Default for Societies {
 
 impl PartialEq<SocietyHandle> for PlayerSociety {
     fn eq(&self, other: &SocietyHandle) -> bool {
-        self.0.map(|me| me == *other).unwrap_or(false)
+        if let SocietyVisibility::All = self.visibility {
+            true
+        } else if let Some(me) = self.own {
+            me == *other
+        } else {
+            false
+        }
+    }
+}
+
+impl PartialEq<Option<SocietyHandle>> for PlayerSociety {
+    fn eq(&self, other: &Option<SocietyHandle>) -> bool {
+        if let SocietyVisibility::All = self.visibility {
+            true
+        } else if let Some((me, other)) = self.own.zip(*other) {
+            me == other
+        } else {
+            false
+        }
+    }
+}
+
+impl PlayerSociety {
+    pub fn with_society(soc: SocietyHandle) -> Self {
+        Self {
+            own: Some(soc),
+            ..Self::default()
+        }
+    }
+
+    /// Don't use for visibility checking
+    pub fn get(&self) -> Option<SocietyHandle> {
+        self.own
+    }
+
+    pub fn set_visibility(&mut self, vis: SocietyVisibility) {
+        self.visibility = vis
+    }
+}
+
+impl Default for SocietyVisibility {
+    fn default() -> Self {
+        Self::JustOwn
     }
 }
 
