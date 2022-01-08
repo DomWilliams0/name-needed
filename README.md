@@ -12,6 +12,12 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 08 Jan 2022: <em>In-world text labels to show entity types and names, job progress and item stack information.</em>
+<p style="margin: auto">
+    <img src=".screenshots/stack-split-labelled.gif"/>
+    <img src=".screenshots/busy-with-labels.gif" width="500"/>
+</p>
+
 * 22 Dec 2021: <em>Material gathering for simple build jobs, with homogeneous item stacking. The build job (translucent square) requires 6 stone bricks, which are brought over in a stack of 5, then 1. The blue circle then uses these gathered materials to build a stone wall.</em>
 <p style="margin: auto">
     <img src=".screenshots/simple-material-gathering.gif" width="500"/>
