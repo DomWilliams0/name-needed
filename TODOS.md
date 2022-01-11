@@ -1,4 +1,4 @@
-# TODOs (398)
+# TODOs (397)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -121,8 +121,7 @@
    * `// TODO arrival radius depends on the size of the item`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (3)
-   * `// TODO ensure component refs cant be held across awaits`
+ * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
  * [game/simulation/src/activity/subactivity/break_block.rs](game/simulation/src/activity/subactivity/break_block.rs) (3)
