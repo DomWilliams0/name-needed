@@ -54,27 +54,36 @@ impl<C: Context> Smarts<C> {
         Self { decisions }
     }
 
-    pub fn score(&mut self, input_cache: &mut InputCache<C>, blackboard: &mut C::Blackboard) {
+    pub fn score(
+        &mut self,
+        input_cache: &mut InputCache<C>,
+        blackboard: &mut C::Blackboard,
+        best_so_far: &mut f32,
+    ) {
         let dses = self.decisions.iter_mut().map(Decision::as_mut);
-        Self::score_dses(input_cache, blackboard, dses)
+        Self::score_dses(input_cache, blackboard, dses, best_so_far)
     }
 
     fn score_dses<'dse>(
         input_cache: &mut InputCache<C>,
         blackboard: &mut C::Blackboard,
         dses: impl Iterator<Item = (&'dse dyn Dse<C>, &'dse mut f32)>,
+        best_so_far: &mut f32,
     ) where
         C: 'dse,
     {
-        // TODO optimize: not all decisions need to be checked each time, but at least zero all scores
         // TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array
         for (dse, score) in dses {
             // TODO add momentum to discourage changing mind so often
             let bonus = dse.weight().multiplier();
 
             log_scope!(o!("dse" => dse.name()));
-            *score = dse.score(blackboard, input_cache, bonus);
+            *score = dse.score(blackboard, input_cache, bonus, *best_so_far);
             trace!("DSE scored {score}", score = *score);
+
+            if *score > *best_so_far {
+                *best_so_far = *score;
+            }
         }
     }
 }
@@ -111,9 +120,11 @@ impl<C: Context> Intelligence<C> {
         self.input_cache.reset();
 
         // score all possible decisions
-        self.base.score(&mut self.input_cache, blackboard);
+        let mut best_so_far = 0.0;
+        self.base
+            .score(&mut self.input_cache, blackboard, &mut best_so_far);
         for (_, smarts) in self.additional.iter_mut() {
-            smarts.score(&mut self.input_cache, blackboard)
+            smarts.score(&mut self.input_cache, blackboard, &mut best_so_far)
         }
 
         // score streams in a parallel array of scores
@@ -123,6 +134,7 @@ impl<C: Context> Intelligence<C> {
             &mut self.input_cache,
             blackboard,
             streams.iter_mut().map(|(dse, score)| (*dse, score)),
+            &mut best_so_far,
         );
 
         // choose the best out of all scores

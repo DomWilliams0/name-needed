@@ -1,14 +1,12 @@
-# TODOs (397)
+# TODOs (395)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `/// TODO pooled vec/slice rather than Vec each time`
-   * `// TODO optimization: dont consider all considerations every time`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (7)
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (6)
    * `// TODO pool/arena allocator`
-   * `// TODO optimize: not all decisions need to be checked each time, but at least zero all scores`
    * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
    * `// TODO reuse allocation`

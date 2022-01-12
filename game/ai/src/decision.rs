@@ -43,13 +43,19 @@ pub trait Dse<C: Context> {
         blackboard: &mut C::Blackboard,
         input_cache: &mut InputCache<C>,
         bonus: f32,
+        best_so_far: f32,
     ) -> f32 {
+        // starts as the maximum possible score (i.e. all considerations are 1.0)
         let mut final_score = bonus;
 
         let considerations = self.considerations();
         let modification_factor = 1.0 - (1.0 / considerations.len() as f32);
         for c in considerations.iter() {
-            // TODO optimization: dont consider all considerations every time
+            if final_score < best_so_far {
+                trace!("skipping {dse} due to falling below best result found so far", dse = self.name();
+                       "current_score" => final_score, "best_so_far" => best_so_far);
+                return 0.0;
+            }
 
             let score = c.consider(blackboard, input_cache).value();
 
@@ -72,6 +78,18 @@ pub trait Dse<C: Context> {
                 c.log_metric(&blackboard.entity(), evaluated_score);
             }
 
+            debug_assert!(
+                (0.0..=1.0).contains(&evaluated_score),
+                "evaluated score {} out of range",
+                evaluated_score
+            );
+
+            if evaluated_score <= 0.0 {
+                // will never financially recover from this
+                final_score = 0.0;
+                break;
+            }
+
             final_score *= evaluated_score;
         }
 
@@ -86,7 +104,7 @@ pub struct WeightedDse<C: Context, D: Dse<C>> {
     phantom: PhantomData<C>,
 }
 
-impl<C: Context> Debug for dyn Dse<C> {
+impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_struct("Dse")
             .field("name", &self.name())
