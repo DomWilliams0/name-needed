@@ -215,17 +215,18 @@ impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::intelligence::IntelligenceContext;
+    use crate::bumpalo::Bump;
+    use crate::intelligence::{InputCache, IntelligenceContext};
     use crate::test_utils::*;
     use crate::*;
 
     #[test]
     fn score() {
         let mut blackboard = TestBlackboard { my_hunger: 0.5 };
-        let mut cache = InputCache::default();
+        let alloc = Bump::new();
         let mut ctx = IntelligenceContext {
             blackboard: &mut blackboard,
-            input_cache: &mut cache,
+            input_cache: InputCache::new(&alloc),
             best_so_far: 0.0,
             alloc: &Default::default(),
         };

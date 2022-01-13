@@ -2,7 +2,7 @@
 
 pub use consideration::{Consideration, ConsiderationParameter, Curve};
 pub use decision::{Considerations, DecisionWeightType, Dse, WeightedDse};
-pub use intelligence::{DecisionSource, Intelligence, IntelligentDecision, Smarts};
+pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
 
 use common::bumpalo;
 use std::fmt::Debug;
@@ -28,6 +28,7 @@ pub trait Blackboard {
     fn entity(&self) -> String;
 }
 
+// TODO use a separate allocator for ai to avoid fragmentation
 pub type AiBox<T> = Box<T>;
 
 pub(crate) fn pretty_type_name(name: &str) -> &str {

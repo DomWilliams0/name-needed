@@ -1,4 +1,4 @@
-# TODOs (399)
+# TODOs (400)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -16,6 +16,8 @@
    * `// TODO benchmark adding and popping smarts`
    * `// TODO use bump`
    * `// TODO reuse allocation`
+ * [game/ai/src/lib.rs](game/ai/src/lib.rs) (1)
+   * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
