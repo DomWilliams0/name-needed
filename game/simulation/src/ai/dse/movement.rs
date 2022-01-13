@@ -1,4 +1,4 @@
-use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::ConstantConsideration;
 use crate::ai::{AiAction, AiContext};
@@ -6,8 +6,8 @@ use crate::ai::{AiAction, AiContext};
 pub struct WanderDse;
 
 impl Dse<AiContext> for WanderDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![AiBox::new(ConstantConsideration(0.2))]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        out.add(ConstantConsideration(0.2));
     }
 
     fn weight_type(&self) -> DecisionWeightType {

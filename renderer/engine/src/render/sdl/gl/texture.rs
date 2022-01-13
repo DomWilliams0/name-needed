@@ -40,10 +40,6 @@ impl Texture {
         Ok(Self(name))
     }
 
-    pub fn bind(&self) {
-        unsafe { gl::BindTexture(gl::TEXTURE_2D, self.0) }
-    }
-
     pub fn borrow(&self) -> BorrowedTexture {
         BorrowedTexture(self.0)
     }

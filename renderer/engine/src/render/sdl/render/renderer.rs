@@ -249,7 +249,7 @@ impl Renderer for GlRenderer {
         let (program, _vao, vbo) = self.debug_pipeline.bind_all();
 
         // TODO use glBufferSubData to reuse the allocation if <= len
-        vbo.buffer_data_uninitialized::<DebugVertex>(line_count * 2, BufferUsage::StreamDraw)?;
+        vbo.buffer_data_uninitialized::<DebugVertex>(line_count * 2, BufferUsage::Stream)?;
 
         if let Some(mut mapped) = vbo.map_write_only::<DebugVertex>()? {
             let mut i = 0;

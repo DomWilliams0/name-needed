@@ -1,11 +1,12 @@
 use float_ord::FloatOrd;
 
-use crate::consideration::InputCache;
 use crate::decision::Dse;
-use crate::{AiBox, Context};
+use crate::{AiBox, Context, Input};
 use common::*;
 use std::cell::Cell;
 use std::collections::HashMap;
+
+// TODO bump allocator should not expose bumpalo specifically
 
 // TODO pool/arena allocator
 /// Collection of DSEs
@@ -21,7 +22,13 @@ pub struct Intelligence<C: Context> {
     additional: HashMap<C::AdditionalDseId, Smarts<C>>,
 
     last_action: Cell<C::Action>,
-    input_cache: InputCache<C>,
+}
+
+pub struct IntelligenceContext<'a, C: Context> {
+    pub blackboard: &'a mut C::Blackboard,
+    pub input_cache: InputCache<'a, C>,
+    pub best_so_far: f32,
+    pub alloc: &'a bumpalo::Bump,
 }
 
 pub enum IntelligentDecision<'a, C: Context> {
@@ -45,6 +52,26 @@ struct Decision<C: Context> {
     score: f32,
 }
 
+pub struct InputCache<'a, C: Context>(bumpalo::collections::Vec<'a, (C::Input, f32)>);
+
+impl<'a, C: Context> InputCache<'a, C> {
+    pub fn new(alloc: &'a bumpalo::Bump) -> Self {
+        InputCache(bumpalo::collections::Vec::with_capacity_in(16, alloc))
+    }
+
+    pub fn get(&mut self, input: C::Input, blackboard: &mut C::Blackboard) -> f32 {
+        // TODO use an arena-allocator hashmap
+        // TODO perfect hash on C::Input
+        if let Some((_, val)) = self.0.iter().find(|(ty, _)| *ty == input) {
+            *val
+        } else {
+            let val = input.get(blackboard);
+            self.0.push((input, val));
+            val
+        }
+    }
+}
+
 impl<C: Context> Smarts<C> {
     pub fn new(dses: impl Iterator<Item = AiBox<dyn Dse<C>>>) -> Self {
         let decisions: Vec<_> = dses.map(Decision::new).collect();
@@ -54,27 +81,29 @@ impl<C: Context> Smarts<C> {
         Self { decisions }
     }
 
-    pub fn score(&mut self, input_cache: &mut InputCache<C>, blackboard: &mut C::Blackboard) {
+    pub fn score(&mut self, context: &mut IntelligenceContext<C>) {
         let dses = self.decisions.iter_mut().map(Decision::as_mut);
-        Self::score_dses(input_cache, blackboard, dses)
+        Self::score_dses(context, dses)
     }
 
     fn score_dses<'dse>(
-        input_cache: &mut InputCache<C>,
-        blackboard: &mut C::Blackboard,
+        context: &mut IntelligenceContext<C>,
         dses: impl Iterator<Item = (&'dse dyn Dse<C>, &'dse mut f32)>,
     ) where
         C: 'dse,
     {
-        // TODO optimize: not all decisions need to be checked each time, but at least zero all scores
         // TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array
         for (dse, score) in dses {
             // TODO add momentum to discourage changing mind so often
             let bonus = dse.weight().multiplier();
 
             log_scope!(o!("dse" => dse.name()));
-            *score = dse.score(blackboard, input_cache, bonus);
+            *score = dse.score(context, bonus);
             trace!("DSE scored {score}", score = *score);
+
+            if *score > context.best_so_far {
+                context.best_so_far = *score;
+            }
         }
     }
 }
@@ -90,12 +119,15 @@ impl<C: Context> Intelligence<C> {
             base,
             additional: HashMap::new(),
             last_action: Default::default(),
-            input_cache: InputCache::default(),
         }
     }
 
-    pub fn choose<'a>(&'a mut self, blackboard: &'a mut C::Blackboard) -> IntelligentDecision<C> {
-        self.choose_with_stream_dses(blackboard, empty())
+    pub fn choose<'a>(
+        &'a mut self,
+        blackboard: &'a mut C::Blackboard,
+        alloc: &'a bumpalo::Bump,
+    ) -> IntelligentDecision<C> {
+        self.choose_with_stream_dses(blackboard, alloc, empty())
     }
 
     /// "Stream" behaviours only apply to a single tick, avoiding the overhead of adding then
@@ -103,25 +135,30 @@ impl<C: Context> Intelligence<C> {
     pub fn choose_with_stream_dses<'a, 'b>(
         &'a mut self,
         blackboard: &'b mut C::Blackboard,
+        alloc: &'a bumpalo::Bump,
         streams: impl Iterator<Item = &'b dyn Dse<C>>,
     ) -> IntelligentDecision<'b, C>
     where
         'a: 'b,
     {
-        self.input_cache.reset();
-
         // score all possible decisions
-        self.base.score(&mut self.input_cache, blackboard);
+        let mut context = IntelligenceContext {
+            blackboard,
+            input_cache: InputCache::new(alloc),
+            alloc,
+            best_so_far: 0.0,
+        };
+        self.base.score(&mut context);
+
         for (_, smarts) in self.additional.iter_mut() {
-            smarts.score(&mut self.input_cache, blackboard)
+            smarts.score(&mut context)
         }
 
         // score streams in a parallel array of scores
-        // TODO reuse allocation
+        // TODO use bump allocator
         let mut streams: Vec<_> = streams.map(|dse| (dse, 0.0f32)).collect();
         Smarts::score_dses(
-            &mut self.input_cache,
-            blackboard,
+            &mut context,
             streams.iter_mut().map(|(dse, score)| (*dse, score)),
         );
 
@@ -142,6 +179,7 @@ impl<C: Context> Intelligence<C> {
 
         trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src);
 
+        drop(context);
         let action = choice.action(blackboard);
         let last_action = self.last_action.replace(action.clone());
 
@@ -156,12 +194,9 @@ impl<C: Context> Intelligence<C> {
         }
     }
 
-    pub fn drain_input_cache(&mut self) -> impl Iterator<Item = (C::Input, f32)> + '_ {
-        self.input_cache.drain()
-    }
-
     // TODO benchmark adding and popping smarts
 
+    // TODO use bump
     pub fn add_smarts(
         &mut self,
         id: C::AdditionalDseId,
@@ -251,10 +286,10 @@ mod tests {
     use crate::decision::WeightedDse;
     use crate::test_utils::*;
     use crate::{
-        AiBox, Consideration, DecisionSource, DecisionWeightType, Dse, Intelligence,
-        IntelligentDecision,
+        AiBox, Consideration, Considerations, DecisionSource, DecisionWeightType, Dse,
+        Intelligence, IntelligentDecision,
     };
-    use common::once;
+    use common::{bumpalo, once};
 
     #[test]
     fn extra_dses() {
@@ -266,17 +301,18 @@ mod tests {
         ];
 
         let mut intelligence = Intelligence::new(dses.into_iter());
+        let alloc = bumpalo::Bump::new();
 
         // eat wins
         assert!(matches!(
-            intelligence.choose(&mut blackboard),
+            intelligence.choose(&mut blackboard, &alloc),
             IntelligentDecision::New {
                 action: TestAction::Eat,
                 ..
             }
         ));
         assert!(matches!(
-            intelligence.choose(&mut blackboard),
+            intelligence.choose(&mut blackboard, &alloc),
             IntelligentDecision::Unchanged
         ));
 
@@ -286,7 +322,7 @@ mod tests {
             vec![AiBox::new(EmergencyDse) as AiBox<dyn Dse<TestContext>>].into_iter(),
         );
         assert!(matches!(
-            intelligence.choose(&mut blackboard),
+            intelligence.choose(&mut blackboard, &alloc),
             IntelligentDecision::New {
                 action: TestAction::CancelExistence,
                 ..
@@ -296,7 +332,7 @@ mod tests {
         // pop it, back to original
         intelligence.pop_smarts(&100);
         assert!(matches!(
-            intelligence.choose(&mut blackboard),
+            intelligence.choose(&mut blackboard, &alloc),
             IntelligentDecision::New {
                 action: TestAction::Eat,
                 ..
@@ -307,7 +343,7 @@ mod tests {
         let emergency = Box::new(EmergencyDse);
         let streams = once(emergency.as_ref() as &dyn Dse<TestContext>);
         assert!(matches!(
-            intelligence.choose_with_stream_dses(&mut blackboard, streams),
+            intelligence.choose_with_stream_dses(&mut blackboard, &alloc, streams),
             IntelligentDecision::New {
                 action: TestAction::CancelExistence,
                 ..
@@ -327,8 +363,8 @@ mod tests {
                 "Configurable"
             }
 
-            fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-                vec![AiBox::new(ConstantConsideration(50))]
+            fn considerations(&self, out: &mut Considerations<TestContext>) {
+                out.add(ConstantConsideration(50));
             }
 
             fn weight_type(&self) -> DecisionWeightType {
@@ -346,7 +382,8 @@ mod tests {
         let mut intelligence = Intelligence::new(dses.into_iter());
 
         // choose the only available Eat
-        match intelligence.choose(&mut blackboard) {
+        let alloc = bumpalo::Bump::new();
+        match intelligence.choose(&mut blackboard, &alloc) {
             IntelligentDecision::New { action, src, .. } => {
                 assert_eq!(action, TestAction::Eat);
                 assert!(matches!(src, DecisionSource::Base(0)));
@@ -364,7 +401,8 @@ mod tests {
         );
 
         // choose the new weighted Nop
-        match intelligence.choose(&mut blackboard) {
+        let alloc = bumpalo::Bump::new();
+        match intelligence.choose(&mut blackboard, &alloc) {
             IntelligentDecision::New { action, src, .. } => {
                 assert_eq!(action, TestAction::Nop); // changed
                 assert!(matches!(src, DecisionSource::Additional(5, 0)));
@@ -381,7 +419,7 @@ mod tests {
             ),
         );
 
-        match intelligence.choose(&mut blackboard) {
+        match intelligence.choose(&mut blackboard, &alloc) {
             IntelligentDecision::New { action, src, .. } => {
                 assert_eq!(action, TestAction::Eat); // changed
                 assert!(matches!(src, DecisionSource::Additional(8, 0)));

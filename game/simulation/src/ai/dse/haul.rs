@@ -5,7 +5,7 @@ use crate::ai::consideration::{
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
-use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 use unit::world::WorldPoint;
 
 pub struct HaulDse {
@@ -18,18 +18,16 @@ pub struct HaulDse {
 }
 
 impl Dse<AiContext> for HaulDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            AiBox::new(HasExtraHandsForHaulingConsideration(
-                self.extra_hands_needed,
-                Some(ItemFilter::SpecificEntity(self.thing)),
-            )),
-            AiBox::new(MyProximityToConsideration {
-                target: self.destination,
-                proximity: Proximity::Walkable,
-            }),
-            // TODO consider distance to source too
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        out.add(HasExtraHandsForHaulingConsideration(
+            self.extra_hands_needed,
+            Some(ItemFilter::SpecificEntity(self.thing)),
+        ));
+        out.add(MyProximityToConsideration {
+            target: self.destination,
+            proximity: Proximity::Walkable,
+        });
+        // TODO consider distance to source too
     }
 
     fn weight_type(&self) -> DecisionWeightType {

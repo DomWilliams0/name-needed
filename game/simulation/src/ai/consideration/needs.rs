@@ -34,6 +34,7 @@ mod tests {
     use crate::ecs::Builder;
     use crate::{ComponentWorld, EcsWorld, WorldPosition};
     use ai::{Consideration, InputCache};
+    use common::bumpalo::Bump;
     use common::NormalizedFloat;
 
     struct NoLeaksGuard(*mut EcsWorld, *mut SharedBlackboard);
@@ -78,7 +79,8 @@ mod tests {
     fn hunger() {
         // initialize blackboard with only what we want
         let (mut blackboard, _guard) = dummy_blackboard();
-        let mut cache = InputCache::default();
+        let alloc = Bump::new();
+        let mut cache = InputCache::new(&alloc);
 
         let hunger = HungerConsideration;
 
@@ -86,19 +88,18 @@ mod tests {
         let score_when_full = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
-        cache.reset();
+        cache = InputCache::new(&alloc);
 
         blackboard.hunger = Some(NormalizedFloat::new(0.2));
         let score_when_hungry = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
-        cache.reset();
+        cache = InputCache::new(&alloc);
 
         blackboard.hunger = Some(NormalizedFloat::new(0.01));
         let score_when_empty = hunger
             .curve()
             .evaluate(hunger.consider(&mut blackboard, &mut cache));
-        cache.reset();
 
         assert!(
             score_when_hungry > score_when_full,

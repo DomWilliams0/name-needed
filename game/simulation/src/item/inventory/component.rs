@@ -413,17 +413,19 @@ impl<'a> FoundSlotMut<'a> {
                 };
 
                 // now attempt to free up equip slot
+                let on_move = |_item, _container| {
+                    // TODO impl this when a scenario is found to hit this code path :^)
+                    //  - pass through a closure from caller?
+                    todo!()
+                };
+
                 if inv.insert_item(
                     resolver,
                     removed_item.entity,
                     extra_hands,
                     removed_item.volume,
                     removed_item.size,
-                    |_item, _container| {
-                        // TODO impl this when a scenario is found to hit this code path :^)
-                        //  - pass through a closure from caller?
-                        todo!()
-                    },
+                    on_move,
                 ) {
                     // it worked
                     true

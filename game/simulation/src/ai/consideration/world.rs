@@ -4,6 +4,7 @@ use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ai::input::BlockTypeMatch;
 
+#[allow(unused)]
 pub enum Proximity {
     /// e.g. a job that can be walked to
     Walkable,

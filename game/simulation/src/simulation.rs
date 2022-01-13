@@ -30,6 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::alloc::FrameAllocator;
 use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
@@ -51,10 +52,6 @@ use std::sync::Arc;
 #[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
-    BuildJobWip {
-        build: SocietyJobHandle,
-        reserved_materials: Arc<Vec<Entity>>,
-    },
 }
 
 pub struct WorldContext;
@@ -248,6 +245,9 @@ impl<R: Renderer> Simulation<R> {
 
         // update display text for rendering
         self.display_text_system.run_now(&self.ecs_world);
+
+        // reset frame bump allocator
+        self.ecs_world.resource_mut::<FrameAllocator>().reset();
     }
 
     fn delete_queued_entities(&mut self) {
@@ -467,7 +467,7 @@ impl<R: Renderer> Simulation<R> {
                     info!("executing script"; "path" => %path.display());
                     let result = self
                         .scripting
-                        .eval_path(&path, &*self.ecs_world, &self.voxel_world)
+                        .eval_path(&path, &*self.ecs_world)
                         .map(|output| output.into_string());
 
                     if let Err(err) = result.as_ref() {
@@ -660,6 +660,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(Runtime::default());
     world.insert(MouseLocation::default());
     world.insert(NameGeneration::load(&resources)?);
+    world.insert(FrameAllocator::default());
 
     Ok(())
 }

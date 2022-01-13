@@ -1,7 +1,8 @@
 use common::*;
 
-use crate::consideration::InputCache;
-use crate::{pretty_type_name, AiBox, Consideration, Context};
+use crate::bumpalo::Bump;
+use crate::intelligence::IntelligenceContext;
+use crate::{pretty_type_name, Consideration, Context};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DecisionWeightType {
@@ -23,9 +24,14 @@ pub enum DecisionWeight {
     Weighted(DecisionWeightType, f32),
 }
 
+pub struct Considerations<'a, C: Context> {
+    // TODO use a simpler manual vec that doesnt run destructors
+    vec: bumpalo::collections::Vec<'a, &'a dyn Consideration<C>>,
+    alloc: &'a bumpalo::Bump,
+}
+
 pub trait Dse<C: Context> {
-    /// TODO pooled vec/slice rather than Vec each time
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>>;
+    fn considerations(&self, out: &mut Considerations<C>);
     fn weight_type(&self) -> DecisionWeightType;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
 
@@ -38,20 +44,27 @@ pub trait Dse<C: Context> {
         DecisionWeight::Plain(self.weight_type())
     }
 
-    fn score(
-        &self,
-        blackboard: &mut C::Blackboard,
-        input_cache: &mut InputCache<C>,
-        bonus: f32,
-    ) -> f32 {
+    fn score(&self, context: &mut IntelligenceContext<C>, bonus: f32) -> f32 {
+        // starts as the maximum possible score (i.e. all considerations are 1.0)
         let mut final_score = bonus;
 
-        let considerations = self.considerations();
-        let modification_factor = 1.0 - (1.0 / considerations.len() as f32);
-        for c in considerations.iter() {
-            // TODO optimization: dont consider all considerations every time
+        let considerations = {
+            let mut considerations = Considerations::new(context.alloc);
+            self.considerations(&mut considerations);
+            considerations.vec
+        };
 
-            let score = c.consider(blackboard, input_cache).value();
+        let modification_factor = 1.0 - (1.0 / considerations.len() as f32);
+        for c in considerations {
+            if final_score < context.best_so_far {
+                trace!("skipping {dse} due to falling below best result found so far", dse = self.name();
+                       "current_score" => final_score, "best_so_far" => context.best_so_far);
+                return 0.0;
+            }
+
+            let score = c
+                .consider(context.blackboard, &mut context.input_cache)
+                .value();
 
             // compensation factor balances overall drop when multiplying multiple floats by
             // taking into account the number of considerations
@@ -72,6 +85,18 @@ pub trait Dse<C: Context> {
                 c.log_metric(&blackboard.entity(), evaluated_score);
             }
 
+            debug_assert!(
+                (0.0..=1.0).contains(&evaluated_score),
+                "evaluated score {} out of range",
+                evaluated_score
+            );
+
+            if evaluated_score <= 0.0 {
+                // will never financially recover from this
+                final_score = 0.0;
+                break;
+            }
+
             final_score *= evaluated_score;
         }
 
@@ -86,13 +111,42 @@ pub struct WeightedDse<C: Context, D: Dse<C>> {
     phantom: PhantomData<C>,
 }
 
-impl<C: Context> Debug for dyn Dse<C> {
+impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let alloc = Bump::new();
+        let mut considerations = Considerations::new(&alloc);
+        self.considerations(&mut considerations);
         f.debug_struct("Dse")
             .field("name", &self.name())
             .field("weight", &self.weight())
-            .field("considerations", &self.considerations().len())
+            .field("considerations", &considerations)
             .finish()
+    }
+}
+
+impl<'a, C: Context> Debug for Considerations<'a, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_list()
+            .entries(self.vec.iter().map(|c| c.name()))
+            .finish()
+    }
+}
+
+impl<'a, C: Context> Considerations<'a, C> {
+    pub fn new(alloc: &'a bumpalo::Bump) -> Self {
+        Considerations {
+            vec: bumpalo::collections::Vec::new_in(alloc),
+            alloc,
+        }
+    }
+
+    pub fn add<T: Consideration<C> + 'a>(&mut self, c: T) {
+        assert!(
+            !std::mem::needs_drop::<T>(),
+            "drop won't be run for consideration"
+        );
+        let c = self.alloc.alloc(c) as &dyn Consideration<C>;
+        self.vec.push(c)
     }
 }
 
@@ -142,8 +196,8 @@ impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
         self.dse.name()
     }
 
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<C>>> {
-        self.dse.considerations()
+    fn considerations(&self, out: &mut Considerations<C>) {
+        self.dse.considerations(out)
     }
 
     fn weight_type(&self) -> DecisionWeightType {
@@ -161,17 +215,23 @@ impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::consideration::InputCache;
-
+    use crate::bumpalo::Bump;
+    use crate::intelligence::{InputCache, IntelligenceContext};
     use crate::test_utils::*;
     use crate::*;
 
     #[test]
     fn score() {
         let mut blackboard = TestBlackboard { my_hunger: 0.5 };
-        let mut cache = InputCache::default();
+        let alloc = Bump::new();
+        let mut ctx = IntelligenceContext {
+            blackboard: &mut blackboard,
+            input_cache: InputCache::new(&alloc),
+            best_so_far: 0.0,
+            alloc: &Default::default(),
+        };
 
-        assert!(EatDse.score(&mut blackboard, &mut cache, 1.0) > 0.9);
-        assert!(BadDse.score(&mut blackboard, &mut cache, 1.0) < 0.1);
+        assert!(EatDse.score(&mut ctx, 1.0) > 0.9);
+        assert!(BadDse.score(&mut ctx, 1.0) < 0.1);
     }
 }

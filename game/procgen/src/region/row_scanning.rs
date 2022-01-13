@@ -53,6 +53,7 @@ pub enum RowIndex {
 /// of the same biome
 ///
 /// (region neighbours, diagonal region neighbours derived from aligned neighbours)
+#[allow(clippy::while_let_loop)]
 pub fn scan<const SIZE: usize>(
     chunks: RegionChunksBlockRows<SIZE>,
     biome: BiomeType,

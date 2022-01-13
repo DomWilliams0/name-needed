@@ -40,7 +40,7 @@ impl EntityRenderer {
             let vbo = pipeline.shared_vbo.scoped_bind();
             vbo.buffer_data_uninitialized::<[f32; 3]>(
                 CIRCLE_VERTEX_COUNT + quad_mesh.len(),
-                BufferUsage::StaticDraw,
+                BufferUsage::Static,
             )?;
 
             // circle mesh is immediately followed by quad mesh
@@ -51,7 +51,7 @@ impl EntityRenderer {
             let indices = indices.scoped_bind();
             indices.buffer_data_uninitialized::<u16>(
                 CIRCLE_VERTEX_COUNT + RECT_VERTEX_COUNT,
-                BufferUsage::StaticDraw,
+                BufferUsage::Static,
             )?;
             if let Some(mut indices) = indices.map_write_only::<u16>()? {
                 // circle mesh, no special indices
@@ -138,10 +138,7 @@ impl EntityRenderer {
         let _indices = self.indices_vbo.scoped_bind();
 
         // TODO use buffersubdata to reuse allocation if len <=
-        vbo.buffer_data_uninitialized::<EntityInstance>(
-            self.entities.len(),
-            BufferUsage::StreamDraw,
-        )?;
+        vbo.buffer_data_uninitialized::<EntityInstance>(self.entities.len(), BufferUsage::Stream)?;
 
         if let Some(mut mapped) = vbo.map_write_only::<EntityInstance>()? {
             // TODO cursor interface in ScopedMap

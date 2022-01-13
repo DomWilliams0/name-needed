@@ -18,11 +18,11 @@ pub trait SliceIndexScale {
 }
 
 /// A slice in the world
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Chunk;
 
 /// A slice in a single slab
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Slab;
 
 impl SliceIndexScale for Chunk {

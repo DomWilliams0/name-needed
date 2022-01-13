@@ -6,7 +6,7 @@ use crate::input::SelectedEntity;
 use crate::scripting::context::{
     parse_entity_id, Scripting, ScriptingError, ScriptingOutput, ScriptingResult,
 };
-use crate::{ComponentWorld, EcsWorld, PlayerSociety, SocietyHandle, WorldRef};
+use crate::{ComponentWorld, EcsWorld, PlayerSociety, SocietyHandle};
 use common::*;
 
 pub struct LuaScripting {
@@ -20,7 +20,6 @@ const GAME_STATE_KEY: &str = "game-state";
 #[derive(Clone)]
 struct LuaGameState<'a> {
     ecs: &'a EcsWorld,
-    world: &'a WorldRef,
     /// Output specific to the running script only. Ptr to allow this struct to be cloneable
     output: *mut ScriptingOutput,
 
@@ -64,16 +63,10 @@ impl Scripting for LuaScripting {
         Ok(Self { runtime })
     }
 
-    fn run(
-        &mut self,
-        script: &[u8],
-        ecs: &EcsWorld,
-        world: &WorldRef,
-    ) -> ScriptingResult<ScriptingOutput> {
+    fn run(&mut self, script: &[u8], ecs: &EcsWorld) -> ScriptingResult<ScriptingOutput> {
         let mut output = ScriptingOutput::default();
         let state = LuaGameState {
             ecs,
-            world,
             output: &mut output as *mut _,
             #[cfg(debug_assertions)]
             safety_guard: Default::default(),

@@ -15,6 +15,7 @@ use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
 use crate::{EntityLoggingComponent, TransformComponent};
 
+use crate::alloc::FrameAllocator;
 use crate::job::JobIndex;
 use crate::{dse, Societies};
 
@@ -96,6 +97,7 @@ impl<'a> System<'a> for AiSystem {
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldRef>,
         Read<'a, Societies>,
+        Read<'a, FrameAllocator>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
@@ -111,6 +113,7 @@ impl<'a> System<'a> for AiSystem {
             entities,
             ecs_world,
             societies,
+            alloc,
             transform,
             hunger,
             inventory,
@@ -125,8 +128,6 @@ impl<'a> System<'a> for AiSystem {
         if tick.value() % 10 != 0 {
             return;
         }
-
-        let ecs_world: &EcsWorld = &*ecs_world;
 
         let mut shared_bb = SharedBlackboard {
             area_link_cache: HashMap::new(),
@@ -172,13 +173,13 @@ impl<'a> System<'a> for AiSystem {
             // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             // TODO fix eventually false assumption that all stream DSEs come from a society
             let society = society_opt.and_then(|comp| comp.resolve(&*societies));
-            let extra_dses = self.collect_society_tasks(e, tick, society, ecs_world);
+            let extra_dses = self.collect_society_tasks(e, tick, society, &ecs_world);
 
             // choose best action
             let streamed_dse = extra_dses.iter().map(|(_, _, dse)| &**dse);
-            let decision = ai
-                .intelligence
-                .choose_with_stream_dses(bb_ref, streamed_dse);
+            let decision =
+                ai.intelligence
+                    .choose_with_stream_dses(bb_ref, alloc.allocator(), streamed_dse);
 
             if let IntelligentDecision::New { dse, action, src } = decision {
                 debug!("new activity"; "dse" => dse.name(), "source" => ?src);

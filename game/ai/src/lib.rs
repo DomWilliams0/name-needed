@@ -1,8 +1,10 @@
 //! Infinite axis utility system
 
-pub use consideration::{Consideration, ConsiderationParameter, Curve, InputCache};
-pub use decision::{DecisionWeightType, Dse, WeightedDse};
-pub use intelligence::{DecisionSource, Intelligence, IntelligentDecision, Smarts};
+pub use consideration::{Consideration, ConsiderationParameter, Curve};
+pub use decision::{Considerations, DecisionWeightType, Dse, WeightedDse};
+pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
+
+use common::bumpalo;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -26,6 +28,7 @@ pub trait Blackboard {
     fn entity(&self) -> String;
 }
 
+// TODO use a separate allocator for ai to avoid fragmentation
 pub type AiBox<T> = Box<T>;
 
 pub(crate) fn pretty_type_name(name: &str) -> &str {
@@ -166,8 +169,8 @@ mod test_utils {
             "Eat"
         }
 
-        fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-            vec![AiBox::new(MyHungerConsideration)]
+        fn considerations(&self, out: &mut Considerations<TestContext>) {
+            out.add(MyHungerConsideration);
         }
 
         fn weight_type(&self) -> DecisionWeightType {
@@ -186,8 +189,8 @@ mod test_utils {
             "Bad"
         }
 
-        fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-            vec![AiBox::new(CancelExistenceConsideration)]
+        fn considerations(&self, out: &mut Considerations<TestContext>) {
+            out.add(CancelExistenceConsideration);
         }
 
         fn weight_type(&self) -> DecisionWeightType {
@@ -206,8 +209,8 @@ mod test_utils {
             "Emergency"
         }
 
-        fn considerations(&self) -> Vec<AiBox<dyn Consideration<TestContext>>> {
-            vec![AiBox::new(AlwaysWinConsideration)]
+        fn considerations(&self, out: &mut Considerations<TestContext>) {
+            out.add(AlwaysWinConsideration);
         }
 
         fn weight_type(&self) -> DecisionWeightType {

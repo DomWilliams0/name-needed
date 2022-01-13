@@ -1,5 +1,5 @@
 use crate::ecs::EntityWrapper;
-use crate::{EcsWorld, WorldRef};
+use crate::EcsWorld;
 use common::*;
 use std::fmt::Write;
 use std::path::Path;
@@ -28,12 +28,7 @@ pub type ScriptingResult<T> = Result<T, ScriptingError>;
 pub trait Scripting: Sized {
     fn new() -> ScriptingResult<Self>;
 
-    fn run(
-        &mut self,
-        script: &[u8],
-        ecs: &EcsWorld,
-        world: &WorldRef,
-    ) -> ScriptingResult<ScriptingOutput>;
+    fn run(&mut self, script: &[u8], ecs: &EcsWorld) -> ScriptingResult<ScriptingOutput>;
 }
 
 pub struct ScriptingContext<S: Scripting> {
@@ -46,23 +41,13 @@ impl<S: Scripting> ScriptingContext<S> {
         Ok(Self { inner })
     }
 
-    pub fn eval_path(
-        &mut self,
-        path: &Path,
-        ecs: &EcsWorld,
-        world: &WorldRef,
-    ) -> ScriptingResult<ScriptingOutput> {
+    pub fn eval_path(&mut self, path: &Path, ecs: &EcsWorld) -> ScriptingResult<ScriptingOutput> {
         let bytes = std::fs::read(path)?;
-        self.eval_bytes(&bytes, ecs, world)
+        self.eval_bytes(&bytes, ecs)
     }
 
-    fn eval_bytes(
-        &mut self,
-        bytes: &[u8],
-        ecs: &EcsWorld,
-        world: &WorldRef,
-    ) -> ScriptingResult<ScriptingOutput> {
-        self.inner.run(bytes, ecs, world)
+    fn eval_bytes(&mut self, bytes: &[u8], ecs: &EcsWorld) -> ScriptingResult<ScriptingOutput> {
+        self.inner.run(bytes, ecs)
     }
 }
 

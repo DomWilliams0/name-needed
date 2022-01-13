@@ -315,6 +315,7 @@ impl Slab {
 // ---------
 
 #[derive(Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum SliceSource<'a> {
     BelowSlab(Slice<'a>),
     ThisSlab(Slice<'a>),

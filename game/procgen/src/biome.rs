@@ -90,6 +90,7 @@ struct BiomeNode {
 #[derive(Clone)]
 struct BiomeParams {
     biome: BiomeType,
+    #[allow(unused)]
     color: u32,
     elevation: Range<ElevationLimit>,
 }

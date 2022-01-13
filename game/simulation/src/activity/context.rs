@@ -43,7 +43,6 @@ macro_rules! unexpected_event2 {
 #[derive(Clone)]
 pub struct ActivityContext {
     entity: Entity,
-    // TODO ensure component refs cant be held across awaits
     world: Pin<&'static EcsWorld>,
     task: TaskRef,
     status: StatusUpdater,

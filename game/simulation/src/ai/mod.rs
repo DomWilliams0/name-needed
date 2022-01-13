@@ -11,6 +11,7 @@ use crate::ecs::{EcsWorld, Entity};
 use crate::item::{FoundSlot, InventoryComponent, ItemFilter};
 use crate::SocietyHandle;
 pub use action::AiAction;
+
 use world::WorldArea;
 
 mod action;

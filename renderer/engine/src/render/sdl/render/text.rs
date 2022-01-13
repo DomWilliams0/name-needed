@@ -14,7 +14,7 @@ use unit::world::WorldPoint;
 
 const RESOLUTION: f32 = 128.0;
 const FONT_SIZE: f32 = 5.0;
-const WORD_WRAP: f32 = 1.6;
+// TODO word wrap
 
 pub struct TextRenderer {
     font: rusttype::Font<'static>,
@@ -217,7 +217,7 @@ impl TextRenderer {
         let vbo = self.vbo.scoped_bind();
 
         let vertex_count = self.glyphs.len() * 6;
-        vbo.buffer_data_uninitialized::<Vertex>(vertex_count, BufferUsage::StreamDraw)?;
+        vbo.buffer_data_uninitialized::<Vertex>(vertex_count, BufferUsage::Stream)?;
         let mut vertices = vbo.map_write_only()?.unwrap(); // checked to be not empty
         let mut i = 0;
 

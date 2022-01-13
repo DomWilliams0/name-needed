@@ -50,6 +50,7 @@ impl Gl {
         unsafe { gl::Viewport(0, 0, width, height) }
     }
 
+    #[allow(unused)]
     pub fn max_texture_size() -> u32 {
         let mut value = 0;
         unsafe { gl::GetIntegerv(gl::MAX_TEXTURE_SIZE, &mut value) };

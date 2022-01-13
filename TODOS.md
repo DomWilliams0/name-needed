@@ -1,19 +1,23 @@
-# TODOs (398)
+# TODOs (401)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
-   * `/// TODO pooled vec/slice rather than Vec each time`
-   * `// TODO optimization: dont consider all considerations every time`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (7)
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
+   * `// TODO use a simpler manual vec that doesnt run destructors`
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
+   * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
-   * `// TODO optimize: not all decisions need to be checked each time, but at least zero all scores`
+   * `// TODO use an arena-allocator hashmap`
+   * `// TODO perfect hash on C::Input`
    * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO reuse allocation`
+   * `// TODO use bump allocator`
    * `// TODO benchmark adding and popping smarts`
+   * `// TODO use bump`
    * `// TODO reuse allocation`
+ * [game/ai/src/lib.rs](game/ai/src/lib.rs) (1)
+   * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
@@ -121,8 +125,7 @@
    * `// TODO arrival radius depends on the size of the item`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
    * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
- * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (3)
-   * `// TODO ensure component refs cant be held across awaits`
+ * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
  * [game/simulation/src/activity/subactivity/break_block.rs](game/simulation/src/activity/subactivity/break_block.rs) (3)
@@ -482,7 +485,8 @@
    * `// TODO render head at head height, not the ground`
    * `// TODO add proper support for quads and other debug shapes`
    * `// TODO use glBufferSubData to reuse the allocation if <= len`
- * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (3)
+ * [renderer/engine/src/render/sdl/render/text.rs](renderer/engine/src/render/sdl/render/text.rs) (4)
+   * `// TODO word wrap`
    * `// TODO customise text colour`
    * `// TODO use instances or indices?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`

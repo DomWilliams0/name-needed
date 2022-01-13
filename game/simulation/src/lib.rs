@@ -90,6 +90,7 @@ macro_rules! as_any_impl {
 
 mod activity;
 mod ai;
+mod alloc;
 mod backend;
 mod build;
 mod definitions;

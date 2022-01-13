@@ -236,15 +236,17 @@ impl ComponentRegistry {
         world: &EcsWorld,
         source: Entity,
         dest: Entity,
-    ) -> Result<(), ()> {
-        if world.is_entity_alive(source) && world.is_entity_alive(dest) {
-            for (name, cloneable) in self.cloneables.iter() {
-                trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
-                (cloneable)(world, source, dest);
+    ) -> Result<(), Entity> {
+        match (world.is_entity_alive(source), world.is_entity_alive(dest)) {
+            (true, true) => {
+                for (name, cloneable) in self.cloneables.iter() {
+                    trace!("copying component from {src} to {dst}", src = source, dst = dest; "component" => name);
+                    (cloneable)(world, source, dest);
+                }
+                Ok(())
             }
-            Ok(())
-        } else {
-            Err(())
+            (false, _) => Err(source),
+            (_, false) => Err(dest),
         }
     }
 

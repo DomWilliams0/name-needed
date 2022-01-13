@@ -1,4 +1,4 @@
-use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,
@@ -18,12 +18,10 @@ const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
 const FOOD_MAX_RADIUS: u32 = 20;
 
 impl Dse<AiContext> for EatHeldFoodDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            AiBox::new(HungerConsideration),
-            AiBox::new(HoldingItemConsideration(FOOD_FILTER)),
-            AiBox::new(CanUseHeldItemConsideration(FOOD_FILTER)),
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        out.add(HungerConsideration);
+        out.add(HoldingItemConsideration(FOOD_FILTER));
+        out.add(CanUseHeldItemConsideration(FOOD_FILTER));
     }
 
     fn weight_type(&self) -> DecisionWeightType {
@@ -47,16 +45,14 @@ impl Dse<AiContext> for EatHeldFoodDse {
 }
 
 impl Dse<AiContext> for FindLocalFoodDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            AiBox::new(HungerConsideration),
-            // TODO "I can/want to move" consideration
-            AiBox::new(FindLocalGradedItemConsideration {
-                filter: FOOD_FILTER,
-                max_radius: FOOD_MAX_RADIUS,
-                normalize_range: 2.0, // 2 perfect food nearby is enough for a 1
-            }),
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        out.add(HungerConsideration);
+        // TODO "I can/want to move" consideration
+        out.add(FindLocalGradedItemConsideration {
+            filter: FOOD_FILTER,
+            max_radius: FOOD_MAX_RADIUS,
+            normalize_range: 2.0, // 2 perfect food nearby is enough for a 1
+        });
     }
 
     fn weight_type(&self) -> DecisionWeightType {

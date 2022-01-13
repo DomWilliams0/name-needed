@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use common::{num_traits::FromPrimitive, *};
 
@@ -130,7 +130,7 @@ impl EntityEventQueue {
         let grouped_events = events.drain(..).group_by(|evt| evt.subject);
 
         // shouldn't happen often if ever, so no need to cache this allocation in self
-        let mut erroneous_subscribers = HashSet::new();
+        let mut erroneous_subscribers = Vec::new();
 
         for (subject, events) in grouped_events.into_iter() {
             // find subscribers interested in this subject entity
@@ -169,7 +169,7 @@ impl EntityEventQueue {
 
                     if !not_erroneous {
                         warn!("skipping remaining events for erroneous subscriber"; "subscriber" => subscriber);
-                        erroneous_subscribers.insert(*subscriber);
+                        erroneous_subscribers.push(*subscriber);
                         break;
                     }
                 }
