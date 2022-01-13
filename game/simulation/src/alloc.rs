@@ -7,7 +7,7 @@ impl FrameAllocator {
     pub fn reset(&mut self) {
         let bytes = self.0.allocated_bytes();
         if bytes > 0 {
-            debug!("freeing {} bytes in frame allocator", bytes);
+            trace!("freeing {} bytes in frame allocator", bytes);
         }
 
         self.0.reset();
