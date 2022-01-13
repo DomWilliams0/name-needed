@@ -1,11 +1,10 @@
-# TODOs (400)
+# TODOs (399)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `// TODO use a simpler manual vec that doesnt run destructors`
-   * `// TODO .field("considerations", &self.considerations().len())`
  * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`

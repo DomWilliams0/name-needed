@@ -1,5 +1,6 @@
 use common::*;
 
+use crate::bumpalo::Bump;
 use crate::intelligence::IntelligenceContext;
 use crate::{pretty_type_name, Consideration, Context};
 
@@ -112,10 +113,21 @@ pub struct WeightedDse<C: Context, D: Dse<C>> {
 
 impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let alloc = Bump::new();
+        let mut considerations = Considerations::new(&alloc);
+        self.considerations(&mut considerations);
         f.debug_struct("Dse")
             .field("name", &self.name())
             .field("weight", &self.weight())
-            // TODO .field("considerations", &self.considerations().len())
+            .field("considerations", &considerations)
+            .finish()
+    }
+}
+
+impl<'a, C: Context> Debug for Considerations<'a, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_list()
+            .entries(self.vec.iter().map(|c| c.name()))
             .finish()
     }
 }
