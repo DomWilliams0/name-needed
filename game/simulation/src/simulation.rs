@@ -30,6 +30,7 @@ use crate::render::{
 use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
+use crate::alloc::FrameAllocator;
 use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
@@ -248,6 +249,9 @@ impl<R: Renderer> Simulation<R> {
 
         // update display text for rendering
         self.display_text_system.run_now(&self.ecs_world);
+
+        // reset frame bump allocator
+        self.ecs_world.resource_mut::<FrameAllocator>().reset();
     }
 
     fn delete_queued_entities(&mut self) {
@@ -660,6 +664,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(Runtime::default());
     world.insert(MouseLocation::default());
     world.insert(NameGeneration::load(&resources)?);
+    world.insert(FrameAllocator::default());
 
     Ok(())
 }

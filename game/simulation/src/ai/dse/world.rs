@@ -3,6 +3,7 @@ use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
     HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
+use std::fmt::Debug;
 
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
@@ -11,7 +12,7 @@ use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
 use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{AiBox, Consideration, Context, DecisionWeightType, Dse};
+use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse, InputCache};
 use common::OrderedFloat;
 
 use unit::world::WorldPosition;
@@ -32,20 +33,18 @@ pub struct GatherMaterialsDse {
 }
 
 impl Dse<AiContext> for BreakBlockDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            // for now, direct distance
-            // TODO calculate path and use length, cache path which can be reused by movement system
-            // TODO has the right tool/is the right tool nearby/close enough in society storage
-            AiBox::new(MyProximityToConsideration {
-                target: self.0.centred(),
-                proximity: Proximity::Walkable,
-            }),
-            AiBox::new(BlockTypeMatchesConsideration(
-                self.0,
-                BlockTypeMatch::IsNot(BlockType::Air),
-            )),
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        // for now, direct distance
+        // TODO calculate path and use length, cache path which can be reused by movement system
+        // TODO has the right tool/is the right tool nearby/close enough in society storage
+        out.add(MyProximityToConsideration {
+            target: self.0.centred(),
+            proximity: Proximity::Walkable,
+        });
+        out.add(BlockTypeMatchesConsideration(
+            self.0,
+            BlockTypeMatch::IsNot(BlockType::Air),
+        ));
     }
 
     fn weight_type(&self) -> DecisionWeightType {
@@ -64,23 +63,21 @@ impl GatherMaterialsDse {
 }
 
 impl Dse<AiContext> for GatherMaterialsDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            AiBox::new(HasExtraHandsForHaulingConsideration(
-                self.extra_hands_for_haul,
-                Some(self.filter()),
-            )),
-            AiBox::new(MyProximityToConsideration {
-                target: self.target.centred(),
-                proximity: Proximity::Walkable,
-            }),
-            AiBox::new(FindLocalGradedItemConsideration {
-                filter: self.filter(),
-                max_radius: 20,
-                normalize_range: 1.0,
-            }),
-            // TODO check society containers
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        out.add(HasExtraHandsForHaulingConsideration(
+            self.extra_hands_for_haul,
+            Some(self.filter()),
+        ));
+        out.add(MyProximityToConsideration {
+            target: self.target.centred(),
+            proximity: Proximity::Walkable,
+        });
+        out.add(FindLocalGradedItemConsideration {
+            filter: self.filter(),
+            max_radius: 20,
+            normalize_range: 1.0,
+        });
+        // TODO check society containers
     }
 
     fn weight_type(&self) -> DecisionWeightType {
@@ -149,15 +146,13 @@ impl GatherMaterialsDse {
 }
 
 impl Dse<AiContext> for BuildDse {
-    fn considerations(&self) -> Vec<AiBox<dyn Consideration<AiContext>>> {
-        vec![
-            // TODO wants to work, can work
-            // TODO has tool
-            AiBox::new(MyProximityToConsideration {
-                target: self.details.pos.centred(),
-                proximity: Proximity::Walkable,
-            }),
-        ]
+    fn considerations(&self, out: &mut Considerations<AiContext>) {
+        // TODO wants to work, can work
+        // TODO has tool
+        out.add(MyProximityToConsideration {
+            target: self.details.pos.centred(),
+            proximity: Proximity::Walkable,
+        });
     }
 
     fn weight_type(&self) -> DecisionWeightType {

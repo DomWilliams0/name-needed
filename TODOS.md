@@ -1,16 +1,20 @@
-# TODOs (395)
+# TODOs (399)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
-   * `/// TODO pooled vec/slice rather than Vec each time`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (6)
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
+   * `// TODO use a simpler manual vec that doesnt run destructors`
+   * `// TODO .field("considerations", &self.considerations().len())`
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (9)
+   * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
    * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO reuse allocation`
+   * `// TODO use bump allocator`
+   * `// TODO use bump allocator`
    * `// TODO benchmark adding and popping smarts`
+   * `// TODO use bump`
    * `// TODO reuse allocation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
