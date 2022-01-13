@@ -52,10 +52,6 @@ use std::sync::Arc;
 #[non_exhaustive]
 pub enum AssociatedBlockData {
     Container(Entity),
-    BuildJobWip {
-        build: SocietyJobHandle,
-        reserved_materials: Arc<Vec<Entity>>,
-    },
 }
 
 pub struct WorldContext;
