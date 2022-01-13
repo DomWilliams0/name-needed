@@ -12,7 +12,6 @@ impl Scripting for NopScripting {
         &mut self,
         _script: &[u8],
         _ecs: &EcsWorld,
-        _world: &WorldRef,
     ) -> ScriptingResult<ScriptingOutput> {
         Ok(ScriptingOutput::default())
     }
