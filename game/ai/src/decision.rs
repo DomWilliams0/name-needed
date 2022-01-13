@@ -61,7 +61,9 @@ pub trait Dse<C: Context> {
                 return 0.0;
             }
 
-            let score = c.consider(context.blackboard, context.input_cache).value();
+            let score = c
+                .consider(context.blackboard, &mut context.input_cache)
+                .value();
 
             // compensation factor balances overall drop when multiplying multiple floats by
             // taking into account the number of considerations
@@ -201,8 +203,6 @@ impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::consideration::InputCache;
-
     use crate::intelligence::IntelligenceContext;
     use crate::test_utils::*;
     use crate::*;

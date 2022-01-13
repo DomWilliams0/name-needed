@@ -1,6 +1,6 @@
 //! Infinite axis utility system
 
-pub use consideration::{Consideration, ConsiderationParameter, Curve, InputCache};
+pub use consideration::{Consideration, ConsiderationParameter, Curve};
 pub use decision::{Considerations, DecisionWeightType, Dse, WeightedDse};
 pub use intelligence::{DecisionSource, Intelligence, IntelligentDecision, Smarts};
 

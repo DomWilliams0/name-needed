@@ -1,8 +1,7 @@
 use float_ord::FloatOrd;
 
-use crate::consideration::InputCache;
 use crate::decision::Dse;
-use crate::{AiBox, Blackboard, Context};
+use crate::{AiBox, Blackboard, Context, Input};
 use common::*;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -23,12 +22,11 @@ pub struct Intelligence<C: Context> {
     additional: HashMap<C::AdditionalDseId, Smarts<C>>,
 
     last_action: Cell<C::Action>,
-    input_cache: InputCache<C>,
 }
 
 pub struct IntelligenceContext<'a, C: Context> {
     pub blackboard: &'a mut C::Blackboard,
-    pub input_cache: &'a mut InputCache<C>,
+    pub input_cache: InputCache<'a, C>,
     pub best_so_far: f32,
     pub alloc: &'a bumpalo::Bump,
 }
@@ -52,6 +50,26 @@ pub enum DecisionSource<C: Context> {
 struct Decision<C: Context> {
     dse: AiBox<dyn Dse<C>>,
     score: f32,
+}
+
+pub struct InputCache<'a, C: Context>(bumpalo::collections::Vec<'a, (C::Input, f32)>);
+
+impl<'a, C: Context> InputCache<'a, C> {
+    pub fn new(alloc: &'a bumpalo::Bump) -> Self {
+        InputCache(bumpalo::collections::Vec::with_capacity_in(16, alloc))
+    }
+
+    pub fn get(&mut self, input: C::Input, blackboard: &mut C::Blackboard) -> f32 {
+        // TODO use an arena-allocator hashmap
+        // TODO perfect hash on C::Input
+        if let Some((_, val)) = self.0.iter().find(|(ty, _)| *ty == input) {
+            *val
+        } else {
+            let val = input.get(blackboard);
+            self.0.push((input, val));
+            val
+        }
+    }
 }
 
 impl<C: Context> Smarts<C> {
@@ -101,7 +119,6 @@ impl<C: Context> Intelligence<C> {
             base,
             additional: HashMap::new(),
             last_action: Default::default(),
-            input_cache: InputCache::default(),
         }
     }
 
@@ -124,13 +141,10 @@ impl<C: Context> Intelligence<C> {
     where
         'a: 'b,
     {
-        // TODO use bump allocator
-        self.input_cache.reset();
-
         // score all possible decisions
         let mut context = IntelligenceContext {
             blackboard,
-            input_cache: &mut self.input_cache,
+            input_cache: InputCache::new(&alloc),
             alloc,
             best_so_far: 0.0,
         };
@@ -165,6 +179,7 @@ impl<C: Context> Intelligence<C> {
 
         trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src);
 
+        drop(context);
         let action = choice.action(blackboard);
         let last_action = self.last_action.replace(action.clone());
 
@@ -177,10 +192,6 @@ impl<C: Context> Intelligence<C> {
                 src: choice_src,
             }
         }
-    }
-
-    pub fn drain_input_cache(&mut self) -> impl Iterator<Item = (C::Input, f32)> + '_ {
-        self.input_cache.drain()
     }
 
     // TODO benchmark adding and popping smarts

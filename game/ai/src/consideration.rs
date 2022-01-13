@@ -1,5 +1,6 @@
 use common::NormalizedFloat;
 
+use crate::intelligence::InputCache;
 use crate::{pretty_type_name, Context, Input};
 use std::collections::HashMap;
 
@@ -80,35 +81,6 @@ impl Curve {
             Curve::Exponential(a, b, c, d, e) => (a.powf((b * x) + c) * d) + e,
             Curve::SquareRoot(a, b, c) => (a + (b * (c * x).sqrt())),
         })
-    }
-}
-
-pub struct InputCache<C: Context> {
-    cache: HashMap<C::Input, f32>,
-}
-
-impl<C: Context> Default for InputCache<C> {
-    fn default() -> Self {
-        Self {
-            cache: HashMap::new(),
-        }
-    }
-}
-
-impl<C: Context> InputCache<C> {
-    pub fn get(&mut self, input: C::Input, blackboard: &mut C::Blackboard) -> f32 {
-        *self
-            .cache
-            .entry(input.clone())
-            .or_insert_with(|| input.get(blackboard))
-    }
-
-    pub fn reset(&mut self) {
-        self.cache.clear();
-    }
-
-    pub fn drain(&mut self) -> impl Iterator<Item = (C::Input, f32)> + '_ {
-        self.cache.drain()
     }
 }
 

@@ -12,7 +12,7 @@ use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
 use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse, InputCache};
+use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse};
 use common::OrderedFloat;
 
 use unit::world::WorldPosition;

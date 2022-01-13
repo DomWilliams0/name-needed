@@ -1,4 +1,4 @@
-# TODOs (399)
+# TODOs (400)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -6,12 +6,13 @@
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (2)
    * `// TODO use a simpler manual vec that doesnt run destructors`
    * `// TODO .field("considerations", &self.considerations().len())`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (9)
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
+   * `// TODO use an arena-allocator hashmap`
+   * `// TODO perfect hash on C::Input`
    * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO use bump allocator`
    * `// TODO use bump allocator`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO use bump`
