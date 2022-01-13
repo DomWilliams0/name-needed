@@ -67,6 +67,12 @@ pub struct BuildProgressDetails {
 pub enum BuildThingError {
     #[error("Build materials are invalid")]
     InvalidMaterials,
+
+    #[error("No definition for material {0}")]
+    MissingDefinition(Entity),
+
+    #[error("Material '{0}' is not required")]
+    MaterialNotRequired(String),
 }
 
 impl BuildThingJob {
@@ -151,12 +157,10 @@ impl BuildThingJob {
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
             *entry = entry.checked_sub(quantity).unwrap_or_else(|| {
-                warn!(
+                unreachable!(
                     "tried to over-reserve {}/{} of remaining requirement '{}'",
                     quantity, *entry, def.0
-                );
-                // TODO avoid this case
-                0
+                )
             });
         }
 
@@ -167,9 +171,44 @@ impl BuildThingJob {
             .collect()
     }
 
-    /// Returns false if already reserved. Entity should have ReservedMaterialComponent
-    pub fn add_reservation(&mut self, reservee: Entity) -> bool {
-        self.reserved_materials.insert(reservee)
+    /// Returns Ok(Some(surplus)) if there is a surplus of material to drop in a new stack.
+    /// Entity should have ReservedMaterialComponent on success
+    pub fn add_reservation(
+        &mut self,
+        reservee: Entity,
+        world: &EcsWorld,
+    ) -> Result<Option<u16>, BuildThingError> {
+        let stacks = world.read_storage::<ItemStackComponent>();
+        let defs = world.read_storage::<DefinitionNameComponent>();
+
+        let n_required = {
+            let def = reservee
+                .get(&defs)
+                .ok_or(BuildThingError::MissingDefinition(reservee))?;
+
+            match self.materials_remaining.get(def.0.as_str()) {
+                None => return Err(BuildThingError::MaterialNotRequired(def.0.clone())),
+                Some(n) => n.get(),
+            }
+        };
+
+        let n_actual = {
+            reservee
+                .get(&stacks)
+                .map(|stack| stack.stack.total_count())
+                .unwrap_or(1)
+        };
+
+        let result = if n_actual > n_required {
+            // trying to reserve too many, keep the original stack but split off some
+            let to_drop = n_actual - n_required;
+            Some(to_drop)
+        } else {
+            None
+        };
+
+        let _ = self.reserved_materials.insert(reservee);
+        Ok(result)
     }
 
     pub fn reserved_materials(&self) -> impl Iterator<Item = Entity> + '_ {

@@ -2,11 +2,11 @@ use unit::world::WorldPoint;
 
 use crate::build::{ConsumedMaterialForJobComponent, ReservedMaterialComponent};
 use crate::ecs::{EcsWorld, Entity, WorldExt};
-use crate::{ComponentWorld, TransformComponent};
+use crate::{ComponentWorld, ContainersError, TransformComponent};
 use common::*;
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
-use crate::job::{BuildThingJob, SocietyJobHandle};
+use crate::job::{BuildThingError, BuildThingJob, SocietyJobHandle};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtComponents<'w>(&'w EcsWorld);
@@ -108,15 +108,39 @@ impl EcsExtComponents<'_> {
         material: Entity,
         job: SocietyJobHandle,
     ) -> Result<(), ReservationError> {
-        // find job in society
-        let succeeded = job
+        // find job in society and try to reserve
+        let surplus = job
             .resolve_and_cast_mut(self.0.resource(), |build_job: &mut BuildThingJob| {
-                build_job.add_reservation(material)
+                build_job.add_reservation(material, self.0)
             })
-            .ok_or(ReservationError::InvalidJob(job))?;
+            .ok_or(ReservationError::InvalidJob(job))??;
 
-        if !succeeded {
-            return Err(ReservationError::AlreadyReserved(job, material));
+        if let Some(surplus) = surplus {
+            // drop surplus
+            debug!("splitting {n} surplus materials from build reservation", n = surplus; "job" => ?job);
+            let new_stack = self
+                .0
+                .helpers_containers()
+                .split_stack(material, surplus)
+                .map_err(ReservationError::DropSurplus)?;
+
+            // drop it at a slight  offset
+            if new_stack != material {
+                let mut transform = self
+                    .0
+                    .component_mut::<TransformComponent>(new_stack)
+                    .expect("transform expected");
+
+                let pos = {
+                    let mut rand = thread_rng();
+                    let mut pos = transform.position;
+                    pos.modify_x(|x| x + rand.gen_range(-1.0, 1.0));
+                    pos.modify_y(|y| y + rand.gen_range(-1.0, 1.0));
+                    pos
+                };
+
+                transform.reset_position(pos)
+            }
         }
 
         // no more failures, now we can add the reservation to the item
@@ -157,6 +181,9 @@ pub enum ReservationError {
     #[error("Job used for society material reservation is not a build job: {0:?}")]
     InvalidJob(SocietyJobHandle),
 
-    #[error("Material {1} is already reserved for build job {0:?}")]
-    AlreadyReserved(SocietyJobHandle, Entity),
+    #[error("Failed to reserve material: {0}")]
+    BuildJob(#[from] BuildThingError),
+
+    #[error("Failed to drop surplus materials: {0}")]
+    DropSurplus(ContainersError),
 }

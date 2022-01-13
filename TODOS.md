@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (400)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -332,12 +332,11 @@
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
- * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (11)
+ * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
    * `// TODO fewer temporary allocations`
    * `// TODO ensure this doesn't happen, or just handle it properly`
-   * `// TODO avoid this case`
    * `// TODO allow "building" of a non-air block, and automatically emit a break task first?`
    * `// TODO job is destined to fail...`
    * `// TODO dont run this every tick, only when something changes or intermittently`

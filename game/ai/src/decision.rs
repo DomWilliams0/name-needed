@@ -40,6 +40,10 @@ pub trait Dse<C: Context> {
         name.strip_suffix("Dse").unwrap_or(name)
     }
 
+    fn as_debug(&self) -> Option<&dyn Debug> {
+        None
+    }
+
     fn weight(&self) -> DecisionWeight {
         DecisionWeight::Plain(self.weight_type())
     }
@@ -192,10 +196,6 @@ impl<C: Context, D: Dse<C>> WeightedDse<C, D> {
 }
 
 impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
-    fn name(&self) -> &'static str {
-        self.dse.name()
-    }
-
     fn considerations(&self, out: &mut Considerations<C>) {
         self.dse.considerations(out)
     }
@@ -206,6 +206,14 @@ impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
 
     fn action(&self, blackboard: &mut <C as Context>::Blackboard) -> <C as Context>::Action {
         self.dse.action(blackboard)
+    }
+
+    fn name(&self) -> &'static str {
+        self.dse.name()
+    }
+
+    fn as_debug(&self) -> Option<&dyn Debug> {
+        self.dse.as_debug()
     }
 
     fn weight(&self) -> DecisionWeight {

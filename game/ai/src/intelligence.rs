@@ -177,7 +177,7 @@ impl<C: Context> Intelligence<C> {
                 .unwrap() // not empty
         };
 
-        trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src);
+        trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src, "detail" => ?choice.as_debug());
 
         drop(context);
         let action = choice.action(blackboard);

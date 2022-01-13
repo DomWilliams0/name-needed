@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
+use crate::simulation::WorldPosition;
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
