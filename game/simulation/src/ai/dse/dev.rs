@@ -1,6 +1,6 @@
 use crate::ai::consideration::ConstantConsideration;
 use crate::ai::{AiAction, AiContext};
-use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 
 pub struct ObeyDivineCommandDse(pub AiAction);
 

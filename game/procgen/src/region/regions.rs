@@ -750,6 +750,7 @@ fn neighbouring_regions_with_params<const SIZE: usize>(
 impl<const SIZE: usize, const SIZE_2: usize> RegionEntry<SIZE, SIZE_2> {
     /// # Safety
     /// Must be in the Partially or Fully loaded state
+    #[allow(clippy::needless_lifetimes)]
     async unsafe fn region_ref_with_guard<'a>(
         &self,
         guard: RwLockReadGuard<'a, RegionLoadState<SIZE, SIZE_2>>,

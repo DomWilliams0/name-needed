@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::iter::once;
-use std::pin::Pin;
 
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
@@ -98,7 +97,7 @@ impl<'a> System<'a> for AiSystem {
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldRef>,
         Read<'a, Societies>,
-        Write<'a, FrameAllocator>,
+        Read<'a, FrameAllocator>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
@@ -114,7 +113,7 @@ impl<'a> System<'a> for AiSystem {
             entities,
             ecs_world,
             societies,
-            mut alloc,
+            alloc,
             transform,
             hunger,
             inventory,

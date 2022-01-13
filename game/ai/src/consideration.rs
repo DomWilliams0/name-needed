@@ -1,8 +1,7 @@
 use common::NormalizedFloat;
 
 use crate::intelligence::InputCache;
-use crate::{pretty_type_name, Context, Input};
-use std::collections::HashMap;
+use crate::{pretty_type_name, Context};
 
 pub enum ConsiderationParameter {
     /// Already normalized

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPosition, CHUNK_SIZE};
 
 use crate::region::Region;

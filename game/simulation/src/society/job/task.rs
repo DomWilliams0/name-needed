@@ -10,7 +10,7 @@ use crate::ecs::{EcsWorld, Entity};
 use crate::{ComponentWorld, HaulSource};
 
 use crate::item::HaulableItemComponent;
-use crate::job::{BuildDetails, SocietyJobHandle, SocietyJobRef};
+use crate::job::{BuildDetails, SocietyJobHandle};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {

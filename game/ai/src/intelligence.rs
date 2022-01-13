@@ -1,7 +1,7 @@
 use float_ord::FloatOrd;
 
 use crate::decision::Dse;
-use crate::{AiBox, Blackboard, Context, Input};
+use crate::{AiBox, Context, Input};
 use common::*;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -144,7 +144,7 @@ impl<C: Context> Intelligence<C> {
         // score all possible decisions
         let mut context = IntelligenceContext {
             blackboard,
-            input_cache: InputCache::new(&alloc),
+            input_cache: InputCache::new(alloc),
             alloc,
             best_so_far: 0.0,
         };

@@ -19,7 +19,6 @@ use specs::prelude::Resource;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 
-use crate::ecs::name::KindComponent;
 use std::ops::{Deref, DerefMut};
 
 pub type SpecsWorld = specs::World;
@@ -109,10 +108,10 @@ pub trait ComponentWorld: ContainerResolver + Sized {
 }
 
 impl EntitiesToKill {
-    pub fn add(&mut self, entity: Entity, reason: DeathReason) {
-        self.entities.push(entity.into());
-        self.reasons.push(reason);
-    }
+    // pub fn add(&mut self, entity: Entity, reason: DeathReason) {
+    //     self.entities.push(entity.into());
+    //     self.reasons.push(reason);
+    // }
 
     pub fn add_many(&mut self, entities: impl Iterator<Item = (Entity, DeathReason)>) {
         if let Some(n) = entities.size_hint().1 {
@@ -243,7 +242,7 @@ impl EcsWorld {
 
     /// Returns Err if either entity is not alive.
     /// Only components not marked as `#[clone(disallow)]`
-    pub fn copy_components_to(&self, source: Entity, dest: Entity) -> Result<(), ()> {
+    pub fn copy_components_to(&self, source: Entity, dest: Entity) -> Result<(), Entity> {
         self.component_registry
             .copy_components_to(self, source, dest)
     }

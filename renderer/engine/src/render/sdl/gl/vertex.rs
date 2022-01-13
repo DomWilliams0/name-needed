@@ -185,17 +185,17 @@ impl Bindable for Vbo {
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum BufferUsage {
-    StaticDraw,
-    DynamicDraw,
-    StreamDraw,
+    Static,
+    Dynamic,
+    Stream,
 }
 
 impl From<BufferUsage> for GLenum {
     fn from(usage: BufferUsage) -> Self {
         match usage {
-            BufferUsage::StaticDraw => gl::STATIC_DRAW,
-            BufferUsage::DynamicDraw => gl::DYNAMIC_DRAW,
-            BufferUsage::StreamDraw => gl::STREAM_DRAW,
+            BufferUsage::Static => gl::STATIC_DRAW,
+            BufferUsage::Dynamic => gl::DYNAMIC_DRAW,
+            BufferUsage::Stream => gl::STREAM_DRAW,
         }
     }
 }

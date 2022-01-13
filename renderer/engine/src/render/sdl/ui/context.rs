@@ -126,7 +126,7 @@ impl Display for EntityDesc<'_> {
 }
 
 impl<'a> EntityDesc<'a> {
-    pub fn with_fallback(mut self, fallback: &'a dyn Display) -> Self {
+    pub fn with_fallback(self, fallback: &'a dyn Display) -> Self {
         match self {
             EntityDesc::Fallback(_) => EntityDesc::Overridden(fallback),
             other => other,

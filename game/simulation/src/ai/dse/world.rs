@@ -3,7 +3,6 @@ use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
     HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
-use std::fmt::Debug;
 
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
@@ -12,7 +11,7 @@ use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
 use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 use common::OrderedFloat;
 
 use unit::world::WorldPosition;

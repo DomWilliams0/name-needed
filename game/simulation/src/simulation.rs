@@ -471,7 +471,7 @@ impl<R: Renderer> Simulation<R> {
                     info!("executing script"; "path" => %path.display());
                     let result = self
                         .scripting
-                        .eval_path(&path, &*self.ecs_world, &self.voxel_world)
+                        .eval_path(&path, &*self.ecs_world)
                         .map(|output| output.into_string());
 
                     if let Err(err) = result.as_ref() {

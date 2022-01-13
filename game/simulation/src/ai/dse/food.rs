@@ -1,4 +1,4 @@
-use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,

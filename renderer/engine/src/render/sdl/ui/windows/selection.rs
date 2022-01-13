@@ -403,7 +403,6 @@ impl SelectionWindow {
             ui_str!(in context, "Capacity {}/{}", count, limit),
         );
 
-        let ecs = context.simulation().ecs;
         for (entity, count) in stack.stack.contents() {
             context.text_wrapped(
                 ui_str!(in context, " - {}x {} ({})", count, context.description(entity), entity),
@@ -419,7 +418,6 @@ impl SelectionWindow {
             ui_str!(in context, "Capacity {}/{}, size {}", capacity, max_vol, max_size),
         );
 
-        let ecs = context.simulation().ecs;
         for entity in container.contents() {
             context.text_wrapped(
                 ui_str!(in context, " - {} ({}, vol {})", context.description(entity.entity), entity.entity, entity.volume),
@@ -539,6 +537,7 @@ impl SelectionWindow {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn do_ui_element(&mut self, context: &UiContext, ui: &UiElementComponent) {
         let tab = context.new_tab(im_str!("Build"));
         if !tab.is_open() {

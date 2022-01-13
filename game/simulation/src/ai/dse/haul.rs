@@ -5,7 +5,7 @@ use crate::ai::consideration::{
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
-use ai::{AiBox, Consideration, Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeightType, Dse};
 use unit::world::WorldPoint;
 
 pub struct HaulDse {
