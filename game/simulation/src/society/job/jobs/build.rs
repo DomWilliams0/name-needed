@@ -75,6 +75,13 @@ pub enum BuildThingError {
     MaterialNotRequired(String),
 }
 
+pub enum MaterialReservation {
+    /// Whole stack of this size is reserved
+    ConsumeAll(u16),
+    /// Stack has too many materials, should be split from original stack
+    Surplus { surplus: u16, reserved: u16 },
+}
+
 impl BuildThingJob {
     pub fn new(block: WorldPosition, build: impl Build + 'static) -> Self {
         let mut materials = Vec::new();
@@ -149,7 +156,7 @@ impl BuildThingJob {
 
         let def_names = world.read_storage::<DefinitionNameComponent>();
         let stacks = world.read_storage::<ItemStackComponent>();
-        for (_, def, stack_opt) in (&reservations_bitset, &def_names, stacks.maybe()).join() {
+        for (e, def, stack_opt) in (&reservations_bitset, &def_names, stacks.maybe()).join() {
             let entry = remaining_materials
                 .get_mut(def.0.as_str())
                 .unwrap_or_else(|| panic!("invalid reservation {:?}", def.0));
@@ -158,8 +165,8 @@ impl BuildThingJob {
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
             *entry = entry.checked_sub(quantity).unwrap_or_else(|| {
                 unreachable!(
-                    "tried to over-reserve {}/{} of remaining requirement '{}'",
-                    quantity, *entry, def.0
+                    "tried to over-reserve {}/{} of remaining requirement '{}' in job {:?} (material = {})",
+                    quantity, *entry, def.0, this_job, e
                 )
             });
         }
@@ -171,26 +178,26 @@ impl BuildThingJob {
             .collect()
     }
 
-    /// Returns Ok(Some(surplus)) if there is a surplus of material to drop in a new stack.
-    /// Entity should have ReservedMaterialComponent on success
+    /// Returns (Surplus(n), _) if there is a surplus of material to drop in a NEW stack.
+    /// Second return val is the now-remaining requirement for this material.
+    /// Entity should get a ReservedMaterialComponent on success
     pub fn add_reservation(
         &mut self,
         reservee: Entity,
         world: &EcsWorld,
-    ) -> Result<Option<u16>, BuildThingError> {
+    ) -> Result<(MaterialReservation, u16), BuildThingError> {
         let stacks = world.read_storage::<ItemStackComponent>();
         let defs = world.read_storage::<DefinitionNameComponent>();
 
-        let n_required = {
-            let def = reservee
-                .get(&defs)
-                .ok_or(BuildThingError::MissingDefinition(reservee))?;
+        let def = reservee
+            .get(&defs)
+            .ok_or(BuildThingError::MissingDefinition(reservee))?;
 
-            match self.materials_remaining.get(def.0.as_str()) {
-                None => return Err(BuildThingError::MaterialNotRequired(def.0.clone())),
-                Some(n) => n.get(),
-            }
-        };
+        let n_required_ref = self
+            .materials_remaining
+            .get_mut(def.0.as_str())
+            .ok_or_else(|| BuildThingError::MaterialNotRequired(def.0.clone()))?;
+        let n_required = n_required_ref.get();
 
         let n_actual = {
             reservee
@@ -199,16 +206,36 @@ impl BuildThingJob {
                 .unwrap_or(1)
         };
 
+        let n_to_reserve;
         let result = if n_actual > n_required {
             // trying to reserve too many, keep the original stack but split off some
             let to_drop = n_actual - n_required;
-            Some(to_drop)
+            n_to_reserve = n_required;
+            MaterialReservation::Surplus {
+                surplus: to_drop,
+                reserved: n_required,
+            }
         } else {
-            None
+            n_to_reserve = n_actual;
+            MaterialReservation::ConsumeAll(n_actual)
         };
 
+        // reserve material entity
         let _ = self.reserved_materials.insert(reservee);
-        Ok(result)
+
+        // reduce requirement count
+        let remaining = match NonZeroU16::new(n_required - n_to_reserve) {
+            Some(n) => {
+                *n_required_ref = n;
+                n.get()
+            }
+            None => {
+                self.materials_remaining.remove(def.0.as_str());
+                0
+            }
+        };
+
+        Ok((result, remaining))
     }
 
     pub fn reserved_materials(&self) -> impl Iterator<Item = Entity> + '_ {
@@ -347,7 +374,6 @@ impl SocietyJobImpl for BuildThingJob {
             // all gather requirements are satisfied, do the build
             // TODO some builds could have multiple workers
 
-            let this_job = self.this_job.unwrap(); // set unconditionally
             tasks.push(SocietyTask::Build(this_job, self.details()));
         }
 

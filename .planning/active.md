@@ -1,6 +1,6 @@
 # Active tasks
 
-* [o] fix over reserving of materials
+* [X] fix over reserving of materials
 * [ ] pre-filled society stores of bricks
 * [ ] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically

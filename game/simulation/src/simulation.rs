@@ -31,7 +31,7 @@ use crate::render::{RenderSystem, Renderer};
 use crate::senses::{SensesDebugRenderer, SensesSystem};
 
 use crate::alloc::FrameAllocator;
-use crate::job::SocietyJobHandle;
+
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
 use crate::society::{NameGeneration, PlayerSociety};
@@ -45,7 +45,6 @@ use crate::{
 use crate::{ComponentWorld, Societies, SocietyHandle};
 use std::collections::HashSet;
 use std::pin::Pin;
-use std::sync::Arc;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]

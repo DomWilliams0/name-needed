@@ -6,7 +6,7 @@ use crate::{ComponentWorld, ContainersError, TransformComponent};
 use common::*;
 
 use crate::item::{ContainedInComponent, EndHaulBehaviour, HaulType, HauledItemComponent};
-use crate::job::{BuildThingError, BuildThingJob, SocietyJobHandle};
+use crate::job::{BuildThingError, BuildThingJob, MaterialReservation, SocietyJobHandle};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtComponents<'w>(&'w EcsWorld);
@@ -109,37 +109,43 @@ impl EcsExtComponents<'_> {
         job: SocietyJobHandle,
     ) -> Result<(), ReservationError> {
         // find job in society and try to reserve
-        let surplus = job
+        let (surplus, remaining) = job
             .resolve_and_cast_mut(self.0.resource(), |build_job: &mut BuildThingJob| {
                 build_job.add_reservation(material, self.0)
             })
             .ok_or(ReservationError::InvalidJob(job))??;
 
-        if let Some(surplus) = surplus {
-            // drop surplus
-            debug!("splitting {n} surplus materials from build reservation", n = surplus; "job" => ?job);
-            let new_stack = self
-                .0
-                .helpers_containers()
-                .split_stack(material, surplus)
-                .map_err(ReservationError::DropSurplus)?;
-
-            // drop it at a slight  offset
-            if new_stack != material {
-                let mut transform = self
+        match surplus {
+            MaterialReservation::ConsumeAll(n) => {
+                debug!("reserving material for build job"; "material" => material, "job" => ?job, "n" => n, "remaining" => remaining);
+            }
+            MaterialReservation::Surplus { surplus, reserved } => {
+                // drop surplus
+                debug!("reserving {n} material for build job with {surplus} surplus to be split into new stack",
+                    n = reserved, surplus = surplus; "job" => ?job);
+                let new_stack = self
                     .0
-                    .component_mut::<TransformComponent>(new_stack)
-                    .expect("transform expected");
+                    .helpers_containers()
+                    .split_stack(material, surplus)
+                    .map_err(ReservationError::DropSurplus)?;
 
-                let pos = {
-                    let mut rand = thread_rng();
-                    let mut pos = transform.position;
-                    pos.modify_x(|x| x + rand.gen_range(-1.0, 1.0));
-                    pos.modify_y(|y| y + rand.gen_range(-1.0, 1.0));
-                    pos
-                };
+                // drop it at a slight offset
+                if new_stack != material {
+                    let mut transform = self
+                        .0
+                        .component_mut::<TransformComponent>(new_stack)
+                        .expect("transform expected");
 
-                transform.reset_position(pos)
+                    let pos = {
+                        let mut rand = thread_rng();
+                        let mut pos = transform.position;
+                        pos.modify_x(|x| x + rand.gen_range(-1.0, 1.0));
+                        pos.modify_y(|y| y + rand.gen_range(-1.0, 1.0));
+                        pos
+                    };
+
+                    transform.reset_position(pos)
+                }
             }
         }
 

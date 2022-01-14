@@ -224,7 +224,6 @@ impl<'a> HaulSubactivity<'a> {
                 self.ctx.world().resource::<QueuedUpdates>().queue(
                     "reserve material",
                     move |world| {
-                        trace!("reserving material for job"; "material" => thing, "job" => ?job);
                         world.helpers_comps().reserve_material_for_job(thing, job)?;
                         Ok(())
                     },
