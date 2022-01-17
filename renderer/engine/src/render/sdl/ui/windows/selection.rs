@@ -648,7 +648,7 @@ impl SelectionWindow {
 
         context.key_value(
             im_str!("Blocks:"),
-            || ui_str!(in context, "{}", selection.block_occurrences()),
+            || Value::Wrapped(ui_str!(in context, "{}", selection.block_occurrences())),
             None,
             COLOR_ORANGE,
         );
