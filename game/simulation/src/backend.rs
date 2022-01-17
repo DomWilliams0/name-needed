@@ -1,9 +1,9 @@
 use crate::input::UiCommands;
 use crate::perf::PerfAvg;
 use crate::{Renderer, Simulation, WorldViewer};
-use common::{Error, NotNan};
+use common::Error;
 use resources::Resources;
-use unit::world::WorldPosition;
+use unit::world::{WorldPoint2d, WorldPosition};
 
 #[derive(Debug)]
 pub enum Exit {
@@ -22,8 +22,8 @@ pub enum Exit {
 /// Populated by backend events
 #[derive(Default)]
 pub struct BackendData {
-    /// Mouse position in WORLD SPACE
-    pub mouse_position: Option<(NotNan<f32>, NotNan<f32>)>,
+    /// Mouse position in world space
+    pub mouse_position: Option<WorldPoint2d>,
 }
 
 pub trait InitializedSimulationBackend: Sized {

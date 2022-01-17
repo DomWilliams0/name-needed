@@ -3,7 +3,7 @@ use std::ops::{Add, Deref};
 use common::*;
 use resources::Resources;
 use strum_macros::EnumDiscriminants;
-use unit::world::{WorldPoint, WorldPosition, WorldPositionRange};
+use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
@@ -168,18 +168,19 @@ impl<R: Renderer> Simulation<R> {
         self.apply_world_updates(world_viewer);
 
         // process backend input
-        if let Some((x, y)) = backend_data.mouse_position {
+        if let Some(point) = backend_data.mouse_position {
             let z = {
                 let w = self.voxel_world.borrow();
                 let range = world_viewer.entity_range();
-                let start_from = WorldPosition::new(*x as i32, *y as i32, range.top());
+                let start_from =
+                    WorldPosition::new(point.x() as i32, point.y() as i32, range.top());
                 match w.find_accessible_block_in_column_with_range(start_from, Some(range.bottom()))
                 {
                     Some(pos) => pos.2,
                     None => range.bottom(),
                 }
             };
-            let pos = WorldPoint::new(*x, *y, z.slice() as f32).unwrap(); // not nan
+            let pos = point.into_world_point(NotNan::new(z.slice() as f32).unwrap()); // z is not nan
             self.ecs_world.insert(MouseLocation(pos));
         }
 
@@ -372,7 +373,7 @@ impl<R: Renderer> Simulation<R> {
 
                 UiRequest::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
-                    if let Some((mut from, mut to)) = selection.bounds() {
+                    if let Some((mut from, mut to)) = selection.selected_bounds() {
                         if let BlockPlacement::PlaceAbove = placement {
                             // move the range up 1 block
                             from = from.above();

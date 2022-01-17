@@ -7,7 +7,7 @@ use common::*;
 use unit::world::BLOCKS_PER_METRE;
 
 use crate::ecs::*;
-use crate::input::{SelectedComponent, SelectedTiles};
+use crate::input::{SelectedComponent, SelectedTiles, SelectionProgress};
 
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
@@ -105,9 +105,12 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         }
 
         // render player's world selection
-        if let Some((from, to)) = selected_block.bounds() {
-            self.renderer
-                .tile_selection(from, to, Color::rgb(230, 240, 230));
+        if let Some((progress, (from, to))) = selected_block.bounds() {
+            let color = match progress {
+                SelectionProgress::InProgress => Color::rgb(140, 150, 140),
+                SelectionProgress::Complete => Color::rgb(230, 240, 230),
+            };
+            self.renderer.tile_selection(from, to, color);
         }
 
         // render in-game ui elements above entities

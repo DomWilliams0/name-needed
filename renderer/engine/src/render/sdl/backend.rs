@@ -24,7 +24,7 @@ use resources::Resources;
 use sdl2::mouse::{MouseButton, MouseState, MouseWheelDirection};
 use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
 use std::hint::unreachable_unchecked;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
@@ -236,7 +236,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 } => {
                     if let Some(mouse_btn) = mousestate.pressed_mouse_buttons().next() {
                         if let Some((select, col)) = self.parse_mouse_event(mouse_btn, x, y) {
-                            self.selection.mouse_move(select, col);
+                            let evt = self.selection.mouse_move(select, col);
+                            if let Some(evt) = evt {
+                                self.sim_input_events.push(evt);
+                            }
                         }
                     }
                 }
@@ -269,7 +272,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             let x = NotNan::new(x).ok();
             let y = NotNan::new(y).ok();
-            x.zip(y)
+            x.zip(y).map(|(x, y)| WorldPoint2d::new(x, y))
         };
 
         BackendData { mouse_position }

@@ -15,8 +15,19 @@ pub struct WorldColumn {
 #[derive(Debug)]
 pub enum InputEvent {
     Click(SelectType, WorldColumn),
-    /// (_, from ,to)
-    Select(SelectType, WorldColumn, WorldColumn),
+    /// Selection has been made
+    Select {
+        select: SelectType,
+        from: WorldColumn,
+        to: WorldColumn,
+        progress: SelectionProgress,
+    },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SelectionProgress {
+    InProgress,
+    Complete,
 }
 
 /// Resource for current mouse location in WORLD SPACE

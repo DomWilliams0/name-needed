@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use common::*;
 use simulation::input::{
-    BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, UiRequest,
+    BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, SelectionProgress, UiRequest,
 };
 use simulation::job::BuildThingJob;
 use simulation::{
@@ -594,11 +594,8 @@ impl SelectionWindow {
         }
 
         let selection = context.simulation().ecs.resource::<SelectedTiles>();
-        let bounds = match selection.bounds() {
-            None => {
-                context.text_disabled(im_str!("No tile selection"));
-                return;
-            }
+        let (progress, bounds) = match selection.bounds() {
+            None => return context.text_disabled(im_str!("No tile selection")),
             Some(bounds) => bounds,
         };
 
@@ -615,6 +612,18 @@ impl SelectionWindow {
                 } else {
                     ui_str!(in context, "{}x{}x{} ({})", w, h,z, w*h*z)
                 }
+            },
+            None,
+            COLOR_BLUE,
+        );
+
+        context.key_value(
+            im_str!("Progress:"),
+            || {
+                ui_str!(in context, "{}", match progress {
+                    SelectionProgress::Complete => "Selected",
+                    SelectionProgress::InProgress => "Ongoing",
+                })
             },
             None,
             COLOR_BLUE,

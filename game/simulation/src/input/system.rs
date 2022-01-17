@@ -2,7 +2,7 @@ use common::*;
 use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
-use crate::input::{InputEvent, SelectType, WorldColumn};
+use crate::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
 use crate::{UiElementComponent, WorldRef};
@@ -24,7 +24,10 @@ pub struct SelectedComponent;
 pub struct SelectedEntity(Option<Entity>);
 
 #[derive(Default, Clone)]
-pub struct SelectedTiles(Option<WorldPositionRange>);
+pub struct SelectedTiles {
+    current: Option<(WorldPositionRange, SelectionProgress)>,
+    last: Option<(WorldPosition, WorldPosition, SelectionProgress)>,
+}
 
 const TILE_SELECTION_LIMIT: f32 = 50.0;
 
@@ -84,54 +87,26 @@ impl<'a> System<'a> for InputSystem<'a> {
                     }
                 }
 
-                InputEvent::Select(SelectType::Left, _, _) => {
+                InputEvent::Select {
+                    select: SelectType::Left,
+                    ..
+                } => {
                     // TODO select multiple entities
                 }
 
                 InputEvent::Click(SelectType::Right, _) => {
                     // unselect tile selection
-                    selected_block.0 = None;
+                    selected_block.clear();
                 }
 
-                InputEvent::Select(SelectType::Right, from, to) => {
-                    // select tiles
-                    let w = (*world).borrow();
-
-                    // limit selection size by moving the second point placed. this isn't totally
-                    // accurate and may allow selections of 1 block bigger, but meh who cares
-                    let to = {
-                        let dx = (from.x - to.x).abs();
-                        let dy = (from.y - to.y).abs();
-
-                        let x_overlap = TILE_SELECTION_LIMIT - dx;
-                        let y_overlap = TILE_SELECTION_LIMIT - dy;
-
-                        let mut to = *to;
-                        if x_overlap < 0.0 {
-                            let mul = if from.x > to.x { 1.0 } else { -1.0 };
-                            to.x -= mul * x_overlap;
-                        }
-
-                        if y_overlap < 0.0 {
-                            let mul = if from.y > to.y { 1.0 } else { -1.0 };
-                            to.y -= mul * y_overlap;
-                        }
-
-                        to
-                    };
-
-                    selected_block.0 = from.find_min_max_walkable(&to, &w).map(|(min, max)| {
-                        let mut a = min.floor();
-                        let mut b = max.floor();
-
-                        // these blocks are walkable air blocks, move them down 1 to select the
-                        // actual block beneath
-                        a.2 -= 1;
-                        b.2 -= 1;
-
-                        debug!("selecting tiles"; "min" => %a, "max" => %b);
-                        WorldPositionRange::with_inclusive_range(a, b)
-                    });
+                InputEvent::Select {
+                    select: SelectType::Right,
+                    from,
+                    to,
+                    progress,
+                } => {
+                    // update tile selection
+                    selected_block.update((*from, *to), *progress, &world);
                 }
             }
         }
@@ -184,15 +159,85 @@ impl SelectedEntity {
 }
 
 impl SelectedTiles {
-    pub fn range(&self) -> Option<WorldPositionRange> {
-        self.0.as_ref().cloned()
+    fn update(
+        &mut self,
+        range: (WorldColumn, WorldColumn),
+        progress: SelectionProgress,
+        world: &WorldRef,
+    ) {
+        let (from, mut to) = range;
+
+        // limit selection size by moving the second point placed. this isn't totally
+        // accurate and may allow selections of 1 block bigger, but meh who cares
+        let to = {
+            let dx = (from.x - to.x).abs();
+            let dy = (from.y - to.y).abs();
+
+            let x_overlap = TILE_SELECTION_LIMIT - dx;
+            let y_overlap = TILE_SELECTION_LIMIT - dy;
+
+            if x_overlap < 0.0 {
+                let mul = if from.x > to.x { 1.0 } else { -1.0 };
+                to.x -= mul * x_overlap;
+            }
+
+            if y_overlap < 0.0 {
+                let mul = if from.y > to.y { 1.0 } else { -1.0 };
+                to.y -= mul * y_overlap;
+            }
+
+            to
+        };
+
+        let w = world.borrow();
+        if let Some((min, max)) = from.find_min_max_walkable(&to, &w) {
+            let mut a = min.floor();
+            let mut b = max.floor();
+
+            // these blocks are walkable air blocks, move them down 1 to select the
+            // actual block beneath
+            a.2 -= 1;
+            b.2 -= 1;
+
+            if Some((a, b, progress)) != self.last {
+                self.last = Some((a, b, progress));
+                self.current = Some((WorldPositionRange::with_inclusive_range(a, b), progress));
+
+                if let SelectionProgress::Complete = progress {
+                    debug!("selecting tiles"; "min" => %a, "max" => %b);
+                }
+            }
+        }
     }
-    pub fn bounds(&self) -> Option<(WorldPosition, WorldPosition)> {
-        self.0.as_ref().map(|range| range.bounds())
+
+    fn clear(&mut self) {
+        self.current = None;
+    }
+
+    /// Includes in-progress selection
+    pub fn bounds(&self) -> Option<(SelectionProgress, (WorldPosition, WorldPosition))> {
+        self.current
+            .as_ref()
+            .map(|(range, progress)| (*progress, range.bounds()))
+    }
+
+    fn selected(&self) -> Option<&WorldPositionRange> {
+        match self.current.as_ref() {
+            Some((range, SelectionProgress::Complete)) => Some(range),
+            _ => None,
+        }
+    }
+
+    pub fn selected_range(&self) -> Option<WorldPositionRange> {
+        self.selected().cloned()
+    }
+
+    pub fn selected_bounds(&self) -> Option<(WorldPosition, WorldPosition)> {
+        self.selected().map(|range| range.bounds())
     }
 
     pub fn single_tile(&self) -> Option<WorldPosition> {
-        self.0.clone().and_then(|range| match range {
+        self.selected().and_then(|range| match *range {
             WorldRange::Single(pos) => Some(pos),
             WorldRange::Range(a, b) if a == b => Some(a),
             _ => None,

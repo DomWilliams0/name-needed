@@ -1,56 +1,73 @@
 use sdl2::mouse::MouseButton;
 
-use simulation::input::{InputEvent, SelectType, WorldColumn};
+use simulation::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
 
 #[derive(Copy, Clone)]
 enum MouseState {
     Unpressed,
-    Down(SelectType, WorldColumn),
-    Dragging(SelectType, WorldColumn),
+    Down(SelectType),
+    Dragging {
+        select: SelectType,
+        start: WorldColumn,
+    },
 }
 
-pub struct Selection {
-    state: MouseState,
-}
+pub struct Selection(MouseState);
 
 impl Selection {
-    pub fn mouse_down(&mut self, select: SelectType, pos: WorldColumn) {
+    pub fn mouse_down(&mut self, select: SelectType, _pos: WorldColumn) {
         // dont bother about multiple buttons being held down at once
-        if let MouseState::Unpressed = self.state {
-            self.state = MouseState::Down(select, pos);
+        if let MouseState::Unpressed = self.0 {
+            self.0 = MouseState::Down(select)
         }
     }
 
     pub fn mouse_up(&mut self, select: SelectType, pos: WorldColumn) -> Option<InputEvent> {
-        let evt = match self.state {
-            MouseState::Down(prev_select, _) if select == prev_select => {
+        let evt = match self.0 {
+            MouseState::Down(prev_select) if select == prev_select => {
                 // single selection at the mouse up location, ignoring the down location
-                let evt = InputEvent::Click(select, pos);
-                Some(evt)
+                Some(InputEvent::Click(select, pos))
             }
-            MouseState::Dragging(prev_select, start) if select == prev_select => {
+            MouseState::Dragging {
+                select: prev_select,
+                start,
+            } if select == prev_select => {
                 // region selection from original mouse down location
-                let evt = InputEvent::Select(select, start, pos);
-                Some(evt)
+                Some(InputEvent::Select {
+                    select,
+                    from: start,
+                    to: pos,
+                    progress: SelectionProgress::Complete,
+                })
             }
             _ => None,
         };
 
         if evt.is_some() {
             // consume mouse press
-            self.state = MouseState::Unpressed;
+            self.0 = MouseState::Unpressed;
         }
 
         evt
     }
 
-    pub fn mouse_move(&mut self, select: SelectType, pos: WorldColumn) {
-        match self.state {
-            MouseState::Down(prev_select, _) if prev_select == select => {
+    pub fn mouse_move(&mut self, select: SelectType, pos: WorldColumn) -> Option<InputEvent> {
+        match self.0 {
+            MouseState::Down(prev_select) if prev_select == select => {
                 // start dragging
-                self.state = MouseState::Dragging(select, pos);
+                self.0 = MouseState::Dragging { select, start: pos };
+                None
             }
-            _ => {}
+            MouseState::Dragging {
+                select: prev_select,
+                start,
+            } if prev_select == select => Some(InputEvent::Select {
+                select,
+                from: start,
+                to: pos,
+                progress: SelectionProgress::InProgress,
+            }),
+            _ => None,
         }
     }
 
@@ -65,8 +82,6 @@ impl Selection {
 
 impl Default for Selection {
     fn default() -> Self {
-        Self {
-            state: MouseState::Unpressed,
-        }
+        Selection(MouseState::Unpressed)
     }
 }

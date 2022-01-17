@@ -60,7 +60,7 @@ impl SocietyWindow {
             let block_selection = ecs.resource::<SelectedTiles>();
 
             // break selected blocks
-            if let Some(range) = block_selection.range() {
+            if let Some(range) = block_selection.selected_range() {
                 any_buttons = true;
                 if context.button(im_str!("Break blocks"), [0.0, 0.0]) {
                     context.issue_request(UiRequest::IssueSocietyCommand(
