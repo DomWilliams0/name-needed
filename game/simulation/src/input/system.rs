@@ -2,6 +2,7 @@ use common::*;
 use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
+pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
@@ -22,13 +23,6 @@ pub struct SelectedComponent;
 /// `get()` will clear it if the entity is dead
 #[derive(Default)]
 pub struct SelectedEntity(Option<Entity>);
-
-#[derive(Default, Clone)]
-pub struct SelectedTiles {
-    current: Option<(WorldPositionRange, SelectionProgress)>,
-    last: Option<(WorldPosition, WorldPosition, SelectionProgress)>,
-}
-
 const TILE_SELECTION_LIMIT: f32 = 50.0;
 
 impl<'a> System<'a> for InputSystem<'a> {
@@ -158,89 +152,204 @@ impl SelectedEntity {
     }
 }
 
-impl SelectedTiles {
-    fn update(
-        &mut self,
-        range: (WorldColumn, WorldColumn),
+mod selected_tiles {
+    use super::*;
+    use crate::InnerWorldRef;
+    use std::collections::BTreeMap;
+    use std::fmt::Write;
+    use world::block::BlockType;
+
+    #[derive(Default, Clone)]
+    pub struct SelectedTiles {
+        current: Option<CurrentSelection>,
+        last: Option<(WorldPosition, WorldPosition, SelectionProgress)>,
+    }
+
+    #[derive(Clone)]
+    pub struct CurrentSelection {
+        range: WorldPositionRange,
         progress: SelectionProgress,
-        world: &WorldRef,
-    ) {
-        let (from, mut to) = range;
+        makeup: BTreeMap<BlockType, u32>,
+    }
 
-        // limit selection size by moving the second point placed. this isn't totally
-        // accurate and may allow selections of 1 block bigger, but meh who cares
-        let to = {
-            let dx = (from.x - to.x).abs();
-            let dy = (from.y - to.y).abs();
+    pub struct BlockOccurrences<'a>(&'a BTreeMap<BlockType, u32>);
 
-            let x_overlap = TILE_SELECTION_LIMIT - dx;
-            let y_overlap = TILE_SELECTION_LIMIT - dy;
+    impl SelectedTiles {
+        pub fn update(
+            &mut self,
+            range: (WorldColumn, WorldColumn),
+            progress: SelectionProgress,
+            world: &WorldRef,
+        ) {
+            let (from, mut to) = range;
 
-            if x_overlap < 0.0 {
-                let mul = if from.x > to.x { 1.0 } else { -1.0 };
-                to.x -= mul * x_overlap;
-            }
+            // limit selection size by moving the second point placed. this isn't totally
+            // accurate and may allow selections of 1 block bigger, but meh who cares
+            let to = {
+                let dx = (from.x - to.x).abs();
+                let dy = (from.y - to.y).abs();
 
-            if y_overlap < 0.0 {
-                let mul = if from.y > to.y { 1.0 } else { -1.0 };
-                to.y -= mul * y_overlap;
-            }
+                let x_overlap = TILE_SELECTION_LIMIT - dx;
+                let y_overlap = TILE_SELECTION_LIMIT - dy;
 
-            to
-        };
+                if x_overlap < 0.0 {
+                    let mul = if from.x > to.x { 1.0 } else { -1.0 };
+                    to.x -= mul * x_overlap;
+                }
 
-        let w = world.borrow();
-        if let Some((min, max)) = from.find_min_max_walkable(&to, &w) {
-            let mut a = min.floor();
-            let mut b = max.floor();
+                if y_overlap < 0.0 {
+                    let mul = if from.y > to.y { 1.0 } else { -1.0 };
+                    to.y -= mul * y_overlap;
+                }
 
-            // these blocks are walkable air blocks, move them down 1 to select the
-            // actual block beneath
-            a.2 -= 1;
-            b.2 -= 1;
+                to
+            };
 
-            if Some((a, b, progress)) != self.last {
-                self.last = Some((a, b, progress));
-                self.current = Some((WorldPositionRange::with_inclusive_range(a, b), progress));
+            let w = world.borrow();
+            if let Some((min, max)) = from.find_min_max_walkable(&to, &w) {
+                let mut a = min.floor();
+                let mut b = max.floor();
 
-                if let SelectionProgress::Complete = progress {
-                    debug!("selecting tiles"; "min" => %a, "max" => %b);
+                // these blocks are walkable air blocks, move them down 1 to select the
+                // actual block beneath
+                a.2 -= 1;
+                b.2 -= 1;
+
+                if Some((a, b, progress)) != self.last {
+                    self.last = Some((a, b, progress));
+
+                    self.current = Some(CurrentSelection::new(
+                        WorldPositionRange::with_inclusive_range(a, b),
+                        progress,
+                        self.current.take(),
+                        &w,
+                    ));
+
+                    if let SelectionProgress::Complete = progress {
+                        debug!("selecting tiles"; "min" => %a, "max" => %b);
+                    }
                 }
             }
         }
-    }
 
-    fn clear(&mut self) {
-        self.current = None;
-    }
+        pub fn clear(&mut self) {
+            self.current = None;
+        }
 
-    /// Includes in-progress selection
-    pub fn bounds(&self) -> Option<(SelectionProgress, (WorldPosition, WorldPosition))> {
-        self.current
-            .as_ref()
-            .map(|(range, progress)| (*progress, range.bounds()))
-    }
+        /// Includes in-progress selection
+        pub fn current(&self) -> Option<&CurrentSelection> {
+            self.current.as_ref()
+        }
 
-    fn selected(&self) -> Option<&WorldPositionRange> {
-        match self.current.as_ref() {
-            Some((range, SelectionProgress::Complete)) => Some(range),
-            _ => None,
+        /// Only complete selection
+        pub fn current_selected(&self) -> Option<&CurrentSelection> {
+            match self.current.as_ref() {
+                Some(
+                    sel @ CurrentSelection {
+                        progress: SelectionProgress::Complete,
+                        ..
+                    },
+                ) => Some(sel),
+                _ => None,
+            }
         }
     }
 
-    pub fn selected_range(&self) -> Option<WorldPositionRange> {
-        self.selected().cloned()
+    impl CurrentSelection {
+        fn new(
+            range: WorldPositionRange,
+            progress: SelectionProgress,
+            prev: Option<Self>,
+            world: &InnerWorldRef,
+        ) -> Self {
+            let mut makeup = prev
+                .map(|mut sel| {
+                    sel.makeup.clear();
+                    sel.makeup
+                })
+                .unwrap_or_default();
+
+            for (b, _) in world.iterate_blocks(&range) {
+                makeup
+                    .entry(b.block_type())
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
+            }
+
+            Self {
+                range,
+                progress,
+                makeup,
+            }
+        }
+
+        pub fn bounds(&self) -> (WorldPosition, WorldPosition) {
+            self.range.bounds()
+        }
+
+        pub fn progress(&self) -> SelectionProgress {
+            self.progress
+        }
+
+        pub fn range(&self) -> &WorldPositionRange {
+            &self.range
+        }
+
+        pub fn single_tile(&self) -> Option<WorldPosition> {
+            match &self.range {
+                WorldRange::Single(pos) => Some(*pos),
+                WorldRange::Range(a, b) if a == b => Some(*a),
+                _ => None,
+            }
+        }
+
+        pub fn block_occurrences(&self) -> impl Display + '_ {
+            BlockOccurrences(&self.makeup)
+        }
     }
 
-    pub fn selected_bounds(&self) -> Option<(WorldPosition, WorldPosition)> {
-        self.selected().map(|range| range.bounds())
+    impl Display for BlockOccurrences<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.write_char('[')?;
+
+            let mut comma = false;
+            for (b, n) in self.0.iter() {
+                if comma {
+                    f.write_str(", ")?;
+                } else {
+                    comma = true;
+                }
+                write!(f, "{}x{}", n, b)?;
+            }
+
+            f.write_char(']')
+        }
     }
 
-    pub fn single_tile(&self) -> Option<WorldPosition> {
-        self.selected().and_then(|range| match *range {
-            WorldRange::Single(pos) => Some(pos),
-            WorldRange::Range(a, b) if a == b => Some(a),
-            _ => None,
-        })
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::input::system::selected_tiles::BlockOccurrences;
+        use std::collections::HashMap;
+        use world::block::BlockType;
+
+        #[test]
+        fn comma_separated_blocks() {
+            let mut map = BTreeMap::new();
+
+            assert_eq!(format!("{}", BlockOccurrences(&map)), "[]");
+
+            map.insert(BlockType::Air, 5);
+            assert_eq!(format!("{}", BlockOccurrences(&map)), "[5xAir]");
+
+            map.insert(BlockType::Dirt, 2);
+            assert_eq!(format!("{}", BlockOccurrences(&map)), "[5xAir, 2xDirt]");
+
+            map.insert(BlockType::Grass, 10);
+            assert_eq!(
+                format!("{}", BlockOccurrences(&map)),
+                "[5xAir, 2xDirt, 10xGrass]"
+            );
+        }
     }
 }

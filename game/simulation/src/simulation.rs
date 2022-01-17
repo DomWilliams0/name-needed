@@ -373,7 +373,9 @@ impl<R: Renderer> Simulation<R> {
 
                 UiRequest::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
-                    if let Some((mut from, mut to)) = selection.selected_bounds() {
+                    if let Some((mut from, mut to)) =
+                        selection.current_selected().map(|sel| sel.range().bounds())
+                    {
                         if let BlockPlacement::PlaceAbove = placement {
                             // move the range up 1 block
                             from = from.above();

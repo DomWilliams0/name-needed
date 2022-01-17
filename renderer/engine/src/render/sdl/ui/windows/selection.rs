@@ -314,7 +314,10 @@ impl SelectionWindow {
             let tab = context.new_tab(im_str!("Control"));
             if tab.is_open() {
                 let world_selection = ecs.resource::<SelectedTiles>();
-                if let Some(tile) = world_selection.single_tile() {
+                if let Some(tile) = world_selection
+                    .current_selected()
+                    .and_then(|sel| sel.single_tile())
+                {
                     if context.button(im_str!("Go to selected block"), [0.0, 0.0]) {
                         context.issue_request(UiRequest::IssueDivineCommand(
                             DivineInputCommand::Goto(tile.above()),
@@ -593,13 +596,13 @@ impl SelectionWindow {
             return;
         }
 
-        let selection = context.simulation().ecs.resource::<SelectedTiles>();
-        let (progress, bounds) = match selection.bounds() {
+        let selection_res = context.simulation().ecs.resource::<SelectedTiles>();
+        let selection = match selection_res.current() {
             None => return context.text_disabled(im_str!("No tile selection")),
-            Some(bounds) => bounds,
+            Some(sel) => sel,
         };
 
-        let (from, to) = bounds;
+        let (from, to) = selection.bounds();
         let w = (to.0 - from.0).abs() + 1;
         let h = (to.1 - from.1).abs() + 1;
         let z = (to.2 - from.2).abs().slice() + 1;
@@ -620,7 +623,7 @@ impl SelectionWindow {
         context.key_value(
             im_str!("Progress:"),
             || {
-                ui_str!(in context, "{}", match progress {
+                ui_str!(in context, "{}", match selection.progress() {
                     SelectionProgress::Complete => "Selected",
                     SelectionProgress::InProgress => "Ongoing",
                 })
@@ -643,6 +646,13 @@ impl SelectionWindow {
             COLOR_ORANGE,
         );
 
+        context.key_value(
+            im_str!("Blocks:"),
+            || ui_str!(in context, "{}", selection.block_occurrences()),
+            None,
+            COLOR_ORANGE,
+        );
+
         let tab_bar = context.new_tab_bar(im_str!("##worldselectiontabbar"));
         if !tab_bar.is_open() {
             return;
@@ -652,7 +662,7 @@ impl SelectionWindow {
         {
             let tab = context.new_tab(im_str!("Block"));
             if tab.is_open() {
-                self.do_single_block(context, selection);
+                self.do_single_block(context, selection_res);
             }
         }
 
@@ -661,7 +671,7 @@ impl SelectionWindow {
         {
             let tab = context.new_tab(im_str!("Generation"));
             if tab.is_open() {
-                self.do_generation(context, selection);
+                self.do_generation(context, selection_res);
             }
         }
 
@@ -675,7 +685,10 @@ impl SelectionWindow {
     }
 
     fn do_single_block(&mut self, context: &UiContext, selection: &SelectedTiles) {
-        let pos = match selection.single_tile() {
+        let pos = match selection
+            .current_selected()
+            .and_then(|sel| sel.single_tile())
+        {
             Some(pos) => pos,
             None => {
                 context.text_disabled(im_str!("Single block selection required"));
@@ -863,7 +876,9 @@ impl SelectionWindow {
             return;
         }
 
-        let single_tile = selection.single_tile();
+        let single_tile = selection
+            .current_selected()
+            .and_then(|sel| sel.single_tile());
         let block_query = single_tile.and_then(|pos| loader.query_block(pos));
         let details = match (block_query, single_tile) {
             (None, Some(_)) => {

@@ -105,10 +105,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         }
 
         // render player's world selection
-        if let Some((progress, (from, to))) = selected_block.bounds() {
-            let color = match progress {
-                SelectionProgress::InProgress => Color::rgb(140, 150, 140),
-                SelectionProgress::Complete => Color::rgb(230, 240, 230),
+        if let Some(sel) = selected_block.current() {
+            let (from, to) = sel.bounds();
+            let color = match sel.progress() {
+                SelectionProgress::InProgress => Color::rgb(216, 221, 230),
+                SelectionProgress::Complete => Color::rgb(252, 253, 255),
             };
             self.renderer.tile_selection(from, to, color);
         }

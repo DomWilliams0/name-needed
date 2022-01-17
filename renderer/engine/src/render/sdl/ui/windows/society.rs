@@ -58,14 +58,15 @@ impl SocietyWindow {
 
             let ecs = context.simulation().ecs;
             let block_selection = ecs.resource::<SelectedTiles>();
+            let block_selection = block_selection.current_selected();
 
             // break selected blocks
-            if let Some(range) = block_selection.selected_range() {
+            if let Some(sel) = block_selection {
                 any_buttons = true;
                 if context.button(im_str!("Break blocks"), [0.0, 0.0]) {
                     context.issue_request(UiRequest::IssueSocietyCommand(
                         society_handle,
-                        SocietyCommand::BreakBlocks(range),
+                        SocietyCommand::BreakBlocks(sel.range().clone()),
                     ));
                 }
             }
@@ -74,7 +75,7 @@ impl SocietyWindow {
             if let Some((entity, target)) = ecs
                 .resource::<SelectedEntity>()
                 .get_unchecked()
-                .zip(block_selection.single_tile())
+                .zip(block_selection.and_then(|sel| sel.single_tile()))
             {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
                     let desc = context.description(entity);
