@@ -36,6 +36,11 @@ pub trait RangePosition: Copy + Sized {
         let (x, y, z) = self.xyz();
         Self::new((x, y, z - Self::Z::one()))
     }
+
+    fn above(self) -> Option<Self> {
+        let (x, y, z) = self.xyz();
+        Self::new((x, y, z + Self::Z::one()))
+    }
 }
 
 impl<P: RangePosition> WorldRange<P> {
@@ -124,12 +129,22 @@ impl<P: RangePosition> WorldRange<P> {
         xy.as_() * z.as_()
     }
 
-    pub fn below(self) -> Option<Self> {
+    pub fn below(&self) -> Option<Self> {
         match self {
             WorldRange::Single(pos) => pos.below().map(WorldRange::Single),
             WorldRange::Range(from, to) => from
                 .below()
                 .zip(to.below())
+                .map(|(from, to)| WorldRange::Range(from, to)),
+        }
+    }
+
+    pub fn above(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => pos.above().map(WorldRange::Single),
+            WorldRange::Range(from, to) => from
+                .above()
+                .zip(to.above())
                 .map(|(from, to)| WorldRange::Range(from, to)),
         }
     }

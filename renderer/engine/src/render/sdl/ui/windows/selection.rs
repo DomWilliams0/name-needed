@@ -4,7 +4,8 @@ use std::cell::RefCell;
 
 use common::*;
 use simulation::input::{
-    BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, SelectionProgress, UiRequest,
+    BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, SelectionModification,
+    SelectionProgress, UiRequest,
 };
 use simulation::job::BuildThingJob;
 use simulation::{
@@ -645,6 +646,24 @@ impl SelectionWindow {
             None,
             COLOR_ORANGE,
         );
+
+        // selection modification buttons
+        {
+            let mut modification = None;
+            if context.button(im_str!("Move up"), [0.0, 0.0]) {
+                modification = Some(SelectionModification::Up);
+            }
+
+            context.ui().same_line(0.0);
+
+            if context.button(im_str!("Move down"), [0.0, 0.0]) {
+                modification = Some(SelectionModification::Down);
+            }
+
+            if let Some(modification) = modification {
+                context.issue_request(UiRequest::ModifySelection(modification));
+            }
+        }
 
         context.key_value(
             im_str!("Blocks:"),

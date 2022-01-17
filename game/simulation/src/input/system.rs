@@ -154,9 +154,11 @@ impl SelectedEntity {
 
 mod selected_tiles {
     use super::*;
+    use crate::input::SelectionModification;
     use crate::InnerWorldRef;
     use std::collections::BTreeMap;
     use std::fmt::Write;
+    use unit::world::{all_slabs_in_range, SlabLocation};
     use world::block::BlockType;
 
     #[derive(Default, Clone)]
@@ -254,6 +256,18 @@ mod selected_tiles {
             }
         }
 
+        pub fn modify(&mut self, modification: SelectionModification, world: &WorldRef) {
+            if let Some(
+                sel @ CurrentSelection {
+                    progress: SelectionProgress::Complete,
+                    ..
+                },
+            ) = self.current.as_mut()
+            {
+                sel.modify(modification, world);
+            }
+        }
+
         pub fn on_world_change(&mut self, world: &WorldRef) {
             self.current
                 .as_mut()
@@ -322,6 +336,25 @@ mod selected_tiles {
 
         pub fn block_occurrences(&self) -> impl Display + '_ {
             BlockOccurrences(&self.makeup)
+        }
+
+        pub fn modify(&mut self, modification: SelectionModification, world: &WorldRef) {
+            let new = match modification {
+                SelectionModification::Up => self.range.above(),
+                SelectionModification::Down => self.range.below(),
+            };
+
+            if let Some(new) = new {
+                let w = world.borrow();
+                let (from, to) = new.bounds();
+
+                if w.has_slab(SlabLocation::new(from.slice().slab_index(), from))
+                    && w.has_slab(SlabLocation::new(to.slice().slab_index(), to))
+                {
+                    self.range = new;
+                    self.update_makeup(&world.borrow())
+                }
+            }
         }
     }
 

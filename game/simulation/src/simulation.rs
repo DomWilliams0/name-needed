@@ -483,6 +483,11 @@ impl<R: Renderer> Simulation<R> {
                         let _ = self.ecs_world.remove_now::<EntityLoggingComponent>(entity);
                     }
                 }
+
+                UiRequest::ModifySelection(modification) => {
+                    let sel = self.ecs_world.resource_mut::<SelectedTiles>();
+                    sel.modify(modification, &self.voxel_world);
+                }
             }
         }
 

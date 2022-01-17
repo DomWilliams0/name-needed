@@ -41,6 +41,14 @@ pub enum UiRequest {
         entity: Entity,
         enabled: bool,
     },
+
+    ModifySelection(SelectionModification),
+}
+
+pub enum SelectionModification {
+    Up,
+    Down,
+    // TODO expand/contract in a direction
 }
 
 pub enum UiResponsePayload {
