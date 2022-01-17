@@ -792,7 +792,6 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "color",
  "common",
  "config",
@@ -803,6 +802,7 @@ dependencies = [
  "imgui-sdl2",
  "panik",
  "resources",
+ "ron",
  "rusttype",
  "sdl2",
  "sdl2-sys",

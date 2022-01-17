@@ -166,8 +166,9 @@ impl Ui {
         Ok(Some(state))
     }
 
-    fn serialize_to(&mut self, writer: impl Write) -> Result<(), bincode::Error> {
+    fn serialize_to(&mut self, writer: impl Write) -> Result<(), ron::Error> {
         #[derive(Serialize)]
+        #[repr(C)]
         struct SerializedState<'a> {
             state: &'a State,
             imgui: &'a str,
@@ -181,20 +182,18 @@ impl Ui {
             imgui: &imgui,
         };
 
-        bincode::serialize_into(writer, &serialized)
+        ron::ser::to_writer(writer, &serialized)
     }
 
-    fn deserialize_from(
-        imgui_ctx: &mut Context,
-        reader: impl Read,
-    ) -> Result<State, bincode::Error> {
+    fn deserialize_from(imgui_ctx: &mut Context, reader: impl Read) -> Result<State, ron::Error> {
         #[derive(Deserialize)]
+        #[repr(C)]
         struct SerializedState {
             state: State,
             imgui: String,
         }
 
-        let SerializedState { state, imgui } = bincode::deserialize_from(reader)?;
+        let SerializedState { state, imgui } = ron::de::from_reader(reader)?;
 
         imgui_ctx.load_ini_settings(&imgui);
         Ok(state)

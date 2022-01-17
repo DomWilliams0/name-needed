@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -503,7 +503,8 @@
    * `// TODO use the arena for this`
    * `// TODO other job tabs`
    * `// TODO proper way of checking if an entity is living`
- * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (2)
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
+   * `// TODO temporary hardcoded list of builds`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (5)
