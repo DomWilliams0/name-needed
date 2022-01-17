@@ -86,6 +86,7 @@ impl<P: RangePosition> WorldRange<P> {
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
+    /// TODO cache this?
     #[allow(clippy::type_complexity)]
     pub fn ranges(&self) -> ((P::XY, P::XY), (P::XY, P::XY), (P::Z, P::Z)) {
         let (from, to) = match self {
@@ -131,6 +132,13 @@ impl<P: RangePosition> WorldRange<P> {
                 .zip(to.below())
                 .map(|(from, to)| WorldRange::Range(from, to)),
         }
+    }
+
+    pub fn contains(&self, pos: &P) -> bool {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+        let (x, y, z) = pos.xyz();
+
+        ax <= x && x <= bx && ay <= y && y <= by && az <= z && z <= bz
     }
 }
 

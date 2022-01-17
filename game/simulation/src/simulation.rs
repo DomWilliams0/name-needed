@@ -342,15 +342,11 @@ impl<R: Renderer> Simulation<R> {
 
         // consume change events
         let mut events = std::mem::take(&mut self.change_events);
-        events
-            .drain(..)
-            .filter(|e| e.new != e.prev)
-            .for_each(|e| self.on_world_change(e));
+        self.on_world_changes(&events);
+        events.clear();
 
         // swap storage back and forget empty vec
-        let empty = std::mem::replace(&mut self.change_events, events);
-        debug_assert!(empty.is_empty());
-        std::mem::forget(empty);
+        std::mem::forget(std::mem::replace(&mut self.change_events, events));
     }
 
     fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
@@ -551,39 +547,54 @@ impl<R: Renderer> Simulation<R> {
         renderer.deinit()
     }
 
-    fn on_world_change(&mut self, WorldChangeEvent { pos, prev, new }: WorldChangeEvent) {
-        debug_assert_ne!(prev, new);
+    fn on_world_changes(&mut self, events: &[WorldChangeEvent]) {
+        let selection = self.ecs_world.resource_mut::<SelectedTiles>();
+        let mut selection_modified = false;
 
-        match (prev, new) {
-            (_, BlockType::Chest) => {
-                // new chest placed
-                if let Err(err) = self
-                    .ecs_world
-                    .helpers_containers()
-                    .create_container_voxel(pos, "core_storage_chest")
-                {
-                    error!("failed to create container entity"; "error" => %err);
+        for &WorldChangeEvent { pos, prev, new } in events {
+            match (prev, new) {
+                (a, b) if a == b => continue,
+                (_, BlockType::Chest) => {
+                    // new chest placed
+                    if let Err(err) = self
+                        .ecs_world
+                        .helpers_containers()
+                        .create_container_voxel(pos, "core_storage_chest")
+                    {
+                        error!("failed to create container entity"; "error" => %err);
+                    }
+                }
+
+                (BlockType::Chest, _) => {
+                    // chest destroyed
+                    self.ecs_world.resource::<QueuedUpdates>().queue(
+                        "destroy container",
+                        move |world| match world
+                            .helpers_containers()
+                            .destroy_container(pos, DeathReason::BlockDestroyed)
+                        {
+                            Err(err) => {
+                                error!("failed to destroy container"; "error" => %err);
+                                Err(err.into())
+                            }
+                            Ok(()) => Ok(()),
+                        },
+                    )
+                }
+                _ => {}
+            }
+
+            if !selection_modified {
+                if let Some(sel) = selection.current_selected() {
+                    if sel.range().contains(&pos) {
+                        selection_modified = true;
+                    }
                 }
             }
+        }
 
-            (BlockType::Chest, _) => {
-                // chest destroyed
-                self.ecs_world.resource::<QueuedUpdates>().queue(
-                    "destroy container",
-                    move |world| match world
-                        .helpers_containers()
-                        .destroy_container(pos, DeathReason::BlockDestroyed)
-                    {
-                        Err(err) => {
-                            error!("failed to destroy container"; "error" => %err);
-                            Err(err.into())
-                        }
-                        Ok(()) => Ok(()),
-                    },
-                )
-            }
-
-            _ => {}
+        if selection_modified {
+            selection.on_world_change(&self.voxel_world);
         }
     }
 

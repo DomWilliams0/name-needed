@@ -253,6 +253,12 @@ mod selected_tiles {
                 _ => None,
             }
         }
+
+        pub fn on_world_change(&mut self, world: &WorldRef) {
+            self.current
+                .as_mut()
+                .map(|sel| sel.on_world_change(world.borrow()));
+        }
     }
 
     impl CurrentSelection {
@@ -262,24 +268,35 @@ mod selected_tiles {
             prev: Option<Self>,
             world: &InnerWorldRef,
         ) -> Self {
-            let mut makeup = prev
+            let makeup = prev
                 .map(|mut sel| {
                     sel.makeup.clear();
                     sel.makeup
                 })
                 .unwrap_or_default();
 
-            for (b, _) in world.iterate_blocks(&range) {
-                makeup
-                    .entry(b.block_type())
-                    .and_modify(|count| *count += 1)
-                    .or_insert(1);
-            }
-
-            Self {
+            let mut sel = Self {
                 range,
                 progress,
                 makeup,
+            };
+
+            sel.update_makeup(world);
+
+            sel
+        }
+
+        fn on_world_change(&mut self, world: InnerWorldRef) {
+            self.update_makeup(&world);
+        }
+
+        fn update_makeup(&mut self, world: &InnerWorldRef) {
+            self.makeup.clear();
+            for (b, _) in world.iterate_blocks(&self.range) {
+                self.makeup
+                    .entry(b.block_type())
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
             }
         }
 
