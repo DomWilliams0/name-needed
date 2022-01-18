@@ -4,8 +4,9 @@ use crate::ecs::*;
 use crate::needs::FoodEatingError;
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits, Display};
+use num_traits::FromPrimitive;
 use std::convert::TryInto;
-use strum_macros::EnumDiscriminants;
+use strum::EnumDiscriminants;
 use unit::world::WorldPoint;
 use world::NavigationError;
 

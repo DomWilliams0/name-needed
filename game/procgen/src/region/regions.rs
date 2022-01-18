@@ -25,7 +25,7 @@ use std::hint::unreachable_unchecked;
 use std::ops::{Deref, DerefMut};
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use strum_macros::EnumDiscriminants;
+use strum::EnumDiscriminants;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParamsRef,

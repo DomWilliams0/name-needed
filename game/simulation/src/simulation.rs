@@ -2,7 +2,7 @@ use std::ops::{Add, Deref};
 
 use common::*;
 use resources::Resources;
-use strum_macros::EnumDiscriminants;
+use strum::EnumDiscriminants;
 use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};

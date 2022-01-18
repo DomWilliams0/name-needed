@@ -979,11 +979,11 @@ impl SelectionWindow {
             }
 
             if let Some(placement) = placement {
-                if let Some(bt) = BlockType::into_enum_iter().nth(self.edit_selection) {
+                if let Some(bt) = BlockType::iter().nth(self.edit_selection) {
                     context.issue_request(UiRequest::FillSelectedTiles(placement, bt));
                 } else {
                     // reset to a valid one
-                    debug_assert!(BlockType::into_enum_iter().count() > 0);
+                    debug_assert!(BlockType::iter().count() > 0);
                     self.edit_selection = 0;
                 }
             }
@@ -995,7 +995,7 @@ impl SelectionWindow {
             .horizontal_scrollbar(true)
             .movable(false)
             .build(context.ui(), || {
-                for (i, ty) in BlockType::into_enum_iter().enumerate() {
+                for (i, ty) in BlockType::iter().enumerate() {
                     if Selectable::new(ui_str!(in context, "{}", ty))
                         .selected(self.edit_selection == i)
                         .build(context)
