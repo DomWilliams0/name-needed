@@ -6,10 +6,13 @@
     * [ ] block selection can be added to with ctrl+drag
     * [ ] show selection dimensions in world
     * [ ] use left click for all selections, to allow right click context menu
-* [ ] ui for creating jobs for building many blocks
+* [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview
     * [ ] can specify thickness of wall
     * [ ] can shrink/expand selection by 1 block
 * [ ] extend material reservation to include the specific materials in transit for a build,
     to avoid others considering hauling more when it's already on the way
+* [ ] register builds in data
+* [ ] central registry of all builds including a unique identifier to refer to it in ui and its
+    requests

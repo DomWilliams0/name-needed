@@ -1,7 +1,10 @@
-use imgui::{im_str, StyleColor};
+use imgui::{im_str, ChildWindow, Selectable, StyleColor};
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::{AssociatedBlockData, ComponentWorld, PlayerSociety, Societies, SocietyHandle};
+use simulation::{
+    AssociatedBlockData, Build, ComponentWorld, PlayerSociety, Societies, SocietyHandle,
+    StoneBrickWall,
+};
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
@@ -10,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use simulation::job::SocietyCommand;
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct SocietyWindow;
+pub struct SocietyWindow {
+    build_selection: usize,
+}
 
 impl SocietyWindow {
     pub fn render(&mut self, context: &UiContext) {
@@ -51,7 +56,7 @@ impl SocietyWindow {
         self.do_jobs(context, society_handle);
     }
 
-    fn do_control(&self, context: &UiContext, society_handle: SocietyHandle) {
+    fn do_control(&mut self, context: &UiContext, society_handle: SocietyHandle) {
         let tab = context.new_tab(im_str!("Control"));
         if tab.is_open() {
             let mut any_buttons = false;
@@ -63,12 +68,44 @@ impl SocietyWindow {
             // break selected blocks
             if let Some(sel) = block_selection {
                 any_buttons = true;
-                if context.button(im_str!("Break blocks"), [0.0, 0.0]) {
+                if context.button(
+                    ui_str!(in context, "Break {} blocks", sel.range().count()),
+                    [0.0, 0.0],
+                ) {
                     context.issue_request(UiRequest::IssueSocietyCommand(
                         society_handle,
                         SocietyCommand::BreakBlocks(sel.range().clone()),
                     ));
                 }
+
+                if context.button(im_str!("Build"), [0.0, 0.0]) {
+                    // TODO handle failure better?
+                    if let Some(above) = sel.range().above() {
+                        context.issue_request(UiRequest::IssueSocietyCommand(
+                            society_handle,
+                            SocietyCommand::Build(above),
+                        ));
+                    }
+                }
+
+                context.same_line_with_spacing(0.0, 40.0);
+
+                ChildWindow::new("##buildsocietyblocks")
+                    .size([0.0, 50.0])
+                    .horizontal_scrollbar(true)
+                    .movable(false)
+                    .build(context.ui(), || {
+                        // TODO temporary hardcoded list of builds
+                        let builds = [&StoneBrickWall as &dyn Build];
+                        for (i, build) in builds.iter().enumerate() {
+                            if Selectable::new(ui_str!(in context, "{}", build))
+                                .selected(self.build_selection == i)
+                                .build(context)
+                            {
+                                self.build_selection = i;
+                            }
+                        }
+                    });
             }
 
             // entity selection and block selection

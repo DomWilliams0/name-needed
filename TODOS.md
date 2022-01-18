@@ -1,4 +1,4 @@
-# TODOs (403)
+# TODOs (405)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -330,8 +330,10 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (3)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
+   * `// TODO specify which build`
+   * `// TODO use actual job provided`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
@@ -503,7 +505,8 @@
    * `// TODO use the arena for this`
    * `// TODO other job tabs`
    * `// TODO proper way of checking if an entity is living`
- * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (4)
+   * `// TODO handle failure better?`
    * `// TODO temporary hardcoded list of builds`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
@@ -536,8 +539,6 @@
    * `// TODO helper for this-1`
  * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
    * `// TODO pub mod hunger;`
- * [shared/unit/src/world/range.rs](shared/unit/src/world/range.rs) (1)
-   * `/// TODO cache this?`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)

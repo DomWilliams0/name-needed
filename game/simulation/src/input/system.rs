@@ -306,7 +306,7 @@ mod selected_tiles {
 
         fn update_makeup(&mut self, world: &InnerWorldRef) {
             self.makeup.clear();
-            for (b, _) in world.iterate_blocks(&self.range) {
+            for (b, _) in world.iterate_blocks(self.range.clone()) {
                 self.makeup
                     .entry(b.block_type())
                     .and_modify(|count| *count += 1)

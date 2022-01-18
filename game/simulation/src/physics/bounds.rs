@@ -115,7 +115,7 @@ impl BoundsOverlap {
 impl BoundsCheck for World {
     fn all(&self, range: &WorldPositionRange) -> Option<BlockOpacity> {
         let mut opacities = self
-            .iterate_blocks(range)
+            .iterate_blocks(range.clone())
             .map(|(block, _)| block.block_type().opacity());
 
         opacities.next().and_then(|opacity| {
@@ -130,13 +130,16 @@ impl BoundsCheck for World {
     }
 
     fn find_solids(&self, range: &WorldPositionRange, out: &mut Vec<WorldPosition>) {
-        out.extend(self.iterate_blocks(range).filter_map(|(block, pos)| {
-            if block.opacity().solid() {
-                Some(pos)
-            } else {
-                None
-            }
-        }));
+        out.extend(
+            self.iterate_blocks(range.clone())
+                .filter_map(|(block, pos)| {
+                    if block.opacity().solid() {
+                        Some(pos)
+                    } else {
+                        None
+                    }
+                }),
+        );
     }
 }
 

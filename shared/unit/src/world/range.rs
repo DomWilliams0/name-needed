@@ -4,6 +4,7 @@ use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
     WorldPosition,
 };
+use common::Itertools;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
 
@@ -91,7 +92,6 @@ impl<P: RangePosition> WorldRange<P> {
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
-    /// TODO cache this?
     #[allow(clippy::type_complexity)]
     pub fn ranges(&self) -> ((P::XY, P::XY), (P::XY, P::XY), (P::Z, P::Z)) {
         let (from, to) = match self {
@@ -285,6 +285,16 @@ impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
             (WorldRange::Range(a0, a1), WorldRange::Range(b0, b1)) => a0 == b0 && a1 == b1,
             _ => false,
         }
+    }
+}
+
+impl WorldRange<WorldPosition> {
+    pub fn iter_blocks(self) -> impl Iterator<Item = WorldPosition> {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+        (az..=bz)
+            .cartesian_product(ay..=by)
+            .cartesian_product(ax..=bx)
+            .map(move |((z, y), x)| (x, y, z).into())
     }
 }
 

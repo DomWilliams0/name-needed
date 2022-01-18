@@ -1,11 +1,12 @@
 // these will be defined in data at some point
 
 use crate::build::material::BuildMaterial;
-use std::fmt::Debug;
+use common::Display;
+use std::fmt;
 use std::num::NonZeroU16;
 use world::block::BlockType;
 
-pub trait Build: Debug {
+pub trait Build: fmt::Debug + fmt::Display {
     /// Target block
     fn output(&self) -> BlockType;
 
@@ -18,7 +19,8 @@ pub trait Build: Debug {
 
 // -------
 
-#[derive(Debug)]
+/// Stone brick wall
+#[derive(Debug, Display)]
 pub struct StoneBrickWall;
 
 impl Build for StoneBrickWall {

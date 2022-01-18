@@ -607,15 +607,13 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    pub fn iterate_blocks<'a>(
-        &'a self,
-        range: &WorldPositionRange,
-    ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
-        let ((ax, bx), (ay, by), (az, bz)) = range.ranges();
-        (az..=bz)
-            .cartesian_product(ay..=by)
-            .cartesian_product(ax..=bx)
-            .map(move |((z, y), x)| (self.block((x, y, z)), (x, y, z).into()))
+    pub fn iterate_blocks(
+        &self,
+        range: WorldPositionRange,
+    ) -> impl Iterator<Item = (Block, WorldPosition)> + '_ {
+        range
+            .iter_blocks()
+            .map(move |pos| (self.block(pos), pos))
             .filter_map(move |(block, pos)| block.map(|b| (b, pos)))
     }
 
@@ -626,7 +624,7 @@ impl<C: WorldContext> World<C> {
     ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
         // TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups
 
-        self.iterate_blocks(range)
+        self.iterate_blocks(range.clone())
             .filter(move |(block, pos)| f(*block, pos))
     }
 
