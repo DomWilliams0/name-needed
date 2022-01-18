@@ -4,17 +4,17 @@ use crate::definitions::loader::step1_deserialization::{
 use crate::definitions::loader::step2_preprocessing::preprocess;
 use crate::definitions::loader::step3_construction::{instantiate, Definition};
 use crate::definitions::loader::template_lookup::TemplateLookup;
-use crate::definitions::registry::RegistryBuilder;
-use crate::definitions::{DefinitionError, DefinitionErrors, Registry};
+use crate::definitions::registry::DefinitionRegistryBuilder;
+use crate::definitions::{DefinitionError, DefinitionErrors, DefinitionRegistry};
 
-pub fn load(resources: resources::Definitions) -> Result<Registry, DefinitionErrors> {
+pub fn load(resources: resources::Definitions) -> Result<DefinitionRegistry, DefinitionErrors> {
     let defs = load_and_preprocess_with(|| collect_raw_definitions(resources))?;
     let instantiated = instantiate(defs, &TemplateLookup::init())?;
     build_registry(instantiated)
 }
 
 #[cfg(test)]
-pub fn load_from_str(definitions: &str) -> Result<Registry, DefinitionErrors> {
+pub fn load_from_str(definitions: &str) -> Result<DefinitionRegistry, DefinitionErrors> {
     let defs = preprocess_from_str(definitions)?;
     let instantiated = instantiate(defs, &TemplateLookup::init())?;
     build_registry(instantiated)
@@ -58,10 +58,10 @@ pub fn load_and_preprocess_with<
 
 pub fn build_registry(
     defs: Vec<(DefinitionUid, Definition)>,
-) -> Result<Registry, DefinitionErrors> {
+) -> Result<DefinitionRegistry, DefinitionErrors> {
     let mut errors = Vec::new();
 
-    let mut registry = RegistryBuilder::new();
+    let mut registry = DefinitionRegistryBuilder::new();
     for (uid, definition) in defs {
         if let Err((def, err)) = registry.register(uid, definition) {
             errors.push(def.make_error(err));

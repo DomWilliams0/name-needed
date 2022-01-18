@@ -7,19 +7,13 @@ use crate::ComponentWorld;
 use common::*;
 use std::collections::HashMap;
 
-pub struct Registry {
-    map: HashMap<String, Definition>,
-}
+pub struct DefinitionRegistry(HashMap<String, Definition>);
 
-pub struct RegistryBuilder {
-    map: HashMap<String, Definition>,
-}
+pub struct DefinitionRegistryBuilder(HashMap<String, Definition>);
 
-impl RegistryBuilder {
+impl DefinitionRegistryBuilder {
     pub fn new() -> Self {
-        Self {
-            map: HashMap::with_capacity(512),
-        }
+        Self(HashMap::with_capacity(512))
     }
 
     pub fn register(
@@ -28,37 +22,37 @@ impl RegistryBuilder {
         definition: Definition,
     ) -> Result<(), (Definition, DefinitionErrorKind)> {
         #[allow(clippy::map_entry)]
-        if self.map.contains_key(&uid) {
+        if self.0.contains_key(&uid) {
             Err((definition, DefinitionErrorKind::AlreadyRegistered(uid)))
         } else {
-            self.map.insert(uid, definition);
+            self.0.insert(uid, definition);
             Ok(())
         }
     }
 
-    pub fn build(self) -> Registry {
+    pub fn build(self) -> DefinitionRegistry {
         info!(
             "creating definition registry with {count} entries",
-            count = self.map.len()
+            count = self.0.len()
         );
-        Registry { map: self.map }
+        DefinitionRegistry(self.0)
     }
 }
 
-impl Registry {
+impl DefinitionRegistry {
     pub fn instantiate<'s, 'w: 's, W: ComponentWorld>(
         &'s self,
         uid: &str,
         world: &'w W,
     ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
-        match self.map.get(uid) {
+        match self.0.get(uid) {
             Some(def) => Ok(DefinitionBuilder::new(def, world, uid)),
             None => Err(DefinitionErrorKind::NoSuchDefinition(uid.to_owned())),
         }
     }
 
     pub fn lookup_template(&self, uid: &str, component: &str) -> Option<&dyn Any> {
-        self.map
+        self.0
             .get(uid)
             .and_then(|def| def.find_component(component))
     }
@@ -69,7 +63,7 @@ mod tests {
 
     #[test]
     fn duplicates() {
-        let mut reg = RegistryBuilder::new();
+        let mut reg = DefinitionRegistryBuilder::new();
 
         assert!(reg.register("nice".to_owned(), Definition::dummy()).is_ok());
         assert!(reg

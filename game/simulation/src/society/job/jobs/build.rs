@@ -1,7 +1,7 @@
 use crate::build::{
     Build, BuildMaterial, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
 };
-use crate::definitions::{DefinitionNameComponent, Registry};
+use crate::definitions::{DefinitionNameComponent, DefinitionRegistry};
 use crate::ecs::{EcsWorld, Join, WorldExt};
 use crate::item::HaulableItemComponent;
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
@@ -289,7 +289,7 @@ impl SocietyJobImpl for BuildThingJob {
         //  maybe that should be at a higher level than this
 
         // preprocess materials to get hands needed for hauling
-        let definitions = world.resource::<Registry>();
+        let definitions = world.resource::<DefinitionRegistry>();
         for mat in self.required_materials.iter() {
             let hands = match definitions.lookup_template(mat.definition(), "haulable") {
                 Some(any) => {

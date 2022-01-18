@@ -8,12 +8,12 @@ use common::*;
 
 use crate::event::{DeathReason, EntityEvent, EntityEventQueue};
 
-use crate::definitions::{DefinitionBuilder, DefinitionErrorKind};
+use crate::definitions::{DefinitionBuilder, DefinitionErrorKind, DefinitionRegistry};
 use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::item::{ContainerComponent, ContainerResolver};
 
-use crate::{definitions, Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
+use crate::{Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
 
 use specs::prelude::Resource;
 use specs::world::EntitiesRes;
@@ -338,7 +338,7 @@ impl ComponentWorld for EcsWorld {
         &self,
         definition_uid: &str,
     ) -> Result<DefinitionBuilder<Self>, DefinitionErrorKind> {
-        let definitions = self.resource::<definitions::Registry>();
+        let definitions = self.resource::<DefinitionRegistry>();
         definitions.instantiate(&*definition_uid, self)
     }
 
