@@ -14,9 +14,8 @@ use crate::definitions::loader::step2_preprocessing::ProcessedComponents;
 use crate::definitions::{DefinitionError, DefinitionErrorKind};
 use crate::ecs;
 use crate::ecs::ComponentBuildError;
-use serde::de::Error;
 
-pub type DefinitionUid = String;
+use serde::de::Error;
 
 /// Parent hierarchy is unprocessed
 #[derive(Debug, Deserialize)]
@@ -124,7 +123,7 @@ impl DeserializedDefinition {
             .map_err(|e| DefinitionError(source.clone(), DefinitionErrorKind::Format(e)))
     }
 
-    pub fn into_inner(self) -> (DefinitionUid, DefinitionSource, ProcessedComponents) {
+    pub fn into_inner(self) -> (String, DefinitionSource, ProcessedComponents) {
         (
             self.uid,
             self.source,

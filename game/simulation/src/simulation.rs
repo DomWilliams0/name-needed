@@ -37,6 +37,7 @@ use crate::scripting::ScriptingContext;
 use crate::society::{NameGeneration, PlayerSociety};
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::string::StringCache;
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
     definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
@@ -110,10 +111,12 @@ impl world::WorldContext for WorldContext {
 impl<R: Renderer> Simulation<R> {
     /// world_loader should have had some slabs requested
     pub fn new(world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
+        let string_cache = StringCache::default();
+
         // load entity definitions from file system
         let definitions = {
             let def_root = resources.definitions()?;
-            definitions::load(def_root)?
+            definitions::load(def_root, &string_cache)?
         };
 
         let voxel_world = world_loader.world();
@@ -122,6 +125,7 @@ impl<R: Renderer> Simulation<R> {
         let mut ecs_world = EcsWorld::new();
         ecs_world.insert(voxel_world.clone());
         ecs_world.insert(definitions);
+        ecs_world.insert(string_cache);
         register_resources(&mut ecs_world, resources)?;
 
         // get a self referential ecs world resource pointing to itself

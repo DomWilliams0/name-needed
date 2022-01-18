@@ -33,7 +33,7 @@ impl Build for StoneBrickWall {
     }
 
     fn materials(&self, materials_out: &mut Vec<BuildMaterial>) {
-        materials_out.push(BuildMaterial::new(
+        materials_out.push(BuildMaterial::new_str(
             "core_brick_stone",
             NonZeroU16::new(6).unwrap(),
         ))

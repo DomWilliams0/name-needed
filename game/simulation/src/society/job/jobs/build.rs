@@ -13,6 +13,7 @@ use crate::{
 use common::*;
 use specs::BitSet;
 
+use crate::string::{CachedStr, CachedStringHasher};
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;
 
@@ -31,13 +32,13 @@ pub struct BuildThingJob {
     reserved_materials: HashSet<Entity>,
 
     /// Cache of extra hands needed for hauling each material
-    hands_needed: HashMap<&'static str, u16>,
+    hands_needed: HashMap<CachedStr, u16, CachedStringHasher>,
 
     /// Steps completed so far
     progress: u32,
 
     /// Gross temporary way of tracking remaining materials
-    materials_remaining: HashMap<&'static str, NonZeroU16>,
+    materials_remaining: HashMap<CachedStr, NonZeroU16, CachedStringHasher>,
 
     /// Set if any material types are invalid e.g. not haulable
     missing_any_requirements: bool,
@@ -72,7 +73,7 @@ pub enum BuildThingError {
     MissingDefinition(Entity),
 
     #[error("Material '{0}' is not required")]
-    MaterialNotRequired(String),
+    MaterialNotRequired(CachedStr),
 }
 
 pub enum MaterialReservation {
@@ -92,9 +93,9 @@ impl BuildThingJob {
             build: Box::new(build),
             progress: 0,
             required_materials: materials,
-            hands_needed: HashMap::with_capacity(count),
+            hands_needed: HashMap::with_capacity_and_hasher(count, CachedStringHasher::default()),
             reserved_materials: HashSet::new(),
-            materials_remaining: HashMap::new(), // replaced on each call
+            materials_remaining: HashMap::with_hasher(CachedStringHasher::default()), // replaced on each call
             missing_any_requirements: false,
             this_job: None,
             ui_element: None,
@@ -102,7 +103,10 @@ impl BuildThingJob {
     }
 
     // TODO fewer temporary allocations
-    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, NonZeroU16> {
+    fn check_materials(
+        &mut self,
+        world: &EcsWorld,
+    ) -> HashMap<CachedStr, NonZeroU16, CachedStringHasher> {
         let this_job = self.this_job.unwrap(); // set before this is called
 
         let job_pos = self.position.centred();
@@ -158,7 +162,7 @@ impl BuildThingJob {
         let stacks = world.read_storage::<ItemStackComponent>();
         for (e, def, stack_opt) in (&reservations_bitset, &def_names, stacks.maybe()).join() {
             let entry = remaining_materials
-                .get_mut(def.0.as_str())
+                .get_mut(&def.0)
                 .unwrap_or_else(|| panic!("invalid reservation {:?}", def.0));
             // TODO ensure this doesn't happen, or just handle it properly
 
@@ -195,8 +199,8 @@ impl BuildThingJob {
 
         let n_required_ref = self
             .materials_remaining
-            .get_mut(def.0.as_str())
-            .ok_or_else(|| BuildThingError::MaterialNotRequired(def.0.clone()))?;
+            .get_mut(&def.0)
+            .ok_or(BuildThingError::MaterialNotRequired(def.0))?;
         let n_required = n_required_ref.get();
 
         let n_actual = {
@@ -230,7 +234,7 @@ impl BuildThingJob {
                 n.get()
             }
             None => {
-                self.materials_remaining.remove(def.0.as_str());
+                self.materials_remaining.remove(&def.0);
                 0
             }
         };
@@ -312,7 +316,7 @@ impl SocietyJobImpl for BuildThingJob {
 
         // gather materials first
         out.extend(self.required_materials.iter().cloned().flat_map(|mat| {
-            let extra_hands = *self.hands_needed.get(mat.definition()).unwrap(); // just inserted
+            let extra_hands = *self.hands_needed.get(&mat.definition()).unwrap(); // just inserted
 
             Some(SocietyTask::GatherMaterials {
                 target: self.position,
@@ -355,7 +359,7 @@ impl SocietyJobImpl for BuildThingJob {
         tasks.clear();
         let this_job = self.this_job.unwrap(); // set unconditionally
         for (def, count) in outstanding_requirements.iter() {
-            let extra_hands = *self.hands_needed.get(*def).unwrap(); // already inserted
+            let extra_hands = *self.hands_needed.get(def).unwrap(); // already inserted
 
             let task = SocietyTask::GatherMaterials {
                 target: self.position,

@@ -3,6 +3,7 @@ use unit::world::WorldPosition;
 use crate::definitions::loader::Definition;
 use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
+use crate::string::{CachedStr, StringCache};
 use crate::{ComponentWorld, InnerWorldRef, TransformComponent};
 use common::*;
 
@@ -27,20 +28,24 @@ pub enum BuilderError {
 pub struct DefinitionBuilder<'d, W: ComponentWorld> {
     definition: &'d Definition,
     /// Unnecessary when the temporary DefinitionNameComponent is removed
-    uid: String,
+    uid: CachedStr,
     world: &'d W,
 
     position: Option<Box<dyn EntityPosition>>,
 }
 
 impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
-    pub fn new(definition: &'d Definition, world: &'d W, uid: &str) -> Self {
+    pub fn new_with_cached(definition: &'d Definition, world: &'d W, uid: CachedStr) -> Self {
         Self {
             definition,
             world,
-            uid: uid.to_owned(),
+            uid,
             position: None,
         }
+    }
+
+    pub fn new(definition: &'d Definition, world: &'d W, uid: &str) -> Self {
+        Self::new_with_cached(definition, world, world.resource::<StringCache>().get(uid))
     }
 
     pub fn with_position<P: EntityPosition + 'static>(mut self, pos: P) -> Self {

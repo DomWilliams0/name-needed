@@ -1,5 +1,5 @@
 pub use load::load;
-pub use step1_deserialization::{DefinitionSource, DefinitionUid};
+pub use step1_deserialization::DefinitionSource;
 pub use step3_construction::Definition;
 
 pub type ValueImpl = ron::Value;

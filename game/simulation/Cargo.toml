@@ -32,6 +32,7 @@ rbl_circular_buffer = "0.1"
 futures = "0.3"
 cooked-waker = "5.0"
 async-trait = "0.1"
+ustr = "0.8"
 
 ron = "0.6"
 serde = "1.0"

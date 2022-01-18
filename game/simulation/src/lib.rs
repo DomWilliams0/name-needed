@@ -114,5 +114,6 @@ mod simulation;
 mod society;
 mod spatial;
 mod steer;
+mod string;
 mod transform;
 mod world_debug;

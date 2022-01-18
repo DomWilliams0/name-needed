@@ -2,28 +2,34 @@ use crate::definitions::builder::DefinitionBuilder;
 use crate::definitions::{Definition, DefinitionErrorKind};
 use std::any::Any;
 
-use crate::definitions::loader::DefinitionUid;
+use crate::string::{CachedStr, CachedStringHasher, StringCache};
 use crate::ComponentWorld;
 use common::*;
 use std::collections::HashMap;
 
-pub struct DefinitionRegistry(HashMap<String, Definition>);
+pub struct DefinitionRegistry(HashMap<CachedStr, Definition, CachedStringHasher>);
 
-pub struct DefinitionRegistryBuilder(HashMap<String, Definition>);
+pub struct DefinitionRegistryBuilder(HashMap<CachedStr, Definition, CachedStringHasher>);
 
 impl DefinitionRegistryBuilder {
     pub fn new() -> Self {
-        Self(HashMap::with_capacity(512))
+        Self(HashMap::with_capacity_and_hasher(
+            512,
+            CachedStringHasher::default(),
+        ))
     }
 
     pub fn register(
         &mut self,
-        uid: DefinitionUid,
+        uid: CachedStr,
         definition: Definition,
     ) -> Result<(), (Definition, DefinitionErrorKind)> {
         #[allow(clippy::map_entry)]
         if self.0.contains_key(&uid) {
-            Err((definition, DefinitionErrorKind::AlreadyRegistered(uid)))
+            Err((
+                definition,
+                DefinitionErrorKind::AlreadyRegistered(uid.as_ref().to_owned()),
+            ))
         } else {
             self.0.insert(uid, definition);
             Ok(())
@@ -45,15 +51,18 @@ impl DefinitionRegistry {
         uid: &str,
         world: &'w W,
     ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
-        match self.0.get(uid) {
-            Some(def) => Ok(DefinitionBuilder::new(def, world, uid)),
-            None => Err(DefinitionErrorKind::NoSuchDefinition(uid.to_owned())),
+        let uid = world.resource::<StringCache>().get(uid);
+        match self.0.get(&uid) {
+            Some(def) => Ok(DefinitionBuilder::new_with_cached(def, world, uid)),
+            None => Err(DefinitionErrorKind::NoSuchDefinition(
+                uid.as_ref().to_owned(),
+            )),
         }
     }
 
-    pub fn lookup_template(&self, uid: &str, component: &str) -> Option<&dyn Any> {
+    pub fn lookup_template(&self, uid: CachedStr, component: &str) -> Option<&dyn Any> {
         self.0
-            .get(uid)
+            .get(&uid)
             .and_then(|def| def.find_component(component))
     }
 }
@@ -64,13 +73,8 @@ mod tests {
     #[test]
     fn duplicates() {
         let mut reg = DefinitionRegistryBuilder::new();
-
-        assert!(reg.register("nice".to_owned(), Definition::dummy()).is_ok());
-        assert!(reg
-            .register("nice".to_owned(), Definition::dummy())
-            .is_err()); // duplicate
-        assert!(reg
-            .register("nice2".to_owned(), Definition::dummy())
-            .is_ok());
+        assert!(reg.register("nice".into(), Definition::dummy()).is_ok());
+        assert!(reg.register("nice".into(), Definition::dummy()).is_err()); // duplicate
+        assert!(reg.register("nice2".into(), Definition::dummy()).is_ok());
     }
 }

@@ -1,4 +1,4 @@
-# TODOs (405)
+# TODOs (409)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -188,8 +188,9 @@
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/builds.rs](game/simulation/src/build/builds.rs) (1)
    * `// TODO can this somehow return an iterator of build materials?`
- * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
+ * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (2)
    * `// TODO flexible list of reqs based on components`
+   * `// TODO remove this`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
    * `// TODO consume materials incrementally as progress is made`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
@@ -200,6 +201,8 @@
    * `// TODO remove abstract definitions`
  * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)
    * `// TODO consider using `nested` vecs as an optimization`
+ * [game/simulation/src/definitions/loader/step3_construction.rs](game/simulation/src/definitions/loader/step3_construction.rs) (1)
+   * `// TODO CachedStr for component names`
  * [game/simulation/src/definitions/mod.rs](game/simulation/src/definitions/mod.rs) (1)
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (3)
@@ -378,6 +381,9 @@
    * `// TODO show actual steering direction alongside velocity`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
+ * [game/simulation/src/string.rs](game/simulation/src/string.rs) (2)
+   * `// TODO remove this`
+   * `// TODO report panic when cache is empty`
  * [game/world/src/block.rs](game/world/src/block.rs) (5)
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`

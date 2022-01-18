@@ -1,37 +1,40 @@
 use common::*;
 use std::any::Any;
 
-use crate::definitions::loader::step1_deserialization::{
-    DefinitionSource, DefinitionUid, DeserializedDefinition,
-};
+use crate::definitions::loader::step1_deserialization::{DefinitionSource, DeserializedDefinition};
 use crate::definitions::loader::step2_preprocessing::ComponentFields;
 use crate::definitions::loader::template_lookup::TemplateLookup;
 use crate::definitions::{DefinitionError, DefinitionErrorKind, DefinitionErrors, ValueImpl};
 use crate::ecs;
 use crate::ecs::ComponentTemplate;
+use crate::string::{CachedStr, StringCache};
 
 #[derive(Debug)]
 pub struct Definition {
     source: DefinitionSource,
+    // TODO CachedStr for component names
     components: Vec<(String, Box<dyn ecs::ComponentTemplate<ValueImpl>>)>,
 }
 
 pub fn instantiate(
     defs: Vec<DeserializedDefinition>,
     templates: &TemplateLookup,
-) -> Result<Vec<(DefinitionUid, Definition)>, DefinitionErrors> {
+    string_cache: &StringCache,
+) -> Result<Vec<(CachedStr, Definition)>, DefinitionErrors> {
     let mut errors = Vec::new();
 
     // instantiate components
     let instantiated = defs
         .into_iter()
-        .filter_map(|def| match Definition::construct(def, templates) {
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-            Ok(d) => Some(d),
-        })
+        .filter_map(
+            |def| match Definition::construct(def, templates, &string_cache) {
+                Err(e) => {
+                    errors.push(e);
+                    None
+                }
+                Ok(d) => Some(d),
+            },
+        )
         .collect();
 
     if !errors.is_empty() {
@@ -62,7 +65,8 @@ impl Definition {
     fn construct(
         deserialized: DeserializedDefinition,
         templates: &TemplateLookup,
-    ) -> Result<(DefinitionUid, Definition), DefinitionError> {
+        string_cache: &StringCache,
+    ) -> Result<(CachedStr, Definition), DefinitionError> {
         let (uid, source, components) = deserialized.into_inner();
 
         let do_construct = || {
@@ -91,7 +95,9 @@ impl Definition {
         };
 
         match do_construct() {
-            Ok((uid, components)) => Ok((uid, Definition { source, components })),
+            Ok((uid, components)) => {
+                Ok((string_cache.get(&uid), Definition { source, components }))
+            }
             Err(e) => Err(DefinitionError(source, e)),
         }
     }
