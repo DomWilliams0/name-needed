@@ -1,6 +1,7 @@
 use std::hint::unreachable_unchecked;
 use std::iter::repeat_with;
 use std::ops::{Deref, DerefMut, Range};
+use std::rc::Rc;
 
 use common::*;
 use unit::space::length::Length3;
@@ -12,6 +13,7 @@ use crate::SocietyHandle;
 use crate::item::inventory::equip::EquipSlot;
 use crate::item::inventory::{Container, HeldEntity};
 use crate::item::{ItemFilter, ItemFilterable};
+use crate::string::StringCache;
 
 /// Temporary dumb component to hold equip slots and containers. Will eventually be a view on top of
 /// the physical body tree
@@ -665,12 +667,15 @@ impl ContainerComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for InventoryComponentTemplate {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let equip_slots = values.get_int("equip_slots")?;
-        Ok(Box::new(Self { equip_slots }))
+        Ok(Rc::new(Self { equip_slots }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
@@ -689,14 +694,17 @@ struct SizeLimit {
 }
 
 impl<V: Value> ComponentTemplate<V> for ContainerComponentTemplate {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let volume: u16 = values.get_int("volume")?;
         let size: SizeLimit = values.get("size")?.into_type()?;
 
-        Ok(Box::new(ContainerComponentTemplate {
+        Ok(Rc::new(ContainerComponentTemplate {
             volume: Volume::new(volume),
             size: Length3::new(size.x, size.y, size.z),
         }))

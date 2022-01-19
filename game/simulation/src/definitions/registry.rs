@@ -1,6 +1,5 @@
 use crate::definitions::builder::DefinitionBuilder;
 use crate::definitions::{Definition, DefinitionErrorKind};
-use std::any::Any;
 
 use crate::string::{CachedStr, CachedStringHasher, StringCache};
 use crate::ComponentWorld;
@@ -60,10 +59,23 @@ impl DefinitionRegistry {
         }
     }
 
-    pub fn lookup_template(&self, uid: CachedStr, component: &str) -> Option<&dyn Any> {
-        self.0
-            .get(&uid)
-            .and_then(|def| def.find_component(component))
+    pub fn lookup_definition(&self, uid: CachedStr) -> Option<&Definition> {
+        self.0.get(&uid)
+    }
+
+    pub fn iter_templates<T: 'static>(
+        &self,
+        component: &'static str,
+    ) -> impl Iterator<Item = CachedStr> + '_ {
+        self.0.iter().filter_map(move |(name, def)| {
+            def.find_component(component).and_then(|template| {
+                if template.is::<T>() {
+                    Some(*name)
+                } else {
+                    None
+                }
+            })
+        })
     }
 }
 #[cfg(test)]

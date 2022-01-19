@@ -1,4 +1,4 @@
-# TODOs (409)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -186,11 +186,8 @@
    * `// TODO dont return a new vec of boxes, have some dignity`
    * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
- * [game/simulation/src/build/builds.rs](game/simulation/src/build/builds.rs) (1)
-   * `// TODO can this somehow return an iterator of build materials?`
- * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (2)
+ * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
-   * `// TODO remove this`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
    * `// TODO consume materials incrementally as progress is made`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
@@ -333,10 +330,8 @@
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
- * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (3)
+ * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
-   * `// TODO specify which build`
-   * `// TODO use actual job provided`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
@@ -381,8 +376,7 @@
    * `// TODO show actual steering direction alongside velocity`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
- * [game/simulation/src/string.rs](game/simulation/src/string.rs) (2)
-   * `// TODO remove this`
+ * [game/simulation/src/string.rs](game/simulation/src/string.rs) (1)
    * `// TODO report panic when cache is empty`
  * [game/world/src/block.rs](game/world/src/block.rs) (5)
    * `// TODO store sparse block data in the slab instead of inline in the block`
@@ -511,9 +505,8 @@
    * `// TODO use the arena for this`
    * `// TODO other job tabs`
    * `// TODO proper way of checking if an entity is living`
- * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (4)
+ * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
    * `// TODO handle failure better?`
-   * `// TODO temporary hardcoded list of builds`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (5)

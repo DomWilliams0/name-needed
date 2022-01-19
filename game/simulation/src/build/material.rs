@@ -1,8 +1,9 @@
-use crate::ecs::*;
-use crate::job::SocietyJobHandle;
-use crate::string::{CachedStr, StringCache};
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU16;
+
+use crate::ecs::*;
+use crate::job::SocietyJobHandle;
+use crate::string::CachedStr;
 
 #[derive(Hash, Clone, Eq, PartialEq)]
 pub struct BuildMaterial {
@@ -32,15 +33,6 @@ impl BuildMaterial {
     pub fn new(definition_name: CachedStr, quantity: NonZeroU16) -> Self {
         Self {
             definition_name,
-            quantity,
-        }
-    }
-
-    // TODO remove this
-    #[deprecated]
-    pub fn new_str(definition_name: &str, quantity: NonZeroU16) -> Self {
-        Self {
-            definition_name: StringCache::get_temporary(definition_name),
             quantity,
         }
     }

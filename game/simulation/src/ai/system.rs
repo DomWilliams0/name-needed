@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::iter::once;
+use std::rc::Rc;
 
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
@@ -17,6 +18,7 @@ use crate::{EntityLoggingComponent, TransformComponent};
 
 use crate::alloc::FrameAllocator;
 use crate::job::JobIndex;
+use crate::string::StringCache;
 use crate::{dse, Societies};
 
 #[derive(Component, EcsComponent)]
@@ -287,7 +289,10 @@ pub struct IntelligenceComponentTemplate {
 }
 
 impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
@@ -303,7 +308,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
             }
         };
 
-        Ok(Box::new(Self { species }))
+        Ok(Rc::new(Self { species }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

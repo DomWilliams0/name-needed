@@ -13,6 +13,9 @@
     * [ ] can shrink/expand selection by 1 block
 * [ ] extend material reservation to include the specific materials in transit for a build,
     to avoid others considering hauling more when it's already on the way
-* [ ] register builds in data
+* [o] register builds in data
+    * [ ] validate build material definition exists?
+    * [X] cache build templates intead of iterating all each time
+* [ ] used cache strings for component names too
 * [ ] central registry of all builds including a unique identifier to refer to it in ui and its
     requests

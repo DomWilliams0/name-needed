@@ -1,5 +1,7 @@
-use common::*;
 use std::any::Any;
+use std::rc::Rc;
+
+use common::*;
 
 use crate::definitions::loader::step1_deserialization::{DefinitionSource, DeserializedDefinition};
 use crate::definitions::loader::step2_preprocessing::ComponentFields;
@@ -13,7 +15,7 @@ use crate::string::{CachedStr, StringCache};
 pub struct Definition {
     source: DefinitionSource,
     // TODO CachedStr for component names
-    components: Vec<(String, Box<dyn ecs::ComponentTemplate<ValueImpl>>)>,
+    components: Vec<(String, Rc<dyn ecs::ComponentTemplate<ValueImpl>>)>,
 }
 
 pub fn instantiate(
@@ -27,7 +29,7 @@ pub fn instantiate(
     let instantiated = defs
         .into_iter()
         .filter_map(
-            |def| match Definition::construct(def, templates, &string_cache) {
+            |def| match Definition::construct(def, templates, string_cache) {
                 Err(e) => {
                     errors.push(e);
                     None
@@ -58,6 +60,18 @@ impl Definition {
         })
     }
 
+    pub fn find_component_ref<T: 'static>(&self, name: &str) -> Option<Rc<T>> {
+        self.components.iter().find_map(|(comp, template)| {
+            if name == comp && template.as_any().is::<T>() {
+                let rc = template.clone();
+                // safety: type has been checked
+                Some(unsafe { Rc::from_raw(Rc::into_raw(rc) as _) })
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn source(&self) -> DefinitionSource {
         self.source.clone()
     }
@@ -79,7 +93,8 @@ impl Definition {
                     ComponentFields::Negate => unimplemented!(),
                 };
 
-                let component_template = templates.construct(key.as_str(), &mut map)?;
+                let component_template =
+                    templates.construct(key.as_str(), &mut map, string_cache)?;
 
                 for leftover in map.keys() {
                     warn!(

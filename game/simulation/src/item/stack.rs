@@ -715,8 +715,6 @@ mod tests {
 
     #[test]
     fn homogeneity() {
-        let world = TestWorld::default();
-
         let mut odd_stack = TestStack::new(1, 10);
         assert!(matches!(
             odd_stack.add(2),

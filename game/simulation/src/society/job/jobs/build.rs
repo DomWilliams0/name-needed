@@ -1,5 +1,13 @@
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU16;
+use std::rc::Rc;
+
+use specs::BitSet;
+
+use common::*;
+
 use crate::build::{
-    Build, BuildMaterial, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
+    BuildMaterial, BuildTemplate, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
 };
 use crate::definitions::{DefinitionNameComponent, DefinitionRegistry};
 use crate::ecs::{EcsWorld, Join, WorldExt};
@@ -7,15 +15,10 @@ use crate::item::HaulableItemComponent;
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::{SocietyJobHandle, SocietyTask};
+use crate::string::{CachedStr, CachedStringHasher};
 use crate::{
     BlockType, ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition,
 };
-use common::*;
-use specs::BitSet;
-
-use crate::string::{CachedStr, CachedStringHasher};
-use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU16;
 
 // TODO build requirement engine for generic material combining
 //      each job owns an instance, lends it to UI for rendering
@@ -27,7 +30,7 @@ use std::num::NonZeroU16;
 pub struct BuildThingJob {
     // TODO support builds spanning multiple blocks/range
     position: WorldPosition,
-    build: Box<dyn Build>,
+    build: Rc<BuildTemplate>,
     required_materials: Vec<BuildMaterial>,
     reserved_materials: HashSet<Entity>,
 
@@ -84,15 +87,14 @@ pub enum MaterialReservation {
 }
 
 impl BuildThingJob {
-    pub fn new(block: WorldPosition, build: impl Build + 'static) -> Self {
-        let mut materials = Vec::new();
-        build.materials(&mut materials);
-        let count = materials.len();
+    pub fn new(block: WorldPosition, build: Rc<BuildTemplate>) -> Self {
+        let required_materials = build.materials().to_vec();
+        let count = required_materials.len();
         Self {
             position: block,
-            build: Box::new(build),
+            build,
             progress: 0,
-            required_materials: materials,
+            required_materials,
             hands_needed: HashMap::with_capacity_and_hasher(count, CachedStringHasher::default()),
             reserved_materials: HashSet::new(),
             materials_remaining: HashMap::with_hasher(CachedStringHasher::default()), // replaced on each call
@@ -295,7 +297,10 @@ impl SocietyJobImpl for BuildThingJob {
         // preprocess materials to get hands needed for hauling
         let definitions = world.resource::<DefinitionRegistry>();
         for mat in self.required_materials.iter() {
-            let hands = match definitions.lookup_template(mat.definition(), "haulable") {
+            let def = definitions
+                .lookup_definition(mat.definition())
+                .and_then(|def| def.find_component("haulable"));
+            let hands = match def {
                 Some(any) => {
                     let haulable = any
                         .downcast_ref::<HaulableItemComponent>()

@@ -1,16 +1,18 @@
 use crate::job::SocietyTask;
-use crate::{Build, EcsWorld, Entity, StoneBrickWall, WorldPositionRange};
+use crate::{EcsWorld, Entity, WorldPositionRange};
 use std::any::Any;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 
 use common::*;
 
+use crate::build::BuildTemplate;
 use crate::job::list::SocietyJobHandle;
 use crate::society::Society;
+
 use std::ops::Deref;
 use std::rc::Rc;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 /// A high-level society job that produces a number of [SocietyTask]s. Unsized but it lives in an
 /// Rc anyway
@@ -65,8 +67,7 @@ pub trait SocietyJobImpl: Display + Debug {
 #[derive(Debug)]
 pub enum SocietyCommand {
     BreakBlocks(WorldPositionRange),
-    // TODO specify which build
-    Build(WorldPositionRange),
+    Build(WorldPositionRange, Rc<BuildTemplate>),
     HaulToPosition(Entity, WorldPoint),
 
     /// (thing, container)
@@ -89,10 +90,9 @@ impl SocietyCommand {
 
         match self {
             BreakBlocks(range) => job!(BreakBlocksJob::new(range)),
-            Build(pos) => {
+            Build(pos, template) => {
                 for block in pos.iter_blocks() {
-                    // TODO use actual job provided
-                    jobs.submit(world, BuildThingJob::new(block, StoneBrickWall))
+                    jobs.submit(world, BuildThingJob::new(block, template.clone()))
                 }
             }
             HaulToPosition(e, pos) => {

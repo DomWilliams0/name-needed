@@ -1,7 +1,9 @@
 use common::*;
+use std::rc::Rc;
 use unit::world::WorldPoint;
 
 use crate::ecs::*;
+use crate::string::StringCache;
 
 use crate::TransformComponent;
 
@@ -127,12 +129,15 @@ impl Default for EndHaulBehaviour {
 }
 
 impl<V: Value> ComponentTemplate<V> for HaulableItemComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let extra_hands = values.get_int("extra_hands")?;
-        Ok(Box::new(HaulableItemComponent { extra_hands }))
+        Ok(Rc::new(HaulableItemComponent { extra_hands }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

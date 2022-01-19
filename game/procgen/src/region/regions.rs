@@ -1100,7 +1100,7 @@ mod tests {
         timeout_task.abort();
 
         // generic checks
-        for ([x, y, _], entry) in regions.region_grid.iter_coords() {
+        for (_, entry) in regions.region_grid.iter_coords() {
             let guard = entry
                 .0
                 .try_read()

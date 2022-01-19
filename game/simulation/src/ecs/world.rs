@@ -1,30 +1,31 @@
-use specs::storage::InsertResult;
-
 use std::any::TypeId;
 use std::hint::unreachable_unchecked;
 use std::mem::ManuallyDrop;
-
-use common::*;
-
-use crate::event::{DeathReason, EntityEvent, EntityEventQueue};
-
-use crate::definitions::{DefinitionBuilder, DefinitionErrorKind, DefinitionRegistry};
-use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
-use crate::ecs::*;
-use crate::item::{ContainerComponent, ContainerResolver};
-
-use crate::{Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
 use specs::prelude::Resource;
+use specs::storage::InsertResult;
 use specs::world::EntitiesRes;
 use specs::LazyUpdate;
 
-use std::ops::{Deref, DerefMut};
+use common::*;
+
+use crate::build::BuildTemplate;
+use crate::definitions::{DefinitionBuilder, DefinitionErrorKind, DefinitionRegistry};
+use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
+use crate::ecs::*;
+use crate::event::{DeathReason, EntityEvent, EntityEventQueue};
+use crate::item::{ContainerComponent, ContainerResolver};
+use crate::string::CachedStr;
+use crate::{Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
 
 pub type SpecsWorld = specs::World;
 pub struct EcsWorld {
     world: SpecsWorld,
     component_registry: ComponentRegistry,
+    /// (definition name, build template, rendered KindComponent)
+    build_templates: Vec<(CachedStr, Rc<BuildTemplate>, Option<String>)>,
 }
 
 pub struct CachedWorldRef<'a> {
@@ -221,15 +222,39 @@ impl DerefMut for EcsWorld {
 }
 
 impl EcsWorld {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn with_definitions(definitions: DefinitionRegistry) -> Self {
         let mut world = SpecsWorld::new();
         let reg = ComponentRegistry::new(&mut world);
+        let build_templates = definitions
+            .iter_templates::<BuildTemplate>("build")
+            .filter_map(|def| {
+                let definition = definitions.lookup_definition(def)?;
 
-        EcsWorld {
+                let build = definition.find_component_ref::<BuildTemplate>("build")?;
+
+                let name = definition
+                    .find_component("kind")
+                    .and_then(|any| any.downcast_ref::<KindComponent>())
+                    .map(|kind| format!("{}", kind));
+
+                Some((def, build, name))
+            })
+            .collect_vec();
+
+        let mut world = EcsWorld {
             world,
             component_registry: reg,
-        }
+            build_templates,
+        };
+
+        world.world.insert(definitions);
+        world
+    }
+
+    #[cfg(test)]
+    pub fn new() -> Self {
+        let reg = crate::definitions::load_from_str("[]").expect("can't load null definitions");
+        Self::with_definitions(reg)
     }
 
     /// Iterates through all known component types and checks each one
@@ -250,6 +275,20 @@ impl EcsWorld {
     /// Returns the name of the first non-copyable component that this entity has
     pub fn find_non_copyable(&self, entity: Entity) -> Option<&'static str> {
         self.component_registry.find_non_copyable(self, entity)
+    }
+
+    pub fn build_templates(&self) -> &[(CachedStr, Rc<BuildTemplate>, Option<String>)] {
+        &self.build_templates
+    }
+
+    pub fn find_build_template(&self, name: &str) -> Option<Rc<BuildTemplate>> {
+        self.build_templates.iter().find_map(|(def, template, _)| {
+            if def.as_ref() == name {
+                Some(template.clone())
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -569,8 +608,9 @@ impl<'a> CachedWorldRef<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::ecs::*;
+
+    use super::*;
 
     #[derive(Debug, Component, EcsComponent, Clone)]
     #[storage(VecStorage)]

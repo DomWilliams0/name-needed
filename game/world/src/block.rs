@@ -26,7 +26,9 @@ pub type BlockDurability = u8;
 
 // TODO define block types in data instead of code
 /// The type of a block
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, EnumIter, Display)]
+#[derive(
+    Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, EnumIter, EnumString, Display,
+)]
 pub enum BlockType {
     Air,
     Dirt,

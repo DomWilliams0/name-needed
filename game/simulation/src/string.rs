@@ -19,18 +19,14 @@ impl StringCache {
         CachedStr(ustr::ustr(s))
     }
 
-    // TODO remove this
-    pub fn get_temporary(s: &str) -> CachedStr {
-        CachedStr(ustr::ustr(s))
-    }
-
-    #[cfg(test)]
+    /// Doesn't require a StringCache resource
+    #[cfg(any(test, feature = "testing"))]
     pub fn get_direct(s: &str) -> CachedStr {
         CachedStr(ustr::ustr(s))
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 impl From<&str> for CachedStr {
     fn from(s: &str) -> Self {
         StringCache::get_direct(s)

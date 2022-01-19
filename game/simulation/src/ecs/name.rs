@@ -1,19 +1,23 @@
+use crate::string::StringCache;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter, Write};
+use std::hint::unreachable_unchecked;
+use std::rc::Rc;
+
+use specs::storage::StorageEntry;
+
+use ::world::block::BlockType;
+use common::*;
+
+use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
+use crate::input::{MouseLocation, SelectedComponent};
+use crate::job::BuildThingJob;
+use crate::spatial::{Spatial, Transforms};
 use crate::{
     ItemStackComponent, PlayerSociety, Societies, SocietyComponent, Tick, TransformComponent,
     UiElementComponent,
 };
-use common::*;
-
-use crate::build::ReservedMaterialComponent;
-use crate::input::{MouseLocation, SelectedComponent};
-use crate::job::BuildThingJob;
-use crate::spatial::{Spatial, Transforms};
-use ::world::block::BlockType;
-use specs::storage::StorageEntry;
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Write};
-use std::hint::unreachable_unchecked;
 
 // TODO smol string and/or cow and/or pool common strings
 
@@ -351,11 +355,14 @@ impl Display for NameComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for KindComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self(values.get_string("singular")?, None)))
+        Ok(Rc::new(Self(values.get_string("singular")?, None)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

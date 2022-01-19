@@ -1,4 +1,5 @@
 use common::*;
+use std::rc::Rc;
 
 use crate::ecs::*;
 use crate::path::FollowPathComponent;
@@ -6,6 +7,7 @@ use crate::steer::context::ContextMap;
 use crate::steer::SteeringComponent;
 
 use crate::physics::PhysicsComponent;
+use crate::string::StringCache;
 
 /// Desired movement by the brain
 #[derive(Copy, Clone, Default, Component, EcsComponent)]
@@ -57,11 +59,14 @@ pub struct MovementConfigComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for MovementConfigComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self {
+        Ok(Rc::new(Self {
             max_speed: values.get_float("max_speed")?,
             acceleration: values.get_float("acceleration")?,
         }))

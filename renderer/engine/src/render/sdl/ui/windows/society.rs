@@ -1,14 +1,13 @@
 use imgui::{im_str, ChildWindow, Selectable, StyleColor};
+use std::fmt::Display;
 
 use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
-use simulation::{
-    AssociatedBlockData, Build, ComponentWorld, PlayerSociety, Societies, SocietyHandle,
-    StoneBrickWall,
-};
+use simulation::{AssociatedBlockData, ComponentWorld, PlayerSociety, Societies, SocietyHandle};
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
 use crate::ui_str;
+
 use serde::{Deserialize, Serialize};
 use simulation::job::SocietyCommand;
 
@@ -81,10 +80,14 @@ impl SocietyWindow {
                 if context.button(im_str!("Build"), [0.0, 0.0]) {
                     // TODO handle failure better?
                     if let Some(above) = sel.range().above() {
-                        context.issue_request(UiRequest::IssueSocietyCommand(
-                            society_handle,
-                            SocietyCommand::Build(above),
-                        ));
+                        if let Some((_, template, _)) =
+                            ecs.build_templates().get(self.build_selection)
+                        {
+                            context.issue_request(UiRequest::IssueSocietyCommand(
+                                society_handle,
+                                SocietyCommand::Build(above, template.clone()),
+                            ));
+                        }
                     }
                 }
 
@@ -95,10 +98,13 @@ impl SocietyWindow {
                     .horizontal_scrollbar(true)
                     .movable(false)
                     .build(context.ui(), || {
-                        // TODO temporary hardcoded list of builds
-                        let builds = [&StoneBrickWall as &dyn Build];
-                        for (i, build) in builds.iter().enumerate() {
-                            if Selectable::new(ui_str!(in context, "{}", build))
+                        let builds = ecs.build_templates();
+                        for (i, (id, _, name)) in builds.iter().enumerate() {
+                            let name = match name {
+                                Some(s) => s as &dyn Display,
+                                None => id as &dyn Display,
+                            };
+                            if Selectable::new(ui_str!(in context, "{}", name))
                                 .selected(self.build_selection == i)
                                 .build(context)
                             {

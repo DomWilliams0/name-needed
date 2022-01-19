@@ -286,8 +286,8 @@ mod tests {
     use crate::decision::WeightedDse;
     use crate::test_utils::*;
     use crate::{
-        AiBox, Consideration, Considerations, DecisionSource, DecisionWeightType, Dse,
-        Intelligence, IntelligentDecision,
+        AiBox, Considerations, DecisionSource, DecisionWeightType, Dse, Intelligence,
+        IntelligentDecision,
     };
     use common::{bumpalo, once};
 

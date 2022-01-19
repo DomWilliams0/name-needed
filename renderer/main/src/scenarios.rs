@@ -1,11 +1,10 @@
 #![allow(dead_code)]
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
-use crate::simulation::WorldPosition;
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies, StoneBrickWall};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -172,12 +171,14 @@ fn building(ecs: &EcsWorld) {
         .society_by_handle(society)
         .expect("bad society");
 
-    for _ in 0..8 {
-        let pos = helpers::random_walkable_pos(&world);
+    if let Some(build) = ecs.find_build_template("core_build_wall") {
+        for _ in 0..8 {
+            let pos = helpers::random_walkable_pos(&world);
 
-        society
-            .jobs_mut()
-            .submit(ecs, BuildThingJob::new(pos, StoneBrickWall));
+            society
+                .jobs_mut()
+                .submit(ecs, BuildThingJob::new(pos, build.clone()));
+        }
     }
 }
 

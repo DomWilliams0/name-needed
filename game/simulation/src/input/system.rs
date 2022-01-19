@@ -153,13 +153,16 @@ impl SelectedEntity {
 }
 
 mod selected_tiles {
-    use super::*;
-    use crate::input::SelectionModification;
-    use crate::InnerWorldRef;
     use std::collections::BTreeMap;
     use std::fmt::Write;
-    use unit::world::{all_slabs_in_range, SlabLocation};
+
+    use unit::world::SlabLocation;
     use world::block::BlockType;
+
+    use crate::input::SelectionModification;
+    use crate::InnerWorldRef;
+
+    use super::*;
 
     #[derive(Default, Clone)]
     pub struct SelectedTiles {
@@ -269,9 +272,9 @@ mod selected_tiles {
         }
 
         pub fn on_world_change(&mut self, world: &WorldRef) {
-            self.current
-                .as_mut()
-                .map(|sel| sel.on_world_change(world.borrow()));
+            if let Some(sel) = self.current.as_mut() {
+                sel.on_world_change(world.borrow())
+            }
         }
     }
 
@@ -380,7 +383,6 @@ mod selected_tiles {
     mod tests {
         use super::*;
         use crate::input::system::selected_tiles::BlockOccurrences;
-        use std::collections::HashMap;
         use world::block::BlockType;
 
         #[test]

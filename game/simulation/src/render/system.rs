@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::rc::Rc;
 
 use serde::de::Error;
 
@@ -12,6 +13,7 @@ use crate::input::{SelectedComponent, SelectedTiles, SelectionProgress};
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::render::UiElementComponent;
+use crate::string::StringCache;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
 use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
@@ -152,7 +154,10 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 }
 
 impl<V: Value> ComponentTemplate<V> for RenderComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
@@ -169,7 +174,7 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
             }
         };
 
-        Ok(Box::new(Self {
+        Ok(Rc::new(Self {
             color: color.into(),
             shape,
         }))
