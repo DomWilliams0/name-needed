@@ -395,6 +395,6 @@ impl SocietyJobImpl for BuildThingJob {
 impl Display for BuildThingJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // TODO better display impl for builds
-        write!(f, "Build {:?} at {}", self.build, self.position)
+        write!(f, "Build {} at {}", self.build.output(), self.position)
     }
 }
