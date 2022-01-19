@@ -122,7 +122,7 @@ impl<R: Renderer> Simulation<R> {
         let voxel_world = world_loader.world();
 
         // make ecs world and insert resources
-        let mut ecs_world = EcsWorld::with_definitions(definitions);
+        let mut ecs_world = EcsWorld::with_definitions(definitions)?;
         ecs_world.insert(voxel_world.clone());
         ecs_world.insert(string_cache);
         register_resources(&mut ecs_world, resources)?;

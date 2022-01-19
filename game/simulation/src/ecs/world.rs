@@ -42,6 +42,10 @@ pub enum ComponentGetError {
     NoSuchComponent(Entity, &'static str),
 }
 
+#[derive(Debug, Error)]
+#[error("There are build templates with invalid materials: {0:?}")]
+pub struct InvalidBuildTemplatesError(Vec<String>);
+
 /// Resource to hold entities to kill
 #[derive(Default)]
 pub struct EntitiesToKill {
@@ -222,24 +226,45 @@ impl DerefMut for EcsWorld {
 }
 
 impl EcsWorld {
-    pub fn with_definitions(definitions: DefinitionRegistry) -> Self {
+    pub fn with_definitions(
+        definitions: DefinitionRegistry,
+    ) -> Result<Self, InvalidBuildTemplatesError> {
         let mut world = SpecsWorld::new();
         let reg = ComponentRegistry::new(&mut world);
-        let build_templates = definitions
-            .iter_templates::<BuildTemplate>("build")
-            .filter_map(|def| {
-                let definition = definitions.lookup_definition(def)?;
 
-                let build = definition.find_component_ref::<BuildTemplate>("build")?;
+        // collect and validate build templates
+        let build_templates = {
+            let templates = definitions
+                .iter_templates::<BuildTemplate>("build")
+                .filter_map(|def| {
+                    let definition = definitions.lookup_definition(def)?;
 
-                let name = definition
-                    .find_component("kind")
-                    .and_then(|any| any.downcast_ref::<KindComponent>())
-                    .map(|kind| format!("{}", kind));
+                    let build = definition.find_component_ref::<BuildTemplate>("build")?;
 
-                Some((def, build, name))
-            })
-            .collect_vec();
+                    let name = definition
+                        .find_component("kind")
+                        .and_then(|any| any.downcast_ref::<KindComponent>())
+                        .map(|kind| format!("{}", kind));
+
+                    Some((def, build, name))
+                })
+                .collect_vec();
+
+            let mut invalids = Vec::new();
+            for (def, build, _) in &templates {
+                for mat in build.materials() {
+                    if definitions.lookup_definition(mat.definition()).is_none() {
+                        invalids.push(format!("{}:{}", def, mat.definition()));
+                    }
+                }
+            }
+
+            if invalids.is_empty() {
+                templates
+            } else {
+                return Err(InvalidBuildTemplatesError(invalids));
+            }
+        };
 
         let mut world = EcsWorld {
             world,
@@ -248,13 +273,13 @@ impl EcsWorld {
         };
 
         world.world.insert(definitions);
-        world
+        Ok(world)
     }
 
     #[cfg(test)]
     pub fn new() -> Self {
         let reg = crate::definitions::load_from_str("[]").expect("can't load null definitions");
-        Self::with_definitions(reg)
+        Self::with_definitions(reg).expect("invalid definitions")
     }
 
     /// Iterates through all known component types and checks each one
