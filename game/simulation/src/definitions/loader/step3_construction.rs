@@ -14,8 +14,7 @@ use crate::string::{CachedStr, StringCache};
 #[derive(Debug)]
 pub struct Definition {
     source: DefinitionSource,
-    // TODO CachedStr for component names
-    components: Vec<(String, Rc<dyn ecs::ComponentTemplate<ValueImpl>>)>,
+    components: Vec<(CachedStr, Rc<dyn ecs::ComponentTemplate<ValueImpl>>)>,
 }
 
 pub fn instantiate(
@@ -52,7 +51,7 @@ impl Definition {
 
     pub fn find_component(&self, name: &str) -> Option<&dyn Any> {
         self.components.iter().find_map(|(comp, template)| {
-            if name == comp {
+            if name == comp.as_ref() {
                 Some(template.as_any())
             } else {
                 None
@@ -62,7 +61,7 @@ impl Definition {
 
     pub fn find_component_ref<T: 'static>(&self, name: &str) -> Option<Rc<T>> {
         self.components.iter().find_map(|(comp, template)| {
-            if name == comp && template.as_any().is::<T>() {
+            if name == comp.as_ref() && template.as_any().is::<T>() {
                 let rc = template.clone();
                 // safety: type has been checked
                 Some(unsafe { Rc::from_raw(Rc::into_raw(rc) as _) })
@@ -103,7 +102,7 @@ impl Definition {
                     );
                 }
 
-                component_templates.push((key.as_str().to_owned(), component_template));
+                component_templates.push((string_cache.get(&key), component_template));
             }
 
             Ok((uid, component_templates))

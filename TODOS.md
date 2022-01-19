@@ -1,4 +1,4 @@
-# TODOs (403)
+# TODOs (402)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -198,8 +198,6 @@
    * `// TODO remove abstract definitions`
  * [game/simulation/src/definitions/loader/mod.rs](game/simulation/src/definitions/loader/mod.rs) (1)
    * `// TODO consider using `nested` vecs as an optimization`
- * [game/simulation/src/definitions/loader/step3_construction.rs](game/simulation/src/definitions/loader/step3_construction.rs) (1)
-   * `// TODO CachedStr for component names`
  * [game/simulation/src/definitions/mod.rs](game/simulation/src/definitions/mod.rs) (1)
    * `// TODO include which key caused the problem`
  * [game/simulation/src/ecs/component.rs](game/simulation/src/ecs/component.rs) (3)

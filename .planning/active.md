@@ -16,6 +16,6 @@
 * [o] register builds in data
     * [ ] validate build material definition exists?
     * [X] cache build templates intead of iterating all each time
-* [ ] used cache strings for component names too
+* [X] used cache strings for component names too
 * [ ] central registry of all builds including a unique identifier to refer to it in ui and its
     requests
