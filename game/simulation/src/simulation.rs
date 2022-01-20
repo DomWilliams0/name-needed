@@ -15,7 +15,7 @@ use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
     BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntity,
-    SelectedTiles, UiCommand, UiRequest, UiResponsePayload,
+    SelectedTiles, UiCommand, UiPopup, UiRequest, UiResponsePayload, WorldColumn,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -682,6 +682,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(MouseLocation::default());
     world.insert(NameGeneration::load(&resources)?);
     world.insert(FrameAllocator::default());
+    world.insert(UiPopup::default());
 
     Ok(())
 }

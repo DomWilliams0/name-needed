@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (404)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -228,9 +228,12 @@
    * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
    * `// TODO expand/contract in a direction`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
+ * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (1)
+   * `// TODO actual popup content`
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
+   * `// TODO temporary`
    * `// TODO select multiple entities`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`

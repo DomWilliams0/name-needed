@@ -9,8 +9,8 @@ use color::Color;
 use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
 use common::*;
 use simulation::{
-    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
-    Simulation, WorldViewer,
+    BackendData, ComponentWorld, Exit, InitializedSimulationBackend, PerfAvg,
+    PersistentSimulationBackend, Simulation, WorldViewer,
 };
 
 use crate::render::sdl::camera::Camera;
@@ -22,7 +22,9 @@ use crate::render::sdl::GlRenderer;
 use resources::ResourceError;
 use resources::Resources;
 use sdl2::mouse::{MouseButton, MouseState, MouseWheelDirection};
-use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
+use simulation::input::{
+    InputEvent, SelectType, UiCommand, UiCommands, UiPopup, UiRequest, WorldColumn,
+};
 use std::hint::unreachable_unchecked;
 use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
 
@@ -343,12 +345,14 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
         // render ui and collect input commands
         let mouse_state = self.backend.mouse_state();
+        let popups = simulation.world().resource_mut::<UiPopup>().prepare();
         self.backend.ui.render(
             &self.backend.window,
             &mouse_state,
             perf,
             simulation.as_ref(&self.world_viewer),
             commands,
+            popups,
         );
 
         self.window.gl_swap_window();

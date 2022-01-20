@@ -1,4 +1,7 @@
-use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
+use std::io::{ErrorKind, Read, Write};
+use std::path::Path;
+
+use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style, StyleVar, WindowFlags};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -7,7 +10,8 @@ use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 use serde::{Deserialize, Serialize};
 
-use simulation::input::{UiCommand, UiCommands, UiRequest};
+use common::BoxedResult;
+use simulation::input::{PreparedUiPopup, UiCommand, UiCommands, UiRequest};
 use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
@@ -15,10 +19,7 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
 };
-use common::BoxedResult;
-
-use std::io::{ErrorKind, Read, Write};
-use std::path::Path;
+use crate::ui_str;
 
 pub struct Ui {
     imgui: Context,
@@ -116,6 +117,7 @@ impl Ui {
         perf: PerfAvg,
         simulation: SimulationRef,
         commands: &mut UiCommands,
+        popup: PreparedUiPopup,
     ) {
         self.imgui_sdl2
             .prepare_frame(self.imgui.io_mut(), window, mouse_state);
@@ -123,7 +125,7 @@ impl Ui {
 
         // generate windows
         let context = UiContext::new(&ui, &self.strings_arena, simulation, commands, perf);
-        self.state.render(context);
+        self.state.render(context, popup);
 
         // render windows
         self.imgui_sdl2.prepare_render(&ui, window);
@@ -202,7 +204,7 @@ impl Ui {
 
 impl State {
     /// Renders ui windows
-    fn render(&mut self, context: UiContext) {
+    fn render(&mut self, context: UiContext, mut popup: PreparedUiPopup) {
         imgui::Window::new(im_str!("Debug"))
             .size([400.0, 500.0], Condition::FirstUseEver)
             .position([10.0, 10.0], Condition::FirstUseEver)
@@ -222,5 +224,48 @@ impl State {
                 self.society.render(&context);
                 self.debug.render(&context);
             });
+
+        // invisible window for popups
+        let style = context.push_style_var(StyleVar::WindowRounding(0.0));
+        imgui::Window::new(im_str!("invisible"))
+            .size(context.io().display_size, Condition::Always)
+            .position([0.0, 0.0], Condition::Always)
+            .bg_alpha(0.0)
+            .flags(
+                WindowFlags::NO_TITLE_BAR
+                    | WindowFlags::NO_INPUTS
+                    | WindowFlags::NO_RESIZE
+                    | WindowFlags::NO_COLLAPSE
+                    | WindowFlags::NO_BACKGROUND
+                    | WindowFlags::NO_SAVED_SETTINGS
+                    | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS,
+            )
+            .build(context.ui(), || {
+                enum Rendered {
+                    No,
+                    OpenAndRendered,
+                    OpenButNotRendered,
+                }
+
+                let mut rendered = Rendered::No;
+                for (content, open) in popup.iter_all() {
+                    let id = im_str!("popup");
+                    rendered = Rendered::OpenButNotRendered;
+
+                    if open {
+                        context.open_popup(id);
+                    }
+
+                    context.popup(id, || {
+                        context.text(ui_str!(in context, "{:?}", content));
+                        rendered = Rendered::OpenAndRendered;
+                    });
+                }
+
+                if let Rendered::OpenButNotRendered = rendered {
+                    popup.on_close();
+                }
+            });
+        style.pop(context.ui());
     }
 }

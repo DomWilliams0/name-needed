@@ -2,6 +2,7 @@ use common::*;
 use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
+use crate::input::popup::{PopupContent, UiPopup};
 pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
@@ -32,6 +33,7 @@ impl<'a> System<'a> for InputSystem<'a> {
         Read<'a, Spatial>,
         Write<'a, SelectedEntity>,
         Write<'a, SelectedTiles>,
+        Write<'a, UiPopup>,
         WriteStorage<'a, SelectedComponent>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, UiElementComponent>,
@@ -39,7 +41,17 @@ impl<'a> System<'a> for InputSystem<'a> {
 
     fn run(
         &mut self,
-        (world, entities, spatial, mut selected, mut selected_block, mut selecteds, transform, ui): Self::SystemData,
+        (
+            world,
+            entities,
+            spatial,
+            mut selected,
+            mut selected_block,
+            mut popups,
+            mut selecteds,
+            transform,
+            ui,
+        ): Self::SystemData,
     ) {
         let resolve_walkable_pos = |select_pos: &WorldColumn| {
             let world = (*world).borrow();
@@ -78,6 +90,9 @@ impl<'a> System<'a> for InputSystem<'a> {
                     // find newly selected entity
                     if let Some(to_select) = resolve_entity(pos) {
                         selected.select_with_comps(&mut selecteds, to_select);
+
+                        // TODO temporary
+                        popups.open(PopupContent::Test(format!("wahey {}", to_select)));
                     }
                 }
 
@@ -381,9 +396,11 @@ mod selected_tiles {
 
     #[cfg(test)]
     mod tests {
-        use super::*;
-        use crate::input::system::selected_tiles::BlockOccurrences;
         use world::block::BlockType;
+
+        use crate::input::system::selected_tiles::BlockOccurrences;
+
+        use super::*;
 
         #[test]
         fn comma_separated_blocks() {

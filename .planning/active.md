@@ -5,7 +5,9 @@
 * [X] show ui block selection as it is dragged
     * [ ] block selection can be added to with ctrl+drag
     * [ ] show selection dimensions in world
+* [o] test popups with an invisible imgui window
     * [ ] use left click for all selections, to allow right click context menu
+    * [ ] close popup on camera move
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview
