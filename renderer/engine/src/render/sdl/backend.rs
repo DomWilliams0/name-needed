@@ -503,7 +503,7 @@ fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
     let alt_down = || keymod.intersects(Mod::LALTMOD | Mod::RALTMOD);
 
     Some(match keycode {
-        Escape if alt_down() => KeyAction::Engine(EngineKey::Exit),
+        Q if alt_down() => KeyAction::Engine(EngineKey::Exit),
         R if alt_down() => KeyAction::Engine(EngineKey::Restart),
 
         Up => KeyAction::Renderer(SliceUp),
