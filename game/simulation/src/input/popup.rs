@@ -1,3 +1,5 @@
+use crate::Entity;
+
 /// Single right click context menu
 #[derive(Default)]
 pub struct UiPopup {
@@ -9,8 +11,8 @@ pub struct PreparedUiPopup<'a>(&'a mut UiPopup);
 
 #[derive(Debug, Clone)]
 pub enum PopupContent {
-    // TODO actual popup content
-    Test(String),
+    TileSelection,
+    Entity(Entity),
 }
 
 impl UiPopup {

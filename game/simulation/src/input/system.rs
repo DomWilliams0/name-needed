@@ -1,5 +1,5 @@
 use common::*;
-use unit::world::{WorldPosition, WorldPositionRange, WorldRange};
+use unit::world::{WorldPoint, WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
 use crate::input::popup::{PopupContent, UiPopup};
@@ -10,7 +10,7 @@ use crate::TransformComponent;
 use crate::{UiElementComponent, WorldRef};
 
 pub struct InputSystem<'a> {
-    pub events: &'a [InputEvent],
+    events: &'a [InputEvent],
 }
 
 /// Marker for entity selection by the player
@@ -25,6 +25,22 @@ pub struct SelectedComponent;
 #[derive(Default)]
 pub struct SelectedEntity(Option<Entity>);
 const TILE_SELECTION_LIMIT: f32 = 50.0;
+
+impl<'a> InputSystem<'a> {
+    /// Events for this tick
+    pub fn with_events(events: &'a [InputEvent]) -> Self {
+        Self { events }
+    }
+
+    fn resolve_walkable_pos(
+        &self,
+        select_pos: &WorldColumn,
+        world: &WorldRef,
+    ) -> Option<WorldPoint> {
+        let world = (*world).borrow();
+        select_pos.find_highest_walkable(&world)
+    }
+}
 
 impl<'a> System<'a> for InputSystem<'a> {
     type SystemData = (
@@ -53,59 +69,36 @@ impl<'a> System<'a> for InputSystem<'a> {
             ui,
         ): Self::SystemData,
     ) {
-        let resolve_walkable_pos = |select_pos: &WorldColumn| {
-            let world = (*world).borrow();
-            select_pos.find_highest_walkable(&world)
-        };
-
         let resolve_entity = |select_pos: &WorldColumn| {
-            resolve_walkable_pos(select_pos).and_then(|point| {
-                // TODO multiple clicks in the same place should iterate through all entities in selection range
+            self.resolve_walkable_pos(select_pos, &world)
+                .and_then(|point| {
+                    // TODO multiple clicks in the same place should iterate through all entities in selection range
+                    const RADIUS: f32 = 1.25;
 
-                const RADIUS: f32 = 1.25;
+                    // prioritise ui elements first
+                    // TODO spatial lookup for ui elements too
+                    let ui_elem = (&entities, &transform, &ui)
+                        .join()
+                        .find(|(_, transform, _)| transform.position.is_almost(&point, RADIUS))
+                        .map(|(e, _, _)| e.into());
 
-                // prioritise ui elements first
-                // TODO spatial lookup for ui elements too
-                let ui_elem = (&entities, &transform, &ui)
-                    .join()
-                    .find(|(_, transform, _)| transform.position.is_almost(&point, RADIUS))
-                    .map(|(e, _, _)| e.into());
-
-                // fallack to looking for normal entities
-                ui_elem.or_else(|| {
-                    spatial
-                        .query_in_radius(Transforms::Storage(&transform), point, RADIUS)
-                        .next()
-                        .map(|(e, _, _)| e)
+                    // fallback to looking for normal entities
+                    ui_elem.or_else(|| {
+                        spatial
+                            .query_in_radius(Transforms::Storage(&transform), point, RADIUS)
+                            .next()
+                            .map(|(e, _, _)| e)
+                    })
                 })
-            })
         };
 
         for e in self.events {
             match e {
-                InputEvent::Click(SelectType::Left, pos) => {
-                    // unselect current entity regardless of click location
-                    selected.unselect_with_comps(&mut selecteds);
-
-                    // find newly selected entity
-                    if let Some(to_select) = resolve_entity(pos) {
-                        selected.select_with_comps(&mut selecteds, to_select);
-
-                        // TODO temporary
-                        popups.open(PopupContent::Test(format!("wahey {}", to_select)));
-                    }
-                }
-
                 InputEvent::Select {
                     select: SelectType::Left,
                     ..
                 } => {
                     // TODO select multiple entities
-                }
-
-                InputEvent::Click(SelectType::Right, _) => {
-                    // unselect tile selection
-                    selected_block.clear();
                 }
 
                 InputEvent::Select {
@@ -116,6 +109,26 @@ impl<'a> System<'a> for InputSystem<'a> {
                 } => {
                     // update tile selection
                     selected_block.update((*from, *to), *progress, &world);
+                }
+
+                InputEvent::Click(SelectType::Left, pos) => {
+                    // unselect current entity regardless of click location
+                    selected.unselect_with_comps(&mut selecteds);
+
+                    // find newly selected entity
+                    if let Some(to_select) = resolve_entity(pos) {
+                        selected.select_with_comps(&mut selecteds, to_select);
+                    }
+                }
+
+                InputEvent::Click(SelectType::Right, pos) => {
+                    if selected_block.is_right_click_relevant(pos) {
+                        // show popup for selection
+                        popups.open(PopupContent::TileSelection);
+                    } else if let Some(entity) = resolve_entity(pos) {
+                        // show popup for entity
+                        popups.open(PopupContent::Entity(entity));
+                    }
                 }
             }
         }
@@ -290,6 +303,25 @@ mod selected_tiles {
             if let Some(sel) = self.current.as_mut() {
                 sel.on_world_change(world.borrow())
             }
+        }
+
+        /// Is the given right click position close enough to the bottom right of the active
+        /// selection
+        pub fn is_right_click_relevant(&self, pos: &WorldColumn) -> bool {
+            const DISTANCE_THRESHOLD: f32 = 2.0;
+            self.current_selected()
+                .map(|sel| {
+                    // distance check to bottom right corner, ignoring z axis
+
+                    let corner = {
+                        let ((_, x2), (y1, _), _) = sel.range.ranges();
+                        Point2::new(x2 as f32, y1 as f32)
+                    };
+                    let click = Point2::new(pos.x.into_inner(), pos.y.into_inner());
+
+                    corner.distance2(click) <= DISTANCE_THRESHOLD * DISTANCE_THRESHOLD
+                })
+                .unwrap_or(false)
         }
     }
 

@@ -507,7 +507,7 @@ impl<R: Renderer> Simulation<R> {
         input: &[InputEvent],
     ) -> R::FrameContext {
         // process input before rendering
-        InputSystem { events: input }.run_now(&*self.ecs_world);
+        InputSystem::with_events(input).run_now(&*self.ecs_world);
 
         // start frame
         renderer.init(target);

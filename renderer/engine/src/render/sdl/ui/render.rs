@@ -257,6 +257,7 @@ impl State {
                     }
 
                     context.popup(id, || {
+                        // TODO actual popup content
                         context.text(ui_str!(in context, "{:?}", content));
                         rendered = Rendered::OpenAndRendered;
                     });

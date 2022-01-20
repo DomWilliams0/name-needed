@@ -109,11 +109,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         // render player's world selection
         if let Some(sel) = selected_block.current() {
             let (from, to) = sel.bounds();
-            let color = match sel.progress() {
-                SelectionProgress::InProgress => Color::rgb(216, 221, 230),
-                SelectionProgress::Complete => Color::rgb(252, 253, 255),
+            let (color, finished) = match sel.progress() {
+                SelectionProgress::InProgress => (Color::rgb(216, 221, 230), false),
+                SelectionProgress::Complete => (Color::rgb(252, 253, 255), true),
             };
-            self.renderer.tile_selection(from, to, color);
+            self.renderer.tile_selection(from, to, color, finished);
         }
 
         // render in-game ui elements above entities

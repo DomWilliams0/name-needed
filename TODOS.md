@@ -1,4 +1,4 @@
-# TODOs (404)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -228,12 +228,9 @@
    * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
    * `// TODO expand/contract in a direction`
- * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (1)
-   * `// TODO actual popup content`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
-   * `// TODO temporary`
    * `// TODO select multiple entities`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
@@ -494,6 +491,8 @@
    * `// TODO customise text colour`
    * `// TODO use instances or indices?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
+ * [renderer/engine/src/render/sdl/ui/render.rs](renderer/engine/src/render/sdl/ui/render.rs) (1)
+   * `// TODO actual popup content`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)
