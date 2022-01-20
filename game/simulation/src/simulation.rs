@@ -1,8 +1,11 @@
+use std::collections::HashSet;
 use std::ops::{Add, Deref};
+use std::pin::Pin;
+
+use strum::EnumDiscriminants;
 
 use common::*;
 use resources::Resources;
-use strum::EnumDiscriminants;
 use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -10,7 +13,7 @@ use world::WorldChangeEvent;
 
 use crate::activity::ActivitySystem;
 use crate::ai::{AiAction, AiComponent, AiSystem};
-
+use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
@@ -28,12 +31,9 @@ use crate::render::{
     DebugRenderersState, UiElementPruneSystem,
 };
 use crate::render::{RenderSystem, Renderer};
-use crate::senses::{SensesDebugRenderer, SensesSystem};
-
-use crate::alloc::FrameAllocator;
-
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
+use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::{NameGeneration, PlayerSociety};
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
@@ -44,8 +44,6 @@ use crate::{
     ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
-use std::collections::HashSet;
-use std::pin::Pin;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
@@ -490,6 +488,19 @@ impl<R: Renderer> Simulation<R> {
                 UiRequest::ModifySelection(modification) => {
                     let sel = self.ecs_world.resource_mut::<SelectedTiles>();
                     sel.modify(modification, &self.voxel_world);
+                }
+
+                UiRequest::CancelSelection => {
+                    // close current popup if there is one
+                    let popup = self.ecs_world.resource_mut::<UiPopup>();
+                    if !popup.close() {
+                        // fallback to clearing tile and entity selections
+                        let tiles = self.ecs_world.resource_mut::<SelectedTiles>();
+                        let entity = self.ecs_world.resource_mut::<SelectedEntity>();
+
+                        tiles.clear();
+                        entity.unselect(&self.ecs_world);
+                    }
                 }
             }
         }

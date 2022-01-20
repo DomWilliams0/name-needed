@@ -43,6 +43,8 @@ pub enum UiRequest {
     },
 
     ModifySelection(SelectionModification),
+
+    CancelSelection,
 }
 
 pub enum SelectionModification {

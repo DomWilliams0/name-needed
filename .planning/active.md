@@ -9,7 +9,7 @@
     * [X] test popups with an invisible imgui window
     * [o] selection-sensitive right click context menu
     * [ ] close popup on camera move
-    * [ ] escape for clearing tile and entity selection (rebind quit)
+    * [X] escape for clearing tile and entity selection (rebind quit)
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview

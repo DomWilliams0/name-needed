@@ -26,6 +26,17 @@ impl UiPopup {
         self.popup = None;
     }
 
+    /// Returns true if closed
+    pub fn close(&mut self) -> bool {
+        if self.popup.is_some() {
+            self.popup = None;
+            self.open = false;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Called once per frame by render system
     pub fn prepare(&mut self) -> PreparedUiPopup {
         PreparedUiPopup(self)
