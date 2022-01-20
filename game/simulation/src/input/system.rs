@@ -1,10 +1,11 @@
 use common::*;
+pub use selected_entities::{SelectedComponent, SelectedEntities};
 use unit::world::{WorldPoint, WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
 use crate::input::popup::{PopupContentType, UiPopup};
 pub use crate::input::system::selected_tiles::SelectedTiles;
-use crate::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
+use crate::input::{InputEvent, InputModifier, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
 use crate::{UiElementComponent, WorldRef};
@@ -13,17 +14,6 @@ pub struct InputSystem<'a> {
     events: &'a [InputEvent],
 }
 
-/// Marker for entity selection by the player
-#[derive(Component, EcsComponent, Default)]
-#[storage(NullStorage)]
-#[name("selected")]
-#[clone(disallow)]
-pub struct SelectedComponent;
-
-/// Resource for selected entity - not guaranteed to be alive
-/// `get()` will clear it if the entity is dead
-#[derive(Default)]
-pub struct SelectedEntity(Option<Entity>);
 const TILE_SELECTION_LIMIT: f32 = 50.0;
 
 impl<'a> InputSystem<'a> {
@@ -47,7 +37,7 @@ impl<'a> System<'a> for InputSystem<'a> {
         Read<'a, WorldRef>,
         Read<'a, EntitiesRes>,
         Read<'a, Spatial>,
-        Write<'a, SelectedEntity>,
+        Write<'a, SelectedEntities>,
         Write<'a, SelectedTiles>,
         Write<'a, UiPopup>,
         WriteStorage<'a, SelectedComponent>,
@@ -61,8 +51,8 @@ impl<'a> System<'a> for InputSystem<'a> {
             world,
             entities,
             spatial,
-            mut selected,
-            mut selected_block,
+            mut entity_sel,
+            mut tile_sel,
             mut popups,
             mut selecteds,
             transform,
@@ -106,76 +96,36 @@ impl<'a> System<'a> for InputSystem<'a> {
                     from,
                     to,
                     progress,
+                    ..
                 } => {
                     // update tile selection
-                    selected_block.update((*from, *to), *progress, &world);
+                    tile_sel.update((*from, *to), *progress, &world);
                 }
 
-                InputEvent::Click(SelectType::Left, pos) => {
-                    // unselect current entity regardless of click location
-                    selected.unselect_with_comps(&mut selecteds);
+                InputEvent::Click(SelectType::Left, pos, modifier) => {
+                    let additive = modifier.contains(InputModifier::SHIFT);
+
+                    if !additive {
+                        // unselect all entities first
+                        entity_sel.unselect_all_with_comps(&mut selecteds);
+                    }
 
                     // find newly selected entity
                     if let Some(to_select) = resolve_entity(pos) {
-                        selected.select_with_comps(&mut selecteds, to_select);
+                        entity_sel.select_with_comps(&mut selecteds, to_select);
                     }
                 }
 
-                InputEvent::Click(SelectType::Right, pos) => {
-                    if selected_block.is_right_click_relevant(pos) {
+                InputEvent::Click(SelectType::Right, pos, _) => {
+                    if tile_sel.is_right_click_relevant(pos) {
                         // show popup for selection
                         popups.open(PopupContentType::TileSelection);
-                    } else if let Some(entity) = resolve_entity(pos) {
-                        // show popup for entity
-                        popups.open(PopupContentType::Entity(entity));
+                        // } else if let Some(entity) = resolve_entity(pos) {
+                        //     // show popup for entity
+                        //     popups.open(PopupContentType::Entity(entity));
                     }
                 }
             }
-        }
-    }
-}
-
-impl SelectedEntity {
-    pub fn get<W: ComponentWorld>(&mut self, world: &W) -> Option<Entity> {
-        match self.0 {
-            None => None,
-            Some(e) if world.component::<TransformComponent>(e).is_err() => {
-                // entity is dead or no longer has transform
-                self.0 = None;
-                None
-            }
-            nice => nice, // still alive
-        }
-    }
-
-    /// Entity may not be alive
-    pub fn get_unchecked(&self) -> Option<Entity> {
-        self.0
-    }
-
-    pub fn select(&mut self, world: &EcsWorld, e: Entity) {
-        let mut selecteds = world.write_storage();
-        self.select_with_comps(&mut selecteds, e)
-    }
-
-    fn select_with_comps(&mut self, selecteds: &mut WriteStorage<SelectedComponent>, e: Entity) {
-        // unselect current entity
-        self.unselect_with_comps(selecteds);
-
-        debug!("selected entity"; e);
-        let _ = selecteds.insert(e.into(), SelectedComponent);
-        self.0 = Some(e);
-    }
-
-    pub fn unselect(&mut self, world: &EcsWorld) {
-        let mut selecteds = world.write_storage();
-        self.unselect_with_comps(&mut selecteds)
-    }
-
-    fn unselect_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
-        if let Some(old) = self.0.take() {
-            debug!("unselected entity"; old);
-            comp.remove(old.into());
         }
     }
 }
@@ -451,6 +401,86 @@ mod selected_tiles {
                 format!("{}", BlockOccurrences(&map)),
                 "[5xAir, 2xDirt, 10xGrass]"
             );
+        }
+    }
+}
+
+mod selected_entities {
+    use std::collections::HashSet;
+
+    use common::*;
+
+    use crate::ecs::*;
+
+    /// Marker for entity selection by the player
+    #[derive(Component, EcsComponent, Default)]
+    #[storage(NullStorage)]
+    #[name("selected")]
+    #[clone(disallow)]
+    pub struct SelectedComponent;
+
+    #[derive(Default)]
+    pub struct SelectedEntities {
+        entities: HashSet<Entity>,
+        last: Option<Entity>,
+    }
+
+    impl SelectedEntities {
+        pub fn select(&mut self, world: &EcsWorld, e: Entity) {
+            let mut selecteds = world.write_storage();
+            self.select_with_comps(&mut selecteds, e)
+        }
+
+        pub fn select_with_comps(
+            &mut self,
+            selecteds: &mut WriteStorage<SelectedComponent>,
+            e: Entity,
+        ) {
+            debug!("selected entity"; e);
+            if self.entities.insert(e) {
+                let _ = selecteds.insert(e.into(), SelectedComponent);
+            }
+            self.last = Some(e);
+        }
+
+        pub fn unselect(&mut self, world: &EcsWorld, e: Entity) {
+            if self.entities.remove(&e) {
+                world.remove_now::<SelectedComponent>(e);
+
+                if self.last == Some(e) {
+                    self.last = self.entities.iter().next().copied();
+                }
+            }
+        }
+
+        pub fn unselect_all(&mut self, world: &EcsWorld) {
+            let mut selecteds = world.write_storage();
+            self.unselect_all_with_comps(&mut selecteds)
+        }
+
+        pub fn unselect_all_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
+            for e in self.entities.drain() {
+                debug!("unselected entity"; e);
+                comp.remove(e.into());
+            }
+            self.last = None;
+        }
+
+        /// Could be dead
+        pub fn iter_unchecked(&self) -> impl Iterator<Item = Entity> + '_ {
+            self.entities.iter().copied()
+        }
+
+        pub fn primary(&self) -> Option<Entity> {
+            self.last
+        }
+
+        pub fn just_one(&self) -> Option<Entity> {
+            self.entities.iter().exactly_one().ok().copied()
+        }
+
+        pub fn count(&self) -> usize {
+            self.entities.len()
         }
     }
 }

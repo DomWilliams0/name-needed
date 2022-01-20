@@ -1,10 +1,11 @@
-use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable};
-use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+
+use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable, StyleColor};
+use serde::{Deserialize, Serialize};
 
 use common::*;
 use simulation::input::{
-    BlockPlacement, DivineInputCommand, SelectedEntity, SelectedTiles, SelectionModification,
+    BlockPlacement, DivineInputCommand, SelectedEntities, SelectedTiles, SelectionModification,
     SelectionProgress, UiRequest,
 };
 use simulation::job::BuildThingJob;
@@ -66,7 +67,8 @@ impl SelectionWindow {
 
         let ecs = context.simulation().ecs;
 
-        let (e, details, state) = match ecs.resource::<SelectedEntity>().get_unchecked() {
+        let entity_sel = ecs.resource::<SelectedEntities>();
+        let (e, details, state) = match entity_sel.just_one() {
             Some(e) if ecs.is_entity_alive(e) => {
                 let transform = ecs.component(e).ok();
                 let physical = ecs.component(e).ok();
@@ -94,10 +96,19 @@ impl SelectionWindow {
                 // entity is dead
                 (e, None, EntityState::Dead)
             }
-            None => {
-                context.text_disabled(im_str!("No entity selected"));
-                return;
+            None if entity_sel.count() > 1 => {
+                // TODO better support for multiple entity selection in debug window
+                let style = context.push_style_color(
+                    StyleColor::Text,
+                    context.style_color(StyleColor::TextDisabled),
+                );
+                context.text_wrapped(ui_str!(in context,
+                    "{} entities selected, select just 1 for details",
+                    entity_sel.count()
+                ));
+                return style.pop(context);
             }
+            None => return context.text_disabled(im_str!("No entity selected")),
         };
 
         context.key_value(
@@ -833,9 +844,9 @@ impl SelectionWindow {
                     COLOR_ORANGE,
                 );
 
-                let entity_selection = ecs.resource::<SelectedEntity>().get_unchecked();
-                // TODO proper way of checking if an entity is living
-                let living_entity = entity_selection.and_then(|e| {
+                let entity_selection = ecs.resource::<SelectedEntities>();
+                // TODO proper way of checking if an entity is living e.g. separate component for container ownership
+                let living_entity = entity_selection.just_one().and_then(|e| {
                     if ecs.is_entity_alive(e) && !ecs.has_component::<ConditionComponent>(e) {
                         Some(e)
                     } else {

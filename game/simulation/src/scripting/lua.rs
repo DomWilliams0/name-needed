@@ -2,7 +2,7 @@ use rlua::prelude::*;
 use rlua::{Context, MetaMethod, StdLib, UserData, UserDataMethods, Variadic};
 
 use crate::ecs::EntityWrapper;
-use crate::input::SelectedEntity;
+use crate::input::SelectedEntities;
 use crate::scripting::context::{
     parse_entity_id, Scripting, ScriptingError, ScriptingOutput, ScriptingResult,
 };
@@ -134,7 +134,7 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
         state
             .ensure_alive(eid)
             .map(|e| {
-                let selected = state.ecs.resource_mut::<SelectedEntity>();
+                let selected = state.ecs.resource_mut::<SelectedEntities>();
                 selected.select(state.ecs, e.into());
             })
             .map_err(rlua::Error::external)?;
@@ -142,11 +142,11 @@ fn populate_globals(ctx: Context) -> ScriptingResult<()> {
         Ok(())
     });
 
-    define!(fn UnselectEntity |ctx: Context, _: ()| {
+    define!(fn UnselectEntities |ctx: Context, _: ()| {
         let state: LuaGameState = ctx.named_registry_value(GAME_STATE_KEY)?;
 
-        let selected = state.ecs.resource_mut::<SelectedEntity>();
-        selected.unselect(state.ecs);
+        let selected = state.ecs.resource_mut::<SelectedEntities>();
+        selected.unselect_all(state.ecs);
 
         Ok(())
     });

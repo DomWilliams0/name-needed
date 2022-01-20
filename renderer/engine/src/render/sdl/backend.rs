@@ -34,7 +34,6 @@ pub struct SdlBackendPersistent {
 
     /// `take`n out and replaced each tick
     sdl_events: Option<EventPump>,
-    #[allow(dead_code)]
     keep_alive: GraphicsKeepAlive,
     window: Window,
 
@@ -226,7 +225,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 } => {
                     let evt = self
                         .parse_mouse_event(mouse_btn, x, y)
-                        .and_then(|(select, col)| self.selection.mouse_up(select, col));
+                        .and_then(|(select, col)| {
+                            let modifiers = self.mod_state();
+                            self.selection.mouse_up(select, col, modifiers)
+                        });
 
                     if let Some(evt) = evt {
                         self.sim_input_events.push(evt);
@@ -238,7 +240,8 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 } => {
                     if let Some(mouse_btn) = mousestate.pressed_mouse_buttons().next() {
                         if let Some((select, col)) = self.parse_mouse_event(mouse_btn, x, y) {
-                            let evt = self.selection.mouse_move(select, col);
+                            let modifiers = self.mod_state();
+                            let evt = self.selection.mouse_move(select, col, modifiers);
                             if let Some(evt) = evt {
                                 self.sim_input_events.push(evt);
                             }
@@ -472,6 +475,10 @@ impl SdlBackendInit {
             };
             Some((select, col))
         })
+    }
+
+    fn mod_state(&self) -> Mod {
+        self.keep_alive.sdl.keyboard().mod_state()
     }
 }
 

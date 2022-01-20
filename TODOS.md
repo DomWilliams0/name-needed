@@ -1,4 +1,4 @@
-# TODOs (406)
+# TODOs (407)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -500,7 +500,8 @@
    * `// TODO render buttons`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (10)
+   * `// TODO better support for multiple entity selection in debug window`
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO component-specific widget`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
@@ -509,7 +510,7 @@
    * `// TODO switch to table API when available`
    * `// TODO use the arena for this`
    * `// TODO other job tabs`
-   * `// TODO proper way of checking if an entity is living`
+   * `// TODO proper way of checking if an entity is living e.g. separate component for container ownership`
  * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (3)
    * `// TODO handle failure better?`
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`

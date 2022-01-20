@@ -1,6 +1,7 @@
+use sdl2::keyboard::Mod;
 use sdl2::mouse::MouseButton;
 
-use simulation::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
+use simulation::input::{InputEvent, InputModifier, SelectType, SelectionProgress, WorldColumn};
 
 #[derive(Copy, Clone)]
 enum MouseState {
@@ -22,11 +23,16 @@ impl Selection {
         }
     }
 
-    pub fn mouse_up(&mut self, select: SelectType, pos: WorldColumn) -> Option<InputEvent> {
+    pub fn mouse_up(
+        &mut self,
+        select: SelectType,
+        pos: WorldColumn,
+        modifiers: Mod,
+    ) -> Option<InputEvent> {
         let evt = match self.0 {
             MouseState::Down(prev_select) if select == prev_select => {
                 // single selection at the mouse up location, ignoring the down location
-                Some(InputEvent::Click(select, pos))
+                Some(InputEvent::Click(select, pos, parse_modifiers(modifiers)))
             }
             MouseState::Dragging {
                 select: prev_select,
@@ -38,6 +44,7 @@ impl Selection {
                     from: start,
                     to: pos,
                     progress: SelectionProgress::Complete,
+                    modifiers: parse_modifiers(modifiers),
                 })
             }
             _ => None,
@@ -51,7 +58,12 @@ impl Selection {
         evt
     }
 
-    pub fn mouse_move(&mut self, select: SelectType, pos: WorldColumn) -> Option<InputEvent> {
+    pub fn mouse_move(
+        &mut self,
+        select: SelectType,
+        pos: WorldColumn,
+        modifiers: Mod,
+    ) -> Option<InputEvent> {
         match self.0 {
             MouseState::Down(prev_select) if prev_select == select => {
                 // start dragging
@@ -66,6 +78,7 @@ impl Selection {
                 from: start,
                 to: pos,
                 progress: SelectionProgress::InProgress,
+                modifiers: parse_modifiers(modifiers),
             }),
             _ => None,
         }
@@ -84,4 +97,22 @@ impl Default for Selection {
     fn default() -> Self {
         Selection(MouseState::Unpressed)
     }
+}
+
+fn parse_modifiers(modifiers: Mod) -> InputModifier {
+    let mut out = InputModifier::empty();
+
+    if modifiers.intersects(Mod::LCTRLMOD | Mod::RCTRLMOD) {
+        out.insert(InputModifier::CTRL);
+    }
+
+    if modifiers.intersects(Mod::LSHIFTMOD | Mod::RSHIFTMOD) {
+        out.insert(InputModifier::SHIFT);
+    }
+
+    if modifiers.intersects(Mod::LALTMOD | Mod::RALTMOD) {
+        out.insert(InputModifier::ALT);
+    }
+
+    out
 }

@@ -1,7 +1,7 @@
 use imgui::{im_str, ChildWindow, Selectable, StyleColor};
 use std::fmt::Display;
 
-use simulation::input::{SelectedEntity, SelectedTiles, UiRequest};
+use simulation::input::{SelectedEntities, SelectedTiles, UiRequest};
 use simulation::{AssociatedBlockData, ComponentWorld, PlayerSociety, Societies, SocietyHandle};
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
@@ -116,8 +116,8 @@ impl SocietyWindow {
 
             // entity selection and block selection
             if let Some((entity, target)) = ecs
-                .resource::<SelectedEntity>()
-                .get_unchecked()
+                .resource::<SelectedEntities>()
+                .just_one()
                 .zip(block_selection.and_then(|sel| sel.single_tile()))
             {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {

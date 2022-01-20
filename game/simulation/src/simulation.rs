@@ -17,8 +17,8 @@ use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntity,
-    SelectedTiles, UiCommand, UiPopup, UiRequest, UiResponsePayload, WorldColumn,
+    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntities,
+    SelectedTiles, UiCommand, UiPopup, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -385,11 +385,8 @@ impl<R: Renderer> Simulation<R> {
                             .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
-                UiRequest::IssueDivineCommand(ref divine_command) => {
-                    let entity = match self
-                        .ecs_world
-                        .resource_mut::<SelectedEntity>()
-                        .get(&*self.ecs_world)
+                UiRequest::IssueDivineCommand(divine_command) => {
+                    let entity = match self.ecs_world.resource_mut::<SelectedEntities>().just_one()
                     {
                         Some(e) => e,
                         None => {
@@ -400,7 +397,7 @@ impl<R: Renderer> Simulation<R> {
 
                     let command = match divine_command {
                         DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
-                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(*pos),
+                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos),
                     };
 
                     match self.ecs_world.component_mut::<AiComponent>(entity) {
@@ -496,10 +493,10 @@ impl<R: Renderer> Simulation<R> {
                     if !popup.close() {
                         // fallback to clearing tile and entity selections
                         let tiles = self.ecs_world.resource_mut::<SelectedTiles>();
-                        let entity = self.ecs_world.resource_mut::<SelectedEntity>();
+                        let entities = self.ecs_world.resource_mut::<SelectedEntities>();
 
                         tiles.clear();
-                        entity.unselect(&self.ecs_world);
+                        entities.unselect_all(&self.ecs_world);
                     }
                 }
                 UiRequest::CancelPopup => {
@@ -685,7 +682,7 @@ impl Add<u32> for Tick {
 fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult<()> {
     world.insert(QueuedUpdates::default());
     world.insert(EntitiesToKill::default());
-    world.insert(SelectedEntity::default());
+    world.insert(SelectedEntities::default());
     world.insert(SelectedTiles::default());
     world.insert(TerrainUpdatesRes::default());
     world.insert(Societies::default());
