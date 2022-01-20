@@ -2,7 +2,7 @@ use common::*;
 use unit::world::{WorldPoint, WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
-use crate::input::popup::{PopupContent, UiPopup};
+use crate::input::popup::{PopupContentType, UiPopup};
 pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
@@ -124,10 +124,10 @@ impl<'a> System<'a> for InputSystem<'a> {
                 InputEvent::Click(SelectType::Right, pos) => {
                     if selected_block.is_right_click_relevant(pos) {
                         // show popup for selection
-                        popups.open(PopupContent::TileSelection);
+                        popups.open(PopupContentType::TileSelection);
                     } else if let Some(entity) = resolve_entity(pos) {
                         // show popup for entity
-                        popups.open(PopupContent::Entity(entity));
+                        popups.open(PopupContentType::Entity(entity));
                     }
                 }
             }

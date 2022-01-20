@@ -1,8 +1,10 @@
-# TODOs (403)
+# TODOs (406)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
+ * [.planning/active.md](.planning/active.md) (1)
+   * `* TODO prioritise`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `// TODO use a simpler manual vec that doesnt run destructors`
  * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
@@ -228,6 +230,9 @@
    * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
    * `// TODO expand/contract in a direction`
+ * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (2)
+   * `// TODO bump alloc`
+   * `// TODO`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
@@ -492,7 +497,7 @@
    * `// TODO use instances or indices?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/render.rs](renderer/engine/src/render/sdl/ui/render.rs) (1)
-   * `// TODO actual popup content`
+   * `// TODO render buttons`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)

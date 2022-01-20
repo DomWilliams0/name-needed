@@ -548,6 +548,12 @@ impl<'a, T: Component + Debug> Debug for ComponentRef<'a, T> {
     }
 }
 
+impl<'a, T: Component + Display> Display for ComponentRef<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        Display::fmt(self.comp, f)
+    }
+}
+
 impl<T: Component, U> Deref for ComponentRefMapped<'_, T, U> {
     type Target = U;
 

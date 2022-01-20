@@ -7,7 +7,9 @@
     * [ ] show selection dimensions in world
 * popups and ui selection changes
     * [X] test popups with an invisible imgui window
-    * [o] selection-sensitive right click context menu
+    * [X] selection-sensitive right click context menu
+        * [ ] populate for entity selection
+        * [ ] populate for tile selection
     * [X] close popup on camera move
     * [X] escape for clearing tile and entity selection (rebind quit)
 * [X] ui for creating jobs for building many blocks

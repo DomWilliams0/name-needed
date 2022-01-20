@@ -19,7 +19,6 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
 };
-use crate::ui_str;
 
 pub struct Ui {
     imgui: Context,
@@ -204,7 +203,7 @@ impl Ui {
 
 impl State {
     /// Renders ui windows
-    fn render(&mut self, context: UiContext, mut popup: PreparedUiPopup) {
+    fn render(&mut self, context: UiContext, mut popups: PreparedUiPopup) {
         imgui::Window::new(im_str!("Debug"))
             .size([400.0, 500.0], Condition::FirstUseEver)
             .position([10.0, 10.0], Condition::FirstUseEver)
@@ -241,6 +240,7 @@ impl State {
                     | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS,
             )
             .build(context.ui(), || {
+                #[allow(clippy::enum_variant_names)]
                 enum Rendered {
                     No,
                     OpenAndRendered,
@@ -248,23 +248,28 @@ impl State {
                 }
 
                 let mut rendered = Rendered::No;
-                for (content, open) in popup.iter_all() {
+                for popup in popups.iter_all() {
                     let id = im_str!("popup");
                     rendered = Rendered::OpenButNotRendered;
 
+                    let (renderable, open) = popup.as_renderable(context.simulation().ecs);
                     if open {
                         context.open_popup(id);
                     }
 
                     context.popup(id, || {
-                        // TODO actual popup content
-                        context.text(ui_str!(in context, "{:?}", content));
+                        // title
+                        context.text(renderable.title());
+                        context.separator();
+
+                        // TODO render buttons
+
                         rendered = Rendered::OpenAndRendered;
                     });
                 }
 
                 if let Rendered::OpenButNotRendered = rendered {
-                    popup.on_close();
+                    popups.on_close();
                 }
             });
         style.pop(context.ui());
