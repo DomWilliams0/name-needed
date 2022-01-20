@@ -44,6 +44,10 @@ pub enum UiRequest {
 
     ModifySelection(SelectionModification),
 
+    /// Closes current popup if any
+    CancelPopup,
+
+    /// Closes current popup if any then clears entity+tile selection
     CancelSelection,
 }
 

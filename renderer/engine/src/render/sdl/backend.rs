@@ -414,20 +414,21 @@ impl SdlBackendInit {
                             // move by 1 slice
                             self.world_viewer.move_by(delta);
                         }
+
+                        None
                     }
 
                     (_, Camera(direction)) => {
                         self.camera.handle_move(direction, is_down);
+                        Some(UiRequest::CancelPopup)
                     }
                     _ => {
                         if is_down {
                             warn!("unhandled key down: {:?}", key);
                         }
+                        None
                     }
-                };
-
-                // no ui command to return
-                None
+                }
             }
             KeyAction::Engine(key) => {
                 if is_down {

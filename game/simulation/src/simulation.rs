@@ -502,6 +502,10 @@ impl<R: Renderer> Simulation<R> {
                         entity.unselect(&self.ecs_world);
                     }
                 }
+                UiRequest::CancelPopup => {
+                    // close current popup only
+                    self.ecs_world.resource_mut::<UiPopup>().close();
+                }
             }
         }
 
