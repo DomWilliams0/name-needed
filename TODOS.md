@@ -1,10 +1,8 @@
-# TODOs (407)
+# TODOs (408)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [.planning/active.md](.planning/active.md) (1)
-   * `* TODO prioritise`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `// TODO use a simpler manual vec that doesnt run destructors`
  * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
@@ -233,10 +231,12 @@
  * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (2)
    * `// TODO bump alloc`
    * `// TODO`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (5)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
-   * `// TODO select multiple entities`
+   * `// TODO spatial lookup for all entities contained in the given range`
+   * `// TODO prune dead entities from selection at some point`
+   * `// TODO need to bother tracking this?`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`

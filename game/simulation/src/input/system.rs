@@ -1,6 +1,7 @@
+use std::collections::HashSet;
+
 use common::*;
-pub use selected_entities::{SelectedComponent, SelectedEntities};
-use unit::world::{WorldPoint, WorldPosition, WorldPositionRange, WorldRange};
+use unit::world::{WorldPoint, WorldPointRange, WorldPosition, WorldPositionRange, WorldRange};
 
 use crate::ecs::*;
 use crate::input::popup::{PopupContentType, UiPopup};
@@ -15,6 +16,20 @@ pub struct InputSystem<'a> {
 }
 
 const TILE_SELECTION_LIMIT: f32 = 50.0;
+
+/// Marker for entity selection by the player
+#[derive(Component, EcsComponent, Default)]
+#[storage(NullStorage)]
+#[name("selected")]
+#[clone(disallow)]
+pub struct SelectedComponent;
+
+#[derive(Default)]
+pub struct SelectedEntities {
+    entities: HashSet<Entity>,
+    last: Option<Entity>,
+    drag_in_progress: Option<WorldPointRange>,
+}
 
 impl<'a> InputSystem<'a> {
     /// Events for this tick
@@ -82,13 +97,49 @@ impl<'a> System<'a> for InputSystem<'a> {
                 })
         };
 
+        let resolve_all_entities_in_range = |range: WorldPointRange| {
+            // TODO spatial lookup for all entities contained in the given range
+            (&entities, &transform)
+                .join()
+                .filter_map(move |(e, transform)| {
+                    if range.contains(&transform.position) {
+                        Some(e.into())
+                    } else {
+                        None
+                    }
+                })
+        };
+
         for e in self.events {
             match e {
                 InputEvent::Select {
                     select: SelectType::Left,
-                    ..
+                    from,
+                    to,
+                    progress,
+                    modifiers,
                 } => {
-                    // TODO select multiple entities
+                    let additive = modifiers.contains(InputModifier::SHIFT);
+
+                    if !additive {
+                        // unselect all entities first
+                        entity_sel.unselect_all_with_comps(&mut selecteds);
+                    }
+
+                    match progress {
+                        SelectionProgress::InProgress => {
+                            entity_sel.update_dragged_selection((*from, *to));
+                        }
+                        SelectionProgress::Complete => {
+                            // no lasting selection
+                            entity_sel.clear_dragged_selection();
+
+                            let range = SelectedEntities::calculate_drag_range((*from, *to));
+                            for e in resolve_all_entities_in_range(range) {
+                                entity_sel.select_with_comps(&mut selecteds, e);
+                            }
+                        }
+                    }
                 }
 
                 InputEvent::Select {
@@ -127,6 +178,85 @@ impl<'a> System<'a> for InputSystem<'a> {
                 }
             }
         }
+    }
+}
+
+// TODO prune dead entities from selection at some point
+impl SelectedEntities {
+    pub fn select(&mut self, world: &EcsWorld, e: Entity) {
+        let mut selecteds = world.write_storage();
+        self.select_with_comps(&mut selecteds, e)
+    }
+
+    fn select_with_comps(&mut self, selecteds: &mut WriteStorage<SelectedComponent>, e: Entity) {
+        debug!("selected entity"; e);
+        if self.entities.insert(e) {
+            let _ = selecteds.insert(e.into(), SelectedComponent);
+        }
+        self.last = Some(e);
+    }
+
+    pub fn unselect(&mut self, world: &EcsWorld, e: Entity) {
+        if self.entities.remove(&e) {
+            world.remove_now::<SelectedComponent>(e);
+
+            if self.last == Some(e) {
+                self.last = self.entities.iter().next().copied();
+            }
+        }
+    }
+
+    pub fn unselect_all(&mut self, world: &EcsWorld) {
+        let mut selecteds = world.write_storage();
+        self.unselect_all_with_comps(&mut selecteds)
+    }
+
+    fn unselect_all_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
+        for e in self.entities.drain() {
+            debug!("unselected entity"; e);
+            comp.remove(e.into());
+        }
+        self.last = None;
+    }
+
+    /// Could be dead
+    pub fn iter_unchecked(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.entities.iter().copied()
+    }
+
+    // TODO need to bother tracking this?
+    /// Could be dead
+    pub fn primary(&self) -> Option<Entity> {
+        self.last
+    }
+
+    /// Could be dead
+    pub fn just_one(&self) -> Option<Entity> {
+        self.entities.iter().exactly_one().ok().copied()
+    }
+
+    pub fn count(&self) -> usize {
+        self.entities.len()
+    }
+
+    pub fn drag_in_progress(&self) -> Option<&WorldPointRange> {
+        self.drag_in_progress.as_ref()
+    }
+
+    fn update_dragged_selection(&mut self, range: (WorldColumn, WorldColumn)) {
+        self.drag_in_progress = Some(Self::calculate_drag_range(range));
+    }
+
+    fn calculate_drag_range((from, to): (WorldColumn, WorldColumn)) -> WorldPointRange {
+        let min_z = NotNan::new(from.slice_range.bottom().slice() as f32)
+            .expect("i32 -> f32 should be valid");
+        let max_z =
+            NotNan::new(to.slice_range.top().slice() as f32).expect("i32 -> f32 should be valid");
+        WorldPointRange::with_inclusive_range((from.x, from.y, min_z), (to.x, to.y, max_z))
+    }
+
+    fn clear_dragged_selection(&mut self) {
+        self.drag_in_progress = None;
     }
 }
 
@@ -401,86 +531,6 @@ mod selected_tiles {
                 format!("{}", BlockOccurrences(&map)),
                 "[5xAir, 2xDirt, 10xGrass]"
             );
-        }
-    }
-}
-
-mod selected_entities {
-    use std::collections::HashSet;
-
-    use common::*;
-
-    use crate::ecs::*;
-
-    /// Marker for entity selection by the player
-    #[derive(Component, EcsComponent, Default)]
-    #[storage(NullStorage)]
-    #[name("selected")]
-    #[clone(disallow)]
-    pub struct SelectedComponent;
-
-    #[derive(Default)]
-    pub struct SelectedEntities {
-        entities: HashSet<Entity>,
-        last: Option<Entity>,
-    }
-
-    impl SelectedEntities {
-        pub fn select(&mut self, world: &EcsWorld, e: Entity) {
-            let mut selecteds = world.write_storage();
-            self.select_with_comps(&mut selecteds, e)
-        }
-
-        pub fn select_with_comps(
-            &mut self,
-            selecteds: &mut WriteStorage<SelectedComponent>,
-            e: Entity,
-        ) {
-            debug!("selected entity"; e);
-            if self.entities.insert(e) {
-                let _ = selecteds.insert(e.into(), SelectedComponent);
-            }
-            self.last = Some(e);
-        }
-
-        pub fn unselect(&mut self, world: &EcsWorld, e: Entity) {
-            if self.entities.remove(&e) {
-                world.remove_now::<SelectedComponent>(e);
-
-                if self.last == Some(e) {
-                    self.last = self.entities.iter().next().copied();
-                }
-            }
-        }
-
-        pub fn unselect_all(&mut self, world: &EcsWorld) {
-            let mut selecteds = world.write_storage();
-            self.unselect_all_with_comps(&mut selecteds)
-        }
-
-        pub fn unselect_all_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
-            for e in self.entities.drain() {
-                debug!("unselected entity"; e);
-                comp.remove(e.into());
-            }
-            self.last = None;
-        }
-
-        /// Could be dead
-        pub fn iter_unchecked(&self) -> impl Iterator<Item = Entity> + '_ {
-            self.entities.iter().copied()
-        }
-
-        pub fn primary(&self) -> Option<Entity> {
-            self.last
-        }
-
-        pub fn just_one(&self) -> Option<Entity> {
-            self.entities.iter().exactly_one().ok().copied()
-        }
-
-        pub fn count(&self) -> usize {
-            self.entities.len()
         }
     }
 }

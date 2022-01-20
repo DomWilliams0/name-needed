@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Sub};
 
 use common::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
-use std::fmt::Debug;
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
@@ -168,6 +168,12 @@ impl From<WorldPoint> for Vector3 {
             y: p.y(),
             z: p.z(),
         }
+    }
+}
+
+impl From<(NotNan<f32>, NotNan<f32>, NotNan<f32>)> for WorldPoint {
+    fn from((x, y, z): (NotNan<f32>, NotNan<f32>, NotNan<f32>)) -> Self {
+        Self(x, y, z)
     }
 }
 

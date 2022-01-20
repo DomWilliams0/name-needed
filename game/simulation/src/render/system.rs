@@ -8,7 +8,7 @@ use common::*;
 use unit::world::BLOCKS_PER_METRE;
 
 use crate::ecs::*;
-use crate::input::{SelectedComponent, SelectedTiles, SelectionProgress};
+use crate::input::{SelectedComponent, SelectedEntities, SelectedTiles, SelectionProgress};
 
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
@@ -39,6 +39,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         Read<'a, PlayerSociety>,
         Read<'a, SelectedTiles>,
+        Read<'a, SelectedEntities>,
         Read<'a, EntitiesRes>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
@@ -54,7 +55,8 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         &mut self,
         (
             player_soc,
-            selected_block,
+            block_sel,
+            entity_sel,
             entities,
             transform,
             render,
@@ -106,14 +108,21 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             }
         }
 
-        // render player's world selection
-        if let Some(sel) = selected_block.current() {
+        // render player's selections
+        if let Some(sel) = block_sel.current() {
             let (from, to) = sel.bounds();
             let (color, finished) = match sel.progress() {
                 SelectionProgress::InProgress => (Color::rgb(216, 221, 230), false),
                 SelectionProgress::Complete => (Color::rgb(252, 253, 255), true),
             };
-            self.renderer.tile_selection(from, to, color, finished);
+            self.renderer
+                .selection(from.into(), to.into(), color, finished);
+        }
+
+        if let Some(range) = entity_sel.drag_in_progress() {
+            let (from, to) = range.bounds();
+            let color = Color::rgb(216, 221, 230);
+            self.renderer.selection(from, to, color, false);
         }
 
         // render in-game ui elements above entities
