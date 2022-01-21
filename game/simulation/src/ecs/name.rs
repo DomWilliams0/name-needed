@@ -330,6 +330,10 @@ impl KindComponent {
     pub fn make_stack(&mut self) {
         self.1 = Some(KindModifier::Stack);
     }
+
+    pub fn from_display(s: &dyn Display) -> Self {
+        Self(s.to_string(), None)
+    }
 }
 
 impl Display for KindComponent {

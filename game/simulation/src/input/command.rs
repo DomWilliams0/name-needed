@@ -1,10 +1,9 @@
-use unit::world::WorldPosition;
 use world::block::BlockType;
 
 use crate::ecs::Entity;
 use crate::scripting::ScriptingError;
 use crate::society::job::SocietyCommand;
-use crate::{Exit, SocietyHandle};
+use crate::{AiAction, Exit, SocietyHandle};
 use common::*;
 
 use std::borrow::Cow;
@@ -24,7 +23,9 @@ pub enum UiRequest {
 
     FillSelectedTiles(BlockPlacement, BlockType),
 
-    IssueDivineCommand(DivineInputCommand),
+    IssueDivineCommand(AiAction),
+
+    CancelDivineCommand,
 
     IssueSocietyCommand(SocietyHandle, SocietyCommand),
 
@@ -78,12 +79,6 @@ pub struct UiResponse {
 
 pub type UiCommands = Vec<UiCommand>;
 
-#[derive(Debug)]
-pub enum DivineInputCommand {
-    Goto(WorldPosition),
-    Break(WorldPosition),
-}
-
 #[derive(Copy, Clone, PartialEq)]
 pub enum BlockPlacement {
     Set,
@@ -92,6 +87,7 @@ pub enum BlockPlacement {
 
 impl UiCommand {
     pub fn new(req: UiRequest) -> UiCommand {
+        // TODO only allocate uiresponse for those that need it
         Self {
             req,
             response: UiResponse {

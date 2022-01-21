@@ -5,16 +5,16 @@ use serde::{Deserialize, Serialize};
 
 use common::*;
 use simulation::input::{
-    BlockPlacement, DivineInputCommand, SelectedEntities, SelectedTiles, SelectionModification,
-    SelectionProgress, UiRequest,
+    BlockPlacement, SelectedEntities, SelectedTiles, SelectionModification, SelectionProgress,
+    UiRequest,
 };
 use simulation::job::BuildThingJob;
 use simulation::{
-    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
-    ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
-    EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, TransformComponent, UiElementComponent,
+    ActivityComponent, AiAction, AssociatedBlockData, AssociatedBlockDataType, BlockType,
+    ComponentRef, ComponentWorld, ConditionComponent, Container, ContainerComponent,
+    EdibleItemComponent, Entity, EntityLoggingComponent, FollowPathComponent, HungerComponent,
+    IntoEnumIterator, InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent,
+    Societies, SocietyComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
@@ -326,19 +326,19 @@ impl SelectionWindow {
             let tab = context.new_tab(im_str!("Control"));
             if tab.is_open() {
                 let world_selection = ecs.resource::<SelectedTiles>();
-                if let Some(tile) = world_selection
+                if let Some(block) = world_selection
                     .current_selected()
                     .and_then(|sel| sel.single_tile())
                 {
                     if context.button(im_str!("Go to selected block"), [0.0, 0.0]) {
-                        context.issue_request(UiRequest::IssueDivineCommand(
-                            DivineInputCommand::Goto(tile.above()),
-                        ));
+                        context.issue_request(UiRequest::IssueDivineCommand(AiAction::Goto(
+                            block.above().centred(),
+                        )));
                     }
 
                     if context.button(im_str!("Break selected block"), [0.0, 0.0]) {
                         context.issue_request(UiRequest::IssueDivineCommand(
-                            DivineInputCommand::Break(tile),
+                            AiAction::GoBreakBlock(block),
                         ));
                     }
                 } else {

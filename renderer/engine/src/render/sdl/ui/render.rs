@@ -19,6 +19,7 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
 };
+use crate::ui_str;
 
 pub struct Ui {
     imgui: Context,
@@ -262,7 +263,14 @@ impl State {
                         context.text(renderable.title());
                         context.separator();
 
-                        // TODO render buttons
+                        for button in renderable.buttons() {
+                            // TODO render disabled buttons
+                            if context.button(ui_str!(in context, "{}", button), [0.0, 0.0]) {
+                                if let Some(req) = button.request() {
+                                    context.issue_request(req);
+                                }
+                            }
+                        }
 
                         rendered = Rendered::OpenAndRendered;
                     });

@@ -8,18 +8,17 @@ use common::*;
 use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
+use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
+use crate::job::JobIndex;
 use crate::needs::HungerComponent;
 use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
-use crate::{EntityLoggingComponent, TransformComponent};
-
-use crate::alloc::FrameAllocator;
-use crate::job::JobIndex;
 use crate::string::StringCache;
 use crate::{dse, Societies};
+use crate::{EntityLoggingComponent, TransformComponent};
 
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
@@ -55,6 +54,18 @@ impl AiComponent {
 
     pub fn last_action(&self) -> &AiAction {
         self.intelligence.last_action()
+    }
+
+    pub fn is_current_divine(&self) -> bool {
+        self.current
+            .as_ref()
+            .map(|src| {
+                matches!(
+                    src,
+                    DecisionSource::Additional(AdditionalDse::DivineCommand, _)
+                )
+            })
+            .unwrap_or_default()
     }
 
     pub fn clear_last_action(&mut self) {

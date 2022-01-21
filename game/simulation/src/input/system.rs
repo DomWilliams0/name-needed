@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use common::*;
 use unit::world::{WorldPoint, WorldPointRange, WorldPosition, WorldPositionRange, WorldRange};
 
@@ -9,7 +7,7 @@ pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, InputModifier, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
-use crate::{UiElementComponent, WorldRef};
+use crate::{Tick, UiElementComponent, WorldRef};
 
 pub struct InputSystem<'a> {
     events: &'a [InputEvent],
@@ -27,9 +25,9 @@ pub struct SelectedComponent;
 
 #[derive(Default)]
 pub struct SelectedEntities {
-    entities: HashSet<Entity>,
-    last: Option<Entity>,
+    entities: Vec<Entity>,
     drag_in_progress: Option<WorldPointRange>,
+    last_prune: Tick,
 }
 
 impl<'a> InputSystem<'a> {
@@ -75,31 +73,27 @@ impl<'a> System<'a> for InputSystem<'a> {
             ui,
         ): Self::SystemData,
     ) {
+        let resolve_entity_near_point = |point: WorldPoint| {
+            // TODO multiple clicks in the same place should iterate through all entities in selection range
+            // TODO spatial lookup for ui elements too
+            // prioritise ui elements first
+            let ui_elem = (&entities, &transform, &ui)
+                .join()
+                .find(|(_, transform, _)| transform.position.is_almost(&point, DISTANCE_THRESHOLD))
+                .map(|(e, _, _)| e.into());
+
+            // fallback to looking for normal entities
+            ui_elem.or_else(|| {
+                spatial
+                    .query_in_radius(Transforms::Storage(&transform), point, DISTANCE_THRESHOLD)
+                    .next()
+                    .map(|(e, _, _)| e)
+            })
+        };
+
         let resolve_entity = |select_pos: &WorldColumn| {
             self.resolve_walkable_pos(select_pos, &world)
-                .and_then(|point| {
-                    // TODO multiple clicks in the same place should iterate through all entities in selection range
-                    // prioritise ui elements first
-                    // TODO spatial lookup for ui elements too
-                    let ui_elem = (&entities, &transform, &ui)
-                        .join()
-                        .find(|(_, transform, _)| {
-                            transform.position.is_almost(&point, DISTANCE_THRESHOLD)
-                        })
-                        .map(|(e, _, _)| e.into());
-
-                    // fallback to looking for normal entities
-                    ui_elem.or_else(|| {
-                        spatial
-                            .query_in_radius(
-                                Transforms::Storage(&transform),
-                                point,
-                                DISTANCE_THRESHOLD,
-                            )
-                            .next()
-                            .map(|(e, _, _)| e)
-                    })
-                })
+                .and_then(resolve_entity_near_point)
         };
 
         let resolve_all_entities_in_range = |range: WorldPointRange| {
@@ -154,6 +148,7 @@ impl<'a> System<'a> for InputSystem<'a> {
                     progress,
                     ..
                 } => {
+                    // TODO additive tile selection
                     // update tile selection
                     tile_sel.update((*from, *to), *progress, &world);
                 }
@@ -174,11 +169,15 @@ impl<'a> System<'a> for InputSystem<'a> {
 
                 InputEvent::Click(SelectType::Right, pos, _) => {
                     if tile_sel.is_right_click_relevant(pos) {
-                        // show popup for selection
                         popups.open(PopupContentType::TileSelection);
-                        // } else if let Some(entity) = resolve_entity(pos) {
-                        //     // show popup for entity
-                        //     popups.open(PopupContentType::Entity(entity));
+                    } else if let Some(walkable) = self.resolve_walkable_pos(pos, &world) {
+                        let popup = if let Some(target) = resolve_entity_near_point(walkable) {
+                            PopupContentType::TargetEntity(target)
+                        } else {
+                            PopupContentType::TargetPoint(walkable)
+                        };
+
+                        popups.open(popup)
                     }
                 }
             }
@@ -194,20 +193,19 @@ impl SelectedEntities {
     }
 
     fn select_with_comps(&mut self, selecteds: &mut WriteStorage<SelectedComponent>, e: Entity) {
-        debug!("selected entity"; e);
-        if self.entities.insert(e) {
-            let _ = selecteds.insert(e.into(), SelectedComponent);
+        let res = selecteds.insert(e.into(), SelectedComponent);
+        if let Ok(None) = res {
+            debug_assert!(!self.entities.contains(&e));
+            self.entities.push(e);
+            debug!("selected entity"; e);
         }
-        self.last = Some(e);
     }
 
     pub fn unselect(&mut self, world: &EcsWorld, e: Entity) {
-        if self.entities.remove(&e) {
+        let idx = self.entities.iter().position(|selected| *selected == e);
+        if let Some(idx) = idx {
+            self.entities.remove(idx); // preserve order, this isn't done often
             world.remove_now::<SelectedComponent>(e);
-
-            if self.last == Some(e) {
-                self.last = self.entities.iter().next().copied();
-            }
         }
     }
 
@@ -217,27 +215,33 @@ impl SelectedEntities {
     }
 
     fn unselect_all_with_comps(&mut self, comp: &mut WriteStorage<SelectedComponent>) {
-        for e in self.entities.drain() {
+        for e in self.entities.drain(..) {
             debug!("unselected entity"; e);
             comp.remove(e.into());
         }
-        self.last = None;
     }
 
     /// Could be dead
-    pub fn iter_unchecked(&self) -> impl Iterator<Item = Entity> + '_ {
-        self.entities.iter().copied()
-    }
-
-    // TODO need to bother tracking this?
-    /// Could be dead
-    pub fn primary(&self) -> Option<Entity> {
-        self.last
+    pub fn iter_unchecked(&self) -> &[Entity] {
+        &self.entities
     }
 
     /// Could be dead
     pub fn just_one(&self) -> Option<Entity> {
-        self.entities.iter().exactly_one().ok().copied()
+        if self.entities.len() == 1 {
+            let iter = self.entities.first();
+            // safety: checked length
+            let e = unsafe { iter.unwrap_unchecked() };
+            Some(*e)
+        } else {
+            None
+        }
+    }
+
+    /// Prunes dead entities first (only once per tick)
+    pub fn iter(&mut self, world: &EcsWorld) -> &[Entity] {
+        self.prune(world);
+        &self.entities
     }
 
     pub fn count(&self) -> usize {
@@ -262,6 +266,21 @@ impl SelectedEntities {
 
     fn clear_dragged_selection(&mut self) {
         self.drag_in_progress = None;
+    }
+
+    fn prune(&mut self, world: &EcsWorld) {
+        let now = Tick::fetch();
+        if now != self.last_prune {
+            self.last_prune = now;
+
+            self.entities.retain(|e| {
+                let keep = world.is_entity_alive(*e);
+                if !keep {
+                    debug!("pruning dead entity from selection"; e)
+                }
+                keep
+            });
+        }
     }
 }
 

@@ -12,13 +12,13 @@ use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
 use crate::activity::ActivitySystem;
-use crate::ai::{AiAction, AiComponent, AiSystem};
+use crate::ai::{AiComponent, AiSystem};
 use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntities,
-    SelectedTiles, UiCommand, UiPopup, UiRequest, UiResponsePayload,
+    BlockPlacement, InputEvent, InputSystem, MouseLocation, SelectedEntities, SelectedTiles,
+    UiCommand, UiPopup, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -385,26 +385,16 @@ impl<R: Renderer> Simulation<R> {
                             .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
-                UiRequest::IssueDivineCommand(divine_command) => {
-                    let entity = match self.ecs_world.resource_mut::<SelectedEntities>().just_one()
-                    {
-                        Some(e) => e,
-                        None => {
-                            warn!("no selected entity to issue divine command to"; "command" => ?divine_command);
-                            continue;
-                        }
-                    };
-
-                    let command = match divine_command {
-                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
-                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(pos),
-                    };
-
-                    match self.ecs_world.component_mut::<AiComponent>(entity) {
-                        Err(e) => warn!("can't issue divine command"; "error" => %e),
-                        Ok(mut ai) => {
-                            // add DSE
-                            ai.add_divine_command(command.clone());
+                UiRequest::IssueDivineCommand(_) | UiRequest::CancelDivineCommand => {
+                    let mut ais = self.ecs_world.write_storage::<AiComponent>();
+                    let selected_entities = self.ecs_world.resource_mut::<SelectedEntities>();
+                    for selected in selected_entities.iter(&self.ecs_world) {
+                        if let Some(mut ai) = selected.get_mut(&mut ais) {
+                            if let UiRequest::IssueDivineCommand(ref command) = req {
+                                ai.add_divine_command(command.clone());
+                            } else {
+                                ai.remove_divine_command();
+                            }
                         }
                     }
                 }

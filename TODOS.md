@@ -1,4 +1,4 @@
-# TODOs (408)
+# TODOs (409)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -226,17 +226,18 @@
    * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (1)
+ * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (2)
    * `// TODO expand/contract in a direction`
+   * `// TODO only allocate uiresponse for those that need it`
  * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (2)
    * `// TODO bump alloc`
-   * `// TODO`
+   * `// TODO too easy to forget checks here - consider having each declare true/false/ignore needed for every button`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (5)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
+   * `// TODO additive tile selection`
    * `// TODO prune dead entities from selection at some point`
-   * `// TODO need to bother tracking this?`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
@@ -497,7 +498,7 @@
    * `// TODO use instances or indices?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/render.rs](renderer/engine/src/render/sdl/ui/render.rs) (1)
-   * `// TODO render buttons`
+   * `// TODO render disabled buttons`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (10)

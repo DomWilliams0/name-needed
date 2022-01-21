@@ -1,12 +1,13 @@
+use std::hash::{Hash, Hasher};
+use std::ops::{Add, Mul, SubAssign};
+
 use common::num_traits::*;
+use common::Itertools;
 
 use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
     WorldPosition,
 };
-use common::Itertools;
-use std::hash::{Hash, Hasher};
-use std::ops::{Add, Mul, SubAssign};
 
 #[derive(Clone, Debug, PartialOrd)]
 pub enum WorldRange<P: RangePosition> {
@@ -289,19 +290,27 @@ impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
 }
 
 impl WorldRange<WorldPosition> {
-    pub fn iter_blocks(self) -> impl Iterator<Item = WorldPosition> {
+    pub fn iter_blocks(&self) -> impl Iterator<Item = WorldPosition> {
         let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
         (az..=bz)
             .cartesian_product(ay..=by)
             .cartesian_product(ax..=bx)
             .map(move |((z, y), x)| (x, y, z).into())
     }
+
+    pub fn iter_columns(&self) -> impl Iterator<Item = (i32, i32)> {
+        let ((ax, bx), (ay, by), (_, _)) = self.ranges();
+        (ay..=by)
+            .cartesian_product(ax..=bx)
+            .map(move |(y, x)| (x, y))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
     use common::ApproxEq;
+
+    use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
 
     #[test]
     fn count() {

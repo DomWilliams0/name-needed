@@ -8,10 +8,9 @@
 * popups and ui selection changes
     * [X] test popups with an invisible imgui window
     * [X] selection-sensitive right click context menu
-        * [ ] populate for entity selection
-        * [ ] populate for tile selection
     * [X] close popup on camera move
     * [X] escape for clearing tile and entity selection (rebind quit)
+    * [o] improved ui for ordering people about and issuing society commands via popup
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview
@@ -26,4 +25,5 @@
 * [X] central registry of all builds including a unique identifier to refer to it in ui and its
     requests
 * [ ] update controls in readme
+* [ ] display basic info about multiple entity selection in ui
 

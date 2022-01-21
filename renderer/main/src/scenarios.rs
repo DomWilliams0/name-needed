@@ -1,10 +1,11 @@
 #![allow(dead_code)]
-use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
 use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies};
+
+use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -221,7 +222,6 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use crate::simulation::NameComponent;
     use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use engine::simulation;
@@ -232,6 +232,8 @@ mod helpers {
         SocietyComponent, SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange,
         WorldTerrainUpdate,
     };
+
+    use crate::simulation::NameComponent;
 
     pub fn get_config_count(wat: &str) -> usize {
         let counts = &config::get().simulation.spawn_counts;
