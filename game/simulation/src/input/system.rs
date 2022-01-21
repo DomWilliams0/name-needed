@@ -16,6 +16,7 @@ pub struct InputSystem<'a> {
 }
 
 const TILE_SELECTION_LIMIT: f32 = 50.0;
+const DISTANCE_THRESHOLD: f32 = 2.0;
 
 /// Marker for entity selection by the player
 #[derive(Component, EcsComponent, Default)]
@@ -78,19 +79,23 @@ impl<'a> System<'a> for InputSystem<'a> {
             self.resolve_walkable_pos(select_pos, &world)
                 .and_then(|point| {
                     // TODO multiple clicks in the same place should iterate through all entities in selection range
-                    const RADIUS: f32 = 1.25;
-
                     // prioritise ui elements first
                     // TODO spatial lookup for ui elements too
                     let ui_elem = (&entities, &transform, &ui)
                         .join()
-                        .find(|(_, transform, _)| transform.position.is_almost(&point, RADIUS))
+                        .find(|(_, transform, _)| {
+                            transform.position.is_almost(&point, DISTANCE_THRESHOLD)
+                        })
                         .map(|(e, _, _)| e.into());
 
                     // fallback to looking for normal entities
                     ui_elem.or_else(|| {
                         spatial
-                            .query_in_radius(Transforms::Storage(&transform), point, RADIUS)
+                            .query_in_radius(
+                                Transforms::Storage(&transform),
+                                point,
+                                DISTANCE_THRESHOLD,
+                            )
                             .next()
                             .map(|(e, _, _)| e)
                     })
@@ -388,7 +393,6 @@ mod selected_tiles {
         /// Is the given right click position close enough to the bottom right of the active
         /// selection
         pub fn is_right_click_relevant(&self, pos: &WorldColumn) -> bool {
-            const DISTANCE_THRESHOLD: f32 = 2.0;
             self.current_selected()
                 .map(|sel| {
                     // distance check to bottom right corner, ignoring z axis
