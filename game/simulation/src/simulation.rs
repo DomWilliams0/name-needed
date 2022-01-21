@@ -389,7 +389,7 @@ impl<R: Renderer> Simulation<R> {
                     let mut ais = self.ecs_world.write_storage::<AiComponent>();
                     let selected_entities = self.ecs_world.resource_mut::<SelectedEntities>();
                     for selected in selected_entities.iter(&self.ecs_world) {
-                        if let Some(mut ai) = selected.get_mut(&mut ais) {
+                        if let Some(ai) = selected.get_mut(&mut ais) {
                             if let UiRequest::IssueDivineCommand(ref command) = req {
                                 ai.add_divine_command(command.clone());
                             } else {
@@ -417,6 +417,17 @@ impl<R: Renderer> Simulation<R> {
                         continue;
                     }
                 }
+
+                UiRequest::CancelJob(job) => {
+                    if let Some(society) = self
+                        .world()
+                        .resource::<Societies>()
+                        .society_by_handle(job.society())
+                    {
+                        society.jobs_mut().cancel(job);
+                    }
+                }
+
                 UiRequest::SetContainerOwnership {
                     container,
                     owner,

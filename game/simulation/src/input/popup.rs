@@ -104,24 +104,26 @@ impl PreparedUiPopup<'_> {
 
 mod content {
     use std::fmt;
+    use std::iter::once;
 
-    use unit::world::{WorldPoint, WorldPosition, WorldPositionRange};
+    use common::SmallVec;
+    use unit::world::{WorldPoint, WorldPositionRange};
 
     use crate::ai::AiComponent;
     use crate::ecs::*;
-    use crate::input::popup::{content, PopupContentType, RenderedPopupContent};
+    use crate::input::popup::{PopupContentType, RenderedPopupContent};
     use crate::input::{SelectedEntities, SelectedTiles, UiRequest, UiResponse};
     use crate::item::HaulableItemComponent;
-    use crate::job::SocietyCommand;
+    use crate::job::{SocietyCommand, SocietyJobHandle};
     use crate::{
         AiAction, ContainedInComponent, FollowPathComponent, HaulPurpose, HaulSource, HaulTarget,
-        PlayerSociety, SocietyComponent, SocietyHandle, WorldRef,
+        PlayerSociety, SocietyComponent, SocietyHandle, UiElementComponent, WorldRef,
     };
 
     pub enum ButtonType {
         GoTo(WorldPoint),
         Follow(Entity),
-        CancelJob,
+        CancelJobs(SmallVec<[SocietyJobHandle; 1]>),
         CancelDivineCommand,
         /// Society command or divine command to all subjects
         Command(Option<SocietyHandle>, ButtonCommand),
@@ -149,15 +151,14 @@ mod content {
     struct Buttons(Vec<Button>);
 
     struct State<'a> {
-        has_subjects: bool,
         single_subject: bool,
         subjects_have_ai: bool,
         subjects_contain_self: bool,
         subjects_are_controllable: bool,
         target_has_path_finding: bool,
         target_is_haulable: bool,
-        player_society: Option<SocietyHandle>,
 
+        player_society: Read<'a, PlayerSociety>,
         tile_selection: Read<'a, SelectedTiles>,
         subjects: Write<'a, SelectedEntities>,
     }
@@ -187,13 +188,15 @@ mod content {
 
             let has_subjects = !subjects.is_empty();
             let single_subject = subjects.len() == 1;
-            let subjects_have_ai = subjects.iter().all(|e| e.has(&ais));
-            let subjects_contain_self = target_entity
-                .map(|target| subjects.iter().any(|e| *e == target))
-                .unwrap_or_default();
-            let subjects_are_controllable = subjects
-                .iter()
-                .all(|e| *player_soc == e.get(&socs).map(|comp| comp.handle));
+            let subjects_have_ai = has_subjects && subjects.iter().all(|e| e.has(&ais));
+            let subjects_contain_self = has_subjects
+                && target_entity
+                    .map(|target| subjects.iter().any(|e| *e == target))
+                    .unwrap_or_default();
+            let subjects_are_controllable = has_subjects
+                && subjects
+                    .iter()
+                    .all(|e| *player_soc == e.get(&socs).map(|comp| comp.handle()));
             let target_has_path_finding = target_entity
                 .map(|target| target.has(&paths))
                 .unwrap_or_default();
@@ -214,14 +217,13 @@ mod content {
                 .unwrap_or_default();
 
             State {
-                has_subjects,
                 single_subject,
                 subjects_have_ai,
                 subjects_contain_self,
                 subjects_are_controllable,
                 target_has_path_finding,
                 target_is_haulable,
-                player_society: player_soc.get(),
+                player_society: player_soc,
                 tile_selection: world_sel,
                 subjects: entity_sel,
             }
@@ -234,19 +236,19 @@ mod content {
         }
 
         fn player_has_society(&self) -> bool {
-            self.player_society.is_some()
+            self.player_society.get().is_some()
         }
     }
 
+    #[allow(clippy::collapsible_if)]
     pub fn prepare_popup(ty: PopupContentType, world: &EcsWorld) -> RenderedPopupContent {
-        let (target_entity, target_pos, title) = match ty {
-            PopupContentType::TileSelection => (None, None, "Selection".to_string()),
-            PopupContentType::TargetEntity(e) => (Some(e), None, mk_title_for(e, world)),
-            PopupContentType::TargetPoint(p) => (None, Some(p), format!("{}", p)),
-        };
+        type Query<'a> = (
+            Read<'a, WorldRef>,
+            ReadStorage<'a, AiComponent>,
+            ReadStorage<'a, UiElementComponent>,
+        );
 
-        type Query<'a> = (Read<'a, WorldRef>, ReadStorage<'a, AiComponent>);
-        let (voxel_world, ais) = <Query as SystemData>::fetch(world);
+        let (voxel_world, ais, uis) = <Query as SystemData>::fetch(world);
 
         let state = State::fetch(world, ty);
         let mut buttons = Buttons::default();
@@ -260,8 +262,7 @@ mod content {
 
                 // follow target entity
                 buttons.add(|| {
-                    if state.has_subjects
-                        && state.subjects_are_controllable
+                    if state.subjects_are_controllable
                         && !state.subjects_contain_self
                         && state.subjects_have_ai
                         && state.target_has_path_finding
@@ -311,20 +312,38 @@ mod content {
                             add(ButtonType::Command(None, cmd.clone()));
 
                             // societal
-                            if state.player_has_society() {
-                                add(ButtonType::Command(state.player_society, cmd));
+                            if let soc @ Some(_) = state.player_society.get() {
+                                add(ButtonType::Command(soc, cmd));
                             }
                         }
                     }
+                });
+
+                // cancel job
+                buttons.add(|| {
+                    // cancel all selected + target job
+                    if state.player_society.has() {
+                        let jobs = state
+                            .subjects()
+                            .iter()
+                            .copied()
+                            .chain(once(target_entity))
+                            .filter_map(|e| {
+                                e.get(&uis)
+                                    .map(|ui| ui.build_job)
+                                    .filter(|job| *state.player_society == job.society())
+                            });
+
+                        return Some(ButtonType::CancelJobs(jobs.collect()));
+                    }
+
+                    None
                 });
             }
             PopupContentType::TargetPoint(target_pos) => {
                 title = format!("{}", target_pos.floor());
                 buttons.add(|| {
-                    if state.has_subjects
-                        && state.subjects_have_ai
-                        && state.subjects_are_controllable
-                    {
+                    if state.subjects_have_ai && state.subjects_are_controllable {
                         return Some(ButtonType::GoTo(target_pos));
                     }
 
@@ -336,9 +355,9 @@ mod content {
 
                 if let Some(selection) = state.tile_selection.current_selected() {
                     buttons.add_multiple(|add| {
-                        if state.player_has_society() {
+                        if let soc @ Some(_) = state.player_society.get() {
                             add(ButtonType::Command(
-                                state.player_society,
+                                soc,
                                 ButtonCommand::BreakBlocks(selection.range().clone()),
                             ));
                         }
@@ -400,9 +419,9 @@ mod content {
             }
         }
 
-        pub fn request(&self) -> Option<UiRequest> {
+        pub fn issue_requests(&self, mut issue_req: impl FnMut(UiRequest) -> UiResponse) {
             use ButtonType::*;
-            Some(match &self.ty {
+            let req = match &self.ty {
                 GoTo(pos) => UiRequest::IssueDivineCommand(AiAction::Goto(*pos)),
                 Follow(e) => UiRequest::IssueDivineCommand(AiAction::Follow {
                     target: *e,
@@ -440,8 +459,14 @@ mod content {
                 }
 
                 CancelDivineCommand => UiRequest::CancelDivineCommand,
-                CancelJob => todo!(),
-            })
+                CancelJobs(jobs) => {
+                    return for job in jobs.iter() {
+                        issue_req(UiRequest::CancelJob(*job));
+                    }
+                }
+            };
+
+            issue_req(req);
         }
     }
 
@@ -458,7 +483,8 @@ mod content {
             let s = match self {
                 GoTo(_) => "Go here",
                 Follow(_) => "Follow",
-                CancelJob => "Cancel job",
+                CancelJobs(jobs) if jobs.len() == 1 => "Cancel job",
+                CancelJobs(jobs) => return write!(f, "Cancel {} jobs", jobs.len()),
                 CancelDivineCommand => "Cancel divine command",
                 Command(soc, cmd) => {
                     // special case

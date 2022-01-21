@@ -127,7 +127,7 @@ impl<'a> System<'a> for DisplayTextSystem {
 
         for (e, _, society) in (&entities, &name, (&society).maybe()).join() {
             // always display name for named society members
-            if *player_soc == society.map(|soc| soc.handle) {
+            if *player_soc == society.map(|soc| soc.handle()) {
                 self.preparation.insert(e, PreparedDisplay::Name);
             }
         }

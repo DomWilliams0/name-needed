@@ -171,7 +171,7 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
-                society: society_opt.map(|comp| comp.handle),
+                society: society_opt.map(|comp| comp.handle()),
                 ai,
                 world: &*ecs_world,
                 shared: &mut shared_bb,

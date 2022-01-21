@@ -290,7 +290,7 @@ impl SelectionWindow {
                             .as_ref()
                             .map(|comp| {
                                 let name = societies
-                                    .society_by_handle(comp.handle)
+                                    .society_by_handle(comp.handle())
                                     .map(|s| s.name())
                                     .unwrap_or("Invalid handle");
                                 ui_str!(in context, "{}", name)
@@ -299,7 +299,7 @@ impl SelectionWindow {
                     },
                     society
                         .as_ref()
-                        .map(|comp| ui_str!(in context, "{:?}", comp.handle)),
+                        .map(|comp| ui_str!(in context, "{:?}", comp.handle())),
                     COLOR_ORANGE,
                 );
             }
@@ -869,7 +869,7 @@ impl SelectionWindow {
                             context.issue_request(UiRequest::SetContainerOwnership {
                                 container: container_entity,
                                 owner: None,
-                                communal: Some(Some(society.handle)),
+                                communal: Some(Some(society.handle())),
                             });
                         }
                     }

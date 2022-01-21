@@ -127,6 +127,10 @@ impl PlayerSociety {
         self.own
     }
 
+    pub fn has(&self) -> bool {
+        matches!(self.visibility, SocietyVisibility::All) || self.own.is_some()
+    }
+
     pub fn set_visibility(&mut self, vis: SocietyVisibility) {
         self.visibility = vis
     }

@@ -11,6 +11,7 @@
     * [X] close popup on camera move
     * [X] escape for clearing tile and entity selection (rebind quit)
     * [o] improved ui for ordering people about and issuing society commands via popup
+    * [ ] close popup after button pressed
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview

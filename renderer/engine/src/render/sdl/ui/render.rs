@@ -266,9 +266,7 @@ impl State {
                         for button in renderable.buttons() {
                             // TODO render disabled buttons
                             if context.button(ui_str!(in context, "{}", button), [0.0, 0.0]) {
-                                if let Some(req) = button.request() {
-                                    context.issue_request(req);
-                                }
+                                button.issue_requests(|req| context.issue_request(req));
                             }
                         }
 

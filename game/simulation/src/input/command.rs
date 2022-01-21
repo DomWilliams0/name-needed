@@ -6,6 +6,7 @@ use crate::society::job::SocietyCommand;
 use crate::{AiAction, Exit, SocietyHandle};
 use common::*;
 
+use crate::job::SocietyJobHandle;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -28,6 +29,8 @@ pub enum UiRequest {
     CancelDivineCommand,
 
     IssueSocietyCommand(SocietyHandle, SocietyCommand),
+
+    CancelJob(SocietyJobHandle),
 
     SetContainerOwnership {
         container: Entity,
