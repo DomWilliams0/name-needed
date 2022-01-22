@@ -25,7 +25,7 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Navigation paths\0"
+        "Navigation paths"
     }
 
     fn render(
@@ -73,7 +73,7 @@ impl<R: Renderer> DebugRenderer<R> for NavigationAreaDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Navigation areas\0"
+        "Navigation areas"
     }
 
     fn render(

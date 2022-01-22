@@ -1,6 +1,7 @@
 use std::cell::RefCell;
+use std::fmt::Write;
 
-use imgui::{im_str, ChildWindow, InputTextMultiline, Selectable, StyleColor};
+use imgui::{ChildWindow, Selectable, StyleColor};
 use serde::{Deserialize, Serialize};
 
 use common::*;
@@ -18,10 +19,8 @@ use simulation::{
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
-use crate::render::sdl::ui::windows::{
-    with_fake_owned_imstr, UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE,
-};
-use crate::ui_str;
+use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE, COLOR_GREEN, COLOR_ORANGE};
+use crate::{open_or_ret, ui_str};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct SelectionWindow {
@@ -60,10 +59,7 @@ impl SelectionWindow {
     }
 
     fn entity_selection(&mut self, context: &UiContext) {
-        let tab = context.new_tab(im_str!("Entity"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("Entity"));
 
         let ecs = context.simulation().ecs;
 
@@ -106,20 +102,20 @@ impl SelectionWindow {
                     "{} entities selected, select just 1 for details",
                     entity_sel.count()
                 ));
-                return style.pop(context);
+                return style.pop();
             }
-            None => return context.text_disabled(im_str!("No entity selected")),
+            None => return context.text_disabled("No entity selected"),
         };
 
         context.key_value(
-            im_str!("Entity:"),
+            "Entity:",
             || ui_str!(in context, "{}", e),
             None,
             COLOR_GREEN,
         );
 
         context.key_value(
-            im_str!("State:"),
+            "State:",
             || ui_str!(in context, "{:?}", state),
             None,
             COLOR_GREEN,
@@ -134,7 +130,7 @@ impl SelectionWindow {
 
         if let Ok(name) = ecs.component::<NameComponent>(details.entity) {
             context.key_value(
-                im_str!("Name:"),
+                "Name:",
                 || ui_str!(in context, "{}", *name),
                 None,
                 COLOR_GREEN,
@@ -144,7 +140,7 @@ impl SelectionWindow {
         let kind = context.description(details.entity);
         if !matches!(kind, EntityDesc::Fallback(_)) {
             context.key_value(
-                im_str!("Kind:"),
+                "Kind:",
                 || ui_str!(in context, "{}", kind),
                 None,
                 COLOR_GREEN,
@@ -152,7 +148,7 @@ impl SelectionWindow {
         }
 
         context.key_value(
-            im_str!("Position:"),
+            "Position:",
             || {
                 details
                     .transform
@@ -166,14 +162,14 @@ impl SelectionWindow {
 
         if let Some(physical) = details.physical.as_ref() {
             context.key_value(
-                im_str!("Size:"),
+                "Size:",
                 || ui_str!(in context, "{}", physical.size),
                 None,
                 COLOR_GREEN,
             );
 
             context.key_value(
-                im_str!("Volume:"),
+                "Volume:",
                 || ui_str!(in context, "{}", physical.volume),
                 None,
                 COLOR_GREEN,
@@ -182,14 +178,14 @@ impl SelectionWindow {
 
         // item stack contents
         if let Some(stack) = details.component::<ItemStackComponent>(context) {
-            let node = context.new_tree_node(im_str!("Item stack"), DefaultOpen::Closed);
-            if node.is_open() {
+            let node = context.new_tree_node("Item stack", DefaultOpen::Closed);
+            if node.is_some() {
                 self.do_stack(context, &stack);
             }
         }
 
-        let components_node = context.new_tree_node(im_str!("Components"), DefaultOpen::Closed);
-        if components_node.is_open() {
+        let components_node = context.new_tree_node("Components", DefaultOpen::Closed);
+        if components_node.is_some() {
             // TODO component-specific widget
             for (name, component) in context.simulation().ecs.all_components_for(details.entity) {
                 let interactive = match component.as_interactive() {
@@ -204,12 +200,12 @@ impl SelectionWindow {
                 // nice tree node
                 let title = ui_str!(in context, "{}", name);
                 let node = context.new_tree_node(title, DefaultOpen::Closed);
-                if !node.is_open() {
+                if node.is_none() {
                     continue;
                 }
 
                 context.key_value(
-                    im_str!("Summary"),
+                    "Summary",
                     || {
                         if let Some(dbg) = interactive.as_debug() {
                             Value::Wrapped(ui_str!(in context, "{:?}", dbg))
@@ -223,8 +219,8 @@ impl SelectionWindow {
             }
         }
 
-        let tabbar = context.new_tab_bar(im_str!("##entitydetailstabbar"));
-        if tabbar.is_open() {
+        let tabbar = context.new_tab_bar("##entitydetailstabbar");
+        if tabbar.is_some() {
             match details.ty {
                 EntityType::Living => self.do_living(context, &details),
                 EntityType::Item(ref condition) => self.do_item(context, &details, condition),
@@ -242,10 +238,10 @@ impl SelectionWindow {
         let ecs = context.simulation().ecs;
 
         {
-            let tab = context.new_tab(im_str!("Living"));
-            if tab.is_open() {
+            let tab = context.new_tab("Living");
+            if tab.is_some() {
                 context.key_value(
-                    im_str!("Velocity:"),
+                    "Velocity:",
                     || {
                         details
                             .transform
@@ -257,7 +253,7 @@ impl SelectionWindow {
                 );
 
                 context.key_value(
-                    im_str!("Satiety:"),
+                    "Satiety:",
                     || {
                         details.component::<HungerComponent>(context).map(|h| {
                             let (current, max) = h.satiety();
@@ -269,7 +265,7 @@ impl SelectionWindow {
                 );
 
                 context.key_value(
-                    im_str!("Navigating to:"),
+                    "Navigating to:",
                     || {
                         details
                             .component::<FollowPathComponent>(context)
@@ -284,7 +280,7 @@ impl SelectionWindow {
                 let societies = ecs.resource::<Societies>();
                 let society = details.component::<SocietyComponent>(context);
                 context.key_value(
-                    im_str!("Society:"),
+                    "Society:",
                     || {
                         society
                             .as_ref()
@@ -307,36 +303,36 @@ impl SelectionWindow {
 
         // inventory
         if let Some(inv) = details.component::<InventoryComponent>(context) {
-            let tab = context.new_tab(im_str!("Inventory"));
-            if tab.is_open() {
+            let tab = context.new_tab("Inventory");
+            if tab.is_some() {
                 self.do_inventory(context, &*inv);
             }
         }
 
         // activity
         if let Some(activity) = details.component::<ActivityComponent>(context) {
-            let tab = context.new_tab(im_str!("Activity"));
-            if tab.is_open() {
+            let tab = context.new_tab("Activity");
+            if tab.is_some() {
                 self.do_activity(context, &*activity);
             }
         }
 
         // control
         {
-            let tab = context.new_tab(im_str!("Control"));
-            if tab.is_open() {
+            let tab = context.new_tab("Control");
+            if tab.is_some() {
                 let world_selection = ecs.resource::<SelectedTiles>();
                 if let Some(block) = world_selection
                     .current_selected()
                     .and_then(|sel| sel.single_tile())
                 {
-                    if context.button(im_str!("Go to selected block"), [0.0, 0.0]) {
+                    if context.button("Go to selected block") {
                         context.issue_request(UiRequest::IssueDivineCommand(AiAction::Goto(
                             block.above().centred(),
                         )));
                     }
 
-                    if context.button(im_str!("Break selected block"), [0.0, 0.0]) {
+                    if context.button("Break selected block") {
                         context.issue_request(UiRequest::IssueDivineCommand(
                             AiAction::GoBreakBlock(block),
                         ));
@@ -357,10 +353,10 @@ impl SelectionWindow {
         // TODO list components on item that are relevant (i.e. not transform etc)
 
         {
-            let tab = context.new_tab(im_str!("Item"));
-            if tab.is_open() {
+            let tab = context.new_tab("Item");
+            if tab.is_some() {
                 context.key_value(
-                    im_str!("Condition:"),
+                    "Condition:",
                     || ui_str!(in context, "{}", condition.0),
                     None,
                     COLOR_ORANGE,
@@ -369,10 +365,10 @@ impl SelectionWindow {
         }
 
         if let Some(edible) = details.component::<EdibleItemComponent>(context) {
-            let tab = context.new_tab(im_str!("Nutrition"));
-            if tab.is_open() {
+            let tab = context.new_tab("Nutrition");
+            if tab.is_some() {
                 context.key_value(
-                    im_str!("Nutrition:"),
+                    "Nutrition:",
                     || ui_str!(in context, "{}", edible.total_nutrition),
                     None,
                     COLOR_ORANGE,
@@ -390,7 +386,7 @@ impl SelectionWindow {
         );
 
         for slot in inventory.equip_slots() {
-            context.same_line(0.0);
+            context.same_line();
             context.text(ui_str!(in context, "{} ", slot));
         }
 
@@ -405,7 +401,7 @@ impl SelectionWindow {
                 DefaultOpen::Closed,
             );
 
-            if tree.is_open() {
+            if tree.is_some() {
                 self.do_container(context, &container);
             }
         }
@@ -443,14 +439,14 @@ impl SelectionWindow {
     fn do_activity(&mut self, context: &UiContext, activity: &ActivityComponent) {
         if let Some((activity, status)) = activity.status() {
             context.key_value(
-                im_str!("Activity:"),
+                "Activity:",
                 || Value::Wrapped(ui_str!(in context, "{}", activity)),
                 None,
                 COLOR_ORANGE,
             );
 
             context.key_value(
-                im_str!("Status:"),
+                "Status:",
                 || Value::Wrapped(ui_str!(in context, "{}", &*status)),
                 None,
                 COLOR_ORANGE,
@@ -461,7 +457,7 @@ impl SelectionWindow {
             // TODO society task
             // let reservation = activity.current_society_task();
             // context.key_value(
-            //     im_str!("Reserved task:"),
+            //     ("Reserved task:",
             //     || {
             //         if let Some((_, task)) = reservation {
             //             Value::Wrapped(ui_str!(in context, "{}", task))
@@ -474,7 +470,7 @@ impl SelectionWindow {
             // );
             //
             // context.key_value(
-            //     im_str!("Job:"),
+            //     ("Job:",
             //     || {
             //         if let Some((job, _)) = reservation {
             //             Value::Wrapped(ui_str!(in context, "{}", job))
@@ -489,10 +485,7 @@ impl SelectionWindow {
     }
 
     fn do_logs(&mut self, context: &UiContext, details: &SelectedEntityDetails) {
-        let tab = context.new_tab(im_str!("Logs"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("Logs"));
 
         // TODO persist logs after entity is dead
         let render_logs = |logs: &EntityLoggingComponent| {
@@ -507,21 +500,21 @@ impl SelectionWindow {
                 }
             }
             // TODO switch to table API when available
-            let str = ui_str!(in context, "{}", EntityLogs(logs));
-            // safety: readonly textbox
-            unsafe {
-                with_fake_owned_imstr(str, |str| {
-                    InputTextMultiline::new(
-                        context.ui(),
-                        im_str!("##entitylogs"),
-                        str,
-                        [context.window_content_region_width(), 0.0],
-                    )
-                    .no_horizontal_scroll(false)
-                    .read_only(true)
-                    .build();
-                });
-            }
+            let mut backing_str = {
+                let mut s = context.entity_log_cached_string_mut();
+                let _ = write!(&mut s, "{}", EntityLogs(logs));
+                s
+            };
+
+            context
+                .input_text_multiline(
+                    "##entitylogs",
+                    &mut backing_str,
+                    [context.window_content_region_width(), 0.0],
+                )
+                .no_horizontal_scroll(false)
+                .read_only(true)
+                .build();
         };
 
         let mut req = None;
@@ -531,14 +524,14 @@ impl SelectionWindow {
             .component::<EntityLoggingComponent>(details.entity)
         {
             Ok(comp) => {
-                if context.button(im_str!("Disable logs"), [0.0, 0.0]) {
+                if context.button("Disable logs") {
                     req = Some(false);
                 } else {
                     render_logs(&*comp);
                 }
             }
             _ => {
-                if context.button(im_str!("Enable logs"), [0.0, 0.0]) {
+                if context.button("Enable logs") {
                     req = Some(true);
                 }
             }
@@ -554,13 +547,9 @@ impl SelectionWindow {
 
     #[allow(clippy::needless_return)]
     fn do_ui_element(&mut self, context: &UiContext, ui: &UiElementComponent) {
-        let tab = context.new_tab(im_str!("Build"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("Build"));
 
         let ecs = context.simulation().ecs;
-
         let ret = ui
             .build_job
             .resolve_and_cast(ecs.resource(), move |build: &BuildThingJob| {
@@ -574,21 +563,21 @@ impl SelectionWindow {
                 );
 
                 context.key_value(
-                    im_str!("Target:"),
+                    "Target:",
                     || Value::Some(ui_str!(in context, "{}", deets.target)),
                     None,
                     COLOR_ORANGE,
                 );
 
                 context.key_value(
-                    im_str!("Requirements:"),
+                    "Requirements:",
                     move || Value::Wrapped(ui_str!(in context, "{}", reqs)),
                     None,
                     COLOR_ORANGE,
                 );
 
                 context.key_value(
-                    im_str!("Progress:"),
+                    "Progress:",
                     || Value::Some(ui_str!(in context, "{}/{}", progress.steps_completed, progress.total_steps_needed)),
                     None,
                     COLOR_ORANGE
@@ -603,14 +592,11 @@ impl SelectionWindow {
     }
 
     fn world_selection(&mut self, context: &UiContext) {
-        let tab = context.new_tab(im_str!("World"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("World"));
 
         let selection_res = context.simulation().ecs.resource::<SelectedTiles>();
         let selection = match selection_res.current() {
-            None => return context.text_disabled(im_str!("No tile selection")),
+            None => return context.text_disabled("No tile selection"),
             Some(sel) => sel,
         };
 
@@ -620,7 +606,7 @@ impl SelectionWindow {
         let z = (to.2 - from.2).abs().slice() + 1;
 
         context.key_value(
-            im_str!("Size:"),
+            "Size:",
             || {
                 if z == 1 {
                     ui_str!(in context, "{}x{} ({})", w, h, w*h)
@@ -633,7 +619,7 @@ impl SelectionWindow {
         );
 
         context.key_value(
-            im_str!("Progress:"),
+            "Progress:",
             || {
                 ui_str!(in context, "{}", match selection.progress() {
                     SelectionProgress::Complete => "Selected",
@@ -645,14 +631,14 @@ impl SelectionWindow {
         );
 
         context.key_value(
-            im_str!("From:"),
+            "From:",
             || ui_str!(in context, "{}", from),
             None,
             COLOR_ORANGE,
         );
 
         context.key_value(
-            im_str!("To:  "),
+            "To:  ",
             || ui_str!(in context, "{}", to),
             None,
             COLOR_ORANGE,
@@ -661,13 +647,13 @@ impl SelectionWindow {
         // selection modification buttons
         {
             let mut modification = None;
-            if context.button(im_str!("Move up"), [0.0, 0.0]) {
+            if context.button("Move up") {
                 modification = Some(SelectionModification::Up);
             }
 
-            context.ui().same_line(0.0);
+            context.ui().same_line();
 
-            if context.button(im_str!("Move down"), [0.0, 0.0]) {
+            if context.button("Move down") {
                 modification = Some(SelectionModification::Down);
             }
 
@@ -677,21 +663,18 @@ impl SelectionWindow {
         }
 
         context.key_value(
-            im_str!("Blocks:"),
+            "Blocks:",
             || Value::Wrapped(ui_str!(in context, "{}", selection.block_occurrences())),
             None,
             COLOR_ORANGE,
         );
 
-        let tab_bar = context.new_tab_bar(im_str!("##worldselectiontabbar"));
-        if !tab_bar.is_open() {
-            return;
-        }
+        let _tab_bar = open_or_ret!(context.new_tab_bar("##worldselectiontabbar"));
 
         // single block
         {
-            let tab = context.new_tab(im_str!("Block"));
-            if tab.is_open() {
+            let tab = context.new_tab("Block");
+            if tab.is_some() {
                 self.do_single_block(context, selection_res);
             }
         }
@@ -699,16 +682,16 @@ impl SelectionWindow {
         // generation
         #[cfg(feature = "procgen")]
         {
-            let tab = context.new_tab(im_str!("Generation"));
-            if tab.is_open() {
+            let tab = context.new_tab("Generation");
+            if tab.is_some() {
                 self.do_generation(context, selection_res);
             }
         }
 
         // modification
         {
-            let tab = context.new_tab(im_str!("Edit"));
-            if tab.is_open() {
+            let tab = context.new_tab("Edit");
+            if tab.is_some() {
                 self.do_edit(context);
             }
         }
@@ -721,7 +704,7 @@ impl SelectionWindow {
         {
             Some(pos) => pos,
             None => {
-                context.text_disabled(im_str!("Single block selection required"));
+                context.text_disabled("Single block selection required");
                 return;
             }
         };
@@ -738,45 +721,45 @@ impl SelectionWindow {
         };
 
         context.key_value(
-            im_str!("Type:"),
+            "Type:",
             || ui_str!(in context, "{}", block.block_type()),
             None,
             COLOR_ORANGE,
         );
 
         context.key_value(
-            im_str!("Accessibility:"),
+            "Accessibility:",
             || {
                 above
                     .walkable_area()
                     .map(|area_index| ui_str!(in context, "{:?}", area_index))
-                    .unwrap_or(im_str!("Inaccessible"))
+                    .unwrap_or("Inaccessible")
             },
-            Some(im_str!("Accessibility of the block above the selection")),
+            Some("Accessibility of the block above the selection"),
             COLOR_ORANGE,
         );
 
         context.key_value(
-            im_str!("Durability:"),
+            "Durability:",
             || ui_str!(in context, "{}", block.durability()),
             None,
             COLOR_ORANGE,
         );
 
         context.key_value(
-            im_str!("AO:"),
+            "AO:",
             || Value::Wrapped(ui_str!(in context, "{:?}", block.occlusion())),
-            Some(im_str!("Ambient occlusion")),
+            Some("Ambient occlusion"),
             COLOR_ORANGE,
         );
 
         let block_data = world.associated_block_data(pos);
         context.key_value(
-            im_str!("Block data:"),
+            "Block data:",
             || {
                 block_data
                     .map(|data| ui_str!(in context, "{:?}", AssociatedBlockDataType::from(data)))
-                    .unwrap_or(im_str!("None"))
+                    .unwrap_or("None")
             },
             None,
             COLOR_ORANGE,
@@ -785,7 +768,7 @@ impl SelectionWindow {
         if let Some(data) = block_data {
             let name = ui_str!(in context, "{:?}", AssociatedBlockDataType::from(data));
             let tree = context.new_tree_node(name, DefaultOpen::Closed);
-            if tree.is_open() {
+            if tree.is_some() {
                 self.do_single_block_associated_data(context, data);
             }
         }
@@ -798,7 +781,7 @@ impl SelectionWindow {
                 let kind = context.description(container_entity);
 
                 context.key_value(
-                    im_str!("Kind:"),
+                    "Kind:",
                     || ui_str!(in context, "{}", kind),
                     None,
                     COLOR_ORANGE,
@@ -813,19 +796,19 @@ impl SelectionWindow {
                 };
 
                 context.key_value(
-                    im_str!("Owner:"),
+                    "Owner:",
                     || {
                         container
                             .owner
                             .map(|o| ui_str!(in context, "{}", o))
-                            .unwrap_or(im_str!("No owner"))
+                            .unwrap_or("No owner")
                     },
                     None,
                     COLOR_ORANGE,
                 );
 
                 context.key_value(
-                    im_str!("Communal:"),
+                    "Communal:",
                     || {
                         container
                             .communal()
@@ -838,7 +821,7 @@ impl SelectionWindow {
 
                                 ui_str!(in context, "{}", name)
                             })
-                            .unwrap_or(im_str!("Not communal"))
+                            .unwrap_or("Not communal")
                     },
                     None,
                     COLOR_ORANGE,
@@ -855,7 +838,7 @@ impl SelectionWindow {
                 });
 
                 if let Some(living) = living_entity {
-                    if context.button(im_str!("Set owner"), [0.0, 0.0]) {
+                    if context.button("Set owner") {
                         context.issue_request(UiRequest::SetContainerOwnership {
                             container: container_entity,
                             owner: Some(Some(living)),
@@ -864,8 +847,8 @@ impl SelectionWindow {
                     }
 
                     if let Ok(society) = ecs.component::<SocietyComponent>(living) {
-                        context.same_line(0.0);
-                        if context.button(im_str!("Set communal"), [0.0, 0.0]) {
+                        context.same_line();
+                        if context.button("Set communal") {
                             context.issue_request(UiRequest::SetContainerOwnership {
                                 container: container_entity,
                                 owner: None,
@@ -875,15 +858,15 @@ impl SelectionWindow {
                     }
                 }
 
-                if context.button(im_str!("Clear owner"), [0.0, 0.0]) {
+                if context.button("Clear owner") {
                     context.issue_request(UiRequest::SetContainerOwnership {
                         container: container_entity,
                         owner: Some(None),
                         communal: None,
                     });
                 }
-                context.same_line(0.0);
-                if context.button(im_str!("Clear communal"), [0.0, 0.0]) {
+                context.same_line();
+                if context.button("Clear communal") {
                     context.issue_request(UiRequest::SetContainerOwnership {
                         container: container_entity,
                         owner: None,
@@ -902,8 +885,7 @@ impl SelectionWindow {
         let loader = context.simulation().loader;
 
         if !loader.is_generated() {
-            context.text_disabled(im_str!("World is not generated"));
-            return;
+            return context.text_disabled("World is not generated");
         }
 
         let single_tile = selection
@@ -912,12 +894,10 @@ impl SelectionWindow {
         let block_query = single_tile.and_then(|pos| loader.query_block(pos));
         let details = match (block_query, single_tile) {
             (None, Some(_)) => {
-                context.text_disabled(im_str!("Query failed"));
-                return;
+                return context.text_disabled("Query failed");
             }
             (None, _) => {
-                context.text_disabled(im_str!("Single selection required"));
-                return;
+                return context.text_disabled("Single selection required");
             }
             (Some(t), _) => t,
         };
@@ -925,7 +905,7 @@ impl SelectionWindow {
         let (primary_biome, _) = details.biome_choices.iter().next().expect("missing biome");
 
         context.key_value(
-            im_str!("Biome:"),
+            "Biome:",
             || ui_str!(in context, "{:?}", primary_biome),
             None,
             COLOR_GREEN,
@@ -937,25 +917,25 @@ impl SelectionWindow {
         }
 
         context.key_value(
-            im_str!("Coastline proximity:"),
+            "Coastline proximity:",
             || ui_str!(in context, "{:.4}", details.coastal_proximity),
             None,
             COLOR_GREEN,
         );
         context.key_value(
-            im_str!("Elevation:"),
+            "Elevation:",
             || ui_str!(in context, "{:.4}", details.base_elevation),
             None,
             COLOR_GREEN,
         );
         context.key_value(
-            im_str!("Temperature:"),
+            "Temperature:",
             || ui_str!(in context, "{:.4}", details.temperature),
             None,
             COLOR_GREEN,
         );
         context.key_value(
-            im_str!("Moisture:"),
+            "Moisture:",
             || ui_str!(in context, "{:.4}", details.moisture),
             None,
             COLOR_GREEN,
@@ -965,7 +945,7 @@ impl SelectionWindow {
 
         if let Some((region, features)) = details.region.as_ref() {
             context.key_value(
-                im_str!("Region:"),
+                "Region:",
                 || ui_str!(in context, "{:?}", region),
                 None,
                 COLOR_BLUE,
@@ -981,11 +961,11 @@ impl SelectionWindow {
     fn do_edit(&mut self, context: &UiContext) {
         context.group(|| {
             let mut placement = None;
-            if context.button(im_str!(" Set "), [0.0, 0.0]) {
+            if context.button(" Set ") {
                 placement = Some(BlockPlacement::Set);
             }
 
-            if context.button(im_str!("Place"), [0.0, 0.0]) {
+            if context.button("Place") {
                 placement = Some(BlockPlacement::PlaceAbove);
             }
 
@@ -999,7 +979,7 @@ impl SelectionWindow {
                 }
             }
         });
-        context.same_line(0.0);
+        context.same_line();
 
         ChildWindow::new("##editblocktypes")
             .size([0.0, 120.0])

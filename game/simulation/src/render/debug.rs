@@ -6,7 +6,6 @@ use color::Color;
 use common::*;
 
 use std::borrow::Cow;
-use std::ffi::CStr;
 use std::ops::DerefMut;
 use unit::space::view::ViewPoint;
 use unit::world::{WorldPoint, CHUNK_SIZE};
@@ -14,7 +13,6 @@ use unit::world::{WorldPoint, CHUNK_SIZE};
 pub trait DebugRenderer<R: Renderer> {
     fn identifier(&self) -> &'static str;
 
-    /// Must be null terminated, is checked during registration
     fn name(&self) -> &'static str;
 
     fn render(
@@ -39,8 +37,7 @@ pub struct DebugRenderers<R: Renderer> {
 #[derive(Copy, Clone)]
 pub struct DebugRendererDescriptor {
     pub identifier: &'static str,
-    /// Must be valid utf8 and null terminated for UI to render
-    pub name: &'static CStr,
+    pub name: &'static str,
 }
 
 #[repr(transparent)]
@@ -56,9 +53,6 @@ pub enum DebugRendererError {
 
     #[error("No such renderer '{0}'")]
     NoSuchRenderer(Cow<'static, str>),
-
-    #[error("Renderer name is not null-terminated: '{0}'")]
-    BadName(&'static str),
 }
 
 impl<R: Renderer> DebugRenderersBuilder<R> {
@@ -66,10 +60,6 @@ impl<R: Renderer> DebugRenderersBuilder<R> {
         &mut self,
     ) -> Result<(), DebugRendererError> {
         let renderer = T::default();
-
-        if CStr::from_bytes_with_nul(renderer.name().as_bytes()).is_err() {
-            return Err(DebugRendererError::BadName(renderer.name()));
-        }
 
         let ident = renderer.identifier();
         if self.0.iter().any(|(i, _)| *i == ident) {
@@ -88,8 +78,7 @@ impl<R: Renderer> DebugRenderersBuilder<R> {
                 .iter()
                 .map(|(ident, r)| DebugRendererDescriptor {
                     identifier: *ident,
-                    // safety: checked during registration
-                    name: unsafe { CStr::from_bytes_with_nul_unchecked(r.name().as_bytes()) },
+                    name: r.name(),
                 })
                 .collect(),
             renderers: self
@@ -169,7 +158,7 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Axes\0"
+        "Axes"
     }
 
     fn render(
@@ -196,7 +185,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Chunk boundaries\0"
+        "Chunk boundaries"
     }
 
     fn render(

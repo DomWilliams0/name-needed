@@ -13,6 +13,7 @@
     * [X] improved ui for ordering people about and issuing society commands via popup
     * [X] close popup after button pressed
     * [ ] build command
+    * [ ] remove command tab from entity tab
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview

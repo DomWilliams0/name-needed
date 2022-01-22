@@ -1285,9 +1285,9 @@ dependencies = [
 
 [[package]]
 name = "imgui"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24cfcf6e3326886321c5d637caf1ce217006651059015fae372b1c49c0e722b2"
+checksum = "e6a33933d4645d6db1bfa55ff75e13ef301644d4c001cfaec6fe3afcfb05b82c"
 dependencies = [
  "bitflags",
  "imgui-sys",
@@ -1297,8 +1297,7 @@ dependencies = [
 [[package]]
 name = "imgui-opengl-renderer"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "562c7be8f6c93a0846b68535b53b4ede180d82860f7b656354f9ce07d4994992"
+source = "git+https://github.com//eliaperantoni/rust-imgui-opengl-renderer?rev=e80b5f21cefea355b9f8932f895f5592bd02a4ee#e80b5f21cefea355b9f8932f895f5592bd02a4ee"
 dependencies = [
  "gl_generator",
  "imgui",
@@ -1306,9 +1305,8 @@ dependencies = [
 
 [[package]]
 name = "imgui-sdl2"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "836dafdf4d29be5a44a5acc38aac2dc3a2e8a6bfc461aa48d309fb2a56832a53"
+version = "0.15.0"
+source = "git+https://github.com/MFEK/rust-imgui-sdl2?rev=7ce849fd5df90ccf4a278334b492349fc828ae40#7ce849fd5df90ccf4a278334b492349fc828ae40"
 dependencies = [
  "imgui",
  "sdl2",
@@ -1316,9 +1314,9 @@ dependencies = [
 
 [[package]]
 name = "imgui-sys"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85ca00be6b78bf02b57e91468cf19d08dfcc11d0fb3c2f3dc491c29404d8d330"
+checksum = "286f5338bd8281e3203de29cc317d123b178f2e565eca5aee770a2048074fdf7"
 dependencies = [
  "cc",
  "chlorine",

@@ -1,7 +1,7 @@
 use std::io::{ErrorKind, Read, Write};
 use std::path::Path;
 
-use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style, StyleVar, WindowFlags};
+use imgui::{Condition, Context, FontConfig, FontSource, Style, StyleVar, WindowFlags};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -205,7 +205,7 @@ impl Ui {
 impl State {
     /// Renders ui windows
     fn render(&mut self, context: UiContext, mut popups: PreparedUiPopup) {
-        imgui::Window::new(im_str!("Debug"))
+        imgui::Window::new("Debug")
             .size([400.0, 500.0], Condition::FirstUseEver)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
@@ -215,19 +215,16 @@ impl State {
                 // perf fixed at the top
                 self.perf.render(&context);
 
-                let tabbar = context.new_tab_bar(im_str!("Debug Tabs"));
-                if !tabbar.is_open() {
-                    return;
+                if let Some(_bar) = context.new_tab_bar("Debug Tabs") {
+                    self.selection.render(&context);
+                    self.society.render(&context);
+                    self.debug.render(&context);
                 }
-
-                self.selection.render(&context);
-                self.society.render(&context);
-                self.debug.render(&context);
             });
 
         // invisible window for popups
-        let style = context.push_style_var(StyleVar::WindowRounding(0.0));
-        imgui::Window::new(im_str!("invisible"))
+        let _style = context.push_style_var(StyleVar::WindowRounding(0.0));
+        imgui::Window::new("invisible")
             .size(context.io().display_size, Condition::Always)
             .position([0.0, 0.0], Condition::Always)
             .bg_alpha(0.0)
@@ -250,7 +247,7 @@ impl State {
 
                 let mut rendered = Rendered::NoPopup;
                 for popup in popups.iter_all() {
-                    let id = im_str!("popup");
+                    let id = "popup";
                     rendered = Rendered::OpenButPlsClose;
 
                     let (renderable, open) = popup.as_renderable(context.simulation().ecs);
@@ -266,7 +263,7 @@ impl State {
 
                         for button in renderable.buttons() {
                             // TODO render disabled buttons
-                            if context.button(ui_str!(in context, "{}", button), [0.0, 0.0]) {
+                            if context.button(ui_str!(in context, "{}", button)) {
                                 button.issue_requests(|req| context.issue_request(req));
 
                                 // close on action
@@ -284,6 +281,5 @@ impl State {
                     popups.on_close();
                 }
             });
-        style.pop(context.ui());
     }
 }

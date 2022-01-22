@@ -1,14 +1,14 @@
+use std::cell::{RefCell, RefMut};
+use std::fmt::{Display, Formatter};
+
+use std::ops::Deref;
+
+use imgui::{TabBarFlags, TabBarToken, TabItemToken, TreeNode, TreeNodeToken};
+
 use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
 use simulation::{ComponentRef, ComponentWorld, Entity, KindComponent, PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::memory::PerFrameStrings;
-use imgui::{
-    ImStr, TabBar, TabBarFlags, TabBarToken, TabItem, TabItemToken, TreeNode, TreeNodeToken, Ui,
-};
-use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
-use std::mem::{ManuallyDrop, MaybeUninit};
-use std::ops::Deref;
 
 /// Context for a single frame. Provides communication to the game
 pub struct UiContext<'ctx> {
@@ -17,16 +17,18 @@ pub struct UiContext<'ctx> {
     perf: PerfAvg,
     simulation: SimulationRef<'ctx>,
     commands: RefCell<&'ctx mut UiCommands>,
+    cached_entity_logs: RefCell<String>,
 }
 
-/// # Safety
-/// No UI reference is actually passed, so implementations must ensure that that param is unused
-pub unsafe trait UiGuardable: Sized {
-    fn end(self, null_ui: &imgui::Ui);
+#[macro_export]
+macro_rules! open_or_ret {
+    ($token:expr) => {
+        match $token {
+            Some(t) => t,
+            None => return,
+        }
+    };
 }
-
-#[must_use]
-pub struct UiGuard<T: UiGuardable>(Option<T>);
 
 pub enum DefaultOpen {
     Closed,
@@ -53,6 +55,7 @@ impl<'a> UiContext<'a> {
             perf,
             simulation,
             commands: RefCell::new(commands),
+            cached_entity_logs: Default::default(),
         }
     }
 
@@ -79,30 +82,19 @@ impl<'a> UiContext<'a> {
         response
     }
 
-    /// Helper to reduce insane nesting in [build] closures. Must check [UiGuard::is_open]!!
-    /// Returned guard should be dropped before creating a new one (not ideal)
-    pub fn new_tab(&self, title: &ImStr) -> UiGuard<TabItemToken> {
-        UiGuard(TabItem::new(title).begin(self.ui))
+    pub fn new_tab(&self, title: &str) -> Option<TabItemToken> {
+        self.ui.tab_item(title)
     }
 
-    /// Helper to reduce insane nesting in [build] closures. Must check [UiGuard::is_open]!!
-    /// Returned guard should be dropped before creating a new one (not ideal)
-    pub fn new_tab_bar(&self, id: &ImStr) -> UiGuard<TabBarToken> {
-        UiGuard(
-            TabBar::new(id)
-                .flags(TabBarFlags::FITTING_POLICY_SCROLL)
-                .begin(self.ui),
-        )
+    pub fn new_tab_bar(&self, id: &str) -> Option<TabBarToken> {
+        self.ui
+            .tab_bar_with_flags(id, TabBarFlags::FITTING_POLICY_SCROLL)
     }
 
-    /// Helper to reduce insane nesting in [build] closures. Must check [UiGuard::is_open]!!
-    /// Returned guard should be dropped before creating a new one (not ideal)
-    pub fn new_tree_node(&self, title: &ImStr, open: DefaultOpen) -> UiGuard<TreeNodeToken> {
-        UiGuard(
-            TreeNode::new(title)
-                .default_open(matches!(open, DefaultOpen::Open))
-                .push(self.ui),
-        )
+    pub fn new_tree_node(&self, title: &str, open: DefaultOpen) -> Option<TreeNodeToken> {
+        TreeNode::new(title)
+            .default_open(matches!(open, DefaultOpen::Open))
+            .push(self.ui)
     }
 
     pub fn description(&self, e: Entity) -> EntityDesc {
@@ -110,6 +102,10 @@ impl<'a> UiContext<'a> {
             Ok(comp) => EntityDesc::Kind(comp),
             Err(_) => EntityDesc::Fallback(e),
         }
+    }
+
+    pub fn entity_log_cached_string_mut(&self) -> RefMut<String> {
+        self.cached_entity_logs.borrow_mut()
     }
 }
 
@@ -134,45 +130,10 @@ impl<'a> EntityDesc<'a> {
     }
 }
 
-impl<T: UiGuardable> UiGuard<T> {
-    pub fn is_open(&self) -> bool {
-        self.0.is_some()
-    }
-}
-
-impl<T: UiGuardable> Drop for UiGuard<T> {
-    fn drop(&mut self) {
-        if let Some(inner) = self.0.take() {
-            let null_ui = MaybeUninit::<Ui>::uninit();
-            // safety: implementation guarantees this is unused
-            let null_ui = ManuallyDrop::new(unsafe { null_ui.assume_init() });
-            inner.end(&null_ui);
-        }
-    }
-}
-
 impl<'a> Deref for UiContext<'a> {
     type Target = imgui::Ui<'a>;
 
     fn deref(&self) -> &Self::Target {
         self.ui
-    }
-}
-
-unsafe impl UiGuardable for TabItemToken {
-    fn end(self, null_ui: &Ui) {
-        TabItemToken::end(self, null_ui)
-    }
-}
-
-unsafe impl UiGuardable for TreeNodeToken {
-    fn end(self, null_ui: &Ui) {
-        self.pop(null_ui)
-    }
-}
-
-unsafe impl UiGuardable for TabBarToken {
-    fn end(self, null_ui: &Ui) {
-        self.end(null_ui)
     }
 }

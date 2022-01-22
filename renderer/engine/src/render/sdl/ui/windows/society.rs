@@ -1,4 +1,4 @@
-use imgui::{im_str, ChildWindow, Selectable, StyleColor};
+use imgui::{ChildWindow, Selectable, StyleColor};
 use std::fmt::Display;
 
 use simulation::input::{SelectedEntities, SelectedTiles, UiRequest};
@@ -6,7 +6,7 @@ use simulation::{AssociatedBlockData, ComponentWorld, PlayerSociety, Societies, 
 
 use crate::render::sdl::ui::context::{DefaultOpen, UiContext};
 use crate::render::sdl::ui::windows::{UiExt, COLOR_BLUE};
-use crate::ui_str;
+use crate::{open_or_ret, ui_str};
 
 use serde::{Deserialize, Serialize};
 use simulation::job::SocietyCommand;
@@ -18,10 +18,7 @@ pub struct SocietyWindow {
 
 impl SocietyWindow {
     pub fn render(&mut self, context: &UiContext) {
-        let tab = context.new_tab(im_str!("Society"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("Society"));
 
         let ecs = context.simulation().ecs;
         let society_handle = match ecs.resource::<PlayerSociety>().get() {
@@ -36,28 +33,25 @@ impl SocietyWindow {
 
         let society = societies.society_by_handle(society_handle);
         context.key_value(
-            im_str!("Society:"),
+            "Society:",
             || {
                 society
                     .map(|s| ui_str!(in context, "{}", s.name()))
-                    .unwrap_or(im_str!("Error: invalid handle"))
+                    .unwrap_or("Error: invalid handle")
             },
             Some(ui_str!(in context, "{:?}", society_handle)),
             COLOR_BLUE,
         );
 
-        let tabbar = context.new_tab_bar(im_str!("##societytabbar"));
-        if !tabbar.is_open() {
-            return;
-        }
+        let _tab_bar = open_or_ret!(context.new_tab_bar("##societytabbar"));
 
         self.do_control(context, society_handle);
         self.do_jobs(context, society_handle);
     }
 
     fn do_control(&mut self, context: &UiContext, society_handle: SocietyHandle) {
-        let tab = context.new_tab(im_str!("Control"));
-        if tab.is_open() {
+        let tab = context.new_tab("Control");
+        if tab.is_some() {
             let mut any_buttons = false;
 
             let ecs = context.simulation().ecs;
@@ -67,17 +61,14 @@ impl SocietyWindow {
             // break selected blocks
             if let Some(sel) = block_selection {
                 any_buttons = true;
-                if context.button(
-                    ui_str!(in context, "Break {} blocks", sel.range().count()),
-                    [0.0, 0.0],
-                ) {
+                if context.button(ui_str!(in context, "Break {} blocks", sel.range().count())) {
                     context.issue_request(UiRequest::IssueSocietyCommand(
                         society_handle,
                         SocietyCommand::BreakBlocks(sel.range().clone()),
                     ));
                 }
 
-                if context.button(im_str!("Build"), [0.0, 0.0]) {
+                if context.button("Build") {
                     // TODO handle failure better?
                     if let Some(above) = sel.range().above() {
                         if let Some((_, template, _)) =
@@ -123,10 +114,7 @@ impl SocietyWindow {
                 if ecs.is_entity_alive(entity) && ecs.has_component_by_name("haulable", entity) {
                     let desc = context.description(entity);
                     any_buttons = true;
-                    if context.button(
-                        ui_str!(in context, "Haul {} to {}", desc, target),
-                        [0.0, 0.0],
-                    ) {
+                    if context.button(ui_str!(in context, "Haul {} to {}", desc, target)) {
                         // hopefully this gets the accessible air above the block
                         let target = target.above();
 
@@ -143,10 +131,9 @@ impl SocietyWindow {
                     if let Some(AssociatedBlockData::Container(container)) = block_data {
                         let container_name =
                             context.description(*container).with_fallback(&"container");
-                        if context.button(
-                            ui_str!(in context, "Haul {} into {}", desc, container_name),
-                            [0.0, 0.0],
-                        ) {
+                        if context
+                            .button(ui_str!(in context, "Haul {} into {}", desc, container_name))
+                        {
                             context.issue_request(UiRequest::IssueSocietyCommand(
                                 society_handle,
                                 SocietyCommand::HaulIntoContainer(entity, *container),
@@ -159,22 +146,19 @@ impl SocietyWindow {
             if !any_buttons {
                 let color = context.style_color(StyleColor::TextDisabled);
                 let style = context.push_style_color(StyleColor::Text, color);
-                context.text_wrapped(im_str!(
-                    "Try selecting an entity, a container and/or some blocks"
-                ));
-                style.pop(context);
+                context.text_wrapped("Try selecting an entity, a container and/or some blocks");
+                style.pop();
             }
         }
     }
 
     fn do_jobs(&self, context: &UiContext, society_handle: SocietyHandle) {
-        let tab = context.new_tab(im_str!("Jobs"));
-        if tab.is_open() {
+        let tab = context.new_tab("Jobs");
+        if tab.is_some() {
             let societies = context.simulation().ecs.resource::<Societies>();
             let society = match societies.society_by_handle(society_handle) {
                 None => {
-                    context.text_disabled("Invalid society");
-                    return;
+                    return context.text_disabled("Invalid society");
                 }
                 Some(s) => s,
             };
@@ -191,7 +175,7 @@ impl SocietyWindow {
                     let node =
                         context.new_tree_node(ui_str!(in context, "{}", job), DefaultOpen::Closed);
 
-                    if node.is_open() {
+                    if node.is_some() {
                         job_node = Some(node);
                         true
                     } else {

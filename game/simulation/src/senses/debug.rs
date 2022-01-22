@@ -20,7 +20,7 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Senses\0"
+        "Senses"
     }
 
     fn render(

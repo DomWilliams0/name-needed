@@ -14,7 +14,7 @@ impl<R: Renderer> DebugRenderer<R> for SteeringDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Steering\0"
+        "Steering"
     }
 
     fn render(

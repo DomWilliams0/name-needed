@@ -19,7 +19,7 @@ impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Entity IDs\0"
+        "Entity IDs"
     }
 
     fn render(
@@ -59,7 +59,7 @@ impl<R: Renderer> DebugRenderer<R> for AllSocietyVisibilityDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "All societies\0"
+        "All societies"
     }
 
     fn render(

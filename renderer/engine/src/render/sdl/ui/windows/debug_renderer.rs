@@ -1,15 +1,14 @@
-use imgui::{im_str, ImStr, ImString};
+use std::array::IntoIter;
+use std::borrow::Cow;
 
 use simulation::input::{UiRequest, UiResponse};
 
 use crate::render::sdl::ui::context::UiContext;
 use crate::render::sdl::ui::windows::{UiExt, Value, COLOR_BLUE};
-use crate::ui_str;
-use std::array::IntoIter;
-use std::borrow::Cow;
+use crate::{open_or_ret, ui_str};
 
 pub struct DebugWindow {
-    script_input: ImString,
+    script_input: String,
     script_output: ScriptOutput,
     enabled_debug_renderers: Vec<Cow<'static, str>>,
 }
@@ -17,17 +16,14 @@ pub struct DebugWindow {
 enum ScriptOutput {
     NoScript,
     Waiting(UiResponse),
-    Done(ImString),
+    Done(String),
 }
 
 const MAX_PATH_INPUT: usize = 256;
 
 impl DebugWindow {
     pub fn render(&mut self, context: &UiContext) {
-        let tab = context.new_tab(im_str!("Debug"));
-        if !tab.is_open() {
-            return;
-        }
+        let _tab = open_or_ret!(context.new_tab("Debug"));
 
         let view_range = context.simulation().viewer.terrain_range();
         context.text(ui_str!(in context, "World range: {} => {} ({})",
@@ -39,47 +35,40 @@ impl DebugWindow {
             context.separator();
 
             context
-                .input_text(im_str!("##scriptpath"), &mut self.script_input)
+                .input_text("##scriptpath", &mut self.script_input)
                 .build();
 
-            if context.button(im_str!("Execute script##script"), [0.0, 0.0]) {
-                let response = context.issue_request(UiRequest::ExecuteScript(
-                    self.script_input.to_str().to_owned().into(),
-                ));
+            if context.button("Execute script##script") {
+                let response = context
+                    .issue_request(UiRequest::ExecuteScript(self.script_input.clone().into()));
                 self.script_output = ScriptOutput::Waiting(response);
             }
 
             if matches!(self.script_output, ScriptOutput::Done(_)) {
-                context.same_line(0.0);
-                if context.button(im_str!("Clear output##script"), [0.0, 0.0]) {
+                context.same_line();
+                if context.button("Clear output##script") {
                     self.script_output = ScriptOutput::NoScript;
                 }
             }
 
             if let ScriptOutput::Waiting(resp) = &self.script_output {
                 if let Some(resp) = resp.take_response() {
-                    self.script_output = ScriptOutput::Done(ImString::from(format!("{}", resp)));
+                    self.script_output = ScriptOutput::Done(resp.to_string());
                 };
             }
 
-            let str = match &self.script_output {
-                ScriptOutput::NoScript => None,
-                ScriptOutput::Waiting(_) => Some(im_str!("Executing...")),
-                ScriptOutput::Done(s) => Some(s.as_ref()),
-            };
-
-            if let Some(output) = str {
+            if let ScriptOutput::Waiting(_) | ScriptOutput::Done(_) = &self.script_output {
                 let width = context.window_content_region_width();
-                context.key_value(
-                    im_str!("Output:"),
-                    || Value::MultilineReadonly {
-                        label: im_str!("##scriptoutput"),
-                        buffer: output,
+                let value = match &mut self.script_output {
+                    ScriptOutput::Waiting(_) => Value::Some("Executing..."),
+                    ScriptOutput::Done(s) => Value::MultilineReadonly {
+                        label: "##scriptoutput",
+                        buffer: s,
                         width,
                     },
-                    None,
-                    COLOR_BLUE,
-                );
+                    ScriptOutput::NoScript => unreachable!(),
+                };
+                context.key_value("Output:", || value, None, COLOR_BLUE);
             }
         }
 
@@ -94,10 +83,7 @@ impl DebugWindow {
                 None => (false, 0 /* unused */),
             };
 
-            // safety: debug renderer was registered from a rust &str, so definitely utf8
-            let name = unsafe { ImStr::from_cstr_unchecked(descriptor.name) };
-
-            if context.checkbox(name, &mut enabled) {
+            if context.checkbox(descriptor.name, &mut enabled) {
                 context.issue_request(UiRequest::SetDebugRendererEnabled {
                     ident: Cow::Borrowed(descriptor.identifier),
                     enabled,
@@ -123,7 +109,7 @@ impl DebugWindow {
 
 impl Default for DebugWindow {
     fn default() -> Self {
-        let mut script_input = ImString::with_capacity(MAX_PATH_INPUT);
+        let mut script_input = String::with_capacity(MAX_PATH_INPUT);
 
         // TODO proper default script path
         script_input.push_str("resources/script.lua");
@@ -144,11 +130,13 @@ impl Default for DebugWindow {
 }
 
 mod serialization {
-    use super::*;
+    use std::borrow::Cow;
+
     use serde::de::Deserializer;
     use serde::ser::Serializer;
     use serde::{Deserialize, Serialize};
-    use std::borrow::Cow;
+
+    use super::*;
 
     #[derive(Serialize)]
     struct SerializedDebugWindow<'a> {
@@ -172,7 +160,7 @@ mod serialization {
             S: Serializer,
         {
             let serialized = SerializedDebugWindow {
-                script_input: self.script_input.to_str(), // dont serialize null terminator
+                script_input: &self.script_input,
                 enabled_debug_renderers: &self.enabled_debug_renderers,
             };
 
@@ -190,7 +178,7 @@ mod serialization {
                 // must preserve capacity
                 let mut str = String::with_capacity(MAX_PATH_INPUT);
                 str.push_str(&deserialized.script_input);
-                ImString::from(str)
+                str
             };
 
             let enabled_debug_renderers = deserialized
