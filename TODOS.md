@@ -1,4 +1,4 @@
-# TODOs (409)
+# TODOs (408)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -232,12 +232,11 @@
  * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (2)
    * `// TODO bump alloc`
    * `// TODO too easy to forget checks here - consider having each declare true/false/ignore needed for every button`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (5)
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
-   * `// TODO prune dead entities from selection at some point`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`

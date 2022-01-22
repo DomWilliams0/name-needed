@@ -27,7 +27,6 @@ pub struct SelectedComponent;
 pub struct SelectedEntities {
     entities: Vec<Entity>,
     drag_in_progress: Option<WorldPointRange>,
-    last_prune: Tick,
 }
 
 impl<'a> InputSystem<'a> {
@@ -185,7 +184,6 @@ impl<'a> System<'a> for InputSystem<'a> {
     }
 }
 
-// TODO prune dead entities from selection at some point
 impl SelectedEntities {
     pub fn select(&mut self, world: &EcsWorld, e: Entity) {
         let mut selecteds = world.write_storage();
@@ -221,12 +219,10 @@ impl SelectedEntities {
         }
     }
 
-    /// Could be dead
-    pub fn iter_unchecked(&self) -> &[Entity] {
+    pub fn iter(&self) -> &[Entity] {
         &self.entities
     }
 
-    /// Could be dead
     pub fn just_one(&self) -> Option<Entity> {
         if self.entities.len() == 1 {
             let iter = self.entities.first();
@@ -236,12 +232,6 @@ impl SelectedEntities {
         } else {
             None
         }
-    }
-
-    /// Prunes dead entities first (only once per tick)
-    pub fn iter(&mut self, world: &EcsWorld) -> &[Entity] {
-        self.prune(world);
-        &self.entities
     }
 
     pub fn count(&self) -> usize {
@@ -268,19 +258,14 @@ impl SelectedEntities {
         self.drag_in_progress = None;
     }
 
-    fn prune(&mut self, world: &EcsWorld) {
-        let now = Tick::fetch();
-        if now != self.last_prune {
-            self.last_prune = now;
-
-            self.entities.retain(|e| {
-                let keep = world.is_entity_alive(*e);
-                if !keep {
-                    debug!("pruning dead entity from selection"; e)
-                }
-                keep
-            });
-        }
+    pub fn prune(&mut self, world: &EcsWorld) {
+        self.entities.retain(|e| {
+            let keep = world.is_entity_alive(*e);
+            if !keep {
+                debug!("pruning dead entity from selection"; e)
+            }
+            keep
+        });
     }
 }
 

@@ -184,7 +184,7 @@ mod content {
             let (world_sel, mut entity_sel, player_soc, socs, ais, paths, haulables, containeds) =
                 <Query as SystemData>::fetch(world);
 
-            let subjects = entity_sel.iter(world);
+            let subjects = entity_sel.iter();
 
             let has_subjects = !subjects.is_empty();
             let single_subject = subjects.len() == 1;
@@ -232,7 +232,7 @@ mod content {
 
     impl State<'_> {
         fn subjects(&self) -> &[Entity] {
-            self.subjects.iter_unchecked()
+            self.subjects.iter()
         }
 
         fn player_has_society(&self) -> bool {

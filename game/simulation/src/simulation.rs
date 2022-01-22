@@ -244,6 +244,11 @@ impl<R: Renderer> Simulation<R> {
         // prune ui elements
         UiElementPruneSystem.run_now(&self.ecs_world);
 
+        // prune dead entities from selection
+        self.ecs_world
+            .resource_mut::<SelectedEntities>()
+            .prune(&self.ecs_world);
+
         // update display text for rendering
         self.display_text_system.run_now(&self.ecs_world);
 
@@ -388,7 +393,7 @@ impl<R: Renderer> Simulation<R> {
                 UiRequest::IssueDivineCommand(_) | UiRequest::CancelDivineCommand => {
                     let mut ais = self.ecs_world.write_storage::<AiComponent>();
                     let selected_entities = self.ecs_world.resource_mut::<SelectedEntities>();
-                    for selected in selected_entities.iter(&self.ecs_world) {
+                    for selected in selected_entities.iter() {
                         if let Some(ai) = selected.get_mut(&mut ais) {
                             if let UiRequest::IssueDivineCommand(ref command) = req {
                                 ai.add_divine_command(command.clone());

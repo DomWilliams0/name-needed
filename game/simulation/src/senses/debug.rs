@@ -32,7 +32,7 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
         viewer: &WorldViewer,
     ) {
         let range = viewer.entity_range();
-        for &selected in ecs_world.resource::<SelectedEntities>().iter_unchecked() {
+        for &selected in ecs_world.resource::<SelectedEntities>().iter() {
             let transform = ecs_world.component::<TransformComponent>(selected);
             let senses = ecs_world.component::<SensesComponent>(selected);
 
