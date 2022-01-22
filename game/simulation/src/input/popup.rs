@@ -104,7 +104,6 @@ impl PreparedUiPopup<'_> {
 
 mod content {
     use std::fmt;
-    use std::iter::once;
 
     use common::SmallVec;
     use unit::world::{WorldPoint, WorldPositionRange};
@@ -181,7 +180,7 @@ mod content {
                 ReadStorage<'a, HaulableItemComponent>,
                 ReadStorage<'a, ContainedInComponent>,
             );
-            let (world_sel, mut entity_sel, player_soc, socs, ais, paths, haulables, containeds) =
+            let (world_sel, entity_sel, player_soc, socs, ais, paths, haulables, containeds) =
                 <Query as SystemData>::fetch(world);
 
             let subjects = entity_sel.iter();
@@ -233,10 +232,6 @@ mod content {
     impl State<'_> {
         fn subjects(&self) -> &[Entity] {
             self.subjects.iter()
-        }
-
-        fn player_has_society(&self) -> bool {
-            self.player_society.get().is_some()
         }
     }
 
@@ -323,18 +318,27 @@ mod content {
                 buttons.add(|| {
                     // cancel all selected + target job
                     if state.player_society.has() {
+                        let include_target = if state.subjects().contains(&target_entity) {
+                            None // dont duplicate
+                        } else {
+                            Some(target_entity)
+                        };
+
                         let jobs = state
                             .subjects()
                             .iter()
                             .copied()
-                            .chain(once(target_entity))
+                            .chain(include_target.into_iter())
                             .filter_map(|e| {
                                 e.get(&uis)
                                     .map(|ui| ui.build_job)
                                     .filter(|job| *state.player_society == job.society())
-                            });
+                            })
+                            .collect::<SmallVec<[_; 1]>>();
 
-                        return Some(ButtonType::CancelJobs(jobs.collect()));
+                        if !jobs.is_empty() {
+                            return Some(ButtonType::CancelJobs(jobs));
+                        }
                     }
 
                     None

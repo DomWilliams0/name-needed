@@ -7,7 +7,7 @@ pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, InputModifier, SelectType, SelectionProgress, WorldColumn};
 use crate::spatial::{Spatial, Transforms};
 use crate::TransformComponent;
-use crate::{Tick, UiElementComponent, WorldRef};
+use crate::{UiElementComponent, WorldRef};
 
 pub struct InputSystem<'a> {
     events: &'a [InputEvent],
