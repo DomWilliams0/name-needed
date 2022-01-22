@@ -63,8 +63,8 @@ impl RenderedPopupContent {
         &self.title
     }
 
-    pub fn buttons(&self) -> impl Iterator<Item = &Button> + ExactSizeIterator {
-        self.buttons.iter()
+    pub fn buttons(&mut self) -> impl Iterator<Item = &mut Button> + ExactSizeIterator {
+        self.buttons.iter_mut()
     }
 }
 
@@ -75,7 +75,7 @@ impl PopupContentType {
 }
 
 impl PopupContent {
-    pub fn as_renderable(&mut self, world: &EcsWorld) -> (&RenderedPopupContent, bool) {
+    pub fn as_renderable(&mut self, world: &EcsWorld) -> (&mut RenderedPopupContent, bool) {
         let open = if self.content.is_none() {
             // prepare for rendering
             self.content = Some(self.ty.prepare(world));
@@ -86,7 +86,7 @@ impl PopupContent {
 
         debug_assert!(self.content.is_some());
         // safety: unconditionally set above
-        let content = unsafe { self.content.as_ref().unwrap_unchecked() };
+        let content = unsafe { self.content.as_mut().unwrap_unchecked() };
 
         (content, open)
     }
@@ -104,6 +104,8 @@ impl PreparedUiPopup<'_> {
 
 mod content {
     use std::fmt;
+    use std::fmt::Display;
+    use std::rc::Rc;
 
     use common::SmallVec;
     use unit::world::{WorldPoint, WorldPositionRange};
@@ -115,8 +117,9 @@ mod content {
     use crate::item::HaulableItemComponent;
     use crate::job::{SocietyCommand, SocietyJobHandle};
     use crate::{
-        AiAction, ContainedInComponent, FollowPathComponent, HaulPurpose, HaulSource, HaulTarget,
-        PlayerSociety, SocietyComponent, SocietyHandle, UiElementComponent, WorldRef,
+        AiAction, BuildTemplate, ContainedInComponent, FollowPathComponent, HaulPurpose,
+        HaulSource, HaulTarget, PlayerSociety, SocietyComponent, SocietyHandle, UiElementComponent,
+        WorldRef,
     };
 
     pub enum ButtonType {
@@ -126,6 +129,12 @@ mod content {
         CancelDivineCommand,
         /// Society command or divine command to all subjects
         Command(Option<SocietyHandle>, ButtonCommand),
+        Build {
+            society: SocietyHandle,
+            range: WorldPositionRange,
+            template: Rc<BuildTemplate>,
+            display: Box<dyn Display>,
+        },
     }
 
     /// Individual divine command or society
@@ -142,7 +151,8 @@ mod content {
     }
 
     pub struct Button {
-        ty: ButtonType,
+        /// Consumed after press, which is fine because the popup menu is then closed
+        ty: Option<ButtonType>,
         state: ButtonState,
     }
 
@@ -357,6 +367,7 @@ mod content {
             PopupContentType::TileSelection => {
                 title = "Selection".to_owned();
 
+                // break blocks
                 if let Some(selection) = state.tile_selection.current_selected() {
                     buttons.add_multiple(|add| {
                         if let soc @ Some(_) = state.player_society.get() {
@@ -378,6 +389,29 @@ mod content {
                                         block,
                                     )),
                                 ))
+                            }
+                        }
+                    });
+
+                    // building
+                    buttons.add_multiple(|add| {
+                        if let Some(soc) = state.player_society.get() {
+                            for (def, template, name) in world.build_templates() {
+                                // gross that we need an allocation but the build menu will be different
+                                // in the future
+                                let name = match name {
+                                    Some(s) => Box::new(s.clone()) as Box<dyn Display>,
+                                    None => Box::new(*def) as Box<dyn Display>,
+                                };
+
+                                if let Some(range) = selection.range().above() {
+                                    add(ButtonType::Build {
+                                        society: soc,
+                                        range,
+                                        template: template.clone(),
+                                        display: name,
+                                    });
+                                }
                             }
                         }
                     });
@@ -418,39 +452,36 @@ mod content {
     impl Button {
         fn new(ty: ButtonType) -> Self {
             Self {
-                ty,
+                ty: Some(ty),
                 state: ButtonState::Active,
             }
         }
 
-        pub fn issue_requests(&self, mut issue_req: impl FnMut(UiRequest) -> UiResponse) {
+        pub fn issue_requests(&mut self, mut issue_req: impl FnMut(UiRequest) -> UiResponse) {
             use ButtonType::*;
-            let req = match &self.ty {
-                GoTo(pos) => UiRequest::IssueDivineCommand(AiAction::Goto(*pos)),
-                Follow(e) => UiRequest::IssueDivineCommand(AiAction::Follow {
-                    target: *e,
-                    radius: 3,
-                }),
+            let req = match self.ty.take().expect("reusing consumed button") {
+                GoTo(pos) => UiRequest::IssueDivineCommand(AiAction::Goto(pos)),
+                Follow(target) => {
+                    UiRequest::IssueDivineCommand(AiAction::Follow { target, radius: 3 })
+                }
                 Command(Some(soc), command) => {
                     // command to player's society
                     let cmd = match command {
                         ButtonCommand::HaulToPosition(e, tgt) => {
-                            SocietyCommand::HaulToPosition(*e, *tgt)
+                            SocietyCommand::HaulToPosition(e, tgt)
                         }
-                        ButtonCommand::BreakBlocks(range) => {
-                            SocietyCommand::BreakBlocks(range.clone())
-                        }
+                        ButtonCommand::BreakBlocks(range) => SocietyCommand::BreakBlocks(range),
                     };
 
-                    UiRequest::IssueSocietyCommand(*soc, cmd)
+                    UiRequest::IssueSocietyCommand(soc, cmd)
                 }
                 Command(None, command) => {
                     // divine command to all subjects
                     let divine = match command {
                         ButtonCommand::HaulToPosition(e, tgt) => AiAction::Haul(
-                            *e,
+                            e,
                             HaulSource::PickUp,
-                            HaulTarget::Drop(*tgt),
+                            HaulTarget::Drop(tgt),
                             HaulPurpose::JustBecause,
                         ),
                         ButtonCommand::BreakBlocks(range) => {
@@ -464,9 +495,17 @@ mod content {
 
                 CancelDivineCommand => UiRequest::CancelDivineCommand,
                 CancelJobs(jobs) => {
-                    return for job in jobs.iter() {
-                        issue_req(UiRequest::CancelJob(*job));
+                    return for job in jobs.into_iter() {
+                        issue_req(UiRequest::CancelJob(job));
                     }
+                }
+                Build {
+                    society,
+                    range,
+                    template,
+                    ..
+                } => {
+                    UiRequest::IssueSocietyCommand(society, SocietyCommand::Build(range, template))
                 }
             };
 
@@ -476,7 +515,7 @@ mod content {
 
     impl fmt::Display for Button {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt::Display::fmt(&self.ty, f)
+            fmt::Display::fmt(self.ty.as_ref().take().expect("reusing consumed button"), f)
         }
     }
 
@@ -504,6 +543,7 @@ mod content {
 
                     return write!(f, "{} ({})", s, reason);
                 }
+                Build { display, .. } => return write!(f, "Build: {}", display),
             };
             f.write_str(s)
         }

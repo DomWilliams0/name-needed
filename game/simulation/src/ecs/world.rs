@@ -302,6 +302,7 @@ impl EcsWorld {
         self.component_registry.find_non_copyable(self, entity)
     }
 
+    /// (definition name, template, build name)
     pub fn build_templates(&self) -> &[(CachedStr, Rc<BuildTemplate>, Option<String>)] {
         &self.build_templates
     }
