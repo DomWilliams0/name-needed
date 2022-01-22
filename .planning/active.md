@@ -10,8 +10,9 @@
     * [X] selection-sensitive right click context menu
     * [X] close popup on camera move
     * [X] escape for clearing tile and entity selection (rebind quit)
-    * [o] improved ui for ordering people about and issuing society commands via popup
-    * [ ] close popup after button pressed
+    * [X] improved ui for ordering people about and issuing society commands via popup
+    * [X] close popup after button pressed
+    * [ ] build command
 * [X] ui for creating jobs for building many blocks
 * [ ] ui for wall outline specifically?
     * hovering over button should show outline preview

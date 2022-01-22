@@ -63,7 +63,7 @@ impl RenderedPopupContent {
         &self.title
     }
 
-    pub fn buttons(&self) -> impl Iterator<Item = &Button> {
+    pub fn buttons(&self) -> impl Iterator<Item = &Button> + ExactSizeIterator {
         self.buttons.iter()
     }
 }

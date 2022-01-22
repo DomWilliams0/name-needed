@@ -243,15 +243,15 @@ impl State {
             .build(context.ui(), || {
                 #[allow(clippy::enum_variant_names)]
                 enum Rendered {
-                    No,
+                    NoPopup,
                     OpenAndRendered,
-                    OpenButNotRendered,
+                    OpenButPlsClose,
                 }
 
-                let mut rendered = Rendered::No;
+                let mut rendered = Rendered::NoPopup;
                 for popup in popups.iter_all() {
                     let id = im_str!("popup");
-                    rendered = Rendered::OpenButNotRendered;
+                    rendered = Rendered::OpenButPlsClose;
 
                     let (renderable, open) = popup.as_renderable(context.simulation().ecs);
                     if open {
@@ -259,7 +259,8 @@ impl State {
                     }
 
                     context.popup(id, || {
-                        // title
+                        rendered = Rendered::OpenAndRendered;
+
                         context.text(renderable.title());
                         context.separator();
 
@@ -267,14 +268,19 @@ impl State {
                             // TODO render disabled buttons
                             if context.button(ui_str!(in context, "{}", button), [0.0, 0.0]) {
                                 button.issue_requests(|req| context.issue_request(req));
+
+                                // close on action
+                                rendered = Rendered::OpenButPlsClose;
                             }
                         }
 
-                        rendered = Rendered::OpenAndRendered;
+                        if renderable.buttons().len() == 0 {
+                            context.text_disabled("Nothing to do");
+                        }
                     });
                 }
 
-                if let Rendered::OpenButNotRendered = rendered {
+                if let Rendered::OpenButPlsClose = rendered {
                     popups.on_close();
                 }
             });
