@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Read, Write};
+use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::path::Path;
 
 use imgui::{Condition, Context, FontConfig, FontSource, Style, StyleVar, WindowFlags};
@@ -141,9 +141,10 @@ impl Ui {
             let file = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(path)?;
 
-            self.serialize_to(file)?;
+            self.serialize_to(BufWriter::new(file))?;
         }
 
         Ok(())
@@ -164,39 +165,18 @@ impl Ui {
             Ok(f) => f,
         };
 
-        let state = Self::deserialize_from(imgui_ctx, file)?;
+        let state = Self::deserialize_from(imgui_ctx, BufReader::new(file))?;
         Ok(Some(state))
     }
 
     fn serialize_to(&mut self, writer: impl Write) -> Result<(), ron::Error> {
-        #[derive(Serialize)]
-        #[repr(C)]
-        struct SerializedState<'a> {
-            state: &'a State,
-            imgui: &'a str,
-        }
-
         let mut imgui = String::new();
         self.imgui.save_ini_settings(&mut imgui);
-
-        let serialized = SerializedState {
-            state: &self.state,
-            imgui: &imgui,
-        };
-
-        ron::ser::to_writer(writer, &serialized)
+        do_serialize(&self.state, &imgui.clone(), writer)
     }
 
     fn deserialize_from(imgui_ctx: &mut Context, reader: impl Read) -> Result<State, ron::Error> {
-        #[derive(Deserialize)]
-        #[repr(C)]
-        struct SerializedState {
-            state: State,
-            imgui: String,
-        }
-
-        let SerializedState { state, imgui } = ron::de::from_reader(reader)?;
-
+        let (state, imgui) = do_deserialize(reader)?;
         imgui_ctx.load_ini_settings(&imgui);
         Ok(state)
     }
@@ -282,4 +262,29 @@ impl State {
                 }
             });
     }
+}
+
+fn do_serialize(state: &State, imgui: &str, writer: impl Write) -> Result<(), ron::Error> {
+    #[derive(Serialize)]
+    #[repr(C)]
+    struct SerializedState<'a> {
+        state: &'a State,
+        imgui: &'a str,
+    }
+
+    let serialized = SerializedState { state, imgui };
+
+    ron::ser::to_writer(writer, &serialized)
+}
+
+fn do_deserialize(reader: impl Read) -> Result<(State, String), ron::Error> {
+    #[derive(Deserialize)]
+    #[repr(C)]
+    struct SerializedState {
+        state: State,
+        imgui: String,
+    }
+
+    let SerializedState { state, imgui } = ron::de::from_reader(reader)?;
+    Ok((state, imgui))
 }
