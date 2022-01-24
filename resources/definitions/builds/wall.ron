@@ -9,6 +9,7 @@
         steps: 10,
         rate: 4,
         output: "StoneBrickWall",
+        outline: true,
       )},
       {"kind": (
         singular: "Stone brick wall",

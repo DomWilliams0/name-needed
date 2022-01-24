@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
 
+use serde::de::Error;
 use serde::Deserialize;
 
 use common::derive_more::IntoIterator;
@@ -14,8 +15,6 @@ use crate::definitions::loader::step2_preprocessing::ProcessedComponents;
 use crate::definitions::{DefinitionError, DefinitionErrorKind};
 use crate::ecs;
 use crate::ecs::ComponentBuildError;
-
-use serde::de::Error;
 
 /// Parent hierarchy is unprocessed
 #[derive(Debug, Deserialize)]
@@ -169,6 +168,10 @@ pub fn collect_raw_definitions(
     (definitions, errors)
 }
 impl ecs::Value for ron::Value {
+    fn into_bool(self) -> Result<bool, ComponentBuildError> {
+        self.into_type()
+    }
+
     fn into_int(self) -> Result<i64, ComponentBuildError> {
         self.into_type()
     }

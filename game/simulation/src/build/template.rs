@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use std::num::NonZeroU16;
 use std::rc::Rc;
 
@@ -16,6 +15,8 @@ pub struct BuildTemplate {
     steps: u32,
     rate: u32,
     output: BlockType,
+    /// For walls
+    supports_outline: bool,
 }
 
 impl BuildTemplate {
@@ -32,8 +33,8 @@ impl BuildTemplate {
         &self.materials
     }
 
-    pub fn supports_outline(&self) -> bool {
-        true // TODO
+    pub const fn supports_outline(&self) -> bool {
+        self.supports_outline
     }
 
     #[cfg(any(test, feature = "testing"))]
@@ -43,6 +44,7 @@ impl BuildTemplate {
             steps,
             rate,
             output,
+            supports_outline: false,
         }
     }
 }
@@ -81,12 +83,18 @@ impl<V: Value> ComponentTemplate<V> for BuildTemplate {
                 ComponentBuildError::TemplateSpecific(format!("invalid block type {:?}", name))
             })?
         };
+        let supports_outline = match values.get_bool("outline") {
+            Ok(b) => b,
+            Err(ComponentBuildError::KeyNotFound(_)) => false, // default if not present
+            Err(err) => return Err(err),
+        };
 
         Ok(Rc::new(BuildTemplate {
             materials,
             steps,
             rate,
             output,
+            supports_outline,
         }))
     }
 

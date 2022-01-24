@@ -1,4 +1,4 @@
-# TODOs (408)
+# TODOs (407)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -188,8 +188,6 @@
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
- * [game/simulation/src/build/template.rs](game/simulation/src/build/template.rs) (1)
-   * `true // TODO`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
    * `// TODO consume materials incrementally as progress is made`
  * [game/simulation/src/definitions/builder.rs](game/simulation/src/definitions/builder.rs) (1)
