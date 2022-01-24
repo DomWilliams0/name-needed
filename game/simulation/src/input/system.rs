@@ -78,8 +78,17 @@ impl<'a> System<'a> for InputSystem<'a> {
             // prioritise ui elements first
             let ui_elem = (&entities, &transform, &ui)
                 .join()
-                .find(|(_, transform, _)| transform.position.is_almost(&point, DISTANCE_THRESHOLD))
-                .map(|(e, _, _)| e.into());
+                .filter_map(|(e, transform, _)| {
+                    let dist2 = transform.position.distance_hor2(point);
+                    if dist2 < DISTANCE_THRESHOLD * DISTANCE_THRESHOLD {
+                        Some((e, dist2))
+                    } else {
+                        None
+                    }
+                })
+                .sorted_by_key(|(_, d)| OrderedFloat(*d))
+                .map(|(e, _)| e.into())
+                .next();
 
             // fallback to looking for normal entities
             ui_elem.or_else(|| {

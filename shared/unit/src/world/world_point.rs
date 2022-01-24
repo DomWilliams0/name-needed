@@ -94,6 +94,12 @@ impl WorldPoint {
         (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2) + (self.2 - other.2).powi(2)
     }
 
+    /// xy only
+    pub fn distance_hor2(&self, other: impl Into<Self>) -> f32 {
+        let other = other.into();
+        (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)
+    }
+
     #[inline]
     pub fn xyz(&self) -> (f32, f32, f32) {
         (self.x(), self.y(), self.z())
