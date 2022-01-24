@@ -1,17 +1,24 @@
+use std::fs::OpenOptions;
+use std::path::PathBuf;
+
+use sha2::{Digest, Sha256};
+
+use common::*;
+
 use crate::continent::ContinentMap;
 use crate::planet::PlanetInner;
 use crate::PlanetParams;
-use common::*;
-use sha2::{Digest, Sha256};
-use std::fs::OpenOptions;
-use std::path::PathBuf;
 
 pub fn save(planet: &PlanetInner) -> BoxedResult<()> {
     let path = cache_file(&planet.params);
     info!("caching planet to {file}", file = path.display());
     std::fs::create_dir_all(path.parent().unwrap())?;
 
-    let mut file = OpenOptions::new().write(true).create(true).open(&path)?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(&path)?;
 
     // TODO cache global features too
     bincode::serialize_into(&mut file, &planet.continents)?;
