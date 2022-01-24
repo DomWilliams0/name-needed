@@ -146,15 +146,10 @@ mod content {
         BreakBlocks(WorldPositionRange),
     }
 
-    pub enum ButtonState {
-        Active,
-        Disabled,
-    }
-
     pub struct Button {
         /// Consumed after press, which is fine because the popup menu is then closed
         ty: Option<ButtonType>,
-        state: ButtonState,
+        // TODO support disabled buttons?
     }
 
     #[derive(Default)]
@@ -471,10 +466,7 @@ mod content {
 
     impl Button {
         fn new(ty: ButtonType) -> Self {
-            Self {
-                ty: Some(ty),
-                state: ButtonState::Active,
-            }
+            Self { ty: Some(ty) }
         }
 
         pub fn issue_requests(&mut self, mut issue_req: impl FnMut(UiRequest) -> UiResponse) {

@@ -1,4 +1,4 @@
-# TODOs (407)
+# TODOs (408)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -229,8 +229,10 @@
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (2)
    * `// TODO expand/contract in a direction`
    * `// TODO only allocate uiresponse for those that need it`
- * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (2)
+ * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (4)
    * `// TODO bump alloc`
+   * `// TODO prioritise job`
+   * `// TODO support disabled buttons?`
    * `// TODO too easy to forget checks here - consider having each declare true/false/ignore needed for every button`
  * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
@@ -496,8 +498,6 @@
    * `// TODO customise text colour`
    * `// TODO use instances or indices?`
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
- * [renderer/engine/src/render/sdl/ui/render.rs](renderer/engine/src/render/sdl/ui/render.rs) (1)
-   * `// TODO render disabled buttons`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
  * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (10)

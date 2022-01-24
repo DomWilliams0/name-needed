@@ -242,7 +242,6 @@ impl State {
                         context.separator();
 
                         for button in renderable.buttons() {
-                            // TODO render disabled buttons
                             if context.button(ui_str!(in context, "{}", button)) {
                                 button.issue_requests(|req| context.issue_request(req));
 
