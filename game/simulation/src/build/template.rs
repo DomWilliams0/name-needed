@@ -32,6 +32,10 @@ impl BuildTemplate {
         &self.materials
     }
 
+    pub fn supports_outline(&self) -> bool {
+        true // TODO
+    }
+
     #[cfg(any(test, feature = "testing"))]
     pub fn new(materials: Vec<BuildMaterial>, steps: u32, rate: u32, output: BlockType) -> Self {
         Self {

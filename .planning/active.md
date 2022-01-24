@@ -15,7 +15,7 @@
     * [X] build command
     * [X] remove old command tabs
 * [X] ui for creating jobs for building many blocks
-* [ ] ui for wall outline specifically?
+* [X] ui for wall outline specifically?
     * hovering over button should show outline preview
     * [ ] can specify thickness of wall
     * [ ] can shrink/expand selection by 1 block

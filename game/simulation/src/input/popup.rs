@@ -133,7 +133,8 @@ mod content {
             society: SocietyHandle,
             range: WorldPositionRange,
             template: Rc<BuildTemplate>,
-            display: Box<dyn Display>,
+            display: Rc<dyn Display>,
+            outline_only: bool,
         },
     }
 
@@ -400,17 +401,36 @@ mod content {
                                 // gross that we need an allocation but the build menu will be different
                                 // in the future
                                 let name = match name {
-                                    Some(s) => Box::new(s.clone()) as Box<dyn Display>,
-                                    None => Box::new(*def) as Box<dyn Display>,
+                                    Some(s) => Rc::new(s.clone()) as Rc<dyn Display>,
+                                    None => Rc::new(*def) as Rc<dyn Display>,
                                 };
 
                                 if let Some(range) = selection.range().above() {
+                                    let outline = if template.supports_outline()
+                                        && range.iter_outline().is_some()
+                                    {
+                                        Some(ButtonType::Build {
+                                            society: soc,
+                                            range: range.clone(),
+                                            template: template.clone(),
+                                            display: name.clone(),
+                                            outline_only: true,
+                                        })
+                                    } else {
+                                        None
+                                    };
+
                                     add(ButtonType::Build {
                                         society: soc,
                                         range,
                                         template: template.clone(),
                                         display: name,
+                                        outline_only: false,
                                     });
+
+                                    if let Some(outline) = outline {
+                                        add(outline)
+                                    }
                                 }
                             }
                         }
@@ -503,9 +523,24 @@ mod content {
                     society,
                     range,
                     template,
+                    outline_only,
                     ..
                 } => {
-                    UiRequest::IssueSocietyCommand(society, SocietyCommand::Build(range, template))
+                    if !outline_only {
+                        UiRequest::IssueSocietyCommand(
+                            society,
+                            SocietyCommand::Build(range, template),
+                        )
+                    } else {
+                        return if let Some(outline) = range.iter_outline() {
+                            for range in outline {
+                                issue_req(UiRequest::IssueSocietyCommand(
+                                    society,
+                                    SocietyCommand::Build(range, template.clone()),
+                                ));
+                            }
+                        };
+                    }
                 }
             };
 
@@ -543,7 +578,18 @@ mod content {
 
                     return write!(f, "{} ({})", s, reason);
                 }
-                Build { display, .. } => return write!(f, "Build: {}", display),
+                Build {
+                    display,
+                    outline_only,
+                    ..
+                } => {
+                    return write!(
+                        f,
+                        "Build: {}{}",
+                        display,
+                        if *outline_only { " (outline)" } else { "" }
+                    )
+                }
             };
             f.write_str(s)
         }
