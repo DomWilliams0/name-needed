@@ -173,7 +173,8 @@ fn building(ecs: &EcsWorld) {
         .expect("bad society");
 
     if let Some(build) = ecs.find_build_template("core_build_wall") {
-        for _ in 0..8 {
+        let builds = helpers::get_config_count("build_jobs");
+        for _ in 0..builds {
             let pos = helpers::random_walkable_pos(&world);
 
             society

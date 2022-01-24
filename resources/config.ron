@@ -28,6 +28,7 @@ Config(
             "dogs": 5,
             "food": 50,
             "bricks": 20,
+            "build_jobs": 2,
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 64,
