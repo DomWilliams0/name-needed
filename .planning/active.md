@@ -29,4 +29,5 @@
     requests
 * [ ] update controls in readme
 * [X] display basic info about multiple entity selection in ui
+* [ ] when issuing a society command, remove any existing that conflict
 

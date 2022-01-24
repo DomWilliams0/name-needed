@@ -125,10 +125,13 @@ mod content {
     pub enum ButtonType {
         GoTo(WorldPoint),
         Follow(Entity),
+        // TODO prioritise job
         CancelJobs(SmallVec<[SocietyJobHandle; 1]>),
         CancelDivineCommand,
         /// Society command or divine command to all subjects
         Command(Option<SocietyHandle>, ButtonCommand),
+        /// Haul multiple entities to target pos
+        HaulToTarget(SocietyHandle, SmallVec<[Entity; 1]>, WorldPoint),
         Build {
             society: SocietyHandle,
             range: WorldPositionRange,
@@ -141,6 +144,7 @@ mod content {
     /// Individual divine command or society
     #[derive(Clone)]
     pub enum ButtonCommand {
+        /// Haul single entity to tile selection
         HaulToPosition(Entity, WorldPoint),
         /// Only works for single block for divine
         BreakBlocks(WorldPositionRange),
@@ -162,6 +166,7 @@ mod content {
         subjects_are_controllable: bool,
         target_has_path_finding: bool,
         target_is_haulable: bool,
+        subjects_are_haulable: bool,
 
         player_society: Read<'a, PlayerSociety>,
         tile_selection: Read<'a, SelectedTiles>,
@@ -205,21 +210,22 @@ mod content {
             let target_has_path_finding = target_entity
                 .map(|target| target.has(&paths))
                 .unwrap_or_default();
-            let target_is_haulable = target_entity
-                .map(|target| {
-                    target.has(&haulables)
-                        && target
-                            .get(&containeds)
-                            .map(|comp| {
-                                !matches!(
-                                    comp,
-                                    ContainedInComponent::Container(_)
-                                        | ContainedInComponent::InventoryOf(_)
-                                )
-                            })
-                            .unwrap_or(true)
-                })
-                .unwrap_or_default();
+
+            let is_haulable = |e: Entity| {
+                e.has(&haulables)
+                    && e.get(&containeds)
+                        .map(|comp| {
+                            !matches!(
+                                comp,
+                                ContainedInComponent::Container(_)
+                                    | ContainedInComponent::InventoryOf(_)
+                            )
+                        })
+                        .unwrap_or(true)
+            };
+
+            let target_is_haulable = target_entity.map(is_haulable).unwrap_or_default();
+            let subjects_are_haulable = has_subjects && subjects.iter().copied().all(is_haulable);
 
             State {
                 single_subject,
@@ -228,6 +234,7 @@ mod content {
                 subjects_are_controllable,
                 target_has_path_finding,
                 target_is_haulable,
+                subjects_are_haulable,
                 player_society: player_soc,
                 tile_selection: world_sel,
                 subjects: entity_sel,
@@ -352,9 +359,25 @@ mod content {
             }
             PopupContentType::TargetPoint(target_pos) => {
                 title = format!("{}", target_pos.floor());
+                // go to
                 buttons.add(|| {
                     if state.subjects_have_ai && state.subjects_are_controllable {
                         return Some(ButtonType::GoTo(target_pos));
+                    }
+
+                    None
+                });
+
+                // society item haul to here
+                buttons.add(|| {
+                    if state.subjects_are_haulable {
+                        if let Some(soc) = state.player_society.get() {
+                            return Some(ButtonType::HaulToTarget(
+                                soc,
+                                state.subjects().iter().copied().collect(),
+                                target_pos,
+                            ));
+                        }
                     }
 
                     None
@@ -505,6 +528,15 @@ mod content {
                     UiRequest::IssueDivineCommand(divine)
                 }
 
+                HaulToTarget(soc, entities, tgt) => {
+                    return for e in entities {
+                        issue_req(UiRequest::IssueSocietyCommand(
+                            soc,
+                            SocietyCommand::HaulToPosition(e, tgt),
+                        ));
+                    }
+                }
+
                 CancelDivineCommand => UiRequest::CancelDivineCommand,
                 CancelJobs(jobs) => {
                     return for job in jobs.into_iter() {
@@ -569,6 +601,10 @@ mod content {
                     };
 
                     return write!(f, "{} ({})", s, reason);
+                }
+                HaulToTarget(_, entities, _) if entities.len() == 1 => "Haul here",
+                HaulToTarget(_, entities, _) => {
+                    return write!(f, "Haul {} things here", entities.len())
                 }
                 Build {
                     display,
