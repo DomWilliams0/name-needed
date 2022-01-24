@@ -93,14 +93,25 @@ impl SelectionWindow {
                 (e, None, EntityState::Dead)
             }
             None if entity_sel.count() > 1 => {
-                // TODO better support for multiple entity selection in debug window
+                // TODO better support for multiple entity selection
+
+                context.key_value(
+                    "Entities:",
+                    || {
+                        Value::Wrapped(ui_str!(in context, "{}",
+                            CommaSeparatedDebugIter(RefCell::new(entity_sel.iter().iter()))
+                        ))
+                    },
+                    None,
+                    COLOR_GREEN,
+                );
+
                 let style = context.push_style_color(
                     StyleColor::Text,
                     context.style_color(StyleColor::TextDisabled),
                 );
                 context.text_wrapped(ui_str!(in context,
-                    "{} entities selected, select just 1 for details",
-                    entity_sel.count()
+                    "Multiple entity control not yet supported, reduce selection to a single entity",
                 ));
                 return style.pop();
             }

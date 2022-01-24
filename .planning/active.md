@@ -28,5 +28,5 @@
 * [X] central registry of all builds including a unique identifier to refer to it in ui and its
     requests
 * [ ] update controls in readme
-* [ ] display basic info about multiple entity selection in ui
+* [X] display basic info about multiple entity selection in ui
 
