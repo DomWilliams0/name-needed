@@ -11,11 +11,11 @@ use simulation::input::{
 };
 use simulation::job::BuildThingJob;
 use simulation::{
-    ActivityComponent, AiAction, AssociatedBlockData, AssociatedBlockDataType, BlockType,
-    ComponentRef, ComponentWorld, ConditionComponent, Container, ContainerComponent,
-    EdibleItemComponent, Entity, EntityLoggingComponent, FollowPathComponent, HungerComponent,
-    IntoEnumIterator, InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent,
-    Societies, SocietyComponent, TransformComponent, UiElementComponent,
+    ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
+    ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
+    EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
+    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
+    SocietyComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
@@ -325,32 +325,6 @@ impl SelectionWindow {
             let tab = context.new_tab("Activity");
             if tab.is_some() {
                 self.do_activity(context, &*activity);
-            }
-        }
-
-        // control
-        {
-            let tab = context.new_tab("Control");
-            if tab.is_some() {
-                let world_selection = ecs.resource::<SelectedTiles>();
-                if let Some(block) = world_selection
-                    .current_selected()
-                    .and_then(|sel| sel.single_tile())
-                {
-                    if context.button("Go to selected block") {
-                        context.issue_request(UiRequest::IssueDivineCommand(AiAction::Goto(
-                            block.above().centred(),
-                        )));
-                    }
-
-                    if context.button("Break selected block") {
-                        context.issue_request(UiRequest::IssueDivineCommand(
-                            AiAction::GoBreakBlock(block),
-                        ));
-                    }
-                } else {
-                    context.text_disabled("Select a single block");
-                }
             }
         }
     }
