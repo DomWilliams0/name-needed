@@ -13,7 +13,7 @@ pub fn for_tests() {
     LOGGER.get_or_init(|| {
         // let drain = StdLog.filter_level(Level::Trace).fuse();
         let drain = slog_term::TermDecorator::new()
-            .stdout()
+            .stderr()
             .force_color()
             .build();
         let terminal_drain = slog_term::CompactFormat::new(drain).build();
