@@ -33,9 +33,11 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * graph for fps/tps history
 	* measure ticks per second in perf window
 * better tile selection
-	* live updating selection region
 	* selection shows if selected blocks are occluded
 	* depth selection
+    * show dimensions in-world
+    * arbitrary polygon that can be added to/subtracted from with $modifier+drag
+    * button to expand outwards/inwards by 1 block
 * better entity selection
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
@@ -75,14 +77,14 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 ### Society-oriented behaviours
 * more society level jobs
 	* place blocks, destroying what's currently there (DAG for dependencies)
-	* place walls (hollow rectangle)
-		* specify wall thickness and height
+    * specify thickness for wall building
 * ai filtering at the job level on high-level requirements before considering all its subtasks
 * preserve info about completed society jobs/tasks to show in the ui
 * etiquette/morality "meters" that vary based on personality and mood. if low, they take things reserved for work items, take other's food, consider items stored inside other people's personal containers
 * specify a limit on job reservations per task, e.g. 2 maximum on sawing a tree trunk
 * expand concept of "society" to just be a gathering/group of related entities that emits jobs, e.g. family, guild, village
 	* allow multiple societies, e.g. someone has their family and village, a wild animal has its family/herd
+* when issuing a society command, remove any that conflict (e.g. multiple hauls for the same thing)
 
 #### Jobs and tools
 * tool requirements for a job
@@ -92,6 +94,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* equip from storage on the way to the work location when all materials are available
 	* already held or equipped
 * will need a better way of choosing the best person for a job, currently the first person to consider it will reserve it. possibly a voting phase/stage where each candidate volunteers via AI weight system, then the best candidate is chosen from them
+* extend material reservation to include the specific materials in transit for a build, to avoid others considering hauling more when it's already on the way
 * personality affects the desiribility of jobs - lazy/weak/injured people dont want to do physical work, selfish people dont want to work on society jobs, only things for themselves
 
 ##### Building
@@ -109,6 +112,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * allow smooth changing of material gathering target job without dropping the current haul
 * prioritise material gathering for the most complete job, rather than random/round robin
 * better handle a build job being set in a non-air position
+* overlapping vertical builds need to be clearer, maybe collapse ui elements together
 
 
 ### Item stacks
@@ -198,7 +202,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged
 * biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage
-* dynstack for ai dses and considerations, to avoid the huge amount of boxing
+* consider dynstack for ai dses and considerations, to avoid the huge amount of boxing
 * experiment with PGO
 * consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
 * physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed
@@ -229,7 +233,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: occlusion flickers after world changes, updates are probably being queued for too long
 * bug: occlusion shadows above a 9 block drop
 * bug: occlusion shadows cast by blocks above current viewing slice (like treetops) look very weird
-* bug: entities not rendered on a particular laptop (ticket #90)
 
 ## Building and testing
 * fuzzing
