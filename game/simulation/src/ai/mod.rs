@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
+pub use action::AiAction;
 use common::*;
 pub use input::AiInput;
 pub use system::{AiComponent, AiSystem};
 use unit::world::{WorldPoint, WorldPosition};
+use world::WorldArea;
 
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
+
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{FoundSlot, InventoryComponent, ItemFilter};
-use crate::SocietyHandle;
-pub use action::AiAction;
-
-use world::WorldArea;
+use crate::{HungerComponent, SocietyComponent, SocietyHandle, TransformComponent};
 
 mod action;
 mod consideration;
@@ -51,6 +51,7 @@ pub struct AiBlackboard<'a> {
     pub shared: &'a mut SharedBlackboard,
 }
 
+#[derive(Default)]
 pub struct SharedBlackboard {
     pub area_link_cache: HashMap<(WorldArea, WorldArea), bool>,
 }
@@ -67,4 +68,32 @@ macro_rules! dse {
     ($dse:expr) => {
         AiBox::new($dse) as Box<dyn Dse<AiContext>>
     };
+}
+
+impl<'a> AiBlackboard<'a> {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        e: Entity,
+        transform: &'a TransformComponent,
+        hunger: Option<&'a HungerComponent>,
+        inventory: Option<&'a InventoryComponent>,
+        society: Option<&'a SocietyComponent>,
+        ai: &'a AiComponent,
+        shared: &'a mut SharedBlackboard,
+        world: &'a EcsWorld,
+    ) -> Self {
+        AiBlackboard::<'a> {
+            entity: e,
+            accessible_position: transform.accessible_position(),
+            position: transform.position,
+            hunger: hunger.map(|h| h.hunger()),
+            inventory_search_cache: HashMap::new(),
+            local_area_search_cache: HashMap::new(),
+            inventory,
+            society: society.map(|comp| comp.handle()),
+            ai,
+            world,
+            shared,
+        }
+    }
 }

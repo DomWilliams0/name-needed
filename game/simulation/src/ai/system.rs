@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
 
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
+use common::bumpalo::Bump;
 use common::*;
 
 use crate::activity::ActivityComponent;
@@ -142,57 +142,65 @@ impl<'a> System<'a> for AiSystem {
             return;
         }
 
-        let mut shared_bb = SharedBlackboard {
-            area_link_cache: HashMap::new(),
-        };
+        // TODO use frame allocator in ai blackboards
+        let mut shared_bb = SharedBlackboard::default();
 
         for (e, transform, hunger_opt, inventory_opt, ai, activity, society_opt) in (
             &entities,
             &transform,
-            hunger.maybe(),
-            inventory.maybe(),
+            (&hunger).maybe(),
+            (&inventory).maybe(),
             &mut ai,
             &mut activity,
-            society.maybe(),
+            (&society).maybe(),
         )
             .join()
         {
             let e = Entity::from(e);
-            log_scope!(o!("system" => "ai", e));
-            let society_opt: Option<&SocietyComponent> = society_opt; // for IDE
 
             // initialize blackboard
-            // TODO use arena/bump allocator and share instance between entities
-            let mut bb = AiBlackboard {
-                entity: e,
-                accessible_position: transform.accessible_position(),
-                position: transform.position,
-                hunger: hunger_opt.map(|h| h.hunger()),
-                inventory_search_cache: HashMap::new(),
-                local_area_search_cache: HashMap::new(),
-                inventory: inventory_opt,
-                society: society_opt.map(|comp| comp.handle()),
+            let mut bb = AiBlackboard::new(
+                e,
+                transform,
+                hunger_opt,
+                inventory_opt,
+                society_opt,
                 ai,
-                world: &*ecs_world,
-                shared: &mut shared_bb,
-            };
+                &mut shared_bb,
+                &ecs_world,
+            );
 
             // safety: can't use true lifetime on Blackboard so using 'static and transmuting until
             // we get our GATs
-            let bb_ref: &'a mut AiBlackboard = unsafe { std::mem::transmute(&mut bb) };
+            let bb_ref = unsafe {
+                std::mem::transmute::<&mut AiBlackboard, &mut AiBlackboard<'static>>(&mut bb)
+            };
 
             // collect extra actions from society job list, if any
             // TODO provide READ ONLY DSEs to ai intelligence
-            // TODO use dynstack to avoid so many small temporary allocations, or arena allocator
             // TODO fix eventually false assumption that all stream DSEs come from a society
             let society = society_opt.and_then(|comp| comp.resolve(&*societies));
-            let extra_dses = self.collect_society_tasks(e, tick, society, &ecs_world);
+            let extra_dses = {
+                let mut dses = BumpVec::new_in(alloc.allocator());
+                collect_society_tasks(
+                    e,
+                    tick,
+                    society,
+                    &ecs_world,
+                    alloc.allocator(),
+                    |society_task, job_idx, dse| {
+                        dses.push((society_task, job_idx, dse));
+                    },
+                );
+                dses
+            };
 
             // choose best action
-            let streamed_dse = extra_dses.iter().map(|(_, _, dse)| &**dse);
-            let decision =
-                ai.intelligence
-                    .choose_with_stream_dses(bb_ref, alloc.allocator(), streamed_dse);
+            let decision = ai.intelligence.choose_with_stream_dses(
+                bb_ref,
+                alloc.allocator(),
+                extra_dses.iter().map(|(_, _, dse)| &**dse),
+            );
 
             if let IntelligentDecision::New { dse, action, src } = decision {
                 debug!("new activity"; "dse" => dse.name(), "source" => ?src);
@@ -207,9 +215,9 @@ impl<'a> System<'a> for AiSystem {
                         society.expect("streamed DSEs expected to come from a society only");
 
                     let (task, job_idx, _) = &extra_dses[i];
-                    let mut jobs = society.jobs_mut();
 
                     // reserve task
+                    let mut jobs = society.jobs_mut();
                     jobs.reservations_mut().reserve(task.clone(), e);
 
                     // get job reference from index (avoiding the need to clone all job refs even
@@ -230,7 +238,7 @@ impl<'a> System<'a> for AiSystem {
 
                 ai.current = Some(src);
 
-                // pass on to activity system
+                // pass decision on to activity system
                 activity.interrupt_with_new_activity(action, society_task);
             }
 
@@ -242,49 +250,37 @@ impl<'a> System<'a> for AiSystem {
     }
 }
 
-impl AiSystem {
-    // TODO dont return a new vec of boxes, have some dignity
-    /// Prevents further jobs being added to society until manually cleared
-    fn collect_society_tasks(
-        &self,
-        entity: Entity,
-        this_tick: Tick,
-        society: Option<&Society>,
-        ecs_world: &EcsWorld,
-    ) -> Vec<(SocietyTask, JobIndex, Box<dyn Dse<AiContext>>)> {
-        let mut extra_dses = Vec::new();
+/// Prevents further jobs being added to society until manually cleared
+fn collect_society_tasks<'bump>(
+    entity: Entity,
+    this_tick: Tick,
+    society: Option<&Society>,
+    ecs_world: &EcsWorld,
+    alloc: &'bump Bump,
+    mut add_dse: impl FnMut(SocietyTask, JobIndex, BumpBox<'bump, dyn Dse<AiContext>>),
+) {
+    if let Some(society) = society {
+        trace!("considering tasks for society"; "society" => ?society);
 
-        if let Some(society) = society {
-            trace!("considering tasks for society"; "society" => ?society);
+        // TODO collect jobs from society directly, which can filter them from the applicable work items too
+        let mut jobs = society.jobs_mut();
+        let mut n = 0usize;
+        jobs.filter_applicable_tasks(
+            entity,
+            this_tick,
+            ecs_world,
+            |task, job_idx, reservations| match task.as_dse(ecs_world, reservations, alloc) {
+                Some(dse) => {
+                    add_dse(task, job_idx, dse);
+                    n += 1;
+                }
+                None => {
+                    warn!("task failed conversion to DSE"; "task" => ?task);
+                }
+            },
+        );
 
-            let mut applicable_tasks = Vec::new(); // TODO reuse allocation
-
-            // TODO collect jobs from society directly, which can filter them from the applicable work items too
-            let mut jobs = society.jobs_mut();
-            jobs.filter_applicable_tasks(entity, this_tick, ecs_world, &mut applicable_tasks);
-
-            debug_assert!(
-                extra_dses.is_empty(),
-                "society tasks expected to be the only source of extra dses"
-            );
-
-            extra_dses.extend(applicable_tasks.into_iter().filter_map(
-                |(task, job_idx, reservations)| match task.as_dse(ecs_world, reservations) {
-                    Some(dse) => Some((task, job_idx, dse)),
-                    None => {
-                        warn!("task failed conversion to DSE"; "task" => ?task);
-                        None
-                    }
-                },
-            ));
-
-            trace!(
-                "there are {count} tasks available",
-                count = extra_dses.len();
-            );
-        }
-
-        extra_dses
+        trace!("there are {count} tasks available", count = n);
     }
 }
 

@@ -1,10 +1,13 @@
-use float_ord::FloatOrd;
-
-use crate::decision::Dse;
-use crate::{AiBox, Context, Input};
-use common::*;
 use std::cell::Cell;
 use std::collections::HashMap;
+
+use float_ord::FloatOrd;
+
+use common::*;
+
+use crate::bumpalo::collections::CollectIn;
+use crate::decision::Dse;
+use crate::{AiBox, Context, Input};
 
 // TODO bump allocator should not expose bumpalo specifically
 
@@ -52,11 +55,11 @@ struct Decision<C: Context> {
     score: f32,
 }
 
-pub struct InputCache<'a, C: Context>(bumpalo::collections::Vec<'a, (C::Input, f32)>);
+pub struct InputCache<'a, C: Context>(BumpVec<'a, (C::Input, f32)>);
 
 impl<'a, C: Context> InputCache<'a, C> {
     pub fn new(alloc: &'a bumpalo::Bump) -> Self {
-        InputCache(bumpalo::collections::Vec::with_capacity_in(16, alloc))
+        InputCache(BumpVec::with_capacity_in(16, alloc))
     }
 
     pub fn get(&mut self, input: C::Input, blackboard: &mut C::Blackboard) -> f32 {
@@ -132,15 +135,12 @@ impl<C: Context> Intelligence<C> {
 
     /// "Stream" behaviours only apply to a single tick, avoiding the overhead of adding then
     /// immediately removing additional behaviours
-    pub fn choose_with_stream_dses<'a, 'b>(
+    pub fn choose_with_stream_dses<'a: 'b, 'b>(
         &'a mut self,
         blackboard: &'b mut C::Blackboard,
         alloc: &'a bumpalo::Bump,
         streams: impl Iterator<Item = &'b dyn Dse<C>>,
-    ) -> IntelligentDecision<'b, C>
-    where
-        'a: 'b,
-    {
+    ) -> IntelligentDecision<'b, C> {
         // score all possible decisions
         let mut context = IntelligenceContext {
             blackboard,
@@ -155,8 +155,7 @@ impl<C: Context> Intelligence<C> {
         }
 
         // score streams in a parallel array of scores
-        // TODO use bump allocator
-        let mut streams: Vec<_> = streams.map(|dse| (dse, 0.0f32)).collect();
+        let mut streams: BumpVec<_> = streams.map(|dse| (dse, 0.0f32)).collect_in(alloc);
         Smarts::score_dses(
             &mut context,
             streams.iter_mut().map(|(dse, score)| (*dse, score)),
@@ -278,13 +277,14 @@ impl<C: Context> Debug for DecisionSource<C> {
 
 #[cfg(test)]
 mod tests {
+    use common::{bumpalo, once};
+
     use crate::decision::WeightedDse;
     use crate::test_utils::*;
     use crate::{
         AiBox, Considerations, DecisionSource, DecisionWeightType, Dse, Intelligence,
         IntelligentDecision,
     };
-    use common::{bumpalo, once};
 
     #[test]
     fn extra_dses() {

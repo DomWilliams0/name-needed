@@ -1,4 +1,5 @@
 use ai::{Dse, WeightedDse};
+use common::bumpalo::Bump;
 use common::*;
 use unit::world::WorldPosition;
 
@@ -50,11 +51,13 @@ impl SocietyTask {
 
     // TODO temporary box allocation is gross, use dynstack for dses
     /// More reservations = lower weight
-    pub fn as_dse(
+    #[allow(unused_variables)] // used in macro
+    pub fn as_dse<'bump>(
         &self,
         world: &EcsWorld,
         existing_reservations: u16,
-    ) -> Option<Box<dyn Dse<AiContext>>> {
+        alloc: &'bump Bump,
+    ) -> Option<BumpBox<'bump, dyn Dse<AiContext>>> {
         use SocietyTask::*;
 
         // TODO use an equation you unmathematical twat
@@ -67,9 +70,14 @@ impl SocietyTask {
         };
 
         macro_rules! dse {
-            ($dse:expr) => {
-                Some(Box::new(WeightedDse::new($dse, weighting)))
-            };
+            ($dse:expr) => {{
+                let boxed = BumpBox::new_in(WeightedDse::new($dse, weighting), alloc);
+                // safety: normal safe cast allowed with Box but not custom BumpBox
+                let boxed_dyn = unsafe {
+                    BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>)
+                };
+                Some(boxed_dyn)
+            }};
         }
 
         match self {

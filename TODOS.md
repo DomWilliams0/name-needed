@@ -1,18 +1,17 @@
-# TODOs (408)
+# TODOs (404)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `// TODO use a simpler manual vec that doesnt run destructors`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (9)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
    * `// TODO use an arena-allocator hashmap`
    * `// TODO perfect hash on C::Input`
    * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
    * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO use bump allocator`
    * `// TODO benchmark adding and popping smarts`
    * `// TODO use bump`
    * `// TODO reuse allocation`
@@ -177,14 +176,11 @@
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (8)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
-   * `// TODO use arena/bump allocator and share instance between entities`
+   * `// TODO use frame allocator in ai blackboards`
    * `// TODO provide READ ONLY DSEs to ai intelligence`
-   * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
-   * `// TODO dont return a new vec of boxes, have some dignity`
-   * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`

@@ -154,7 +154,7 @@ impl SocietyJobList {
         entity: Entity,
         this_tick: Tick,
         world: &EcsWorld,
-        tasks_out: &mut Vec<(SocietyTask, JobIndex, ReservationCount)>,
+        mut add_task: impl FnMut(SocietyTask, JobIndex, ReservationCount),
     ) {
         // refresh jobs if necessary
         if self.last_update != this_tick {
@@ -195,19 +195,21 @@ impl SocietyJobList {
 
             for task in job.tasks() {
                 use Reservation::*;
-                match self.reservations.check_for(task, entity) {
+                let reservations = match self.reservations.check_for(task, entity) {
                     Unreserved | ReservedBySelf => {
                         // wonderful, this task is fully available
-                        tasks_out.push((task.clone(), i, 0));
+                        0
                     }
                     ReservedButShareable(n) => {
                         // this task is available but already reserved by others
-                        tasks_out.push((task.clone(), i, n));
+                        n
                     }
                     Unavailable => {
                         // not available
+                        continue;
                     }
-                }
+                };
+                add_task(task.clone(), i, reservations);
             }
         }
     }
