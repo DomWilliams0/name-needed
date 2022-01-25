@@ -88,7 +88,7 @@ The `--scenario` parameter chooses a specific situation to spawn entities in, fo
 
 *Note: the "game" is currently very much a demo and not very playable in the slightest. Abandon all expectations!*
 
-* <kbd>Alt</kbd>+<kbd>Esc</kbd> to exit (most importantly)
+* <kbd>Alt</kbd>+<kbd>Q</kbd> to exit (most importantly)
 * <kbd>Alt</kbd>+<kbd>R</kbd> to restart
 * <kbd>Right-click</kbd> to drag a selection over blocks in the world
     * Then <kbd>Right-click</kbd> in the bottom right corner to build there/destroy the blocks
