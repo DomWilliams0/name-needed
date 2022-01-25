@@ -1,5 +1,9 @@
 use std::collections::HashSet;
 use std::iter::once;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use tokio::sync::broadcast;
 
 use common::derive_more::Constructor;
 use common::*;
@@ -10,7 +14,6 @@ use unit::world::{
 };
 
 use crate::block::{Block, BlockDurability, BlockType};
-
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
 use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
@@ -19,10 +22,6 @@ use crate::navigation::{
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
-
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use tokio::sync::broadcast;
 
 pub trait WorldContext: 'static + Send + Sync {
     type AssociatedBlockData;
@@ -313,6 +312,36 @@ impl<C: WorldContext> World<C> {
                     .find_accessible_block(slice_block, Some(pos.2), z_min)
             })
             .map(|pos| pos.to_world_position(chunk_pos))
+    }
+
+    pub fn find_accessible_block_in_range(
+        &self,
+        range: &WorldPositionRange,
+    ) -> Option<WorldPosition> {
+        let mut chunks = ContiguousChunkIterator::new(self);
+        let (_, _, (min_z, max_z)) = range.ranges();
+
+        for (x, y) in range.iter_columns() {
+            let pos = WorldPosition::new(x, y, GlobalSliceIndex::new(max_z));
+            let chunk_pos = ChunkLocation::from(pos);
+            let slice_block = SliceBlock::from(BlockPosition::from(pos));
+            let res = chunks
+                .next(chunk_pos)
+                .and_then(|c| {
+                    c.raw_terrain().find_accessible_block(
+                        slice_block,
+                        Some(pos.2),
+                        Some(GlobalSliceIndex::new(min_z)),
+                    )
+                })
+                .map(|pos| pos.to_world_position(chunk_pos));
+
+            if res.is_some() {
+                return res;
+            }
+        }
+
+        None
     }
 
     pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<C> {
@@ -607,15 +636,13 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    pub fn iterate_blocks<'a>(
-        &'a self,
-        range: &WorldPositionRange,
-    ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
-        let ((ax, bx), (ay, by), (az, bz)) = range.ranges();
-        (az..=bz)
-            .cartesian_product(ay..=by)
-            .cartesian_product(ax..=bx)
-            .map(move |((z, y), x)| (self.block((x, y, z)), (x, y, z).into()))
+    pub fn iterate_blocks(
+        &self,
+        range: WorldPositionRange,
+    ) -> impl Iterator<Item = (Block, WorldPosition)> + '_ {
+        range
+            .iter_blocks()
+            .map(move |pos| (self.block(pos), pos))
             .filter_map(move |(block, pos)| block.map(|b| (b, pos)))
     }
 
@@ -626,7 +653,7 @@ impl<C: WorldContext> World<C> {
     ) -> impl Iterator<Item = (Block, WorldPosition)> + 'a {
         // TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups
 
-        self.iterate_blocks(range)
+        self.iterate_blocks(range.clone())
             .filter(move |(block, pos)| f(*block, pos))
     }
 
@@ -742,15 +769,18 @@ impl LoadNotifier {
 }
 
 pub mod slab_loading {
+    use std::hint::unreachable_unchecked;
+
+    use futures::task::{Context, Poll};
+    use futures::Future;
+    use tokio::macros::support::Pin;
+
+    use common::*;
+    use unit::world::SlabLocation;
+
     use crate::chunk::slab::{Slab, SlabInternalNavigability};
     use crate::world::WaitResult;
     use crate::{BaseTerrain, WorldContext, WorldRef};
-    use common::*;
-    use futures::task::{Context, Poll};
-    use futures::Future;
-    use std::hint::unreachable_unchecked;
-    use tokio::macros::support::Pin;
-    use unit::world::SlabLocation;
 
     pub(crate) struct SlabProcessingFuture<'a, C: WorldContext> {
         phantom: PhantomData<&'a C>,
@@ -1065,10 +1095,11 @@ impl AreaLookup {
 pub mod helpers {
     use std::time::Duration;
 
-    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
-    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
     use common::Itertools;
     use unit::world::ChunkLocation;
+
+    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
+    use crate::{Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
 
     pub struct DummyWorldContext;
 
@@ -1156,9 +1187,11 @@ pub mod helpers {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
     use std::time::Duration;
 
     use common::{seeded_rng, Itertools, Rng};
+    use config::WorldPreset;
     use unit::world::{all_slabs_in_range, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
@@ -1177,8 +1210,6 @@ mod tests {
     };
     use crate::world::ContiguousChunkIterator;
     use crate::{presets, BaseTerrain, OcclusionChunkUpdate, SearchGoal, WorldContext};
-    use config::WorldPreset;
-    use std::convert::TryFrom;
 
     #[test]
     fn world_path_single_block_in_y_direction() {

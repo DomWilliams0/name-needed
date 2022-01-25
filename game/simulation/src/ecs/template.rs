@@ -1,10 +1,15 @@
 pub use crate::definitions::ValueImpl;
 use crate::ecs::*;
+use crate::string::StringCache;
 use common::Debug;
 use std::any::Any;
+use std::rc::Rc;
 
 pub trait ComponentTemplate<V: Value>: Debug {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        string_cache: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized;
 
@@ -16,7 +21,8 @@ pub trait ComponentTemplate<V: Value>: Debug {
 #[derive(Clone)]
 pub struct ComponentTemplateEntry<V: Value> {
     pub key: &'static str,
-    pub construct_fn: fn(&mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>,
+    pub construct_fn:
+        fn(&mut Map<V>, &StringCache) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>,
 }
 
 inventory::collect!(ComponentTemplateEntry<ValueImpl>);

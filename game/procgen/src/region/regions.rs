@@ -25,7 +25,7 @@ use std::hint::unreachable_unchecked;
 use std::ops::{Deref, DerefMut};
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use strum_macros::EnumDiscriminants;
+use strum::EnumDiscriminants;
 
 pub struct Regions<const SIZE: usize, const SIZE_2: usize> {
     params: PlanetParamsRef,
@@ -1100,7 +1100,7 @@ mod tests {
         timeout_task.abort();
 
         // generic checks
-        for ([x, y, _], entry) in regions.region_grid.iter_coords() {
+        for (_, entry) in regions.region_grid.iter_coords() {
             let guard = entry
                 .0
                 .try_read()

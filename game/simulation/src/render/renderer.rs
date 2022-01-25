@@ -1,6 +1,6 @@
 use color::Color;
 use common::*;
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
 use crate::render::UiElementComponent;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
@@ -65,9 +65,9 @@ pub trait Renderer {
 
     // ----
 
-    fn tile_selection(&mut self, a: WorldPosition, b: WorldPosition, color: Color) {
-        let (ax, ay, az) = WorldPoint::from(a).xyz();
-        let (bx, by, bz) = WorldPoint::from(b).xyz();
+    fn selection(&mut self, a: WorldPoint, b: WorldPoint, color: Color, finished: bool) {
+        let (ax, ay, az) = a.xyz();
+        let (bx, by, bz) = b.xyz();
 
         let bl = {
             let x = ax.min(bx);
@@ -90,6 +90,11 @@ pub trait Renderer {
 
         self.debug_add_quad([bl, br, tr, tl], color);
         // TODO render translucent quad over selected blocks, showing which are visible/occluded. cache this mesh
+
+        // thing to right click on in bottom right corner
+        if finished {
+            self.debug_add_square_around(br, 0.15, color);
+        }
     }
 
     fn debug_add_square_around(&mut self, centre: WorldPoint, radius: f32, color: Color) {

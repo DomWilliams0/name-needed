@@ -1,10 +1,11 @@
 #![allow(dead_code)]
-use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies, StoneBrickWall};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies};
+
+use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
 pub type Scenario = fn(&EcsWorld);
 const DEFAULT_SCENARIO: &str = "wander_and_eat";
@@ -171,12 +172,15 @@ fn building(ecs: &EcsWorld) {
         .society_by_handle(society)
         .expect("bad society");
 
-    for _ in 0..8 {
-        let pos = helpers::random_walkable_pos(&world);
+    if let Some(build) = ecs.find_build_template("core_build_wall") {
+        let builds = helpers::get_config_count("build_jobs");
+        for _ in 0..builds {
+            let pos = helpers::random_walkable_pos(&world);
 
-        society
-            .jobs_mut()
-            .submit(ecs, BuildThingJob::new(pos, StoneBrickWall));
+            society
+                .jobs_mut()
+                .submit(ecs, BuildThingJob::new(pos, build.clone()));
+        }
     }
 }
 
@@ -219,7 +223,6 @@ fn haul_to_container(ecs: &EcsWorld) {
 }
 
 mod helpers {
-    use crate::simulation::NameComponent;
     use color::Color;
     use common::{random, NormalizedFloat, Rng};
     use engine::simulation;
@@ -230,6 +233,8 @@ mod helpers {
         SocietyComponent, SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange,
         WorldTerrainUpdate,
     };
+
+    use crate::simulation::NameComponent;
 
     pub fn get_config_count(wat: &str) -> usize {
         let counts = &config::get().simulation.spawn_counts;

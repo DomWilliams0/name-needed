@@ -5,7 +5,7 @@ use crate::needs::FoodEatingError;
 use crate::path::PathToken;
 use common::{num_derive::FromPrimitive, num_traits, Display};
 use std::convert::TryInto;
-use strum_macros::EnumDiscriminants;
+use strum::EnumDiscriminants;
 use unit::world::WorldPoint;
 use world::NavigationError;
 

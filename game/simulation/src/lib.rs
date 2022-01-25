@@ -3,7 +3,7 @@
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
-    block::{BlockType, IntoEnumIterator},
+    block::BlockType,
     loader::{
         AsyncWorkerPool, BlockForAllError, TerrainSourceError, TerrainUpdatesRes, WorldLoader,
         WorldTerrainUpdate,
@@ -45,7 +45,7 @@ pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
-pub use build::{Build, BuildMaterial, StoneBrickWall};
+pub use build::{BuildMaterial, BuildTemplate};
 #[cfg(debug_assertions)]
 pub use item::validation::validate_all_inventories;
 pub use item::{
@@ -59,6 +59,8 @@ pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
 pub use society::{job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use string::{CachedStr, StringCache};
+pub use strum::IntoEnumIterator;
 pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,
@@ -113,5 +115,6 @@ mod simulation;
 mod society;
 mod spatial;
 mod steer;
+mod string;
 mod transform;
 mod world_debug;

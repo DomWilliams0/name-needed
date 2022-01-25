@@ -1,5 +1,6 @@
 use crate::definitions::DefinitionNameComponent;
 use crate::ecs::Entity;
+use crate::string::CachedStr;
 use crate::ComponentWorld;
 use common::*;
 
@@ -8,7 +9,7 @@ pub enum ItemFilter {
     SpecificEntity(Entity),
     Predicate(fn(Entity) -> bool),
     HasComponent(&'static str),
-    MatchesDefinition(&'static str),
+    MatchesDefinition(CachedStr),
     // TODO filters on other fields e.g. mass, size, condition, etc
 }
 

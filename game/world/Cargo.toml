@@ -16,7 +16,7 @@ procgen = { path = "../procgen", default-features = false, features = ["cache"],
 
 petgraph = "0.5"
 nd_iter = "0.0"
-enum-iterator = "0.6"
+strum = { version = "0.19", features = ["derive"] }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 tokio = { version = "1.0", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"] }
 

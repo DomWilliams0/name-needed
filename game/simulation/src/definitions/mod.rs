@@ -6,7 +6,7 @@ mod registry;
 pub use builder::{BuilderError, DefinitionBuilder, EntityPosition};
 pub use component::DefinitionNameComponent;
 pub use loader::{load, Definition, ValueImpl};
-pub use registry::Registry;
+pub use registry::DefinitionRegistry;
 
 #[cfg(test)]
 pub use loader::load_from_str;

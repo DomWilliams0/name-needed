@@ -1,21 +1,24 @@
+use std::collections::HashSet;
 use std::ops::{Add, Deref};
+use std::pin::Pin;
+
+use strum::EnumDiscriminants;
 
 use common::*;
 use resources::Resources;
-use strum_macros::EnumDiscriminants;
-use unit::world::{WorldPoint, WorldPosition, WorldPositionRange};
+use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
 
 use crate::activity::ActivitySystem;
-use crate::ai::{AiAction, AiComponent, AiSystem};
-
+use crate::ai::{AiComponent, AiSystem};
+use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
-    BlockPlacement, DivineInputCommand, InputEvent, InputSystem, MouseLocation, SelectedEntity,
-    SelectedTiles, UiCommand, UiRequest, UiResponsePayload,
+    BlockPlacement, InputEvent, InputSystem, MouseLocation, SelectedEntities, SelectedTiles,
+    UiCommand, UiPopup, UiRequest, UiResponsePayload,
 };
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
@@ -28,24 +31,19 @@ use crate::render::{
     DebugRenderersState, UiElementPruneSystem,
 };
 use crate::render::{RenderSystem, Renderer};
-use crate::senses::{SensesDebugRenderer, SensesSystem};
-
-use crate::alloc::FrameAllocator;
-use crate::job::SocietyJobHandle;
 use crate::runtime::{Runtime, RuntimeSystem};
 use crate::scripting::ScriptingContext;
+use crate::senses::{SensesDebugRenderer, SensesSystem};
 use crate::society::{NameGeneration, PlayerSociety};
 use crate::spatial::{Spatial, SpatialSystem};
 use crate::steer::{SteeringDebugRenderer, SteeringSystem};
+use crate::string::StringCache;
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
     definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
     ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
-use std::collections::HashSet;
-use std::pin::Pin;
-use std::sync::Arc;
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(AssociatedBlockDataType))]
@@ -111,18 +109,20 @@ impl world::WorldContext for WorldContext {
 impl<R: Renderer> Simulation<R> {
     /// world_loader should have had some slabs requested
     pub fn new(world_loader: ThreadedWorldLoader, resources: Resources) -> BoxedResult<Self> {
+        let string_cache = StringCache::default();
+
         // load entity definitions from file system
         let definitions = {
             let def_root = resources.definitions()?;
-            definitions::load(def_root)?
+            definitions::load(def_root, &string_cache)?
         };
 
         let voxel_world = world_loader.world();
 
         // make ecs world and insert resources
-        let mut ecs_world = EcsWorld::new();
+        let mut ecs_world = EcsWorld::with_definitions(definitions)?;
         ecs_world.insert(voxel_world.clone());
-        ecs_world.insert(definitions);
+        ecs_world.insert(string_cache);
         register_resources(&mut ecs_world, resources)?;
 
         // get a self referential ecs world resource pointing to itself
@@ -169,18 +169,19 @@ impl<R: Renderer> Simulation<R> {
         self.apply_world_updates(world_viewer);
 
         // process backend input
-        if let Some((x, y)) = backend_data.mouse_position {
+        if let Some(point) = backend_data.mouse_position {
             let z = {
                 let w = self.voxel_world.borrow();
                 let range = world_viewer.entity_range();
-                let start_from = WorldPosition::new(*x as i32, *y as i32, range.top());
+                let start_from =
+                    WorldPosition::new(point.x() as i32, point.y() as i32, range.top());
                 match w.find_accessible_block_in_column_with_range(start_from, Some(range.bottom()))
                 {
                     Some(pos) => pos.2,
                     None => range.bottom(),
                 }
             };
-            let pos = WorldPoint::new(*x, *y, z.slice() as f32).unwrap(); // not nan
+            let pos = point.into_world_point(NotNan::new(z.slice() as f32).unwrap()); // z is not nan
             self.ecs_world.insert(MouseLocation(pos));
         }
 
@@ -242,6 +243,11 @@ impl<R: Renderer> Simulation<R> {
 
         // prune ui elements
         UiElementPruneSystem.run_now(&self.ecs_world);
+
+        // prune dead entities from selection
+        self.ecs_world
+            .resource_mut::<SelectedEntities>()
+            .prune(&self.ecs_world);
 
         // update display text for rendering
         self.display_text_system.run_now(&self.ecs_world);
@@ -342,15 +348,11 @@ impl<R: Renderer> Simulation<R> {
 
         // consume change events
         let mut events = std::mem::take(&mut self.change_events);
-        events
-            .drain(..)
-            .filter(|e| e.new != e.prev)
-            .for_each(|e| self.on_world_change(e));
+        self.on_world_changes(&events);
+        events.clear();
 
         // swap storage back and forget empty vec
-        let empty = std::mem::replace(&mut self.change_events, events);
-        debug_assert!(empty.is_empty());
-        std::mem::forget(empty);
+        std::mem::forget(std::mem::replace(&mut self.change_events, events));
     }
 
     fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
@@ -373,7 +375,9 @@ impl<R: Renderer> Simulation<R> {
 
                 UiRequest::FillSelectedTiles(placement, block_type) => {
                     let selection = self.ecs_world.resource::<SelectedTiles>();
-                    if let Some((mut from, mut to)) = selection.bounds() {
+                    if let Some((mut from, mut to)) =
+                        selection.current_selected().map(|sel| sel.range().bounds())
+                    {
                         if let BlockPlacement::PlaceAbove = placement {
                             // move the range up 1 block
                             from = from.above();
@@ -386,29 +390,16 @@ impl<R: Renderer> Simulation<R> {
                             .insert(WorldTerrainUpdate::new(range, block_type));
                     }
                 }
-                UiRequest::IssueDivineCommand(ref divine_command) => {
-                    let entity = match self
-                        .ecs_world
-                        .resource_mut::<SelectedEntity>()
-                        .get(&*self.ecs_world)
-                    {
-                        Some(e) => e,
-                        None => {
-                            warn!("no selected entity to issue divine command to"; "command" => ?divine_command);
-                            continue;
-                        }
-                    };
-
-                    let command = match divine_command {
-                        DivineInputCommand::Goto(pos) => AiAction::Goto(pos.centred()),
-                        DivineInputCommand::Break(pos) => AiAction::GoBreakBlock(*pos),
-                    };
-
-                    match self.ecs_world.component_mut::<AiComponent>(entity) {
-                        Err(e) => warn!("can't issue divine command"; "error" => %e),
-                        Ok(mut ai) => {
-                            // add DSE
-                            ai.add_divine_command(command.clone());
+                UiRequest::IssueDivineCommand(_) | UiRequest::CancelDivineCommand => {
+                    let mut ais = self.ecs_world.write_storage::<AiComponent>();
+                    let selected_entities = self.ecs_world.resource_mut::<SelectedEntities>();
+                    for selected in selected_entities.iter() {
+                        if let Some(ai) = selected.get_mut(&mut ais) {
+                            if let UiRequest::IssueDivineCommand(ref command) = req {
+                                ai.add_divine_command(command.clone());
+                            } else {
+                                ai.remove_divine_command();
+                            }
                         }
                     }
                 }
@@ -431,6 +422,17 @@ impl<R: Renderer> Simulation<R> {
                         continue;
                     }
                 }
+
+                UiRequest::CancelJob(job) => {
+                    if let Some(society) = self
+                        .world()
+                        .resource::<Societies>()
+                        .society_by_handle(job.society())
+                    {
+                        society.jobs_mut().cancel(job);
+                    }
+                }
+
                 UiRequest::SetContainerOwnership {
                     container,
                     owner,
@@ -485,6 +487,28 @@ impl<R: Renderer> Simulation<R> {
                         let _ = self.ecs_world.remove_now::<EntityLoggingComponent>(entity);
                     }
                 }
+
+                UiRequest::ModifySelection(modification) => {
+                    let sel = self.ecs_world.resource_mut::<SelectedTiles>();
+                    sel.modify(modification, &self.voxel_world);
+                }
+
+                UiRequest::CancelSelection => {
+                    // close current popup if there is one
+                    let popup = self.ecs_world.resource_mut::<UiPopup>();
+                    if !popup.close() {
+                        // fallback to clearing tile and entity selections
+                        let tiles = self.ecs_world.resource_mut::<SelectedTiles>();
+                        let entities = self.ecs_world.resource_mut::<SelectedEntities>();
+
+                        tiles.clear();
+                        entities.unselect_all(&self.ecs_world);
+                    }
+                }
+                UiRequest::CancelPopup => {
+                    // close current popup only
+                    self.ecs_world.resource_mut::<UiPopup>().close();
+                }
             }
         }
 
@@ -501,7 +525,7 @@ impl<R: Renderer> Simulation<R> {
         input: &[InputEvent],
     ) -> R::FrameContext {
         // process input before rendering
-        InputSystem { events: input }.run_now(&*self.ecs_world);
+        InputSystem::with_events(input).run_now(&*self.ecs_world);
 
         // start frame
         renderer.init(target);
@@ -549,39 +573,54 @@ impl<R: Renderer> Simulation<R> {
         renderer.deinit()
     }
 
-    fn on_world_change(&mut self, WorldChangeEvent { pos, prev, new }: WorldChangeEvent) {
-        debug_assert_ne!(prev, new);
+    fn on_world_changes(&mut self, events: &[WorldChangeEvent]) {
+        let selection = self.ecs_world.resource_mut::<SelectedTiles>();
+        let mut selection_modified = false;
 
-        match (prev, new) {
-            (_, BlockType::Chest) => {
-                // new chest placed
-                if let Err(err) = self
-                    .ecs_world
-                    .helpers_containers()
-                    .create_container_voxel(pos, "core_storage_chest")
-                {
-                    error!("failed to create container entity"; "error" => %err);
+        for &WorldChangeEvent { pos, prev, new } in events {
+            match (prev, new) {
+                (a, b) if a == b => continue,
+                (_, BlockType::Chest) => {
+                    // new chest placed
+                    if let Err(err) = self
+                        .ecs_world
+                        .helpers_containers()
+                        .create_container_voxel(pos, "core_storage_chest")
+                    {
+                        error!("failed to create container entity"; "error" => %err);
+                    }
+                }
+
+                (BlockType::Chest, _) => {
+                    // chest destroyed
+                    self.ecs_world.resource::<QueuedUpdates>().queue(
+                        "destroy container",
+                        move |world| match world
+                            .helpers_containers()
+                            .destroy_container(pos, DeathReason::BlockDestroyed)
+                        {
+                            Err(err) => {
+                                error!("failed to destroy container"; "error" => %err);
+                                Err(err.into())
+                            }
+                            Ok(()) => Ok(()),
+                        },
+                    )
+                }
+                _ => {}
+            }
+
+            if !selection_modified {
+                if let Some(sel) = selection.current_selected() {
+                    if sel.range().contains(&pos) {
+                        selection_modified = true;
+                    }
                 }
             }
+        }
 
-            (BlockType::Chest, _) => {
-                // chest destroyed
-                self.ecs_world.resource::<QueuedUpdates>().queue(
-                    "destroy container",
-                    move |world| match world
-                        .helpers_containers()
-                        .destroy_container(pos, DeathReason::BlockDestroyed)
-                    {
-                        Err(err) => {
-                            error!("failed to destroy container"; "error" => %err);
-                            Err(err.into())
-                        }
-                        Ok(()) => Ok(()),
-                    },
-                )
-            }
-
-            _ => {}
+        if selection_modified {
+            selection.on_world_change(&self.voxel_world);
         }
     }
 
@@ -649,7 +688,7 @@ impl Add<u32> for Tick {
 fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult<()> {
     world.insert(QueuedUpdates::default());
     world.insert(EntitiesToKill::default());
-    world.insert(SelectedEntity::default());
+    world.insert(SelectedEntities::default());
     world.insert(SelectedTiles::default());
     world.insert(TerrainUpdatesRes::default());
     world.insert(Societies::default());
@@ -661,6 +700,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(MouseLocation::default());
     world.insert(NameGeneration::load(&resources)?);
     world.insert(FrameAllocator::default());
+    world.insert(UiPopup::default());
 
     Ok(())
 }

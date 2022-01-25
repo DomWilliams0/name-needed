@@ -4,7 +4,7 @@ use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::BlockOcclusion;
 use common::derive_more::Display;
 use common::Proportion;
-pub use enum_iterator::IntoEnumIterator;
+use strum::{EnumIter, EnumString};
 use unit::world::GlobalSliceIndex;
 
 /// A single block in a chunk
@@ -26,7 +26,9 @@ pub type BlockDurability = u8;
 
 // TODO define block types in data instead of code
 /// The type of a block
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, IntoEnumIterator, Display)]
+#[derive(
+    Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, EnumIter, EnumString, Display,
+)]
 pub enum BlockType {
     Air,
     Dirt,

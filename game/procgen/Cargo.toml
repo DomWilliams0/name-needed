@@ -14,8 +14,7 @@ color = { path = "../../shared/color", optional = true }
 resources = { path = "../resources" }
 noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
 rand_distr = { version = "0.3" }
-strum = "0.19"
-strum_macros = "0.19"
+strum = { version = "0.19", features = ["derive"] }
 tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi-thread", "sync", "time"] }
 futures = { version = "0.3", default-features = false, features = ["std", "alloc", "async-await"] }
 geo = "0.16"

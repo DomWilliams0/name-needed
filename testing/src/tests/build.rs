@@ -1,18 +1,19 @@
-use crate::helpers::EntityPosition;
-use crate::tests::TestHelper;
-use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
-use common::*;
-use simulation::job::BuildThingJob;
-use simulation::{
-    AiAction, BlockType, Build, BuildMaterial, ComponentWorld, ContainersError, Entity,
-    EntityEventDebugPayload, EntityEventPayload, HaulPurpose, HaulSource, ItemStackError,
-    QueuedUpdates, Societies, SocietyComponent, StackableComponent, TaskResultSummary,
-};
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::num::NonZeroU16;
 use std::rc::Rc;
+
+use common::*;
+use simulation::job::BuildThingJob;
+use simulation::{
+    BlockType, BuildMaterial, BuildTemplate, CachedStr, ComponentWorld, ContainersError, Entity,
+    EntityEventDebugPayload, EntityEventPayload, ItemStackError, Societies, SocietyComponent,
+    StackableComponent, TaskResultSummary,
+};
 use unit::world::WorldPosition;
+
+use crate::helpers::EntityPosition;
+use crate::tests::TestHelper;
+use crate::{HookContext, HookResult, InitHookResult, TestDeclaration};
 
 pub struct GatherAndBuild {
     builder: Entity,
@@ -22,28 +23,8 @@ pub struct GatherAndBuild {
     all_bricks: Vec<Entity>,
 }
 
-#[derive(Debug)]
-pub struct TestBrickWall;
-
 const BRICKS_PER_WALL: u16 = 6;
 const MAX_STACKABILITY: u16 = 8;
-
-impl Build for TestBrickWall {
-    fn output(&self) -> BlockType {
-        BlockType::StoneBrickWall
-    }
-
-    fn progression(&self) -> (u32, u32) {
-        (4, 4)
-    }
-
-    fn materials(&self, materials_out: &mut Vec<BuildMaterial>) {
-        materials_out.push(BuildMaterial::new(
-            "core_brick_stone",
-            NonZeroU16::new(BRICKS_PER_WALL).unwrap(),
-        ))
-    }
-}
 
 impl GatherAndBuild {
     pub fn on_tick(&mut self, test: TestHelper, ctx: &HookContext) -> HookResult {
@@ -171,10 +152,21 @@ impl GatherAndBuild {
                 .copied()
                 .map(|(x, y)| WorldPosition::from((x, y, 1)))
                 .collect_vec();
+
+            let build = Rc::new(BuildTemplate::new(
+                vec![BuildMaterial::new(
+                    CachedStr::from("core_brick_stone"),
+                    NonZeroU16::new(BRICKS_PER_WALL).unwrap(),
+                )],
+                4,
+                4,
+                BlockType::StoneBrickWall,
+            ));
+
             for pos in walls.iter() {
                 society
                     .jobs_mut()
-                    .submit(ctx.simulation.ecs, BuildThingJob::new(*pos, TestBrickWall));
+                    .submit(ctx.simulation.ecs, BuildThingJob::new(*pos, build.clone()));
             }
 
             Ok(Self {

@@ -1,8 +1,10 @@
 use common::derive_more::*;
+use std::rc::Rc;
 
 use crate::ecs::*;
 use crate::item::condition::ItemCondition;
 use crate::needs::Fuel;
+use crate::string::StringCache;
 
 /// Condition/durability of an entity, e.g. a tool or food
 #[derive(Component, EcsComponent, Constructor, Clone, Debug)]
@@ -34,11 +36,14 @@ pub struct ThrowableItemComponent;
 // TODO weapon (damage to target per hit, damage to own condition per hit, attack speed, cooldown)
 
 impl<V: Value> ComponentTemplate<V> for ConditionComponent {
-    fn construct(_: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        _: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self(ItemCondition::perfect())))
+        Ok(Rc::new(Self(ItemCondition::perfect())))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
@@ -51,8 +56,9 @@ impl<V: Value> ComponentTemplate<V> for ConditionComponent {
 impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
     fn construct(
         values: &mut Map<V>,
-    ) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError> {
-        Ok(Box::new(Self {
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError> {
+        Ok(Rc::new(Self {
             total_nutrition: values.get_int("total_nutrition")?,
             extra_hands: values.get_int("extra_hands")?,
         }))
@@ -66,8 +72,11 @@ impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
-    fn construct(_: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError> {
-        Ok(Box::new(Self))
+    fn construct(
+        _: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError> {
+        Ok(Rc::new(Self))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

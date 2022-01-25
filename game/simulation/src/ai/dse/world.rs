@@ -3,6 +3,7 @@ use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
     HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
 };
+use std::fmt::Debug;
 
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
@@ -24,6 +25,7 @@ pub struct BuildDse {
     pub details: BuildDetails,
 }
 
+#[derive(Debug)]
 pub struct GatherMaterialsDse {
     pub target: WorldPosition,
     pub material: BuildMaterial,
@@ -101,6 +103,10 @@ impl Dse<AiContext> for GatherMaterialsDse {
 
         todo!("gather materials from a different source")
     }
+
+    fn as_debug(&self) -> Option<&dyn Debug> {
+        Some(self)
+    }
 }
 
 impl GatherMaterialsDse {
@@ -111,7 +117,8 @@ impl GatherMaterialsDse {
         let filter = self.filter();
         if let AiAction::Haul(haulee, source, ..) = blackboard.ai.last_action() {
             if (*haulee, Some(blackboard.world)).matches(filter) {
-                // use this thing in inventory for hauling
+                // use this thing in inventory for hauling. even if the stack is too big, it will be
+                // split when it arrives at the build site
                 return Some((*haulee, *source));
             }
         }

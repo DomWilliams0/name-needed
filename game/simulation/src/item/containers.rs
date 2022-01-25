@@ -1,5 +1,6 @@
 use common::*;
 use std::num::NonZeroU16;
+use std::rc::Rc;
 use unit::space::volume::Volume;
 use unit::world::WorldPosition;
 
@@ -14,6 +15,7 @@ use crate::{
 use crate::item::stack::{EntityCopyability, ItemStackComponent, StackAdd, StackMigrationType};
 use crate::item::{ContainerComponent, ItemStack, ItemStackError};
 use crate::simulation::AssociatedBlockData;
+use crate::string::StringCache;
 
 #[derive(Debug, Error, Clone)]
 pub enum ContainersError {
@@ -452,12 +454,15 @@ impl Display for ContainedInComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for StackableComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let max_count = values.get_int("max_count")?;
-        Ok(Box::new(Self { max_count }))
+        Ok(Rc::new(Self { max_count }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

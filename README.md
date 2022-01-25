@@ -12,6 +12,11 @@ A one man effort to produce an **open source**, **intuitive** and **high perform
 
 ## Progress log
 
+* 25 Jan 2022: <em>A better UI for selecting entities with a dragged selection, and for issuing commands via a right-click context menu. </em>
+<p style="margin: auto">
+    <img src=".screenshots/context-menu-build-orders.gif" width="500"/>
+</p>
+
 * 08 Jan 2022: <em>In-world text labels to show entity types and names, job progress and item stack information.</em>
 <p style="margin: auto">
     <img src=".screenshots/stack-split-labelled.gif" width="500"/>
@@ -83,12 +88,12 @@ The `--scenario` parameter chooses a specific situation to spawn entities in, fo
 
 *Note: the "game" is currently very much a demo and not very playable in the slightest. Abandon all expectations!*
 
-* <kbd>Esc</kbd> to exit (most importantly)
-* <kbd>R</kbd> to restart
-* <kbd>Left-click</kbd> to select an entity and view their stats in the debug menu
-	* Command them to go to or break a selected block via `Divine control`
-	* Select an item and order it to be hauled to the tile selection in the `Society` menu
+* <kbd>Alt</kbd>+<kbd>Esc</kbd> to exit (most importantly)
+* <kbd>Alt</kbd>+<kbd>R</kbd> to restart
 * <kbd>Right-click</kbd> to drag a selection over blocks in the world
-	* Command them to collaborate to break blocks via the `Society` menu
-	* Set and place blocks via the `Selection` menu
+    * Then <kbd>Right-click</kbd> in the bottom right corner to build there/destroy the blocks
+    * Move the selection up and down with buttons in the `World` tab
+* <kbd>Left-click</kbd> (or drag) to select entities
+    * Then <kbd>Right-click</kbd> a location in the world, or another entity to order them around
+* <kbd>Escape</kbd> to clear the current entity and world selections
 * Move the camera sideways with <kbd>WASD</kbd>, and vertically with the <kbd>Arrow keys</kbd>

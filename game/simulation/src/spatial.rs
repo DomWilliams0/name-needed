@@ -64,7 +64,10 @@ impl Spatial {
             Transforms::World(w) => Cow::Owned(w.read_storage()),
         };
 
-        // awful allocation only acceptable because this is an awful temporary brute force implementation
+        let radius2 = radius.powi(2);
+
+        // awful allocation in sort only acceptable because this is an awful temporary brute force
+        // implementation
         self.entities
             .iter()
             .map(|(e, point)| {
@@ -72,7 +75,7 @@ impl Spatial {
                 (e, point, distance2)
             })
             // positions are cached so check transform is still present after filtering by distance
-            .filter(|(e, _, dist2)| *dist2 < radius.powi(2) && transforms.contains((**e).into()))
+            .filter(|(e, _, dist2)| *dist2 < radius2 && transforms.contains((**e).into()))
             .map(|(e, point, dist2)| (*e, *point, dist2.sqrt()))
             .sorted_by_key(|(_, _, dist)| OrderedFloat(*dist))
     }

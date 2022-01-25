@@ -1,5 +1,5 @@
 pub use load::load;
-pub use step1_deserialization::{DefinitionSource, DefinitionUid};
+pub use step1_deserialization::DefinitionSource;
 pub use step3_construction::Definition;
 
 pub type ValueImpl = ron::Value;
@@ -21,6 +21,8 @@ mod tests {
     use crate::definitions::loader::step1_deserialization::DeserializedDefinition;
     use crate::definitions::DefinitionErrorKind;
     use crate::ecs::*;
+    use crate::string::StringCache;
+    use std::rc::Rc;
 
     use super::*;
 
@@ -52,11 +54,12 @@ mod tests {
     impl ComponentTemplate<ValueImpl> for TestComponentTemplate {
         fn construct(
             values: &mut Map<ValueImpl>,
-        ) -> Result<Box<dyn ComponentTemplate<ValueImpl>>, ComponentBuildError>
+            _: &StringCache,
+        ) -> Result<Rc<dyn ComponentTemplate<ValueImpl>>, ComponentBuildError>
         where
             Self: Sized,
         {
-            Ok(Box::new(Self {
+            Ok(Rc::new(Self {
                 int: values.get_int("int")?,
                 string: values.get_string("string")?,
             }))

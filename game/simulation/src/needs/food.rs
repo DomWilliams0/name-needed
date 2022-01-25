@@ -1,10 +1,12 @@
 use common::newtype::AccumulativeInt;
 use common::*;
+use std::rc::Rc;
 
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
 use crate::item::{EdibleItemComponent, InventoryComponent};
 use crate::simulation::EcsWorldRef;
+use crate::string::StringCache;
 use crate::{ActivityComponent, ConditionComponent};
 
 // TODO newtype for Fuel
@@ -188,12 +190,15 @@ impl HungerComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for HungerComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let max = values.get_int("max")?;
-        Ok(Box::new(Self::new(max)))
+        Ok(Rc::new(Self::new(max)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

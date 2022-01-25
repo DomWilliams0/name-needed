@@ -31,9 +31,9 @@ macro_rules! ui_str {
         use core::fmt::Write;
         let bump = $ctx.strings().arena();
         let mut s = ::common::bumpalo::collections::String::new_in(bump);
-        let _ = write!(&mut s, concat!($fmt, "\0"), $($args),*);
-        // safety: s is nul terminated utf8
-        unsafe { ::imgui::ImStr::from_utf8_with_nul_unchecked(s.into_bump_str().as_bytes()) }
+        let _ = write!(&mut s, $fmt, $($args),*);
+        // safety: s is utf8 from string literal
+        unsafe { ::std::str::from_utf8_unchecked(s.into_bump_str().as_bytes()) }
     }};
 
     ( in $bump:expr, $fmt:expr, $($args:expr,)* ) => {

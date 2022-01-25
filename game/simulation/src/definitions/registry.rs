@@ -1,66 +1,81 @@
 use crate::definitions::builder::DefinitionBuilder;
 use crate::definitions::{Definition, DefinitionErrorKind};
-use std::any::Any;
 
-use crate::definitions::loader::DefinitionUid;
+use crate::string::{CachedStr, CachedStringHasher, StringCache};
 use crate::ComponentWorld;
 use common::*;
 use std::collections::HashMap;
 
-pub struct Registry {
-    map: HashMap<String, Definition>,
-}
+pub struct DefinitionRegistry(HashMap<CachedStr, Definition, CachedStringHasher>);
 
-pub struct RegistryBuilder {
-    map: HashMap<String, Definition>,
-}
+pub struct DefinitionRegistryBuilder(HashMap<CachedStr, Definition, CachedStringHasher>);
 
-impl RegistryBuilder {
+impl DefinitionRegistryBuilder {
     pub fn new() -> Self {
-        Self {
-            map: HashMap::with_capacity(512),
-        }
+        Self(HashMap::with_capacity_and_hasher(
+            512,
+            CachedStringHasher::default(),
+        ))
     }
 
     pub fn register(
         &mut self,
-        uid: DefinitionUid,
+        uid: CachedStr,
         definition: Definition,
     ) -> Result<(), (Definition, DefinitionErrorKind)> {
         #[allow(clippy::map_entry)]
-        if self.map.contains_key(&uid) {
-            Err((definition, DefinitionErrorKind::AlreadyRegistered(uid)))
+        if self.0.contains_key(&uid) {
+            Err((
+                definition,
+                DefinitionErrorKind::AlreadyRegistered(uid.as_ref().to_owned()),
+            ))
         } else {
-            self.map.insert(uid, definition);
+            self.0.insert(uid, definition);
             Ok(())
         }
     }
 
-    pub fn build(self) -> Registry {
+    pub fn build(self) -> DefinitionRegistry {
         info!(
             "creating definition registry with {count} entries",
-            count = self.map.len()
+            count = self.0.len()
         );
-        Registry { map: self.map }
+        DefinitionRegistry(self.0)
     }
 }
 
-impl Registry {
+impl DefinitionRegistry {
     pub fn instantiate<'s, 'w: 's, W: ComponentWorld>(
         &'s self,
         uid: &str,
         world: &'w W,
     ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
-        match self.map.get(uid) {
-            Some(def) => Ok(DefinitionBuilder::new(def, world, uid)),
-            None => Err(DefinitionErrorKind::NoSuchDefinition(uid.to_owned())),
+        let uid = world.resource::<StringCache>().get(uid);
+        match self.0.get(&uid) {
+            Some(def) => Ok(DefinitionBuilder::new_with_cached(def, world, uid)),
+            None => Err(DefinitionErrorKind::NoSuchDefinition(
+                uid.as_ref().to_owned(),
+            )),
         }
     }
 
-    pub fn lookup_template(&self, uid: &str, component: &str) -> Option<&dyn Any> {
-        self.map
-            .get(uid)
-            .and_then(|def| def.find_component(component))
+    pub fn lookup_definition(&self, uid: CachedStr) -> Option<&Definition> {
+        self.0.get(&uid)
+    }
+
+    pub fn iter_templates<T: 'static>(
+        &self,
+        component: &'static str,
+    ) -> impl Iterator<Item = CachedStr> + '_ {
+        self.0.iter().filter_map(move |(name, def)| {
+            def.find_component(component).and_then(|template| {
+                if template.is::<T>() {
+                    Some(*name)
+                } else {
+                    None
+                }
+            })
+        })
     }
 }
 #[cfg(test)]
@@ -69,14 +84,9 @@ mod tests {
 
     #[test]
     fn duplicates() {
-        let mut reg = RegistryBuilder::new();
-
-        assert!(reg.register("nice".to_owned(), Definition::dummy()).is_ok());
-        assert!(reg
-            .register("nice".to_owned(), Definition::dummy())
-            .is_err()); // duplicate
-        assert!(reg
-            .register("nice2".to_owned(), Definition::dummy())
-            .is_ok());
+        let mut reg = DefinitionRegistryBuilder::new();
+        assert!(reg.register("nice".into(), Definition::dummy()).is_ok());
+        assert!(reg.register("nice".into(), Definition::dummy()).is_err()); // duplicate
+        assert!(reg.register("nice2".into(), Definition::dummy()).is_ok());
     }
 }

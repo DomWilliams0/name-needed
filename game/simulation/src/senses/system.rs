@@ -1,11 +1,13 @@
 use crate::ecs::*;
 use crate::senses::sense::{HearingSphere, Sense, VisionCone};
 use crate::spatial::Spatial;
+use crate::string::StringCache;
 use crate::TransformComponent;
 use common::*;
 use serde::Deserialize;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
+use std::rc::Rc;
 use unit::world::WorldPoint;
 
 /// Ticks to remember a sensed entity
@@ -204,7 +206,10 @@ impl Debug for SensesComponent {
 }
 
 impl<V: Value> ComponentTemplate<V> for MagicalSenseComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
@@ -226,7 +231,7 @@ impl<V: Value> ComponentTemplate<V> for MagicalSenseComponent {
         let vision: DeVision = values.get("vision").and_then(|v| v.into_type())?;
         // let hearing: DeHearing = values.get("hearing").and_then(|v| v.into_type())?;
 
-        Ok(Box::new(Self {
+        Ok(Rc::new(Self {
             vision: VisionCone {
                 length: vision.length,
                 angle: deg(vision.angle).into(),

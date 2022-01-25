@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::input::SelectedEntity;
+use crate::input::SelectedEntities;
 use crate::render::DebugRenderer;
 
 use crate::senses::SensesComponent;
@@ -20,7 +20,7 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Senses\0"
+        "Senses"
     }
 
     fn render(
@@ -32,7 +32,7 @@ impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
         viewer: &WorldViewer,
     ) {
         let range = viewer.entity_range();
-        if let Some(selected) = ecs_world.resource::<SelectedEntity>().get_unchecked() {
+        for &selected in ecs_world.resource::<SelectedEntities>().iter() {
             let transform = ecs_world.component::<TransformComponent>(selected);
             let senses = ecs_world.component::<SensesComponent>(selected);
 

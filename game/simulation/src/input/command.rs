@@ -1,12 +1,12 @@
-use unit::world::WorldPosition;
 use world::block::BlockType;
 
 use crate::ecs::Entity;
 use crate::scripting::ScriptingError;
 use crate::society::job::SocietyCommand;
-use crate::{Exit, SocietyHandle};
+use crate::{AiAction, Exit, SocietyHandle};
 use common::*;
 
+use crate::job::SocietyJobHandle;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -24,9 +24,13 @@ pub enum UiRequest {
 
     FillSelectedTiles(BlockPlacement, BlockType),
 
-    IssueDivineCommand(DivineInputCommand),
+    IssueDivineCommand(AiAction),
+
+    CancelDivineCommand,
 
     IssueSocietyCommand(SocietyHandle, SocietyCommand),
+
+    CancelJob(SocietyJobHandle),
 
     SetContainerOwnership {
         container: Entity,
@@ -41,6 +45,20 @@ pub enum UiRequest {
         entity: Entity,
         enabled: bool,
     },
+
+    ModifySelection(SelectionModification),
+
+    /// Closes current popup if any
+    CancelPopup,
+
+    /// Closes current popup if any then clears entity+tile selection
+    CancelSelection,
+}
+
+pub enum SelectionModification {
+    Up,
+    Down,
+    // TODO expand/contract in a direction
 }
 
 pub enum UiResponsePayload {
@@ -64,12 +82,6 @@ pub struct UiResponse {
 
 pub type UiCommands = Vec<UiCommand>;
 
-#[derive(Debug)]
-pub enum DivineInputCommand {
-    Goto(WorldPosition),
-    Break(WorldPosition),
-}
-
 #[derive(Copy, Clone, PartialEq)]
 pub enum BlockPlacement {
     Set,
@@ -78,6 +90,7 @@ pub enum BlockPlacement {
 
 impl UiCommand {
     pub fn new(req: UiRequest) -> UiCommand {
+        // TODO only allocate uiresponse for those that need it
         Self {
             req,
             response: UiResponse {

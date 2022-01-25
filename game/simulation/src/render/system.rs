@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::rc::Rc;
 
 use serde::de::Error;
 
@@ -7,11 +8,12 @@ use common::*;
 use unit::world::BLOCKS_PER_METRE;
 
 use crate::ecs::*;
-use crate::input::{SelectedComponent, SelectedTiles};
+use crate::input::{SelectedComponent, SelectedEntities, SelectedTiles, SelectionProgress};
 
 use crate::render::renderer::Renderer;
 use crate::render::shape::RenderHexColor;
 use crate::render::UiElementComponent;
+use crate::string::StringCache;
 use crate::transform::{PhysicalComponent, TransformRenderDescription};
 use crate::{PlayerSociety, Shape2d, SliceRange, TransformComponent};
 
@@ -37,6 +39,7 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
     type SystemData = (
         Read<'a, PlayerSociety>,
         Read<'a, SelectedTiles>,
+        Read<'a, SelectedEntities>,
         Read<'a, EntitiesRes>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, RenderComponent>,
@@ -52,7 +55,8 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
         &mut self,
         (
             player_soc,
-            selected_block,
+            block_sel,
+            entity_sel,
             entities,
             transform,
             render,
@@ -104,10 +108,21 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             }
         }
 
-        // render player's world selection
-        if let Some((from, to)) = selected_block.bounds() {
+        // render player's selections
+        if let Some(sel) = block_sel.current() {
+            let (from, to) = sel.bounds();
+            let (color, finished) = match sel.progress() {
+                SelectionProgress::InProgress => (Color::rgb(216, 221, 230), false),
+                SelectionProgress::Complete => (Color::rgb(252, 253, 255), true),
+            };
             self.renderer
-                .tile_selection(from, to, Color::rgb(230, 240, 230));
+                .selection(from.into(), to.into(), color, finished);
+        }
+
+        if let Some(range) = entity_sel.drag_in_progress() {
+            let (from, to) = range.bounds();
+            let color = Color::rgb(216, 221, 230);
+            self.renderer.selection(from, to, color, false);
         }
 
         // render in-game ui elements above entities
@@ -148,7 +163,10 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
 }
 
 impl<V: Value> ComponentTemplate<V> for RenderComponent {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
@@ -165,7 +183,7 @@ impl<V: Value> ComponentTemplate<V> for RenderComponent {
             }
         };
 
-        Ok(Box::new(Self {
+        Ok(Rc::new(Self {
             color: color.into(),
             shape,
         }))

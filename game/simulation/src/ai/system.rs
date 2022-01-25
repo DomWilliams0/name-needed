@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::iter::once;
+use std::rc::Rc;
 
 use ai::{AiBox, DecisionSource, Dse, Intelligence, IntelligentDecision};
 use common::*;
@@ -7,17 +8,17 @@ use common::*;
 use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
+use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
+use crate::job::JobIndex;
 use crate::needs::HungerComponent;
 use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
-use crate::{EntityLoggingComponent, TransformComponent};
-
-use crate::alloc::FrameAllocator;
-use crate::job::JobIndex;
+use crate::string::StringCache;
 use crate::{dse, Societies};
+use crate::{EntityLoggingComponent, TransformComponent};
 
 #[derive(Component, EcsComponent)]
 #[storage(DenseVecStorage)]
@@ -53,6 +54,18 @@ impl AiComponent {
 
     pub fn last_action(&self) -> &AiAction {
         self.intelligence.last_action()
+    }
+
+    pub fn is_current_divine(&self) -> bool {
+        self.current
+            .as_ref()
+            .map(|src| {
+                matches!(
+                    src,
+                    DecisionSource::Additional(AdditionalDse::DivineCommand, _)
+                )
+            })
+            .unwrap_or_default()
     }
 
     pub fn clear_last_action(&mut self) {
@@ -158,7 +171,7 @@ impl<'a> System<'a> for AiSystem {
                 inventory_search_cache: HashMap::new(),
                 local_area_search_cache: HashMap::new(),
                 inventory: inventory_opt,
-                society: society_opt.map(|comp| comp.handle),
+                society: society_opt.map(|comp| comp.handle()),
                 ai,
                 world: &*ecs_world,
                 shared: &mut shared_bb,
@@ -287,7 +300,10 @@ pub struct IntelligenceComponentTemplate {
 }
 
 impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
@@ -303,7 +319,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
             }
         };
 
-        Ok(Box::new(Self { species }))
+        Ok(Rc::new(Self { species }))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

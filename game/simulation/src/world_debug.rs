@@ -18,7 +18,7 @@ impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
     }
 
     fn name(&self) -> &'static str {
-        "Feature boundaries\0"
+        "Feature boundaries"
     }
 
     fn render(

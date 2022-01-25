@@ -1,10 +1,12 @@
 use common::*;
+use std::rc::Rc;
 
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ecs::*;
 use crate::physics::{Bounds, PhysicsComponent};
 
+use crate::string::StringCache;
 use common::cgmath::Rotation;
 use serde::Deserialize;
 use unit::space::length::{Length, Length3};
@@ -159,13 +161,16 @@ pub struct PhysicalComponentTemplate {
 }
 
 impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
-    fn construct(values: &mut Map<V>) -> Result<Box<dyn ComponentTemplate<V>>, ComponentBuildError>
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
     where
         Self: Sized,
     {
         let volume = values.get_int("volume")?;
         let size: Size = values.get("size")?.into_type()?;
-        Ok(Box::new(Self {
+        Ok(Rc::new(Self {
             volume: Volume::new(volume),
             size: Length3::new(size.x, size.y, size.z),
         }))

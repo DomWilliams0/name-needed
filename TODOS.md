@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (408)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -186,8 +186,6 @@
    * `// TODO dont return a new vec of boxes, have some dignity`
    * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
- * [game/simulation/src/build/builds.rs](game/simulation/src/build/builds.rs) (1)
-   * `// TODO can this somehow return an iterator of build materials?`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
@@ -228,10 +226,19 @@
    * `// TODO move this into Tick`
    * `// TODO sort by elapsed() bool instead`
    * `// TODO might be better to just insert sorted`
- * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (3)
+ * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (2)
+   * `// TODO expand/contract in a direction`
+   * `// TODO only allocate uiresponse for those that need it`
+ * [game/simulation/src/input/popup.rs](game/simulation/src/input/popup.rs) (4)
+   * `// TODO bump alloc`
+   * `// TODO prioritise job`
+   * `// TODO support disabled buttons?`
+   * `// TODO too easy to forget checks here - consider having each declare true/false/ignore needed for every button`
+ * [game/simulation/src/input/system.rs](game/simulation/src/input/system.rs) (4)
    * `// TODO multiple clicks in the same place should iterate through all entities in selection range`
    * `// TODO spatial lookup for ui elements too`
-   * `// TODO select multiple entities`
+   * `// TODO spatial lookup for all entities contained in the given range`
+   * `// TODO additive tile selection`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
@@ -332,12 +339,11 @@
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
    * `// TODO add display impl for WorldPositionRange`
- * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (11)
+ * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
    * `// TODO fewer temporary allocations`
    * `// TODO ensure this doesn't happen, or just handle it properly`
-   * `// TODO avoid this case`
    * `// TODO allow "building" of a non-air block, and automatically emit a break task first?`
    * `// TODO job is destined to fail...`
    * `// TODO dont run this every tick, only when something changes or intermittently`
@@ -375,6 +381,8 @@
    * `// TODO show actual steering direction alongside velocity`
  * [game/simulation/src/steer/system.rs](game/simulation/src/steer/system.rs) (1)
    * `// TODO cache allocation in system`
+ * [game/simulation/src/string.rs](game/simulation/src/string.rs) (1)
+   * `// TODO report panic when cache is empty`
  * [game/world/src/block.rs](game/world/src/block.rs) (5)
    * `// TODO store sparse block data in the slab instead of inline in the block`
    * `// TODO define block types in data instead of code`
@@ -492,7 +500,8 @@
    * `let _no_depth = Capability::DepthTest.scoped_disable(); // TODO clear depth mask instead`
  * [renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs](renderer/engine/src/render/sdl/ui/windows/debug_renderer.rs) (1)
    * `// TODO proper default script path`
- * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (9)
+ * [renderer/engine/src/render/sdl/ui/windows/selection.rs](renderer/engine/src/render/sdl/ui/windows/selection.rs) (10)
+   * `// TODO better support for multiple entity selection`
    * `// TODO maintain own arena allocator to maintain UI after an entity dies`
    * `// TODO component-specific widget`
    * `// TODO list components on item that are relevant (i.e. not transform etc)`
@@ -501,7 +510,7 @@
    * `// TODO switch to table API when available`
    * `// TODO use the arena for this`
    * `// TODO other job tabs`
-   * `// TODO proper way of checking if an entity is living`
+   * `// TODO proper way of checking if an entity is living e.g. separate component for container ownership`
  * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (2)
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`

@@ -8,11 +8,7 @@ impl Scripting for NopScripting {
         Ok(NopScripting)
     }
 
-    fn run(
-        &mut self,
-        _script: &[u8],
-        _ecs: &EcsWorld,
-    ) -> ScriptingResult<ScriptingOutput> {
+    fn run(&mut self, _script: &[u8], _ecs: &EcsWorld) -> ScriptingResult<ScriptingOutput> {
         Ok(ScriptingOutput::default())
     }
 }

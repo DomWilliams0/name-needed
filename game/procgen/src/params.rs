@@ -2,7 +2,7 @@ use common::*;
 use serde::Deserialize;
 
 use structopt::StructOpt;
-use strum_macros::{EnumIter, EnumString};
+use strum::{EnumIter, EnumString};
 
 use crate::biome::BiomeConfig;
 use crate::region::RegionLocationUnspecialized;

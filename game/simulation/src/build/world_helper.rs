@@ -1,17 +1,16 @@
-use crate::ecs::*;
-use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
-use crate::render::UiElementComponent;
-use crate::{QueuedUpdates, TransformComponent};
+use std::sync::Arc;
 
 use common::*;
-
-use std::sync::Arc;
 use unit::space::length::{Length, Length2};
-
-use crate::event::DeathReason;
 use unit::world::WorldPositionRange;
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
+
+use crate::ecs::*;
+use crate::event::DeathReason;
+use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
+use crate::render::UiElementComponent;
+use crate::{QueuedUpdates, SocietyComponent, TransformComponent};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtBuild<'w>(&'w EcsWorld);
@@ -43,6 +42,11 @@ impl<'w> EcsExtBuild<'w> {
                             build_job: job,
                             size: Length2::new(wip_size, wip_size),
                         })
+                        .with(KindComponent::from_display(&format_args!(
+                            "{} (in progress)",
+                            details.target
+                        )))
+                        .with(SocietyComponent::new(job.society()))
                         .build(),
                 );
 

@@ -6,8 +6,10 @@ use std::cell::RefCell;
 
 use common::*;
 
+use crate::build::BuildTemplate;
 use crate::job::list::SocietyJobHandle;
 use crate::society::Society;
+
 use std::ops::Deref;
 use std::rc::Rc;
 use unit::world::WorldPoint;
@@ -65,6 +67,7 @@ pub trait SocietyJobImpl: Display + Debug {
 #[derive(Debug)]
 pub enum SocietyCommand {
     BreakBlocks(WorldPositionRange),
+    Build(WorldPositionRange, Rc<BuildTemplate>),
     HaulToPosition(Entity, WorldPoint),
 
     /// (thing, container)
@@ -87,6 +90,11 @@ impl SocietyCommand {
 
         match self {
             BreakBlocks(range) => job!(BreakBlocksJob::new(range)),
+            Build(pos, template) => {
+                for block in pos.iter_blocks() {
+                    jobs.submit(world, BuildThingJob::new(block, template.clone()))
+                }
+            }
             HaulToPosition(e, pos) => {
                 job!(HaulJob::with_target_position(e, pos, world).ok_or(self)?)
             }

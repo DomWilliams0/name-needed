@@ -1,15 +1,18 @@
 use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Sub};
 
 use common::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
-use std::fmt::Debug;
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
 pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
+
+#[derive(Copy, Clone)]
+pub struct WorldPoint2d(NotNan<f32>, NotNan<f32>);
 
 #[inline]
 fn not_nan(x: f32) -> Option<NotNan<f32>> {
@@ -91,6 +94,12 @@ impl WorldPoint {
         (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2) + (self.2 - other.2).powi(2)
     }
 
+    /// xy only
+    pub fn distance_hor2(&self, other: impl Into<Self>) -> f32 {
+        let other = other.into();
+        (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)
+    }
+
     #[inline]
     pub fn xyz(&self) -> (f32, f32, f32) {
         (self.x(), self.y(), self.z())
@@ -130,6 +139,34 @@ impl WorldPoint {
     }
 }
 
+impl WorldPoint2d {
+    /// None if any coord is not finite
+    pub fn new_checked(x: f32, y: f32) -> Option<Self> {
+        match (not_nan(x), not_nan(y)) {
+            (Some(x), Some(y)) => Some(Self(x, y)),
+            _ => None,
+        }
+    }
+
+    pub fn new(x: NotNan<f32>, y: NotNan<f32>) -> Self {
+        Self(x, y)
+    }
+
+    pub fn into_world_point(self, z: NotNan<f32>) -> WorldPoint {
+        WorldPoint(self.0, self.1, z)
+    }
+
+    #[inline]
+    pub fn x(self) -> f32 {
+        self.0.into_inner()
+    }
+
+    #[inline]
+    pub fn y(self) -> f32 {
+        self.1.into_inner()
+    }
+}
+
 impl From<WorldPoint> for Vector3 {
     fn from(p: WorldPoint) -> Self {
         Vector3 {
@@ -137,6 +174,12 @@ impl From<WorldPoint> for Vector3 {
             y: p.y(),
             z: p.z(),
         }
+    }
+}
+
+impl From<(NotNan<f32>, NotNan<f32>, NotNan<f32>)> for WorldPoint {
+    fn from((x, y, z): (NotNan<f32>, NotNan<f32>, NotNan<f32>)) -> Self {
+        Self(x, y, z)
     }
 }
 

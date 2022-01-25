@@ -1,14 +1,17 @@
+use std::collections::HashMap;
+
+use common::*;
+
 use crate::job::job::SocietyJobImpl;
 use crate::job::{BuildThingJob, SocietyJob, SocietyTask};
 use crate::simulation::Tick;
 use crate::society::job::job::SocietyJobRef;
 use crate::{EcsWorld, Entity, Societies, SocietyHandle};
-use common::*;
-use std::collections::HashMap;
 
 #[derive(Debug)] // TODO implement manually
 pub struct SocietyJobList {
     jobs: Vec<SocietyJobRef>,
+    to_cancel: Vec<SocietyJobHandle>,
     reservations: SocietyTaskReservations,
     last_update: Tick,
     next_handle: SocietyJobHandle,
@@ -99,6 +102,7 @@ impl SocietyJobList {
     pub(in crate::society) fn new(society: SocietyHandle) -> Self {
         Self {
             jobs: Vec::with_capacity(64),
+            to_cancel: Vec::with_capacity(4),
             reservations: SocietyTaskReservations::default(),
             last_update: Tick::default(),
             next_handle: SocietyJobHandle { society, idx: 0 },
@@ -138,6 +142,12 @@ impl SocietyJobList {
         self.jobs.push(job);
     }
 
+    pub fn cancel(&mut self, job: SocietyJobHandle) {
+        if job.society == self.this_society() {
+            self.to_cancel.push(job);
+        }
+    }
+
     /// Returned job index is valid until [allow_jobs_again] is called
     pub fn filter_applicable_tasks(
         &mut self,
@@ -165,6 +175,14 @@ impl SocietyJobList {
             let len_after = self.jobs.len();
             if len_before != len_after {
                 trace!("pruned {n} finished jobs", n = len_before - len_after);
+            }
+        }
+
+        // remove cancelled jobs
+        for handle in self.to_cancel.drain(..) {
+            if let Some(idx) = self.jobs.iter().position(|j| j.handle() == handle) {
+                self.jobs.swap_remove(idx);
+                debug!("cancelled job"; "job" => ?handle);
             }
         }
 
@@ -209,7 +227,7 @@ impl SocietyJobList {
     }
 
     pub fn find_job(&self, handle: SocietyJobHandle) -> Option<SocietyJobRef> {
-        if handle.society == self.next_handle.society {
+        if handle.society == self.this_society() {
             self.jobs
                 .iter()
                 .find(|j| j.handle().idx == handle.idx)
@@ -217,6 +235,10 @@ impl SocietyJobList {
         } else {
             None
         }
+    }
+
+    const fn this_society(&self) -> SocietyHandle {
+        self.next_handle.society
     }
 
     pub fn reservation(&self, entity: Entity) -> Option<&SocietyTask> {
@@ -401,9 +423,10 @@ impl ReservationTask for SocietyTask {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::ecs::Builder;
     use crate::ComponentWorld;
+
+    use super::*;
 
     impl ReservationTask for i32 {
         fn is_shareable(&self) -> bool {

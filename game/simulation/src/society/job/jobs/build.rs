@@ -1,20 +1,24 @@
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU16;
+use std::rc::Rc;
+
+use specs::BitSet;
+
+use common::*;
+
 use crate::build::{
-    Build, BuildMaterial, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
+    BuildMaterial, BuildTemplate, ConsumedMaterialForJobComponent, ReservedMaterialComponent,
 };
-use crate::definitions::{DefinitionNameComponent, Registry};
+use crate::definitions::{DefinitionNameComponent, DefinitionRegistry};
 use crate::ecs::{EcsWorld, Join, WorldExt};
 use crate::item::HaulableItemComponent;
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::{SocietyJobHandle, SocietyTask};
+use crate::string::{CachedStr, CachedStringHasher};
 use crate::{
     BlockType, ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition,
 };
-use common::*;
-use specs::BitSet;
-
-use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU16;
 
 // TODO build requirement engine for generic material combining
 //      each job owns an instance, lends it to UI for rendering
@@ -26,18 +30,18 @@ use std::num::NonZeroU16;
 pub struct BuildThingJob {
     // TODO support builds spanning multiple blocks/range
     position: WorldPosition,
-    build: Box<dyn Build>,
+    build: Rc<BuildTemplate>,
     required_materials: Vec<BuildMaterial>,
     reserved_materials: HashSet<Entity>,
 
     /// Cache of extra hands needed for hauling each material
-    hands_needed: HashMap<&'static str, u16>,
+    hands_needed: HashMap<CachedStr, u16, CachedStringHasher>,
 
     /// Steps completed so far
     progress: u32,
 
     /// Gross temporary way of tracking remaining materials
-    materials_remaining: HashMap<&'static str, NonZeroU16>,
+    materials_remaining: HashMap<CachedStr, NonZeroU16, CachedStringHasher>,
 
     /// Set if any material types are invalid e.g. not haulable
     missing_any_requirements: bool,
@@ -67,21 +71,33 @@ pub struct BuildProgressDetails {
 pub enum BuildThingError {
     #[error("Build materials are invalid")]
     InvalidMaterials,
+
+    #[error("No definition for material {0}")]
+    MissingDefinition(Entity),
+
+    #[error("Material '{0}' is not required")]
+    MaterialNotRequired(CachedStr),
+}
+
+pub enum MaterialReservation {
+    /// Whole stack of this size is reserved
+    ConsumeAll(u16),
+    /// Stack has too many materials, should be split from original stack
+    Surplus { surplus: u16, reserved: u16 },
 }
 
 impl BuildThingJob {
-    pub fn new(block: WorldPosition, build: impl Build + 'static) -> Self {
-        let mut materials = Vec::new();
-        build.materials(&mut materials);
-        let count = materials.len();
+    pub fn new(block: WorldPosition, build: Rc<BuildTemplate>) -> Self {
+        let required_materials = build.materials().to_vec();
+        let count = required_materials.len();
         Self {
             position: block,
-            build: Box::new(build),
+            build,
             progress: 0,
-            required_materials: materials,
-            hands_needed: HashMap::with_capacity(count),
+            required_materials,
+            hands_needed: HashMap::with_capacity_and_hasher(count, CachedStringHasher::default()),
             reserved_materials: HashSet::new(),
-            materials_remaining: HashMap::new(), // replaced on each call
+            materials_remaining: HashMap::with_hasher(CachedStringHasher::default()), // replaced on each call
             missing_any_requirements: false,
             this_job: None,
             ui_element: None,
@@ -89,7 +105,10 @@ impl BuildThingJob {
     }
 
     // TODO fewer temporary allocations
-    fn check_materials(&mut self, world: &EcsWorld) -> HashMap<&'static str, NonZeroU16> {
+    fn check_materials(
+        &mut self,
+        world: &EcsWorld,
+    ) -> HashMap<CachedStr, NonZeroU16, CachedStringHasher> {
         let this_job = self.this_job.unwrap(); // set before this is called
 
         let job_pos = self.position.centred();
@@ -143,20 +162,18 @@ impl BuildThingJob {
 
         let def_names = world.read_storage::<DefinitionNameComponent>();
         let stacks = world.read_storage::<ItemStackComponent>();
-        for (_, def, stack_opt) in (&reservations_bitset, &def_names, stacks.maybe()).join() {
+        for (e, def, stack_opt) in (&reservations_bitset, &def_names, stacks.maybe()).join() {
             let entry = remaining_materials
-                .get_mut(def.0.as_str())
+                .get_mut(&def.0)
                 .unwrap_or_else(|| panic!("invalid reservation {:?}", def.0));
             // TODO ensure this doesn't happen, or just handle it properly
 
             let quantity = stack_opt.map(|comp| comp.stack.total_count()).unwrap_or(1);
             *entry = entry.checked_sub(quantity).unwrap_or_else(|| {
-                warn!(
-                    "tried to over-reserve {}/{} of remaining requirement '{}'",
-                    quantity, *entry, def.0
-                );
-                // TODO avoid this case
-                0
+                unreachable!(
+                    "tried to over-reserve {}/{} of remaining requirement '{}' in job {:?} (material = {})",
+                    quantity, *entry, def.0, this_job, e
+                )
             });
         }
 
@@ -167,9 +184,64 @@ impl BuildThingJob {
             .collect()
     }
 
-    /// Returns false if already reserved. Entity should have ReservedMaterialComponent
-    pub fn add_reservation(&mut self, reservee: Entity) -> bool {
-        self.reserved_materials.insert(reservee)
+    /// Returns (Surplus(n), _) if there is a surplus of material to drop in a NEW stack.
+    /// Second return val is the now-remaining requirement for this material.
+    /// Entity should get a ReservedMaterialComponent on success
+    pub fn add_reservation(
+        &mut self,
+        reservee: Entity,
+        world: &EcsWorld,
+    ) -> Result<(MaterialReservation, u16), BuildThingError> {
+        let stacks = world.read_storage::<ItemStackComponent>();
+        let defs = world.read_storage::<DefinitionNameComponent>();
+
+        let def = reservee
+            .get(&defs)
+            .ok_or(BuildThingError::MissingDefinition(reservee))?;
+
+        let n_required_ref = self
+            .materials_remaining
+            .get_mut(&def.0)
+            .ok_or(BuildThingError::MaterialNotRequired(def.0))?;
+        let n_required = n_required_ref.get();
+
+        let n_actual = {
+            reservee
+                .get(&stacks)
+                .map(|stack| stack.stack.total_count())
+                .unwrap_or(1)
+        };
+
+        let n_to_reserve;
+        let result = if n_actual > n_required {
+            // trying to reserve too many, keep the original stack but split off some
+            let to_drop = n_actual - n_required;
+            n_to_reserve = n_required;
+            MaterialReservation::Surplus {
+                surplus: to_drop,
+                reserved: n_required,
+            }
+        } else {
+            n_to_reserve = n_actual;
+            MaterialReservation::ConsumeAll(n_actual)
+        };
+
+        // reserve material entity
+        let _ = self.reserved_materials.insert(reservee);
+
+        // reduce requirement count
+        let remaining = match NonZeroU16::new(n_required - n_to_reserve) {
+            Some(n) => {
+                *n_required_ref = n;
+                n.get()
+            }
+            None => {
+                self.materials_remaining.remove(&def.0);
+                0
+            }
+        };
+
+        Ok((result, remaining))
     }
 
     pub fn reserved_materials(&self) -> impl Iterator<Item = Entity> + '_ {
@@ -223,9 +295,12 @@ impl SocietyJobImpl for BuildThingJob {
         //  maybe that should be at a higher level than this
 
         // preprocess materials to get hands needed for hauling
-        let definitions = world.resource::<Registry>();
+        let definitions = world.resource::<DefinitionRegistry>();
         for mat in self.required_materials.iter() {
-            let hands = match definitions.lookup_template(mat.definition(), "haulable") {
+            let def = definitions
+                .lookup_definition(mat.definition())
+                .and_then(|def| def.find_component("haulable"));
+            let hands = match def {
                 Some(any) => {
                     let haulable = any
                         .downcast_ref::<HaulableItemComponent>()
@@ -246,7 +321,7 @@ impl SocietyJobImpl for BuildThingJob {
 
         // gather materials first
         out.extend(self.required_materials.iter().cloned().flat_map(|mat| {
-            let extra_hands = *self.hands_needed.get(mat.definition()).unwrap(); // just inserted
+            let extra_hands = *self.hands_needed.get(&mat.definition()).unwrap(); // just inserted
 
             Some(SocietyTask::GatherMaterials {
                 target: self.position,
@@ -289,7 +364,7 @@ impl SocietyJobImpl for BuildThingJob {
         tasks.clear();
         let this_job = self.this_job.unwrap(); // set unconditionally
         for (def, count) in outstanding_requirements.iter() {
-            let extra_hands = *self.hands_needed.get(*def).unwrap(); // already inserted
+            let extra_hands = *self.hands_needed.get(def).unwrap(); // already inserted
 
             let task = SocietyTask::GatherMaterials {
                 target: self.position,
@@ -308,7 +383,6 @@ impl SocietyJobImpl for BuildThingJob {
             // all gather requirements are satisfied, do the build
             // TODO some builds could have multiple workers
 
-            let this_job = self.this_job.unwrap(); // set unconditionally
             tasks.push(SocietyTask::Build(this_job, self.details()));
         }
 
@@ -321,6 +395,6 @@ impl SocietyJobImpl for BuildThingJob {
 impl Display for BuildThingJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         // TODO better display impl for builds
-        write!(f, "Build {:?} at {}", self.build, self.position)
+        write!(f, "Build {} at {}", self.build.output(), self.position)
     }
 }

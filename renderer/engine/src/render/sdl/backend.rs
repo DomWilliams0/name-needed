@@ -1,17 +1,25 @@
+use std::hint::unreachable_unchecked;
 use std::ops::{Deref, DerefMut};
 
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::{Keycode, Mod};
+use sdl2::mouse::{MouseButton, MouseState, MouseWheelDirection};
 use sdl2::video::{Window, WindowBuildError};
 use sdl2::{EventPump, Sdl, VideoSubsystem};
 
 use color::Color;
-use common::input::{CameraDirection, GameKey, KeyAction, RendererKey};
+use common::input::{CameraDirection, EngineKey, GameKey, KeyAction, RendererKey};
 use common::*;
-use simulation::{
-    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
-    Simulation, WorldViewer,
+use resources::ResourceError;
+use resources::Resources;
+use simulation::input::{
+    InputEvent, SelectType, UiCommand, UiCommands, UiPopup, UiRequest, WorldColumn,
 };
+use simulation::{
+    BackendData, ComponentWorld, Exit, InitializedSimulationBackend, PerfAvg,
+    PersistentSimulationBackend, Simulation, WorldViewer,
+};
+use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
 
 use crate::render::sdl::camera::Camera;
 use crate::render::sdl::gl::{Gl, GlError};
@@ -19,12 +27,6 @@ use crate::render::sdl::render::GlFrameContext;
 use crate::render::sdl::selection::Selection;
 use crate::render::sdl::ui::{EventConsumed, Ui};
 use crate::render::sdl::GlRenderer;
-use resources::ResourceError;
-use resources::Resources;
-use sdl2::mouse::{MouseButton, MouseState, MouseWheelDirection};
-use simulation::input::{InputEvent, SelectType, UiCommand, UiCommands, UiRequest, WorldColumn};
-use std::hint::unreachable_unchecked;
-use unit::world::{WorldPoint, WorldPosition};
 
 pub struct SdlBackendPersistent {
     camera: Camera,
@@ -32,7 +34,6 @@ pub struct SdlBackendPersistent {
 
     /// `take`n out and replaced each tick
     sdl_events: Option<EventPump>,
-    #[allow(dead_code)]
     keep_alive: GraphicsKeepAlive,
     window: Window,
 
@@ -192,7 +193,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     keycode: Some(key),
                     keymod,
                     ..
-                } => match map_sdl_keycode(key) {
+                } => match map_sdl_keycode(key, keymod) {
                     Some(action) => {
                         let ui_req = self.handle_key(action, keymod, true);
                         commands.extend(ui_req.map(UiCommand::new).into_iter());
@@ -205,7 +206,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
                     keymod,
                     ..
                 } => {
-                    if let Some(action) = map_sdl_keycode(key) {
+                    if let Some(action) = map_sdl_keycode(key, keymod) {
                         let ui_req = self.handle_key(action, keymod, false);
                         commands.extend(ui_req.map(UiCommand::new).into_iter());
                     }
@@ -224,7 +225,10 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 } => {
                     let evt = self
                         .parse_mouse_event(mouse_btn, x, y)
-                        .and_then(|(select, col)| self.selection.mouse_up(select, col));
+                        .and_then(|(select, col)| {
+                            let modifiers = self.mod_state();
+                            self.selection.mouse_up(select, col, modifiers)
+                        });
 
                     if let Some(evt) = evt {
                         self.sim_input_events.push(evt);
@@ -236,7 +240,11 @@ impl InitializedSimulationBackend for SdlBackendInit {
                 } => {
                     if let Some(mouse_btn) = mousestate.pressed_mouse_buttons().next() {
                         if let Some((select, col)) = self.parse_mouse_event(mouse_btn, x, y) {
-                            self.selection.mouse_move(select, col);
+                            let modifiers = self.mod_state();
+                            let evt = self.selection.mouse_move(select, col, modifiers);
+                            if let Some(evt) = evt {
+                                self.sim_input_events.push(evt);
+                            }
                         }
                     }
                 }
@@ -269,7 +277,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             let x = NotNan::new(x).ok();
             let y = NotNan::new(y).ok();
-            x.zip(y)
+            x.zip(y).map(|(x, y)| WorldPoint2d::new(x, y))
         };
 
         BackendData { mouse_position }
@@ -340,12 +348,14 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
         // render ui and collect input commands
         let mouse_state = self.backend.mouse_state();
+        let popups = simulation.world().resource_mut::<UiPopup>().prepare();
         self.backend.ui.render(
             &self.backend.window,
             &mouse_state,
             perf,
             simulation.as_ref(&self.world_viewer),
             commands,
+            popups,
         );
 
         self.window.gl_swap_window();
@@ -407,31 +417,43 @@ impl SdlBackendInit {
                             // move by 1 slice
                             self.world_viewer.move_by(delta);
                         }
+
+                        None
                     }
 
                     (_, Camera(direction)) => {
                         self.camera.handle_move(direction, is_down);
+                        Some(UiRequest::CancelPopup)
                     }
                     _ => {
                         if is_down {
                             warn!("unhandled key down: {:?}", key);
                         }
+                        None
                     }
-                };
-
-                // no ui command to return
-                None
+                }
             }
-            KeyAction::Game(key) => {
+            KeyAction::Engine(key) => {
                 if is_down {
                     let cmd = match key {
-                        GameKey::Exit => UiRequest::ExitGame(Exit::Stop),
-                        GameKey::Restart => UiRequest::ExitGame(Exit::Restart),
+                        EngineKey::Exit => UiRequest::ExitGame(Exit::Stop),
+                        EngineKey::Restart => UiRequest::ExitGame(Exit::Restart),
                     };
 
                     Some(cmd)
                 } else {
                     // ignore key ups
+                    None
+                }
+            }
+
+            KeyAction::Game(key) => {
+                // send input to game on down only
+                if is_down {
+                    Some(match key {
+                        GameKey::CancelSelection => UiRequest::CancelSelection,
+                    })
+                } else {
                     None
                 }
             }
@@ -453,6 +475,10 @@ impl SdlBackendInit {
             };
             Some((select, col))
         })
+    }
+
+    fn mod_state(&self) -> Mod {
+        self.keep_alive.sdl.keyboard().mod_state()
     }
 }
 
@@ -477,13 +503,15 @@ impl SdlBackendPersistent {
 //            - impl<T, U> std::convert::TryInto<U> for T
 //              where U: std::convert::TryFrom<T>;
 //    = note: upstream crates may add a new impl of trait `std::convert::From<sdl2::keyboard::keycode::Keycode>` for type `common::input::Key` in future versions
-fn map_sdl_keycode(keycode: Keycode) -> Option<KeyAction> {
+fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
     use Keycode::*;
     use RendererKey::*;
 
+    let alt_down = || keymod.intersects(Mod::LALTMOD | Mod::RALTMOD);
+
     Some(match keycode {
-        Escape => KeyAction::Game(GameKey::Exit),
-        R => KeyAction::Game(GameKey::Restart),
+        Q if alt_down() => KeyAction::Engine(EngineKey::Exit),
+        R if alt_down() => KeyAction::Engine(EngineKey::Restart),
 
         Up => KeyAction::Renderer(SliceUp),
         Down => KeyAction::Renderer(SliceDown),
@@ -493,6 +521,7 @@ fn map_sdl_keycode(keycode: Keycode) -> Option<KeyAction> {
         S => KeyAction::Renderer(Camera(CameraDirection::Down)),
         D => KeyAction::Renderer(Camera(CameraDirection::Right)),
 
+        Escape => KeyAction::Game(GameKey::CancelSelection),
         _ => return None,
     })
 }

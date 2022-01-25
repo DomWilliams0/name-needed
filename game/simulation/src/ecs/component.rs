@@ -47,6 +47,7 @@ pub struct Map<V: Value> {
 }
 
 pub trait Value: Debug {
+    fn into_bool(self) -> Result<bool, ComponentBuildError>;
     fn into_int(self) -> Result<i64, ComponentBuildError>;
     fn into_float(self) -> Result<f64, ComponentBuildError>;
     fn into_string(self) -> Result<String, ComponentBuildError>;
@@ -110,6 +111,10 @@ impl<V: Value> Map<V> {
             .ok_or_else(|| ComponentBuildError::KeyNotFound(key.to_owned()))
     }
 
+    pub fn get_bool(&mut self, key: &str) -> Result<bool, ComponentBuildError> {
+        self.get(key).and_then(|val| val.into_bool())
+    }
+
     pub fn get_int<I: TryFrom<i64>>(&mut self, key: &str) -> Result<I, ComponentBuildError> {
         self.get(key).and_then(|val| {
             val.into_int().and_then(|int| {
@@ -119,6 +124,7 @@ impl<V: Value> Map<V> {
             })
         })
     }
+
     pub fn get_float<F: num_traits::NumCast>(
         &mut self,
         key: &str,

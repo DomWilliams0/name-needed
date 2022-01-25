@@ -7,6 +7,7 @@ use common::*;
 use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 
+use crate::string::CachedStr;
 use crate::PhysicalComponent;
 
 #[derive(Debug, Error, Eq, PartialEq, Clone)]
@@ -82,7 +83,7 @@ pub struct ItemStack<W: World> {
 #[derive(Debug)]
 pub struct StackHomogeneity<W: World> {
     // TODO use a better way than hacky definition names
-    definition: String,
+    definition: CachedStr,
     phantom: PhantomData<W>,
 }
 
@@ -356,7 +357,7 @@ impl<W: World> ItemStack<W> {
 impl<W: World> Clone for StackHomogeneity<W> {
     fn clone(&self) -> Self {
         Self {
-            definition: self.definition.clone(),
+            definition: self.definition,
             phantom: PhantomData,
         }
     }
@@ -420,7 +421,7 @@ impl World for EcsWorld {
         self.component::<DefinitionNameComponent>(e)
             .ok()
             .map(|comp| StackHomogeneity {
-                definition: comp.0.clone(),
+                definition: comp.0,
                 phantom: PhantomData,
             })
     }
@@ -714,8 +715,6 @@ mod tests {
 
     #[test]
     fn homogeneity() {
-        let world = TestWorld::default();
-
         let mut odd_stack = TestStack::new(1, 10);
         assert!(matches!(
             odd_stack.add(2),

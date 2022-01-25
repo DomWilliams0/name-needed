@@ -121,7 +121,7 @@ impl<'a> System<'a> for ActivitySystem<'a> {
                     // interrupt ai and unreserve society task
                     let society = e
                         .get(&societies)
-                        .and_then(|soc| societies_res.society_by_handle(soc.handle));
+                        .and_then(|soc| societies_res.society_by_handle(soc.handle()));
                     ai.interrupt_current_action(e, None, society);
 
                     // next tick ai should return a new decision rather than unchanged to avoid

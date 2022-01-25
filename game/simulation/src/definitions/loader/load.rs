@@ -1,22 +1,27 @@
 use crate::definitions::loader::step1_deserialization::{
-    collect_raw_definitions, DefinitionUid, DeserializedDefinition,
+    collect_raw_definitions, DeserializedDefinition,
 };
 use crate::definitions::loader::step2_preprocessing::preprocess;
 use crate::definitions::loader::step3_construction::{instantiate, Definition};
 use crate::definitions::loader::template_lookup::TemplateLookup;
-use crate::definitions::registry::RegistryBuilder;
-use crate::definitions::{DefinitionError, DefinitionErrors, Registry};
+use crate::definitions::registry::DefinitionRegistryBuilder;
+use crate::definitions::{DefinitionError, DefinitionErrors, DefinitionRegistry};
+use crate::string::{CachedStr, StringCache};
 
-pub fn load(resources: resources::Definitions) -> Result<Registry, DefinitionErrors> {
+pub fn load(
+    resources: resources::Definitions,
+    string_cache: &StringCache,
+) -> Result<DefinitionRegistry, DefinitionErrors> {
     let defs = load_and_preprocess_with(|| collect_raw_definitions(resources))?;
-    let instantiated = instantiate(defs, &TemplateLookup::init())?;
+    let instantiated = instantiate(defs, &TemplateLookup::init(), string_cache)?;
     build_registry(instantiated)
 }
 
 #[cfg(test)]
-pub fn load_from_str(definitions: &str) -> Result<Registry, DefinitionErrors> {
+pub fn load_from_str(definitions: &str) -> Result<DefinitionRegistry, DefinitionErrors> {
     let defs = preprocess_from_str(definitions)?;
-    let instantiated = instantiate(defs, &TemplateLookup::init())?;
+    let string_cache = StringCache::default(); // cache is not cleared in tests on drop
+    let instantiated = instantiate(defs, &TemplateLookup::init(), &string_cache)?;
     build_registry(instantiated)
 }
 
@@ -57,11 +62,11 @@ pub fn load_and_preprocess_with<
 }
 
 pub fn build_registry(
-    defs: Vec<(DefinitionUid, Definition)>,
-) -> Result<Registry, DefinitionErrors> {
+    defs: Vec<(CachedStr, Definition)>,
+) -> Result<DefinitionRegistry, DefinitionErrors> {
     let mut errors = Vec::new();
 
-    let mut registry = RegistryBuilder::new();
+    let mut registry = DefinitionRegistryBuilder::new();
     for (uid, definition) in defs {
         if let Err((def, err)) = registry.register(uid, definition) {
             errors.push(def.make_error(err));

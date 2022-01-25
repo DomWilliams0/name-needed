@@ -177,7 +177,7 @@ impl<C: Context> Intelligence<C> {
                 .unwrap() // not empty
         };
 
-        trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src);
+        trace!("intelligence chose {dse}", dse = choice.name(); "source" => ?choice_src, "detail" => ?choice.as_debug());
 
         drop(context);
         let action = choice.action(blackboard);
@@ -216,12 +216,7 @@ impl<C: Context> Intelligence<C> {
     }
 
     pub fn pop_smarts(&mut self, id_to_remove: &C::AdditionalDseId) {
-        if self.additional.remove(id_to_remove).is_none() {
-            warn!(
-                "didn't have any additional smarts to remove";
-                "dse_id" => ?id_to_remove
-            );
-        }
+        let _ = self.additional.remove(id_to_remove);
     }
 
     fn all_decisions(&self) -> impl Iterator<Item = (&dyn Dse<C>, f32, DecisionSource<C>)> {
@@ -286,8 +281,8 @@ mod tests {
     use crate::decision::WeightedDse;
     use crate::test_utils::*;
     use crate::{
-        AiBox, Consideration, Considerations, DecisionSource, DecisionWeightType, Dse,
-        Intelligence, IntelligentDecision,
+        AiBox, Considerations, DecisionSource, DecisionWeightType, Dse, Intelligence,
+        IntelligentDecision,
     };
     use common::{bumpalo, once};
 

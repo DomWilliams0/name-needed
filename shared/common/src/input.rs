@@ -20,14 +20,19 @@ pub enum RendererKey {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum GameKey {
+pub enum EngineKey {
     Exit,
     Restart,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum GameKey {
+    CancelSelection,
+}
+
 pub enum KeyAction {
-    /// Renderer action e.g. move camera
     Renderer(RendererKey),
+    Engine(EngineKey),
     Game(GameKey),
 }
 

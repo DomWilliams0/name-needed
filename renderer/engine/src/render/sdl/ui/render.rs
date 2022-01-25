@@ -1,4 +1,7 @@
-use imgui::{im_str, Condition, Context, FontConfig, FontSource, Style};
+use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
+use std::path::Path;
+
+use imgui::{Condition, Context, FontConfig, FontSource, Style, StyleVar, WindowFlags};
 use imgui_opengl_renderer::Renderer;
 use imgui_sdl2::ImguiSdl2;
 use sdl2::event::Event;
@@ -7,7 +10,8 @@ use sdl2::video::Window;
 use sdl2::VideoSubsystem;
 use serde::{Deserialize, Serialize};
 
-use simulation::input::{UiCommand, UiCommands, UiRequest};
+use common::BoxedResult;
+use simulation::input::{PreparedUiPopup, UiCommand, UiCommands, UiRequest};
 use simulation::{PerfAvg, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
@@ -15,10 +19,7 @@ use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
 };
-use common::BoxedResult;
-
-use std::io::{ErrorKind, Read, Write};
-use std::path::Path;
+use crate::ui_str;
 
 pub struct Ui {
     imgui: Context,
@@ -116,6 +117,7 @@ impl Ui {
         perf: PerfAvg,
         simulation: SimulationRef,
         commands: &mut UiCommands,
+        popup: PreparedUiPopup,
     ) {
         self.imgui_sdl2
             .prepare_frame(self.imgui.io_mut(), window, mouse_state);
@@ -123,7 +125,7 @@ impl Ui {
 
         // generate windows
         let context = UiContext::new(&ui, &self.strings_arena, simulation, commands, perf);
-        self.state.render(context);
+        self.state.render(context, popup);
 
         // render windows
         self.imgui_sdl2.prepare_render(&ui, window);
@@ -139,9 +141,10 @@ impl Ui {
             let file = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(path)?;
 
-            self.serialize_to(file)?;
+            self.serialize_to(BufWriter::new(file))?;
         }
 
         Ok(())
@@ -162,40 +165,18 @@ impl Ui {
             Ok(f) => f,
         };
 
-        let state = Self::deserialize_from(imgui_ctx, file)?;
+        let state = Self::deserialize_from(imgui_ctx, BufReader::new(file))?;
         Ok(Some(state))
     }
 
-    fn serialize_to(&mut self, writer: impl Write) -> Result<(), bincode::Error> {
-        #[derive(Serialize)]
-        struct SerializedState<'a> {
-            state: &'a State,
-            imgui: &'a str,
-        }
-
+    fn serialize_to(&mut self, writer: impl Write) -> Result<(), ron::Error> {
         let mut imgui = String::new();
         self.imgui.save_ini_settings(&mut imgui);
-
-        let serialized = SerializedState {
-            state: &self.state,
-            imgui: &imgui,
-        };
-
-        bincode::serialize_into(writer, &serialized)
+        do_serialize(&self.state, &imgui.clone(), writer)
     }
 
-    fn deserialize_from(
-        imgui_ctx: &mut Context,
-        reader: impl Read,
-    ) -> Result<State, bincode::Error> {
-        #[derive(Deserialize)]
-        struct SerializedState {
-            state: State,
-            imgui: String,
-        }
-
-        let SerializedState { state, imgui } = bincode::deserialize_from(reader)?;
-
+    fn deserialize_from(imgui_ctx: &mut Context, reader: impl Read) -> Result<State, ron::Error> {
+        let (state, imgui) = do_deserialize(reader)?;
         imgui_ctx.load_ini_settings(&imgui);
         Ok(state)
     }
@@ -203,8 +184,8 @@ impl Ui {
 
 impl State {
     /// Renders ui windows
-    fn render(&mut self, context: UiContext) {
-        imgui::Window::new(im_str!("Debug"))
+    fn render(&mut self, context: UiContext, mut popups: PreparedUiPopup) {
+        imgui::Window::new("Debug")
             .size([400.0, 500.0], Condition::FirstUseEver)
             .position([10.0, 10.0], Condition::FirstUseEver)
             .title_bar(false)
@@ -214,14 +195,95 @@ impl State {
                 // perf fixed at the top
                 self.perf.render(&context);
 
-                let tabbar = context.new_tab_bar(im_str!("Debug Tabs"));
-                if !tabbar.is_open() {
-                    return;
+                if let Some(_bar) = context.new_tab_bar("Debug Tabs") {
+                    self.selection.render(&context);
+                    self.society.render(&context);
+                    self.debug.render(&context);
+                }
+            });
+
+        // invisible window for popups
+        let _style = context.push_style_var(StyleVar::WindowRounding(0.0));
+        imgui::Window::new("invisible")
+            .size(context.io().display_size, Condition::Always)
+            .position([0.0, 0.0], Condition::Always)
+            .bg_alpha(0.0)
+            .flags(
+                WindowFlags::NO_TITLE_BAR
+                    | WindowFlags::NO_INPUTS
+                    | WindowFlags::NO_RESIZE
+                    | WindowFlags::NO_COLLAPSE
+                    | WindowFlags::NO_BACKGROUND
+                    | WindowFlags::NO_SAVED_SETTINGS
+                    | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS,
+            )
+            .build(context.ui(), || {
+                #[allow(clippy::enum_variant_names)]
+                enum Rendered {
+                    NoPopup,
+                    OpenAndRendered,
+                    OpenButPlsClose,
                 }
 
-                self.selection.render(&context);
-                self.society.render(&context);
-                self.debug.render(&context);
+                let mut rendered = Rendered::NoPopup;
+                for popup in popups.iter_all() {
+                    let id = "popup";
+                    rendered = Rendered::OpenButPlsClose;
+
+                    let (renderable, open) = popup.as_renderable(context.simulation().ecs);
+                    if open {
+                        context.open_popup(id);
+                    }
+
+                    context.popup(id, || {
+                        rendered = Rendered::OpenAndRendered;
+
+                        context.text(renderable.title());
+                        context.separator();
+
+                        for button in renderable.buttons() {
+                            if context.button(ui_str!(in context, "{}", button)) {
+                                button.issue_requests(|req| context.issue_request(req));
+
+                                // close on action
+                                rendered = Rendered::OpenButPlsClose;
+                            }
+                        }
+
+                        if renderable.buttons().len() == 0 {
+                            context.text_disabled("Nothing to do");
+                        }
+                    });
+                }
+
+                if let Rendered::OpenButPlsClose = rendered {
+                    popups.on_close();
+                }
             });
     }
+}
+
+fn do_serialize(state: &State, imgui: &str, writer: impl Write) -> Result<(), ron::Error> {
+    #[derive(Serialize)]
+    #[repr(C)]
+    struct SerializedState<'a> {
+        state: &'a State,
+        imgui: &'a str,
+    }
+
+    let serialized = SerializedState { state, imgui };
+
+    ron::ser::to_writer(writer, &serialized)
+}
+
+fn do_deserialize(reader: impl Read) -> Result<(State, String), ron::Error> {
+    #[derive(Deserialize)]
+    #[repr(C)]
+    struct SerializedState {
+        state: State,
+        imgui: String,
+    }
+
+    let SerializedState { state, imgui } = ron::de::from_reader(reader)?;
+    Ok((state, imgui))
 }

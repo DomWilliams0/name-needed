@@ -1,11 +1,14 @@
+use std::array::IntoIter;
+use std::hash::{Hash, Hasher};
+use std::ops::{Add, Mul, SubAssign};
+
 use common::num_traits::*;
+use common::Itertools;
 
 use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
     WorldPosition,
 };
-use std::hash::{Hash, Hasher};
-use std::ops::{Add, Mul, SubAssign};
 
 #[derive(Clone, Debug, PartialOrd)]
 pub enum WorldRange<P: RangePosition> {
@@ -35,6 +38,11 @@ pub trait RangePosition: Copy + Sized {
     fn below(self) -> Option<Self> {
         let (x, y, z) = self.xyz();
         Self::new((x, y, z - Self::Z::one()))
+    }
+
+    fn above(self) -> Option<Self> {
+        let (x, y, z) = self.xyz();
+        Self::new((x, y, z + Self::Z::one()))
     }
 }
 
@@ -123,7 +131,7 @@ impl<P: RangePosition> WorldRange<P> {
         xy.as_() * z.as_()
     }
 
-    pub fn below(self) -> Option<Self> {
+    pub fn below(&self) -> Option<Self> {
         match self {
             WorldRange::Single(pos) => pos.below().map(WorldRange::Single),
             WorldRange::Range(from, to) => from
@@ -131,6 +139,23 @@ impl<P: RangePosition> WorldRange<P> {
                 .zip(to.below())
                 .map(|(from, to)| WorldRange::Range(from, to)),
         }
+    }
+
+    pub fn above(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => pos.above().map(WorldRange::Single),
+            WorldRange::Range(from, to) => from
+                .above()
+                .zip(to.above())
+                .map(|(from, to)| WorldRange::Range(from, to)),
+        }
+    }
+
+    pub fn contains(&self, pos: &P) -> bool {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+        let (x, y, z) = pos.xyz();
+
+        ax <= x && x <= bx && ay <= y && y <= by && az <= z && z <= bz
     }
 }
 
@@ -265,10 +290,50 @@ impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
     }
 }
 
+impl WorldRange<WorldPosition> {
+    pub fn iter_blocks(&self) -> impl Iterator<Item = WorldPosition> {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+        (az..=bz)
+            .cartesian_product(ay..=by)
+            .cartesian_product(ax..=bx)
+            .map(move |((z, y), x)| (x, y, z).into())
+    }
+
+    pub fn iter_columns(&self) -> impl Iterator<Item = (i32, i32)> {
+        let ((ax, bx), (ay, by), (_, _)) = self.ranges();
+        (ay..=by)
+            .cartesian_product(ax..=bx)
+            .map(move |(y, x)| (x, y))
+    }
+
+    /// 2d outline in xy, keeps full z range
+    pub fn iter_outline(&self) -> Option<impl Iterator<Item = Self> + '_> {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+
+        let w = bx - ax;
+        let h = by - ay;
+
+        // too narrow
+        if w < 2 || h < 2 {
+            return None;
+        }
+
+        Some(IntoIter::new([
+            WorldPositionRange::with_inclusive_range((ax, ay, az), (bx, ay, bz)),
+            WorldPositionRange::with_inclusive_range((ax, ay + 1, az), (ax, by, bz)),
+            WorldPositionRange::with_inclusive_range((bx, ay + 1, az), (bx, by, bz)),
+            WorldPositionRange::with_inclusive_range((ax + 1, by, az), (bx - 1, by, bz)),
+        ]))
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
+    use common::{ApproxEq, Itertools};
+
     use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
-    use common::ApproxEq;
 
     #[test]
     fn count() {
@@ -300,5 +365,48 @@ mod tests {
         let range = WorldPositionRange::with_inclusive_range((4, 5, 0), (3, 6, -2));
         assert_eq!(range.ranges(), ((3, 4), (5, 6), (-2, 0)));
         assert_eq!(range.count(), 2 * 2 * 3);
+    }
+
+    #[test]
+    fn outline_no_overlap() {
+        let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (3, 3, 3));
+        let outline_blocks = range
+            .iter_outline()
+            .unwrap()
+            .flat_map(|range| range.iter_blocks())
+            .collect_vec();
+
+        assert_eq!(
+            outline_blocks.iter().cloned().collect::<HashSet<_>>().len(),
+            outline_blocks.len()
+        );
+    }
+
+    #[test]
+    fn outline_all_within() {
+        let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (2, 2, 3));
+        let outline_blocks = range
+            .iter_outline()
+            .unwrap()
+            .flat_map(|range| range.iter_blocks())
+            .collect_vec();
+
+        assert!(outline_blocks.iter().all(|b| range.contains(b)));
+    }
+
+    #[test]
+    fn outline_too_narrow() {
+        let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (1, 1, 3));
+        assert!(range.iter_outline().is_none());
+
+        let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (1, 2, 1));
+        assert!(range.iter_outline().is_none());
+
+        let range = WorldPositionRange::with_inclusive_range((0, 0, 0), (2, 2, 0));
+        let outline = range
+            .iter_outline()
+            .expect("smallest possible")
+            .collect_vec();
+        assert_eq!(outline.iter().flat_map(|r| r.iter_blocks()).count(), 8);
     }
 }

@@ -1,0 +1,19 @@
+[
+  (
+    uid: "core_build_wall",
+    components: [
+      {"build": (
+        materials: [
+          ("core_brick_stone", 6),
+        ],
+        steps: 10,
+        rate: 4,
+        output: "StoneBrickWall",
+        outline: true,
+      )},
+      {"kind": (
+        singular: "Stone brick wall",
+      )},
+    ],
+  ),
+]
