@@ -279,11 +279,11 @@ impl<C: Context> Debug for DecisionSource<C> {
 mod tests {
     use common::{bumpalo, once};
 
+    use crate::consideration::Considerations;
     use crate::decision::WeightedDse;
     use crate::test_utils::*;
     use crate::{
-        AiBox, Considerations, DecisionSource, DecisionWeightType, Dse, Intelligence,
-        IntelligentDecision,
+        AiBox, DecisionSource, DecisionWeightType, Dse, Intelligence, IntelligentDecision,
     };
 
     #[test]

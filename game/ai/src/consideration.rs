@@ -1,4 +1,6 @@
-use common::NormalizedFloat;
+use common::bumpalo::Bump;
+use common::*;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use crate::intelligence::InputCache;
 use crate::{pretty_type_name, Context};
@@ -36,6 +38,13 @@ pub trait Consideration<C: Context> {
     fn consider_input(&self, input: f32) -> NormalizedFloat {
         self.parameter().apply(input)
     }
+}
+
+/// For emitting considerations in a DSE
+pub struct Considerations<'a, C: Context> {
+    // TODO dont bother running destructors
+    vec: BumpVec<'a, &'a dyn Consideration<C>>,
+    alloc: &'a Bump,
 }
 
 impl ConsiderationParameter {
@@ -80,6 +89,36 @@ impl Curve {
             Curve::Exponential(a, b, c, d, e) => (a.powf((b * x) + c) * d) + e,
             Curve::SquareRoot(a, b, c) => (a + (b * (c * x).sqrt())),
         })
+    }
+}
+
+impl<'a, C: Context> Debug for Considerations<'a, C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_list()
+            .entries(self.vec.iter().map(|c| c.name()))
+            .finish()
+    }
+}
+
+impl<'a, C: Context> Considerations<'a, C> {
+    pub fn new(alloc: &'a Bump) -> Self {
+        Considerations {
+            vec: BumpVec::new_in(alloc),
+            alloc,
+        }
+    }
+
+    pub fn add<T: Consideration<C> + 'a>(&mut self, c: T) {
+        assert!(
+            !std::mem::needs_drop::<T>(),
+            "drop won't be run for consideration"
+        );
+        let c = self.alloc.alloc(c) as &dyn Consideration<C>;
+        self.vec.push(c)
+    }
+
+    pub fn into_vec(self) -> BumpVec<'a, &'a dyn Consideration<C>> {
+        self.vec
     }
 }
 

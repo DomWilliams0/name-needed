@@ -1,10 +1,10 @@
-# TODOs (404)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
- * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
-   * `// TODO use a simpler manual vec that doesnt run destructors`
+ * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
+   * `// TODO dont bother running destructors`
  * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (9)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
@@ -356,10 +356,9 @@
    * `// TODO filter jobs for entity`
    * `// TODO use SocietyJobHandle instead of indices`
    * `/// TODO cancelling a shared reservation might cancel it for everyone else too, oh no`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (7)
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (6)
    * `// TODO this could be a work item`
    * `// TODO temporary box allocation is gross, use dynstack for dses`
-   * `// TODO use an equation you unmathematical twat`
    * `// TODO distinct build actions e.g. sawing, wood building, stone building etc`
    * `// TODO some types of hauling will be shareable`
    * `// TODO depends on work item`

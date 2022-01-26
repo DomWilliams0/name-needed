@@ -1,8 +1,9 @@
 use common::*;
 
 use crate::bumpalo::Bump;
+use crate::consideration::Considerations;
 use crate::intelligence::IntelligenceContext;
-use crate::{pretty_type_name, Consideration, Context};
+use crate::{pretty_type_name, Context};
 
 #[derive(Copy, Clone, Debug)]
 pub enum DecisionWeightType {
@@ -19,12 +20,6 @@ pub enum DecisionWeight {
     Plain(DecisionWeightType),
     /// Extra multiplier
     Weighted(DecisionWeightType, f32),
-}
-
-pub struct Considerations<'a, C: Context> {
-    // TODO use a simpler manual vec that doesnt run destructors
-    vec: bumpalo::collections::Vec<'a, &'a dyn Consideration<C>>,
-    alloc: &'a bumpalo::Bump,
 }
 
 pub trait Dse<C: Context> {
@@ -52,7 +47,7 @@ pub trait Dse<C: Context> {
         let considerations = {
             let mut considerations = Considerations::new(context.alloc);
             self.considerations(&mut considerations);
-            considerations.vec
+            considerations.into_vec()
         };
 
         let modification_factor = 1.0 - (1.0 / considerations.len() as f32);
@@ -122,32 +117,6 @@ impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
             .field("weight", &self.weight())
             .field("considerations", &considerations)
             .finish()
-    }
-}
-
-impl<'a, C: Context> Debug for Considerations<'a, C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_list()
-            .entries(self.vec.iter().map(|c| c.name()))
-            .finish()
-    }
-}
-
-impl<'a, C: Context> Considerations<'a, C> {
-    pub fn new(alloc: &'a bumpalo::Bump) -> Self {
-        Considerations {
-            vec: bumpalo::collections::Vec::new_in(alloc),
-            alloc,
-        }
-    }
-
-    pub fn add<T: Consideration<C> + 'a>(&mut self, c: T) {
-        assert!(
-            !std::mem::needs_drop::<T>(),
-            "drop won't be run for consideration"
-        );
-        let c = self.alloc.alloc(c) as &dyn Consideration<C>;
-        self.vec.push(c)
     }
 }
 
