@@ -1,13 +1,13 @@
 //! Infinite axis utility system
 
-pub use consideration::{Consideration, ConsiderationParameter, Curve};
-pub use decision::{DecisionWeightType, Dse, WeightedDse};
-pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
+use std::fmt::Debug;
+use std::hash::Hash;
 
 use common::bumpalo;
 pub use consideration::Considerations;
-use std::fmt::Debug;
-use std::hash::Hash;
+pub use consideration::{Consideration, ConsiderationParameter, Curve};
+pub use decision::{DecisionWeightType, Dse, WeightedDse};
+pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
 
 mod consideration;
 mod decision;

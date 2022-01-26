@@ -8,10 +8,9 @@ use crate::ai::dse::{BreakBlockDse, BuildDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
 use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
-use crate::{ComponentWorld, HaulSource};
-
 use crate::item::HaulableItemComponent;
 use crate::job::{BuildDetails, SocietyJobHandle};
+use crate::{ComponentWorld, HaulSource};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
@@ -60,24 +59,29 @@ impl SocietyTask {
     ) -> Option<BumpBox<'bump, dyn Dse<AiContext>>> {
         use SocietyTask::*;
 
-        // TODO use an equation you unmathematical twat
         let weighting = match existing_reservations {
-            0 => 1.0,
-            1 => 0.7,
-            2 => 0.4,
-            3 => 0.2,
-            _ => 0.0,
+            0 => None, // 1.0
+            1 => Some(0.7),
+            2 => Some(0.6),
+            3 => Some(0.55),
+            _ => return None, // don't even bother
         };
 
-        macro_rules! dse {
+        macro_rules! dse_as_boxed_trait {
             ($dse:expr) => {{
-                let boxed = BumpBox::new_in(WeightedDse::new($dse, weighting), alloc);
+                let boxed = BumpBox::new_in($dse, alloc);
                 // safety: normal safe cast allowed with Box but not custom BumpBox
-                let boxed_dyn = unsafe {
-                    BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>)
-                };
-                Some(boxed_dyn)
+                unsafe { BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>) }
             }};
+        }
+
+        macro_rules! dse {
+            ($dse:expr) => {
+                Some(match weighting {
+                    Some(f) => dse_as_boxed_trait!(WeightedDse::new($dse, f)),
+                    None => dse_as_boxed_trait!($dse),
+                })
+            };
         }
 
         match self {
