@@ -8,9 +8,6 @@ use crate::{pretty_type_name, Consideration, Context};
 pub enum DecisionWeightType {
     Idle,
     Normal,
-    /// This normally follows another decision and is disabled by a switch - once the switch toggles
-    /// this is more likely to be chosen
-    Dependent,
     BasicNeeds,
     Emergency,
     /// Obedience without question, for dev mode and debugging
@@ -164,7 +161,6 @@ impl DecisionWeight {
         let mut weight = match ty {
             Idle => 1.0,
             Normal => 2.0,
-            Dependent => 2.5,
             BasicNeeds => 3.5,
             Emergency => 4.0,
             AbsoluteOverride => 1000.0,
