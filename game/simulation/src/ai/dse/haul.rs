@@ -5,9 +5,10 @@ use crate::ai::consideration::{
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
-use ai::{Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeight, Dse};
 use unit::world::WorldPoint;
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct HaulDse {
     pub thing: Entity,
     pub src_tgt: (HaulSource, HaulTarget),
@@ -30,8 +31,8 @@ impl Dse<AiContext> for HaulDse {
         // TODO consider distance to source too
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::Normal
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Normal
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {

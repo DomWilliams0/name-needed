@@ -1,9 +1,16 @@
 # Active tasks
 
-* [ ] impl clone for dyn Dse
-* [ ] impl eq for dyn Dse
-* [ ] store parallel array of dse scores in ai instead of alongside dses
-* [ ] store stream dses within intelligence
-* [ ] multistep decision progress pipeline for choosing the best candidate for a task
-    * [ ] add None variant to intelligent decision, default to nop
-* [ ] make WeightedDse more ergonomic
+* [X] impl clone for dyn Dse
+* [X] impl eq for dyn Dse
+* [X] store parallel array of dse scores in ai instead of alongside dses
+* [X] store stream dses within intelligence
+* [X] multistep decision progress pipeline for choosing the best candidate for a task
+    * [X] add None variant to intelligent decision, default to nop
+* [X] make WeightedDse more ergonomic
+* [X] fix tests
+* [X] update all society jobs once per tick
+* [ ] use frame alloc for boxed ai blackboard without lifetime
+* [ ] fix reservation flip-flop
+* [ ] fix break block job terminating early
+* [ ] fix over-gathering of materials when already on the way
+* [ ] use rust-derivative to avoid manually implementing clone/debug/default etc

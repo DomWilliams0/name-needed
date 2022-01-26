@@ -1,12 +1,16 @@
+use std::any::{Any, TypeId};
+use std::hash::Hasher;
+
+use common::bumpalo::Bump;
 use common::*;
 
-use crate::bumpalo::Bump;
 use crate::consideration::Considerations;
+use crate::context::pretty_type_name;
 use crate::intelligence::IntelligenceContext;
-use crate::{pretty_type_name, Context};
+use crate::{AiBox, Context};
 
 #[derive(Copy, Clone, Debug)]
-pub enum DecisionWeightType {
+pub enum DecisionWeight {
     Idle,
     Normal,
     BasicNeeds,
@@ -14,17 +18,22 @@ pub enum DecisionWeightType {
     /// Obedience without question, for dev mode and debugging
     AbsoluteOverride,
 }
-#[derive(Copy, Clone, Debug)]
 
-pub enum DecisionWeight {
-    Plain(DecisionWeightType),
-    /// Extra multiplier
-    Weighted(DecisionWeightType, f32),
+pub trait DseExt<C: Context>: Any {
+    fn clone_dse(&self) -> AiBox<dyn Dse<C>>;
+    fn compare_dse(&self, other: &dyn Dse<C>) -> bool;
+    fn hash_dse(&self, hasher: &mut dyn Hasher);
 }
 
-pub trait Dse<C: Context> {
+pub struct WeightedDse<C: Context> {
+    // TODO cow type for dse (aibox, framealloc, borrowed)
+    dse: AiBox<dyn Dse<C>>,
+    multiplier: f32,
+}
+
+pub trait Dse<C: Context>: DseExt<C> {
     fn considerations(&self, out: &mut Considerations<C>);
-    fn weight_type(&self) -> DecisionWeightType;
+    fn weight(&self) -> DecisionWeight;
     fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
 
     fn name(&self) -> &'static str {
@@ -34,10 +43,6 @@ pub trait Dse<C: Context> {
 
     fn as_debug(&self) -> Option<&dyn Debug> {
         None
-    }
-
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Plain(self.weight_type())
     }
 
     fn score(&self, context: &mut IntelligenceContext<C>, bonus: f32) -> f32 {
@@ -55,7 +60,7 @@ pub trait Dse<C: Context> {
             if final_score < context.best_so_far {
                 trace!("skipping {dse} due to falling below best result found so far", dse = self.name();
                        "current_score" => final_score, "best_so_far" => context.best_so_far);
-                return 0.0;
+                return final_score;
             }
 
             let score = c
@@ -100,13 +105,6 @@ pub trait Dse<C: Context> {
     }
 }
 
-/// A DSE with an additional weight multiplier
-pub struct WeightedDse<C: Context, D: Dse<C>> {
-    dse: D,
-    additional_weight: f32,
-    phantom: PhantomData<C>,
-}
-
 impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let alloc = Bump::new();
@@ -120,91 +118,209 @@ impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
     }
 }
 
+impl<C, D> DseExt<C> for D
+where
+    C: Context,
+    D: Dse<C> + Clone + Eq + Hash + 'static,
+{
+    fn clone_dse(&self) -> AiBox<dyn Dse<C>> {
+        AiBox::new(self.clone())
+    }
+
+    fn compare_dse(&self, other: &dyn Dse<C>) -> bool {
+        if other.type_id() == self.type_id() {
+            // safety: compared types
+            let other = unsafe { &*(other as *const dyn Dse<C> as *const D) };
+            self == other
+        } else {
+            false
+        }
+    }
+
+    fn hash_dse(&self, mut hasher: &mut dyn Hasher) {
+        TypeId::of::<D>().hash(&mut hasher); // ensure different hash for different types
+        self.hash(&mut hasher);
+    }
+}
+
+impl<C: Context> Clone for AiBox<dyn Dse<C>> {
+    fn clone(&self) -> Self {
+        self.clone_dse()
+    }
+}
+
+impl<C: Context> Clone for WeightedDse<C> {
+    fn clone(&self) -> Self {
+        Self {
+            dse: self.dse.clone(),
+            multiplier: self.multiplier,
+        }
+    }
+}
+
+impl<C: Context> PartialEq<dyn Dse<C>> for dyn Dse<C> {
+    fn eq(&self, other: &dyn Dse<C>) -> bool {
+        self.compare_dse(other)
+    }
+}
+
+impl<C: Context> Eq for dyn Dse<C> {}
+
+impl<C: Context> Hash for dyn Dse<C> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_dse(state);
+    }
+}
+
 impl DecisionWeight {
     pub fn multiplier(self) -> f32 {
-        use DecisionWeightType::*;
-        let ty = match self {
-            DecisionWeight::Plain(ty) | DecisionWeight::Weighted(ty, _) => ty,
-        };
-
-        let mut weight = match ty {
+        use DecisionWeight::*;
+        match self {
             Idle => 1.0,
             Normal => 2.0,
             BasicNeeds => 3.5,
             Emergency => 4.0,
             AbsoluteOverride => 1000.0,
-        };
-
-        if let DecisionWeight::Weighted(_, mul) = self {
-            weight *= mul;
         }
-
-        weight
     }
 }
 
-impl From<DecisionWeightType> for DecisionWeight {
-    fn from(ty: DecisionWeightType) -> Self {
-        Self::Plain(ty)
-    }
-}
-
-impl<C: Context, D: Dse<C>> WeightedDse<C, D> {
-    pub fn new(dse: D, weight: f32) -> Self {
-        debug_assert!(weight.is_sign_positive());
+impl<C: Context> WeightedDse<C> {
+    pub fn new(dse: impl Dse<C> + 'static, weight: f32) -> Self {
+        assert!(weight.is_sign_positive() && weight.is_finite());
         Self {
-            dse,
-            additional_weight: weight,
-            phantom: PhantomData,
+            dse: AiBox::new(dse) as AiBox<dyn Dse<C>>,
+            multiplier: weight,
         }
     }
-}
 
-impl<C: Context, D: Dse<C>> Dse<C> for WeightedDse<C, D> {
-    fn considerations(&self, out: &mut Considerations<C>) {
-        self.dse.considerations(out)
+    pub fn dse(&self) -> &dyn Dse<C> {
+        &*self.dse
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        unreachable!()
-    }
-
-    fn action(&self, blackboard: &mut <C as Context>::Blackboard) -> <C as Context>::Action {
-        self.dse.action(blackboard)
-    }
-
-    fn name(&self) -> &'static str {
-        self.dse.name()
-    }
-
-    fn as_debug(&self) -> Option<&dyn Debug> {
-        self.dse.as_debug()
-    }
-
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Weighted(self.dse.weight_type(), self.additional_weight)
+    pub fn weight(&self) -> f32 {
+        self.dse.weight().multiplier() * self.multiplier
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::bumpalo::Bump;
-    use crate::intelligence::{InputCache, IntelligenceContext};
+    use crate::intelligence::IntelligenceContext;
     use crate::test_utils::*;
     use crate::*;
+    use common::bumpalo::Bump;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     #[test]
     fn score() {
         let mut blackboard = TestBlackboard { my_hunger: 0.5 };
         let alloc = Bump::new();
-        let mut ctx = IntelligenceContext {
-            blackboard: &mut blackboard,
-            input_cache: InputCache::new(&alloc),
-            best_so_far: 0.0,
-            alloc: &Default::default(),
-        };
+        let mut ctx = IntelligenceContext::new(&mut blackboard, &alloc);
 
         assert!(EatDse.score(&mut ctx, 1.0) > 0.9);
         assert!(BadDse.score(&mut ctx, 1.0) < 0.1);
+    }
+
+    macro_rules! impl_dse {
+        ($ty:ty) => {
+            impl Dse<TestContext> for $ty {
+                fn considerations(&self, _: &mut Considerations<TestContext>) {
+                    unreachable!()
+                }
+
+                fn weight(&self) -> DecisionWeight {
+                    unreachable!()
+                }
+
+                fn action(&self, _: &mut TestBlackboard) -> TestAction {
+                    unreachable!()
+                }
+            }
+        };
+    }
+
+    #[test]
+    fn compare_dses() {
+        #[derive(Hash, Eq)]
+        struct A(u32);
+
+        #[derive(Hash, Eq)]
+        struct B;
+
+        impl_dse!(A);
+        impl_dse!(B);
+
+        impl Clone for A {
+            fn clone(&self) -> Self {
+                eprintln!("clone A");
+                Self(self.0)
+            }
+        }
+
+        impl PartialEq for A {
+            fn eq(&self, other: &Self) -> bool {
+                eprintln!("compare A");
+                self.0 == other.0
+            }
+        }
+
+        impl Clone for B {
+            fn clone(&self) -> Self {
+                eprintln!("clone B");
+                Self
+            }
+        }
+
+        impl PartialEq for B {
+            fn eq(&self, _: &Self) -> bool {
+                eprintln!("compare B");
+                true
+            }
+        }
+
+        let a1 = Box::new(A(10)) as Box<dyn Dse<TestContext>>;
+        let a2 = a1.clone();
+        let a3 = Box::new(A(20)) as Box<dyn Dse<TestContext>>;
+        let b = Box::new(B) as Box<dyn Dse<TestContext>>;
+
+        assert_eq!(&a1, &a1);
+        assert_eq!(&a1, &a2);
+        assert_eq!(&a2, &a1);
+        assert_ne!(&a1, &a3);
+
+        assert_ne!(&a1, &b);
+        assert_ne!(&a2, &b);
+        assert_ne!(&a3, &b);
+        assert_ne!(&b, &a1);
+
+        assert_eq!(&b, &b);
+    }
+
+    #[test]
+    fn hash_dse() {
+        #[derive(Hash, Eq, PartialEq, Clone)]
+        struct A(i32, &'static str);
+        #[derive(Hash, Eq, PartialEq, Clone)]
+        struct B(i32, &'static str); // same fields
+
+        impl_dse!(A);
+        impl_dse!(B);
+
+        fn do_hash(dse: &dyn Dse<TestContext>) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            dse.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let a1 = do_hash(&A(50, "nice"));
+        let a2 = do_hash(&A(50, "nice"));
+        let b1 = do_hash(&B(50, "nice"));
+
+        // same type
+        assert_eq!(a1, a2);
+
+        // same fields but different type
+        assert_ne!(a1, b1, "different types have the same hash");
     }
 }

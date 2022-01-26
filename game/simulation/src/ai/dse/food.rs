@@ -1,4 +1,4 @@
-use ai::{Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeight, Dse};
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,
@@ -9,9 +9,11 @@ use crate::item::ItemFilter;
 use common::*;
 
 /// Equips food in inventory and eats it
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct EatHeldFoodDse;
 
 /// Finds food nearby to pick up
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct FindLocalFoodDse;
 
 const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
@@ -24,8 +26,8 @@ impl Dse<AiContext> for EatHeldFoodDse {
         out.add(CanUseHeldItemConsideration(FOOD_FILTER));
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::BasicNeeds
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::BasicNeeds
     }
 
     fn action(
@@ -55,8 +57,8 @@ impl Dse<AiContext> for FindLocalFoodDse {
         });
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::Normal
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Normal
     }
 
     fn action(

@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::num::NonZeroU16;
 
 use common::*;
 
 use crate::job::job::SocietyJobImpl;
 use crate::job::{BuildThingJob, SocietyJob, SocietyTask};
-use crate::simulation::Tick;
+
 use crate::society::job::job::SocietyJobRef;
 use crate::{EcsWorld, Entity, Societies, SocietyHandle};
 
@@ -13,11 +14,7 @@ pub struct SocietyJobList {
     jobs: Vec<SocietyJobRef>,
     to_cancel: Vec<SocietyJobHandle>,
     reservations: SocietyTaskReservations,
-    last_update: Tick,
     next_handle: SocietyJobHandle,
-
-    /// Pretty hacky way to prevent Job indices changing
-    no_more_jobs_temporarily: bool,
 }
 
 pub type ReservationCount = u16;
@@ -32,7 +29,8 @@ pub struct Reservations<T> {
 }
 
 pub trait ReservationTask: Clone + Hash + Eq + Debug {
-    fn is_shareable(&self) -> bool;
+    /// How many in total can work on this task
+    fn max_reservers(&self) -> NonZeroU16;
 }
 
 #[cfg_attr(test, derive(Eq, PartialEq, Debug))]
@@ -104,9 +102,7 @@ impl SocietyJobList {
             jobs: Vec::with_capacity(64),
             to_cancel: Vec::with_capacity(4),
             reservations: SocietyTaskReservations::default(),
-            last_update: Tick::default(),
             next_handle: SocietyJobHandle { society, idx: 0 },
-            no_more_jobs_temporarily: false,
         }
     }
 
@@ -124,11 +120,6 @@ impl SocietyJobList {
     /// Without generic parameter to reduce code size
     fn submit_internal(&mut self, world: &EcsWorld, job: SocietyJobRef) {
         debug!("submitting society job"; "job" => ?job);
-        assert!(
-            !self.no_more_jobs_temporarily,
-            "job indices are still held, or allow_jobs_again wasn't called"
-        );
-
         {
             // TODO special case for build job should be expanded to all jobs needing progress tracking
             let j = job.borrow();
@@ -148,35 +139,20 @@ impl SocietyJobList {
         }
     }
 
-    /// Returned job index is valid until [allow_jobs_again] is called
-    pub fn filter_applicable_tasks(
-        &mut self,
-        entity: Entity,
-        this_tick: Tick,
-        world: &EcsWorld,
-        mut add_task: impl FnMut(SocietyTask, JobIndex, ReservationCount),
-    ) {
-        // refresh jobs if necessary
-        if self.last_update != this_tick {
-            self.last_update = this_tick;
-            let len_before = self.jobs.len();
-            trace!("refreshing {n} jobs", n = len_before);
-            self.jobs.retain(|job| {
-                let result = job.borrow_mut().refresh_tasks(world);
-                match result {
-                    None => true,
-                    Some(result) => {
-                        debug!("job finished"; "result" => ?result, "job" => ?job);
-                        false
-                    }
+    /// Update once per tick to remove finished and cancelled jobs
+    pub fn refresh_jobs(&mut self, world: &EcsWorld) {
+        let len_before = self.jobs.len();
+        trace!("refreshing {n} jobs", n = len_before);
+        self.jobs.retain(|job| {
+            let result = job.borrow_mut().refresh_tasks(world);
+            match result {
+                None => true,
+                Some(result) => {
+                    debug!("job finished"; "result" => ?result, "job" => ?job);
+                    false
                 }
-            });
-
-            let len_after = self.jobs.len();
-            if len_before != len_after {
-                trace!("pruned {n} finished jobs", n = len_before - len_after);
             }
-        }
+        });
 
         // remove cancelled jobs
         for handle in self.to_cancel.drain(..) {
@@ -186,9 +162,21 @@ impl SocietyJobList {
             }
         }
 
-        // reset when finished with tasks
-        self.no_more_jobs_temporarily = true;
+        let len_after = self.jobs.len();
+        if len_before != len_after {
+            trace!(
+                "pruned {n} finished and cancelled jobs",
+                n = len_before - len_after
+            );
+        }
+    }
 
+    /// Returned job index is valid until [allow_jobs_again] is called
+    pub fn filter_applicable_tasks(
+        &self,
+        entity: Entity,
+        mut add_task: impl FnMut(SocietyTask, JobIndex, ReservationCount),
+    ) {
         for (i, job) in self.jobs.iter().enumerate() {
             let job = job.borrow();
             // TODO filter jobs for entity
@@ -217,10 +205,6 @@ impl SocietyJobList {
     #[inline]
     pub fn reservations_mut(&mut self) -> &mut SocietyTaskReservations {
         &mut self.reservations
-    }
-
-    pub(crate) fn allow_jobs_again(&mut self) {
-        self.no_more_jobs_temporarily = false;
     }
 
     // TODO use SocietyJobHandle instead of indices
@@ -371,7 +355,7 @@ impl<T: ReservationTask> Reservations<T> {
             Some(n) => *n,
         };
 
-        let is_shareable = task.is_shareable();
+        let max_workers = task.max_reservers().get();
         let mut count = 0;
         for (reserved_task, reserving_entity) in self.reservations.iter() {
             if task != reserved_task {
@@ -381,13 +365,18 @@ impl<T: ReservationTask> Reservations<T> {
             if reserver == *reserving_entity {
                 // itsa me
                 return Reservation::ReservedBySelf;
-            } else if !is_shareable {
+            } else if max_workers == 1 {
                 // someone else has reserved an unshareable task
                 return Reservation::Unavailable;
             }
 
             // count shared reservations
             count += 1;
+
+            if count >= max_workers {
+                // fully reserved
+                return Reservation::Unavailable;
+            }
         }
 
         debug_assert_ne!(count, 0);
@@ -418,8 +407,8 @@ impl<T: ReservationTask> Reservations<T> {
 }
 
 impl ReservationTask for SocietyTask {
-    fn is_shareable(&self) -> bool {
-        SocietyTask::is_shareable(self)
+    fn max_reservers(&self) -> NonZeroU16 {
+        SocietyTask::max_workers(self)
     }
 }
 
@@ -431,15 +420,18 @@ mod tests {
     use super::*;
 
     impl ReservationTask for i32 {
-        fn is_shareable(&self) -> bool {
-            *self % 2 == 0
+        fn max_reservers(&self) -> NonZeroU16 {
+            let n = if *self % 2 == 0 { 3 } else { 1 };
+
+            NonZeroU16::new(n).unwrap()
         }
     }
 
-    fn create() -> (Reservations<i32>, [Entity; 3]) {
+    fn create() -> (Reservations<i32>, [Entity; 4]) {
         let reservations = Reservations::default();
         let ecs = EcsWorld::new();
         let entities = [
+            ecs.create_entity().build().into(),
             ecs.create_entity().build().into(),
             ecs.create_entity().build().into(),
             ecs.create_entity().build().into(),
@@ -449,7 +441,7 @@ mod tests {
 
     #[test]
     fn simple_unshareable() {
-        let (mut reservations, [a, b, _]) = create();
+        let (mut reservations, [a, b, _, _]) = create();
         let task = 1; // odd = unshareable
 
         assert_eq!(reservations.check_for(&task, a), Reservation::Unreserved);
@@ -466,7 +458,7 @@ mod tests {
 
     #[test]
     fn simple_shareable() {
-        let (mut reservations, [a, b, c]) = create();
+        let (mut reservations, [a, b, c, d]) = create();
         let task = 2; // even = shareable
 
         // reserve but shared
@@ -497,11 +489,21 @@ mod tests {
             reservations.check_for(&task, c),
             Reservation::ReservedButShareable(2)
         );
+
+        reservations.reserve(task, c);
+        assert_eq!(
+            reservations.check_for(&task, c),
+            Reservation::ReservedBySelf
+        );
+        assert_eq!(
+            reservations.check_for(&task, d),
+            Reservation::Unavailable // hit limit of 3 max workers
+        );
     }
 
     #[test]
     fn replace_and_cancel() {
-        let (mut reservations, [a, b, c]) = create();
+        let (mut reservations, [a, b, c, _]) = create();
         let task = 9; // odd = unshareable
 
         // reserve other then swap
@@ -524,7 +526,7 @@ mod tests {
 
     #[test]
     fn check_all() {
-        let (mut reservations, [a, b, c]) = create();
+        let (mut reservations, [a, b, c, _]) = create();
         let task = 4;
 
         macro_rules! collect_all {

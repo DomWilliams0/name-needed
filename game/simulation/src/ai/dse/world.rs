@@ -12,20 +12,22 @@ use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
 use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::{HaulTarget, ItemStackComponent};
-use ai::{Considerations, Context, DecisionWeightType, Dse};
+use ai::{Considerations, Context, DecisionWeight, Dse};
 use common::OrderedFloat;
 
 use unit::world::WorldPosition;
 use world::block::BlockType;
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BreakBlockDse(pub WorldPosition);
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BuildDse {
     pub job: SocietyJobHandle,
     pub details: BuildDetails,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GatherMaterialsDse {
     pub target: WorldPosition,
     pub material: BuildMaterial,
@@ -48,8 +50,8 @@ impl Dse<AiContext> for BreakBlockDse {
         ));
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::Normal
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Normal
     }
 
     fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
@@ -81,8 +83,8 @@ impl Dse<AiContext> for GatherMaterialsDse {
         // TODO check society containers
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::Normal
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Normal
     }
 
     fn action(
@@ -161,8 +163,8 @@ impl Dse<AiContext> for BuildDse {
         });
     }
 
-    fn weight_type(&self) -> DecisionWeightType {
-        DecisionWeightType::Normal
+    fn weight(&self) -> DecisionWeight {
+        DecisionWeight::Normal
     }
 
     fn action(&self, _blackboard: &mut <AiContext as Context>::Blackboard) -> AiAction {

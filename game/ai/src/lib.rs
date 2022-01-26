@@ -1,47 +1,23 @@
 //! Infinite axis utility system
 
-use std::fmt::Debug;
-use std::hash::Hash;
-
-use common::bumpalo;
-pub use consideration::Considerations;
-pub use consideration::{Consideration, ConsiderationParameter, Curve};
-pub use decision::{DecisionWeightType, Dse, WeightedDse};
-pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
+pub use consideration::{Consideration, ConsiderationParameter, Considerations, Curve};
+pub use context::{AiBox, Blackboard, Context, Input};
+pub use decision::{DecisionWeight, Dse, WeightedDse};
+pub use intelligence::{
+    DecisionProgress, DecisionSource, DseSkipper, InitialChoice, InputCache, Intelligence,
+    IntelligentDecision, Smarts,
+};
 
 mod consideration;
+mod context;
 mod decision;
 mod intelligence;
-
-pub trait Context: Sized {
-    type Blackboard: Blackboard;
-    type Input: Input<Self>;
-    type Action: Default + Eq + Clone;
-    type AdditionalDseId: Hash + Eq + Clone + Debug;
-}
-
-pub trait Input<C: Context>: Hash + Clone + Eq {
-    fn get(&self, blackboard: &mut C::Blackboard) -> f32;
-}
-
-pub trait Blackboard {
-    #[cfg(feature = "logging")]
-    fn entity(&self) -> String;
-}
-
-// TODO use a separate allocator for ai to avoid fragmentation
-pub type AiBox<T> = Box<T>;
-
-pub(crate) fn pretty_type_name(name: &str) -> &str {
-    let split_idx = name.rfind(':').map(|i| i + 1).unwrap_or(0);
-    &name[split_idx..]
-}
 
 #[cfg(test)]
 mod test_utils {
     use super::*;
 
-    #[derive(Eq, PartialEq, Clone, Debug)]
+    #[derive(Eq, PartialEq, Clone, Debug, Hash)]
     pub enum TestAction {
         Nop,
         Eat,
@@ -74,6 +50,7 @@ mod test_utils {
         }
     }
 
+    #[derive(Clone)]
     pub struct TestBlackboard {
         pub my_hunger: f32,
     }
@@ -93,6 +70,7 @@ mod test_utils {
         type Input = TestInput;
         type Action = TestAction;
         type AdditionalDseId = u32;
+        type StreamDseExtraData = ();
     }
 
     pub struct MyHungerConsideration;
@@ -163,76 +141,66 @@ mod test_utils {
         }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct EatDse;
 
     impl Dse<TestContext> for EatDse {
-        fn name(&self) -> &'static str {
-            "Eat"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(MyHungerConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::Normal
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::Normal
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
             TestAction::Eat
         }
+
+        fn name(&self) -> &'static str {
+            "Eat"
+        }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct BadDse;
 
     impl Dse<TestContext> for BadDse {
-        fn name(&self) -> &'static str {
-            "Bad"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(CancelExistenceConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::Emergency
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::Emergency
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
             TestAction::CancelExistence
         }
+
+        fn name(&self) -> &'static str {
+            "Bad"
+        }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct EmergencyDse;
 
     impl Dse<TestContext> for EmergencyDse {
-        fn name(&self) -> &'static str {
-            "Emergency"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(AlwaysWinConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::AbsoluteOverride
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::AbsoluteOverride
         }
 
         fn action(&self, _: &mut TestBlackboard) -> TestAction {
             TestAction::CancelExistence // sorry
         }
-    }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pretty_type_names() {
-        assert_eq!(pretty_type_name("this::is::my::type::Lmao"), "Lmao");
-        assert_eq!(pretty_type_name("boop"), "boop");
-        assert_eq!(pretty_type_name("malformed:"), "");
-        assert_eq!(pretty_type_name(":malformed"), "malformed");
+        fn name(&self) -> &'static str {
+            "Emergency"
+        }
     }
 }

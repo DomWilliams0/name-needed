@@ -36,15 +36,16 @@ mod tests {
     use ai::{Consideration, InputCache};
     use common::bumpalo::Bump;
     use common::NormalizedFloat;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
-    struct NoLeaksGuard(*mut EcsWorld, *mut SharedBlackboard);
+    struct NoLeaksGuard(*mut EcsWorld);
 
     impl Drop for NoLeaksGuard {
         fn drop(&mut self) {
-            // safety: ptrs came from leaked boxes
+            // safety: ptr came from leaked boxes
             unsafe {
                 let _ = Box::from_raw(self.0);
-                let _ = Box::from_raw(self.1);
             }
         }
     }
@@ -52,11 +53,11 @@ mod tests {
     fn dummy_blackboard() -> (AiBlackboard<'static>, NoLeaksGuard) {
         let world = Box::leak(Box::new(EcsWorld::new()));
         let ai = Box::leak(Box::new(AiComponent::with_species(&Species::Human)));
-        let shared = Box::leak(Box::new(SharedBlackboard {
+        let shared = Rc::new(RefCell::new(SharedBlackboard {
             area_link_cache: Default::default(),
         }));
 
-        let guard = NoLeaksGuard(world as *mut _, shared as *mut _);
+        let guard = NoLeaksGuard(world as *mut _);
 
         let blackboard = AiBlackboard {
             entity: world.create_entity().build().into(),

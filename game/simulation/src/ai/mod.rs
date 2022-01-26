@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub use action::AiAction;
 use common::*;
@@ -10,6 +12,7 @@ use world::WorldArea;
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 
+use crate::ai::system::StreamDseData;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::{FoundSlot, InventoryComponent, ItemFilter};
 use crate::{HungerComponent, SocietyComponent, SocietyHandle, TransformComponent};
@@ -28,9 +31,11 @@ impl ai::Context for AiContext {
     type Input = AiInput;
     type Action = AiAction;
     type AdditionalDseId = AdditionalDse;
+    type StreamDseExtraData = StreamDseData;
 }
 
 /// 'a: only as long as this AI tick
+#[derive(Clone)]
 pub struct AiBlackboard<'a> {
     pub entity: Entity,
     /// For navigation
@@ -48,7 +53,7 @@ pub struct AiBlackboard<'a> {
 
     // For fetching other components
     pub world: &'a EcsWorld,
-    pub shared: &'a mut SharedBlackboard,
+    pub shared: Rc<RefCell<SharedBlackboard>>,
 }
 
 #[derive(Default)]
@@ -79,7 +84,7 @@ impl<'a> AiBlackboard<'a> {
         inventory: Option<&'a InventoryComponent>,
         society: Option<&'a SocietyComponent>,
         ai: &'a AiComponent,
-        shared: &'a mut SharedBlackboard,
+        shared: Rc<RefCell<SharedBlackboard>>,
         world: &'a EcsWorld,
     ) -> Self {
         AiBlackboard::<'a> {

@@ -1,6 +1,7 @@
-use ai::{Dse, WeightedDse};
-use common::bumpalo::Bump;
+use ai::WeightedDse;
+
 use common::*;
+use std::num::NonZeroU16;
 use unit::world::WorldPosition;
 
 use crate::activity::HaulTarget;
@@ -24,7 +25,6 @@ pub struct HaulSocietyTask {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
     /// Break the given block
-    // TODO this could be a work item
     BreakBlock(WorldPosition),
 
     /// Work on a build job
@@ -51,36 +51,32 @@ impl SocietyTask {
     // TODO temporary box allocation is gross, use dynstack for dses
     /// More reservations = lower weight
     #[allow(unused_variables)] // used in macro
-    pub fn as_dse<'bump>(
+    pub fn as_dse(
         &self,
         world: &EcsWorld,
         existing_reservations: u16,
-        alloc: &'bump Bump,
-    ) -> Option<BumpBox<'bump, dyn Dse<AiContext>>> {
+    ) -> Option<WeightedDse<AiContext>> {
         use SocietyTask::*;
 
         let weighting = match existing_reservations {
-            0 => None, // 1.0
-            1 => Some(0.7),
-            2 => Some(0.6),
-            3 => Some(0.55),
+            0 => 1.0,
+            1 => 0.9,
+            2 => 0.8,
+            3 => 0.75,
             _ => return None, // don't even bother
         };
 
-        macro_rules! dse_as_boxed_trait {
-            ($dse:expr) => {{
-                let boxed = BumpBox::new_in($dse, alloc);
-                // safety: normal safe cast allowed with Box but not custom BumpBox
-                unsafe { BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>) }
-            }};
-        }
+        // macro_rules! dse_as_boxed_trait {
+        //     ($dse:expr) => {{
+        //         let boxed = BumpBox::new_in($dse, alloc);
+        //         // safety: normal safe cast allowed with Box but not custom BumpBox
+        //         unsafe { BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>) }
+        //     }};
+        // }
 
         macro_rules! dse {
             ($dse:expr) => {
-                Some(match weighting {
-                    Some(f) => dse_as_boxed_trait!(WeightedDse::new($dse, f)),
-                    None => dse_as_boxed_trait!($dse),
-                })
+                Some(WeightedDse::new($dse, weighting))
             };
         }
 
@@ -121,16 +117,18 @@ impl SocietyTask {
         }
     }
 
-    pub fn is_shareable(&self) -> bool {
+    pub fn max_workers(&self) -> NonZeroU16 {
         use SocietyTask::*;
-        match self {
-            BreakBlock(_) => true,
-            Build(_, _) => false,
+        let n = match self {
+            BreakBlock(_) => 2,
+            Build(_, _) => 1,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
-            Haul(_) => false,
-            GatherMaterials { .. } => true,
-        }
+            Haul(_) => 1,
+            GatherMaterials { .. } => 3,
+        };
+
+        NonZeroU16::new(n).unwrap()
     }
 }
 

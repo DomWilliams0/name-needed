@@ -2,8 +2,9 @@ use common::bumpalo::Bump;
 use common::*;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
+use crate::context::pretty_type_name;
 use crate::intelligence::InputCache;
-use crate::{pretty_type_name, Context};
+use crate::Context;
 
 pub enum ConsiderationParameter {
     /// Already normalized

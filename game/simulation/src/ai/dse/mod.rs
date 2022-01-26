@@ -14,7 +14,7 @@ mod haul;
 mod movement;
 mod world;
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
 pub enum AdditionalDse {
     DivineCommand,
 }

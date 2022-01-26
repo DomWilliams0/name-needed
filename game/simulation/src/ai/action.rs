@@ -10,7 +10,7 @@ use crate::job::{BuildDetails, SocietyJobHandle};
 
 // TODO speed should be specified as an enum for all go??? actions
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Hash)]
 pub enum AiAction {
     /// Standing still stupidly and looking stupid
     Nop,

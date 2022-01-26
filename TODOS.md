@@ -1,22 +1,22 @@
-# TODOs (403)
+# TODOs (401)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
  * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
    * `// TODO dont bother running destructors`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (9)
+ * [game/ai/src/context.rs](game/ai/src/context.rs) (1)
+   * `// TODO use a separate allocator for ai to avoid fragmentation`
+ * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
+   * `// TODO cow type for dse (aibox, framealloc, borrowed)`
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (7)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
+   * `// TODO framealloc this, with helper type to assert same tick i.e. still populated`
    * `// TODO use an arena-allocator hashmap`
    * `// TODO perfect hash on C::Input`
-   * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
-   * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO benchmark adding and popping smarts`
-   * `// TODO use bump`
+   * `// TODO add momentum to weight to discourage changing mind so often`
    * `// TODO reuse allocation`
- * [game/ai/src/lib.rs](game/ai/src/lib.rs) (1)
-   * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
@@ -178,9 +178,9 @@
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
  * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
-   * `// TODO use frame allocator in ai blackboards`
-   * `// TODO provide READ ONLY DSEs to ai intelligence`
+   * `// TODO bump alloc this`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
+   * `.entry(dse.clone_dse()) // TODO frame alloc this`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
@@ -356,8 +356,7 @@
    * `// TODO filter jobs for entity`
    * `// TODO use SocietyJobHandle instead of indices`
    * `/// TODO cancelling a shared reservation might cancel it for everyone else too, oh no`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (6)
-   * `// TODO this could be a work item`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (5)
    * `// TODO temporary box allocation is gross, use dynstack for dses`
    * `// TODO distinct build actions e.g. sawing, wood building, stone building etc`
    * `// TODO some types of hauling will be shareable`
