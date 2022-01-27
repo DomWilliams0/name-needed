@@ -26,10 +26,11 @@ echo "OS is $DETECTED_OS"
 echo "running e2e tests: $RUN_E2E_TESTS"
 
 cargo test $FLAGS
-cargo test $FLAGS -- --ignored
 
 if (( $RUN_E2E_TESTS )); then
 	cargo run --bin test-runner --features testing
 else
 	echo "skipping e2e tests for platform $DETECTED_OS"
 fi
+
+cargo test $FLAGS -- --ignored
