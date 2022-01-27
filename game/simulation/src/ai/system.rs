@@ -287,11 +287,10 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
 
                             let end = best.len().min(max_candidates);
                             match best[..end].binary_search_by_key(&score, |(_, f)| *f) {
-                                Ok(_) => unreachable!(), // entity has not been seen before
                                 Err(idx) if idx >= max_candidates => {
                                     // not in top n
                                 }
-                                Err(idx) => {
+                                Err(idx) | Ok(idx) => {
                                     // insert into position, popping the current worst if necessary
                                     if best.len() == max_candidates {best.pop();}
                                     best.insert(idx, (e, score));

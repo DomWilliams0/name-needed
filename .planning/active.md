@@ -16,3 +16,4 @@
 * [ ] use rust-derivative to avoid manually implementing clone/debug/default etc
 * [X] fix wander and eating (blackboard invalidated?)
 * [ ] when thinking, should reset subactivity status
+* [ ] rebalance weight of proximity-to a build/break job
