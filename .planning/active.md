@@ -11,6 +11,6 @@
 * [X] update all society jobs once per tick
 * [ ] use frame alloc for boxed ai blackboard without lifetime
 * [ ] fix reservation flip-flop
-* [ ] fix break block job terminating early
+* [X] fix break block job terminating early
 * [ ] fix over-gathering of materials when already on the way
 * [ ] use rust-derivative to avoid manually implementing clone/debug/default etc
