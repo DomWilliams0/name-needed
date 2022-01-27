@@ -1,4 +1,5 @@
 use ai::{Considerations, Context, DecisionWeight, Dse};
+use common::*;
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,
@@ -6,7 +7,6 @@ use crate::ai::consideration::{
 };
 use crate::ai::{AiAction, AiContext};
 use crate::item::ItemFilter;
-use common::*;
 
 /// Equips food in inventory and eats it
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -65,21 +65,30 @@ impl Dse<AiContext> for FindLocalFoodDse {
         &self,
         blackboard: &mut <AiContext as Context>::Blackboard,
     ) -> <AiContext as Context>::Action {
-        let (_, found_items) = blackboard
-            .local_area_search_cache
+        let food = blackboard.inventory_search_cache
             .get(&FOOD_FILTER)
-            .expect("local food search succeeded but missing result in cache");
+            .map(|slot| slot.get(blackboard.inventory.expect("inventory expected"), blackboard.world))
+            .or_else(|| {
+                blackboard
+                    .local_area_search_cache
+                    .get(&FOOD_FILTER)
+                    .map(|(_, found_items)| {
+                        let (best_item, item_pos, _, condition) = found_items
+                            .iter()
+                            .max_by_key(|(_, _, distance, condition)| {
+                                // flip distance so closer == higher score
+                                let distance = FOOD_MAX_RADIUS as f32 - distance;
+                                OrderedFloat(condition.value() * distance)
+                            })
+                            .expect("food search is empty");
 
-        let (best_item, item_pos, _, condition) = found_items
-            .iter()
-            .max_by_key(|(_, _, distance, condition)| {
-                // flip distance so closer == higher score
-                let distance = FOOD_MAX_RADIUS as f32 - distance;
-                OrderedFloat(condition.value() * distance)
+                        debug!("chose best item to pick up"; "item" => best_item, "pos" => %item_pos, "condition" => ?condition);
+                        *best_item
+                    })
+
             })
-            .expect("food search is empty");
+        .expect("local food search succeeded but missing result in both inventory and local cache");
 
-        debug!("chose best item to pick up"; "item" => best_item, "pos" => %item_pos, "condition" => ?condition);
-        AiAction::GoEquip(*best_item)
+        AiAction::GoEquip(food)
     }
 }

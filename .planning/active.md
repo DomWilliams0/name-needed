@@ -14,3 +14,5 @@
 * [X] fix break block job terminating early
 * [ ] fix over-gathering of materials when already on the way
 * [ ] use rust-derivative to avoid manually implementing clone/debug/default etc
+* [X] fix wander and eating (blackboard invalidated?)
+* [ ] when thinking, should reset subactivity status
