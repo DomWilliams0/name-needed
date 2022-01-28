@@ -101,7 +101,8 @@ pub trait Dse<C: Context>: DseExt<C> {
             final_score *= evaluated_score;
         }
 
-        final_score * self.weight().multiplier()
+        debug_assert!(final_score <= bonus);
+        final_score
     }
 }
 
