@@ -15,6 +15,6 @@
 * [ ] fix over-gathering of materials when already on the way
 * [ ] use rust-derivative to avoid manually implementing clone/debug/default etc
 * [X] fix wander and eating (blackboard invalidated?)
-* [ ] when thinking, should reset subactivity status
+* [X] when thinking, should reset subactivity status
 * [X] rebalance weight of proximity-to a build/break job
 * [ ] when evaluating a break/build thing in a range, dont always do all blocks in the same order

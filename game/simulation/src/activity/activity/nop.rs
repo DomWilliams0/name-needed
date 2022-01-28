@@ -1,14 +1,18 @@
 use async_trait::async_trait;
 
-use crate::activity::context::{ActivityContext, ActivityResult};
-use crate::activity::Activity;
 use common::*;
 
-const NOP_WARN_THRESHOLD: u32 = 60;
+use crate::activity::context::{ActivityContext, ActivityResult};
+use crate::activity::status::Status;
+use crate::activity::Activity;
 
 /// Thinking
 #[derive(Default, Debug, Display)]
 pub struct NopActivity;
+
+/// Pondering
+#[derive(Display)]
+struct NopStatus;
 
 #[async_trait]
 impl Activity for NopActivity {
@@ -17,13 +21,15 @@ impl Activity for NopActivity {
     }
 
     async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
+        ctx.update_status(NopStatus);
         loop {
-            ctx.wait(NOP_WARN_THRESHOLD).await;
-
-            warn!(
-                "{} has been stuck in nop activity for a while, possible infinite loop",
-                ctx.entity()
-            );
+            ctx.park_indefinitely().await;
         }
+    }
+}
+
+impl Status for NopStatus {
+    fn exertion(&self) -> f32 {
+        0.1
     }
 }
