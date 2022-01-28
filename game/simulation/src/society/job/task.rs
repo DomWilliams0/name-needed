@@ -120,7 +120,7 @@ impl SocietyTask {
     pub fn max_workers(&self) -> NonZeroU16 {
         use SocietyTask::*;
         let n = match self {
-            BreakBlock(_) => 2,
+            BreakBlock(_) => 1,
             Build(_, _) => 1,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
