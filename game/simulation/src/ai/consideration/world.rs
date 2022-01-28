@@ -11,7 +11,7 @@ pub struct BlockTypeMatchesConsideration(pub WorldPosition, pub BlockTypeMatch);
 
 impl Consideration<AiContext> for MyProximityToConsideration {
     fn curve(&self) -> Curve {
-        Curve::SquareRoot(1.02, -1.02, 1.0)
+        Curve::SquareRoot(1.05, -1.05, 1.0)
     }
 
     fn input(&self) -> <AiContext as Context>::Input {
@@ -58,8 +58,8 @@ mod tests {
     fn proximity_consideration() {
         let very_far = dbg!(value(60.0));
         let far = dbg!(value(10.0));
-        let closer = dbg!(value(4.0));
-        let closerrr = dbg!(value(1.5));
+        let closer = dbg!(value(7.0));
+        let closerrr = dbg!(value(3.0));
         let arrived = dbg!(value(0.1));
 
         assert!(very_far <= 0.0);
