@@ -172,6 +172,13 @@ impl<C: Context> Intelligence<C> {
         // score all dses
         let mut context = IntelligenceContext::<C>::new(&mut blackboard, alloc);
         for ((dse, weight), score) in self.all_dses_with_weights().zip(scores.iter_mut()) {
+            if weight < context.best_so_far {
+                trace!("skipping {dse} entirely due to its initial bonus weight being below the best result so far",
+                    dse = dse.name(); "best_so_far" => context.best_so_far);
+                *score = 0.0;
+                continue;
+            }
+
             log_scope!(o!("dse" => dse.name()));
 
             // TODO add momentum to weight to discourage changing mind so often
