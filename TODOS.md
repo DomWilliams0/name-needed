@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (401)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -154,8 +154,7 @@
  * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
    * `/// TODO search society stores as well`
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
- * [game/simulation/src/ai/consideration/world.rs](game/simulation/src/ai/consideration/world.rs) (2)
-   * `// TODO take into account general world/society size? need some scale`
+ * [game/simulation/src/ai/consideration/world.rs](game/simulation/src/ai/consideration/world.rs) (1)
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
  * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
    * `// TODO "I can/want to move" consideration`
