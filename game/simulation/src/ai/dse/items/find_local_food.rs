@@ -1,50 +1,15 @@
 use ai::{Considerations, Context, DecisionWeight, Dse};
 use common::*;
 
-use crate::ai::consideration::{
-    CanUseHeldItemConsideration, FindLocalGradedItemConsideration, HoldingItemConsideration,
-    HungerConsideration,
-};
+use crate::ai::consideration::{FindLocalGradedItemConsideration, HungerConsideration};
 use crate::ai::{AiAction, AiContext};
 use crate::item::ItemFilter;
-
-/// Equips food in inventory and eats it
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct EatHeldFoodDse;
-
 /// Finds food nearby to pick up
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct FindLocalFoodDse;
 
 const FOOD_FILTER: ItemFilter = ItemFilter::HasComponent("edible");
 const FOOD_MAX_RADIUS: u32 = 20;
-
-impl Dse<AiContext> for EatHeldFoodDse {
-    fn considerations(&self, out: &mut Considerations<AiContext>) {
-        out.add(HungerConsideration);
-        out.add(HoldingItemConsideration(FOOD_FILTER));
-        out.add(CanUseHeldItemConsideration(FOOD_FILTER));
-    }
-
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::BasicNeeds
-    }
-
-    fn action(
-        &self,
-        blackboard: &mut <AiContext as Context>::Blackboard,
-    ) -> <AiContext as Context>::Action {
-        let slot = blackboard
-            .inventory_search_cache
-            .get(&FOOD_FILTER)
-            .expect("item search succeeded but missing result in cache");
-
-        let inventory = blackboard.inventory.unwrap(); // certainly has an inv by now
-        let food = slot.get(inventory, blackboard.world);
-
-        AiAction::EatHeldItem(food)
-    }
-}
 
 impl Dse<AiContext> for FindLocalFoodDse {
     fn considerations(&self, out: &mut Considerations<AiContext>) {

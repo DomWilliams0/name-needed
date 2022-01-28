@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (402)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -151,24 +151,29 @@
    * `// TODO need to notify society here, as above?`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
- * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
+ * [game/simulation/src/ai/consideration/items/find_local_graded_item.rs](game/simulation/src/ai/consideration/items/find_local_graded_item.rs) (1)
    * `/// TODO search society stores as well`
+ * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
- * [game/simulation/src/ai/consideration/world.rs](game/simulation/src/ai/consideration/world.rs) (2)
+ * [game/simulation/src/ai/consideration/world/my_proximity_to.rs](game/simulation/src/ai/consideration/world/my_proximity_to.rs) (2)
    * `// TODO take into account general world/society size? need some scale`
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
- * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
+ * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (1)
    * `// TODO "I can/want to move" consideration`
- * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
+ * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
    * `// TODO consider distance to source too`
- * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (7)
+ * [game/simulation/src/ai/dse/mod.rs](game/simulation/src/ai/dse/mod.rs) (1)
+   * `// TODO species concept is temporary`
+ * [game/simulation/src/ai/dse/world/break_block.rs](game/simulation/src/ai/dse/world/break_block.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
+ * [game/simulation/src/ai/dse/world/build.rs](game/simulation/src/ai/dse/world/build.rs) (2)
+   * `// TODO wants to work, can work`
+   * `// TODO has tool`
+ * [game/simulation/src/ai/dse/world/gather_materials.rs](game/simulation/src/ai/dse/world/gather_materials.rs) (3)
    * `// TODO check society containers`
    * `// TODO separate HaulTarget to drop nearby/adjacent`
    * `// TODO take the stack size into account too, choose the biggest`
-   * `// TODO wants to work, can work`
-   * `// TODO has tool`
  * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO should include check for n free slots anywhere in inventory (not just hands)`

@@ -1,13 +1,10 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
-use unit::world::{WorldPoint, WorldPosition};
+use unit::world::WorldPoint;
 
-use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiContext, AiInput};
 
 // TODO take into account general world/society size? need some scale
 pub struct MyProximityToConsideration(pub WorldPoint);
-
-pub struct BlockTypeMatchesConsideration(pub WorldPosition, pub BlockTypeMatch);
 
 impl Consideration<AiContext> for MyProximityToConsideration {
     fn curve(&self) -> Curve {
@@ -25,20 +22,6 @@ impl Consideration<AiContext> for MyProximityToConsideration {
             min: 0.25,
             max: MAX_DISTANCE.powi(2),
         }
-    }
-}
-
-impl Consideration<AiContext> for BlockTypeMatchesConsideration {
-    fn curve(&self) -> Curve {
-        Curve::Identity
-    }
-
-    fn input(&self) -> <AiContext as Context>::Input {
-        AiInput::BlockTypeMatches(self.0, self.1)
-    }
-
-    fn parameter(&self) -> ConsiderationParameter {
-        ConsiderationParameter::Nop
     }
 }
 

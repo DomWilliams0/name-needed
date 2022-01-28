@@ -1,31 +1,20 @@
 use crate::activity::{HaulPurpose, HaulSource};
 use crate::ai::consideration::{
-    BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
-    HasExtraHandsForHaulingConsideration, MyProximityToConsideration,
+    FindLocalGradedItemConsideration, HasExtraHandsForHaulingConsideration,
+    MyProximityToConsideration,
 };
 use std::fmt::Debug;
 
-use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiAction, AiContext};
 use crate::build::BuildMaterial;
 use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
-use crate::job::{BuildDetails, SocietyJobHandle};
+use crate::job::SocietyJobHandle;
 use crate::{HaulTarget, ItemStackComponent};
 use ai::{Considerations, Context, DecisionWeight, Dse};
 use common::OrderedFloat;
 
 use unit::world::WorldPosition;
-use world::block::BlockType;
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct BreakBlockDse(pub WorldPosition);
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct BuildDse {
-    pub job: SocietyJobHandle,
-    pub details: BuildDetails,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GatherMaterialsDse {
@@ -33,27 +22,6 @@ pub struct GatherMaterialsDse {
     pub material: BuildMaterial,
     pub job: SocietyJobHandle,
     pub extra_hands_for_haul: u16,
-}
-
-impl Dse<AiContext> for BreakBlockDse {
-    fn considerations(&self, out: &mut Considerations<AiContext>) {
-        // for now, direct distance
-        // TODO calculate path and use length, cache path which can be reused by movement system
-        // TODO has the right tool/is the right tool nearby/close enough in society storage
-        out.add(MyProximityToConsideration(self.0.centred()));
-        out.add(BlockTypeMatchesConsideration(
-            self.0,
-            BlockTypeMatch::IsNot(BlockType::Air),
-        ));
-    }
-
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
-    }
-
-    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
-        AiAction::GoBreakBlock(self.0)
-    }
 }
 
 impl GatherMaterialsDse {
@@ -144,24 +112,5 @@ impl GatherMaterialsDse {
         }
 
         None
-    }
-}
-
-impl Dse<AiContext> for BuildDse {
-    fn considerations(&self, out: &mut Considerations<AiContext>) {
-        // TODO wants to work, can work
-        // TODO has tool
-        out.add(MyProximityToConsideration(self.details.pos.centred()));
-    }
-
-    fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
-    }
-
-    fn action(&self, _blackboard: &mut <AiContext as Context>::Blackboard) -> AiAction {
-        AiAction::GoBuild {
-            job: self.job,
-            details: self.details.clone(),
-        }
     }
 }
