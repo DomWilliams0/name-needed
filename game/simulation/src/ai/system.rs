@@ -7,11 +7,11 @@ use ai::{
     AiBox, DecisionProgress, DecisionSource, Dse, DseSkipper, Intelligence, IntelligentDecision,
     WeightedDse,
 };
-
 use common::*;
 
 use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
+use crate::ai::system::candidates::BestNCandidates;
 use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
 use crate::alloc::FrameAllocator;
 use crate::ecs::*;
@@ -114,10 +114,7 @@ const MAX_DSE_CANDIDATES: usize = 5;
 
 /// State shared between steps
 struct PipelineState {
-    best_society_dse_candidate: HashMap<
-        AiBox<dyn Dse<AiContext>>,
-        ArrayVec<(Entity, OrderedFloat<f32>), MAX_DSE_CANDIDATES>,
-    >,
+    best_society_dse_candidate: HashMap<AiBox<dyn Dse<AiContext>>, BestNCandidates<Entity>>,
 }
 
 /// Step 1: tick all societies to prune finished and cancelled jobs
@@ -275,43 +272,21 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
                         .dse(&choice.source)
                         .expect("source should be valid");
 
-                    let score = OrderedFloat(choice.score);
                     self.0
                         .best_society_dse_candidate
                         .entry(dse.clone_dse()) // TODO frame alloc this
                         .and_modify(|best| {
+                            if best.insert(e, choice.score) {
+                                trace!("new candidate chosen"; "dse" => ?dse.name(), e, "score" => ?choice.score);
+                            }
+                        })
+                        .or_insert_with(|| {
+                            trace!("initial candidate"; "dse" => ?dse.name(), e, "score" => ?choice.score);
                             let max_candidates = (data.society_task
                                 .max_workers()
                                 .get() as usize)
                                 .min(MAX_DSE_CANDIDATES);
-
-                            let end = best.len().min(max_candidates);
-                            match best[..end].binary_search_by_key(&score, |(_, f)| *f) {
-                                Err(idx) if idx >= max_candidates => {
-                                    // not in top n
-                                }
-                                Err(idx) | Ok(idx) => {
-                                    // insert into position, popping the current worst if necessary
-                                    if best.len() == max_candidates {best.pop();}
-                                    best.insert(idx, (e, score));
-                                    trace!("new candidate chosen"; "dse" => ?dse.name(), e, "score" => ?score, "index" => idx);
-                                }
-                            }
-
-                            // ensure sorted
-                            debug_assert_eq!(
-                                &best[..],
-                                &best.iter()
-                                    .copied()
-                                    .sorted_by_key(|(_, f)| *f)
-                                    .collect::<ArrayVec<_, MAX_DSE_CANDIDATES>>()[..]
-                            );
-                        })
-                        .or_insert_with(|| {
-                            trace!("initial candidate"; "dse" => ?dse.name(), e, "score" => ?score);
-                            let mut vec = ArrayVec::new();
-                            vec.push((e, score));
-                            vec
+                            BestNCandidates::new(max_candidates, e, choice.score)
                         });
                 }
             }
@@ -361,7 +336,7 @@ impl<'a> System<'a> for FinaliseChoice<'a> {
                         .get(dse)
                         .expect("society dse should be found");
 
-                    if best_candidates.iter().any(|(candidate, _)| *candidate == e) {
+                    if best_candidates.contains(&e) {
                         // this is one of the best candidates
                         trace!("accepting candidate for society dse"; "source" => ?source, e);
                         ai.intelligence
@@ -500,9 +475,7 @@ impl DseSkipper<AiContext> for (&'_ FinaliseChoice<'_>, Entity) {
             };
 
             // dont skip if we're a candidate
-            !best_candidates
-                .iter()
-                .any(|(candidate, _)| me == *candidate)
+            !best_candidates.contains(&me)
         } else {
             // dont skip non-societal dses
             false
@@ -582,3 +555,133 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
 }
 
 register_component_template!("intelligence", IntelligenceComponentTemplate);
+
+mod candidates {
+    use super::*;
+
+    pub struct BestNCandidates<C> {
+        vec: ArrayVec<(C, OrderedFloat<f32>), MAX_DSE_CANDIDATES>,
+        max_candidates: usize,
+    }
+
+    impl<C: PartialEq> BestNCandidates<C> {
+        /// Panics if max_candidates is greater than [MAX_DSE_CANDIDATES] or is 0
+        pub fn new(max_candidates: usize, candidate: C, score: f32) -> Self {
+            assert!((1..=MAX_DSE_CANDIDATES).contains(&max_candidates));
+            let mut vec = ArrayVec::new();
+            vec.push((candidate, OrderedFloat(score)));
+            Self {
+                vec,
+                max_candidates,
+            }
+        }
+
+        /// Returns false if not entered
+        pub fn insert(&mut self, candidate: C, score: f32) -> bool {
+            let end = self.vec.len().min(self.max_candidates);
+            let insert_idx =
+                match self.vec[..end].binary_search_by_key(&OrderedFloat(score), |(_, f)| *f) {
+                    Ok(idx) | Err(idx) => idx,
+                };
+
+            let full = end == self.max_candidates;
+
+            enum Operation {
+                DontAdd,
+                ReplaceBest,
+                Insert,
+            }
+
+            let mut op = Operation::DontAdd;
+
+            if full {
+                // full, only insert if this one is better
+                if insert_idx == end {
+                    op = Operation::ReplaceBest;
+                }
+            } else {
+                // not full, only insert if not the worst
+                if insert_idx != 0 {
+                    op = Operation::Insert;
+                }
+            }
+
+            let ret = match op {
+                Operation::DontAdd => false,
+                Operation::ReplaceBest => {
+                    self.vec.remove(0);
+                    self.vec.push((candidate, OrderedFloat(score)));
+                    true
+                }
+                Operation::Insert => {
+                    self.vec
+                        .insert(insert_idx, (candidate, OrderedFloat(score)));
+                    true
+                }
+            };
+
+            if cfg!(debug_assertions) {
+                let sorted = self
+                    .vec
+                    .iter()
+                    .sorted_by_key(|(_, f)| *f)
+                    .map(|(c, _)| c)
+                    .collect_vec();
+
+                for (sorted, (orig, _)) in sorted.into_iter().zip(&self.vec) {
+                    if sorted != orig {
+                        unreachable!("not sorted")
+                    }
+                }
+            }
+
+            ret
+        }
+
+        pub fn contains(&self, candidate: &C) -> bool {
+            self.vec.iter().any(|(c, _)| c == candidate)
+        }
+    }
+
+    impl<C: Copy> BestNCandidates<C> {
+        /// Best first
+        #[cfg(test)]
+        pub fn iter_candidates(&self) -> impl Iterator<Item = C> + '_ {
+            self.vec.iter().rev().map(|(c, _)| *c)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn best_candidates() {
+            let max_candidates = 3;
+            let mut candidates = BestNCandidates::new(3, 'a', 0.5);
+
+            assert!(candidates.insert('b', 0.6)); // a better candidate
+            assert_eq!(candidates.iter_candidates().collect_vec(), vec!['b', 'a']);
+
+            assert!(!candidates.insert('c', 0.2)); // a bad candidate that isn't added
+            assert_eq!(candidates.iter_candidates().collect_vec(), vec!['b', 'a']);
+
+            assert!(candidates.insert('d', 0.55)); // an average candidate
+            assert_eq!(
+                candidates.iter_candidates().collect_vec(),
+                vec!['b', 'd', 'a']
+            ); // 0.6, 0.55, 0.5
+
+            // cant add any more average candidates
+            assert!(!candidates.insert('e', 0.52));
+            assert!(!candidates.insert('e', 0.59));
+
+            // pop worst candidate to make room for a really good one
+            assert!(candidates.insert('f', 0.7));
+            assert_eq!(
+                candidates.iter_candidates().collect_vec(),
+                vec!['f', 'b', 'd']
+            ); // 0.7, 0.6, 0.55
+        }
+    }
+}
