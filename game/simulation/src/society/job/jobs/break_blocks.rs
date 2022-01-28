@@ -68,7 +68,6 @@ impl SocietyJobImpl for BreakBlocksJob {
 
 impl Display for BreakBlocksJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        // TODO add display impl for WorldPositionRange
-        write!(f, "Break {} blocks in range {:?}", self.0.count(), self.0)
+        write!(f, "Break {} blocks in range {}", self.0.count(), self.0)
     }
 }
