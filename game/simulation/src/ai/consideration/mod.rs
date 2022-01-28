@@ -1,4 +1,4 @@
-pub use self::world::{BlockTypeMatchesConsideration, MyProximityToConsideration, Proximity};
+pub use self::world::{BlockTypeMatchesConsideration, MyProximityToConsideration};
 pub use items::{
     CanUseHeldItemConsideration, FindLocalGradedItemConsideration,
     HasExtraHandsForHaulingConsideration, HoldingItemConsideration,

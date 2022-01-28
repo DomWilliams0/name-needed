@@ -1,7 +1,5 @@
 use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
-use crate::ai::consideration::{
-    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
-};
+use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
 use crate::ai::{AiAction, AiContext};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
@@ -24,10 +22,7 @@ impl Dse<AiContext> for HaulDse {
             self.extra_hands_needed,
             Some(ItemFilter::SpecificEntity(self.thing)),
         ));
-        out.add(MyProximityToConsideration {
-            target: self.destination,
-            proximity: Proximity::Walkable,
-        });
+        out.add(MyProximityToConsideration(self.destination));
         // TODO consider distance to source too
     }
 

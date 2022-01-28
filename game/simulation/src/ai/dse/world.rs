@@ -1,7 +1,7 @@
 use crate::activity::{HaulPurpose, HaulSource};
 use crate::ai::consideration::{
     BlockTypeMatchesConsideration, FindLocalGradedItemConsideration,
-    HasExtraHandsForHaulingConsideration, MyProximityToConsideration, Proximity,
+    HasExtraHandsForHaulingConsideration, MyProximityToConsideration,
 };
 use std::fmt::Debug;
 
@@ -40,10 +40,7 @@ impl Dse<AiContext> for BreakBlockDse {
         // for now, direct distance
         // TODO calculate path and use length, cache path which can be reused by movement system
         // TODO has the right tool/is the right tool nearby/close enough in society storage
-        out.add(MyProximityToConsideration {
-            target: self.0.centred(),
-            proximity: Proximity::Walkable,
-        });
+        out.add(MyProximityToConsideration(self.0.centred()));
         out.add(BlockTypeMatchesConsideration(
             self.0,
             BlockTypeMatch::IsNot(BlockType::Air),
@@ -71,10 +68,7 @@ impl Dse<AiContext> for GatherMaterialsDse {
             self.extra_hands_for_haul,
             Some(self.filter()),
         ));
-        out.add(MyProximityToConsideration {
-            target: self.target.centred(),
-            proximity: Proximity::Walkable,
-        });
+        out.add(MyProximityToConsideration(self.target.centred()));
         out.add(FindLocalGradedItemConsideration {
             filter: self.filter(),
             max_radius: 20,
@@ -157,10 +151,7 @@ impl Dse<AiContext> for BuildDse {
     fn considerations(&self, out: &mut Considerations<AiContext>) {
         // TODO wants to work, can work
         // TODO has tool
-        out.add(MyProximityToConsideration {
-            target: self.details.pos.centred(),
-            proximity: Proximity::Walkable,
-        });
+        out.add(MyProximityToConsideration(self.details.pos.centred()));
     }
 
     fn weight(&self) -> DecisionWeight {
