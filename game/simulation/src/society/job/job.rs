@@ -207,7 +207,7 @@ impl Display for SocietyJobRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self.0.try_borrow() {
             Err(_) => write!(f, "<locked>)"),
-            Ok(job) => write!(f, "{} ({} tasks)", &job.inner, job.tasks.len()),
+            Ok(job) => Display::fmt(&job.inner, f),
         }
     }
 }
