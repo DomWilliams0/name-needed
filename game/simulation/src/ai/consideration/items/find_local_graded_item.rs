@@ -33,7 +33,7 @@ impl Consideration<AiContext> for FindLocalGradedItemConsideration {
     }
 
     fn input(&self) -> <AiContext as Context>::Input {
-        AiInput::CanFindGradedItems {
+        AiInput::CanFindGradedItemsLocally {
             filter: self.filter,
             max_radius: self.max_radius,
             // a tad arbitrary - assumes the average item condition is 0.25 so 4x range would

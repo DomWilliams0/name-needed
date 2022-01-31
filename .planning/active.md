@@ -18,3 +18,4 @@
 * [X] when thinking, should reset subactivity status
 * [X] rebalance weight of proximity-to a build/break job
 * [ ] when evaluating a break/build thing in a range, dont always do all blocks in the same order
+* [ ] add check for enough hands before considering finding food to pickup

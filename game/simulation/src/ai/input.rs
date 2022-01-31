@@ -28,7 +28,8 @@ pub enum AiInput {
 
     // TODO HasInInventoryGraded - returns number,quality of matches
     // TODO should include check for n free slots anywhere in inventory (not just hands)
-    CanFindGradedItems {
+    /// Does not look in inventory
+    CanFindGradedItemsLocally {
         filter: ItemFilter,
         max_radius: u32,
         max_count: u32,
@@ -64,20 +65,11 @@ impl ai::Input<AiContext> for AiInput {
                     }
                 }
             },
-            AiInput::CanFindGradedItems {
+            AiInput::CanFindGradedItemsLocally {
                 filter,
                 max_radius,
                 max_count,
-            } => {
-                if let Some(inv) = blackboard.inventory {
-                    if search_inventory_with_cache(blackboard, inv, filter).is_some() {
-                        // found in inventory
-                        trace!("matching item found in inventory"; "filter" => ?filter);
-                        return 1.0;
-                    }
-                }
-                search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count)
-            }
+            } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
 
             AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
             AiInput::BlockTypeMatches(pos, bt_match) => {
@@ -320,7 +312,7 @@ impl Display for AiInput {
         match self {
             AiInput::Hunger => write!(f, "Hunger"),
             AiInput::HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
-            AiInput::CanFindGradedItems {
+            AiInput::CanFindGradedItemsLocally {
                 filter,
                 max_radius,
                 max_count,
