@@ -1,8 +1,11 @@
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use ai::{Considerations, DecisionWeight, Dse, TargetOutput, Targets};
 use common::*;
 
-use crate::ai::consideration::{FindLocalGradedItemConsideration, HungerConsideration};
-use crate::ai::{AiAction, AiContext};
+use crate::ai::consideration::{
+    HasFreeHandsToHoldTargetConsideration, HungerConsideration, MyProximityToConsideration,
+    MyProximityToTargetConsideration,
+};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::item::ItemFilter;
 /// Finds food nearby to pick up
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -14,38 +17,30 @@ const FOOD_MAX_RADIUS: u32 = 20;
 impl Dse<AiContext> for FindLocalFoodDse {
     fn considerations(&self, out: &mut Considerations<AiContext>) {
         out.add(HungerConsideration);
+        out.add(MyProximityToTargetConsideration);
+        out.add(HasFreeHandsToHoldTargetConsideration);
         // TODO "I can/want to move" consideration
-        out.add(FindLocalGradedItemConsideration {
-            filter: FOOD_FILTER,
-            max_radius: FOOD_MAX_RADIUS,
-            normalize_range: 2.0, // 2 perfect food nearby is enough for a 1
-        });
     }
 
     fn weight(&self) -> DecisionWeight {
         DecisionWeight::Normal
     }
 
-    fn action(
+    fn target(
         &self,
-        blackboard: &mut <AiContext as Context>::Blackboard,
-    ) -> <AiContext as Context>::Action {
-        let (_, found_items) = blackboard
-            .local_area_search_cache
-            .get(&FOOD_FILTER)
-            .expect("local food search succeeded but missing result in search cache");
+        targets: &mut Targets<AiContext>,
+        blackboard: &mut AiBlackboard,
+    ) -> TargetOutput {
+        blackboard.search_local_entities(FOOD_FILTER, FOOD_MAX_RADIUS as f32, 10, |item| {
+            targets.add(AiTarget::Entity(item.entity));
+            true
+        });
 
-        let (best_item, item_pos, _, condition) = found_items
-            .iter()
-            .max_by_key(|(_, _, distance, condition)| {
-                // flip distance so closer == higher score
-                let distance = FOOD_MAX_RADIUS as f32 - distance;
-                OrderedFloat(condition.value() * distance)
-            })
-            .expect("food search is empty");
+        TargetOutput::TargetsCollected
+    }
 
-        debug!("chose best item to pick up"; "item" => best_item, "pos" => %item_pos, "condition" => ?condition);
-
-        AiAction::GoEquip(*best_item)
+    fn action(&self, _: &mut AiBlackboard, target: Option<AiTarget>) -> AiAction {
+        let target = target.and_then(|t| t.entity()).expect("bad target");
+        AiAction::GoEquip(target)
     }
 }

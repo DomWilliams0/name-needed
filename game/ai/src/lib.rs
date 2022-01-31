@@ -2,7 +2,7 @@
 
 pub use consideration::{Consideration, ConsiderationParameter, Considerations, Curve};
 pub use context::{AiBox, Blackboard, Context, Input};
-pub use decision::{DecisionWeight, Dse, WeightedDse};
+pub use decision::{DecisionWeight, Dse, TargetOutput, Targets, WeightedDse};
 pub use intelligence::{
     DecisionProgress, DecisionSource, DseSkipper, InitialChoice, InputCache, Intelligence,
     IntelligentDecision, Smarts,
@@ -22,6 +22,7 @@ mod test_utils {
         Nop,
         Eat,
         CancelExistence,
+        Attack(u32),
     }
 
     impl Default for TestAction {
@@ -37,22 +38,35 @@ mod test_utils {
         One,
         /// out of 100
         Constant(u32),
+        IsTargetFive,
     }
 
     impl Input<TestContext> for TestInput {
-        fn get(&self, blackboard: &mut <TestContext as Context>::Blackboard) -> f32 {
+        fn get(
+            &self,
+            blackboard: &mut <TestContext as Context>::Blackboard,
+            target: Option<&u32>,
+        ) -> f32 {
             match self {
                 TestInput::MyHunger => blackboard.my_hunger,
                 TestInput::DoAnythingElse => 0.001,
                 TestInput::One => 1.0,
                 TestInput::Constant(c) => (*c as f32) / 100.0,
+                TestInput::IsTargetFive => {
+                    if target.copied() == Some(5) {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
             }
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     pub struct TestBlackboard {
         pub my_hunger: f32,
+        pub targets: Vec<u32>,
     }
 
     impl Blackboard for TestBlackboard {
@@ -71,6 +85,7 @@ mod test_utils {
         type Action = TestAction;
         type AdditionalDseId = u32;
         type StreamDseExtraData = ();
+        type DseTarget = u32;
     }
 
     pub struct MyHungerConsideration;
@@ -153,12 +168,12 @@ mod test_utils {
             DecisionWeight::Normal
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(
+            &self,
+            blackboard: &mut TestBlackboard,
+            target: Option<u32>,
+        ) -> TestAction {
             TestAction::Eat
-        }
-
-        fn name(&self) -> &'static str {
-            "Eat"
         }
     }
 
@@ -174,12 +189,12 @@ mod test_utils {
             DecisionWeight::Emergency
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(
+            &self,
+            blackboard: &mut TestBlackboard,
+            target: Option<u32>,
+        ) -> TestAction {
             TestAction::CancelExistence
-        }
-
-        fn name(&self) -> &'static str {
-            "Bad"
         }
     }
 
@@ -195,12 +210,12 @@ mod test_utils {
             DecisionWeight::AbsoluteOverride
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(
+            &self,
+            blackboard: &mut TestBlackboard,
+            target: Option<u32>,
+        ) -> TestAction {
             TestAction::CancelExistence // sorry
-        }
-
-        fn name(&self) -> &'static str {
-            "Emergency"
         }
     }
 }

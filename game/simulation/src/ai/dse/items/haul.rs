@@ -1,9 +1,9 @@
 use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
-use crate::ai::{AiAction, AiContext};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::ecs::Entity;
 use crate::item::ItemFilter;
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use ai::{Considerations, DecisionWeight, Dse};
 use unit::world::WorldPoint;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -30,7 +30,7 @@ impl Dse<AiContext> for HaulDse {
         DecisionWeight::Normal
     }
 
-    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
+    fn action(&self, _: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         let (src, tgt) = self.src_tgt;
         AiAction::Haul(self.thing, src, tgt, HaulPurpose::JustBecause)
     }

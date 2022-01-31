@@ -7,10 +7,11 @@ pub trait Context: Sized + 'static {
     type Action: Default + Eq + Clone;
     type AdditionalDseId: Hash + Eq + Copy + Debug;
     type StreamDseExtraData: Clone;
+    type DseTarget: PartialEq + Clone + Debug;
 }
 
 pub trait Input<C: Context>: Hash + Clone + Eq {
-    fn get(&self, blackboard: &mut C::Blackboard) -> f32;
+    fn get(&self, blackboard: &mut C::Blackboard, target: Option<&C::DseTarget>) -> f32;
 }
 
 pub trait Blackboard: Clone {

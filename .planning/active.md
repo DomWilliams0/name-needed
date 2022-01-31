@@ -18,4 +18,13 @@
 * [X] when thinking, should reset subactivity status
 * [X] rebalance weight of proximity-to a build/break job
 * [ ] when evaluating a break/build thing in a range, dont always do all blocks in the same order
-* [ ] add check for enough hands before considering finding food to pickup
+* [o] add check for enough hands before considering finding food to pickup
+* [X] remove AiBox from best candidate choosing
+* [ ] improve WorldPosition/WorldPoint debug impls to be same as display
+* [X] add support for targets to dses
+*   * [.] port food and item gathering to use this
+* [ ] lazily calculate targets for dses? or easier: specific filter for when the dse is impossible
+    regardless of targets
+        * when finding food nearby, the possible targets should only be evaluated if hungry, which
+        is the first consideration (returns 0.0 if not hungry). but currently all local food will be
+        searched for and expanded into targeted dses regardless of hunger level.

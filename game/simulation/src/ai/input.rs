@@ -1,15 +1,21 @@
-use crate::{ConditionComponent, ContainedInComponent, SocietyHandle, WorldRef};
+use std::collections::hash_map::Entry;
+
 use ai::Context;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
+use world::block::BlockType;
 
-use crate::ai::{AiBlackboard, AiContext, SharedBlackboard};
+use crate::ai::{AiBlackboard, AiContext, AiTarget, SharedBlackboard};
 use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
-use crate::item::{FoundSlot, HauledItemComponent, InventoryComponent, ItemFilter, ItemFilterable};
+use crate::item::{
+    FoundSlot, HaulableItemComponent, HauledItemComponent, InventoryComponent, ItemFilter,
+    ItemFilterable,
+};
 use crate::spatial::{Spatial, Transforms};
-use std::collections::hash_map::Entry;
-use world::block::BlockType;
+use crate::{
+    ConditionComponent, ContainedInComponent, SocietyHandle, TransformComponent, WorldRef,
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
@@ -22,6 +28,9 @@ pub enum AiInput {
     /// Has n extra hands available for hauling the given entity. 1 if already hauling one matching
     /// the filter
     HasExtraHandsForHauling(u16, Option<ItemFilter>),
+
+    /// 1.0=has enough hands free to hold/haul/equip target entity
+    HasFreeHandsToHoldTarget,
 
     /// Switch, 0=item is unusable e.g. being hauled, 1=usable immediately
     CanUseHeldItem(ItemFilter),
@@ -40,6 +49,9 @@ pub enum AiInput {
     /// Distance squared to given pos
     MyDistance2To(WorldPoint),
 
+    /// Distance squared to target entity/position, f32::MAX on error
+    MyDistance2ToTarget,
+
     BlockTypeMatches(WorldPosition, BlockTypeMatch),
 }
 
@@ -50,7 +62,11 @@ pub enum BlockTypeMatch {
 }
 
 impl ai::Input<AiContext> for AiInput {
-    fn get(&self, blackboard: &mut <AiContext as Context>::Blackboard) -> f32 {
+    fn get(
+        &self,
+        blackboard: &mut <AiContext as Context>::Blackboard,
+        target: Option<&AiTarget>,
+    ) -> f32 {
         match self {
             // "full up" if not applicable
             AiInput::Hunger => blackboard.hunger.map(Into::into).unwrap_or(1.0),
@@ -71,7 +87,10 @@ impl ai::Input<AiContext> for AiInput {
                 max_count,
             } => search_local_area_with_cache_graded(blackboard, filter, *max_radius, *max_count),
 
-            AiInput::MyDistance2To(pos) => blackboard.position.distance2(*pos),
+            AiInput::MyDistance2To(pos) => blackboard.transform.position.distance2(*pos),
+            AiInput::MyDistance2ToTarget => {
+                distance_to_target(blackboard, target).unwrap_or(f32::MAX)
+            }
             AiInput::BlockTypeMatches(pos, bt_match) => {
                 let world = blackboard.world.voxel_world();
                 let block_type = world
@@ -127,8 +146,50 @@ impl ai::Input<AiContext> for AiInput {
                     None => 0.0,
                 }
             }
+            AiInput::HasFreeHandsToHoldTarget => {
+                has_free_hands_to_hold_target(blackboard, target).unwrap_or(0.0)
+            }
         }
     }
+}
+
+fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) -> Option<f32> {
+    let target_pos = match target {
+        Some(AiTarget::Entity(e)) => {
+            let pos = blackboard
+                .world
+                .component::<TransformComponent>(*e)
+                .ok()
+                .map(|pos| pos.position)?;
+
+            pos
+        }
+        Some(AiTarget::Point(pos)) => *pos,
+        Some(AiTarget::Block(block)) => block.centred(),
+        _ => return None,
+    };
+
+    Some(target_pos.distance2(blackboard.transform.position))
+}
+
+fn has_free_hands_to_hold_target(
+    blackboard: &mut AiBlackboard,
+    target: Option<&AiTarget>,
+) -> Option<f32> {
+    let target = target.and_then(|t| t.entity())?;
+    let inv = blackboard.inventory?;
+
+    let extra_hands = blackboard
+        .world
+        .component::<HaulableItemComponent>(target)
+        .ok()
+        .map(|comp| comp.extra_hands)?;
+
+    Some(if inv.has_hauling_slots(extra_hands) {
+        1.0
+    } else {
+        0.0
+    })
 }
 
 fn search_inventory_with_cache<'a>(
@@ -163,7 +224,7 @@ fn search_local_area_with_cache_graded(
             let mut results = Vec::new();
             search_local_area(
                 blackboard.society,
-                blackboard.accessible_position,
+                blackboard.transform.accessible_position(),
                 blackboard.world,
                 &mut *blackboard.shared.borrow_mut(),
                 filter,
@@ -189,7 +250,7 @@ fn search_local_area_with_cache_graded(
                 results_mut.clear();
                 search_local_area(
                     blackboard.society,
-                    blackboard.accessible_position,
+                    blackboard.transform.accessible_position(),
                     blackboard.world,
                     &mut *blackboard.shared.borrow_mut(),
                     filter,
@@ -223,6 +284,7 @@ fn search_local_area_with_cache_graded(
     }
 }
 
+#[deprecated]
 fn search_local_area(
     my_society: Option<SocietyHandle>,
     self_position: WorldPosition,
@@ -324,6 +386,7 @@ impl Display for AiInput {
             AiInput::Constant(_) => write!(f, "Constant"),
 
             AiInput::MyDistance2To(pos) => write!(f, "Distance to {}", pos),
+            AiInput::MyDistance2ToTarget => write!(f, "Distance to target"),
 
             // TODO lowercase BlockType
             AiInput::BlockTypeMatches(pos, bt_match) => write!(f, "{} at {}", bt_match, pos),
@@ -331,6 +394,7 @@ impl Display for AiInput {
                 write!(f, "Has {} extra hands for hauling", n)
             }
             AiInput::CanUseHeldItem(filter) => write!(f, "Can use held item matching {}", filter),
+            AiInput::HasFreeHandsToHoldTarget => write!(f, "Has free hands to hold target entity"),
         }
     }
 }

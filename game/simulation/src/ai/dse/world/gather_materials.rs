@@ -5,7 +5,7 @@ use crate::ai::consideration::{
 };
 use std::fmt::Debug;
 
-use crate::ai::{AiAction, AiContext};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::build::BuildMaterial;
 use crate::ecs::*;
 use crate::item::{ItemFilter, ItemFilterable};
@@ -49,10 +49,7 @@ impl Dse<AiContext> for GatherMaterialsDse {
         DecisionWeight::Normal
     }
 
-    fn action(
-        &self,
-        blackboard: &mut <AiContext as Context>::Blackboard,
-    ) -> <AiContext as Context>::Action {
+    fn action(&self, blackboard: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         // if we are already hauling a matching item, choose that
 
         if let Some((best_item, source)) = self.choose_best_item(blackboard) {
@@ -74,10 +71,7 @@ impl Dse<AiContext> for GatherMaterialsDse {
 }
 
 impl GatherMaterialsDse {
-    fn choose_best_item(
-        &self,
-        blackboard: &<AiContext as Context>::Blackboard,
-    ) -> Option<(Entity, HaulSource)> {
+    fn choose_best_item(&self, blackboard: &AiBlackboard) -> Option<(Entity, HaulSource)> {
         let filter = self.filter();
         if let AiAction::Haul(haulee, source, ..) = blackboard.ai.last_action() {
             if (*haulee, Some(blackboard.world)).matches(filter) {

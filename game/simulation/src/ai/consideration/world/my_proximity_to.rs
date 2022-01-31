@@ -4,6 +4,7 @@ use unit::world::WorldPoint;
 use crate::ai::{AiContext, AiInput};
 
 // TODO take into account general world/society size? need some scale
+#[deprecated]
 pub struct MyProximityToConsideration(pub WorldPoint);
 
 impl Consideration<AiContext> for MyProximityToConsideration {

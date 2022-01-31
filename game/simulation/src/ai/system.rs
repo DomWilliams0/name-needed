@@ -12,7 +12,7 @@ use common::*;
 use crate::activity::ActivityComponent;
 use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::system::candidates::BestNCandidates;
-use crate::ai::{AiAction, AiBlackboard, AiContext, SharedBlackboard};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget, SharedBlackboard};
 use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
@@ -114,7 +114,13 @@ const MAX_DSE_CANDIDATES: usize = 5;
 
 /// State shared between steps
 struct PipelineState {
-    best_society_dse_candidate: HashMap<AiBox<dyn Dse<AiContext>>, BestNCandidates<Entity>>,
+    best_society_dse_candidate: HashMap<DseCandidateKey<'static>, BestNCandidates<Entity>>,
+}
+
+#[derive(Hash, Eq, PartialEq)]
+struct DseCandidateKey<'a> {
+    dse: &'a dyn Dse<AiContext>,
+    target: Option<AiTarget>,
 }
 
 /// Step 1: tick all societies to prune finished and cancelled jobs
@@ -267,14 +273,23 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
 
                 if let DecisionSource::Stream(_, data) = &choice.source {
                     // track top few best candidates for society jobs
-                    let dse = ai
-                        .intelligence
-                        .dse(&choice.source)
-                        .expect("source should be valid");
+                    let dse = choice.dse;
+                    let key = {
+                        let key = DseCandidateKey {
+                            dse,
+                            target: choice.target.clone(),
+                        };
+
+                        // safety: only used in this system in this tick
+                        unsafe {
+                            std::mem::transmute::<DseCandidateKey, DseCandidateKey<'static>>(key)
+                        }
+                    };
 
                     self.0
                         .best_society_dse_candidate
-                        .entry(dse.clone_dse()) // TODO frame alloc this
+                        // TODO use bump reference as hashmap key, with no cloning or boxing
+                        .entry(key)
                         .and_modify(|best| {
                             if best.insert(e, choice.score) {
                                 trace!("new candidate chosen"; "dse" => ?dse.name(), e, "score" => ?choice.score);
@@ -313,7 +328,7 @@ impl<'a> System<'a> for FinaliseChoice<'a> {
             let ai = ai_ref.get_mut_unchecked();
             let progress = ai
                 .intelligence
-                .decision_in_progress()
+                .take_decision_in_progress()
                 .expect("decision should be in progress");
 
             let mut denied = false;
@@ -321,47 +336,50 @@ impl<'a> System<'a> for FinaliseChoice<'a> {
             match progress {
                 DecisionProgress::NoChoice => {}
                 DecisionProgress::InitialChoice {
-                    source: source @ DecisionSource::Stream(_, _),
                     blackboard,
+                    candidate,
+                    dses,
                     ..
                 } => {
-                    // only accept the best candidates for the society dse
-                    let dse = ai
-                        .intelligence
-                        .dse(&source)
-                        .expect("source should be valid");
-                    let best_candidates = self
-                        .0
-                        .best_society_dse_candidate
-                        .get(dse)
-                        .expect("society dse should be found");
+                    let (dse, target, source) = dses
+                        .resolve_dse(candidate, &ai.intelligence)
+                        .expect("candidate should be valid");
 
-                    if best_candidates.contains(&e) {
-                        // this is one of the best candidates
-                        trace!("accepting candidate for society dse"; "source" => ?source, e);
-                        ai.intelligence
-                            .update_decision_in_progress(DecisionProgress::Decided {
-                                source,
-                                blackboard,
-                            });
+                    if let DecisionSource::Stream(_, _) = source {
+                        // only accept the best candidates for the society dse
+                        let best_candidates = self
+                            .0
+                            .best_society_dse_candidate
+                            .get(&DseCandidateKey { dse, target })
+                            .expect("society dse should be found");
+
+                        if best_candidates.contains(&e) {
+                            // this is one of the best candidates
+                            trace!("accepting candidate for society dse"; "source" => ?source, e);
+                        } else {
+                            // need to choose the next best dse
+                            trace!("denied for society job"; "source" => ?source, e);
+                            denied = true;
+                        }
                     } else {
-                        // need to choose the next best dse
-                        trace!("denied for society job"; "source" => ?source, e);
-                        denied = true;
+                        // non-societal choice, accept unconditionally
+                        trace!("accepting non-societal choice"; "source" => ?source, e);
                     }
-                }
-                DecisionProgress::InitialChoice {
-                    source, blackboard, ..
-                } => {
-                    // non-societal choice, accept unconditionally
-                    trace!("accepting non-societal choice"; "source" => ?source, e);
-                    ai.intelligence
-                        .update_decision_in_progress(DecisionProgress::Decided {
-                            source,
+
+                    ai.intelligence.update_decision_in_progress(if denied {
+                        DecisionProgress::InitialChoiceDenied { dses, blackboard }
+                    } else {
+                        DecisionProgress::Decided {
+                            dses,
+                            candidate,
                             blackboard,
-                        });
+                        }
+                    });
                 }
-                DecisionProgress::Decided { .. } => {
+
+                DecisionProgress::TakenWhileInProgress
+                | DecisionProgress::InitialChoiceDenied { .. }
+                | DecisionProgress::Decided { .. } => {
                     unreachable!() // not used yet
                 }
             }
@@ -406,8 +424,12 @@ impl<'a> System<'a> for ConsumeDecision {
             let decision = ai.intelligence.consume_decision();
 
             let (src, action) = match decision {
-                IntelligentDecision::New { src, action, dse } => {
-                    debug!("new activity chosen"; "dse" => dse.name(), "source" => ?src, e);
+                IntelligentDecision::New {
+                    src,
+                    action,
+                    dse_name,
+                } => {
+                    debug!("new activity chosen"; "dse" => dse_name, "source" => ?src, e);
                     (Some(src), action)
                 }
                 IntelligentDecision::Undecided => {
@@ -464,12 +486,21 @@ impl<'a> System<'a> for ConsumeDecision {
 }
 
 impl DseSkipper<AiContext> for (&'_ FinaliseChoice<'_>, Entity) {
-    fn should_skip(&self, dse: &dyn Dse<AiContext>, src: &DecisionSource<AiContext>) -> bool {
+    fn should_skip(
+        &self,
+        dse: &dyn Dse<AiContext>,
+        target: Option<&AiTarget>,
+        src: &DecisionSource<AiContext>,
+    ) -> bool {
         let (system, me) = *self;
         let system_state = &system.0;
 
         if let DecisionSource::Stream(_, _) = src {
-            let best_candidates = match system_state.best_society_dse_candidate.get(dse) {
+            let key = DseCandidateKey {
+                dse,
+                target: target.cloned(),
+            };
+            let best_candidates = match system_state.best_society_dse_candidate.get(&key) {
                 Some(vec) => vec,
                 None => return false,
             };

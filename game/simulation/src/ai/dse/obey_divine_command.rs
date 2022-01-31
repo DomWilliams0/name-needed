@@ -1,6 +1,6 @@
 use crate::ai::consideration::ConstantConsideration;
-use crate::ai::{AiAction, AiContext};
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
+use ai::{Considerations, DecisionWeight, Dse};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ObeyDivineCommandDse(pub AiAction);
@@ -14,7 +14,7 @@ impl Dse<AiContext> for ObeyDivineCommandDse {
         DecisionWeight::AbsoluteOverride
     }
 
-    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
+    fn action(&self, _: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         self.0.clone()
     }
 }

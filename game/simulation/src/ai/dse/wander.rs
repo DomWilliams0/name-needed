@@ -1,7 +1,7 @@
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use ai::{Considerations, DecisionWeight, Dse};
 
 use crate::ai::consideration::ConstantConsideration;
-use crate::ai::{AiAction, AiContext};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct WanderDse;
@@ -15,7 +15,7 @@ impl Dse<AiContext> for WanderDse {
         DecisionWeight::Idle
     }
 
-    fn action(&self, _: &mut <AiContext as Context>::Blackboard) -> <AiContext as Context>::Action {
+    fn action(&self, _: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         AiAction::Wander
     }
 }

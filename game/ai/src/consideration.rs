@@ -6,6 +6,7 @@ use crate::context::pretty_type_name;
 use crate::intelligence::InputCache;
 use crate::Context;
 
+#[derive(Clone, Copy)]
 pub enum ConsiderationParameter {
     /// Already normalized
     Nop,
@@ -22,9 +23,10 @@ pub trait Consideration<C: Context> {
     fn consider(
         &self,
         blackboard: &mut C::Blackboard,
+        target: Option<&C::DseTarget>,
         input_cache: &mut InputCache<C>,
     ) -> NormalizedFloat {
-        let input = input_cache.get(self.input(), blackboard);
+        let input = input_cache.get(self.input(), blackboard, target);
         self.consider_input(input)
     }
 
@@ -59,7 +61,7 @@ impl ConsiderationParameter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Curve {
     /// x
     Identity,
@@ -120,6 +122,10 @@ impl<'a, C: Context> Considerations<'a, C> {
 
     pub fn into_vec(self) -> BumpVec<'a, &'a dyn Consideration<C>> {
         self.vec
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = &'a dyn Consideration<C>> + '_ {
+        self.vec.drain(..)
     }
 }
 

@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -9,13 +9,12 @@
    * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
    * `// TODO cow type for dse (aibox, framealloc, borrowed)`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (7)
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (6)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
-   * `// TODO framealloc this, with helper type to assert same tick i.e. still populated`
    * `// TODO use an arena-allocator hashmap`
    * `// TODO perfect hash on C::Input`
-   * `// TODO add momentum to weight to discourage changing mind so often`
+   * `// TODO add momentum to initial weight to discourage changing mind so often`
    * `// TODO reuse allocation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
@@ -158,6 +157,11 @@
  * [game/simulation/src/ai/consideration/world/my_proximity_to.rs](game/simulation/src/ai/consideration/world/my_proximity_to.rs) (2)
    * `// TODO take into account general world/society size? need some scale`
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
+ * [game/simulation/src/ai/consideration/world/my_proximity_to_target.rs](game/simulation/src/ai/consideration/world/my_proximity_to_target.rs) (2)
+   * `// TODO take into account general world/society size? need some scale`
+   * `// TODO take mobility into account, e.g. more injured = prefer closer`
+ * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (1)
+   * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
  * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (1)
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
@@ -180,13 +184,11 @@
    * `// TODO old results are a subset of new results, should reuse`
    * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
- * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
-   * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
  * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO bump alloc this`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
-   * `.entry(dse.clone_dse()) // TODO frame alloc this`
+   * `// TODO use bump reference as hashmap key, with no cloning or boxing`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`

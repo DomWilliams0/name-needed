@@ -6,7 +6,7 @@ use common::*;
 
 use crate::consideration::Considerations;
 use crate::context::pretty_type_name;
-use crate::intelligence::IntelligenceContext;
+
 use crate::{AiBox, Context};
 
 #[derive(Copy, Clone, Debug)]
@@ -31,10 +31,24 @@ pub struct WeightedDse<C: Context> {
     multiplier: f32,
 }
 
+/// For emitting targets in a DSE
+pub struct Targets<'a, C: Context>(BumpVec<'a, C::DseTarget>);
+
+pub enum TargetOutput {
+    Untargeted,
+    TargetsCollected,
+}
+
 pub trait Dse<C: Context>: DseExt<C> {
     fn considerations(&self, out: &mut Considerations<C>);
     fn weight(&self) -> DecisionWeight;
-    fn action(&self, blackboard: &mut C::Blackboard) -> C::Action;
+
+    #[allow(unused_variables)]
+    fn target(&self, targets: &mut Targets<C>, blackboard: &mut C::Blackboard) -> TargetOutput {
+        TargetOutput::Untargeted
+    }
+
+    fn action(&self, blackboard: &mut C::Blackboard, target: Option<C::DseTarget>) -> C::Action;
 
     fn name(&self) -> &'static str {
         let name = pretty_type_name(std::any::type_name::<Self>());
@@ -43,66 +57,6 @@ pub trait Dse<C: Context>: DseExt<C> {
 
     fn as_debug(&self) -> Option<&dyn Debug> {
         None
-    }
-
-    fn score(&self, context: &mut IntelligenceContext<C>, bonus: f32) -> f32 {
-        // starts as the maximum possible score (i.e. all considerations are 1.0)
-        let mut final_score = bonus;
-
-        let considerations = {
-            let mut considerations = Considerations::new(context.alloc);
-            self.considerations(&mut considerations);
-            considerations.into_vec()
-        };
-
-        let modification_factor = 1.0 - (1.0 / considerations.len() as f32);
-        for c in considerations {
-            if final_score < context.best_so_far {
-                trace!("skipping {dse} due to falling below best result found so far", dse = self.name();
-                       "current_score" => final_score, "best_so_far" => context.best_so_far);
-                return final_score;
-            }
-
-            let score = c
-                .consider(context.blackboard, &mut context.input_cache)
-                .value();
-
-            // compensation factor balances overall drop when multiplying multiple floats by
-            // taking into account the number of considerations
-            let make_up_value = (1.0 - score) * modification_factor;
-            let compensated_score = score + (make_up_value * score);
-            debug_assert!(compensated_score <= 1.0);
-
-            let evaluated_score = c
-                .curve()
-                .evaluate(NormalizedFloat::new(compensated_score))
-                .value();
-
-            trace!("consideration scored {score}", score = evaluated_score; "consideration" => c.name(), "raw" => score);
-
-            #[cfg(feature = "logging")]
-            {
-                use crate::Blackboard;
-                c.log_metric(&blackboard.entity(), evaluated_score);
-            }
-
-            debug_assert!(
-                (0.0..=1.0).contains(&evaluated_score),
-                "evaluated score {} out of range",
-                evaluated_score
-            );
-
-            if evaluated_score <= 0.0 {
-                // will never financially recover from this
-                final_score = 0.0;
-                break;
-            }
-
-            final_score *= evaluated_score;
-        }
-
-        debug_assert!(final_score <= bonus);
-        final_score
     }
 }
 
@@ -199,29 +153,40 @@ impl<C: Context> WeightedDse<C> {
         &*self.dse
     }
 
+    pub fn multiplier(&self) -> f32 {
+        self.multiplier
+    }
+
     pub fn weight(&self) -> f32 {
         self.dse.weight().multiplier() * self.multiplier
     }
 }
 
+impl<'a, C: Context> Targets<'a, C> {
+    pub fn new(alloc: &'a Bump) -> Self {
+        Self(BumpVec::new_in(alloc))
+    }
+
+    pub fn add(&mut self, target: C::DseTarget) {
+        debug_assert!(!self.0.contains(&target), "duplicate target");
+        self.0.push(target);
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = C::DseTarget> + '_ {
+        self.0.drain(..)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::intelligence::IntelligenceContext;
-    use crate::test_utils::*;
-    use crate::*;
-    use common::bumpalo::Bump;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
-    #[test]
-    fn score() {
-        let mut blackboard = TestBlackboard { my_hunger: 0.5 };
-        let alloc = Bump::new();
-        let mut ctx = IntelligenceContext::new(&mut blackboard, &alloc);
+    use common::bumpalo::Bump;
 
-        assert!(EatDse.score(&mut ctx, 1.0) > 0.9);
-        assert!(BadDse.score(&mut ctx, 1.0) < 0.1);
-    }
+    use crate::intelligence::{DseToScore, IntelligenceContext, RealisedDses};
+    use crate::test_utils::*;
+    use crate::*;
 
     macro_rules! impl_dse {
         ($ty:ty) => {
@@ -234,7 +199,7 @@ mod tests {
                     unreachable!()
                 }
 
-                fn action(&self, _: &mut TestBlackboard) -> TestAction {
+                fn action(&self, _: &mut TestBlackboard, _: Option<u32>) -> TestAction {
                     unreachable!()
                 }
             }

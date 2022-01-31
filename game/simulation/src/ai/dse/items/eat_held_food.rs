@@ -1,10 +1,10 @@
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use ai::{Considerations, DecisionWeight, Dse};
 use common::*;
 
 use crate::ai::consideration::{
     CanUseHeldItemConsideration, HoldingItemConsideration, HungerConsideration,
 };
-use crate::ai::{AiAction, AiContext};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::item::ItemFilter;
 
 /// Equips food in inventory and eats it
@@ -24,10 +24,7 @@ impl Dse<AiContext> for EatHeldFoodDse {
         DecisionWeight::BasicNeeds
     }
 
-    fn action(
-        &self,
-        blackboard: &mut <AiContext as Context>::Blackboard,
-    ) -> <AiContext as Context>::Action {
+    fn action(&self, blackboard: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         let slot = blackboard
             .inventory_search_cache
             .get(&FOOD_FILTER)

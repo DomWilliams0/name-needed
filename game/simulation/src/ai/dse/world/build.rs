@@ -1,10 +1,10 @@
 use crate::ai::consideration::MyProximityToConsideration;
 
-use crate::ai::{AiAction, AiContext};
+use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 
 use crate::job::{BuildDetails, SocietyJobHandle};
 
-use ai::{Considerations, Context, DecisionWeight, Dse};
+use ai::{Considerations, DecisionWeight, Dse};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BuildDse {
@@ -23,7 +23,7 @@ impl Dse<AiContext> for BuildDse {
         DecisionWeight::Normal
     }
 
-    fn action(&self, _blackboard: &mut <AiContext as Context>::Blackboard) -> AiAction {
+    fn action(&self, _: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {
         AiAction::GoBuild {
             job: self.job,
             details: self.details.clone(),

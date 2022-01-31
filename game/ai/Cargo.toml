@@ -10,6 +10,7 @@ edition = "2018"
 common = { path = "../../shared/common" }
 
 float-ord = "0.2"
+derivative = "2.2"
 
 [features]
 default = []
