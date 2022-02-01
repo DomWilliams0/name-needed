@@ -16,8 +16,7 @@ use crate::job::BuildThingJob;
 use crate::simulation::EcsWorldRef;
 use crate::spatial::Spatial;
 use crate::{
-    ItemStackComponent, PlayerSociety, Societies, SocietyComponent, Tick, TransformComponent,
-    UiElementComponent,
+    ItemStackComponent, PlayerSociety, Societies, SocietyComponent, Tick, UiElementComponent,
 };
 
 // TODO smol string and/or cow and/or pool common strings
@@ -97,7 +96,6 @@ impl<'a> System<'a> for DisplayTextSystem {
         Read<'a, MouseLocation>,
         Read<'a, Societies>,
         Read<'a, EcsWorldRef>,
-        ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, SelectedComponent>,
         ReadStorage<'a, SocietyComponent>,
         ReadStorage<'a, NameComponent>,
@@ -116,7 +114,6 @@ impl<'a> System<'a> for DisplayTextSystem {
             mouse,
             societies,
             world,
-            transforms,
             selected,
             society,
             name,

@@ -9,7 +9,7 @@ use world::WorldArea;
 use crate::ai::dse::AdditionalDse;
 use crate::ai::input::LocalAreaSearch;
 use crate::ai::system::StreamDseData;
-use crate::ai::{AiComponent, AiInput};
+use crate::ai::AiInput;
 use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::item::{FoundSlot, ItemFilter, ItemFilterable};
