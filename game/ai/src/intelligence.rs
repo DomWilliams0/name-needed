@@ -313,12 +313,6 @@ impl<C: Context> Intelligence<C> {
         )
     }
 
-    pub fn last_action(&self) -> &C::Action {
-        let ptr = self.last_action.as_ptr();
-        // safety: same lifetime as self
-        unsafe { &*ptr }
-    }
-
     pub fn clear_last_action(&mut self) {
         trace!("clearing last action to Nop");
         self.last_action.replace(C::Action::default());

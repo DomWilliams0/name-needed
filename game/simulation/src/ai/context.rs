@@ -48,7 +48,6 @@ pub struct AiBlackboard<'a> {
     pub inventory: Option<&'a InventoryComponent>,
     pub inventory_search_cache: HashMap<ItemFilter, FoundSlot<'a>>,
     pub society: Option<SocietyHandle>,
-    pub ai: &'a AiComponent,
 
     /// Value is (max distance, results), so smaller ranges can reuse results of bigger ranges
     pub local_area_search_cache: HashMap<ItemFilter, (u32, LocalAreaSearch)>,
@@ -91,7 +90,6 @@ impl<'a> AiBlackboard<'a> {
         hunger: Option<&'a HungerComponent>,
         inventory: Option<&'a InventoryComponent>,
         society: Option<&'a SocietyComponent>,
-        ai: &'a AiComponent,
         shared: Rc<RefCell<SharedBlackboard>>,
         world: &'a EcsWorld,
     ) -> Self {
@@ -103,7 +101,6 @@ impl<'a> AiBlackboard<'a> {
             local_area_search_cache: HashMap::new(),
             inventory,
             society: society.map(|comp| comp.handle()),
-            ai,
             world,
             shared,
         }

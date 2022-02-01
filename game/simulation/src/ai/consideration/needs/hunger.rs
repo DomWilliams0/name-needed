@@ -72,7 +72,6 @@ mod tests {
             hunger: None,
             inventory: None,
             society: None,
-            ai,
             inventory_search_cache: Default::default(),
             local_area_search_cache: Default::default(),
             world,

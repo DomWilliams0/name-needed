@@ -57,10 +57,6 @@ impl AiComponent {
         self.intelligence.pop_smarts(&AdditionalDse::DivineCommand);
     }
 
-    pub fn last_action(&self) -> &AiAction {
-        self.intelligence.last_action()
-    }
-
     pub fn is_current_divine(&self) -> bool {
         self.current
             .as_ref()
@@ -234,7 +230,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
                 hunger_opt,
                 inventory_opt,
                 society_opt,
-                ai,
                 shared_bb.clone(),
                 &ecs_world,
             ));
