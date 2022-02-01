@@ -31,4 +31,5 @@
 * [ ] ensure a single entity doesnt appear in all best candidate lists and dominate a society job
     when its chosen for 1 only
 * [ ] build ui element in GatherAndBuild test is invisible
-* [ ] fix gather material haul decision "change" when split stack is picked up
+* [X] fix gather material haul decision "change" when split stack is picked up
+        * [ ] remove last action access from blackboard

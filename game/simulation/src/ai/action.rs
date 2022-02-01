@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 
+use common::trace;
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::activity::{
@@ -7,7 +8,7 @@ use crate::activity::{
 };
 use crate::ecs::Entity;
 use crate::job::{BuildDetails, SocietyJobHandle};
-use crate::EcsWorld;
+use crate::{ComponentWorld, EcsWorld, ItemStackComponent, Tick};
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -48,7 +49,33 @@ impl ai::Action for AiAction {
     type Arg = EcsWorld;
 
     fn cmp(&self, other: &Self, world: &EcsWorld) -> bool {
-        self == other // TODO use world
+        use AiAction::*;
+
+        match (self, other) {
+            (
+                Haul(old_item, old_src, old_tgt, old_purpose),
+                Haul(new_item, new_src, new_tgt, new_purpose),
+            ) if old_item != new_item
+                && old_src == new_src
+                && old_tgt == new_tgt
+                && old_purpose == new_purpose =>
+            {
+                // only entity differs
+                if let Ok(Some((split_from, tick))) = world
+                    .component::<ItemStackComponent>(*new_item)
+                    .map(|comp| comp.split_from)
+                {
+                    if split_from == *old_item && Tick::fetch().elapsed_since(tick) < 100 {
+                        trace!("detected haul of split stack, not changing decision";
+                                "original_stack" => old_item, "hauled_split_stack" => new_item);
+                        return true;
+                    }
+                }
+
+                false
+            }
+            (a, b) => a == b,
+        }
     }
 }
 

@@ -8,7 +8,7 @@ use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 
 use crate::string::CachedStr;
-use crate::PhysicalComponent;
+use crate::{PhysicalComponent, Tick};
 
 #[derive(Debug, Error, Eq, PartialEq, Clone)]
 pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
@@ -47,6 +47,8 @@ pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
 #[clone(disallow)]
 pub struct ItemStackComponent {
     pub stack: crate::item::ItemStack,
+    /// Stack that this stack was spawned from
+    pub split_from: Option<(Entity, Tick)>,
 }
 
 pub trait World {

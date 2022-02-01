@@ -6,12 +6,10 @@ use unit::world::WorldPoint;
 use world::block::BlockType;
 
 use crate::ai::{AiBlackboard, AiContext, AiTarget};
-
 use crate::ecs::*;
 use crate::item::{
     FoundSlot, HaulableItemComponent, HauledItemComponent, InventoryComponent, ItemFilter,
 };
-
 use crate::{ContainedInComponent, TransformComponent};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]

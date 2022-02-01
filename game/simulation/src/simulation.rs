@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::ops::{Add, Deref};
+use std::ops::{Add, Deref, Sub};
 use std::pin::Pin;
 
 use strum::EnumDiscriminants;
@@ -669,6 +669,11 @@ impl Tick {
 
     pub fn value(self) -> u32 {
         self.0
+    }
+
+    /// self is later
+    pub fn elapsed_since(self, other: Self) -> u32 {
+        self.0.saturating_sub(other.0)
     }
 
     #[cfg(test)]

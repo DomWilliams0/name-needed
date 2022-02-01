@@ -8,7 +8,7 @@ use crate::definitions::{BuilderError, DefinitionErrorKind};
 use crate::ecs::*;
 use crate::event::DeathReason;
 use crate::{
-    EntityEvent, EntityEventPayload, PhysicalComponent, Societies, SocietyHandle,
+    EntityEvent, EntityEventPayload, PhysicalComponent, Societies, SocietyHandle, Tick,
     TransformComponent,
 };
 
@@ -211,7 +211,10 @@ impl EcsExtContainers<'_> {
             let entity = Entity::from(
                 self.0
                     .create_entity()
-                    .with(ItemStackComponent { stack })
+                    .with(ItemStackComponent {
+                        stack,
+                        split_from: None,
+                    })
                     .build(),
             );
 
@@ -304,7 +307,10 @@ impl EcsExtContainers<'_> {
         let new_stack = Entity::from(
             self.0
                 .create_entity()
-                .with(ItemStackComponent { stack: new_stack })
+                .with(ItemStackComponent {
+                    stack: new_stack,
+                    split_from: Some((stack_entity, Tick::fetch())),
+                })
                 .build(),
         );
         self.0.copy_components_to(stack_entity, new_stack).unwrap(); // both entities are definitely alive
