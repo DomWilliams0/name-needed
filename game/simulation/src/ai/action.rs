@@ -7,6 +7,7 @@ use crate::activity::{
 };
 use crate::ecs::Entity;
 use crate::job::{BuildDetails, SocietyJobHandle};
+use crate::EcsWorld;
 
 // TODO speed should be specified as an enum for all go??? actions
 
@@ -41,6 +42,14 @@ pub enum AiAction {
 
     /// Haul the entity from the source to the destination target
     Haul(Entity, HaulSource, HaulTarget, HaulPurpose),
+}
+
+impl ai::Action for AiAction {
+    type Arg = EcsWorld;
+
+    fn cmp(&self, other: &Self, world: &EcsWorld) -> bool {
+        self == other // TODO use world
+    }
 }
 
 impl Default for AiAction {

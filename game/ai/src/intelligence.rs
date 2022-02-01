@@ -7,6 +7,7 @@ use derivative::Derivative;
 use common::bumpalo::Bump;
 use common::*;
 
+use crate::context::Action;
 use crate::decision::Dse;
 pub use crate::intelligence::realisation::{RealisedDseIndex, RealisedDses};
 use crate::{AiBox, Consideration, Context, Input, WeightedDse};
@@ -258,9 +259,10 @@ impl<C: Context> Intelligence<C> {
         &mut self,
         blackboard: Box<C::Blackboard>,
         alloc: &bumpalo::Bump,
+        cmp_arg: &<C::Action as Action>::Arg,
     ) -> IntelligentDecision<C> {
         let _ = self.choose_with_stream_dses(blackboard, alloc, empty());
-        self.consume_decision()
+        self.consume_decision(cmp_arg)
     }
 
     #[cfg(test)]
@@ -268,10 +270,11 @@ impl<C: Context> Intelligence<C> {
         &mut self,
         blackboard: Box<C::Blackboard>,
         alloc: &bumpalo::Bump,
+        cmp_arg: &<C::Action as Action>::Arg,
         streams: impl Iterator<Item = (WeightedDse<C>, C::StreamDseExtraData)>,
     ) -> IntelligentDecision<C> {
         let _ = self.choose_with_stream_dses(blackboard, alloc, streams);
-        self.consume_decision()
+        self.consume_decision(cmp_arg)
     }
 
     pub fn add_smarts(
@@ -353,7 +356,7 @@ impl<C: Context> Intelligence<C> {
         });
     }
 
-    pub fn consume_decision(&mut self) -> IntelligentDecision<C> {
+    pub fn consume_decision(&mut self, arg: &<C::Action as Action>::Arg) -> IntelligentDecision<C> {
         let (action, source) = match self.decision_progress.take().expect("thinking expected") {
             DecisionProgress::NoChoice => {
                 trace!("intelligence chose nothing");
@@ -385,7 +388,7 @@ impl<C: Context> Intelligence<C> {
         };
 
         let last_action = self.last_action.replace(action.clone());
-        if last_action == action {
+        if last_action.cmp(&action, arg) {
             IntelligentDecision::Unchanged
         } else if let Some((dse_name, src)) = source {
             IntelligentDecision::New {
@@ -741,14 +744,14 @@ mod tests {
 
         // eat wins
         assert!(matches!(
-            intelligence.choose(blackboard.clone(), &alloc),
+            intelligence.choose(blackboard.clone(), &alloc, &()),
             IntelligentDecision::New {
                 action: TestAction::Eat,
                 ..
             }
         ));
         assert!(matches!(
-            intelligence.choose(blackboard.clone(), &alloc),
+            intelligence.choose(blackboard.clone(), &alloc, &()),
             IntelligentDecision::Unchanged
         ));
 
@@ -758,7 +761,7 @@ mod tests {
             vec![AiBox::new(EmergencyDse) as AiBox<dyn Dse<TestContext>>].into_iter(),
         );
         assert!(matches!(
-            intelligence.choose(blackboard.clone(), &alloc),
+            intelligence.choose(blackboard.clone(), &alloc, &()),
             IntelligentDecision::New {
                 action: TestAction::CancelExistence,
                 ..
@@ -768,7 +771,7 @@ mod tests {
         // pop it, back to original
         intelligence.pop_smarts(&100);
         assert!(matches!(
-            intelligence.choose(blackboard.clone(), &alloc),
+            intelligence.choose(blackboard.clone(), &alloc, &()),
             IntelligentDecision::New {
                 action: TestAction::Eat,
                 ..
@@ -778,7 +781,7 @@ mod tests {
         // add emergency as stream
         let streams = once((WeightedDse::new(EmergencyDse, 1.0), ()));
         assert!(matches!(
-            intelligence.choose_now_with_stream_dses(blackboard.clone(), &alloc, streams),
+            intelligence.choose_now_with_stream_dses(blackboard.clone(), &alloc, &(), streams),
             IntelligentDecision::New {
                 action: TestAction::CancelExistence,
                 ..
@@ -822,7 +825,7 @@ mod tests {
 
         // choose the only available Eat
         let alloc = bumpalo::Bump::new();
-        match intelligence.choose(blackboard.clone(), &alloc) {
+        match intelligence.choose(blackboard.clone(), &alloc, &()) {
             IntelligentDecision::New { action, src, .. } => {
                 assert_eq!(action, TestAction::Eat);
                 assert!(matches!(src, DecisionSource::Base(DseIndex(0))));
@@ -839,6 +842,7 @@ mod tests {
         match intelligence.choose_now_with_stream_dses(
             blackboard.clone(),
             &alloc,
+            &(),
             streams.iter().cloned(),
         ) {
             IntelligentDecision::New { action, src, .. } => {
@@ -854,6 +858,7 @@ mod tests {
         match intelligence.choose_now_with_stream_dses(
             blackboard.clone(),
             &alloc,
+            &(),
             streams.into_iter(),
         ) {
             IntelligentDecision::New { action, src, .. } => {
@@ -945,7 +950,7 @@ mod tests {
         assert_eq!(scores[1].1, 0.0); // Bad
         assert_eq!(scores[2].1, 1.0); // Eat
 
-        match intelligence.consume_decision() {
+        match intelligence.consume_decision(&()) {
             IntelligentDecision::New {
                 dse_name: "Targeted",
                 action: TestAction::Attack(5),

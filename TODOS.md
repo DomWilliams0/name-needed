@@ -1,4 +1,4 @@
-# TODOs (403)
+# TODOs (404)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -148,8 +148,9 @@
  * [game/simulation/src/activity/system.rs](game/simulation/src/activity/system.rs) (2)
    * `// TODO handle society task`
    * `// TODO need to notify society here, as above?`
- * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
+ * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (2)
    * `// TODO speed should be specified as an enum for all go??? actions`
+   * `self == other // TODO use world`
  * [game/simulation/src/ai/consideration/items/find_local_graded_item.rs](game/simulation/src/ai/consideration/items/find_local_graded_item.rs) (1)
    * `/// TODO search society stores as well`
  * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)

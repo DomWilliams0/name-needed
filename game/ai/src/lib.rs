@@ -2,7 +2,7 @@
 #![allow(clippy::type_complexity)]
 
 pub use consideration::{Consideration, ConsiderationParameter, Considerations, Curve};
-pub use context::{AiBox, Blackboard, Context, Input};
+pub use context::{Action, AiBox, Blackboard, Context, Input};
 pub use decision::{DecisionWeight, Dse, TargetOutput, Targets, WeightedDse};
 pub use intelligence::{
     DecisionProgress, DecisionSource, DseSkipper, InitialChoice, InputCache, Intelligence,
@@ -24,6 +24,14 @@ mod test_utils {
         Eat,
         CancelExistence,
         Attack(u32),
+    }
+
+    impl Action for TestAction {
+        type Arg = ();
+
+        fn cmp(&self, other: &Self, _: &Self::Arg) -> bool {
+            self == other
+        }
     }
 
     impl Default for TestAction {

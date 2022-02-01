@@ -400,6 +400,7 @@ impl<'a> System<'a> for FinaliseChoice<'a> {
 impl<'a> System<'a> for ConsumeDecision {
     type SystemData = (
         Read<'a, EntitiesRes>,
+        Read<'a, EcsWorldRef>,
         Read<'a, Societies>,
         WriteStorage<'a, AiComponent>,
         WriteStorage<'a, ActivityComponent>,
@@ -409,7 +410,7 @@ impl<'a> System<'a> for ConsumeDecision {
 
     fn run(
         &mut self,
-        (entities, societies, mut ai, mut activity, mut society, mut logging): Self::SystemData,
+        (entities, world, societies, mut ai, mut activity, mut society, mut logging): Self::SystemData,
     ) {
         for (e, mut ai, activity, society, logging) in (
             &entities,
@@ -421,7 +422,7 @@ impl<'a> System<'a> for ConsumeDecision {
             .join()
         {
             let e = Entity::from(e);
-            let decision = ai.intelligence.consume_decision();
+            let decision = ai.intelligence.consume_decision(&world);
 
             let (src, action) = match decision {
                 IntelligentDecision::New {

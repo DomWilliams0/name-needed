@@ -4,7 +4,7 @@ use std::hash::Hash;
 pub trait Context: Sized + 'static {
     type Blackboard: Blackboard;
     type Input: Input<Self>;
-    type Action: Default + Eq + Clone;
+    type Action: Action;
     type AdditionalDseId: Hash + Eq + Copy + Debug;
     type StreamDseExtraData: Clone;
     type DseTarget: PartialEq + Clone + Debug;
@@ -12,6 +12,14 @@ pub trait Context: Sized + 'static {
 
 pub trait Input<C: Context>: Hash + Clone + Eq {
     fn get(&self, blackboard: &mut C::Blackboard, target: Option<&C::DseTarget>) -> f32;
+}
+
+pub trait Action: Default + Eq + Clone {
+    type Arg;
+
+    /// Comparison for detecting when a decision has changed.
+    /// self=old, other=new
+    fn cmp(&self, other: &Self, arg: &Self::Arg) -> bool;
 }
 
 pub trait Blackboard: Clone {

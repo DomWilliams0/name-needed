@@ -22,6 +22,7 @@ impl Consideration<AiContext> for MyProximityToConsideration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use unit::world::WorldPoint;
 
     /// Takes raw distance, returns score 0-1
     fn value(dist: f32) -> f32 {
