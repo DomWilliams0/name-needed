@@ -1,5 +1,5 @@
 use crate::ecs::*;
-use crate::simulation::Tick;
+
 use crate::{PhysicalComponent, TransformComponent};
 use common::*;
 use std::borrow::Cow;
@@ -43,7 +43,7 @@ impl Spatial {
         }
 
         if !self.entities.is_empty() {
-            debug!(
+            trace!(
                 "updated spatial index with {count} entities",
                 count = self.entities.len()
             );
@@ -90,11 +90,8 @@ impl<'a> System<'a> for SpatialSystem {
     );
 
     fn run(&mut self, (entities, transforms, physicals, mut spatial): Self::SystemData) {
-        // only update occasionally
-        let tick = Tick::fetch();
-        if tick.value() % 8 == 0 {
-            spatial.update(entities, transforms, physicals);
-        }
+        // TODO update occasionally, but always include newly spawned entities immediately
+        spatial.update(entities, transforms, physicals);
     }
 }
 

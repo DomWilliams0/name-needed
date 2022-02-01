@@ -2,7 +2,7 @@ use crate::activity::{HaulPurpose, HaulSource, HaulTarget};
 use crate::ai::consideration::{HasExtraHandsForHaulingConsideration, MyProximityToConsideration};
 use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::ecs::Entity;
-use crate::item::ItemFilter;
+
 use ai::{Considerations, DecisionWeight, Dse};
 use unit::world::WorldPoint;
 
@@ -18,11 +18,13 @@ pub struct HaulDse {
 
 impl Dse<AiContext> for HaulDse {
     fn considerations(&self, out: &mut Considerations<AiContext>) {
-        out.add(HasExtraHandsForHaulingConsideration(
-            self.extra_hands_needed,
-            Some(ItemFilter::SpecificEntity(self.thing)),
-        ));
-        out.add(MyProximityToConsideration(self.destination));
+        out.add(HasExtraHandsForHaulingConsideration {
+            extra_hands: self.extra_hands_needed,
+            target: Some(self.thing),
+        });
+        out.add(MyProximityToConsideration(AiTarget::Point(
+            self.destination,
+        )));
         // TODO consider distance to source too
     }
 

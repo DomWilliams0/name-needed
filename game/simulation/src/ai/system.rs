@@ -277,7 +277,7 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
                     let key = {
                         let key = DseCandidateKey {
                             dse,
-                            target: choice.target.clone(),
+                            target: choice.target,
                         };
 
                         // safety: only used in this system in this tick

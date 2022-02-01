@@ -32,7 +32,7 @@ pub enum SocietyTask {
 
     /// Gather materials for a build at the given position
     GatherMaterials {
-        target: WorldPosition,
+        build_pos: WorldPosition,
         material: BuildMaterial,
         job: SocietyJobHandle,
         extra_hands_needed_for_haul: u16,
@@ -90,12 +90,12 @@ impl SocietyTask {
                 })
             }
             GatherMaterials {
-                target,
+                build_pos: target,
                 material,
                 job,
                 extra_hands_needed_for_haul,
             } => dse!(GatherMaterialsDse {
-                target: *target,
+                build_pos: *target,
                 material: material.clone(),
                 job: *job,
                 extra_hands_for_haul: *extra_hands_needed_for_haul

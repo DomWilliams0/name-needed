@@ -1,18 +1,17 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
-use unit::world::WorldPosition;
 
 use crate::ai::input::BlockTypeMatch;
 use crate::ai::{AiContext, AiInput};
 
-pub struct BlockTypeMatchesConsideration(pub WorldPosition, pub BlockTypeMatch);
+pub struct TargetBlockTypeMatchesConsideration(pub BlockTypeMatch);
 
-impl Consideration<AiContext> for BlockTypeMatchesConsideration {
+impl Consideration<AiContext> for TargetBlockTypeMatchesConsideration {
     fn curve(&self) -> Curve {
         Curve::Identity
     }
 
     fn input(&self) -> <AiContext as Context>::Input {
-        AiInput::BlockTypeMatches(self.0, self.1)
+        AiInput::TargetBlockTypeMatches(self.0)
     }
 
     fn parameter(&self) -> ConsiderationParameter {

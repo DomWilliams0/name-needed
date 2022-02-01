@@ -154,15 +154,14 @@
    * `/// TODO search society stores as well`
  * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
- * [game/simulation/src/ai/consideration/world/my_proximity_to.rs](game/simulation/src/ai/consideration/world/my_proximity_to.rs) (2)
-   * `// TODO take into account general world/society size? need some scale`
-   * `// TODO take mobility into account, e.g. more injured = prefer closer`
  * [game/simulation/src/ai/consideration/world/my_proximity_to_target.rs](game/simulation/src/ai/consideration/world/my_proximity_to_target.rs) (2)
    * `// TODO take into account general world/society size? need some scale`
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
- * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (1)
+ * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (2)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (1)
+   * `// TODO cache searches as before in 2f1fc7a if necessary (profile!)`
+ * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (2)
+   * `// TODO target food condition consideration`
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
    * `// TODO consider distance to source too`
@@ -174,15 +173,14 @@
  * [game/simulation/src/ai/dse/world/build.rs](game/simulation/src/ai/dse/world/build.rs) (2)
    * `// TODO wants to work, can work`
    * `// TODO has tool`
- * [game/simulation/src/ai/dse/world/gather_materials.rs](game/simulation/src/ai/dse/world/gather_materials.rs) (3)
-   * `// TODO check society containers`
-   * `// TODO separate HaulTarget to drop nearby/adjacent`
-   * `// TODO take the stack size into account too, choose the biggest`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
+ * [game/simulation/src/ai/dse/world/gather_materials.rs](game/simulation/src/ai/dse/world/gather_materials.rs) (4)
+   * `// TODO consider item stack size and condition`
+   * `// TODO search range could depend on entity senses`
+   * `// TODO share search range with food searching`
+   * `// TODO check society containers too`
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (3)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO should include check for n free slots anywhere in inventory (not just hands)`
-   * `// TODO old results are a subset of new results, should reuse`
-   * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
@@ -372,8 +370,9 @@
    * `// TODO name generation per society`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
- * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
+ * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (2)
    * `// TODO reimplement with octree`
+   * `// TODO update occasionally, but always include newly spawned entities immediately`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`

@@ -16,7 +16,9 @@ impl Dse<AiContext> for BuildDse {
     fn considerations(&self, out: &mut Considerations<AiContext>) {
         // TODO wants to work, can work
         // TODO has tool
-        out.add(MyProximityToConsideration(self.details.pos.centred()));
+        out.add(MyProximityToConsideration(AiTarget::Block(
+            self.details.pos,
+        )));
     }
 
     fn weight(&self) -> DecisionWeight {

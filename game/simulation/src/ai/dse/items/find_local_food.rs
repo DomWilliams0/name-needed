@@ -2,10 +2,10 @@ use ai::{Considerations, DecisionWeight, Dse, TargetOutput, Targets};
 use common::*;
 
 use crate::ai::consideration::{
-    HasFreeHandsToHoldTargetConsideration, HungerConsideration, MyProximityToConsideration,
-    MyProximityToTargetConsideration,
+    HasFreeHandsToHoldTargetConsideration, HungerConsideration, MyProximityToTargetConsideration,
 };
 use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
+
 use crate::item::ItemFilter;
 /// Finds food nearby to pick up
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -19,6 +19,7 @@ impl Dse<AiContext> for FindLocalFoodDse {
         out.add(HungerConsideration);
         out.add(MyProximityToTargetConsideration);
         out.add(HasFreeHandsToHoldTargetConsideration);
+        // TODO target food condition consideration
         // TODO "I can/want to move" consideration
     }
 

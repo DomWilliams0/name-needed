@@ -1,4 +1,5 @@
 //! Infinite axis utility system
+#![allow(clippy::type_complexity)]
 
 pub use consideration::{Consideration, ConsiderationParameter, Considerations, Curve};
 pub use context::{AiBox, Blackboard, Context, Input};
@@ -168,11 +169,7 @@ mod test_utils {
             DecisionWeight::Normal
         }
 
-        fn action(
-            &self,
-            blackboard: &mut TestBlackboard,
-            target: Option<u32>,
-        ) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::Eat
         }
     }
@@ -189,11 +186,7 @@ mod test_utils {
             DecisionWeight::Emergency
         }
 
-        fn action(
-            &self,
-            blackboard: &mut TestBlackboard,
-            target: Option<u32>,
-        ) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::CancelExistence
         }
     }
@@ -210,11 +203,7 @@ mod test_utils {
             DecisionWeight::AbsoluteOverride
         }
 
-        fn action(
-            &self,
-            blackboard: &mut TestBlackboard,
-            target: Option<u32>,
-        ) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::CancelExistence // sorry
         }
     }

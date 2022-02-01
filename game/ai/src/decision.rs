@@ -168,6 +168,7 @@ impl<'a, C: Context> Targets<'a, C> {
     }
 
     pub fn add(&mut self, target: C::DseTarget) {
+        trace!("adding target"; "target" => ?target);
         debug_assert!(!self.0.contains(&target), "duplicate target");
         self.0.push(target);
     }

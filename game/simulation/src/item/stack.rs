@@ -468,7 +468,11 @@ mod validation {
         held_entities: &mut HashMap<Entity, ContainedInComponent>,
         world: &impl ComponentWorld,
     ) {
-        trace!("validating stack: {:?}", stack.contents().collect_vec());
+        trace!(
+            "validating stack {}: {:?}",
+            stack_entity,
+            stack.contents().collect_vec()
+        );
 
         // validate count
         let real_count: u16 = stack.contents.iter().map(|e| e.count().get()).sum();

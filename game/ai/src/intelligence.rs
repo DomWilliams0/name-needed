@@ -317,8 +317,6 @@ impl<C: Context> Intelligence<C> {
     }
 
     pub fn clear_last_action(&mut self) {
-        self.ensure_modifications_allowed();
-
         trace!("clearing last action to Nop");
         self.last_action.replace(C::Action::default());
     }
@@ -502,12 +500,12 @@ mod realisation {
 
     use common::bumpalo::collections::CollectIn;
     use common::bumpalo::Bump;
-    use common::{BumpVec, Itertools};
+    use common::BumpVec;
 
     use crate::intelligence::{DseIndex, DseToScore};
     use crate::{
-        Consideration, Considerations, Context, Curve, DecisionSource, Dse, DseSkipper,
-        Intelligence, TargetOutput, Targets, WeightedDse,
+        Consideration, Considerations, Context, DecisionSource, Dse, DseSkipper, Intelligence,
+        TargetOutput, Targets, WeightedDse,
     };
 
     #[derive(Derivative)]
@@ -711,6 +709,7 @@ mod realisation {
 mod tests {
     use std::fmt::Debug;
     use std::iter::empty;
+
     use float_ord::FloatOrd;
 
     use common::{bumpalo, once, Itertools};
@@ -894,7 +893,8 @@ mod tests {
         }
 
         fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
-            todo!("get target")
+            let target = target.expect("expected target");
+            TestAction::Attack(target)
         }
 
         fn target(
@@ -932,7 +932,6 @@ mod tests {
             .sorted_by_key(|(_, score, _)| FloatOrd(*score))
             .collect_vec();
 
-
         assert_eq!(scores.len(), 4); // 2 targeted + 2 others
 
         let best = &scores[3];
@@ -945,5 +944,14 @@ mod tests {
 
         assert_eq!(scores[1].1, 0.0); // Bad
         assert_eq!(scores[2].1, 1.0); // Eat
+
+        match intelligence.consume_decision() {
+            IntelligentDecision::New {
+                dse_name: "Targeted",
+                action: TestAction::Attack(5),
+                src: DecisionSource::Base(_),
+            } => {}
+            _ => unreachable!(),
+        };
     }
 }

@@ -441,6 +441,14 @@ impl ContainedInComponent {
             | ContainedInComponent::StackOf(e) => *e,
         }
     }
+
+    /// If the item is freestanding in the world and can be interacted with
+    pub fn is_in_world(&self) -> bool {
+        match self {
+            ContainedInComponent::StackOf(_) => true,
+            ContainedInComponent::Container(_) | ContainedInComponent::InventoryOf(_) => false,
+        }
+    }
 }
 
 impl Display for ContainedInComponent {

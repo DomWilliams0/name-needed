@@ -15,8 +15,8 @@ use crate::ecs::*;
 use crate::item::{FoundSlot, ItemFilter, ItemFilterable};
 use crate::spatial::{Spatial, Transforms};
 use crate::{
-    AiAction, ConditionComponent, ContainedInComponent, EcsWorld, Entity, HungerComponent,
-    InventoryComponent, SocietyComponent, SocietyHandle, TransformComponent, WorldRef,
+    AiAction, ContainedInComponent, EcsWorld, Entity, HungerComponent, InventoryComponent,
+    SocietyComponent, SocietyHandle, TransformComponent, WorldRef,
 };
 
 pub struct AiContext;
@@ -31,7 +31,7 @@ impl ai::Context for AiContext {
     type DseTarget = AiTarget;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 pub enum AiTarget {
     Entity(Entity),
     Block(WorldPosition),
@@ -81,7 +81,6 @@ pub struct FoundItem {
     pub entity: Entity,
     pub position: WorldPoint,
     pub distance: f32,
-    pub condition: NormalizedFloat,
 }
 
 impl<'a> AiBlackboard<'a> {
@@ -110,7 +109,14 @@ impl<'a> AiBlackboard<'a> {
         }
     }
 
+    /// Searches area in radius for entities that are:
+    ///     * accessible from current position
+    ///     * aren't held by ANYONE ELSE
+    ///     * aren't stored in a container
+    ///     * not reserved by this entity's society
+    ///
     /// Stops early if `limit` successful are found, or callback returns false
+    // TODO cache searches as before in 2f1fc7a if necessary (profile!)
     pub fn search_local_entities(
         &self,
         filter: ItemFilter,
@@ -133,7 +139,6 @@ impl<'a> AiBlackboard<'a> {
             }
         };
 
-        let conditions = world.read_storage::<ConditionComponent>();
         let reservations = world.read_storage::<ReservedMaterialComponent>();
         let containeds = world.read_storage::<ContainedInComponent>();
         let transforms = world.read_storage::<TransformComponent>();
@@ -151,9 +156,18 @@ impl<'a> AiBlackboard<'a> {
                     return None;
                 }
 
-                // ensure the item is not held by someone
-                if entity.has(&containeds) {
-                    return None;
+                // ensure the item is not held by someone else
+                match entity.get(&containeds) {
+                    Some(ContainedInComponent::InventoryOf(holder)) if *holder == self.entity => {
+                        // held by entity, include
+                    }
+                    Some(comp) if comp.is_in_world() => {
+                        // available in the world e.g. item stack
+                    }
+                    None => {
+                        // fine
+                    }
+                    _ => return None,
                 }
 
                 // check if this item is reserved by our society
@@ -171,12 +185,8 @@ impl<'a> AiBlackboard<'a> {
                     .get(&transforms)
                     .and_then(|t| t.accessible_position)?;
                 let item_area = voxel_world.area(item_pos).ok()?;
-                let mut reachable;
 
-                // same area, definitely accessible
-                reachable = item_area == self_area;
-
-                if !reachable {
+                if item_area != self_area {
                     // different areas, do a cached cheap path find to see if its accessible
                     // consistent key ordering
                     let cache_key = if self_area < item_area {
@@ -184,32 +194,32 @@ impl<'a> AiBlackboard<'a> {
                     } else {
                         (item_area, self_area)
                     };
-                    let mut shared = self.shared.borrow_mut();
-                    reachable = *shared
+                    if !*self
+                        .shared
+                        .borrow_mut()
                         .area_link_cache
                         .entry(cache_key)
-                        .or_insert_with(|| voxel_world.area_path_exists(self_area, item_area));
+                        .or_insert_with(|| voxel_world.area_path_exists(self_area, item_area))
+                    {
+                        return None;
+                    }
                 }
 
-                let condition = entity
-                    .get(&conditions)
-                    .map(|comp| comp.0.value())
-                    .unwrap_or_else(NormalizedFloat::one);
-
-                reachable.as_some((entity, pos, dist, condition))
+                // item is accessible
+                if found(FoundItem {
+                    entity,
+                    position: pos,
+                    distance: dist,
+                }) {
+                    Some(())
+                } else {
+                    None
+                }
             })
             .take(limit);
 
-        for (entity, position, distance, condition) in results {
-            if !found(FoundItem {
-                entity,
-                position,
-                distance,
-                condition,
-            }) {
-                break;
-            }
-        }
+        // consume iterator
+        for _ in results {}
     }
 }
 
@@ -241,5 +251,16 @@ impl AiTarget {
             AiTarget::Point(pos) => Some(*pos),
             _ => self.expected("point"),
         }
+    }
+}
+
+impl Display for AiTarget {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display = match self {
+            AiTarget::Entity(e) => e as &dyn Display,
+            AiTarget::Block(p) => p as &dyn Display,
+            AiTarget::Point(p) => p as &dyn Display,
+        };
+        Display::fmt(display, f)
     }
 }

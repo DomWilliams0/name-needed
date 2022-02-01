@@ -1,4 +1,8 @@
-#![allow(clippy::type_complexity, clippy::module_inception)]
+#![allow(
+    clippy::type_complexity,
+    clippy::module_inception,
+    clippy::non_send_fields_in_send_ty
+)]
 #![deny(unused_must_use)]
 
 // Exports from world so the renderer only needs to link against simulation

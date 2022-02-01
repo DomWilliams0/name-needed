@@ -22,9 +22,13 @@
 * [X] remove AiBox from best candidate choosing
 * [ ] improve WorldPosition/WorldPoint debug impls to be same as display
 * [X] add support for targets to dses
-*   * [.] port food and item gathering to use this
+*   * [X] port food and item gathering to use this
 * [ ] lazily calculate targets for dses? or easier: specific filter for when the dse is impossible
     regardless of targets
         * when finding food nearby, the possible targets should only be evaluated if hungry, which
         is the first consideration (returns 0.0 if not hungry). but currently all local food will be
         searched for and expanded into targeted dses regardless of hunger level.
+* [ ] ensure a single entity doesnt appear in all best candidate lists and dominate a society job
+    when its chosen for 1 only
+* [ ] build ui element in GatherAndBuild test is invisible
+* [ ] fix gather material haul decision "change" when split stack is picked up
