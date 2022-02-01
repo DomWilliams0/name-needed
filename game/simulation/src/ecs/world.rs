@@ -474,7 +474,9 @@ impl ComponentWorld for EcsWorld {
 
     fn on_new_entity_creation(&self, entity: Entity) {
         // include this entity in spatial queries even before the system updates
-        self.resource::<Spatial>().register_new_entity(entity);
+        if let Some(spatial) = self.try_fetch::<Spatial>() {
+            spatial.register_new_entity(entity);
+        }
     }
 }
 
