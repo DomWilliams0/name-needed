@@ -13,7 +13,7 @@ use crate::ai::{AiComponent, AiInput};
 use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::item::{FoundSlot, ItemFilter, ItemFilterable};
-use crate::spatial::{Spatial, Transforms};
+use crate::spatial::Spatial;
 use crate::{
     AiAction, ContainedInComponent, EcsWorld, Entity, HungerComponent, InventoryComponent,
     SocietyComponent, SocietyHandle, TransformComponent, WorldRef,
@@ -145,11 +145,7 @@ impl<'a> AiBlackboard<'a> {
 
         let spatial = world.resource::<Spatial>();
         let results = spatial
-            .query_in_radius(
-                Transforms::Storage(&transforms),
-                self.transform.position,
-                max_radius,
-            )
+            .query_in_radius(world, self.transform.position, max_radius)
             .filter_map(|(entity, pos, dist)| {
                 // check item filter matches
                 if !(entity, Some(world)).matches(filter) {

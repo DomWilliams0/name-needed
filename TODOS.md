@@ -1,4 +1,4 @@
-# TODOs (404)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -371,9 +371,8 @@
    * `// TODO name generation per society`
  * [game/simulation/src/society/registry.rs](game/simulation/src/society/registry.rs) (1)
    * `// TODO keep society registry sorted by handle for quick lookup`
- * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (2)
+ * [game/simulation/src/spatial.rs](game/simulation/src/spatial.rs) (1)
    * `// TODO reimplement with octree`
-   * `// TODO update occasionally, but always include newly spawned entities immediately`
  * [game/simulation/src/steer/context.rs](game/simulation/src/steer/context.rs) (2)
    * `// TODO average with previous for less sudden movements`
    * `// TODO follow gradients and choose continuous value`

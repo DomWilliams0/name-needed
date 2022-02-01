@@ -108,7 +108,10 @@ fn has_extra_hands_for_hauling(
     let item = match (item, target) {
         (Some(item), _) => item,
         (None, Some(AiTarget::Entity(item))) => *item,
-        _ => return None,
+        _ => {
+            warn!("no target found for has_extra_hands_for_hauling input");
+            return None;
+        }
     };
 
     let inventory = blackboard.inventory?;
@@ -166,35 +169,31 @@ fn can_use_held_item(blackboard: &mut AiBlackboard, filter: &ItemFilter) -> Opti
 fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) -> Option<f32> {
     let target_pos = match target {
         Some(AiTarget::Entity(e)) => {
-            let get_pos = || {
-                // check if held by us first
-                if let Ok(hauled) = blackboard.world.component::<HauledItemComponent>(*e) {
-                    if hauled.hauler == blackboard.entity {
-                        // item is being hauled by us
-                        return Some(blackboard.transform.position);
-                    }
+            // check if held by us first
+            if let Ok(hauled) = blackboard.world.component::<HauledItemComponent>(*e) {
+                if hauled.hauler == blackboard.entity {
+                    // item is being hauled by us
+                    return Some(0.0);
                 }
+            }
 
-                if let Ok(ContainedInComponent::InventoryOf(holder)) = blackboard
-                    .world
-                    .component::<ContainedInComponent>(*e)
-                    .as_deref()
-                {
-                    if *holder == blackboard.entity {
-                        // item is in our inventory
-                        return Some(blackboard.transform.position);
-                    }
+            if let Ok(ContainedInComponent::InventoryOf(holder)) = blackboard
+                .world
+                .component::<ContainedInComponent>(*e)
+                .as_deref()
+            {
+                if *holder == blackboard.entity {
+                    // item is in our inventory
+                    return Some(0.0);
                 }
+            }
 
-                // otherwise check transform
-                blackboard
-                    .world
-                    .component::<TransformComponent>(*e)
-                    .ok()
-                    .map(|pos| pos.position)
-            };
-
-            get_pos()?
+            // otherwise use transform
+            blackboard
+                .world
+                .component::<TransformComponent>(*e)
+                .ok()
+                .map(|pos| pos.position)?
         }
         Some(AiTarget::Point(pos)) => *pos,
         Some(AiTarget::Block(block)) => block.centred(),

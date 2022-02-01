@@ -13,7 +13,8 @@ use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;
 use crate::input::{MouseLocation, SelectedComponent};
 use crate::job::BuildThingJob;
-use crate::spatial::{Spatial, Transforms};
+use crate::simulation::EcsWorldRef;
+use crate::spatial::Spatial;
 use crate::{
     ItemStackComponent, PlayerSociety, Societies, SocietyComponent, Tick, TransformComponent,
     UiElementComponent,
@@ -95,6 +96,7 @@ impl<'a> System<'a> for DisplayTextSystem {
         Read<'a, Spatial>,
         Read<'a, MouseLocation>,
         Read<'a, Societies>,
+        Read<'a, EcsWorldRef>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, SelectedComponent>,
         ReadStorage<'a, SocietyComponent>,
@@ -113,6 +115,7 @@ impl<'a> System<'a> for DisplayTextSystem {
             spatial,
             mouse,
             societies,
+            world,
             transforms,
             selected,
             society,
@@ -134,7 +137,7 @@ impl<'a> System<'a> for DisplayTextSystem {
 
         // show more info for entities close to the mouse
         let nearby = spatial
-            .query_in_radius(Transforms::Storage(&transforms), mouse.0, HOVER_RADIUS)
+            .query_in_radius(&world, mouse.0, HOVER_RADIUS)
             .map(|(e, _, _)| specs::Entity::from(e))
             .take(8)
             .collect::<ArrayVec<_, 8>>();

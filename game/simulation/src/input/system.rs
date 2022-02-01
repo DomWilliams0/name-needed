@@ -5,7 +5,8 @@ use crate::ecs::*;
 use crate::input::popup::{PopupContentType, UiPopup};
 pub use crate::input::system::selected_tiles::SelectedTiles;
 use crate::input::{InputEvent, InputModifier, SelectType, SelectionProgress, WorldColumn};
-use crate::spatial::{Spatial, Transforms};
+use crate::simulation::EcsWorldRef;
+use crate::spatial::Spatial;
 use crate::TransformComponent;
 use crate::{UiElementComponent, WorldRef};
 
@@ -48,6 +49,7 @@ impl<'a> InputSystem<'a> {
 impl<'a> System<'a> for InputSystem<'a> {
     type SystemData = (
         Read<'a, WorldRef>,
+        Read<'a, EcsWorldRef>,
         Read<'a, EntitiesRes>,
         Read<'a, Spatial>,
         Write<'a, SelectedEntities>,
@@ -62,6 +64,7 @@ impl<'a> System<'a> for InputSystem<'a> {
         &mut self,
         (
             world,
+            ecs_world,
             entities,
             spatial,
             mut entity_sel,
@@ -93,7 +96,7 @@ impl<'a> System<'a> for InputSystem<'a> {
             // fallback to looking for normal entities
             ui_elem.or_else(|| {
                 spatial
-                    .query_in_radius(Transforms::Storage(&transform), point, DISTANCE_THRESHOLD)
+                    .query_in_radius(&ecs_world, point, DISTANCE_THRESHOLD)
                     .next()
                     .map(|(e, _, _)| e)
             })
