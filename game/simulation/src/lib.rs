@@ -62,7 +62,10 @@ pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
-pub use society::{job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use society::{
+    job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle,
+    SocietyVisibility,
+};
 pub use string::{CachedStr, StringCache};
 pub use strum::IntoEnumIterator;
 pub use unit::world::{
