@@ -10,7 +10,7 @@
 * [X] fix tests
 * [X] update all society jobs once per tick
 * [ ] use frame alloc for boxed ai blackboard without lifetime
-* [ ] fix reservation flip-flop
+* [X] fix reservation flip-flop
 * [X] fix break block job terminating early
 * [ ] fix over-gathering of materials when already on the way
 * [X] use rust-derivative to avoid manually implementing clone/debug/default etc

@@ -1,7 +1,7 @@
-use ai::WeightedDse;
-
-use common::*;
 use std::num::NonZeroU16;
+
+use ai::WeightedDse;
+use common::*;
 use unit::world::WorldPosition;
 
 use crate::activity::HaulTarget;
@@ -10,7 +10,7 @@ use crate::ai::AiContext;
 use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
 use crate::item::HaulableItemComponent;
-use crate::job::{BuildDetails, SocietyJobHandle};
+use crate::job::{BuildDetails, Reservation, SocietyJobHandle};
 use crate::{ComponentWorld, HaulSource};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
@@ -54,29 +54,23 @@ impl SocietyTask {
     pub fn as_dse(
         &self,
         world: &EcsWorld,
-        existing_reservations: u16,
+        reservation: Reservation,
     ) -> Option<WeightedDse<AiContext>> {
+        use Reservation::*;
         use SocietyTask::*;
 
-        let weighting = match existing_reservations {
-            0 => 1.0,
-            1 => 0.9,
-            2 => 0.8,
-            3 => 0.75,
-            _ => return None, // don't even bother
+        let weight = match reservation {
+            ReservedBySelf => 1.2, // inertia for already reserved tasks
+            Unreserved => 0.95,
+            ReservedButShareable(0..=2) => 0.8,
+            ReservedButShareable(3) => 0.75,
+            ReservedButShareable(4) => 0.7,
+            ReservedButShareable(_) | Unavailable => return None, // don't even bother
         };
-
-        // macro_rules! dse_as_boxed_trait {
-        //     ($dse:expr) => {{
-        //         let boxed = BumpBox::new_in($dse, alloc);
-        //         // safety: normal safe cast allowed with Box but not custom BumpBox
-        //         unsafe { BumpBox::from_raw(BumpBox::into_raw(boxed) as *mut dyn Dse<AiContext>) }
-        //     }};
-        // }
 
         macro_rules! dse {
             ($dse:expr) => {
-                Some(WeightedDse::new($dse, weighting))
+                Some(WeightedDse::new($dse, weight))
             };
         }
 

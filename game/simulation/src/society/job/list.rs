@@ -171,11 +171,11 @@ impl SocietyJobList {
         }
     }
 
-    /// Returned job index is valid until [allow_jobs_again] is called
+    /// Returned job index is valid for single tick
     pub fn filter_applicable_tasks(
         &self,
         entity: Entity,
-        mut add_task: impl FnMut(SocietyTask, JobIndex, ReservationCount),
+        mut add_task: impl FnMut(SocietyTask, JobIndex, Reservation),
     ) {
         for (i, job) in self.jobs.iter().enumerate() {
             let job = job.borrow();
@@ -184,18 +184,8 @@ impl SocietyJobList {
             for task in job.tasks() {
                 use Reservation::*;
                 let reservations = match self.reservations.check_for(task, entity) {
-                    Unreserved | ReservedBySelf => {
-                        // wonderful, this task is fully available
-                        0
-                    }
-                    ReservedButShareable(n) => {
-                        // this task is available but already reserved by others
-                        n
-                    }
-                    Unavailable => {
-                        // not available
-                        continue;
-                    }
+                    Unavailable => continue,
+                    other => other,
                 };
                 add_task(task.clone(), i, reservations);
             }

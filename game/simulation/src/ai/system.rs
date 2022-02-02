@@ -523,8 +523,8 @@ fn collect_society_tasks(
         // TODO collect jobs from society directly, which can filter them from the applicable work items too
         let jobs = society.jobs();
         let mut n = 0usize;
-        jobs.filter_applicable_tasks(entity, |task, job_idx, reservations| {
-            match task.as_dse(ecs_world, reservations) {
+        jobs.filter_applicable_tasks(entity, |task, job_idx, reservation| {
+            match task.as_dse(ecs_world, reservation) {
                 Some(dse) => {
                     add_dse(task, job_idx, dse);
                     n += 1;
