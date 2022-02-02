@@ -28,6 +28,7 @@ pub enum EngineKey {
 #[derive(Copy, Clone, Debug)]
 pub enum GameKey {
     CancelSelection,
+    TogglePaused,
 }
 
 pub enum KeyAction {

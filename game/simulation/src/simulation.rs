@@ -62,9 +62,20 @@ static mut TICK: u32 = 0;
 /// Represents a game tick
 pub struct Tick(u32);
 
+#[derive(Copy, Clone)]
+enum RunStatus {
+    Running,
+    FastForward(f32),
+    Paused,
+}
+
 pub struct Simulation<R: Renderer> {
     ecs_world: Pin<Box<EcsWorld>>,
     voxel_world: WorldRef,
+    running: RunStatus,
+
+    /// Last interpolation passed to renderer, to reuse when paused
+    last_interpolation: f64,
 
     world_loader: ThreadedWorldLoader,
 
@@ -145,6 +156,8 @@ impl<R: Renderer> Simulation<R> {
         Ok(Self {
             ecs_world: pinned_world,
             voxel_world,
+            last_interpolation: 0.0,
+            running: RunStatus::Running,
             world_loader,
             debug_renderers,
             terrain_changes: HashSet::with_capacity(1024),
@@ -161,7 +174,9 @@ impl<R: Renderer> Simulation<R> {
         backend_data: &BackendData,
     ) -> Option<Exit> {
         // update tick
-        increment_tick();
+        if !self.is_paused() {
+            increment_tick();
+        }
 
         // TODO sort out systems so they all have an ecs_world reference and can keep state
 
@@ -203,51 +218,57 @@ impl<R: Renderer> Simulation<R> {
         exit
     }
 
+    fn is_paused(&self) -> bool {
+        matches!(self.running, RunStatus::Paused)
+    }
+
     fn tick_systems(&mut self) {
         // validate inventory soundness
         #[cfg(debug_assertions)]
         crate::item::validation::InventoryValidationSystem.run_now(&self.ecs_world);
 
-        // needs
-        HungerSystem.run_now(&self.ecs_world);
-        EatingSystem.run_now(&self.ecs_world);
+        if !self.is_paused() {
+            // needs
+            HungerSystem.run_now(&self.ecs_world);
+            EatingSystem.run_now(&self.ecs_world);
 
-        // update senses
-        SensesSystem.run_now(&self.ecs_world);
+            // update senses
+            SensesSystem.run_now(&self.ecs_world);
 
-        // choose and tick activity
-        AiSystem.run_now(&self.ecs_world);
-        ActivitySystem(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
-        self.ecs_world.resource::<Runtime>().tick();
+            // choose and tick activity
+            AiSystem.run_now(&self.ecs_world);
+            ActivitySystem(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
+            self.ecs_world.resource::<Runtime>().tick();
 
-        // follow paths with steering
-        PathSteeringSystem.run_now(&self.ecs_world);
+            // follow paths with steering
+            PathSteeringSystem.run_now(&self.ecs_world);
 
-        // apply steering
-        SteeringSystem.run_now(&self.ecs_world);
+            // apply steering
+            SteeringSystem.run_now(&self.ecs_world);
 
-        // attempt to fulfil desired velocity
-        MovementFulfilmentSystem.run_now(&self.ecs_world);
+            // attempt to fulfil desired velocity
+            MovementFulfilmentSystem.run_now(&self.ecs_world);
 
-        // process entity events
-        RuntimeSystem.run_now(&self.ecs_world);
+            // process entity events
+            RuntimeSystem.run_now(&self.ecs_world);
 
-        // apply physics
-        PhysicsSystem.run_now(&self.ecs_world);
+            // apply physics
+            PhysicsSystem.run_now(&self.ecs_world);
 
-        // sync hauled item positions
-        HaulSystem.run_now(&self.ecs_world);
+            // sync hauled item positions
+            HaulSystem.run_now(&self.ecs_world);
 
-        // update spatial
-        SpatialSystem.run_now(&self.ecs_world);
+            // update spatial
+            SpatialSystem.run_now(&self.ecs_world);
 
-        // prune ui elements
-        UiElementPruneSystem.run_now(&self.ecs_world);
+            // prune ui elements
+            UiElementPruneSystem.run_now(&self.ecs_world);
 
-        // prune dead entities from selection
-        self.ecs_world
-            .resource_mut::<SelectedEntities>()
-            .prune(&self.ecs_world);
+            // prune dead entities from selection
+            self.ecs_world
+                .resource_mut::<SelectedEntities>()
+                .prune(&self.ecs_world);
+        }
 
         // update display text for rendering
         self.display_text_system.run_now(&self.ecs_world);
@@ -509,6 +530,22 @@ impl<R: Renderer> Simulation<R> {
                     // close current popup only
                     self.ecs_world.resource_mut::<UiPopup>().close();
                 }
+
+                UiRequest::TogglePaused => {
+                    self.running = match self.running {
+                        RunStatus::Running | RunStatus::FastForward(_) => RunStatus::Paused,
+                        RunStatus::Paused => RunStatus::Running,
+                    };
+
+                    debug!(
+                        "{} gameplay",
+                        if self.is_paused() {
+                            "paused"
+                        } else {
+                            "resumed"
+                        }
+                    )
+                }
             }
         }
 
@@ -529,6 +566,14 @@ impl<R: Renderer> Simulation<R> {
 
         // start frame
         renderer.init(target);
+
+        let interpolation = if self.is_paused() {
+            // reuse last interpolation to avoid jittering
+            self.last_interpolation
+        } else {
+            self.last_interpolation = interpolation;
+            interpolation
+        };
 
         // render simulation
         {

@@ -452,6 +452,7 @@ impl SdlBackendInit {
                 if is_down {
                     Some(match key {
                         GameKey::CancelSelection => UiRequest::CancelSelection,
+                        GameKey::TogglePaused => UiRequest::TogglePaused,
                     })
                 } else {
                     None
@@ -522,6 +523,7 @@ fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
         D => KeyAction::Renderer(Camera(CameraDirection::Right)),
 
         Escape => KeyAction::Game(GameKey::CancelSelection),
+        P => KeyAction::Game(GameKey::TogglePaused),
         _ => return None,
     })
 }
