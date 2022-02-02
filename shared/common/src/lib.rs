@@ -9,6 +9,7 @@ pub use cgmath::{
     Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,
     VectorSpace, Zero,
 };
+pub use derivative::Derivative;
 pub use derive_more;
 pub use displaydoc::Display;
 pub use dynslot::DynSlot;

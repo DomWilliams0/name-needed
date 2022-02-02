@@ -274,7 +274,7 @@
    * `// TODO equip slots will require a lot of integration with the body tree, so dont flesh out properly`
  * [game/simulation/src/item/stack.rs](game/simulation/src/item/stack.rs) (5)
    * `// TODO use a better way than hacky definition names`
-   * `#[derive(Debug)] // TODO implement Debug manually`
+   * `#[derive(Debug, Derivative)] // TODO implement Debug manually`
    * `// TODO spill over to a new stack instead of failing`
    * `// TODO provide an ItemFilter to split a specific range?`
    * `// TODO compare components`

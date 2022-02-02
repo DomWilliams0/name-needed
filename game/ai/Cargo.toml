@@ -9,9 +9,6 @@ edition = "2018"
 [dependencies]
 common = { path = "../../shared/common" }
 
-float-ord = "0.2"
-derivative = "2.2"
-
 [features]
 default = []
 logging = []

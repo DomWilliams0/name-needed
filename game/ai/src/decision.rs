@@ -25,6 +25,8 @@ pub trait DseExt<C: Context>: Any {
     fn hash_dse(&self, hasher: &mut dyn Hasher);
 }
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
 pub struct WeightedDse<C: Context> {
     // TODO cow type for dse (aibox, framealloc, borrowed)
     dse: AiBox<dyn Dse<C>>,
@@ -104,15 +106,6 @@ impl<C: Context> Clone for AiBox<dyn Dse<C>> {
     }
 }
 
-impl<C: Context> Clone for WeightedDse<C> {
-    fn clone(&self) -> Self {
-        Self {
-            dse: self.dse.clone(),
-            multiplier: self.multiplier,
-        }
-    }
-}
-
 impl<C: Context> PartialEq<dyn Dse<C>> for dyn Dse<C> {
     fn eq(&self, other: &dyn Dse<C>) -> bool {
         self.compare_dse(other)
@@ -183,9 +176,6 @@ mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
-    use common::bumpalo::Bump;
-
-    use crate::intelligence::{DseToScore, IntelligenceContext, RealisedDses};
     use crate::test_utils::*;
     use crate::*;
 

@@ -2,8 +2,6 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::hint::unreachable_unchecked;
 
-use derivative::Derivative;
-
 use common::bumpalo::Bump;
 use common::*;
 
@@ -399,7 +397,7 @@ impl<C: Context> Intelligence<C> {
     pub fn iter_scores(
         &mut self,
     ) -> impl Iterator<Item = (&'static str, f32, Option<C::DseTarget>)> + '_ {
-        let mut dses = match self.decision_progress.as_mut() {
+        let dses = match self.decision_progress.as_mut() {
             Some(
                 DecisionProgress::InitialChoice { dses, .. }
                 | DecisionProgress::Decided { dses, .. },
@@ -492,12 +490,9 @@ impl<'a, C: Context> DseToScore<'a, C> {
 }
 
 mod realisation {
-    use derivative::Derivative;
-    use float_ord::FloatOrd;
-
     use common::bumpalo::collections::CollectIn;
     use common::bumpalo::Bump;
-    use common::BumpVec;
+    use common::*;
 
     use crate::intelligence::{DseIndex, DseToScore};
     use crate::{
@@ -605,7 +600,7 @@ mod realisation {
             self.scores
                 .iter()
                 .enumerate()
-                .max_by_key(|(_, f)| FloatOrd(**f))
+                .max_by_key(|(_, f)| OrderedFloat(**f))
                 .map(|(idx, score)| (RealisedDseIndex(idx), *score))
         }
 
@@ -648,7 +643,7 @@ mod realisation {
                 self.sorted_score_indices.sort_unstable_by_key(|i| {
                     debug_assert!(scores_ref.get(i.0).is_some());
                     let score = unsafe { scores_ref.get_unchecked(i.0) };
-                    FloatOrd(*score)
+                    OrderedFloat(*score)
                 });
             }
 
@@ -704,21 +699,17 @@ mod realisation {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use std::iter::empty;
 
-    use float_ord::FloatOrd;
-
-    use common::{bumpalo, once, Itertools};
+    use common::{bumpalo, once, Itertools, OrderedFloat};
 
     use crate::consideration::Considerations;
     use crate::decision::WeightedDse;
-    use crate::intelligence::realisation::RealisedDses;
-    use crate::intelligence::{DseIndex, IntelligenceContext};
+    use crate::intelligence::DseIndex;
     use crate::test_utils::*;
     use crate::{
-        AiBox, Consideration, ConsiderationParameter, Context, Curve, DecisionSource,
-        DecisionWeight, Dse, Intelligence, IntelligentDecision, TargetOutput, Targets,
+        AiBox, Consideration, ConsiderationParameter, Curve, DecisionSource, DecisionWeight, Dse,
+        Intelligence, IntelligentDecision, TargetOutput, Targets,
     };
 
     #[test]
@@ -928,7 +919,7 @@ mod tests {
 
         let scores = intelligence
             .iter_scores()
-            .sorted_by_key(|(_, score, _)| FloatOrd(*score))
+            .sorted_by_key(|(_, score, _)| OrderedFloat(*score))
             .collect_vec();
 
         assert_eq!(scores.len(), 4); // 2 targeted + 2 others
