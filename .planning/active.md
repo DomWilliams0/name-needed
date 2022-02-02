@@ -20,7 +20,7 @@
 * [ ] when evaluating a break/build thing in a range, dont always do all blocks in the same order
 * [o] add check for enough hands before considering finding food to pickup
 * [X] remove AiBox from best candidate choosing
-* [ ] improve WorldPosition/WorldPoint debug impls to be same as display
+* [X] improve WorldPosition/WorldPoint debug impls to be same as display
 * [X] add support for targets to dses
 *   * [X] port food and item gathering to use this
 * [ ] lazily calculate targets for dses? or easier: specific filter for when the dse is impossible
