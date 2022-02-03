@@ -6,7 +6,7 @@ pub use context::{Action, AiBox, Blackboard, Context, Input};
 pub use decision::{DecisionWeight, Dse, TargetOutput, Targets, WeightedDse};
 pub use intelligence::{
     DecisionProgress, DecisionSource, DseSkipper, InitialChoice, InputCache, Intelligence,
-    IntelligentDecision, Smarts,
+    IntelligentDecision, Smarts, StreamDseScorer,
 };
 
 mod consideration;
@@ -93,7 +93,7 @@ mod test_utils {
         type Input = TestInput;
         type Action = TestAction;
         type AdditionalDseId = u32;
-        type StreamDseExtraData = ();
+        type StreamDseExtraData = u32;
         type DseTarget = u32;
     }
 

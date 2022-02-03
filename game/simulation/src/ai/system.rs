@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use ai::{
     AiBox, DecisionProgress, DecisionSource, Dse, DseSkipper, Intelligence, IntelligentDecision,
-    WeightedDse,
+    StreamDseScorer, WeightedDse,
 };
 use common::*;
 
@@ -260,45 +260,12 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
             let choice = ai.intelligence.choose_with_stream_dses(
                 bb_ref,
                 alloc.allocator(),
+                (&mut *self, e),
                 extra_dses.into_iter(),
             );
 
             if let Some(choice) = choice.as_ref() {
                 trace!("initial ai choice"; "source" => ?choice.source, "score" => ?choice.score, e);
-
-                if let DecisionSource::Stream(_, data) = &choice.source {
-                    // track top few best candidates for society jobs
-                    let dse = choice.dse;
-                    let key = {
-                        let key = DseCandidateKey {
-                            dse,
-                            target: choice.target,
-                        };
-
-                        // safety: only used in this system in this tick
-                        unsafe {
-                            std::mem::transmute::<DseCandidateKey, DseCandidateKey<'static>>(key)
-                        }
-                    };
-
-                    self.0
-                        .best_society_dse_candidate
-                        // TODO use bump reference as hashmap key, with no cloning or boxing
-                        .entry(key)
-                        .and_modify(|best| {
-                            if best.insert(e, choice.score) {
-                                trace!("new candidate chosen"; "dse" => ?dse.name(), e, "score" => ?choice.score);
-                            }
-                        })
-                        .or_insert_with(|| {
-                            trace!("initial candidate"; "dse" => ?dse.name(), e, "score" => ?choice.score);
-                            let max_candidates = (data.society_task
-                                .max_workers()
-                                .get() as usize)
-                                .min(MAX_DSE_CANDIDATES);
-                            BestNCandidates::new(max_candidates, e, choice.score)
-                        });
-                }
             }
         }
     }
@@ -481,6 +448,47 @@ impl<'a> System<'a> for ConsumeDecision {
     }
 }
 
+impl StreamDseScorer<AiContext> for (&'_ mut MakeInitialChoice<'_>, Entity) {
+    fn register_score(
+        &mut self,
+        dse: &dyn Dse<AiContext>,
+        data: &StreamDseData,
+        tgt: Option<&AiTarget>,
+        score: f32,
+    ) {
+        let system = &mut self.0;
+        let entity = Entity::from(*self.1);
+
+        // track top few best candidates for society jobs
+        let key = {
+            let key = DseCandidateKey {
+                dse,
+                target: tgt.copied(),
+            };
+
+            // safety: only used in this system in this tick
+            unsafe { std::mem::transmute::<DseCandidateKey, DseCandidateKey<'static>>(key) }
+        };
+
+        system
+            .0
+            .best_society_dse_candidate
+            // TODO use bump reference as hashmap key, with no cloning or boxing
+            .entry(key)
+            .and_modify(|best| {
+                if best.insert(entity, score) {
+                    trace!("new candidate chosen"; "dse" => ?dse.name(), entity, "score" => ?score);
+                }
+            })
+            .or_insert_with(|| {
+                trace!("initial candidate"; "dse" => ?dse.name(), entity, "score" => ?score);
+                let max_candidates =
+                    (data.society_task.max_workers().get() as usize).min(MAX_DSE_CANDIDATES);
+                BestNCandidates::new(max_candidates, entity, score)
+            });
+    }
+}
+
 impl DseSkipper<AiContext> for (&'_ FinaliseChoice<'_>, Entity) {
     fn should_skip(
         &self,
@@ -498,7 +506,14 @@ impl DseSkipper<AiContext> for (&'_ FinaliseChoice<'_>, Entity) {
             };
             let best_candidates = match system_state.best_society_dse_candidate.get(&key) {
                 Some(vec) => vec,
-                None => return false,
+                None => {
+                    debug_assert!(
+                        false,
+                        "stream dse {:?} for target {:?} not seen before",
+                        src, target
+                    );
+                    return false;
+                }
             };
 
             // dont skip if we're a candidate

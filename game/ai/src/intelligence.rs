@@ -104,6 +104,17 @@ pub trait DseSkipper<C: Context> {
     ) -> bool;
 }
 
+/// Allows caller to track scores of the scores of all stream DSEs during thinking
+pub trait StreamDseScorer<C: Context> {
+    fn register_score(
+        &mut self,
+        dse: &dyn Dse<C>,
+        data: &C::StreamDseExtraData,
+        tgt: Option<&C::DseTarget>,
+        score: f32,
+    );
+}
+
 pub struct InputCache<'a, C: Context>(BumpVec<'a, (C::Input, Option<C::DseTarget>, f32)>);
 
 impl<'a, C: Context> InputCache<'a, C> {
@@ -177,6 +188,7 @@ impl<C: Context> Intelligence<C> {
         &mut self,
         mut blackboard: Box<C::Blackboard>,
         alloc: &bumpalo::Bump,
+        mut stream_scorer: impl StreamDseScorer<C>,
         streams: impl Iterator<Item = (WeightedDse<C>, C::StreamDseExtraData)>,
     ) -> Option<InitialChoice<C>> {
         // realise all dses and assign targets if any
@@ -208,6 +220,11 @@ impl<C: Context> Intelligence<C> {
             *dse.score = dse_score;
         }
         drop(context);
+
+        // register scores for all stream dses
+        for (dse, data, target, score) in dses.iter_streams() {
+            stream_scorer.register_score(dse, data, target, score);
+        }
 
         // find the best score for initial choice
         let best = dses.find_best();
@@ -259,7 +276,7 @@ impl<C: Context> Intelligence<C> {
         alloc: &bumpalo::Bump,
         cmp_arg: &<C::Action as Action>::Arg,
     ) -> IntelligentDecision<C> {
-        let _ = self.choose_with_stream_dses(blackboard, alloc, empty());
+        let _ = self.choose_with_stream_dses(blackboard, alloc, (), empty());
         self.consume_decision(cmp_arg)
     }
 
@@ -271,7 +288,7 @@ impl<C: Context> Intelligence<C> {
         cmp_arg: &<C::Action as Action>::Arg,
         streams: impl Iterator<Item = (WeightedDse<C>, C::StreamDseExtraData)>,
     ) -> IntelligentDecision<C> {
-        let _ = self.choose_with_stream_dses(blackboard, alloc, streams);
+        let _ = self.choose_with_stream_dses(blackboard, alloc, (), streams);
         self.consume_decision(cmp_arg)
     }
 
@@ -406,6 +423,18 @@ impl<C: Context> Intelligence<C> {
         };
 
         dses.iter().map(|dse| (dse.name, *dse.score, dse.target))
+    }
+}
+
+/// Dummy impl if not needed
+impl<C: Context> StreamDseScorer<C> for () {
+    fn register_score(
+        &mut self,
+        _: &dyn Dse<C>,
+        _: &C::StreamDseExtraData,
+        _: Option<&C::DseTarget>,
+        _: f32,
+    ) {
     }
 }
 
@@ -596,6 +625,31 @@ mod realisation {
                 })
         }
 
+        pub fn iter_streams(
+            &self,
+        ) -> impl Iterator<
+            Item = (
+                &dyn Dse<C>,
+                &C::StreamDseExtraData,
+                Option<&C::DseTarget>,
+                f32,
+            ),
+        > + '_ {
+            self.dses
+                .iter()
+                .zip(self.scores.iter())
+                .skip_while(|(dse, _)| !matches!(dse.source, DecisionSource::Stream(_, _)))
+                .map(move |(dse, score)| {
+                    // should be contiguous
+                    let (idx, data) = match &dse.source {
+                        DecisionSource::Stream(i, data) => (*i, data),
+                        _ => unreachable!("stream dses should be contiguous"),
+                    };
+                    let (weighted_dse, _) = self.streams.get(idx.0).expect("invalid stream dse");
+                    (weighted_dse.dse(), data, dse.target.as_ref(), *score)
+                })
+        }
+
         pub fn find_best(&self) -> Option<(RealisedDseIndex, f32)> {
             self.scores
                 .iter()
@@ -709,7 +763,7 @@ mod tests {
     use crate::test_utils::*;
     use crate::{
         AiBox, Consideration, ConsiderationParameter, Curve, DecisionSource, DecisionWeight, Dse,
-        Intelligence, IntelligentDecision, TargetOutput, Targets,
+        Intelligence, IntelligentDecision, StreamDseScorer, TargetOutput, Targets,
     };
 
     #[test]
@@ -764,7 +818,7 @@ mod tests {
         ));
 
         // add emergency as stream
-        let streams = once((WeightedDse::new(EmergencyDse, 1.0), ()));
+        let streams = once((WeightedDse::new(EmergencyDse, 1.0), 0));
         assert!(matches!(
             intelligence.choose_now_with_stream_dses(blackboard.clone(), &alloc, &(), streams),
             IntelligentDecision::New {
@@ -820,7 +874,7 @@ mod tests {
 
         // add a weighted dse
         let weighted = WeightedDse::new(ConfigurableDse(TestAction::Nop), 1.1);
-        let mut streams = vec![(weighted, ())];
+        let mut streams = vec![(weighted, 0)];
 
         // choose the new weighted Nop
         let alloc = bumpalo::Bump::new();
@@ -838,7 +892,7 @@ mod tests {
         };
 
         // back to a higher Eat
-        streams.push((WeightedDse::new(ConfigurableDse(TestAction::Eat), 1.9), ()));
+        streams.push((WeightedDse::new(ConfigurableDse(TestAction::Eat), 1.9), 0));
 
         match intelligence.choose_now_with_stream_dses(
             blackboard.clone(),
@@ -899,9 +953,23 @@ mod tests {
         }
     }
 
+    struct StreamDseChecker(Vec<(&'static str, Option<u32>, f32, u32)>);
+
+    impl StreamDseScorer<TestContext> for &'_ mut StreamDseChecker {
+        fn register_score(
+            &mut self,
+            dse: &dyn Dse<TestContext>,
+            data: &u32,
+            tgt: Option<&u32>,
+            score: f32,
+        ) {
+            self.0.push((dse.name(), tgt.copied(), score, *data));
+        }
+    }
+
     #[test]
     fn dse_realisation() {
-        let mut blackboard = Box::new(TestBlackboard {
+        let blackboard = Box::new(TestBlackboard {
             my_hunger: 0.5,
             targets: vec![100, 5],
         });
@@ -915,7 +983,7 @@ mod tests {
 
         let mut intelligence = Intelligence::new(dses.into_iter());
 
-        let _ = intelligence.choose_with_stream_dses(blackboard, &alloc, empty());
+        let _ = intelligence.choose_with_stream_dses(blackboard, &alloc, (), empty());
 
         let scores = intelligence
             .iter_scores()
@@ -943,5 +1011,36 @@ mod tests {
             } => {}
             _ => unreachable!(),
         };
+    }
+
+    #[test]
+    fn stream_scoring() {
+        let blackboard = Box::new(TestBlackboard {
+            my_hunger: 0.5,
+            targets: vec![1, 2, 5],
+        });
+        let alloc = bumpalo::Bump::new();
+
+        let dses = vec![AiBox::new(EatDse) as AiBox<dyn Dse<TestContext>>];
+
+        let mut intelligence = Intelligence::new(dses.into_iter());
+        let mut stream_scorer = StreamDseChecker(Vec::new());
+
+        let _ = intelligence.choose_with_stream_dses(
+            blackboard,
+            &alloc,
+            &mut stream_scorer,
+            once((WeightedDse::new(TargetedDse, 1.0), 123)),
+        );
+
+        assert_eq!(stream_scorer.0.len(), 3);
+        assert!(stream_scorer
+            .0
+            .iter()
+            .all(|(name, _, _, data)| *name == "Targeted" && *data == 123));
+
+        assert_eq!(stream_scorer.0[0].1, Some(1));
+        assert_eq!(stream_scorer.0[1].1, Some(2));
+        assert_eq!(stream_scorer.0[2].1, Some(5));
     }
 }
