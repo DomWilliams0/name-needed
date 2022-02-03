@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (401)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -350,9 +350,8 @@
    * `// TODO this changes the order`
    * `// TODO some builds could have multiple workers`
    * `// TODO better display impl for builds`
- * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (2)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
-   * `// TODO depends on error type?`
    * `// TODO fail early if no space left in container`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (5)
    * `#[derive(Debug)] // TODO implement manually`

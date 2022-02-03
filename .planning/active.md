@@ -38,4 +38,4 @@
 * [ ] update readme controls for pause+ff
 * [ ] bug: if noone considers a dse as initial choice, its best candidates are never tracked, then
     everyone can choose the same one (manifests if a society job is assigned while paused)
-* [ ] bug: 1 completion is asserted wrongly in Haul society job, can get many cancellations
+* [X] bug: 1 completion is asserted wrongly in Haul society job, can get many cancellations
