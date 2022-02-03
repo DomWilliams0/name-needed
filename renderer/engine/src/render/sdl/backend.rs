@@ -16,7 +16,7 @@ use simulation::input::{
     InputEvent, SelectType, UiCommand, UiCommands, UiPopup, UiRequest, WorldColumn,
 };
 use simulation::{
-    BackendData, ComponentWorld, Exit, InitializedSimulationBackend, PerfAvg,
+    BackendData, ComponentWorld, Exit, GameSpeedChange, InitializedSimulationBackend, PerfAvg,
     PersistentSimulationBackend, Simulation, WorldViewer,
 };
 use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
@@ -438,6 +438,8 @@ impl SdlBackendInit {
                     let cmd = match key {
                         EngineKey::Exit => UiRequest::ExitGame(Exit::Stop),
                         EngineKey::Restart => UiRequest::ExitGame(Exit::Restart),
+                        EngineKey::SpeedUp => UiRequest::ChangeGameSpeed(GameSpeedChange::Faster),
+                        EngineKey::SlowDown => UiRequest::ChangeGameSpeed(GameSpeedChange::Slower),
                     };
 
                     Some(cmd)
@@ -513,6 +515,8 @@ fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
     Some(match keycode {
         Q if alt_down() => KeyAction::Engine(EngineKey::Exit),
         R if alt_down() => KeyAction::Engine(EngineKey::Restart),
+        RightBracket => KeyAction::Engine(EngineKey::SpeedUp),
+        LeftBracket => KeyAction::Engine(EngineKey::SlowDown),
 
         Up => KeyAction::Renderer(SliceUp),
         Down => KeyAction::Renderer(SliceDown),

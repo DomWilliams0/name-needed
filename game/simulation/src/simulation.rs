@@ -14,6 +14,7 @@ use world::WorldChangeEvent;
 use crate::activity::ActivitySystem;
 use crate::ai::{AiComponent, AiSystem};
 use crate::alloc::FrameAllocator;
+use crate::backend::TickResponse;
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEventQueue, RuntimeTimers};
 use crate::input::{
@@ -40,7 +41,7 @@ use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::string::StringCache;
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, Exit,
+    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent,
     ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
@@ -65,7 +66,6 @@ pub struct Tick(u32);
 #[derive(Copy, Clone)]
 enum RunStatus {
     Running,
-    FastForward(f32),
     Paused,
 }
 
@@ -172,7 +172,8 @@ impl<R: Renderer> Simulation<R> {
         commands: impl Iterator<Item = UiCommand>,
         world_viewer: &mut WorldViewer,
         backend_data: &BackendData,
-    ) -> Option<Exit> {
+        response: &mut TickResponse,
+    ) {
         // update tick
         if !self.is_paused() {
             increment_tick();
@@ -201,7 +202,7 @@ impl<R: Renderer> Simulation<R> {
         }
 
         // apply player inputs
-        let exit = self.process_ui_commands(commands);
+        self.process_ui_commands(commands, response);
 
         // tick game logic
         self.tick_systems();
@@ -214,8 +215,6 @@ impl<R: Renderer> Simulation<R> {
 
         self.delete_queued_entities();
         self.ecs_world.maintain();
-
-        exit
     }
 
     fn is_paused(&self) -> bool {
@@ -376,8 +375,11 @@ impl<R: Renderer> Simulation<R> {
         std::mem::forget(std::mem::replace(&mut self.change_events, events));
     }
 
-    fn process_ui_commands(&mut self, commands: impl Iterator<Item = UiCommand>) -> Option<Exit> {
-        let mut exit = None;
+    fn process_ui_commands(
+        &mut self,
+        commands: impl Iterator<Item = UiCommand>,
+        tick: &mut TickResponse,
+    ) {
         for cmd in commands {
             let (req, resp) = cmd.consume();
             match req {
@@ -485,7 +487,7 @@ impl<R: Renderer> Simulation<R> {
                         }
                     }
                 }
-                UiRequest::ExitGame(ex) => exit = Some(ex),
+                UiRequest::ExitGame(ex) => tick.exit = Some(ex),
                 UiRequest::ExecuteScript(path) => {
                     info!("executing script"; "path" => %path.display());
                     let result = self
@@ -533,7 +535,7 @@ impl<R: Renderer> Simulation<R> {
 
                 UiRequest::TogglePaused => {
                     self.running = match self.running {
-                        RunStatus::Running | RunStatus::FastForward(_) => RunStatus::Paused,
+                        RunStatus::Running => RunStatus::Paused,
                         RunStatus::Paused => RunStatus::Running,
                     };
 
@@ -546,10 +548,11 @@ impl<R: Renderer> Simulation<R> {
                         }
                     )
                 }
+                UiRequest::ChangeGameSpeed(change) => {
+                    tick.speed_change = Some(change);
+                }
             }
         }
-
-        exit
     }
 
     /// Target is for this frame only

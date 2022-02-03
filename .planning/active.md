@@ -34,8 +34,8 @@
 * [X] fix gather material haul decision "change" when split stack is picked up
         * [X] remove last action access from blackboard
 * [X] pause
-* [ ] fast forward
-* [ ] update readme controls for pause+ff
+* [X] fast forward
+* [X] update readme controls for pause+ff
 * [X] bug: if noone considers a dse as initial choice, its best candidates are never tracked, then
     everyone can choose the same one (manifests if a society job is assigned while paused)
 * [X] bug: 1 completion is asserted wrongly in Haul society job, can get many cancellations

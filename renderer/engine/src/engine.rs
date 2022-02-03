@@ -1,10 +1,26 @@
 use std::time::Duration;
 
+use gameloop::GameLoop;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+
 use common::*;
 use simulation::input::UiCommands;
 use simulation::{
-    self, BackendData, Exit, InitializedSimulationBackend, Perf, Renderer, Simulation,
+    self, BackendData, Exit, GameSpeedChange, InitializedSimulationBackend, Perf, Renderer,
+    Simulation, TickResponse,
 };
+
+#[derive(Copy, Clone, FromPrimitive, Debug)]
+#[num_traits = "num_traits"]
+#[repr(u8)]
+enum RunSpeed {
+    Slowest,
+    Slower,
+    Normal,
+    Faster,
+    Fastest,
+}
 
 pub struct Engine<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> {
     backend: &'b mut B,
@@ -53,14 +69,12 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             std::thread::sleep(Duration::from_millis(delay as u64));
         }
 
-        #[cfg(not(feature = "lite"))]
-        let game_loop = gameloop::GameLoop::new(simulation::TICKS_PER_SECOND, 5)
-            .expect("game loop initialization failed");
-
-        let mut exit = None;
+        let mut speed = RunSpeed::Normal;
+        let mut game_loop = RunSpeed::Normal.into_gameloop();
 
         self.backend.start(&mut self.sim_ui_commands);
 
+        let mut tick = TickResponse::default();
         loop {
             if panik::has_panicked() {
                 debug!("breaking out of loop due to panics");
@@ -73,7 +87,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             for action in game_loop.actions() {
                 match action {
                     gameloop::FrameAction::Tick => {
-                        exit = self.tick(&backend_data);
+                        self.tick(&backend_data, &mut tick);
                     }
                     gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
                 }
@@ -82,26 +96,36 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             #[cfg(feature = "lite")]
             {
                 // tick as fast as possible
-                exit = self.tick(&backend_data);
+                self.tick(&backend_data, &mut tick);
             }
 
-            if let Some(exit) = exit {
+            let tick = std::mem::take(&mut tick);
+            if let Some(exit) = tick.exit {
                 info!("exiting game"; "reason" => ?exit);
                 break exit;
+            }
+
+            if let Some(change) = tick.speed_change {
+                if let Some(new_speed) = speed.try_change(change) {
+                    info!("new game speed"; "speed" => ?new_speed);
+                    speed = new_speed;
+                    game_loop = new_speed.into_gameloop();
+                }
             }
         }
     }
 
-    fn tick(&mut self, backend_data: &BackendData) -> Option<Exit> {
+    fn tick(&mut self, backend_data: &BackendData, response: &mut TickResponse) {
         trace!("tick");
-        let exit = {
+        {
             let _timer = self.perf.tick.time();
 
             let world_viewer = self.backend.world_viewer();
 
             let commands = self.sim_ui_commands.drain(..);
-            self.simulation.tick(commands, world_viewer, backend_data)
-        };
+            self.simulation
+                .tick(commands, world_viewer, backend_data, response)
+        }
 
         self.backend.tick();
 
@@ -114,17 +138,15 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     HookResult::KeepGoing => {}
                     HookResult::TestSuccess => {
                         info!("test finished successfully");
-                        return Some(Exit::TestSuccess);
+                        response.exit = Some(Exit::TestSuccess);
                     }
                     HookResult::TestFailure(err) => {
                         error!("test failed: {}", err);
-                        return Some(Exit::TestFailure(err));
+                        response.exit = Some(Exit::TestFailure(err));
                     }
                 }
             }
         }
-
-        exit
     }
 
     fn render(&mut self, interpolation: f64) {
@@ -139,5 +161,29 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             perf,
             &mut self.sim_ui_commands,
         );
+    }
+}
+
+impl RunSpeed {
+    fn into_gameloop(self) -> GameLoop {
+        let mul = match self {
+            RunSpeed::Slowest => 0.2,
+            RunSpeed::Slower => 0.5,
+            RunSpeed::Normal => 1.0,
+            RunSpeed::Faster => 2.5,
+            RunSpeed::Fastest => 5.0,
+        };
+
+        let tps = ((simulation::TICKS_PER_SECOND as f32) * mul) as usize;
+        GameLoop::new(tps, 5).expect("bad gameloop parameters")
+    }
+
+    fn try_change(self, change: GameSpeedChange) -> Option<Self> {
+        let delta = match change {
+            GameSpeedChange::Faster => 1,
+            GameSpeedChange::Slower => -1,
+        };
+
+        Self::from_i8((self as i8) + delta)
     }
 }

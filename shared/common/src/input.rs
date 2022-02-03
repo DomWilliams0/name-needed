@@ -23,6 +23,8 @@ pub enum RendererKey {
 pub enum EngineKey {
     Exit,
     Restart,
+    SpeedUp,
+    SlowDown,
 }
 
 #[derive(Copy, Clone, Debug)]

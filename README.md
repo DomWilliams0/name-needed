@@ -97,3 +97,5 @@ The `--scenario` parameter chooses a specific situation to spawn entities in, fo
     * Then <kbd>Right-click</kbd> a location in the world, or another entity to order them around
 * <kbd>Escape</kbd> to clear the current entity and world selections
 * Move the camera sideways with <kbd>WASD</kbd>, and vertically with the <kbd>Arrow keys</kbd>
+* <kbd>P</kbd> to pause and unpause
+* <kbd>]</kbd>/<kbd>[</kbd> to speed up and slow down the game
