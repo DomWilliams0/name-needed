@@ -590,6 +590,10 @@ mod realisation {
 
                 match dse.target(&mut targets, blackboard) {
                     TargetOutput::Untargeted => {
+                        debug_assert!(
+                            targets.is_empty(),
+                            "non-empty targets but Untargeted returned"
+                        );
                         dses.push(realised);
                         scores.push(score);
                     }
@@ -747,7 +751,8 @@ mod realisation {
             )
         });
 
-        base.chain(additional).chain(stream)
+        // additional first, as they're generally more likely to win
+        additional.chain(base).chain(stream)
     }
 }
 

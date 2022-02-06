@@ -470,10 +470,10 @@ impl StreamDseScorer<AiContext> for (&'_ mut MakeInitialChoice<'_>, Entity) {
             unsafe { std::mem::transmute::<DseCandidateKey, DseCandidateKey<'static>>(key) }
         };
 
+        // TODO limit the number of times a single entity can appear in best candidates
         system
             .0
             .best_society_dse_candidate
-            // TODO use bump reference as hashmap key, with no cloning or boxing
             .entry(key)
             .and_modify(|best| {
                 if best.insert(entity, score) {

@@ -45,6 +45,8 @@ pub trait Dse<C: Context>: DseExt<C> {
     fn considerations(&self, out: &mut Considerations<C>);
     fn weight(&self) -> DecisionWeight;
 
+    /// Calculate targets for each instance of this DSE. Must return [TargetsCollected] if an
+    /// attempt to find targets is made
     #[allow(unused_variables)]
     fn target(&self, targets: &mut Targets<C>, blackboard: &mut C::Blackboard) -> TargetOutput {
         TargetOutput::Untargeted
@@ -168,6 +170,10 @@ impl<'a, C: Context> Targets<'a, C> {
 
     pub fn drain(&mut self) -> impl Iterator<Item = C::DseTarget> + '_ {
         self.0.drain(..)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

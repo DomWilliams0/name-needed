@@ -186,7 +186,7 @@
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
    * `// TODO bump alloc this`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
-   * `// TODO use bump reference as hashmap key, with no cloning or boxing`
+   * `// TODO limit the number of times a single entity can appear in best candidates`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
