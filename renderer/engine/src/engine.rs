@@ -70,7 +70,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         }
 
         let mut speed = RunSpeed::Normal;
-        let mut game_loop = RunSpeed::Normal.into_gameloop();
+        let mut game_loop = speed.into_gameloop();
 
         self.backend.start(&mut self.sim_ui_commands);
 
@@ -89,7 +89,10 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     gameloop::FrameAction::Tick => {
                         self.tick(&backend_data, &mut tick);
                     }
-                    gameloop::FrameAction::Render { interpolation } => self.render(interpolation),
+                    gameloop::FrameAction::Render { interpolation } => {
+                        // TODO clamp to 1.0 in gameloop crate
+                        self.render(interpolation.min(1.0))
+                    }
                 }
             }
 
@@ -166,16 +169,19 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
 
 impl RunSpeed {
     fn into_gameloop(self) -> GameLoop {
-        let mul = match self {
+        let mul = self.modifier();
+        let tps = ((simulation::TICKS_PER_SECOND as f32) * mul) as usize;
+        GameLoop::new(tps, 5).expect("bad gameloop parameters")
+    }
+
+    fn modifier(self) -> f32 {
+        match self {
             RunSpeed::Slowest => 0.2,
             RunSpeed::Slower => 0.5,
             RunSpeed::Normal => 1.0,
             RunSpeed::Faster => 2.5,
             RunSpeed::Fastest => 5.0,
-        };
-
-        let tps = ((simulation::TICKS_PER_SECOND as f32) * mul) as usize;
-        GameLoop::new(tps, 5).expect("bad gameloop parameters")
+        }
     }
 
     fn try_change(self, change: GameSpeedChange) -> Option<Self> {

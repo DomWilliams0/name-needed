@@ -1,4 +1,4 @@
-# TODOs (400)
+# TODOs (402)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -470,13 +470,16 @@
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
+ * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
+   * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (4)
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (5)
    * `// TODO cache projectction+view matrices if camera isn't moving`
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
+   * `// TODO this seems to be dependent on frame rate...`
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
    * `// TODO proper errors`

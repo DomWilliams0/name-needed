@@ -284,7 +284,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
     }
 
     fn tick(&mut self) {
-        let chunk_bounds = self.camera.tick();
+        let chunk_bounds = self.camera.bounds();
         self.world_viewer.set_chunk_bounds(chunk_bounds);
 
         let renderer = self.backend.renderer.terrain_mut();
@@ -310,7 +310,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         Gl::clear();
 
         // calculate projection and view matrices
-        self.camera.update_interpolation(interpolation);
+        self.camera.tick(interpolation);
         let projection = self.camera.projection_matrix();
 
         let terrain_range = self.world_viewer.terrain_range();
