@@ -19,6 +19,7 @@ struct SpatialInner {
     positions: Vec<(Entity, WorldPoint)>,
     entities: HashSet<Entity>,
     newly_created_entities: Vec<Entity>,
+    query_cache: Vec<(Entity, WorldPoint, f32)>,
 }
 
 /// Update spatial resource
@@ -31,6 +32,7 @@ impl Default for Spatial {
                 positions: Vec::with_capacity(256),
                 entities: HashSet::with_capacity(256),
                 newly_created_entities: Vec::new(),
+                query_cache: Vec::new(),
             }),
         }
     }
@@ -80,7 +82,7 @@ impl Spatial {
         world: &EcsWorld,
         centre: WorldPoint,
         radius: f32,
-    ) -> impl Iterator<Item = (Entity, WorldPoint, f32)> {
+    ) -> impl Iterator<Item = (Entity, WorldPoint, f32)> + '_ {
         let mut inner = self.inner.borrow_mut();
         let transforms = world.read_storage::<TransformComponent>();
 
@@ -117,19 +119,25 @@ impl Spatial {
 
         let radius2 = radius.powi(2);
 
-        // awful allocation in sort only acceptable because this is an awful temporary brute force
-        // implementation
-        inner
-            .positions
-            .iter()
-            .map(|(e, point)| {
-                let distance2 = point.distance2(centre);
-                (e, point, distance2)
-            })
-            // positions are cached so check transform is still present after filtering by distance
-            .filter(|(e, _, dist2)| *dist2 < radius2 && e.has(&transforms))
-            .map(|(e, point, dist2)| (*e, *point, dist2.sqrt()))
-            .sorted_by_key(|(_, _, dist)| OrderedFloat(*dist))
+        // safety: query cache is not referenced anywhere else
+        let query_cache = unsafe { &mut *(&mut inner.query_cache as *mut Vec<_>) };
+        debug_assert!(query_cache.is_empty());
+
+        query_cache.extend(
+            inner
+                .positions
+                .iter()
+                .map(|(e, point)| {
+                    let distance2 = point.distance2(centre);
+                    (e, point, distance2)
+                })
+                // positions are cached so check transform is still present after filtering by distance
+                .filter(|(e, _, dist2)| *dist2 < radius2 && e.has(&transforms))
+                .map(|(e, point, dist2)| (*e, *point, dist2.sqrt())),
+        );
+
+        query_cache.sort_unstable_by_key(|(_, _, dist)| OrderedFloat(*dist));
+        query_cache.drain(..)
     }
 }
 
