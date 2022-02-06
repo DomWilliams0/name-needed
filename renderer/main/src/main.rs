@@ -13,6 +13,16 @@ use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend
 
 use crate::scenarios::Scenario;
 
+#[cfg(feature = "profiling")]
+mod tracy_alloc {
+    use std::alloc::System;
+
+    use crate::tracy_client::ProfiledAllocator;
+
+    #[global_allocator]
+    static GLOBAL: ProfiledAllocator<System> = ProfiledAllocator::new(System, 32);
+}
+
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
     use alloc_counter::{count_alloc, AllocCounter};

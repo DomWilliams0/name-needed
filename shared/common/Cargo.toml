@@ -29,6 +29,7 @@ parking_lot = "0.11"
 backtrace = "0.3"
 displaydoc = "0.2"
 derivative = "2.2"
+tracy-client = { version = "0.12", default-features = false }
 
 # TODO feature for cgmath
 [features]
@@ -36,3 +37,4 @@ default = ["library"]
 binary = ["logging/binary"]
 library = []
 log-to-file = ["logging/to-file"]
+profiling = ["tracy-client/enable"]

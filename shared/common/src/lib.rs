@@ -23,6 +23,7 @@ pub use parse_display;
 pub use rand::{self, prelude::*};
 pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
+pub use tracy_client;
 
 pub use lazy_static::lazy_static;
 pub use logging::{
