@@ -2,6 +2,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use jemallocator::Jemalloc;
+
 use common::*;
 use config::ConfigType;
 use engine::simulation;
@@ -13,27 +15,31 @@ use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend
 
 use crate::scenarios::Scenario;
 
+type MyAllocator = Jemalloc;
+const ALLOCATOR: MyAllocator = Jemalloc;
+
 #[cfg(feature = "profiling")]
 mod tracy_alloc {
-    use std::alloc::System;
-
     use crate::tracy_client::ProfiledAllocator;
+    use crate::{MyAllocator, ALLOCATOR};
 
     #[global_allocator]
-    static GLOBAL: ProfiledAllocator<System> = ProfiledAllocator::new(System, 32);
+    static GLOBAL: ProfiledAllocator<MyAllocator> = ProfiledAllocator::new(ALLOCATOR, 32);
 }
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
     use alloc_counter::{count_alloc, AllocCounter};
 
-    type Allocator = std::alloc::System;
-
-    const ALLOCATOR: Allocator = std::alloc::System;
+    use crate::{MyAllocator, ALLOCATOR};
 
     #[global_allocator]
-    static A: AllocCounter<Allocator> = AllocCounter(ALLOCATOR);
+    static A: AllocCounter<MyAllocator> = AllocCounter(ALLOCATOR);
 }
+
+// #[cfg(not(any(feature = "profiling", feature = "count-allocs")))]
+#[global_allocator]
+static GLOBAL: MyAllocator = ALLOCATOR;
 
 mod scenarios;
 
