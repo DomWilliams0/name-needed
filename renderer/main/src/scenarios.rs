@@ -129,6 +129,7 @@ fn building(ecs: &EcsWorld) {
         helpers::new_entity("core_living_human", ecs, pos)
             .with_color(colors.next().unwrap())
             .with_player_society()
+            .with_satiety(NormalizedFloat::clamped(0.4))
             .with_name()
             .thanks()
     });

@@ -1,5 +1,6 @@
 use crate::ecs::*;
 use crate::senses::sense::{HearingSphere, Sense, VisionCone};
+use crate::simulation::EcsWorldRef;
 use crate::spatial::Spatial;
 use crate::string::StringCache;
 use crate::TransformComponent;
@@ -51,12 +52,16 @@ impl<'a> System<'a> for SensesSystem {
     type SystemData = (
         Read<'a, Spatial>,
         Read<'a, EntitiesRes>,
+        Read<'a, EcsWorldRef>,
         ReadStorage<'a, MagicalSenseComponent>,
         ReadStorage<'a, TransformComponent>,
         WriteStorage<'a, SensesComponent>,
     );
 
-    fn run(&mut self, (spatial, entities, providers, transforms, mut senses): Self::SystemData) {
+    fn run(
+        &mut self,
+        (spatial, entities, world, providers, transforms, mut senses): Self::SystemData,
+    ) {
         log_scope!(o!("system" => "senses"));
 
         // TODO system is expensive, dont run every tick
@@ -97,7 +102,7 @@ impl<'a> System<'a> for SensesSystem {
             // TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)
 
             spatial
-                .query_in_radius((&transforms).into(), transform.position, max_radius)
+                .query_in_radius(&world, transform.position, max_radius)
                 .filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list
                 .for_each(|(entity, pos, dist)| {
                     let sensed = senses.senses(transform, &pos, dist);

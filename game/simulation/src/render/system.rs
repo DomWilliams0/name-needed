@@ -136,8 +136,11 @@ impl<'a, R: Renderer> System<'a> for RenderSystem<'a, R> {
             .join()
         {
             // only render elements for the player's society
-            if !ui.society().map(|soc| *player_soc == soc).unwrap_or(true) {
-                continue;
+            match ui.society() {
+                Some(soc) if *player_soc != soc => {
+                    continue;
+                }
+                _ => {}
             }
 
             if !self.slices.contains(transform.slice()) {

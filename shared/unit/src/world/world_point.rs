@@ -279,6 +279,12 @@ impl Display for WorldPoint {
     }
 }
 
+impl Debug for WorldPoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        Display::fmt(self, f)
+    }
+}
+
 /// No NaNs allowed (sorry grandma)
 impl Eq for WorldPoint {}
 
@@ -299,16 +305,6 @@ impl From<ViewPoint> for WorldPoint {
             const SCALE: f32 = BLOCKS_PER_METRE as f32;
             new_xyz(x * SCALE, y * SCALE, z * SCALE)
         }
-    }
-}
-
-impl Debug for WorldPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("WorldPoint")
-            .field(&self.x())
-            .field(&self.y())
-            .field(&self.z())
-            .finish()
     }
 }
 

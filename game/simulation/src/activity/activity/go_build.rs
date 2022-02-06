@@ -59,6 +59,6 @@ impl Status for BuildStatus {
 
 impl Display for GoBuildActivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Building {:?}", self.details.target)
+        write!(f, "Building {}", self.details.target)
     }
 }

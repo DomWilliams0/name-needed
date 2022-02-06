@@ -6,8 +6,8 @@ use common::*;
 use simulation::job::BuildThingJob;
 use simulation::{
     BlockType, BuildMaterial, BuildTemplate, CachedStr, ComponentWorld, ContainersError, Entity,
-    EntityEventDebugPayload, EntityEventPayload, ItemStackError, Societies, SocietyComponent,
-    StackableComponent, TaskResultSummary,
+    EntityEventDebugPayload, EntityEventPayload, ItemStackError, PlayerSociety, QueuedUpdates,
+    Societies, SocietyComponent, SocietyVisibility, StackableComponent, TaskResultSummary,
 };
 use unit::world::WorldPosition;
 
@@ -139,6 +139,17 @@ impl GatherAndBuild {
 
             // create build jobs
             let societies = ctx.simulation.ecs.resource_mut::<Societies>();
+
+            // make visible in graphical
+            ctx.simulation.ecs.resource::<QueuedUpdates>().queue(
+                "set player society visibility",
+                |world| {
+                    world
+                        .resource_mut::<PlayerSociety>()
+                        .set_visibility(SocietyVisibility::All);
+                    Ok(())
+                },
+            );
 
             let soc = societies.new_society("People".to_owned()).unwrap();
             let society = societies.society_by_handle(soc).unwrap();

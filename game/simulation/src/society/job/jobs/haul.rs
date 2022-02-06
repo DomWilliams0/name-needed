@@ -1,15 +1,15 @@
+use common::*;
+use unit::world::WorldPoint;
+
 use crate::activity::{HaulSource, HaulTarget};
 use crate::ecs::*;
 use crate::item::{ContainedInComponent, HauledItemComponent};
+use crate::job::job::CompletedTasks;
+use crate::job::task::HaulSocietyTask;
 use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::job::SocietyJobImpl;
 use crate::society::job::SocietyTask;
-
-use crate::job::job::CompletedTasks;
-use crate::job::task::HaulSocietyTask;
 use crate::{ContainerComponent, PhysicalComponent, TransformComponent};
-use common::*;
-use unit::world::WorldPoint;
 
 /// Haul a thing to a position
 // TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container
@@ -76,21 +76,16 @@ impl SocietyJobImpl for HaulJob {
     ) -> Option<SocietyTaskResult> {
         debug_assert!(tasks.len() <= 1);
 
-        assert!(
-            completions.len() <= 1,
-            "single completion expected but got {}",
-            completions.len()
-        );
+        // ignore failures
+        let completion = completions
+            .iter()
+            .find(|(_, res)| matches!(res, SocietyTaskResult::Success));
 
         // apply completion
-        if let Some((task, result)) = completions.get_mut(0) {
+        if let Some((task, result)) = completion {
             debug!("haul task completed"; "task" => ?task, "result" => ?result);
-            debug_assert_eq!(tasks.get(0), Some(&*task), "unexpected completion");
-
-            // end job regardless of success or failure
-            // TODO depends on error type?
-            let result = std::mem::replace(result, SocietyTaskResult::Success);
-            return Some(result);
+            debug_assert_eq!(tasks.get(0), Some(task), "unexpected successful completion");
+            return Some(SocietyTaskResult::Success);
         }
 
         // TODO fail early if no space left in container

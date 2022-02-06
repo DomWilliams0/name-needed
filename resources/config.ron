@@ -2,7 +2,7 @@ Config(
     display: (
         resolution: (1280, 720),
         resizable: false,
-        camera_move_speed: 1.0,
+        camera_move_speed: 0.35, // might vary based on frame rate, oopsy
         initial_zoom: 1.0,
         camera_zoom_speed: 0.05,
         initial_view_range: 8,
@@ -27,7 +27,7 @@ Config(
             "humans": 20,
             "dogs": 5,
             "food": 50,
-            "bricks": 20,
+            "bricks": 80,
             "build_jobs": 2,
         },
         entity_logging_by_default: true,

@@ -1,50 +1,37 @@
 //! Infinite axis utility system
+#![allow(clippy::type_complexity)]
 
-pub use consideration::{Consideration, ConsiderationParameter, Curve};
-pub use decision::{Considerations, DecisionWeightType, Dse, WeightedDse};
-pub use intelligence::{DecisionSource, InputCache, Intelligence, IntelligentDecision, Smarts};
-
-use common::bumpalo;
-use std::fmt::Debug;
-use std::hash::Hash;
+pub use consideration::{Consideration, ConsiderationParameter, Considerations, Curve};
+pub use context::{Action, AiBox, Blackboard, Context, Input};
+pub use decision::{DecisionWeight, Dse, TargetOutput, Targets, WeightedDse};
+pub use intelligence::{
+    DecisionProgress, DecisionSource, DseSkipper, InitialChoice, InputCache, Intelligence,
+    IntelligentDecision, Smarts, StreamDseScorer,
+};
 
 mod consideration;
+mod context;
 mod decision;
 mod intelligence;
-
-pub trait Context: Sized {
-    type Blackboard: Blackboard;
-    type Input: Input<Self>;
-    type Action: Default + Eq + Clone;
-    type AdditionalDseId: Hash + Eq + Clone + Debug;
-}
-
-pub trait Input<C: Context>: Hash + Clone + Eq {
-    fn get(&self, blackboard: &mut C::Blackboard) -> f32;
-}
-
-pub trait Blackboard {
-    #[cfg(feature = "logging")]
-    fn entity(&self) -> String;
-}
-
-// TODO use a separate allocator for ai to avoid fragmentation
-pub type AiBox<T> = Box<T>;
-
-pub(crate) fn pretty_type_name(name: &str) -> &str {
-    let split_idx = name.rfind(':').map(|i| i + 1).unwrap_or(0);
-    &name[split_idx..]
-}
 
 #[cfg(test)]
 mod test_utils {
     use super::*;
 
-    #[derive(Eq, PartialEq, Clone, Debug)]
+    #[derive(Eq, PartialEq, Clone, Debug, Hash)]
     pub enum TestAction {
         Nop,
         Eat,
         CancelExistence,
+        Attack(u32),
+    }
+
+    impl Action for TestAction {
+        type Arg = ();
+
+        fn cmp(&self, other: &Self, _: &Self::Arg) -> bool {
+            self == other
+        }
     }
 
     impl Default for TestAction {
@@ -60,21 +47,35 @@ mod test_utils {
         One,
         /// out of 100
         Constant(u32),
+        IsTargetFive,
     }
 
     impl Input<TestContext> for TestInput {
-        fn get(&self, blackboard: &mut <TestContext as Context>::Blackboard) -> f32 {
+        fn get(
+            &self,
+            blackboard: &mut <TestContext as Context>::Blackboard,
+            target: Option<&u32>,
+        ) -> f32 {
             match self {
                 TestInput::MyHunger => blackboard.my_hunger,
                 TestInput::DoAnythingElse => 0.001,
                 TestInput::One => 1.0,
                 TestInput::Constant(c) => (*c as f32) / 100.0,
+                TestInput::IsTargetFive => {
+                    if target.copied() == Some(5) {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
             }
         }
     }
 
+    #[derive(Clone, Default)]
     pub struct TestBlackboard {
         pub my_hunger: f32,
+        pub targets: Vec<u32>,
     }
 
     impl Blackboard for TestBlackboard {
@@ -92,6 +93,8 @@ mod test_utils {
         type Input = TestInput;
         type Action = TestAction;
         type AdditionalDseId = u32;
+        type StreamDseExtraData = u32;
+        type DseTarget = u32;
     }
 
     pub struct MyHungerConsideration;
@@ -162,76 +165,54 @@ mod test_utils {
         }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct EatDse;
 
     impl Dse<TestContext> for EatDse {
-        fn name(&self) -> &'static str {
-            "Eat"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(MyHungerConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::Normal
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::Normal
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::Eat
         }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct BadDse;
 
     impl Dse<TestContext> for BadDse {
-        fn name(&self) -> &'static str {
-            "Bad"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(CancelExistenceConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::Emergency
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::Emergency
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::CancelExistence
         }
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct EmergencyDse;
 
     impl Dse<TestContext> for EmergencyDse {
-        fn name(&self) -> &'static str {
-            "Emergency"
-        }
-
         fn considerations(&self, out: &mut Considerations<TestContext>) {
             out.add(AlwaysWinConsideration);
         }
 
-        fn weight_type(&self) -> DecisionWeightType {
-            DecisionWeightType::AbsoluteOverride
+        fn weight(&self) -> DecisionWeight {
+            DecisionWeight::AbsoluteOverride
         }
 
-        fn action(&self, _: &mut TestBlackboard) -> TestAction {
+        fn action(&self, blackboard: &mut TestBlackboard, target: Option<u32>) -> TestAction {
             TestAction::CancelExistence // sorry
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pretty_type_names() {
-        assert_eq!(pretty_type_name("this::is::my::type::Lmao"), "Lmao");
-        assert_eq!(pretty_type_name("boop"), "boop");
-        assert_eq!(pretty_type_name("malformed:"), "");
-        assert_eq!(pretty_type_name(":malformed"), "malformed");
     }
 }

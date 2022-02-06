@@ -1,8 +1,13 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
+use std::task::{Context, Poll};
 
 use common::*;
+use unit::world::WorldPoint;
+use world::SearchGoal;
 
+use crate::activity::context::EventResult::{Consumed, Unconsumed};
 use crate::activity::status::Status;
 use crate::activity::subactivity::{
     BreakBlockError, BreakBlockSubactivity, BuildBlockError, BuildBlockSubactivity, EatItemError,
@@ -13,17 +18,11 @@ use crate::activity::{Activity, EquipItemError, HaulError, StatusUpdater};
 use crate::ecs::*;
 use crate::event::prelude::*;
 use crate::event::{EntityEventQueue, RuntimeTimers};
+use crate::job::{BuildDetails, SocietyJobHandle};
 use crate::runtime::{TaskRef, TimerFuture};
 use crate::{
     ComponentWorld, EcsWorld, Entity, FollowPathComponent, TransformComponent, WorldPosition,
 };
-
-use crate::activity::context::EventResult::{Consumed, Unconsumed};
-use crate::job::{BuildDetails, SocietyJobHandle};
-use std::rc::Rc;
-use std::task::{Context, Poll};
-use unit::world::WorldPoint;
-use world::SearchGoal;
 
 pub type ActivityResult = Result<(), Box<dyn Error>>;
 
@@ -351,5 +350,9 @@ impl ActivityContext {
         }
 
         YieldNow(false).await
+    }
+
+    pub async fn park_indefinitely(&self) {
+        self.task.park_until_triggered().await
     }
 }

@@ -1,4 +1,8 @@
-#![allow(clippy::type_complexity, clippy::module_inception)]
+#![allow(
+    clippy::type_complexity,
+    clippy::module_inception,
+    clippy::non_send_fields_in_send_ty
+)]
 #![deny(unused_must_use)]
 
 // Exports from world so the renderer only needs to link against simulation
@@ -24,7 +28,8 @@ pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
 pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
 pub use crate::backend::{
-    state, BackendData, Exit, InitializedSimulationBackend, PersistentSimulationBackend,
+    state, BackendData, Exit, GameSpeedChange, InitializedSimulationBackend,
+    PersistentSimulationBackend, TickResponse,
 };
 pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
@@ -58,7 +63,10 @@ pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
 pub use runtime::Runtime;
-pub use society::{job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle};
+pub use society::{
+    job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle,
+    SocietyVisibility,
+};
 pub use string::{CachedStr, StringCache};
 pub use strum::IntoEnumIterator;
 pub use unit::world::{

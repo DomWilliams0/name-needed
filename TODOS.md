@@ -1,23 +1,21 @@
-# TODOs (408)
+# TODOs (402)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
    * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
+ * [game/ai/src/consideration.rs](game/ai/src/consideration.rs) (1)
+   * `// TODO dont bother running destructors`
+ * [game/ai/src/context.rs](game/ai/src/context.rs) (1)
+   * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/ai/src/decision.rs](game/ai/src/decision.rs) (1)
-   * `// TODO use a simpler manual vec that doesnt run destructors`
- * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (10)
+   * `// TODO cow type for dse (aibox, framealloc, borrowed)`
+ * [game/ai/src/intelligence.rs](game/ai/src/intelligence.rs) (6)
    * `// TODO bump allocator should not expose bumpalo specifically`
    * `// TODO pool/arena allocator`
    * `// TODO use an arena-allocator hashmap`
    * `// TODO perfect hash on C::Input`
-   * `// TODO DSEs should be immutable, with scores stored somewhere else e.g. parallel array`
-   * `// TODO add momentum to discourage changing mind so often`
-   * `// TODO use bump allocator`
-   * `// TODO benchmark adding and popping smarts`
-   * `// TODO use bump`
+   * `// TODO add momentum to initial weight to discourage changing mind so often`
    * `// TODO reuse allocation`
- * [game/ai/src/lib.rs](game/ai/src/lib.rs) (1)
-   * `// TODO use a separate allocator for ai to avoid fragmentation`
  * [game/markov/src/lib.rs](game/markov/src/lib.rs) (1)
    * `// TODO markov generation from source words`
  * [game/procgen/src/biome.rs](game/procgen/src/biome.rs) (3)
@@ -152,39 +150,43 @@
    * `// TODO need to notify society here, as above?`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
- * [game/simulation/src/ai/consideration/items.rs](game/simulation/src/ai/consideration/items.rs) (2)
+ * [game/simulation/src/ai/consideration/items/find_local_graded_item.rs](game/simulation/src/ai/consideration/items/find_local_graded_item.rs) (1)
    * `/// TODO search society stores as well`
+ * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)
    * `// TODO also count currently occupied hands as "available", could drop current item to haul this`
- * [game/simulation/src/ai/consideration/world.rs](game/simulation/src/ai/consideration/world.rs) (1)
+ * [game/simulation/src/ai/consideration/world/my_proximity_to_target.rs](game/simulation/src/ai/consideration/world/my_proximity_to_target.rs) (2)
+   * `// TODO take into account general world/society size? need some scale`
    * `// TODO take mobility into account, e.g. more injured = prefer closer`
- * [game/simulation/src/ai/dse/food.rs](game/simulation/src/ai/dse/food.rs) (1)
+ * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (2)
+   * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
+   * `// TODO cache searches as before in 2f1fc7a if necessary (profile!)`
+ * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (2)
+   * `// TODO target food condition consideration`
    * `// TODO "I can/want to move" consideration`
- * [game/simulation/src/ai/dse/haul.rs](game/simulation/src/ai/dse/haul.rs) (1)
+ * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
    * `// TODO consider distance to source too`
- * [game/simulation/src/ai/dse/world.rs](game/simulation/src/ai/dse/world.rs) (7)
+ * [game/simulation/src/ai/dse/mod.rs](game/simulation/src/ai/dse/mod.rs) (1)
+   * `// TODO species concept is temporary`
+ * [game/simulation/src/ai/dse/world/break_block.rs](game/simulation/src/ai/dse/world/break_block.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
-   * `// TODO check society containers`
-   * `// TODO separate HaulTarget to drop nearby/adjacent`
-   * `// TODO take the stack size into account too, choose the biggest`
+ * [game/simulation/src/ai/dse/world/build.rs](game/simulation/src/ai/dse/world/build.rs) (2)
    * `// TODO wants to work, can work`
    * `// TODO has tool`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
+ * [game/simulation/src/ai/dse/world/gather_materials.rs](game/simulation/src/ai/dse/world/gather_materials.rs) (4)
+   * `// TODO consider item stack size and condition`
+   * `// TODO search range could depend on entity senses`
+   * `// TODO share search range with food searching`
+   * `// TODO check society containers too`
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (3)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO should include check for n free slots anywhere in inventory (not just hands)`
-   * `// TODO old results are a subset of new results, should reuse`
-   * `// TODO use accessible position?`
    * `// TODO lowercase BlockType`
- * [game/simulation/src/ai/mod.rs](game/simulation/src/ai/mod.rs) (1)
-   * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
- * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (8)
+ * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
-   * `// TODO use arena/bump allocator and share instance between entities`
-   * `// TODO provide READ ONLY DSEs to ai intelligence`
-   * `// TODO use dynstack to avoid so many small temporary allocations, or arena allocator`
+   * `// TODO bump alloc this`
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
-   * `// TODO dont return a new vec of boxes, have some dignity`
-   * `let mut applicable_tasks = Vec::new(); // TODO reuse allocation`
+   * `// TODO limit the number of times a single entity can appear in best candidates`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
@@ -272,7 +274,7 @@
    * `// TODO equip slots will require a lot of integration with the body tree, so dont flesh out properly`
  * [game/simulation/src/item/stack.rs](game/simulation/src/item/stack.rs) (5)
    * `// TODO use a better way than hacky definition names`
-   * `#[derive(Debug)] // TODO implement Debug manually`
+   * `#[derive(Debug, Derivative)] // TODO implement Debug manually`
    * `// TODO spill over to a new stack instead of failing`
    * `// TODO provide an ItemFilter to split a specific range?`
    * `// TODO compare components`
@@ -337,8 +339,6 @@
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
- * [game/simulation/src/society/job/jobs/break_blocks.rs](game/simulation/src/society/job/jobs/break_blocks.rs) (1)
-   * `// TODO add display impl for WorldPositionRange`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
    * `// TODO build requirement engine for generic material combining`
    * `// TODO support builds spanning multiple blocks/range`
@@ -350,9 +350,8 @@
    * `// TODO this changes the order`
    * `// TODO some builds could have multiple workers`
    * `// TODO better display impl for builds`
- * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (3)
+ * [game/simulation/src/society/job/jobs/haul.rs](game/simulation/src/society/job/jobs/haul.rs) (2)
    * `// TODO differentiate hauling types, reasons and container choices e.g. to any container (choose in ai), to nearby a build project, to specific container`
-   * `// TODO depends on error type?`
    * `// TODO fail early if no space left in container`
  * [game/simulation/src/society/job/list.rs](game/simulation/src/society/job/list.rs) (5)
    * `#[derive(Debug)] // TODO implement manually`
@@ -360,10 +359,8 @@
    * `// TODO filter jobs for entity`
    * `// TODO use SocietyJobHandle instead of indices`
    * `/// TODO cancelling a shared reservation might cancel it for everyone else too, oh no`
- * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (7)
-   * `// TODO this could be a work item`
+ * [game/simulation/src/society/job/task.rs](game/simulation/src/society/job/task.rs) (5)
    * `// TODO temporary box allocation is gross, use dynstack for dses`
-   * `// TODO use an equation you unmathematical twat`
    * `// TODO distinct build actions e.g. sawing, wood building, stone building etc`
    * `// TODO some types of hauling will be shareable`
    * `// TODO depends on work item`
@@ -473,13 +470,16 @@
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
+ * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
+   * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`
    * `// TODO if mouse wheel is reused for anything else, add an input event for it`
- * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (4)
+ * [renderer/engine/src/render/sdl/camera.rs](renderer/engine/src/render/sdl/camera.rs) (5)
    * `// TODO cache projectction+view matrices if camera isn't moving`
    * `// TODO zoom into mouse position/screen centre`
    * `// TODO interpolate zoom`
+   * `// TODO this seems to be dependent on frame rate...`
    * `// TODO cache`
  * [renderer/engine/src/render/sdl/gl/error.rs](renderer/engine/src/render/sdl/gl/error.rs) (2)
    * `// TODO proper errors`
@@ -536,8 +536,6 @@
    * `// TODO return <C: GridCoord>`
  * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
    * `// TODO can still panic`
- * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
-   * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`

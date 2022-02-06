@@ -1,5 +1,5 @@
 use crate::society::society::Society;
-use common::Formatter;
+use common::{slog_value_debug, Formatter};
 use std::fmt::Debug;
 use std::num::NonZeroU32;
 
@@ -79,6 +79,10 @@ impl Societies {
             .find(|(h, _)| *h == handle)
             .map(|(handle, society)| ensure_handle!(society, *handle))
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Society> + '_ {
+        self.registry.iter().map(|(_, s)| s)
+    }
 }
 
 impl Default for Societies {
@@ -147,3 +151,5 @@ impl Debug for SocietyHandle {
         write!(f, "SocietyHandle({})", self.0)
     }
 }
+
+slog_value_debug!(SocietyHandle);

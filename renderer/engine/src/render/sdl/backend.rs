@@ -16,7 +16,7 @@ use simulation::input::{
     InputEvent, SelectType, UiCommand, UiCommands, UiPopup, UiRequest, WorldColumn,
 };
 use simulation::{
-    BackendData, ComponentWorld, Exit, InitializedSimulationBackend, PerfAvg,
+    BackendData, ComponentWorld, Exit, GameSpeedChange, InitializedSimulationBackend, PerfAvg,
     PersistentSimulationBackend, Simulation, WorldViewer,
 };
 use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
@@ -284,7 +284,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
     }
 
     fn tick(&mut self) {
-        let chunk_bounds = self.camera.tick();
+        let chunk_bounds = self.camera.bounds();
         self.world_viewer.set_chunk_bounds(chunk_bounds);
 
         let renderer = self.backend.renderer.terrain_mut();
@@ -310,7 +310,7 @@ impl InitializedSimulationBackend for SdlBackendInit {
         Gl::clear();
 
         // calculate projection and view matrices
-        self.camera.update_interpolation(interpolation);
+        self.camera.tick(interpolation);
         let projection = self.camera.projection_matrix();
 
         let terrain_range = self.world_viewer.terrain_range();
@@ -438,6 +438,8 @@ impl SdlBackendInit {
                     let cmd = match key {
                         EngineKey::Exit => UiRequest::ExitGame(Exit::Stop),
                         EngineKey::Restart => UiRequest::ExitGame(Exit::Restart),
+                        EngineKey::SpeedUp => UiRequest::ChangeGameSpeed(GameSpeedChange::Faster),
+                        EngineKey::SlowDown => UiRequest::ChangeGameSpeed(GameSpeedChange::Slower),
                     };
 
                     Some(cmd)
@@ -452,6 +454,7 @@ impl SdlBackendInit {
                 if is_down {
                     Some(match key {
                         GameKey::CancelSelection => UiRequest::CancelSelection,
+                        GameKey::TogglePaused => UiRequest::TogglePaused,
                     })
                 } else {
                     None
@@ -512,6 +515,8 @@ fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
     Some(match keycode {
         Q if alt_down() => KeyAction::Engine(EngineKey::Exit),
         R if alt_down() => KeyAction::Engine(EngineKey::Restart),
+        RightBracket => KeyAction::Engine(EngineKey::SpeedUp),
+        LeftBracket => KeyAction::Engine(EngineKey::SlowDown),
 
         Up => KeyAction::Renderer(SliceUp),
         Down => KeyAction::Renderer(SliceDown),
@@ -522,6 +527,7 @@ fn map_sdl_keycode(keycode: Keycode, keymod: Mod) -> Option<KeyAction> {
         D => KeyAction::Renderer(Camera(CameraDirection::Right)),
 
         Escape => KeyAction::Game(GameKey::CancelSelection),
+        P => KeyAction::Game(GameKey::TogglePaused),
         _ => return None,
     })
 }

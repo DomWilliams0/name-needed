@@ -1,4 +1,6 @@
-use ai::{Dse, WeightedDse};
+use std::num::NonZeroU16;
+
+use ai::WeightedDse;
 use common::*;
 use unit::world::WorldPosition;
 
@@ -7,10 +9,9 @@ use crate::ai::dse::{BreakBlockDse, BuildDse, GatherMaterialsDse, HaulDse};
 use crate::ai::AiContext;
 use crate::build::BuildMaterial;
 use crate::ecs::{EcsWorld, Entity};
-use crate::{ComponentWorld, HaulSource};
-
 use crate::item::HaulableItemComponent;
-use crate::job::{BuildDetails, SocietyJobHandle};
+use crate::job::{BuildDetails, Reservation, SocietyJobHandle};
+use crate::{ComponentWorld, HaulSource};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct HaulSocietyTask {
@@ -24,7 +25,6 @@ pub struct HaulSocietyTask {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum SocietyTask {
     /// Break the given block
-    // TODO this could be a work item
     BreakBlock(WorldPosition),
 
     /// Work on a build job
@@ -32,7 +32,7 @@ pub enum SocietyTask {
 
     /// Gather materials for a build at the given position
     GatherMaterials {
-        target: WorldPosition,
+        build_pos: WorldPosition,
         material: BuildMaterial,
         job: SocietyJobHandle,
         extra_hands_needed_for_haul: u16,
@@ -50,25 +50,27 @@ impl SocietyTask {
 
     // TODO temporary box allocation is gross, use dynstack for dses
     /// More reservations = lower weight
+    #[allow(unused_variables)] // used in macro
     pub fn as_dse(
         &self,
         world: &EcsWorld,
-        existing_reservations: u16,
-    ) -> Option<Box<dyn Dse<AiContext>>> {
+        reservation: Reservation,
+    ) -> Option<WeightedDse<AiContext>> {
+        use Reservation::*;
         use SocietyTask::*;
 
-        // TODO use an equation you unmathematical twat
-        let weighting = match existing_reservations {
-            0 => 1.0,
-            1 => 0.7,
-            2 => 0.4,
-            3 => 0.2,
-            _ => 0.0,
+        let weight = match reservation {
+            ReservedBySelf => 1.2, // inertia for already reserved tasks
+            Unreserved => 0.95,
+            ReservedButShareable(0..=2) => 0.8,
+            ReservedButShareable(3) => 0.75,
+            ReservedButShareable(4) => 0.7,
+            ReservedButShareable(_) | Unavailable => return None, // don't even bother
         };
 
         macro_rules! dse {
             ($dse:expr) => {
-                Some(Box::new(WeightedDse::new($dse, weighting)))
+                Some(WeightedDse::new($dse, weight))
             };
         }
 
@@ -82,12 +84,12 @@ impl SocietyTask {
                 })
             }
             GatherMaterials {
-                target,
+                build_pos: target,
                 material,
                 job,
                 extra_hands_needed_for_haul,
             } => dse!(GatherMaterialsDse {
-                target: *target,
+                build_pos: *target,
                 material: material.clone(),
                 job: *job,
                 extra_hands_for_haul: *extra_hands_needed_for_haul
@@ -109,16 +111,18 @@ impl SocietyTask {
         }
     }
 
-    pub fn is_shareable(&self) -> bool {
+    pub fn max_workers(&self) -> NonZeroU16 {
         use SocietyTask::*;
-        match self {
-            BreakBlock(_) => true,
-            Build(_, _) => false,
+        let n = match self {
+            BreakBlock(_) => 1,
+            Build(_, _) => 1,
             // TODO some types of hauling will be shareable
             // TODO depends on work item
-            Haul(_) => false,
-            GatherMaterials { .. } => true,
-        }
+            Haul(_) => 1,
+            GatherMaterials { .. } => 3,
+        };
+
+        NonZeroU16::new(n).unwrap()
     }
 }
 

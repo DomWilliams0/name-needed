@@ -94,7 +94,7 @@ pub enum HaulTarget {
     Container(Entity),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum HaulPurpose {
     /// No custom behaviour on success
     JustBecause,

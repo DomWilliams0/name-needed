@@ -135,6 +135,8 @@ pub fn flat_lands() -> MemoryTerrainSource {
         (-2..2).map(move |y| {
             ChunkBuilder::new()
                 .fill_slice(0, BlockType::Stone)
+                .fill_slice(1, BlockType::Dirt)
+                .fill_slice(2, BlockType::Grass)
                 .build((x, y))
         })
     });

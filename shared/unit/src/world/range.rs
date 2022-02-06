@@ -1,4 +1,5 @@
 use std::array::IntoIter;
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
 
@@ -286,6 +287,14 @@ impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
             (WorldRange::Single(a0), WorldRange::Single(b0)) => a0 == b0,
             (WorldRange::Range(a0, a1), WorldRange::Range(b0, b1)) => a0 == b0 && a1 == b1,
             _ => false,
+        }
+    }
+}
+impl<P: RangePosition + Display> Display for WorldRange<P> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WorldRange::Single(b) => write!(f, "{}", b),
+            WorldRange::Range(from, to) => write!(f, "({} -> {})", from, to),
         }
     }
 }

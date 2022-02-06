@@ -1,12 +1,9 @@
-pub use self::world::{BlockTypeMatchesConsideration, MyProximityToConsideration, Proximity};
-pub use items::{
-    CanUseHeldItemConsideration, FindLocalGradedItemConsideration,
-    HasExtraHandsForHaulingConsideration, HoldingItemConsideration,
-};
-pub use misc::ConstantConsideration;
-pub use needs::HungerConsideration;
+pub use self::world::*;
+pub use constant::ConstantConsideration;
+pub use items::*;
+pub use needs::*;
 
+mod constant;
 mod items;
-mod misc;
 mod needs;
 mod world;

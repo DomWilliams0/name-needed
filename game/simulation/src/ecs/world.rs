@@ -17,6 +17,7 @@ use crate::ecs::component::{AsInteractiveFn, ComponentRegistry};
 use crate::ecs::*;
 use crate::event::{DeathReason, EntityEvent, EntityEventQueue};
 use crate::item::{ContainerComponent, ContainerResolver};
+use crate::spatial::Spatial;
 use crate::string::CachedStr;
 use crate::{Entity, InnerWorldRef, ItemStackComponent, TransformComponent, WorldRef};
 
@@ -90,6 +91,9 @@ pub trait ComponentWorld: ContainerResolver + Sized {
 
     fn kill_entity(&self, entity: Entity, reason: DeathReason);
     fn is_entity_alive(&self, entity: Entity) -> bool;
+
+    /// Called when an entity is spawned (before components are added)
+    fn on_new_entity_creation(&self, entity: Entity);
 
     // ---
     fn kill_entities(&self, entities: &[Entity], reason: DeathReason) {
@@ -408,7 +412,9 @@ impl ComponentWorld for EcsWorld {
     }
 
     fn create_entity(&self) -> EntityBuilder {
-        WorldExt::create_entity_unchecked(&self.world)
+        let builder = WorldExt::create_entity_unchecked(&self.world);
+        self.on_new_entity_creation(builder.entity.into());
+        builder
     }
 
     fn kill_entity(&self, entity: Entity, reason: DeathReason) {
@@ -464,6 +470,13 @@ impl ComponentWorld for EcsWorld {
     fn is_entity_alive(&self, entity: Entity) -> bool {
         // must check if generation is alive first to avoid panic
         entity.gen().is_alive() && self.is_alive(entity.into())
+    }
+
+    fn on_new_entity_creation(&self, entity: Entity) {
+        // include this entity in spatial queries even before the system updates
+        if let Some(spatial) = self.try_fetch::<Spatial>() {
+            spatial.register_new_entity(entity);
+        }
     }
 }
 

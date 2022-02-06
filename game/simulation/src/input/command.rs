@@ -6,6 +6,7 @@ use crate::society::job::SocietyCommand;
 use crate::{AiAction, Exit, SocietyHandle};
 use common::*;
 
+use crate::backend::GameSpeedChange;
 use crate::job::SocietyJobHandle;
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -53,6 +54,10 @@ pub enum UiRequest {
 
     /// Closes current popup if any then clears entity+tile selection
     CancelSelection,
+
+    TogglePaused,
+
+    ChangeGameSpeed(GameSpeedChange),
 }
 
 pub enum SelectionModification {

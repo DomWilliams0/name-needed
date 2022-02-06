@@ -1,5 +1,5 @@
 use crate::scripting::context::{Scripting, ScriptingError, ScriptingOutput, ScriptingResult};
-use crate::{EcsWorld, WorldRef};
+use crate::EcsWorld;
 
 pub struct NopScripting;
 

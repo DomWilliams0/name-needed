@@ -8,7 +8,7 @@ use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPoint, BLOCKS_SCALE};
 
 /// A block anywhere in the world. All possible values are valid
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
@@ -40,6 +40,12 @@ impl WorldPosition {
 impl Display for WorldPosition {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "({}, {}, {})", self.0, self.1, self.2.slice())
+    }
+}
+
+impl Debug for WorldPosition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        Display::fmt(self, f)
     }
 }
 

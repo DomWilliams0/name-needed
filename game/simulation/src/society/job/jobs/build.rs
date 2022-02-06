@@ -324,7 +324,7 @@ impl SocietyJobImpl for BuildThingJob {
             let extra_hands = *self.hands_needed.get(&mat.definition()).unwrap(); // just inserted
 
             Some(SocietyTask::GatherMaterials {
-                target: self.position,
+                build_pos: self.position,
                 material: mat,
                 job: this_job,
                 extra_hands_needed_for_haul: extra_hands,
@@ -367,7 +367,7 @@ impl SocietyJobImpl for BuildThingJob {
             let extra_hands = *self.hands_needed.get(def).unwrap(); // already inserted
 
             let task = SocietyTask::GatherMaterials {
-                target: self.position,
+                build_pos: self.position,
                 material: BuildMaterial::new(*def, *count),
                 job: this_job,
                 extra_hands_needed_for_haul: extra_hands,

@@ -23,11 +23,14 @@ pub enum RendererKey {
 pub enum EngineKey {
     Exit,
     Restart,
+    SpeedUp,
+    SlowDown,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum GameKey {
     CancelSelection,
+    TogglePaused,
 }
 
 pub enum KeyAction {

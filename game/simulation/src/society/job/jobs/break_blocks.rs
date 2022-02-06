@@ -1,10 +1,11 @@
+use common::derive_more::*;
+use common::*;
+
 use crate::ecs::{CachedWorldRef, EcsWorld};
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::SocietyTask;
 use crate::{BlockType, ComponentWorld, WorldPositionRange};
-use common::derive_more::*;
-use common::*;
 
 #[derive(Constructor, Debug)]
 pub struct BreakBlocksJob(WorldPositionRange);
@@ -37,7 +38,10 @@ impl SocietyJobImpl for BreakBlocksJob {
         let mut voxel_world = CachedWorldRef::new(world);
 
         tasks.retain(|task| {
-            if completions.iter().any(|(t, _)| t == task) {
+            if completions
+                .iter()
+                .any(|(t, res)| t == task && matches!(res, SocietyTaskResult::Success))
+            {
                 // task completed, remove it
                 false
             } else {
@@ -64,7 +68,6 @@ impl SocietyJobImpl for BreakBlocksJob {
 
 impl Display for BreakBlocksJob {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        // TODO add display impl for WorldPositionRange
-        write!(f, "Break {} blocks in range {:?}", self.0.count(), self.0)
+        write!(f, "Break {} blocks in range {}", self.0.count(), self.0)
     }
 }

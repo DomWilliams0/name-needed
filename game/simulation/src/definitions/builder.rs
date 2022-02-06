@@ -81,6 +81,9 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
 
         let entity = builder.build().into();
 
+        // notify world
+        self.world.on_new_entity_creation(entity);
+
         // set position in transform if present
         if let Ok(mut transform) = self.world.component_mut::<TransformComponent>(entity) {
             if let Some(pos) = pos {

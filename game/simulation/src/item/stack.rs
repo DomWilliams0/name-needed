@@ -8,7 +8,7 @@ use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 
 use crate::string::CachedStr;
-use crate::PhysicalComponent;
+use crate::{PhysicalComponent, Tick};
 
 #[derive(Debug, Error, Eq, PartialEq, Clone)]
 pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
@@ -47,6 +47,8 @@ pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
 #[clone(disallow)]
 pub struct ItemStackComponent {
     pub stack: crate::item::ItemStack,
+    /// Stack that this stack was spawned from
+    pub split_from: Option<(Entity, Tick)>,
 }
 
 pub trait World {
@@ -80,20 +82,22 @@ pub struct ItemStack<W: World> {
 }
 
 /// Defines the criteria for allowing an item into a stack
-#[derive(Debug)]
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
 pub struct StackHomogeneity<W: World> {
     // TODO use a better way than hacky definition names
     definition: CachedStr,
     phantom: PhantomData<W>,
 }
 
-#[derive(Debug)] // TODO implement Debug manually
+#[derive(Debug, Derivative)] // TODO implement Debug manually
+#[derivative(Clone)]
 struct StackedEntity<W: World> {
     entity: W::Entity,
     count: StackedEntityCount,
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Copy, Clone)]
 enum StackedEntityCount {
     /// Non-copyable entity
     Distinct,
@@ -107,7 +111,13 @@ pub enum StackAdd {
     CollapsedIntoOther,
 }
 
-#[derive(Copy)]
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Copy(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = "")
+)]
 pub struct StackMigrationOp<W: World> {
     pub item: W::Entity,
     pub ty: StackMigrationType,
@@ -121,23 +131,6 @@ pub enum StackMigrationType {
 }
 
 const ONE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
-
-impl<W: World> Clone for StackMigrationOp<W> {
-    fn clone(&self) -> Self {
-        Self {
-            item: self.item,
-            ty: self.ty,
-        }
-    }
-}
-
-impl<W: World> PartialEq for StackMigrationOp<W> {
-    fn eq(&self, other: &Self) -> bool {
-        self.item == other.item && self.ty == other.ty
-    }
-}
-
-impl<W: World> Eq for StackMigrationOp<W> {}
 
 impl<W: World> ItemStack<W> {
     pub fn new_with_item(
@@ -354,33 +347,6 @@ impl<W: World> ItemStack<W> {
     }
 }
 
-impl<W: World> Clone for StackHomogeneity<W> {
-    fn clone(&self) -> Self {
-        Self {
-            definition: self.definition,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl Clone for StackedEntityCount {
-    fn clone(&self) -> Self {
-        match self {
-            StackedEntityCount::Distinct => StackedEntityCount::Distinct,
-            StackedEntityCount::Copyable(n) => StackedEntityCount::Copyable(*n),
-        }
-    }
-}
-
-impl<W: World> Clone for StackedEntity<W> {
-    fn clone(&self) -> Self {
-        Self {
-            entity: self.entity,
-            count: self.count,
-        }
-    }
-}
-
 impl<W: World> StackedEntity<W> {
     fn count(&self) -> NonZeroU16 {
         match self.count {
@@ -468,7 +434,11 @@ mod validation {
         held_entities: &mut HashMap<Entity, ContainedInComponent>,
         world: &impl ComponentWorld,
     ) {
-        trace!("validating stack: {:?}", stack.contents().collect_vec());
+        trace!(
+            "validating stack {}: {:?}",
+            stack_entity,
+            stack.contents().collect_vec()
+        );
 
         // validate count
         let real_count: u16 = stack.contents.iter().map(|e| e.count().get()).sum();

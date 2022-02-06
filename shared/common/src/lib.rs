@@ -1,11 +1,15 @@
 pub use arrayvec::*;
 pub use boolinator::Boolinator;
 pub use bumpalo;
+pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
+pub type BumpBox<'a, T> = bumpalo::boxed::Box<'a, T>;
+
 pub use cgmath;
 pub use cgmath::{
     Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,
     VectorSpace, Zero,
 };
+pub use derivative::Derivative;
 pub use derive_more;
 pub use displaydoc::Display;
 pub use dynslot::DynSlot;

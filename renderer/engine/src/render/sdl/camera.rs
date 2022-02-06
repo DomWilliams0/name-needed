@@ -1,8 +1,9 @@
+use std::convert::TryFrom;
+
 use cgmath::ortho;
 
 use common::input::CameraDirection;
 use common::*;
-use std::convert::TryFrom;
 use unit::space::view::ViewPoint;
 use unit::world::{ChunkLocation, WorldPoint, WorldPosition};
 use unit::world::{BLOCKS_SCALE, CHUNK_SIZE};
@@ -81,7 +82,7 @@ impl Camera {
         // TODO interpolate zoom
     }
 
-    pub fn tick(&mut self) -> (ChunkLocation, ChunkLocation) {
+    pub fn tick(&mut self, interpolation: f64) {
         let (dx, dy) = CameraDirection::values()
             .iter()
             .zip(&self.input)
@@ -91,6 +92,7 @@ impl Camera {
                 (x + dx, y + dy)
             });
 
+        // TODO this seems to be dependent on frame rate...
         self.pos += self.velocity;
 
         if dx != 0 || dy != 0 {
@@ -102,6 +104,10 @@ impl Camera {
             self.pos = self.last_extrapolated_pos;
         }
 
+        self.last_extrapolated_pos = self.pos + (self.velocity * interpolation as f32);
+    }
+
+    pub fn bounds(&self) -> (ChunkLocation, ChunkLocation) {
         // calculate visible chunk bounds
         // TODO cache
         let view_point = ViewPoint::try_from(self.pos).expect("invalid camera position");
@@ -115,17 +121,6 @@ impl Camera {
         };
 
         (bottom_left.into(), top_right.into())
-    }
-
-    fn position(&self, interpolation: f64, z: f32) -> Point3 {
-        let pos = self.pos + (self.velocity * interpolation as f32);
-        Point3::new(pos.x, pos.y, z)
-    }
-
-    /// Call before getting view matrix
-    pub fn update_interpolation(&mut self, interpolation: f64) {
-        let pos = self.position(interpolation, 0.0);
-        self.last_extrapolated_pos = Point2::new(pos.x, pos.y);
     }
 
     pub fn view_matrix(&self, z: f32) -> Matrix4 {

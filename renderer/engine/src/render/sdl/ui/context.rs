@@ -37,7 +37,6 @@ pub enum DefaultOpen {
 
 pub enum EntityDesc<'a> {
     Kind(ComponentRef<'a, KindComponent>),
-    Overridden(&'a dyn Display),
     Fallback(Entity),
 }
 
@@ -113,20 +112,10 @@ impl Display for EntityDesc<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let display = match self {
             EntityDesc::Kind(kind) => &**kind as &dyn Display,
-            EntityDesc::Overridden(d) => d,
             EntityDesc::Fallback(e) => e as &dyn Display,
         };
 
         Display::fmt(display, f)
-    }
-}
-
-impl<'a> EntityDesc<'a> {
-    pub fn with_fallback(self, fallback: &'a dyn Display) -> Self {
-        match self {
-            EntityDesc::Fallback(_) => EntityDesc::Overridden(fallback),
-            other => other,
-        }
     }
 }
 

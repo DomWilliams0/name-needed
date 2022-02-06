@@ -26,6 +26,18 @@ pub struct BackendData {
     pub mouse_position: Option<WorldPoint2d>,
 }
 
+#[derive(Copy, Clone)]
+pub enum GameSpeedChange {
+    Faster,
+    Slower,
+}
+
+#[derive(Default)]
+pub struct TickResponse {
+    pub exit: Option<Exit>,
+    pub speed_change: Option<GameSpeedChange>,
+}
+
 pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;

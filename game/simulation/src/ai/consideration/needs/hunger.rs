@@ -1,7 +1,7 @@
 use ai::{Consideration, ConsiderationParameter, Context, Curve};
+use common::*;
 
 use crate::ai::{AiContext, AiInput};
-use common::*;
 
 declare_entity_metric!(AI_HUNGER, "ai_hunger", "Hunger level");
 
@@ -28,16 +28,21 @@ impl Consideration<AiContext> for HungerConsideration {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use ai::{Consideration, InputCache};
+    use common::bumpalo::Bump;
+    use common::NormalizedFloat;
+    use unit::world::WorldPoint;
+
     use crate::ai::consideration::HungerConsideration;
     use crate::ai::system::Species;
     use crate::ai::{AiBlackboard, AiComponent, SharedBlackboard};
     use crate::ecs::Builder;
-    use crate::{ComponentWorld, EcsWorld, WorldPosition};
-    use ai::{Consideration, InputCache};
-    use common::bumpalo::Bump;
-    use common::NormalizedFloat;
+    use crate::{ComponentWorld, EcsWorld, TransformComponent, WorldPosition};
 
-    struct NoLeaksGuard(*mut EcsWorld, *mut SharedBlackboard);
+    struct NoLeaksGuard(*mut EcsWorld, *mut TransformComponent);
 
     impl Drop for NoLeaksGuard {
         fn drop(&mut self) {
@@ -51,21 +56,22 @@ mod tests {
 
     fn dummy_blackboard() -> (AiBlackboard<'static>, NoLeaksGuard) {
         let world = Box::leak(Box::new(EcsWorld::new()));
+        let transform = Box::leak(Box::new(TransformComponent::new(
+            WorldPoint::new_unchecked(1.0, 2.0, 3.0),
+        )));
         let ai = Box::leak(Box::new(AiComponent::with_species(&Species::Human)));
-        let shared = Box::leak(Box::new(SharedBlackboard {
+        let shared = Rc::new(RefCell::new(SharedBlackboard {
             area_link_cache: Default::default(),
         }));
 
-        let guard = NoLeaksGuard(world as *mut _, shared as *mut _);
+        let guard = NoLeaksGuard(world as *mut _, transform as *mut _);
 
         let blackboard = AiBlackboard {
             entity: world.create_entity().build().into(),
-            accessible_position: WorldPosition::new(1, 2, 3.into()),
-            position: Default::default(),
+            transform,
             hunger: None,
             inventory: None,
             society: None,
-            ai,
             inventory_search_cache: Default::default(),
             local_area_search_cache: Default::default(),
             world,
@@ -85,21 +91,24 @@ mod tests {
         let hunger = HungerConsideration;
 
         blackboard.hunger = Some(NormalizedFloat::one());
-        let score_when_full = hunger
-            .curve()
-            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        let score_when_full =
+            hunger
+                .curve()
+                .evaluate(hunger.consider(&mut blackboard, None, &mut cache));
         cache = InputCache::new(&alloc);
 
         blackboard.hunger = Some(NormalizedFloat::new(0.2));
-        let score_when_hungry = hunger
-            .curve()
-            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        let score_when_hungry =
+            hunger
+                .curve()
+                .evaluate(hunger.consider(&mut blackboard, None, &mut cache));
         cache = InputCache::new(&alloc);
 
         blackboard.hunger = Some(NormalizedFloat::new(0.01));
-        let score_when_empty = hunger
-            .curve()
-            .evaluate(hunger.consider(&mut blackboard, &mut cache));
+        let score_when_empty =
+            hunger
+                .curve()
+                .evaluate(hunger.consider(&mut blackboard, None, &mut cache));
 
         assert!(
             score_when_hungry > score_when_full,

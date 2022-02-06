@@ -8,26 +8,11 @@ impl FrameAllocator {
         let bytes = self.0.allocated_bytes();
         if bytes > 0 {
             trace!("freeing {} bytes in frame allocator", bytes);
+            self.0.reset();
         }
-
-        self.0.reset();
     }
 
     pub fn allocator(&self) -> &bumpalo::Bump {
         &self.0
     }
 }
-
-// impl Deref for FrameAllocator {
-//     type Target = bumpalo::Bump;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-//
-// impl DerefMut for FrameAllocator {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.0
-//     }
-// }
