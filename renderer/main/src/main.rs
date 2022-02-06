@@ -27,17 +27,7 @@ mod tracy_alloc {
     static GLOBAL: ProfiledAllocator<MyAllocator> = ProfiledAllocator::new(ALLOCATOR, 32);
 }
 
-#[cfg(feature = "count-allocs")]
-mod count_allocs {
-    use alloc_counter::{count_alloc, AllocCounter};
-
-    use crate::{MyAllocator, ALLOCATOR};
-
-    #[global_allocator]
-    static A: AllocCounter<MyAllocator> = AllocCounter(ALLOCATOR);
-}
-
-// #[cfg(not(any(feature = "profiling", feature = "count-allocs")))]
+#[cfg(not(feature = "profiling"))]
 #[global_allocator]
 static GLOBAL: MyAllocator = ALLOCATOR;
 
@@ -225,24 +215,7 @@ fn main() {
 
     let result = panik::Builder::new()
         .slogger(logger_guard.logger())
-        .run_and_handle_panics(|| {
-            #[cfg(feature = "count-allocs")]
-            {
-                use alloc_counter::count_alloc;
-                let (counts, result) = count_alloc(|| do_main());
-                // TODO more granular - n for engine setup, n for sim setup, n for each frame?
-                info!(
-                    "{allocs} allocations, {reallocs} reallocs, {frees} frees",
-                    allocs = counts.0,
-                    reallocs = counts.1,
-                    frees = counts.2
-                );
-                result
-            }
-
-            #[cfg(not(feature = "count-allocs"))]
-            do_main()
-        });
+        .run_and_handle_panics(do_main);
 
     let exit = match result {
         None => {

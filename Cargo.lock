@@ -63,27 +63,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloc_counter"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a8c3a0a472b3a556e269be64dc65a5c013ba85e940d089367eb8c88f3fdfda9"
-dependencies = [
- "alloc_counter_macro",
- "pin-utils",
-]
-
-[[package]]
-name = "alloc_counter_macro"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a52f81f9add01deacdc1fcb05ba09523a8faefdec6c3f69cb752b9fa9c22e5a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1562,7 +1541,6 @@ dependencies = [
 name = "main"
 version = "0.1.0"
 dependencies = [
- "alloc_counter",
  "argh",
  "color",
  "common",
