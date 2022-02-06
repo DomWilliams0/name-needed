@@ -8,7 +8,7 @@ use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 
 use crate::string::CachedStr;
-use crate::{PhysicalComponent, Tick};
+use crate::Tick;
 
 #[derive(Debug, Error, Eq, PartialEq, Clone)]
 pub enum ItemStackError<E: Debug + Display + Eq + Clone> {
@@ -409,7 +409,10 @@ mod validation {
     use std::collections::HashMap;
 
     use crate::item::HauledItemComponent;
-    use crate::{ComponentWorld, ContainedInComponent, Entity, ItemStack, TransformComponent};
+    use crate::{
+        ComponentWorld, ContainedInComponent, Entity, ItemStack, PhysicalComponent,
+        TransformComponent,
+    };
 
     use super::*;
 

@@ -30,7 +30,7 @@ imgui = { version = "0.8", optional = true }
 rusttype = { version = "0.9", optional = true, features = ["gpu_cache"] }
 
 serde = { version = "1.0", features = ["derive"] }
-ron = "0.6"
+ron = "0.7"
 
 [features]
 default = ["common/log-to-file", "panik/use-slog", "common/binary", "scripting"]
