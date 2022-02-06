@@ -88,14 +88,22 @@ The `--scenario` parameter chooses a specific situation to spawn entities in, fo
 
 *Note: the "game" is currently very much a demo and not very playable in the slightest. Abandon all expectations!*
 
-* <kbd>Alt</kbd>+<kbd>Q</kbd> to exit (most importantly)
-* <kbd>Alt</kbd>+<kbd>R</kbd> to restart
+* <kbd>WASD</kbd> to pan the camera
+* <kbd>Up</kbd>/<kbd>Down</kbd> to move the camera vertically
+  * Hold <kbd>Control</kbd> to resize the vertical range
+  * Hold <kbd>Shift</kbd> to move the full vertical range instead of incrementally
+* <kbd>Scroll</kbd> to zoom in/out
+
+
 * <kbd>Right-click</kbd> to drag a selection over blocks in the world
     * Then <kbd>Right-click</kbd> in the bottom right corner to build there/destroy the blocks
     * Move the selection up and down with buttons in the `World` tab
 * <kbd>Left-click</kbd> (or drag) to select entities
     * Then <kbd>Right-click</kbd> a location in the world, or another entity to order them around
 * <kbd>Escape</kbd> to clear the current entity and world selections
-* Move the camera sideways with <kbd>WASD</kbd>, and vertically with the <kbd>Arrow keys</kbd>
-* <kbd>P</kbd> to pause and unpause
-* <kbd>]</kbd>/<kbd>[</kbd> to speed up and slow down the game
+
+
+* <kbd>P</kbd> to pause/ unpause
+* <kbd>]</kbd>/<kbd>[</kbd> to speed up/slow down the game
+* <kbd>Alt</kbd>+<kbd>Q</kbd> to exit (most importantly)
+* <kbd>Alt</kbd>+<kbd>R</kbd> to restart
