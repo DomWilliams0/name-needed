@@ -494,7 +494,7 @@ impl<'a, C: Context> DseToScore<'a, C> {
             #[cfg(feature = "logging")]
             {
                 use crate::Blackboard;
-                c.log_metric(&blackboard.entity(), evaluated_score);
+                c.log_metric(&context.blackboard.entity(), evaluated_score);
             }
 
             debug_assert!(

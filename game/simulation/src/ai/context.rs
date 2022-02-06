@@ -64,8 +64,14 @@ pub struct SharedBlackboard {
 
 impl ai::Blackboard for AiBlackboard<'_> {
     #[cfg(feature = "metrics")]
-    fn entity(&self) -> String {
-        format!("{}", self.entity)
+    fn entity(&self) -> std::borrow::Cow<str> {
+        use crate::alloc::FrameAllocator;
+        use std::fmt::Write;
+
+        let alloc = self.world.resource::<FrameAllocator>();
+        let mut s = bumpalo::collections::String::new_in(alloc.allocator());
+        let _ = write!(&mut s, "{}", self.entity);
+        std::borrow::Cow::Borrowed(s.into_bump_str())
     }
 }
 

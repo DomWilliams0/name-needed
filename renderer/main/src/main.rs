@@ -1,16 +1,17 @@
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::Duration;
+
 use common::*;
+use config::ConfigType;
 use engine::simulation;
+use engine::Engine;
+use resources::ResourceContainer;
+use resources::Resources;
 use simulation::state::BackendState;
 use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
 
 use crate::scenarios::Scenario;
-use config::ConfigType;
-use engine::Engine;
-use resources::ResourceContainer;
-use resources::Resources;
-use std::io::Write;
-use std::path::PathBuf;
-use std::time::Duration;
 
 #[cfg(feature = "count-allocs")]
 mod count_allocs {
@@ -99,7 +100,11 @@ fn do_main() -> BoxedResult<()> {
 
     // start metrics server
     #[cfg(feature = "metrics")]
-    metrics::start_serving();
+    {
+        info!("starting local metrics server");
+        let server = metrics::start_serving()?;
+        info!("started local metrics server"; "port" => server.port, "thread" => ?server.thread.thread().id());
+    }
 
     // init resources root
     let resources = Resources::new(args.directory.canonicalize()?)?;
@@ -264,8 +269,8 @@ fn main() {
 }
 
 mod start {
-    use super::Renderer;
-    use crate::scenarios::Scenario;
+    use std::time::Duration;
+
     use common::*;
     use config::WorldSource;
     use engine::simulation::{
@@ -273,7 +278,10 @@ mod start {
         SlabLocation, TerrainSourceError, WorldLoader, WorldPosition,
     };
     use resources::Resources;
-    use std::time::Duration;
+
+    use crate::scenarios::Scenario;
+
+    use super::Renderer;
 
     /// (new empty simulation, initial block to centre camera on)
     pub fn create_simulation(

@@ -1,8 +1,11 @@
+use std::error::Error;
 use std::net::SocketAddr;
-
-pub type EntityId = u64;
+use std::sync::mpsc::sync_channel;
+use std::thread::JoinHandle;
 
 pub use prometheus_exporter::prometheus;
+
+pub type EntityId = u64;
 
 #[macro_export]
 macro_rules! declare_entity_metric {
@@ -32,12 +35,26 @@ macro_rules! entity_metric {
     };
 }
 
-// TODO return error to caller
-pub fn start_serving() {
-    std::thread::spawn(|| {
-        let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 9898);
-        if let Err(e) = prometheus_exporter::start(addr) {
-            eprintln!("failed to start metrics server: {}", e);
-        }
+pub struct MetricsServer {
+    pub port: u16,
+    pub thread: JoinHandle<()>,
+}
+
+pub fn start_serving() -> Result<MetricsServer, Box<dyn Error>> {
+    let ip = "127.0.0.1".parse()?;
+    const PORT: u16 = 9898;
+
+    let (result_tx, result_rx) = sync_channel(1);
+    let thread = std::thread::spawn(move || {
+        let addr = SocketAddr::new(ip, PORT);
+        let res = prometheus_exporter::start(addr);
+        result_tx
+            .send(res)
+            .expect("failed to send result from thread")
     });
+
+    match result_rx.recv()? {
+        Ok(_) => Ok(MetricsServer { thread, port: PORT }),
+        Err(err) => Err(err.into()),
+    }
 }

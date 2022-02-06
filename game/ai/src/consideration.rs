@@ -36,7 +36,8 @@ pub trait Consideration<C: Context> {
     }
 
     #[cfg(feature = "logging")]
-    fn log_metric(&self, _: &str, _: f32) {}
+    #[allow(unused_variables)]
+    fn log_metric(&self, entity: &str, value: f32) {}
 
     fn consider_input(&self, input: f32) -> NormalizedFloat {
         self.parameter().apply(input)

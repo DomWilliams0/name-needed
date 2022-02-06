@@ -24,7 +24,7 @@ pub trait Action: Default + Eq + Clone {
 
 pub trait Blackboard: Clone {
     #[cfg(feature = "logging")]
-    fn entity(&self) -> String;
+    fn entity(&self) -> std::borrow::Cow<str>;
 }
 
 // TODO use a separate allocator for ai to avoid fragmentation

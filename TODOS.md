@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (400)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -533,8 +533,6 @@
    * `// TODO return <C: GridCoord>`
  * [shared/grid/src/grid_impl.rs](shared/grid/src/grid_impl.rs) (1)
    * `// TODO can still panic`
- * [shared/metrics/src/lib.rs](shared/metrics/src/lib.rs) (1)
-   * `// TODO return error to caller`
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
