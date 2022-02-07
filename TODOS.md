@@ -1,4 +1,4 @@
-# TODOs (401)
+# TODOs (398)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -433,11 +433,8 @@
    * `// TODO also rotate texture`
  * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (2)
    * `|edge| edge.weight().cost.weight(), // TODO could prefer wider ports`
-   * `// TODO dont allocate and throw away path`
- * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (4)
-   * `// TODO reuse allocations`
-   * `// TODO reuse allocation`
-   * `// TODO reuse allocation`
+   * `// TODO avoid calcultaing path just to throw it away`
+ * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (1)
    * `// TODO this might be expensive, can we build up the vec in order`
  * [game/world/src/navigation/block_navigation.rs](game/world/src/navigation/block_navigation.rs) (2)
    * `// TODO use vertical distance differently?`

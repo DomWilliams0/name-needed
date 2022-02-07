@@ -1,127 +1,151 @@
 //! Copied from petgraph for modifications
 
+use std::cell::{RefCell, RefMut};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{BinaryHeap, HashMap};
 use std::hash::Hash;
 
+use std::ops::Deref;
+
 use petgraph::algo::Measure;
-use petgraph::visit::{EdgeRef, GraphBase, IntoEdges, VisitMap, Visitable};
+use petgraph::visit::{EdgeRef, IntoEdges, VisitMap, Visitable};
+
+/// Contains allocations to reuse
+pub struct SearchContext<N, E, K, V>(RefCell<SearchContextInner<N, E, K, V>>)
+where
+    N: Eq + Hash + Copy,
+    E: Copy,
+    K: Measure + Copy,
+    V: VisitMap<N>;
+
+struct SearchContextInner<N, E, K, V>
+where
+    N: Eq + Hash + Copy,
+    E: Copy,
+    K: Measure + Copy,
+    V: VisitMap<N>,
+{
+    visited: V,
+    visit_next: BinaryHeap<MinScored<K, N>>,
+    scores: HashMap<N, K>,
+    path_tracker: PathTracker<N, E>,
+    result: Vec<(N, E)>,
+}
 
 /// Doesnt include goal node
+#[inline(never)]
 pub fn astar<G, F, H, K, IsGoal>(
     graph: G,
     start: G::NodeId,
     mut is_goal: IsGoal,
     mut edge_cost: F,
     mut estimate_cost: H,
-) -> Option<Vec<(G::NodeId, G::EdgeId)>>
+    context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
+) -> Option<impl Deref<Target = [(G::NodeId, G::EdgeId)]> + '_>
 where
     G: IntoEdges + Visitable,
     IsGoal: FnMut(G::NodeId) -> bool,
-    G::NodeId: Eq + Hash,
+    G::NodeId: Eq + Hash + Copy,
     F: FnMut(G::EdgeRef) -> K,
     H: FnMut(G::NodeId) -> K,
     K: Measure + Copy,
 {
-    // TODO reuse allocations
-    let mut visited = graph.visit_map();
-    let mut visit_next = BinaryHeap::new();
-    let mut scores = HashMap::new();
-    let mut path_tracker = PathTracker::<G>::new();
+    let mut ctx = context.0.borrow_mut();
+    ctx.reset_for(graph);
 
     let zero_score = K::default();
-    scores.insert(start, zero_score);
-    visit_next.push(MinScored(estimate_cost(start), start));
+    ctx.scores.insert(start, zero_score);
+    ctx.visit_next.push(MinScored(estimate_cost(start), start));
 
-    while let Some(MinScored(_, node)) = visit_next.pop() {
+    while let Some(MinScored(_, node)) = ctx.visit_next.pop() {
         if is_goal(node) {
-            let path = path_tracker.reconstruct_path_to(node);
-            // let cost = scores[&node];
-            return Some(path);
+            {
+                // safety: not referenced anywhere else
+                let result = unsafe { &mut *(&mut ctx.result as *mut _) };
+                ctx.path_tracker.reconstruct_path_to(node, result);
+            }
+            return Some(RefMut::map(ctx, |ctx| &mut ctx.result[..]));
         }
 
         // Don't visit the same node several times, as the first time it was visited it was using
         // the shortest available path.
-        if !visited.visit(node) {
+        if !ctx.visited.visit(node) {
             continue;
         }
 
         // This lookup can be unwrapped without fear of panic since the node was necessarily scored
         // before adding him to `visit_next`.
-        let node_score = scores[&node];
+        let node_score = ctx.scores[&node];
 
         for edge in graph.edges(node) {
             let next = edge.target();
-            if visited.is_visited(&next) {
+            if ctx.visited.is_visited(&next) {
                 continue;
             }
 
             let mut next_score = node_score + edge_cost(edge);
 
-            match scores.entry(next) {
+            match ctx.scores.entry(next) {
                 Occupied(ent) => {
                     let old_score = *ent.get();
                     if next_score < old_score {
                         *ent.into_mut() = next_score;
-                        path_tracker.set_predecessor(next, node, edge.id());
+                        ctx.path_tracker.set_predecessor(next, node, edge.id());
                     } else {
                         next_score = old_score;
                     }
                 }
                 Vacant(ent) => {
                     ent.insert(next_score);
-                    path_tracker.set_predecessor(next, node, edge.id());
+                    ctx.path_tracker.set_predecessor(next, node, edge.id());
                 }
             }
 
             let next_estimate_score = next_score + estimate_cost(next);
-            visit_next.push(MinScored(next_estimate_score, next));
+            ctx.visit_next.push(MinScored(next_estimate_score, next));
         }
     }
 
     None
 }
 
-struct PathTracker<G>
+struct PathTracker<N, E>
 where
-    G: GraphBase,
-    G::NodeId: Eq + Hash,
+    N: Eq + Hash,
+    E: Copy,
 {
-    came_from: HashMap<G::NodeId, (G::NodeId, G::EdgeId)>,
+    came_from: HashMap<N, (N, E)>,
 }
 
-impl<G> PathTracker<G>
+impl<N, E> PathTracker<N, E>
 where
-    G: GraphBase,
-    G::NodeId: Eq + Hash,
+    N: Eq + Hash + Copy,
+    E: Copy,
 {
-    fn new() -> PathTracker<G> {
+    fn new() -> Self {
         PathTracker {
-            // TODO reuse allocation
             came_from: HashMap::new(),
         }
     }
 
-    fn set_predecessor(&mut self, node: G::NodeId, previous: G::NodeId, edge: G::EdgeId) {
+    fn set_predecessor(&mut self, node: N, previous: N, edge: E) {
         self.came_from.insert(node, (previous, edge));
     }
 
     /// Returns (node, edge leaving it), missing the goal node
-    fn reconstruct_path_to(&self, last: G::NodeId) -> Vec<(G::NodeId, G::EdgeId)> {
-        // TODO reuse allocation
-        let mut path = Vec::with_capacity(self.came_from.len() / 2);
+    fn reconstruct_path_to(&self, last: N, path_out: &mut Vec<(N, E)>) {
+        path_out.clear();
+        path_out.reserve(self.came_from.len() / 2);
 
         let mut current = last;
         while let Some(&(previous, edge)) = self.came_from.get(&current) {
-            path.push((current, edge));
+            path_out.push((current, edge));
             current = previous;
         }
 
         // TODO this might be expensive, can we build up the vec in order
-        path.reverse();
-
-        path
+        path_out.reverse();
     }
 }
 
@@ -174,5 +198,43 @@ impl<K: PartialOrd, T> Ord for MinScored<K, T> {
         } else {
             Ordering::Greater
         }
+    }
+}
+
+impl<N, E, K, V> SearchContext<N, E, K, V>
+where
+    N: Eq + Hash + Copy,
+    E: Copy,
+    K: Measure + Copy,
+    V: VisitMap<N>,
+{
+    pub fn new<G: Visitable<Map = V> + Default>() -> Self {
+        let graph = G::default();
+        Self::new_with(&graph)
+    }
+    pub fn new_with(graph: impl Visitable<Map = V>) -> Self {
+        Self(RefCell::new(SearchContextInner {
+            visited: graph.visit_map(),
+            visit_next: BinaryHeap::new(),
+            scores: HashMap::new(),
+            path_tracker: PathTracker::new(),
+            result: Vec::new(),
+        }))
+    }
+}
+
+impl<N, E, K, V> SearchContextInner<N, E, K, V>
+where
+    N: Eq + Hash + Copy,
+    E: Copy,
+    K: Measure + Copy,
+    V: VisitMap<N>,
+{
+    fn reset_for(&mut self, graph: impl Visitable<Map = V>) {
+        graph.reset_map(&mut self.visited);
+        self.visit_next.clear();
+        self.scores.clear();
+        self.path_tracker.came_from.clear();
+        self.result.clear();
     }
 }

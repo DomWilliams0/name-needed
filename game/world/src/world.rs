@@ -17,8 +17,8 @@ use crate::block::{Block, BlockDurability, BlockType};
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
 use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
-    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
-    WorldPathNode,
+    AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
+    BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::neighbour::WorldNeighbours;
 use crate::{OcclusionChunkUpdate, SliceRange};
@@ -33,6 +33,8 @@ pub struct World<C: WorldContext> {
     area_graph: AreaGraph,
     dirty_slabs: HashSet<SlabLocation>,
     load_notifier: LoadNotifier,
+    block_search_context: BlockGraphSearchContext,
+    area_search_context: AreaGraphSearchContext,
 }
 
 pub struct LoadNotifier {
@@ -98,6 +100,8 @@ impl<C: WorldContext> World<C> {
             area_graph: AreaGraph::default(),
             dirty_slabs: HashSet::with_capacity(32),
             load_notifier: LoadNotifier::default(),
+            block_search_context: BlockGraph::search_context(),
+            area_search_context: AreaGraph::search_context(),
         }
     }
 
@@ -159,7 +163,9 @@ impl<C: WorldContext> World<C> {
 
         let to_area = resolve_area(to).ok_or(NavigationError::TargetNotWalkable(to))?;
 
-        Ok(self.area_graph.find_area_path(from_area, to_area)?)
+        Ok(self
+            .area_graph
+            .find_area_path(from_area, to_area, &self.area_search_context)?)
     }
 
     fn find_block_path(
@@ -175,7 +181,7 @@ impl<C: WorldContext> World<C> {
             .ok_or(NavigationError::NoSuchArea(area))?;
 
         block_graph
-            .find_block_path(from, to, target)
+            .find_block_path(from, to, target, &self.block_search_context)
             .map_err(|e| NavigationError::BlockError(area, e))
     }
 
@@ -289,7 +295,8 @@ impl<C: WorldContext> World<C> {
 
     /// Cheap check if an path exists between the 2 areas
     pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
-        self.area_graph.path_exists(from, to)
+        self.area_graph
+            .path_exists(from, to, &self.area_search_context)
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
