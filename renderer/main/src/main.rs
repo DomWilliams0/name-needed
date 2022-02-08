@@ -15,7 +15,7 @@ use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend
 use crate::scenarios::Scenario;
 
 // TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"
-#[cfg(target_family = "windows")]
+#[cfg(windows)]
 mod allocator {
     use std::alloc::System;
 
@@ -23,7 +23,7 @@ mod allocator {
     pub const ALLOCATOR: MyAllocator = System;
 }
 
-#[cfg(not(target_family = "windows"))]
+#[cfg(not(windows))]
 mod allocator {
     use jemallocator::Jemalloc;
 

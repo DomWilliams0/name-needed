@@ -21,6 +21,8 @@ panik = { version = "0.2", default-features = false, features = ["use-parking-lo
 num_cpus = "1.13"
 inventory = "0.1"
 argh = "0.1"
+
+[target.'cfg(not(windows))'.dependencies]
 jemallocator = "0.3"
 
 [features]
