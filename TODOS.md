@@ -1,4 +1,4 @@
-# TODOs (398)
+# TODOs (399)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -511,7 +511,8 @@
  * [renderer/engine/src/render/sdl/ui/windows/society.rs](renderer/engine/src/render/sdl/ui/windows/society.rs) (2)
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
- * [renderer/main/src/main.rs](renderer/main/src/main.rs) (4)
+ * [renderer/main/src/main.rs](renderer/main/src/main.rs) (5)
+   * `// TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"`
    * `// TODO specify e2e test by name (feature = "tests")`
    * `.expect("non file config not yet supported"); // TODO`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`

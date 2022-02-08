@@ -2,8 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use jemallocator::Jemalloc;
-
+use allocator::{MyAllocator, ALLOCATOR};
 use common::*;
 use config::ConfigType;
 use engine::simulation;
@@ -15,8 +14,22 @@ use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend
 
 use crate::scenarios::Scenario;
 
-type MyAllocator = Jemalloc;
-const ALLOCATOR: MyAllocator = Jemalloc;
+// TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"
+#[cfg(target_family = "windows")]
+mod allocator {
+    use std::alloc::System;
+
+    pub type MyAllocator = System;
+    pub const ALLOCATOR: MyAllocator = System;
+}
+
+#[cfg(not(target_family = "windows"))]
+mod allocator {
+    use jemallocator::Jemalloc;
+
+    pub type MyAllocator = Jemalloc;
+    pub const ALLOCATOR: MyAllocator = Jemalloc;
+}
 
 #[cfg(feature = "profiling")]
 mod tracy_alloc {

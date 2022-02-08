@@ -234,7 +234,7 @@ impl PlanetParams {
                 (Err(err), _) => {
                     error!("failed to read file {}: {}", path.display(), err);
                     Err(err)
-                },
+                }
                 (Ok(s), _) => Ok(s),
             }
         };
