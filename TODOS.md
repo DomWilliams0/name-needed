@@ -166,7 +166,7 @@
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
    * `// TODO consider distance to source too`
  * [game/simulation/src/ai/dse/mod.rs](game/simulation/src/ai/dse/mod.rs) (1)
-   * `// TODO species concept is temporary`
+   * `// TODO species concept for ai is temporary`
  * [game/simulation/src/ai/dse/world/break_block.rs](game/simulation/src/ai/dse/world/break_block.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`

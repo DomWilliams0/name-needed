@@ -15,7 +15,7 @@ pub enum AdditionalDse {
     DivineCommand,
 }
 
-// TODO species concept is temporary
+// TODO species concept for ai is temporary
 pub mod species {
     use ai::{AiBox, Dse};
 
@@ -34,6 +34,10 @@ pub mod species {
     }
 
     pub fn dog_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
+        vec![dse!(WanderDse)].into_iter()
+    }
+
+    pub fn sheep_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
         vec![dse!(WanderDse)].into_iter()
     }
 }

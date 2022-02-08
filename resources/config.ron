@@ -26,6 +26,7 @@ Config(
         spawn_counts: {
             "humans": 20,
             "dogs": 5,
+            "sheep": 10,
             "food": 50,
             "bricks": 80,
             "build_jobs": 2,

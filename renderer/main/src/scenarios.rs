@@ -18,16 +18,11 @@ struct ScenarioEntry {
 inventory::collect!(ScenarioEntry);
 
 pub fn resolve(name: Option<&str>) -> Option<(&str, Scenario)> {
-    match name {
-        None => {
-            let default = resolve(Some(DEFAULT_SCENARIO)).expect("bad default");
-            Some(default)
-        }
-        Some(name) => inventory::iter::<ScenarioEntry>
-            .into_iter()
-            .find(|e| e.name == name)
-            .map(|e| (e.name, e.func)),
-    }
+    let name = name.unwrap_or("wander_and_eat"); // default
+    inventory::iter::<ScenarioEntry>
+        .into_iter()
+        .find(|e| e.name == name)
+        .map(|e| (e.name, e.func))
 }
 
 pub fn all_names() -> impl Iterator<Item = &'static str> {
@@ -51,6 +46,7 @@ scenario!(nop);
 scenario!(wander_and_eat);
 scenario!(haul_to_container);
 scenario!(building);
+scenario!(herding);
 
 fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
@@ -183,6 +179,20 @@ fn building(ecs: &EcsWorld) {
                 .submit(ecs, BuildThingJob::new(pos, build.clone()));
         }
     }
+}
+
+fn herding(ecs: &EcsWorld) {
+    let world = ecs.voxel_world();
+    let world = world.borrow();
+
+    let mut colors = helpers::entity_colours();
+    let sheep = helpers::get_config_count("sheep");
+
+    let sheep = spawn_entities_randomly(&world, sheep, Placement::RandomPos, |pos| {
+        helpers::new_entity("core_living_sheep", ecs, pos)
+            .with_satiety(NormalizedFloat::clamped(0.6))
+            .thanks()
+    });
 }
 
 fn haul_to_container(ecs: &EcsWorld) {

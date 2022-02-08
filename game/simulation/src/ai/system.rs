@@ -10,7 +10,7 @@ use ai::{
 use common::*;
 
 use crate::activity::ActivityComponent;
-use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
+use crate::ai::dse::{dog_dses, human_dses, sheep_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::system::candidates::BestNCandidates;
 use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget, SharedBlackboard};
 use crate::alloc::FrameAllocator;
@@ -39,6 +39,7 @@ impl AiComponent {
         let intelligence = match species {
             Species::Human => Intelligence::new(human_dses()),
             Species::Dog => Intelligence::new(dog_dses()),
+            Species::Sheep => Intelligence::new(sheep_dses()),
         };
 
         Self {
@@ -554,10 +555,12 @@ fn collect_society_tasks(
     }
 }
 
+/// Temporary way to assign DSEs
 #[derive(Debug, Clone)]
 pub enum Species {
     Human,
     Dog,
+    Sheep,
 }
 
 #[derive(Debug)]
@@ -577,6 +580,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
         let species = match species.as_str() {
             "human" => Species::Human,
             "dog" => Species::Dog,
+            "sheep" => Species::Sheep,
             _ => {
                 return Err(ComponentBuildError::TemplateSpecific(format!(
                     "unknown species {:?}",
