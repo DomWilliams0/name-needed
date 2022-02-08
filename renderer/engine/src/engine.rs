@@ -73,6 +73,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
         let mut game_loop = speed.into_gameloop();
 
         self.backend.start(&mut self.sim_ui_commands);
+        tracy_client::set_thread_name("main");
 
         let mut tick = TickResponse::default();
         loop {
@@ -87,11 +88,13 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
             for action in game_loop.actions() {
                 match action {
                     gameloop::FrameAction::Tick => {
+                        let _frame = tracy_client::start_noncontinuous_frame!("tick");
                         self.tick(&backend_data, &mut tick);
                     }
                     gameloop::FrameAction::Render { interpolation } => {
+                        let _frame = tracy_client::start_noncontinuous_frame!("render");
                         // TODO clamp to 1.0 in gameloop crate
-                        self.render(interpolation.min(1.0))
+                        self.render(interpolation.min(1.0));
                     }
                 }
             }
@@ -115,6 +118,8 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
                     game_loop = new_speed.into_gameloop();
                 }
             }
+
+            tracy_client::finish_continuous_frame!();
         }
     }
 

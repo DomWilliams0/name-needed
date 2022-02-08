@@ -1,9 +1,11 @@
+use std::any::Any;
+use std::rc::Rc;
+
+use common::Debug;
+
 pub use crate::definitions::ValueImpl;
 use crate::ecs::*;
 use crate::string::StringCache;
-use common::Debug;
-use std::any::Any;
-use std::rc::Rc;
 
 pub trait ComponentTemplate<V: Value>: Debug {
     fn construct(
@@ -27,18 +29,12 @@ pub struct ComponentTemplateEntry<V: Value> {
 
 inventory::collect!(ComponentTemplateEntry<ValueImpl>);
 
-impl<V: Value> ComponentTemplateEntry<V> {
-    pub fn new<T: ComponentTemplate<V>>(key: &'static str) -> Self {
-        Self {
-            key,
-            construct_fn: T::construct,
-        }
-    }
-}
-
 #[macro_export]
 macro_rules! register_component_template {
     ($key:expr, $ty:ident) => {
-        inventory::submit!(ComponentTemplateEntry::new::<$ty>($key));
+        inventory::submit!(ComponentTemplateEntry {
+            key: $key,
+            construct_fn: $ty::construct
+        });
     };
 }

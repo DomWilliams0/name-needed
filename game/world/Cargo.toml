@@ -14,7 +14,7 @@ color = { path = "../../shared/color" }
 grid = { path = "../../shared/grid" }
 procgen = { path = "../procgen", default-features = false, features = ["cache"], optional = true } # no bin
 
-petgraph = "0.5"
+petgraph = "0.6"
 nd_iter = "0.0"
 strum = { version = "0.19", features = ["derive"] }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }

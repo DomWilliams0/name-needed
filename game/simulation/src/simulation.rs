@@ -174,6 +174,8 @@ impl<R: Renderer> Simulation<R> {
         backend_data: &BackendData,
         response: &mut TickResponse,
     ) {
+        let _span = tracy_client::Span::new("tick", "Simulation::tick", file!(), line!(), 100);
+
         // update tick
         if !self.is_paused() {
             increment_tick();
@@ -222,46 +224,66 @@ impl<R: Renderer> Simulation<R> {
     }
 
     fn tick_systems(&mut self) {
+        macro_rules! run {
+            ($system:expr, $name:expr) => {{
+                let _span = tracy_client::Span::new($name, "tick_systems", file!(), line!(), 1);
+                $system.run_now(&self.ecs_world);
+            }};
+
+            ($system:expr) => {
+                run!($system, std::stringify!($system))
+            };
+        }
+
         // validate inventory soundness
         #[cfg(debug_assertions)]
-        crate::item::validation::InventoryValidationSystem.run_now(&self.ecs_world);
+        {
+            use crate::item::validation::InventoryValidationSystem;
+            run!(InventoryValidationSystem);
+        }
 
         if !self.is_paused() {
             // needs
-            HungerSystem.run_now(&self.ecs_world);
-            EatingSystem.run_now(&self.ecs_world);
+            run!(HungerSystem);
+            run!(EatingSystem);
 
             // update senses
-            SensesSystem.run_now(&self.ecs_world);
+            run!(SensesSystem);
 
             // choose and tick activity
-            AiSystem.run_now(&self.ecs_world);
-            ActivitySystem(Pin::as_ref(&self.ecs_world)).run_now(&self.ecs_world);
-            self.ecs_world.resource::<Runtime>().tick();
+            run!(AiSystem);
+            run!(
+                ActivitySystem(Pin::as_ref(&self.ecs_world)),
+                "ActivitySystem"
+            );
+            {
+                let _span = tracy_client::Span::new("Runtime", "tick_systems", file!(), line!(), 1);
+                self.ecs_world.resource::<Runtime>().tick();
+            }
 
             // follow paths with steering
-            PathSteeringSystem.run_now(&self.ecs_world);
+            run!(PathSteeringSystem);
 
             // apply steering
-            SteeringSystem.run_now(&self.ecs_world);
+            run!(SteeringSystem);
 
             // attempt to fulfil desired velocity
-            MovementFulfilmentSystem.run_now(&self.ecs_world);
+            run!(MovementFulfilmentSystem);
 
             // process entity events
-            RuntimeSystem.run_now(&self.ecs_world);
+            run!(RuntimeSystem);
 
             // apply physics
-            PhysicsSystem.run_now(&self.ecs_world);
+            run!(PhysicsSystem);
 
             // sync hauled item positions
-            HaulSystem.run_now(&self.ecs_world);
+            run!(HaulSystem);
 
             // update spatial
-            SpatialSystem.run_now(&self.ecs_world);
+            run!(SpatialSystem);
 
             // prune ui elements
-            UiElementPruneSystem.run_now(&self.ecs_world);
+            run!(UiElementPruneSystem);
 
             // prune dead entities from selection
             self.ecs_world
@@ -270,7 +292,7 @@ impl<R: Renderer> Simulation<R> {
         }
 
         // update display text for rendering
-        self.display_text_system.run_now(&self.ecs_world);
+        run!(self.display_text_system, "DisplayTextSystem");
 
         // reset frame bump allocator
         self.ecs_world.resource_mut::<FrameAllocator>().reset();

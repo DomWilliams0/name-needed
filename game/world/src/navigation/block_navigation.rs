@@ -1,16 +1,23 @@
 //! Navigation inside an area
-use common::*;
 
 use petgraph::graphmap::DiGraphMap;
 use petgraph::prelude::EdgeRef;
+use petgraph::visit::Visitable;
 
+use common::*;
 use unit::world::{BlockPosition, SlabIndex, SlabPosition};
 
-use crate::navigation::astar::astar;
+use crate::navigation::astar::{astar, SearchContext};
 use crate::navigation::path::{BlockPath, BlockPathNode};
 use crate::navigation::{EdgeCost, SearchGoal};
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
+pub type BlockGraphSearchContext = SearchContext<
+    BlockNavNode,
+    (BlockNavNode, BlockNavNode),
+    f32,
+    <BlockNavGraph as Visitable>::Map,
+>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Ord, PartialOrd, Hash)]
 pub struct BlockNavNode(pub BlockPosition);
@@ -34,6 +41,10 @@ impl BlockGraph {
         Self {
             graph: BlockNavGraph::new(),
         }
+    }
+
+    pub fn search_context() -> BlockGraphSearchContext {
+        BlockGraphSearchContext::new::<BlockNavGraph>()
     }
 
     pub fn add_edge<F, T>(&mut self, from: F, to: T, cost: EdgeCost, slab: SlabIndex)
@@ -66,6 +77,7 @@ impl BlockGraph {
         from: BlockPosition,
         to: BlockPosition,
         goal: SearchGoal,
+        context: &BlockGraphSearchContext,
     ) -> Result<BlockPath, BlockPathError> {
         // same source and dest is a success, if not a pointless one
         if from == to {
@@ -91,14 +103,10 @@ impl BlockGraph {
         let src = BlockNavNode(from);
         let dst = BlockNavNode(to);
 
-        let is_goal: Box<dyn FnMut(BlockNavNode) -> bool> = match goal {
-            SearchGoal::Arrive => Box::new(|n| n == dst),
-            SearchGoal::Adjacent => {
-                Box::new(|n: BlockNavNode| self.graph.edges(n).any(|e| e.target() == dst))
-            }
-            SearchGoal::Nearby(range) => {
-                Box::new(move |n: BlockNavNode| manhattan(&n.0, &dst.0) <= range.into())
-            }
+        let is_goal = |n: BlockNavNode| match goal {
+            SearchGoal::Arrive => n == dst,
+            SearchGoal::Adjacent => self.graph.edges(n).any(|e| e.target() == dst),
+            SearchGoal::Nearby(range) => manhattan(&n.0, &dst.0) <= range.into(),
         };
 
         let path = astar(
@@ -107,6 +115,7 @@ impl BlockGraph {
             is_goal,
             |(_, _, e)| e.0.weight(),
             |n| manhattan(&n.0, &dst.0) as f32,
+            context,
         )
         .ok_or(BlockPathError::NoPath(to, from))?;
 
@@ -115,7 +124,7 @@ impl BlockGraph {
 
         let target = path.last().map(|(_, (_, target))| target).unwrap_or(&dst).0;
 
-        for (_, (from, to)) in path {
+        for &(_, (from, to)) in path.iter() {
             let edge = self.graph.edge_weight(from, to).unwrap();
             out_path.push(BlockPathNode {
                 block: from.0,
@@ -140,13 +149,14 @@ impl BlockGraph {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
+
     use unit::world::ChunkLocation;
 
     use crate::block::BlockType;
-    use crate::navigation::{BlockPathNode, SearchGoal, WorldArea};
+    use crate::navigation::{BlockGraph, BlockPathNode, SearchGoal, WorldArea};
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkBuilder, EdgeCost};
-    use std::convert::TryInto;
 
     #[test]
     fn simple_path() {
@@ -164,6 +174,7 @@ mod tests {
                 (3, 5, 2).try_into().unwrap(),
                 (6, 5, 4).try_into().unwrap(),
                 SearchGoal::Arrive,
+                &BlockGraph::search_context(),
             )
             .expect("path should succeed");
         let expected = vec![
@@ -190,6 +201,7 @@ mod tests {
                 (6, 5, 4).try_into().unwrap(),
                 (3, 5, 2).try_into().unwrap(),
                 SearchGoal::Arrive,
+                &BlockGraph::search_context(),
             )
             .expect("reverse path should succeed");
 
@@ -235,6 +247,7 @@ mod tests {
                     start.try_into().unwrap(),
                     end.try_into().unwrap(),
                     SearchGoal::Arrive,
+                    &BlockGraph::search_context(),
                 )
                 .expect("path should succeed")
         };

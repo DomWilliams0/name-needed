@@ -1,5 +1,5 @@
-pub use area_navigation::{AreaGraph, AreaNavEdge, AreaPathError};
-pub use block_navigation::{BlockGraph, BlockPathError};
+pub use area_navigation::{AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPathError};
+pub use block_navigation::{BlockGraph, BlockGraphSearchContext, BlockPathError};
 use common::*;
 pub use cost::EdgeCost;
 pub use path::{

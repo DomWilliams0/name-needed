@@ -1,4 +1,4 @@
-# TODOs (402)
+# TODOs (399)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -433,11 +433,8 @@
    * `// TODO also rotate texture`
  * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (2)
    * `|edge| edge.weight().cost.weight(), // TODO could prefer wider ports`
-   * `// TODO dont allocate and throw away path`
- * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (4)
-   * `// TODO reuse allocations`
-   * `// TODO reuse allocation`
-   * `// TODO reuse allocation`
+   * `// TODO avoid calcultaing path just to throw it away`
+ * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (1)
    * `// TODO this might be expensive, can we build up the vec in order`
  * [game/world/src/navigation/block_navigation.rs](game/world/src/navigation/block_navigation.rs) (2)
    * `// TODO use vertical distance differently?`
@@ -515,9 +512,9 @@
    * `// TODO preserve finished jobs and tasks for a bit and display them in the ui too`
    * `// TODO use table API when available`
  * [renderer/main/src/main.rs](renderer/main/src/main.rs) (5)
+   * `// TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"`
    * `// TODO specify e2e test by name (feature = "tests")`
    * `.expect("non file config not yet supported"); // TODO`
-   * `// TODO more granular - n for engine setup, n for sim setup, n for each frame?`
    * `// TODO use error chaining when stable (https://github.com/rust-lang/rust/issues/58520)`
    * `// TODO middle of requested chunk instead of corner`
  * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)

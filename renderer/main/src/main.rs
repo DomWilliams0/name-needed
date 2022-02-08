@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use allocator::{MyAllocator, ALLOCATOR};
 use common::*;
 use config::ConfigType;
 use engine::simulation;
@@ -13,17 +14,35 @@ use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend
 
 use crate::scenarios::Scenario;
 
-#[cfg(feature = "count-allocs")]
-mod count_allocs {
-    use alloc_counter::{count_alloc, AllocCounter};
+// TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"
+#[cfg(windows)]
+mod allocator {
+    use std::alloc::System;
 
-    type Allocator = std::alloc::System;
+    pub type MyAllocator = System;
+    pub const ALLOCATOR: MyAllocator = System;
+}
 
-    const ALLOCATOR: Allocator = std::alloc::System;
+#[cfg(not(windows))]
+mod allocator {
+    use jemallocator::Jemalloc;
+
+    pub type MyAllocator = Jemalloc;
+    pub const ALLOCATOR: MyAllocator = Jemalloc;
+}
+
+#[cfg(feature = "profiling")]
+mod tracy_alloc {
+    use crate::tracy_client::ProfiledAllocator;
+    use crate::{MyAllocator, ALLOCATOR};
 
     #[global_allocator]
-    static A: AllocCounter<Allocator> = AllocCounter(ALLOCATOR);
+    static GLOBAL: ProfiledAllocator<MyAllocator> = ProfiledAllocator::new(ALLOCATOR, 32);
 }
+
+#[cfg(not(feature = "profiling"))]
+#[global_allocator]
+static GLOBAL: MyAllocator = ALLOCATOR;
 
 mod scenarios;
 
@@ -209,24 +228,7 @@ fn main() {
 
     let result = panik::Builder::new()
         .slogger(logger_guard.logger())
-        .run_and_handle_panics(|| {
-            #[cfg(feature = "count-allocs")]
-            {
-                use alloc_counter::count_alloc;
-                let (counts, result) = count_alloc(|| do_main());
-                // TODO more granular - n for engine setup, n for sim setup, n for each frame?
-                info!(
-                    "{allocs} allocations, {reallocs} reallocs, {frees} frees",
-                    allocs = counts.0,
-                    reallocs = counts.1,
-                    frees = counts.2
-                );
-                result
-            }
-
-            #[cfg(not(feature = "count-allocs"))]
-            do_main()
-        });
+        .run_and_handle_panics(do_main);
 
     let exit = match result {
         None => {

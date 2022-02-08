@@ -177,13 +177,12 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * chests/container are multiblock entities that can be hauled around and stored inside other containers, NOT voxels!
 
 ## Optimizations
-* integrate tracy for per-frame profiling
+
 ### Performance
 * allocation reuse
 	* cap cached alloc size so memory usage doesnt only go upwards
 	* raii struct i.e. `fn start(&mut self) -> TempVec;` `TempVec::drop() {self.backing.clear()}`
 * pooled allocations
-* per-tick arena allocator
 * spatial queries for entities
 * path finding worker thread
 	* short term path cache for src -> dst: e.g. ai system requests path for calculating cost, then movement reuses that path for following
@@ -202,7 +201,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * unchecked_unwrap
 * inventory and physical body lookups/searches could be expensive, cache unchanged
 * biggy: consider using separate ECS universes for long and short living entities, if having multiple geneations alive at a time has large memory usage
-* consider dynstack for ai dses and considerations, to avoid the huge amount of boxing
 * experiment with PGO
 * consider replacing expensive area link checking (extending into neighbour to check each block) with simple global lookup of (blockpos, direction, length)
 * physics system is unnecessarily checking the bounds of every entity every tick - skip this expensive check if stationary and slab hasn't changed

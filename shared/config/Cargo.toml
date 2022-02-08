@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 common = { path = "../common" }
 
-ron = "0.6"
+ron = "0.7"
 serde = "1.0"
 notify = "4.0"
 arc-swap = "1.2"

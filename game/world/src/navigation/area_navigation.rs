@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::iter::once;
 
+use petgraph::graph::EdgeIndex;
 use petgraph::stable_graph::StableGraph;
+use petgraph::visit::Visitable;
 use petgraph::Directed;
 
 use common::*;
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 
-use crate::navigation::astar::astar;
+use crate::navigation::astar::{astar, SearchContext};
 use crate::navigation::path::AreaPathNode;
 use crate::navigation::{AreaPath, WorldArea};
 use crate::neighbour::NeighbourOffset;
@@ -17,8 +19,11 @@ use crate::EdgeCost;
 type AreaNavGraph = StableGraph<AreaNavNode, AreaNavEdge, Directed, u32>;
 type NodeIndex = petgraph::prelude::NodeIndex<u32>;
 
+pub type AreaGraphSearchContext =
+    SearchContext<NodeIndex, EdgeIndex, f32, <AreaNavGraph as Visitable>::Map>;
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
-pub(crate) struct AreaNavNode(pub WorldArea);
+pub struct AreaNavNode(pub WorldArea);
 
 #[derive(Copy, Clone)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
@@ -164,10 +169,15 @@ impl AreaNavEdge {
 }
 
 impl AreaGraph {
+    pub fn search_context() -> AreaGraphSearchContext {
+        AreaGraphSearchContext::new::<AreaNavGraph>()
+    }
+
     pub(crate) fn find_area_path(
         &self,
         start: WorldArea,
         goal: WorldArea,
+        context: &AreaGraphSearchContext,
     ) -> Result<AreaPath, AreaPathError> {
         let src_node = self.get_node(start)?;
         let dst_node = self.get_node(goal)?;
@@ -190,6 +200,7 @@ impl AreaGraph {
                 let dy = (ny - gy).abs() * CHUNK_SIZE.as_i32();
                 (dx + dy) as f32
             },
+            context,
         )
         .ok_or(AreaPathError::NoPath)?;
 
@@ -199,8 +210,8 @@ impl AreaGraph {
         out_path.push(AreaPathNode::new_start(start));
 
         let area_nodes = path
-            .into_iter()
-            .map(|(node, edge)| (self.graph[node].0, self.graph[edge]));
+            .iter()
+            .map(|&(node, edge)| (self.graph[node].0, self.graph[edge]));
         for (area, edge) in area_nodes {
             out_path.push(AreaPathNode::new(area, edge));
         }
@@ -208,9 +219,14 @@ impl AreaGraph {
         Ok(AreaPath(out_path))
     }
 
-    pub(crate) fn path_exists(&self, start: WorldArea, goal: WorldArea) -> bool {
-        // TODO dont allocate and throw away path
-        self.find_area_path(start, goal).is_ok()
+    pub(crate) fn path_exists(
+        &self,
+        start: WorldArea,
+        goal: WorldArea,
+        context: &AreaGraphSearchContext,
+    ) -> bool {
+        // TODO avoid calcultaing path just to throw it away
+        self.find_area_path(start, goal, context).is_ok()
     }
 
     pub(crate) fn add_edge(&mut self, from: WorldArea, to: WorldArea, edge: AreaNavEdge) {
@@ -309,6 +325,8 @@ impl Debug for AreaNavEdge {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
+
     use unit::world::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
@@ -319,7 +337,6 @@ mod tests {
     use crate::neighbour::NeighbourOffset;
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkDescriptor, EdgeCost};
-    use std::convert::TryInto;
 
     fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
         // gross but allows for neater tests
@@ -618,6 +635,7 @@ mod tests {
                 .find_area_path(
                     WorldArea::new_with_slab((-1, 1), SLAB),
                     WorldArea::new_with_slab((0, 1), SLAB),
+                    &AreaGraph::search_context(),
                 )
                 .expect("path should succeed");
 
@@ -665,6 +683,7 @@ mod tests {
                 .find_area_path(
                     WorldArea::new_with_slab((0, 1), SLAB),
                     WorldArea::new_with_slab((-1, 1), SLAB),
+                    &AreaGraph::search_context(),
                 )
                 .expect("path should succeed");
 
@@ -726,7 +745,11 @@ mod tests {
                 .build((1, 0)),
         ]);
         let path = graph
-            .find_area_path(WorldArea::new((-1, 0)), WorldArea::new((1, 0)))
+            .find_area_path(
+                WorldArea::new((-1, 0)),
+                WorldArea::new((1, 0)),
+                &AreaGraph::search_context(),
+            )
             .expect("path should succeed");
 
         let expected = vec![
@@ -825,7 +848,11 @@ mod tests {
             .fill_slice(1, BlockType::Grass)
             .build((0, 0))]);
 
-        let err = graph.find_area_path(WorldArea::new((0, 0)), WorldArea::new((100, 20)));
+        let err = graph.find_area_path(
+            WorldArea::new((0, 0)),
+            WorldArea::new((100, 20)),
+            &AreaGraph::search_context(),
+        );
 
         assert!(matches!(err, Err(AreaPathError::NoSuchNode(_))));
     }

@@ -13,7 +13,7 @@ use geo::prelude::{Contains, Intersects};
 use geo::Rect;
 use geo_booleanop::boolean::BooleanOp;
 use rand_distr::{Distribution, Normal};
-use rstar::primitives::PointWithData;
+use rstar::primitives::GeomWithData;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 
@@ -22,7 +22,7 @@ pub struct ForestFeature {
 }
 
 struct PoissonDiskSampling {
-    points: RTree<PointWithData<(), [f64; 2]>>,
+    points: RTree<GeomWithData<[f64; 2], ()>>,
 
     /// From config
     radius: f64,
@@ -195,7 +195,7 @@ impl PoissonDiskSampling {
         // add_point() already returned true for us to get this far, dont add again
 
         let initial_point = initial_point.get_array();
-        self.points.insert(PointWithData::new((), initial_point));
+        self.points.insert(GeomWithData::new(initial_point, ()));
 
         debug_assert!(is_in_bounds(initial_point));
 
@@ -228,7 +228,7 @@ impl PoissonDiskSampling {
                 {
                     // valid point
                     active_points.push(candidate_point);
-                    self.points.insert(PointWithData::new((), candidate));
+                    self.points.insert(GeomWithData::new(candidate, ()));
                 } else {
                     // invalid point, ignore candidate
                 }
