@@ -27,7 +27,7 @@ crossbeam = { version = "0.8", optional = true }
 async-trait = { version = "0.1", optional = true }
 async-scoped = { version = "0.7", features = ["use-tokio"], optional = true }
 
-image = { version = "0.24", optional = true, default-features = false, features = ["png"] }
+image = { version = "0.23", optional = true, default-features = false, features = ["png"] }
 imageproc = { version = "0.22", optional = true, default-features = false }
 panik = { version = "0.2", optional = true, default-features = false, features = ["use-slog", "use-parking-lot"] }
 

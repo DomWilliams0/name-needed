@@ -1,18 +1,19 @@
-use common::*;
-use serde::Deserialize;
+use std::sync::Arc;
 
+use noise::MultiFractal;
+use serde::Deserialize;
+#[cfg(feature = "cache")]
+use serde::Serialize;
 use structopt::StructOpt;
 use strum::{EnumIter, EnumString};
 
+use common::alloc::str::FromStr;
+use common::*;
+use resources::{ReadResource, ResourceContainer, ResourceError, ResourceErrorKind, ResourceFile};
+use unit::world::ChunkLocation;
+
 use crate::biome::BiomeConfig;
 use crate::region::RegionLocationUnspecialized;
-use common::alloc::str::FromStr;
-use noise::MultiFractal;
-use resources::{ReadResource, ResourceContainer, ResourceError, ResourceErrorKind, ResourceFile};
-#[cfg(feature = "cache")]
-use serde::Serialize;
-use std::sync::Arc;
-use unit::world::ChunkLocation;
 
 pub type PlanetParamsRef = Arc<PlanetParams>;
 
@@ -219,23 +220,27 @@ impl PlanetParams {
         use std::io::ErrorKind;
         use std::path::Path;
 
-        let read_file = |path: &Path| -> std::io::Result<String> {
-            match std::fs::read_to_string(path) {
-                Err(e) if e.kind() == ErrorKind::NotFound => {
+        let read_file = |path: &Path, default: Option<&str>| -> std::io::Result<String> {
+            match (std::fs::read_to_string(path), default) {
+                (Err(e), Some(default)) if e.kind() == ErrorKind::NotFound => {
                     // no file, no problem
                     warn!(
-                        "couldn't find config file '{}', continuing with defaults",
+                        "couldn't find config file '{}', continuing with default",
                         path.display()
                     );
 
-                    Ok(String::new())
+                    Ok(default.to_string())
                 }
-                other => other,
+                (Err(err), _) => {
+                    error!("failed to read file {}: {}", path.display(), err);
+                    Err(err)
+                },
+                (Ok(s), _) => Ok(s),
             }
         };
 
-        let cfg = read_file(config_path.as_ref())?;
-        let biomes = read_file("biomes.ron".as_ref())?;
+        let cfg = read_file(config_path.as_ref(), Some(""))?;
+        let biomes = read_file("biomes.ron".as_ref(), None)?;
 
         Self::load(&cfg, &biomes, std::env::args())
     }

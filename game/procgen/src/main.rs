@@ -22,13 +22,13 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
 fn main() {
     use procgen::*;
 
-    // parse config and args first
-    let params = PlanetParams::load_file_with_args("procgen.txt");
-
     let logger = logging::LoggerBuilder::with_env()
         .and_then(|builder| builder.init(log_time))
         .expect("logging failed");
     info!("initialized logging"; "level" => ?logger.level());
+
+    // parse config and args first
+    let params = PlanetParams::load_file_with_args("procgen.txt");
 
     let exit = match params {
         Err(err) => {
