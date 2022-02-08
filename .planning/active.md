@@ -1,7 +1,7 @@
 # Active tasks
 
 * [X] add sheep entity
-* [ ] species component
+* [X] species component
 * [ ] herding component
 *  herdable entities should start/join a herd with nearby members of same species
     * [ ] herd allocation

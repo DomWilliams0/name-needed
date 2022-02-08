@@ -15,7 +15,7 @@ use simulation::{
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
     EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
     InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, TransformComponent, UiElementComponent,
+    SocietyComponent, SpeciesComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
@@ -251,6 +251,16 @@ impl SelectionWindow {
         {
             let tab = context.new_tab("Living");
             if tab.is_some() {
+                context.key_value(
+                    "Species:",
+                    || {
+                        details
+                            .component::<SpeciesComponent>(context)
+                            .map(|s| ui_str!(in context, "{}", s))
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
                 context.key_value(
                     "Velocity:",
                     || {

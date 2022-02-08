@@ -186,13 +186,30 @@ fn herding(ecs: &EcsWorld) {
     let world = world.borrow();
 
     let mut colors = helpers::entity_colours();
-    let sheep = helpers::get_config_count("sheep");
 
-    let sheep = spawn_entities_randomly(&world, sheep, Placement::RandomPos, |pos| {
-        helpers::new_entity("core_living_sheep", ecs, pos)
-            .with_satiety(NormalizedFloat::clamped(0.6))
-            .thanks()
-    });
+    let sheep = spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("sheep"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_sheep", ecs, pos)
+                .with_satiety(NormalizedFloat::clamped(0.6))
+                .thanks()
+        },
+    );
+
+    spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("humans"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_human", ecs, pos)
+                .with_color(colors.next().unwrap())
+                .with_player_society()
+                .with_name()
+                .thanks()
+        },
+    );
 }
 
 fn haul_to_container(ecs: &EcsWorld) {

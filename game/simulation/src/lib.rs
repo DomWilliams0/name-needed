@@ -67,6 +67,7 @@ pub use society::{
     job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle,
     SocietyVisibility,
 };
+pub use species::SpeciesComponent;
 pub use string::{CachedStr, StringCache};
 pub use strum::IntoEnumIterator;
 pub use unit::world::{
@@ -122,6 +123,7 @@ mod senses;
 mod simulation;
 mod society;
 mod spatial;
+mod species;
 mod steer;
 mod string;
 mod transform;
