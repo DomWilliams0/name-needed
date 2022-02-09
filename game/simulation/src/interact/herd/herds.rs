@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
+use crate::species::Species;
 use common::FmtResult;
 
 /// Resource to track herds
@@ -11,12 +12,17 @@ pub struct Herds {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-#[repr(transparent)]
-pub struct HerdHandle(NonZeroU32);
+pub struct HerdHandle {
+    id: NonZeroU32,
+    species: Species,
+}
 
 impl Herds {
-    pub fn new_herd(&mut self) -> HerdHandle {
-        let herd = HerdHandle(self.next);
+    pub fn new_herd(&mut self, species: Species) -> HerdHandle {
+        let herd = HerdHandle {
+            id: self.next,
+            species,
+        };
         self.next = NonZeroU32::new(self.next.get() + 1).expect("herd handle overflow");
 
         herd
@@ -39,6 +45,6 @@ impl Default for Herds {
 
 impl Debug for HerdHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "Herd({})", self.0)
+        write!(f, "Herd({}, {})", self.id, self.species)
     }
 }

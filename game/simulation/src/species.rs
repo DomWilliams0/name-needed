@@ -6,13 +6,22 @@ use common::*;
 use crate::ecs::*;
 use crate::{CachedStr, StringCache};
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Species(CachedStr);
+
 /// Affects behaviours that interact with other members of the same species e.g. herding
 #[derive(Component, EcsComponent, Clone, Debug, Eq, PartialEq)]
 #[storage(DenseVecStorage)]
 #[name("species")]
-pub struct SpeciesComponent(CachedStr);
+pub struct SpeciesComponent(Species);
 
-impl Display for SpeciesComponent {
+impl SpeciesComponent {
+    pub fn species(&self) -> Species {
+        self.0
+    }
+}
+
+impl Display for Species {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let s = self.0.as_ref();
         let chars = {
@@ -39,7 +48,7 @@ impl<V: Value> ComponentTemplate<V> for SpeciesComponent {
         Self: Sized,
     {
         let name = values.get_string("name")?.to_lowercase(); // normalise case
-        Ok(Rc::new(Self(string_cache.get(&name))))
+        Ok(Rc::new(Self(Species(string_cache.get(&name)))))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

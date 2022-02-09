@@ -243,8 +243,7 @@
    * `// TODO just use type name`
    * `// TODO this will be pre calculated already`
    * `// TODO frame alloc debug/display helper`
- * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
-   * `#[derive(Clone, Copy, Debug)] // TODO remove debug`
+ * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (1)
    * `// TODO reuse allocs`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
@@ -524,6 +523,8 @@
    * `// TODO middle of requested chunk instead of corner`
  * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
    * `// TODO random pos offset away from the voxel centre`
+ * [resources/definitions/living/cow.ron](resources/definitions/living/cow.ron) (1)
+   * `{"intelligence": (species: "sheep")}, // TODO`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)

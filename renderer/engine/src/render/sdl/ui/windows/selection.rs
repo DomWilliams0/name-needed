@@ -262,7 +262,7 @@ impl SelectionWindow {
                     || {
                         details
                             .component::<SpeciesComponent>(context)
-                            .map(|s| ui_str!(in context, "{}", s))
+                            .map(|s| ui_str!(in context, "{}", s.species()))
                     },
                     None,
                     COLOR_ORANGE,

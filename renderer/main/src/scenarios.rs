@@ -200,6 +200,17 @@ fn herding(ecs: &EcsWorld) {
 
     spawn_entities_randomly(
         &world,
+        helpers::get_config_count("cows"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_cow", ecs, pos)
+                .with_satiety(NormalizedFloat::clamped(0.6))
+                .thanks()
+        },
+    );
+
+    spawn_entities_randomly(
+        &world,
         helpers::get_config_count("humans"),
         Placement::RandomPos,
         |pos| {
