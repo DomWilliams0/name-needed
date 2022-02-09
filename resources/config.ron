@@ -16,7 +16,7 @@ Config(
         initial_chunk: (33, 512), // near a forest
 
         /// keep these low <=8
-        initial_slab_depth: 0,
+        initial_slab_depth: 1,
         initial_chunk_radius: 1,
     ),
     simulation: (
@@ -26,14 +26,15 @@ Config(
         spawn_counts: {
             "humans": 0,
             "dogs": 5,
-            "sheep": 20,
-            "cows": 10,
+            "sheep": 40,
+            "cows": 0,
             "food": 50,
             "bricks": 80,
             "build_jobs": 2,
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 64,
-        herd_radius: 8.0,
+        herd_radius: 6.0,
+        herd_expiry_ticks: 100,
      ),
 )

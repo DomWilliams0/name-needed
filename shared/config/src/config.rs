@@ -58,6 +58,7 @@ pub struct Simulation {
     /// Ring buffer size
     pub entity_logging_capacity: usize,
     pub herd_radius: f32,
+    pub herd_expiry_ticks: u32,
 }
 
 impl WorldSource {

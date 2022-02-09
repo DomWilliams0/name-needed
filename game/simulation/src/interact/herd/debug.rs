@@ -2,11 +2,11 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use color::Color;
-
 use unit::world::WorldPoint;
 
 use crate::alloc::FrameAllocator;
 use crate::ecs::*;
+use crate::interact::herd::component::CurrentHerd;
 use crate::interact::herd::{HerdHandle, HerdedComponent, Herds};
 use crate::render::DebugRenderer;
 use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
@@ -28,15 +28,13 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
         viewer: &WorldViewer,
     ) {
         let range = viewer.entity_range();
-        // let radius = config::get().simulation.herd_radius;
+        let radius = config::get().simulation.herd_radius;
 
         type Query<'a> = (
             Read<'a, Herds>,
             ReadStorage<'a, TransformComponent>,
             ReadStorage<'a, HerdedComponent>,
         );
-
-        // const RADIUS_COLOR: Color = Color::rgb(92, 211, 247);
 
         let mut visible_herds = HashSet::new();
         let (herds, transform, herd) = Query::fetch(ecs_world);
@@ -45,10 +43,20 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
                 continue;
             }
 
-            // let color = herd_color(herd.handle());
-            // renderer.debug_add_circle(transform.position, radius, color);
+            match herd.current() {
+                CurrentHerd::PendingDeparture { .. } => {
+                    renderer.debug_add_circle(
+                        transform.position,
+                        radius,
+                        Color::rgb(160, 160, 160),
+                    );
+                }
+                CurrentHerd::MemberOf(herd) => {
+                    renderer.debug_add_circle(transform.position, 2.0, herd_color(herd));
+                }
+            }
 
-            visible_herds.insert(herd.handle());
+            visible_herds.insert(herd.current().handle());
         }
 
         let alloc = ecs_world.resource::<FrameAllocator>();

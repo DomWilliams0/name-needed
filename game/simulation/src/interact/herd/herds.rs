@@ -13,7 +13,7 @@ pub struct Herds {
     herds: HashMap<HerdHandle, HerdInfo>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HerdInfo {
     pub average_pos: WorldPoint,
     pub range: WorldPointRange,

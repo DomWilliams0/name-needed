@@ -8,6 +8,10 @@
     * [X] debug renderer to show herds
     * [X] leave herd if alone
     * [X] add cow species to ensure they form their own herds
+* herd formation
+    * [X] dont leave immediately after leaving the radius, but rather slowly decay over a few ticks
+    * [ ] if parts of a herd become disconnected, split into 2
+    * [ ] the herd that wins during merging should be the biggest, not just the first one found
 * [ ] startling of sheep based on senses
 * [ ] propagation of startling through herd
     * could propagate the original startle source, or just be startled at the startlement of another

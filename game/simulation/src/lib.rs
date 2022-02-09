@@ -50,6 +50,8 @@ pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
+pub use interact::herd::HerdedComponent;
+
 pub use build::{BuildMaterial, BuildTemplate};
 #[cfg(debug_assertions)]
 pub use item::validation::validate_all_inventories;

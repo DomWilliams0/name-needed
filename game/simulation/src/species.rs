@@ -6,7 +6,7 @@ use common::*;
 use crate::ecs::*;
 use crate::{CachedStr, StringCache};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Species(CachedStr);
 
 /// Affects behaviours that interact with other members of the same species e.g. herding
@@ -36,6 +36,12 @@ impl Display for Species {
         }
 
         Ok(())
+    }
+}
+
+impl Debug for Species {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Species({})", self.0.as_ref())
     }
 }
 

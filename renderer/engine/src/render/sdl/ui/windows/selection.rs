@@ -13,9 +13,9 @@ use simulation::job::BuildThingJob;
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
-    EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, SpeciesComponent, TransformComponent, UiElementComponent,
+    EntityLoggingComponent, FollowPathComponent, HerdedComponent, HungerComponent,
+    IntoEnumIterator, InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent,
+    Societies, SocietyComponent, SpeciesComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
@@ -263,6 +263,16 @@ impl SelectionWindow {
                         details
                             .component::<SpeciesComponent>(context)
                             .map(|s| ui_str!(in context, "{}", s.species()))
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
+                context.key_value(
+                    "Herd:",
+                    || {
+                        details
+                            .component::<HerdedComponent>(context)
+                            .map(|h| ui_str!(in context, "{}", h.current()))
                     },
                     None,
                     COLOR_ORANGE,
