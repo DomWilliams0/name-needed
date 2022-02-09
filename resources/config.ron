@@ -27,6 +27,7 @@ Config(
             "humans": 0,
             "dogs": 5,
             "sheep": 20,
+            "cows": 10,
             "food": 50,
             "bricks": 80,
             "build_jobs": 2,

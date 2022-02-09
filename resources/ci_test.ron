@@ -32,5 +32,6 @@ Config(
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 8,
-     ),
+        herd_radius: 8.0,
+    ),
 )

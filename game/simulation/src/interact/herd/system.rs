@@ -1,12 +1,12 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use common::rstar::{Envelope, Point, PointDistance, RTree, AABB};
 use common::*;
-use unit::world::WorldPoint;
+use unit::world::{WorldPoint, WorldPointRange};
 
 use crate::ecs::*;
 use crate::interact::herd::component::{HerdableComponent, HerdedComponent};
-use crate::interact::herd::herds::Herds;
+use crate::interact::herd::herds::{HerdInfo, Herds};
 use crate::interact::herd::system::rtree::{HerdTreeNode, SpeciesSelectionFunction};
 use crate::interact::herd::HerdHandle;
 use crate::simulation::EcsWorldRef;
@@ -34,7 +34,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
         (entities, _world, _spatial, mut herds, transform, herdable, mut herded, species): Self::SystemData,
     ) {
         // run occasionally
-        if Tick::fetch().value() % 12 != 0 {
+        if Tick::fetch().value() % 6 != 0 {
             return;
         }
 
@@ -60,19 +60,17 @@ impl<'a> System<'a> for HerdJoiningSystem {
         }
 
         let mut tree = RTree::bulk_load(entries);
-        let mut assigned_herds = HashSet::new();
+        let mut assigned_herds = HashMap::new();
 
+        // TODO reuse allocs
+        let mut current_herd = Vec::new();
+        let mut frontier = VecDeque::new();
         while tree.size() != 0 {
             // find next herd
-            // TODO reuse allocs
-            let mut current_herd = vec![];
-            let mut frontier = VecDeque::new();
-
             let e = *tree.iter().next().unwrap(); // checked to be not empty
             frontier.push_back(e);
 
             let species = e.species;
-
             while let Some(top) = frontier.pop_front() {
                 let selection = SpeciesSelectionFunction {
                     circle_origin: top.pos.xyz(),
@@ -85,27 +83,60 @@ impl<'a> System<'a> for HerdJoiningSystem {
                     current_herd.push(nearby);
                 }
             }
+
             if current_herd.len() == 1 {
                 // one man wolf pack is not a herd
                 let _ = herded.remove(e.entity.into());
+                current_herd.clear();
                 continue;
             }
 
             // find an existing herd to reuse, or make a new one
             let herd = match current_herd.iter().find_map(|e| e.current_herd) {
-                Some(herd) if !assigned_herds.contains(&herd) => herd,
+                Some(herd) if !assigned_herds.contains_key(&herd) => herd,
                 _ => herds.new_herd(species),
             };
 
-            // assign herd
+            // assign herd and calculate bounds and avg position
+            let members = current_herd.len();
+            let mut summed_pos = (0.0, 0.0, 0.0);
+            let mut min_pos = (f32::MAX, f32::MAX, f32::MAX);
+            let mut max_pos = (f32::MIN, f32::MIN, f32::MIN);
+
             for e in current_herd.drain(..) {
                 let _ = herded.insert(e.entity.into(), HerdedComponent::new(herd));
+
+                let (x, y, z) = e.pos.xyz();
+                summed_pos = (summed_pos.0 + x, summed_pos.1 + y, summed_pos.2 + z);
+                min_pos = (min_pos.0.min(x), min_pos.1.min(y), min_pos.2.min(z));
+                max_pos = (max_pos.0.max(x), max_pos.1.max(y), max_pos.2.max(z));
             }
 
-            assigned_herds.insert(herd);
+            let average_pos = {
+                debug_assert_ne!(members, 0);
+                let n = members as f32;
+                WorldPoint::new(summed_pos.0 / n, summed_pos.1 / n, summed_pos.2 / n)
+                    .expect("invalid herd average position")
+            };
+            let range = {
+                let from = WorldPoint::new(min_pos.0, min_pos.1, min_pos.2);
+                let to = WorldPoint::new(max_pos.0, max_pos.1, max_pos.2);
+
+                let (from, to) = from.zip(to).expect("invalid herd min/max position");
+                WorldPointRange::with_inclusive_range(from, to)
+            };
+
+            assigned_herds.insert(
+                herd,
+                HerdInfo {
+                    average_pos,
+                    members,
+                    range,
+                },
+            );
         }
 
-        herds.register_assigned_herds(assigned_herds.iter().copied());
+        herds.register_assigned_herds(assigned_herds.into_iter());
     }
 }
 

@@ -1,14 +1,23 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
 use crate::species::Species;
 use common::FmtResult;
+use unit::world::{WorldPoint, WorldPointRange};
 
 /// Resource to track herds
 pub struct Herds {
     next: NonZeroU32,
-    alive: HashSet<HerdHandle>,
+    /// Holds active herds only
+    herds: HashMap<HerdHandle, HerdInfo>,
+}
+
+#[derive(Clone)]
+pub struct HerdInfo {
+    pub average_pos: WorldPoint,
+    pub range: WorldPointRange,
+    pub members: usize,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -28,9 +37,13 @@ impl Herds {
         herd
     }
 
-    pub fn register_assigned_herds(&mut self, herds: impl Iterator<Item = HerdHandle>) {
-        self.alive.clear();
-        self.alive.extend(herds);
+    pub fn register_assigned_herds(&mut self, herds: impl Iterator<Item = (HerdHandle, HerdInfo)>) {
+        self.herds.clear();
+        self.herds.extend(herds);
+    }
+
+    pub fn get_info(&self, herd: HerdHandle) -> Option<&HerdInfo> {
+        self.herds.get(&herd)
     }
 }
 
@@ -38,7 +51,7 @@ impl Default for Herds {
     fn default() -> Self {
         Self {
             next: unsafe { NonZeroU32::new_unchecked(1) },
-            alive: Default::default(),
+            herds: Default::default(),
         }
     }
 }

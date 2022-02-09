@@ -1,4 +1,4 @@
-# TODOs (400)
+# TODOs (399)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -239,8 +239,6 @@
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
- * [game/simulation/src/interact/herd/debug.rs](game/simulation/src/interact/herd/debug.rs) (1)
-   * `// TODO this will be pre calculated already`
  * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (1)
    * `// TODO reuse allocs`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
