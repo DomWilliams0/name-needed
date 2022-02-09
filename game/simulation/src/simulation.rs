@@ -420,6 +420,9 @@ impl<R: Renderer> Simulation<R> {
                             .set_enabled(ident, enabled, &self.ecs_world)
                     {
                         warn!("failed to set debug renderer state"; "error" => %e);
+                        if cfg!(debug_assertions) {
+                            panic!("unknown debug renderer: {}", e)
+                        }
                     }
                 }
 

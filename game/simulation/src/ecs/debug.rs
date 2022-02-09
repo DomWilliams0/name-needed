@@ -14,10 +14,6 @@ pub struct EntityIdDebugRenderer(String);
 pub struct AllSocietyVisibilityDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "entity ids"
-    }
-
     fn name(&self) -> &'static str {
         "Entity IDs"
     }
@@ -54,10 +50,6 @@ impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
 }
 
 impl<R: Renderer> DebugRenderer<R> for AllSocietyVisibilityDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "all societies"
-    }
-
     fn name(&self) -> &'static str {
         "All societies"
     }

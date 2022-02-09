@@ -20,10 +20,6 @@ pub struct PathDebugRenderer {
 pub struct NavigationAreaDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "navigation path"
-    }
-
     fn name(&self) -> &'static str {
         "Navigation paths"
     }
@@ -68,10 +64,6 @@ impl<R: Renderer> DebugRenderer<R> for PathDebugRenderer {
 }
 
 impl<R: Renderer> DebugRenderer<R> for NavigationAreaDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "navigation areas"
-    }
-
     fn name(&self) -> &'static str {
         "Navigation areas"
     }

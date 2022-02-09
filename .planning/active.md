@@ -15,6 +15,6 @@
     * use another kind of navigation that doesn't use path finding? navigate locally but just away.
         or rather search outward for a flee destination instead of choosing top-down
     * could use this for wandering too
-* [ ] use type name for debug renderer idenfier
+* [X] use type name for debug renderer idenfier
 * [ ] add chained modify_x|y|z helper to worldpoint
 * [X] frame allocator helpers for debug/display/vec

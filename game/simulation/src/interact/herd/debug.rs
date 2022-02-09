@@ -17,11 +17,6 @@ use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, Wo
 pub struct HerdDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        // TODO just use type name
-        "herd"
-    }
-
     fn name(&self) -> &'static str {
         "Herds"
     }

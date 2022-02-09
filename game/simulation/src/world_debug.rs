@@ -13,10 +13,6 @@ pub struct FeatureBoundaryDebugRenderer {
 type FeatureLine = (Color, WorldPoint, WorldPoint);
 
 impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "feature boundaries"
-    }
-
     fn name(&self) -> &'static str {
         "Feature boundaries"
     }
