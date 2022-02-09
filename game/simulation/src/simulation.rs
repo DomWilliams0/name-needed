@@ -21,6 +21,7 @@ use crate::input::{
     BlockPlacement, InputEvent, InputSystem, MouseLocation, SelectedEntities, SelectedTiles,
     UiCommand, UiPopup, UiRequest, UiResponsePayload,
 };
+use crate::interact::herd::{HerdDebugRenderer, HerdJoiningSystem, Herds};
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
 use crate::needs::{EatingSystem, HungerSystem};
@@ -111,6 +112,7 @@ pub struct SimulationRef<'s> {
     pub debug_renderers: &'s DebugRenderersState,
 }
 
+/// Resource to get the world reference in a system
 pub struct EcsWorldRef(Pin<&'static EcsWorld>);
 
 impl world::WorldContext for WorldContext {
@@ -249,6 +251,9 @@ impl<R: Renderer> Simulation<R> {
 
             // update senses
             run!(SensesSystem);
+
+            // update herds
+            run!(HerdJoiningSystem);
 
             // choose and tick activity
             run!(AiSystem);
@@ -776,6 +781,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(NameGeneration::load(&resources)?);
     world.insert(FrameAllocator::default());
     world.insert(UiPopup::default());
+    world.insert(Herds::default());
 
     Ok(())
 }
@@ -793,6 +799,7 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<FeatureBoundaryDebugRenderer>()?;
     builder.register::<EntityIdDebugRenderer>()?;
     builder.register::<AllSocietyVisibilityDebugRenderer>()?;
+    builder.register::<HerdDebugRenderer>()?;
 
     Ok(builder.build())
 }

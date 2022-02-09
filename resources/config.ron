@@ -24,14 +24,15 @@ Config(
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 20,
+            "humans": 0,
             "dogs": 5,
-            "sheep": 10,
+            "sheep": 20,
             "food": 50,
             "bricks": 80,
             "build_jobs": 2,
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 64,
+        herd_radius: 8.0,
      ),
 )

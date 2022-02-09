@@ -109,6 +109,7 @@ pub mod dev;
 mod ecs;
 mod event;
 pub mod input;
+mod interact;
 mod item;
 mod movement;
 mod needs;

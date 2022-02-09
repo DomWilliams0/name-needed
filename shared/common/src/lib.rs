@@ -21,6 +21,7 @@ pub use ordered_float::{NotNan, OrderedFloat};
 pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
+pub use rstar;
 pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
 pub use tracy_client;

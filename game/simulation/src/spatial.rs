@@ -1,6 +1,5 @@
 use std::cell::{RefCell, RefMut};
 use std::collections::HashSet;
-use std::ops::Deref;
 
 use common::*;
 use unit::world::WorldPoint;

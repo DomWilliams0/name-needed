@@ -19,7 +19,6 @@ tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi
 futures = { version = "0.3", default-features = false, features = ["std", "alloc", "async-await"] }
 geo = "0.16"
 geo-booleanop = "0.3"
-rstar = "0.9"
 spiral = "0.1"
 
 line_drawing = "1.0"

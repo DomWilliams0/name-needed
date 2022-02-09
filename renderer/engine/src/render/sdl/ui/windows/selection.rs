@@ -199,7 +199,7 @@ impl SelectionWindow {
         if components_node.is_some() {
             ChildWindow::new("scrolledcomponents")
                 .size([0.0, 150.0])
-                .build(&context, || {
+                .build(context, || {
                     // TODO component-specific widget
                     for (name, component) in
                         context.simulation().ecs.all_components_for(details.entity)
