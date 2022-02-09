@@ -197,37 +197,43 @@ impl SelectionWindow {
 
         let components_node = context.new_tree_node("Components", DefaultOpen::Closed);
         if components_node.is_some() {
-            // TODO component-specific widget
-            for (name, component) in context.simulation().ecs.all_components_for(details.entity) {
-                let interactive = match component.as_interactive() {
-                    None => {
-                        // just show name
-                        context.text(ui_str!(in context, " - {}", name));
-                        continue;
-                    }
-                    Some(i) => i,
-                };
+            ChildWindow::new("scrolledcomponents")
+                .size([0.0, 150.0])
+                .build(&context, || {
+                    // TODO component-specific widget
+                    for (name, component) in
+                        context.simulation().ecs.all_components_for(details.entity)
+                    {
+                        let interactive = match component.as_interactive() {
+                            None => {
+                                // just show name
+                                context.text(ui_str!(in context, " - {}", name));
+                                continue;
+                            }
+                            Some(i) => i,
+                        };
 
-                // nice tree node
-                let title = ui_str!(in context, "{}", name);
-                let node = context.new_tree_node(title, DefaultOpen::Closed);
-                if node.is_none() {
-                    continue;
-                }
-
-                context.key_value(
-                    "Summary",
-                    || {
-                        if let Some(dbg) = interactive.as_debug() {
-                            Value::Wrapped(ui_str!(in context, "{:?}", dbg))
-                        } else {
-                            Value::None("Not implemented")
+                        // nice tree node
+                        let title = ui_str!(in context, "{}", name);
+                        let node = context.new_tree_node(title, DefaultOpen::Closed);
+                        if node.is_none() {
+                            continue;
                         }
-                    },
-                    None,
-                    COLOR_ORANGE,
-                );
-            }
+
+                        context.key_value(
+                            "Summary",
+                            || {
+                                if let Some(dbg) = interactive.as_debug() {
+                                    Value::Wrapped(ui_str!(in context, "{:?}", dbg))
+                                } else {
+                                    Value::None("Not implemented")
+                                }
+                            },
+                            None,
+                            COLOR_ORANGE,
+                        );
+                    }
+                });
         }
 
         let tabbar = context.new_tab_bar("##entitydetailstabbar");
