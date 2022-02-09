@@ -10,6 +10,7 @@ use crate::ecs::*;
 use crate::interact::herd::{HerdHandle, HerdedComponent};
 use crate::render::DebugRenderer;
 
+use crate::alloc::FrameAllocator;
 use crate::{InnerWorldRef, Renderer, ThreadedWorldLoader, TransformComponent, WorldViewer};
 
 #[derive(Default)]
@@ -90,6 +91,7 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
                 });
         }
 
+        let alloc = ecs_world.resource::<FrameAllocator>();
         for (herd, entry) in total_herd {
             debug_assert_ne!(entry.members, 0);
             let n = entry.members as f32;
@@ -99,9 +101,8 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
                 entry.summed_pos.z / n,
             );
 
-            // TODO frame alloc debug/display helper
-            let name = format!("{:?}", herd);
-            renderer.debug_text(avg_pos, &name);
+            let name = alloc.alloc_str_from_debug(&herd);
+            renderer.debug_text(avg_pos, name.as_str());
             renderer.debug_add_square_around(avg_pos, 2.0, Color::rgb(200, 40, 20));
 
             let min = WorldPoint::new(entry.min_pos.x, entry.min_pos.y, entry.min_pos.z);

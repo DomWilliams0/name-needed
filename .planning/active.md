@@ -17,4 +17,4 @@
     * could use this for wandering too
 * [ ] use type name for debug renderer idenfier
 * [ ] add chained modify_x|y|z helper to worldpoint
-* [ ] frame allocator helpers for debug/display/vec
+* [X] frame allocator helpers for debug/display/vec

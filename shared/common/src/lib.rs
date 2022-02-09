@@ -2,6 +2,7 @@ pub use arrayvec::*;
 pub use boolinator::Boolinator;
 pub use bumpalo;
 pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
+pub type BumpString<'a> = bumpalo::collections::String<'a>;
 pub type BumpBox<'a, T> = bumpalo::boxed::Box<'a, T>;
 
 pub use cgmath;
