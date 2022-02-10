@@ -216,12 +216,14 @@ impl<C: WorldContext> World<C> {
                     .chain(WorldNeighbours::new(to.above()))
                     .chain(WorldNeighbours::new(to.below()));
 
-                let accessible_neighbour = neighbours.find_map(|pos| {
-                    self.find_accessible_block_in_column_with_range(pos, Some(pos.2 - 1))
-                });
+                let accessible_neighbour = neighbours
+                    .filter_map(|pos| {
+                        self.find_accessible_block_in_column_with_range(pos, Some(pos.2 - 1))
+                    })
+                    .min_by_key(|pos| pos.distance2(from));
 
                 if let Some(neighbour) = accessible_neighbour {
-                    // arrive at neighbour
+                    // arrive at closest neighbour
                     Some((neighbour, SearchGoal::Arrive))
                 } else {
                     // arrive adjacent to target
