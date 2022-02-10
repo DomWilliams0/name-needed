@@ -50,7 +50,7 @@ pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
 
-pub use interact::herd::HerdedComponent;
+pub use interact::herd::{HerdedComponent, Herds};
 
 pub use build::{BuildMaterial, BuildTemplate};
 #[cfg(debug_assertions)]

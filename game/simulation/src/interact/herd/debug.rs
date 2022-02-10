@@ -43,27 +43,34 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
                 continue;
             }
 
+            let color = match herd.current() {
+                CurrentHerd::PendingDeparture { .. } => Color::rgb(160, 160, 160),
+                CurrentHerd::MemberOf(herd) => herd_color(herd),
+            };
+
             match herd.current() {
                 CurrentHerd::PendingDeparture { .. } => {
-                    renderer.debug_add_circle(
-                        transform.position,
-                        radius,
-                        Color::rgb(160, 160, 160),
-                    );
+                    renderer.debug_add_circle(transform.position, radius, color);
                 }
-                CurrentHerd::MemberOf(herd) => {
-                    renderer.debug_add_circle(transform.position, 2.0, herd_color(herd));
+                CurrentHerd::MemberOf(_) => {
+                    renderer.debug_add_circle(transform.position, 2.0, color);
                 }
-            }
+            };
 
             visible_herds.insert(herd.current().handle());
+
+            // gets messy
+            // if let Some(herd) = herds.get_info(herd.current().handle()) {
+            //     renderer.debug_add_line(transform.position, herd.average_pos, color);
+            // }
         }
 
         let alloc = ecs_world.resource::<FrameAllocator>();
         for herd in visible_herds {
-            let info = herds
-                .get_info(herd)
-                .unwrap_or_else(|| panic!("invalid herd {:?}", herd));
+            let info = match herds.get_info(herd) {
+                Some(h) => h,
+                None => continue,
+            };
 
             let name = alloc.alloc_str_from_debug(&herd);
             renderer.debug_text(info.average_pos, name.as_str());

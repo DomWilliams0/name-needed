@@ -84,9 +84,23 @@ impl From<specs::Entity> for Entity {
     }
 }
 
+impl From<&specs::Entity> for Entity {
+    #[inline(always)]
+    fn from(e: &specs::Entity) -> Self {
+        Self(*e)
+    }
+}
+
 impl From<Entity> for specs::Entity {
     #[inline(always)]
     fn from(e: Entity) -> Self {
+        e.0
+    }
+}
+
+impl From<&Entity> for specs::Entity {
+    #[inline(always)]
+    fn from(e: &Entity) -> Self {
         e.0
     }
 }
