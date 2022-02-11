@@ -19,9 +19,9 @@ use crate::event::EntityEvent;
 use crate::runtime::futures::ParkUntilWakeupFuture;
 
 struct RuntimeInner {
-    ready: Vec<TaskRef>,
+    ready: Vec<WeakTaskRef>,
     /// Swapped out with `ready` during tick
-    ready_double_buf: Vec<TaskRef>,
+    ready_double_buf: Vec<WeakTaskRef>,
 
     next_task: TaskHandle,
 
@@ -96,7 +96,7 @@ impl Runtime {
         let _ = gimme_task_ref.send(task.clone());
 
         // task is ready immediately
-        runtime.ready.push(task.clone());
+        runtime.ready.push(task.weak());
         task.0.ready.store(true, Ordering::Relaxed);
         task
     }
@@ -119,7 +119,7 @@ impl Runtime {
         };
 
         drop(runtime);
-        for task in ready_tasks.drain(..) {
+        for task in ready_tasks.drain(..).filter_map(|t| t.upgrade()) {
             let was_ready = task.0.ready.swap(false, Ordering::Relaxed);
             debug_assert!(was_ready, "task should've been ready but wasn't");
 
@@ -147,7 +147,7 @@ impl Runtime {
                 !self.is_ready(task.handle()),
                 "task handle ready flag is wrong, should be not ready"
             );
-            self.0.borrow_mut().ready.push(task.clone());
+            self.0.borrow_mut().ready.push(task.weak());
         } else {
             debug_assert!(
                 self.is_ready(task.handle()),
@@ -165,6 +165,7 @@ impl Runtime {
             .borrow()
             .ready
             .iter()
+            .filter_map(|t| t.upgrade())
             .position(|t| t.handle() == task)
     }
 }
