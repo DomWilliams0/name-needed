@@ -1,4 +1,4 @@
-# TODOs (399)
+# TODOs (397)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -224,10 +224,8 @@
    * `// TODO track by game tick instead of just number of ops`
  * [game/simulation/src/event/subscription.rs](game/simulation/src/event/subscription.rs) (1)
    * `/// TODO type name of activity instead?`
- * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (3)
+ * [game/simulation/src/event/timer.rs](game/simulation/src/event/timer.rs) (1)
    * `// TODO move this into Tick`
-   * `// TODO sort by elapsed() bool instead`
-   * `// TODO might be better to just insert sorted`
  * [game/simulation/src/input/command.rs](game/simulation/src/input/command.rs) (2)
    * `// TODO expand/contract in a direction`
    * `// TODO only allocate uiresponse for those that need it`

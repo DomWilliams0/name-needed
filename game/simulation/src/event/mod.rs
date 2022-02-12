@@ -1,15 +1,15 @@
-mod queue;
-mod subscription;
-mod timer;
-
 pub use queue::EntityEventQueue;
+#[cfg(feature = "testing")]
+pub use subscription::debug_events::{EntityEventDebugPayload, TaskResultSummary};
 pub use subscription::{
     DeathReason, EntityEvent, EntityEventPayload, EntityEventSubscription, EntityEventType,
     EventSubscription,
 };
+pub use timer::{Timer, TimerToken, Timers};
 
-#[cfg(feature = "testing")]
-pub use subscription::debug_events::{EntityEventDebugPayload, TaskResultSummary};
+mod queue;
+mod subscription;
+mod timer;
 
 pub mod prelude {
     pub use super::{
@@ -18,6 +18,4 @@ pub mod prelude {
     };
 }
 
-pub use timer::{Timer, TimerToken, Timers, Token};
-
-pub type RuntimeTimers = Timers<crate::runtime::WeakTaskRef, TimerToken>;
+pub type RuntimeTimers = Timers<crate::runtime::WeakTaskRef>;
