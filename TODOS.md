@@ -1,4 +1,4 @@
-# TODOs (399)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -121,8 +121,6 @@
    * `// TODO destructive events on items should include moving/falling`
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
- * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
-   * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
  * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
@@ -298,6 +296,8 @@
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
+   * `let target = new_path.target().centred(); // TODO return random target point for unspecified too`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
@@ -431,14 +431,13 @@
    * `// TODO blocks filling in gaps should be tinted the colour of the block they're suggesting`
    * `// TODO consider rendering a blurred buffer of slices below`
    * `// TODO also rotate texture`
- * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (2)
+ * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (3)
+   * `// TODO use graphmap to just use areas as nodes? but we need parallel edges`
    * `|edge| edge.weight().cost.weight(), // TODO could prefer wider ports`
-   * `// TODO avoid calcultaing path just to throw it away`
- * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (1)
-   * `// TODO this might be expensive, can we build up the vec in order`
+   * `// TODO avoid calculating path just to throw it away`
  * [game/world/src/navigation/block_navigation.rs](game/world/src/navigation/block_navigation.rs) (2)
    * `// TODO use vertical distance differently?`
-   * `// TODO reuse vec allocation`
+   * `// TODO improve allocations`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
  * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (3)
@@ -447,6 +446,9 @@
    * `// TODO use unchecked unwrap here`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
+ * [game/world/src/navigation/search.rs](game/world/src/navigation/search.rs) (2)
+   * `// TODO return nothing, just read from context`
+   * `// TODO this might be expensive, can we build up the vec in order`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
@@ -460,9 +462,11 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [game/world/src/world.rs](game/world/src/world.rs) (6)
+ * [game/world/src/world.rs](game/world/src/world.rs) (8)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
+   * `// TODO assert path is fully connected`
+   * `let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`

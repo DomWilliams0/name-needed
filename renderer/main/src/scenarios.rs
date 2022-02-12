@@ -383,7 +383,7 @@ mod helpers {
 
     pub fn random_walkable_pos(world: &InnerWorldRef) -> WorldPosition {
         world
-            .choose_random_walkable_block(50)
+            .choose_random_walkable_block(500)
             .expect("failed to find a random walkable position")
     }
 

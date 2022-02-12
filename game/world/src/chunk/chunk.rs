@@ -2,7 +2,6 @@ use common::*;
 
 use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
-    WorldPosition,
 };
 
 use crate::chunk::slab::Slab;
@@ -95,10 +94,9 @@ impl<C: WorldContext> Chunk<C> {
         (x as u64) << 32 | (y as u64)
     }
 
-    pub(crate) fn area_for_block(&self, pos: WorldPosition) -> Option<WorldArea> {
-        self.get_block(pos.into()).map(|b| {
+    pub(crate) fn area_for_block(&self, block_pos: BlockPosition) -> Option<WorldArea> {
+        self.get_block(block_pos).map(|b| {
             let area_index = b.area_index();
-            let block_pos: BlockPosition = pos.into();
             WorldArea {
                 chunk: self.pos,
                 slab: block_pos.z().slab_index(),

@@ -115,6 +115,11 @@ impl ActivityContext {
             .await
     }
 
+    /// Does not update status
+    pub async fn explore(&self, fuel: u32, speed: NormalizedFloat) -> Result<(), GotoError> {
+        GoToSubactivity::new(self).explore(fuel, speed).await
+    }
+
     pub fn clear_path(&self) {
         if let Ok(mut comp) = self.world.component_mut::<FollowPathComponent>(self.entity) {
             comp.clear_path();

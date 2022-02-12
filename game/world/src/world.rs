@@ -20,8 +20,8 @@ use crate::navigation::{
     AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
     BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
-use crate::neighbour::WorldNeighbours;
-use crate::{OcclusionChunkUpdate, SliceRange};
+use crate::neighbour::{NeighbourOffset, WorldNeighbours};
+use crate::{EdgeCost, OcclusionChunkUpdate, SliceRange};
 
 pub trait WorldContext: 'static + Send + Sync {
     type AssociatedBlockData;
@@ -153,7 +153,7 @@ impl<C: WorldContext> World<C> {
         let resolve_area = |pos: WorldPosition| {
             let chunk_pos: ChunkLocation = pos.into();
             self.find_chunk_with_pos(chunk_pos)
-                .and_then(|c| c.area_for_block(pos))
+                .and_then(|c| c.area_for_block(pos.into()))
         };
 
         let from = from.into();
@@ -212,7 +212,7 @@ impl<C: WorldContext> World<C> {
             }
             SearchGoal::Adjacent => {
                 // only need to be adjacent, try neighbours first
-                let mut neighbours = WorldNeighbours::new(to)
+                let neighbours = WorldNeighbours::new(to)
                     .chain(WorldNeighbours::new(to.above()))
                     .chain(WorldNeighbours::new(to.below()));
 
@@ -248,13 +248,6 @@ impl<C: WorldContext> World<C> {
         let mut full_path = Vec::with_capacity(CHUNK_SIZE.as_usize() / 2 * area_path.0.len()); // random estimate
         let mut start = BlockPosition::from(from);
 
-        let convert_block_path = |area: WorldArea, path: BlockPath| {
-            path.path.into_iter().map(move |n| WorldPathNode {
-                block: n.block.to_world_position(area.chunk),
-                exit_cost: n.exit_cost,
-            })
-        };
-
         for (a, b) in area_path.0.iter().tuple_windows() {
             // unwrap ok because all except the first are Some
             let b_entry: AreaNavEdge = b.entry.unwrap();
@@ -262,7 +255,7 @@ impl<C: WorldContext> World<C> {
 
             // block path from last point to exiting this area
             let block_path = self.find_block_path(a.area, start, exit, SearchGoal::Arrive)?;
-            full_path.extend(convert_block_path(a.area, block_path));
+            full_path.extend(Self::convert_block_path(a.area, block_path));
 
             // add transition edge from exit of this area to entering the next
             full_path.push(WorldPathNode {
@@ -272,7 +265,7 @@ impl<C: WorldContext> World<C> {
 
             // continue from the entry point in the next chunk
             start = {
-                let extended = b_entry.direction.extend_across_boundary(exit);
+                let extended = b_entry.direction.extend_across_boundary_aligned(exit);
                 extended.above_by(b_entry.cost.z_offset())
             };
         }
@@ -281,9 +274,107 @@ impl<C: WorldContext> World<C> {
         let final_area = area_path.0.last().unwrap();
         let block_path = self.find_block_path(final_area.area, start, to.into(), goal)?;
         let real_target = block_path.target.to_world_position(final_area.area.chunk);
-        full_path.extend(convert_block_path(final_area.area, block_path));
+        full_path.extend(Self::convert_block_path(final_area.area, block_path));
 
         Ok(WorldPath::new(full_path, real_target))
+    }
+
+    fn convert_block_path(area: WorldArea, path: BlockPath) -> impl Iterator<Item = WorldPathNode> {
+        path.path.into_iter().map(move |n| WorldPathNode {
+            block: n.block.to_world_position(area.chunk),
+            exit_cost: n.exit_cost,
+        })
+    }
+
+    pub fn find_exploratory_path(
+        &self,
+        from: WorldPosition,
+        mut fuel: u32,
+    ) -> Result<WorldPath, NavigationError> {
+        let (from, from_area) = self
+            .find_accessible_block_in_column_with_range(from, None)
+            .and_then(|pos| self.area(from).ok().map(|area| (pos, area)))
+            .ok_or(NavigationError::SourceNotWalkable(from))?;
+
+        let mut full_path = Vec::new();
+        let mut random = thread_rng();
+
+        // loop vars
+        let mut current_pos = from;
+        let mut current_area = from_area;
+        let mut current_final_target = from;
+        loop {
+            let block_graph = self
+                .find_chunk_with_pos(current_pos.into())
+                .and_then(|c| c.block_graph_for_area(current_area))
+                .ok_or(NavigationError::NoSuchArea(current_area))?;
+
+            // explore within current chunk, possibly ending early at a border
+            let block_path = match block_graph.explore(
+                current_pos.into(),
+                &mut fuel,
+                &self.block_search_context,
+                &mut random,
+            ) {
+                Some(path) => path,
+                None => break,
+            };
+
+            current_final_target = block_path.target.to_world_position(current_pos);
+
+            // add to path
+            // TODO assert path is fully connected
+            full_path.extend(Self::convert_block_path(current_area, block_path));
+
+            // fuel is exhausted
+            if fuel == 0 {
+                break;
+            }
+
+            // determine if we should continue into the next area
+            let (next_block, next_area, edge_cost) = match self
+                .find_candidate_chunks_to_explore(current_final_target)
+                .collect::<ArrayVec<_, 3>>()
+                .choose(&mut random)
+            {
+                Some(next) => *next,
+                _ => break,
+            };
+
+            full_path.push(WorldPathNode {
+                block: current_final_target,
+                exit_cost: edge_cost,
+            });
+
+            current_pos = next_block;
+            current_area = next_area;
+        }
+
+        Ok(WorldPath::new(full_path, current_final_target))
+    }
+
+    fn find_candidate_chunks_to_explore(
+        &self,
+        exiting_block: WorldPosition,
+    ) -> impl Iterator<Item = (WorldPosition, WorldArea, EdgeCost)> + '_ {
+        let exiting_block_pos = BlockPosition::from(exiting_block);
+        let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO
+
+        NeighbourOffset::accessible_neighbours(exiting_block_pos).filter_map(move |offset| {
+            let (tgt_block, tgt_chunk) =
+                offset.extend_across_any_boundary(exiting_block_pos, exiting_block.into());
+            let tgt_area = self
+                .find_chunk_with_pos(tgt_chunk)
+                .and_then(|c| c.area_for_block(tgt_block))?;
+
+            let edge = self.area_graph.get_adjacent_area_edge(src_area, tgt_area)?;
+            if edge.contains(exiting_block_pos) {
+                let tgt_block = tgt_block.to_world_position(tgt_chunk);
+                Some((tgt_block, tgt_area, edge.cost))
+            } else {
+                None
+            }
+        })
     }
 
     /// Cheap check if an area path exists between the areas of the 2 blocks

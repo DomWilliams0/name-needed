@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use common::derive_more::*;
 use common::*;
 
@@ -5,10 +7,8 @@ use crate::world::{
     BlockCoord, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
 };
 
-use std::convert::TryFrom;
-
 /// A block in a chunk. Only valid coords are represented by this type
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
 pub struct BlockPosition(BlockCoord, BlockCoord, GlobalSliceIndex);
 
 impl BlockPosition {
@@ -82,6 +82,14 @@ impl BlockPosition {
     pub fn above_by(self, n: i32) -> Self {
         Self(self.0, self.1, self.2 + n)
     }
+
+    pub fn is_edge(self) -> bool {
+        let (x, y) = (self.0, self.1);
+        x == 0
+            || x == (CHUNK_SIZE.as_block_coord() - 1)
+            || y == 0
+            || y == (CHUNK_SIZE.as_block_coord() - 1)
+    }
 }
 
 impl Display for BlockPosition {
@@ -93,6 +101,12 @@ impl Display for BlockPosition {
             self.1,
             self.2.slice()
         )
+    }
+}
+
+impl Debug for BlockPosition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        Display::fmt(self, f)
     }
 }
 

@@ -1,15 +1,18 @@
-//! Copied from petgraph for modifications
+//! Based on petgraph
 
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{BinaryHeap, HashMap};
+use std::fmt::Debug;
 use std::hash::Hash;
-
 use std::ops::Deref;
 
 use petgraph::algo::Measure;
 use petgraph::visit::{EdgeRef, IntoEdges, VisitMap, Visitable};
+
+use common::Rng;
+use common::{SliceRandom, SmallVec};
 
 /// Contains allocations to reuse
 pub struct SearchContext<N, E, K, V>(RefCell<SearchContextInner<N, E, K, V>>)
@@ -33,8 +36,7 @@ where
     result: Vec<(N, E)>,
 }
 
-/// Doesnt include goal node
-#[inline(never)]
+/// Path is populated in context, left empty if search failed. On success, doesn't include goal node
 pub fn astar<G, F, H, K, IsGoal>(
     graph: G,
     start: G::NodeId,
@@ -42,7 +44,8 @@ pub fn astar<G, F, H, K, IsGoal>(
     mut edge_cost: F,
     mut estimate_cost: H,
     context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
-) -> Option<impl Deref<Target = [(G::NodeId, G::EdgeId)]> + '_>
+)
+// TODO return nothing, just read from context
 where
     G: IntoEdges + Visitable,
     IsGoal: FnMut(G::NodeId) -> bool,
@@ -65,7 +68,7 @@ where
                 let result = unsafe { &mut *(&mut ctx.result as *mut _) };
                 ctx.path_tracker.reconstruct_path_to(node, result);
             }
-            return Some(RefMut::map(ctx, |ctx| &mut ctx.result[..]));
+            return; // success
         }
 
         // Don't visit the same node several times, as the first time it was visited it was using
@@ -107,7 +110,68 @@ where
         }
     }
 
-    None
+    // leave result empty
+    debug_assert!(ctx.result.is_empty())
+}
+
+/// Goes until no more neighours (edge of graph) or out of fuel. Path so far is in context
+pub fn explore<G, K, R>(
+    graph: G,
+    start: G::NodeId,
+    fuel: &mut u32,
+    mut is_at_edge: impl FnMut(G::NodeId) -> bool,
+    context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
+    mut rand: R,
+) where
+    G: IntoEdges + Visitable,
+    G::NodeId: Eq + Hash + Copy + Debug,
+    K: Measure + Copy,
+    R: Rng,
+{
+    let mut ctx = context.0.borrow_mut();
+    ctx.reset_for(graph);
+
+    let mut current = start;
+    while *fuel > 0 {
+        debug_assert!(!ctx.visited.is_visited(&current));
+        ctx.visited.visit(current);
+
+        let mut edges = graph
+            .edges(current)
+            .map(|e| {
+                let weight = if !ctx.visited.is_visited(&e.target()) {
+                    1
+                } else {
+                    0
+                };
+                ((e.target(), e.id()), weight)
+            })
+            .collect::<SmallVec<[_; 4]>>();
+
+        // straight ahead is bit more likely
+        if edges.len() == 4 {
+            edges[2].1 *= 3;
+        }
+
+        let (next, edge) = match edges.choose_weighted(&mut rand, |(_, w)| *w) {
+            Ok((step, _)) => *step,
+            Err(_) => {
+                // no neighbours, nvm
+                break;
+            }
+        };
+
+        // add to path
+        ctx.result.push((next, edge));
+
+        current = next;
+        *fuel -= 1;
+
+        // have a chance to terminate at the edge
+        if is_at_edge(current) && rand.gen_bool(0.25) {
+            break;
+        }
+    }
 }
 
 struct PathTracker<N, E>
@@ -212,6 +276,7 @@ where
         let graph = G::default();
         Self::new_with(&graph)
     }
+
     pub fn new_with(graph: impl Visitable<Map = V>) -> Self {
         Self(RefCell::new(SearchContextInner {
             visited: graph.visit_map(),
@@ -220,6 +285,10 @@ where
             path_tracker: PathTracker::new(),
             result: Vec::new(),
         }))
+    }
+
+    pub fn result(&self) -> impl Deref<Target = [(N, E)]> + '_ {
+        Ref::map(self.0.borrow(), |inner| &inner.result[..])
     }
 }
 

@@ -7,9 +7,14 @@ use world::{EdgeCost, SearchGoal, WorldPath};
 #[derive(Debug)]
 pub enum PathRequest {
     // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
-    NewTarget {
+    NavigateTo {
         target: WorldPoint,
         goal: SearchGoal,
+        speed: NormalizedFloat,
+        token: PathToken,
+    },
+    Explore {
+        fuel: u32,
         speed: NormalizedFloat,
         token: PathToken,
     },

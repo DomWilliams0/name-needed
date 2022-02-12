@@ -1,13 +1,13 @@
-use crate::activity::context::ActivityContext;
-
-use crate::activity::status::{NopStatus, Status};
-use crate::ecs::ComponentGetError;
-use crate::event::prelude::*;
-
-use crate::{ComponentWorld, FollowPathComponent};
 use common::*;
 use unit::world::WorldPoint;
 use world::{NavigationError, SearchGoal};
+
+use crate::activity::context::ActivityContext;
+use crate::activity::status::{NopStatus, Status};
+use crate::ecs::ComponentGetError;
+use crate::event::prelude::*;
+use crate::path::PathToken;
+use crate::{ComponentWorld, FollowPathComponent};
 
 #[derive(Debug, Error)]
 pub enum GotoError {
@@ -61,18 +61,37 @@ impl<'a> GoToSubactivity<'a> {
 
         ctx.update_status(status);
 
-        let path_token;
-        {
+        let path_token = {
             let mut follow_path = ctx
                 .world()
                 .component_mut::<FollowPathComponent>(ctx.entity())
                 .map_err(GotoError::MissingComponent)?;
 
-            // assign path
-            path_token = follow_path.new_path_with_goal(dest, goal, speed);
-        }
+            follow_path.request_navigation_with_goal(dest, goal, speed)
+        };
 
-        // await arrival
+        self.await_arrival(path_token).await
+    }
+
+    pub async fn explore(&mut self, fuel: u32, speed: NormalizedFloat) -> Result<(), GotoError> {
+        let ctx = self.context;
+
+        let path_token = {
+            let mut follow_path = ctx
+                .world()
+                .component_mut::<FollowPathComponent>(ctx.entity())
+                .map_err(GotoError::MissingComponent)?;
+
+            follow_path.request_explore(fuel, speed)
+        };
+
+        self.await_arrival(path_token).await
+    }
+
+    async fn await_arrival(&mut self, path_token: PathToken) -> Result<(), GotoError> {
+        let ctx = self.context;
+
+        // await event
         let goto_result = ctx
             .subscribe_to_specific_until(ctx.entity(), EntityEventType::Arrived, |evt| match evt {
                 EntityEventPayload::Arrived(token, result) if token == path_token => Ok(result),

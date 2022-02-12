@@ -7,8 +7,8 @@ use petgraph::visit::Visitable;
 use common::*;
 use unit::world::{BlockPosition, SlabIndex, SlabPosition};
 
-use crate::navigation::astar::{astar, SearchContext};
 use crate::navigation::path::{BlockPath, BlockPathNode};
+use crate::navigation::search::{self, SearchContext};
 use crate::navigation::{EdgeCost, SearchGoal};
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
@@ -109,20 +109,48 @@ impl BlockGraph {
             SearchGoal::Nearby(range) => manhattan(&n.0, &dst.0) <= range.into(),
         };
 
-        let path = astar(
+        search::astar(
             &self.graph,
             src,
             is_goal,
             |(_, _, e)| e.0.weight(),
             |n| manhattan(&n.0, &dst.0) as f32,
             context,
-        )
-        .ok_or(BlockPathError::NoPath(to, from))?;
+        );
 
-        // TODO reuse vec allocation
+        self.block_path_from_search_result(context)
+            .ok_or(BlockPathError::NoPath(to, from))
+    }
+
+    /// Uses as much fuel as possible. Returns None if empty
+    pub(crate) fn explore(
+        &self,
+        from: BlockPosition,
+        fuel: &mut u32,
+        context: &BlockGraphSearchContext,
+        random: impl Rng,
+    ) -> Option<BlockPath> {
+        let src = BlockNavNode(from);
+
+        search::explore(&self.graph, src, fuel, |n| n.0.is_edge(), context, random);
+
+        self.block_path_from_search_result(context)
+    }
+
+    /// None if empty
+    fn block_path_from_search_result(
+        &self,
+        context: &BlockGraphSearchContext,
+    ) -> Option<BlockPath> {
+        let path = &*context.result();
+        if path.is_empty() {
+            return None;
+        };
+
+        // TODO improve allocations
         let mut out_path = Vec::with_capacity(path.len());
 
-        let target = path.last().map(|(_, (_, target))| target).unwrap_or(&dst).0;
+        let target = path.last().map(|(_, (_, target))| target.0).unwrap(); // not empty
 
         for &(_, (from, to)) in path.iter() {
             let edge = self.graph.edge_weight(from, to).unwrap();
@@ -131,8 +159,7 @@ impl BlockGraph {
                 exit_cost: edge.0,
             });
         }
-
-        Ok(BlockPath {
+        Some(BlockPath {
             path: out_path,
             target,
         })

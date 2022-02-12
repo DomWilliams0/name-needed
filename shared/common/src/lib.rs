@@ -90,6 +90,7 @@ pub mod dynslot;
 pub mod input;
 pub mod newtype;
 pub mod random;
+pub mod sized_iter;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     match seed {
