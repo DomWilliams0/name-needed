@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::iter::once;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -91,6 +92,19 @@ pub(crate) struct ContiguousChunkIterator<'a, C: WorldContext> {
     last_chunk: Option<(ChunkLocation, usize)>,
     #[cfg(test)]
     matched_last: bool,
+}
+
+/// Abort an exploration path-find early
+#[derive(Clone)]
+pub struct ExplorationFilter(pub Rc<dyn (Fn(WorldPosition) -> ExplorationResult) + Send + Sync>);
+
+// only used on main thread by synchronous systems
+unsafe impl Send for ExplorationFilter {}
+unsafe impl Sync for ExplorationFilter {}
+
+pub enum ExplorationResult {
+    Continue,
+    Abort,
 }
 
 impl<C: WorldContext> World<C> {
@@ -290,6 +304,7 @@ impl<C: WorldContext> World<C> {
         &self,
         from: WorldPosition,
         mut fuel: u32,
+        filter: Option<ExplorationFilter>,
     ) -> Result<WorldPath, NavigationError> {
         let (from, from_area) = self
             .find_accessible_block_in_column_with_range(from, None)
@@ -304,8 +319,9 @@ impl<C: WorldContext> World<C> {
         let mut current_area = from_area;
         let mut current_final_target = from;
         loop {
+            let current_chunk = ChunkLocation::from(current_pos);
             let block_graph = self
-                .find_chunk_with_pos(current_pos.into())
+                .find_chunk_with_pos(current_chunk)
                 .and_then(|c| c.block_graph_for_area(current_area))
                 .ok_or(NavigationError::NoSuchArea(current_area))?;
 
@@ -315,6 +331,7 @@ impl<C: WorldContext> World<C> {
                 &mut fuel,
                 &self.block_search_context,
                 &mut random,
+                filter.as_ref().map(|func| (func, current_chunk)),
             ) {
                 Some(path) => path,
                 None => break,

@@ -5,11 +5,12 @@ use petgraph::prelude::EdgeRef;
 use petgraph::visit::Visitable;
 
 use common::*;
-use unit::world::{BlockPosition, SlabIndex, SlabPosition};
+use unit::world::{BlockPosition, ChunkLocation, SlabIndex, SlabPosition};
 
 use crate::navigation::path::{BlockPath, BlockPathNode};
 use crate::navigation::search::{self, SearchContext};
 use crate::navigation::{EdgeCost, SearchGoal};
+use crate::{ExplorationFilter, ExplorationResult};
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
 pub type BlockGraphSearchContext = SearchContext<
@@ -129,10 +130,29 @@ impl BlockGraph {
         fuel: &mut u32,
         context: &BlockGraphSearchContext,
         random: impl Rng,
+        filter: Option<(&ExplorationFilter, ChunkLocation)>,
     ) -> Option<BlockPath> {
         let src = BlockNavNode(from);
 
-        search::explore(&self.graph, src, fuel, |n| n.0.is_edge(), context, random);
+        let filter = move |node: BlockNavNode| {
+            filter
+                .map(
+                    |(func, this_chunk)| match func.0(node.0.to_world_position(this_chunk)) {
+                        ExplorationResult::Abort => true,
+                        ExplorationResult::Continue => false,
+                    },
+                )
+                .unwrap_or_default()
+        };
+        search::explore(
+            &self.graph,
+            src,
+            fuel,
+            |n| n.0.is_edge(),
+            context,
+            random,
+            filter,
+        );
 
         self.block_path_from_search_result(context)
     }

@@ -2,7 +2,7 @@ use std::iter::once;
 
 use common::*;
 use unit::world::WorldPoint;
-use world::{NavigationError, SearchGoal};
+use world::{ExplorationFilter, NavigationError, SearchGoal};
 
 use crate::ecs::*;
 use crate::event::{EntityEvent, EntityEventPayload, EntityEventQueue};
@@ -101,10 +101,15 @@ impl<'a> System<'a> for PathSteeringSystem {
                         speed,
                         token,
                         fuel: distance,
+                        filter,
                     } => {
                         let world = world.borrow();
                         Some((
-                            world.find_exploratory_path(transform.accessible_position(), distance),
+                            world.find_exploratory_path(
+                                transform.accessible_position(),
+                                distance,
+                                filter,
+                            ),
                             speed,
                             token,
                             SearchGoal::Arrive,
@@ -198,9 +203,19 @@ impl FollowPathComponent {
         token
     }
 
-    pub fn request_explore(&mut self, fuel: u32, speed: NormalizedFloat) -> PathToken {
+    pub fn request_explore(
+        &mut self,
+        fuel: u32,
+        speed: NormalizedFloat,
+        filter: Option<ExplorationFilter>,
+    ) -> PathToken {
         let token = self.alloc_token();
-        self.set_request(PathRequest::Explore { fuel, speed, token });
+        self.set_request(PathRequest::Explore {
+            fuel,
+            speed,
+            token,
+            filter,
+        });
         token
     }
 

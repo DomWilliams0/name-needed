@@ -1,7 +1,10 @@
 use async_trait::async_trait;
+use std::rc::Rc;
 
 use common::rand::distributions::Uniform;
 use common::*;
+use unit::world::WorldPosition;
+use world::{ExplorationFilter, ExplorationResult};
 
 use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
@@ -9,6 +12,7 @@ use crate::activity::status::Status;
 use crate::activity::Activity;
 use crate::ecs::ComponentGetError;
 use crate::path::WANDER_SPEED;
+use crate::{ComponentWorld, HerdedComponent, Herds};
 
 /// Wandering aimlessly
 #[derive(Debug, Default, Display)]
@@ -35,6 +39,27 @@ impl Activity for WanderActivity {
         let distr_wander_distance = Uniform::new(2, 50);
         let distr_loiter_ticks = Uniform::new(5, 20);
 
+        let explore_filter = ctx
+            .world()
+            .component::<HerdedComponent>(ctx.entity())
+            .ok()
+            .and_then(|comp| {
+                let herds = ctx.world().resource::<Herds>();
+                herds.get_info(comp.current().handle())
+            })
+            .map(|herd| {
+                let pos = herd.average_pos.floor();
+                const MAX_DISTANCE: i32 = 10; // TODO depends on size of herd
+                ExplorationFilter(Rc::new(move |candidate: WorldPosition| {
+                    if candidate.distance2(pos) < MAX_DISTANCE.pow(2) {
+                        ExplorationResult::Continue
+                    } else {
+                        // too far away
+                        ExplorationResult::Abort
+                    }
+                }))
+            });
+
         loop {
             let (wander_distance, loiter_ticks) = {
                 let mut random = thread_rng();
@@ -45,8 +70,12 @@ impl Activity for WanderActivity {
             };
 
             ctx.update_status(State::Wander);
-            ctx.explore(wander_distance, NormalizedFloat::new(WANDER_SPEED))
-                .await?;
+            ctx.explore(
+                wander_distance,
+                NormalizedFloat::new(WANDER_SPEED),
+                explore_filter.clone(),
+            )
+            .await?;
 
             // loiter for a bit
             ctx.update_status(State::Loiter);

@@ -114,19 +114,22 @@ where
     debug_assert!(ctx.result.is_empty())
 }
 
-/// Goes until no more neighours (edge of graph) or out of fuel. Path so far is in context
-pub fn explore<G, K, R>(
+/// Goes until no more neighours (edge of graph) or out of fuel. Path so far is in context.
+/// Aborts if filter returns true
+pub fn explore<G, K, R, F>(
     graph: G,
     start: G::NodeId,
     fuel: &mut u32,
     mut is_at_edge: impl FnMut(G::NodeId) -> bool,
     context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
     mut rand: R,
+    filter: F,
 ) where
     G: IntoEdges + Visitable,
     G::NodeId: Eq + Hash + Copy + Debug,
     K: Measure + Copy,
     R: Rng,
+    F: Fn(G::NodeId) -> bool,
 {
     let mut ctx = context.0.borrow_mut();
     ctx.reset_for(graph);
@@ -169,6 +172,10 @@ pub fn explore<G, K, R>(
 
         // have a chance to terminate at the edge
         if is_at_edge(current) && rand.gen_bool(0.25) {
+            break;
+        }
+
+        if filter(current) {
             break;
         }
     }

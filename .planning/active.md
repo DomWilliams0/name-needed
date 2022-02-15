@@ -12,10 +12,10 @@
     * [X] dont leave immediately after leaving the radius, but rather slowly decay over a few ticks
     * [X] if parts of a herd become disconnected, split into 2
     * [X] the herd that wins during merging should be the biggest, not just the first one found
-* [ ] wander behaviour should stay near herd
+* [X] wander behaviour should stay near herd
     * use herd avg position and avg position of nearby members too
     * [X] wander target should be found locally instead of searching globally
-    * [ ] skip ahead a few nodes when path finding if visible
+* [ ] skip ahead a few nodes when path finding if visible
 * [ ] startling of sheep based on senses
 * [ ] propagation of startling through herd
     * could propagate the original startle source, or just be startled at the startlement of another

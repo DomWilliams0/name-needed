@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use common::*;
 use unit::world::WorldPoint;
-use world::SearchGoal;
+use world::{ExplorationFilter, SearchGoal};
 
 use crate::activity::context::EventResult::{Consumed, Unconsumed};
 use crate::activity::status::Status;
@@ -116,8 +116,15 @@ impl ActivityContext {
     }
 
     /// Does not update status
-    pub async fn explore(&self, fuel: u32, speed: NormalizedFloat) -> Result<(), GotoError> {
-        GoToSubactivity::new(self).explore(fuel, speed).await
+    pub async fn explore(
+        &self,
+        fuel: u32,
+        speed: NormalizedFloat,
+        filter: Option<ExplorationFilter>,
+    ) -> Result<(), GotoError> {
+        GoToSubactivity::new(self)
+            .explore(fuel, speed, filter)
+            .await
     }
 
     pub fn clear_path(&self) {
