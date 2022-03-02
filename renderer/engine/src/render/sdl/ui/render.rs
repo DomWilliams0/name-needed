@@ -260,6 +260,34 @@ impl State {
                     popups.on_close();
                 }
             });
+
+        // show current test name
+        #[cfg(feature = "testing")]
+        imgui::Window::new("test")
+            .position([0.0, 0.0], Condition::Always)
+            .size([context.io().display_size[0], 200.0], Condition::Always)
+            .bg_alpha(0.0)
+            .flags(
+                WindowFlags::NO_TITLE_BAR
+                    | WindowFlags::NO_INPUTS
+                    | WindowFlags::NO_RESIZE
+                    | WindowFlags::NO_COLLAPSE
+                    | WindowFlags::NO_BACKGROUND
+                    | WindowFlags::NO_SAVED_SETTINGS,
+            )
+            .build(context.ui(), || {
+                use imgui::StyleColor;
+
+                context.set_window_font_scale(2.0);
+                let _style = context.push_style_color(StyleColor::Text, [0.95, 0.2, 0.3, 1.0]);
+                let str = format!("TEST: {}", testing::current_test_name());
+
+                let win_width = context.window_size()[0];
+                let text_width = context.calc_text_size(&str)[0];
+                context.set_cursor_pos([win_width - text_width, 0.0]);
+
+                context.text(str);
+            });
     }
 }
 

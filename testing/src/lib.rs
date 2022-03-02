@@ -137,6 +137,11 @@ pub fn tick_hook(ctx: &HookContext) -> HookResult {
         .invoke_with_self(|this| (test.tick)(this, helper, ctx))
 }
 
+/// Called by engine
+pub fn current_test_name() -> &'static str {
+    current().name
+}
+
 /// inventory doesn't work unless the test module object is actually referenced, defeating the
 /// whole purpose of using inventory
 pub fn register_tests() {
