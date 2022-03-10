@@ -1,5 +1,3 @@
-use std::array::IntoIter;
-
 use common::{ArrayVec, Itertools};
 use unit::world::CHUNK_SIZE;
 
@@ -128,7 +126,8 @@ pub fn scan<const SIZE: usize>(
         }
     }
 
-    let mut neighbours = IntoIter::new(overflows)
+    let mut neighbours = overflows
+        .into_iter()
         .flatten()
         .collect::<ArrayVec<RegionNeighbour, 8>>();
 

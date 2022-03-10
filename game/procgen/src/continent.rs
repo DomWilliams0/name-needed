@@ -3,7 +3,7 @@ use crate::region::PlanetPoint;
 use common::cgmath::num_traits::clamp;
 use common::*;
 use grid::DynamicGrid;
-use std::array::IntoIter;
+
 use std::cell::Cell;
 use std::f64::consts::TAU;
 use std::num::NonZeroUsize;
@@ -138,7 +138,7 @@ impl ContinentMap {
 
             let mut polygons = blobs.map(|(_, blob): (_, &mr_blobby::LandBlob)| {
                 let vertices = polygon_from_blob(blob);
-                let exterior = IntoIter::new(vertices).collect::<LineString<f64>>();
+                let exterior = vertices.into_iter().collect::<LineString<f64>>();
                 debug_assert!(exterior.is_closed());
                 Polygon::new(exterior, vec![])
             });

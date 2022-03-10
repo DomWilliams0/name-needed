@@ -76,7 +76,6 @@ pub trait BaseTerrain {
     /// Panics if invalid position
     #[cfg(test)]
     fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block> {
-        use std::convert::TryFrom;
         let pos = BlockPosition::try_from(pos).expect("bad position");
         self.slice(pos.z()).map(|slice| slice[pos])
     }

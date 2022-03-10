@@ -5,7 +5,7 @@ use tokio::sync::{watch, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use common::derive_more::Deref;
 use common::*;
-use core::array::IntoIter;
+
 use grid::DynamicGrid;
 
 use crate::continent::ContinentMap;
@@ -743,7 +743,8 @@ fn neighbouring_regions_with_params<const SIZE: usize>(
         (1, 1),
     ];
 
-    IntoIter::new(NEIGHBOUR_OFFSETS)
+    NEIGHBOUR_OFFSETS
+        .into_iter()
         .filter_map(move |offset| centre.try_add_offset_with_params(offset, params))
 }
 

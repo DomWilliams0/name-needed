@@ -513,10 +513,9 @@ impl RegionalFeatureBoundary {
         params: &PlanetParams,
     ) -> (Self, usize) {
         let points = MultiPoint(points);
-        let mut polygon;
 
         // trace boundary
-        polygon = points.concave_hull(params.feature_concavity);
+        let mut polygon = points.concave_hull(params.feature_concavity);
 
         // simplify boundary
         polygon = {

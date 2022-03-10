@@ -1,4 +1,3 @@
-use std::array::IntoIter;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
@@ -327,12 +326,15 @@ impl WorldRange<WorldPosition> {
             return None;
         }
 
-        Some(IntoIter::new([
-            WorldPositionRange::with_inclusive_range((ax, ay, az), (bx, ay, bz)),
-            WorldPositionRange::with_inclusive_range((ax, ay + 1, az), (ax, by, bz)),
-            WorldPositionRange::with_inclusive_range((bx, ay + 1, az), (bx, by, bz)),
-            WorldPositionRange::with_inclusive_range((ax + 1, by, az), (bx - 1, by, bz)),
-        ]))
+        Some(
+            [
+                WorldPositionRange::with_inclusive_range((ax, ay, az), (bx, ay, bz)),
+                WorldPositionRange::with_inclusive_range((ax, ay + 1, az), (ax, by, bz)),
+                WorldPositionRange::with_inclusive_range((bx, ay + 1, az), (bx, by, bz)),
+                WorldPositionRange::with_inclusive_range((ax + 1, by, az), (bx - 1, by, bz)),
+            ]
+            .into_iter(),
+        )
     }
 }
 

@@ -61,7 +61,7 @@ impl<D> Timers<D> {
             .timers
             .iter()
             .position(|t| t.elapsed(current))
-            .unwrap_or_else(|| self.timers.len());
+            .unwrap_or(self.timers.len());
 
         self.timers
             .drain(first_elapsed..)

@@ -1,4 +1,3 @@
-use std::array::IntoIter;
 use std::borrow::Cow;
 
 use simulation::input::{UiRequest, UiResponse};
@@ -117,7 +116,7 @@ impl Default for DebugWindow {
         // default debug renderers
         let enabled_debug_renderers = {
             let mut vec = Vec::with_capacity(16);
-            vec.extend(IntoIter::new(["axes", "steering"]).map(Cow::Borrowed));
+            vec.extend(["axes", "steering"].into_iter().map(Cow::Borrowed));
             vec
         };
 
@@ -183,8 +182,8 @@ mod serialization {
 
             let enabled_debug_renderers = deserialized
                 .enabled_debug_renderers
-                .into_owned()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(Cow::Owned)
                 .collect();
 

@@ -1,18 +1,17 @@
-use crate::job::SocietyTask;
-use crate::{EcsWorld, Entity, WorldPositionRange};
 use std::any::Any;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
+use std::ops::Deref;
+use std::rc::Rc;
 
 use common::*;
+use unit::world::WorldPoint;
 
 use crate::build::BuildTemplate;
 use crate::job::list::SocietyJobHandle;
+use crate::job::SocietyTask;
 use crate::society::Society;
-
-use std::ops::Deref;
-use std::rc::Rc;
-use unit::world::WorldPoint;
+use crate::{EcsWorld, Entity, WorldPositionRange};
 
 /// A high-level society job that produces a number of [SocietyTask]s. Unsized but it lives in an
 /// Rc anyway
@@ -133,13 +132,11 @@ impl SocietyJob<dyn SocietyJobImpl> {
         let ret = self
             .inner
             .refresh_tasks(world, &mut self.tasks, &mut self.pending_complete)
-            .or_else(|| {
-                if self.tasks.is_empty() {
-                    // no tasks left and no specific result returned
-                    Some(SocietyTaskResult::Success)
-                } else {
-                    None
-                }
+            .or(if self.tasks.is_empty() {
+                // no tasks left and no specific result returned
+                Some(SocietyTaskResult::Success)
+            } else {
+                None
             });
 
         self.pending_complete.clear();

@@ -733,15 +733,12 @@ mod realisation {
             .enumerate()
             .map(|(i, dse)| (&**dse, 1.0, DecisionSource::Base(DseIndex(i))));
 
-        let additional = intel
-            .additional
-            .iter()
-            .map(|(key, smarts)| {
+        let additional =
+            intel.additional.iter().flat_map(|(key, smarts)| {
                 smarts.0.iter().enumerate().map(move |(i, dse)| {
                     (&**dse, 1.0, DecisionSource::Additional(*key, DseIndex(i)))
                 })
-            })
-            .flatten();
+            });
 
         let stream = streams.iter().enumerate().map(|(i, (weighted, data))| {
             (

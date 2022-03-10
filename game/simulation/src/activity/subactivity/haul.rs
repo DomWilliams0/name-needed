@@ -1,5 +1,5 @@
 use common::*;
-use std::array::IntoIter;
+
 use unit::world::WorldPoint;
 
 use crate::activity::context::{ActivityContext, DistanceCheckResult, EventResult};
@@ -173,7 +173,7 @@ impl<'a> HaulSubactivity<'a> {
         let mut the_result = None;
         ctx.subscribe_to_many_until(
             thing,
-            IntoIter::new([EntityEventType::HauledButSplit, EntityEventType::Hauled]),
+            [EntityEventType::HauledButSplit, EntityEventType::Hauled].into_iter(),
             |evt| match evt {
                 EntityEventPayload::Hauled(hauler, result) if hauler == ctx.entity() => {
                     the_result = Some(result);
