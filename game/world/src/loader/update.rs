@@ -1,3 +1,4 @@
+use common::block::BlockType;
 use std::iter::once;
 
 use common::derive_more::*;
@@ -6,7 +7,6 @@ use unit::world::{
     WorldRange,
 };
 
-use crate::block::BlockType;
 use crate::loader::update::split::split_range_across_slabs;
 use common::Hash;
 
@@ -70,6 +70,7 @@ impl WorldTerrainUpdate {
 mod split {
     use std::iter::once;
 
+    use common::block::BlockType;
     use common::*;
     use unit::world::CHUNK_SIZE;
     use unit::world::{
@@ -77,7 +78,6 @@ mod split {
         WorldRange, SLAB_SIZE,
     };
 
-    use crate::block::BlockType;
     use crate::loader::update::{GenericTerrainUpdate, SlabTerrainUpdate};
 
     pub fn split_range_across_slabs(

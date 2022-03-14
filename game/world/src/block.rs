@@ -1,11 +1,9 @@
-use color::Color;
+pub use common::block::{BlockDurability, BlockOpacity, BlockType};
+use common::Proportion;
+use unit::world::GlobalSliceIndex;
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::BlockOcclusion;
-use common::derive_more::Display;
-use common::Proportion;
-use strum::{EnumIter, EnumString};
-use unit::world::GlobalSliceIndex;
 
 /// A single block in a chunk
 // TODO store sparse block data in the slab instead of inline in the block
@@ -20,50 +18,6 @@ pub struct Block {
     area: SlabAreaIndex,
     /// Lighting
     occlusion: BlockOcclusion,
-}
-
-pub type BlockDurability = u8;
-
-// TODO define block types in data instead of code
-/// The type of a block
-#[derive(
-    Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, EnumIter, EnumString, Display,
-)]
-pub enum BlockType {
-    Air,
-    Dirt,
-    Grass,
-    #[display(fmt = "Light grass")]
-    LightGrass,
-    Leaves,
-    #[display(fmt = "Tree trunk")]
-    TreeTrunk,
-    Stone,
-    Sand,
-    #[display(fmt = "Solid water")]
-    SolidWater,
-
-    /// Temporary substitute for something to build
-    #[display(fmt = "Stone wall")]
-    StoneBrickWall,
-
-    Chest,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum BlockOpacity {
-    Transparent,
-    Solid,
-}
-
-impl BlockOpacity {
-    pub fn solid(self) -> bool {
-        matches!(self, Self::Solid)
-    }
-
-    pub fn transparent(self) -> bool {
-        !self.solid()
-    }
 }
 
 impl Block {
@@ -151,59 +105,6 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self::with_block_type(BlockType::Air)
-    }
-}
-
-// TODO define these in data
-impl BlockType {
-    pub fn color(self) -> Color {
-        match self {
-            BlockType::Air => Color::rgb(0, 0, 0),
-            BlockType::Dirt => Color::rgb(86, 38, 23),
-            BlockType::Grass => Color::rgb(49, 152, 56),
-            BlockType::LightGrass => Color::rgb(91, 152, 51),
-            BlockType::Leaves => Color::rgb(49, 132, 2),
-            BlockType::TreeTrunk => Color::rgb(79, 52, 16),
-            BlockType::Stone => Color::rgb(106, 106, 117),
-            BlockType::Sand => 0xBCA748FF.into(),
-            BlockType::SolidWater => 0x3374BCFF.into(),
-            BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
-            BlockType::Chest => Color::rgb(184, 125, 31),
-        }
-    }
-
-    pub fn opacity(self) -> BlockOpacity {
-        if let BlockType::Air = self {
-            BlockOpacity::Transparent
-        } else {
-            BlockOpacity::Solid
-        }
-    }
-
-    fn durability(self) -> Proportion<BlockDurability> {
-        use BlockType::*;
-        let max = match self {
-            Air => 0,
-            Leaves => 10,
-            Sand => 30,
-            Dirt | Grass | LightGrass => 40,
-            TreeTrunk => 70,
-            Stone => 90,
-            Chest | StoneBrickWall => 60,
-            SolidWater => u8::MAX,
-        };
-
-        Proportion::with_value(max, max)
-    }
-
-    /// TODO very temporary "walkability" for block types
-    pub fn can_be_walked_on(self) -> bool {
-        use BlockType::*;
-        !matches!(self, Air | Leaves | SolidWater)
-    }
-
-    pub fn is_air(self) -> bool {
-        matches!(self, BlockType::Air)
     }
 }
 

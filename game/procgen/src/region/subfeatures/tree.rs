@@ -1,7 +1,7 @@
+use common::block::BlockType;
 use crate::region::subfeature::{Rasterizer, Subfeature};
 use unit::world::WorldPosition;
 
-use crate::BlockType;
 use common::Itertools;
 
 #[derive(Debug)]

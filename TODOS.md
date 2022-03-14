@@ -1,4 +1,4 @@
-# TODOs (404)
+# TODOs (403)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -382,12 +382,9 @@
    * `// TODO cache allocation in system`
  * [game/simulation/src/string.rs](game/simulation/src/string.rs) (1)
    * `// TODO report panic when cache is empty`
- * [game/world/src/block.rs](game/world/src/block.rs) (5)
+ * [game/world/src/block.rs](game/world/src/block.rs) (2)
    * `// TODO store sparse block data in the slab instead of inline in the block`
-   * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
-   * `// TODO define these in data`
-   * `/// TODO very temporary "walkability" for block types`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
@@ -533,6 +530,9 @@
    * `// TODO tree trunk size depends on the tree it came from`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)
    * `# TODO feature for cgmath`
+ * [shared/common/src/block.rs](shared/common/src/block.rs) (2)
+   * `// TODO define block types in data`
+   * `/// TODO very temporary "walkability" for block types`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
  * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)

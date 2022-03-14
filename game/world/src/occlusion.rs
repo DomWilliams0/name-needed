@@ -1,9 +1,9 @@
 use common::derive_more::{Deref, DerefMut};
 use common::*;
 
-use crate::block::BlockOpacity;
 use crate::chunk::slice::Slice;
 use crate::neighbour::NeighbourOffset;
+use common::block::BlockOpacity;
 use std::ops::Add;
 use unit::world::SliceBlock;
 

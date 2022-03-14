@@ -1,6 +1,6 @@
 use crate::loader::terrain_source::TerrainSourceError;
 
-use crate::block::{Block, BlockType};
+use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
@@ -51,24 +51,6 @@ impl From<procgen::SlabGrid> for Slab {
 
 impl From<&procgen::GeneratedBlock> for Block {
     fn from(block: &GeneratedBlock) -> Self {
-        Block::with_block_type(block.into())
-    }
-}
-
-impl From<&procgen::GeneratedBlock> for BlockType {
-    fn from(block: &GeneratedBlock) -> Self {
-        use crate::block::BlockType as B;
-        use procgen::BlockType as A;
-        match block.ty {
-            A::Air => B::Air,
-            A::Stone => B::Stone,
-            A::Dirt => B::Dirt,
-            A::Grass => B::Grass,
-            A::LightGrass => B::LightGrass,
-            A::Sand => B::Sand,
-            A::SolidWater => B::SolidWater,
-            A::Leaves => B::Leaves,
-            A::TreeTrunk => B::TreeTrunk,
-        }
+        Block::with_block_type(block.ty)
     }
 }

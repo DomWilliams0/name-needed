@@ -27,3 +27,9 @@
 * [ ] add chained modify_x|y|z helper to worldpoint
 * [X] frame allocator helpers for debug/display/vec
 * [ ] reuse some allocaions in herd joining system
+* simple fauna for sheep to eat
+    * [ ] generation of plants in procgen
+    * [ ] growth/death of existing plants
+    * [ ] growth of new plants from seeds/corpses/poo
+    * [ ] approximate scattering of non quantitive growth like grass
+    * [ ] sheep have hunger and find nearby plants to eat

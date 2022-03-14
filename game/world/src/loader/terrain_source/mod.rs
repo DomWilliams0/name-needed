@@ -158,10 +158,7 @@ impl TerrainSource {
                     .planet()
                     .steal_world_updates(|updates| {
                         out.extend(updates.map(|(pos, block)| {
-                            WorldTerrainUpdate::new(
-                                WorldPositionRange::with_single(pos),
-                                (&block).into(),
-                            )
+                            WorldTerrainUpdate::new(WorldPositionRange::with_single(pos), block.ty)
                         }));
                     })
                     .await;

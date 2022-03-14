@@ -3,7 +3,8 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
-use crate::block::{Block, BlockType};
+use crate::block::Block;
+use common::block::BlockType;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 

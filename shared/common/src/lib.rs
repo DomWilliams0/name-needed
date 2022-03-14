@@ -86,6 +86,7 @@ pub fn truncate<F: cgmath::BaseFloat, V: cgmath::InnerSpace<Scalar = F>>(vec: V,
     }
 }
 
+pub mod block;
 pub mod dynslot;
 pub mod input;
 pub mod newtype;

@@ -25,7 +25,7 @@ mod cache;
 pub use biome::BiomeType;
 pub use params::{PlanetParams, PlanetParamsRef};
 pub use planet::Planet;
-pub use rasterize::{BlockType, GeneratedBlock, SlabGrid};
+pub use rasterize::{GeneratedBlock, SlabGrid};
 pub use region::RegionLocation;
 
 #[cfg(feature = "benchmarking")]

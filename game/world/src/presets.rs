@@ -1,10 +1,10 @@
 use std::iter::once;
 
+use common::block::BlockType;
 use common::*;
 use config::WorldPreset;
 use unit::world::CHUNK_SIZE;
 
-use crate::block::BlockType;
 use crate::chunk::ChunkBuilder;
 use crate::loader::MemoryTerrainSource;
 #[cfg(test)]
