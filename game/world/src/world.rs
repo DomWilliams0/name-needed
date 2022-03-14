@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
-use common::block::{BlockDurability, BlockType};
 use common::derive_more::Constructor;
 use common::*;
 use unit::world::CHUNK_SIZE;
@@ -14,6 +13,7 @@ use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
     SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
 };
+use world_types::{BlockDurability, BlockType};
 
 use crate::block::Block;
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};

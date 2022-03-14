@@ -1,6 +1,6 @@
-use common::block::BlockType;
 use crate::region::subfeature::{Rasterizer, Subfeature};
 use unit::world::WorldPosition;
+use world_types::BlockType;
 
 use common::Itertools;
 

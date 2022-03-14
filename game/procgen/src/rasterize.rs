@@ -1,6 +1,6 @@
-use common::block::BlockType;
 use grid::{grid_declare, GridImpl};
 use unit::world::{CHUNK_SIZE, SLAB_SIZE};
+use world_types::BlockType;
 
 // TODO custom block types for procgen that are translated to game blocks
 #[derive(Clone, Debug, Copy)]
@@ -23,9 +23,7 @@ impl GeneratedBlock {
 
 impl Default for GeneratedBlock {
     fn default() -> Self {
-        Self {
-            ty: BlockType::Air,
-        }
+        Self { ty: BlockType::Air }
     }
 }
 

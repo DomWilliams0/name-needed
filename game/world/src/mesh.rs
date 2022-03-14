@@ -7,11 +7,11 @@ use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::{BaseTerrain, WorldContext};
-use common::block::BlockType;
 use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
+use world_types::BlockType;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;

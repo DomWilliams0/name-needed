@@ -11,11 +11,11 @@ pub use ::unit::world::{
     CHUNK_SIZE, SLAB_SIZE,
 };
 use common::*;
-use common::block::BlockType;
 use grid::{grid_declare, GridImpl};
 use unit::world::{
     BlockPosition, SlabLocation, SlabPosition, SlabPositionAsCoord, SliceBlockAsCoord,
 };
+use world_types::BlockType;
 
 use crate::biome::BiomeType;
 use crate::continent::ContinentMap;
@@ -609,7 +609,7 @@ impl ChunkDescription {
                     *self.ground_height.get_unchecked(SlabPositionAsCoord(pos));
 
                 // TODO calculate these better, and store them in data
-                use common::block::BlockType::*;
+                use world_types::BlockType::*;
                 let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
                     match biome {
                         BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {

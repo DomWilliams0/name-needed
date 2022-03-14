@@ -3,9 +3,9 @@ use common::*;
 
 use crate::chunk::slice::Slice;
 use crate::neighbour::NeighbourOffset;
-use common::block::BlockOpacity;
 use std::ops::Add;
 use unit::world::SliceBlock;
+use world_types::BlockOpacity;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {

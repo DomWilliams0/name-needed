@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use common::block::BlockType;
 use common::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use world_types::BlockType;
 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;

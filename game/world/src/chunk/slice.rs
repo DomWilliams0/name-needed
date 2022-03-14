@@ -4,9 +4,9 @@ use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::Block;
-use common::block::BlockType;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
+use world_types::BlockType;
 
 const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 const DUMMY_SLICE_BLOCKS: [Block; SLICE_SIZE] = [Block::air(); SLICE_SIZE];

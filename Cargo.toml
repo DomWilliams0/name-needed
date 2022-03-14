@@ -8,6 +8,7 @@ members = [
 	"game/simulation",
 	"game/simulation/ecs-derive",
 	"game/world",
+	"game/world/world_types",
 
 	"renderer/engine",
 	"renderer/main",

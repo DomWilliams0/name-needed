@@ -470,6 +470,9 @@
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
+ * [game/world/world_types/src/block.rs](game/world/world_types/src/block.rs) (2)
+   * `// TODO define block types in data`
+   * `/// TODO very temporary "walkability" for block types`
  * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
    * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
@@ -530,9 +533,6 @@
    * `// TODO tree trunk size depends on the tree it came from`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)
    * `# TODO feature for cgmath`
- * [shared/common/src/block.rs](shared/common/src/block.rs) (2)
-   * `// TODO define block types in data`
-   * `/// TODO very temporary "walkability" for block types`
  * [shared/common/src/newtype.rs](shared/common/src/newtype.rs) (1)
    * `// TODO support f64 too`
  * [shared/grid/src/dynamic.rs](shared/grid/src/dynamic.rs) (3)

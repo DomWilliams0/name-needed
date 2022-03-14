@@ -2,8 +2,8 @@
 //! be defined in data instead
 // TODO define block types in data
 
+use common::{derive_more::Display, Proportion};
 use strum::{EnumIter, EnumString};
-use crate::{Proportion, derive_more::Display};
 
 #[derive(
     Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, EnumIter, EnumString, Display,
@@ -37,7 +37,6 @@ pub enum BlockOpacity {
 
 pub type BlockDurability = u8;
 
-
 impl BlockOpacity {
     pub fn solid(self) -> bool {
         matches!(self, Self::Solid)
@@ -47,7 +46,6 @@ impl BlockOpacity {
         matches!(self, Self::Transparent)
     }
 }
-
 
 impl BlockType {
     pub fn opacity(self) -> BlockOpacity {

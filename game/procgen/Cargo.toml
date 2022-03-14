@@ -12,6 +12,7 @@ unit = { path = "../../shared/unit" }
 grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
 color = { path = "../../shared/color", optional = true }
 resources = { path = "../resources" }
+world_types = { path = "../world/world_types" }
 noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
 rand_distr = "0.3" # cannot be upgraded until rand can be too (to 0.8)
 strum = { version = "0.19", features = ["derive"] }

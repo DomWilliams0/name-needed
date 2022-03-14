@@ -2,7 +2,6 @@ use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
 
-use common::block::BlockDurability;
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
@@ -10,6 +9,7 @@ use unit::world::{
     SLAB_SIZE,
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
+use world_types::BlockDurability;
 
 use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;

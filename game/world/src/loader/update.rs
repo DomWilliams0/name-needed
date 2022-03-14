@@ -1,5 +1,5 @@
-use common::block::BlockType;
 use std::iter::once;
+use world_types::BlockType;
 
 use common::derive_more::*;
 use unit::world::{
@@ -70,13 +70,13 @@ impl WorldTerrainUpdate {
 mod split {
     use std::iter::once;
 
-    use common::block::BlockType;
     use common::*;
     use unit::world::CHUNK_SIZE;
     use unit::world::{
         ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
         WorldRange, SLAB_SIZE,
     };
+    use world_types::BlockType;
 
     use crate::loader::update::{GenericTerrainUpdate, SlabTerrainUpdate};
 

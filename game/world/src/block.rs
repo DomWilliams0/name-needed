@@ -1,6 +1,6 @@
-pub use common::block::{BlockDurability, BlockOpacity, BlockType};
 use common::Proportion;
 use unit::world::GlobalSliceIndex;
+pub use world_types::{BlockDurability, BlockOpacity, BlockType};
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::BlockOcclusion;
