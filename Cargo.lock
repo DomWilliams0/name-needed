@@ -2720,6 +2720,7 @@ dependencies = [
  "ustr",
  "ux",
  "world",
+ "world_types",
 ]
 
 [[package]]
@@ -3429,6 +3430,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "strum",
+ "unit",
 ]
 
 [[package]]

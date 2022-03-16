@@ -1,4 +1,4 @@
-use crate::loader::terrain_source::TerrainSourceError;
+use crate::loader::terrain_source::{GeneratedSlab, TerrainSourceError};
 
 use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabType};
@@ -28,14 +28,18 @@ impl GeneratedTerrainSource {
         &self.planet
     }
 
-    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<GeneratedSlab, TerrainSourceError> {
         // TODO handle wrapping of slabs around planet boundaries
         let slab = self
             .planet
             .generate_slab(slab)
             .await
             .ok_or(TerrainSourceError::SlabOutOfBounds(slab))?;
-        Ok(slab.into())
+
+        Ok(GeneratedSlab {
+            terrain: slab.terrain.into(),
+            entities: slab.entities,
+        })
     }
 
     pub async fn get_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {

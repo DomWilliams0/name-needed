@@ -1,20 +1,22 @@
-use crate::chunk::slab::Slab;
-use crate::loader::WorldTerrainUpdate;
-use common::parking_lot::RwLock;
-use common::*;
 use std::collections::HashSet;
 use std::sync::Arc;
+
+use common::parking_lot::RwLock;
+use common::*;
+#[cfg(feature = "procgen")]
+pub use generate::GeneratedTerrainSource;
+pub use memory::MemoryTerrainSource;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
 };
+use world_types::EntityDescription;
+
+use crate::chunk::slab::Slab;
+use crate::loader::WorldTerrainUpdate;
 
 #[cfg(feature = "procgen")]
 mod generate;
-#[cfg(feature = "procgen")]
-pub use generate::GeneratedTerrainSource;
-
 mod memory;
-pub use memory::MemoryTerrainSource;
 
 #[derive(Debug, Error)]
 pub enum TerrainSourceError {
@@ -61,6 +63,11 @@ pub struct BlockDetails {
     pub region: Option<(procgen::RegionLocation, SmallVec<[String; 4]>)>,
 }
 
+pub struct GeneratedSlab {
+    pub terrain: Slab,
+    pub entities: Vec<EntityDescription>,
+}
+
 impl From<MemoryTerrainSource> for TerrainSource {
     fn from(src: MemoryTerrainSource) -> Self {
         Self::Memory(Arc::new(RwLock::new(src)))
@@ -83,9 +90,12 @@ impl TerrainSource {
         }
     }
 
-    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<GeneratedSlab, TerrainSourceError> {
         match self {
-            TerrainSource::Memory(src) => src.read().get_slab_copy(slab),
+            TerrainSource::Memory(src) => src
+                .read()
+                .get_slab_copy(slab)
+                .map(GeneratedSlab::with_terrain),
             #[cfg(feature = "procgen")]
             TerrainSource::Generated(src) => src.load_slab(slab).await,
         }
@@ -174,12 +184,23 @@ impl TerrainSource {
     }
 }
 
+impl GeneratedSlab {
+    pub fn with_terrain(terrain: Slab) -> Self {
+        Self {
+            terrain,
+            entities: Vec::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::iter::once;
+
     use crate::chunk::RawChunkTerrain;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
-    use std::iter::once;
+
+    use super::*;
 
     #[test]
     fn invalid() {

@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 world = { path = "../world" }
+world_types = { path = "../world/world_types" }
 
 unit = { path = "../../shared/unit" }
 config = { path = "../../shared/config" }

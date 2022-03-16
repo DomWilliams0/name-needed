@@ -28,7 +28,9 @@
 * [X] frame allocator helpers for debug/display/vec
 * [ ] reuse some allocaions in herd joining system
 * simple fauna for sheep to eat
-    * [ ] generation of plants in procgen
+    * [o] generation of plants in procgen
+        * [ ] species definition based on abstract plant
+        * [ ] random position and rotation
     * [ ] growth/death of existing plants
     * [ ] growth of new plants from seeds/corpses/poo
     * [ ] approximate scattering of non quantitive growth like grass

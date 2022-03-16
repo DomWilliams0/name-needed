@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../../../shared/common" }
+unit = { path = "../../../shared/unit" }
+
 strum = { version = "0.19", features = ["derive"] }

@@ -1,4 +1,4 @@
-# TODOs (403)
+# TODOs (413)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -89,16 +89,20 @@
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
- * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (7)
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
    * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
+   * `// TODO reduce smallvec inline size, this is excessive and never spills`
    * `// TODO use dynstack here`
    * `// TODO reuse borrowed vec allocation`
    * `/// TODO handle case where block is multiple slabs over from root slab`
    * `// TODO if continuations is None, set a flag to ignore boundary leaks`
    * `// TODO neighbour slab should wrap around the planet`
    * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
- * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
+ * [game/procgen/src/region/subfeatures/fauna.rs](game/procgen/src/region/subfeatures/fauna.rs) (1)
+   * `// TODO randomise fauna position within block`
+ * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (3)
    * `// TODO actual tree shape`
+   * `// TODO entity for trees`
    * `// TODO tree configuration based on its planet location - branch count, leaf spread, etc`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
@@ -334,11 +338,13 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (6)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `// TODO procgen specifies plant rotation too`
+   * `// TODO use plant species`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
@@ -403,7 +409,8 @@
    * `// TODO use an enum for the slice range rather than Options`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
- * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (9)
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (10)
+   * `let mut entities_to_spawn = vec![]; // TODO reuse`
    * `// TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
@@ -473,6 +480,10 @@
  * [game/world/world_types/src/block.rs](game/world/world_types/src/block.rs) (2)
    * `// TODO define block types in data`
    * `/// TODO very temporary "walkability" for block types`
+ * [game/world/world_types/src/entity.rs](game/world/world_types/src/entity.rs) (3)
+   * `// TODO trait object for other types`
+   * `// TODO species, initial growth progress, initial state (dehydrated, blooming, etc)`
+   * `// TODO tree entity: list of blocks for trunk/roots/leaves, age, height, species`
  * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
    * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
@@ -529,6 +540,8 @@
    * `{"intelligence": (species: "sheep")}, // TODO`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
+ * [resources/definitions/living/plant.ron](resources/definitions/living/plant.ron) (1)
+   * `// TODO make plant abstract`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)
    * `// TODO tree trunk size depends on the tree it came from`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

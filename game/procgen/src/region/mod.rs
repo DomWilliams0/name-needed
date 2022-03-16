@@ -1,6 +1,10 @@
 #![deny(unused_must_use)]
 #![allow(dead_code)]
 
+pub(crate) use feature::generate_loose_subfeatures;
+pub use feature::{ApplyFeatureContext, Feature, RegionalFeature};
+pub(crate) use subfeature::SlabContinuation;
+
 mod feature;
 mod features;
 #[allow(clippy::module_inception)]
@@ -10,9 +14,6 @@ mod row_scanning;
 mod subfeature;
 mod subfeatures;
 mod unit;
-
-pub use feature::{ApplyFeatureContext, Feature, RegionalFeature};
-pub(crate) use subfeature::SlabContinuation;
 
 /// Each region is broken up into this many chunks per side, i.e. this^2 for total number of chunks
 pub const CHUNKS_PER_REGION_SIDE: usize = 8;

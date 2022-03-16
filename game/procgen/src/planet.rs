@@ -12,13 +12,14 @@ use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParamsRef;
 use crate::rasterize::SlabGrid;
-use crate::region::Regions;
+use crate::region::{generate_loose_subfeatures, Regions};
 use crate::region::{
     ApplyFeatureContext, LoadedRegionRef, PlanetPoint, RegionLocation, SlabContinuation,
 };
 
 use crate::GeneratedBlock;
 use geo::{Coordinate, Rect};
+use world_types::EntityDescription;
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -42,6 +43,11 @@ pub struct PlanetInner {
 
     #[cfg(feature = "cache")]
     was_loaded: bool,
+}
+
+pub struct GeneratedPlanetSlab {
+    pub terrain: SlabGrid,
+    pub entities: Vec<EntityDescription>,
 }
 
 impl Planet {
@@ -179,7 +185,7 @@ impl Planet {
     }
 
     /// Generates now and does not cache. Returns None if slab is out of range
-    pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
+    pub async fn generate_slab(&self, slab: SlabLocation) -> Option<GeneratedPlanetSlab> {
         let inner = self.0.read().await;
         let params = inner.params.clone();
         let slab_continuations = inner.regions.slab_continuations();
@@ -210,8 +216,9 @@ impl Planet {
 
         let world_updates_task = world_updates.clone();
         let task = tokio::spawn(async move {
+            let mut entities = vec![];
             while let Some(subfeature) = subfeatures_rx.recv().await {
-                subfeature
+                let entity = subfeature
                     .apply(
                         slab,
                         &mut terrain,
@@ -220,14 +227,22 @@ impl Planet {
                         &world_updates_task,
                     )
                     .await;
+
+                if let Some(e) = entity {
+                    entities.push(e.0);
+                }
             }
 
-            terrain
+            (terrain, entities)
         });
 
+        // apply relevant features
         for feature in region.features_for_slab(slab, &slab_bounds) {
             feature.apply_to_slab(&mut ctx).await;
         }
+
+        // generate subfeatures not associated with any particular feature
+        generate_loose_subfeatures(&mut ctx).await;
 
         // mark slab as completed
         let old_continuations = slab_continuations
@@ -244,19 +259,21 @@ impl Planet {
         drop(inner);
 
         // wait for all subfeatures to be rasterized
-        let mut terrain = task.await.expect("future panicked");
+        let (mut terrain, entities) = task.await.expect("future panicked");
 
         // add any extra leaked subfeatures to this slab
         if let Some(SlabContinuation::Unloaded(extra)) = old_continuations {
             debug!("applying {count} leaked subfeatures to slab", count = extra.len(); slab);
             for subfeature in extra.into_iter() {
-                subfeature
+                // ignore entity description from other slabs, it's already handled by the owning
+                // slab
+                let _entity = subfeature
                     .apply(slab, &mut terrain, None, &params, &world_updates)
                     .await;
             }
         }
 
-        Some(terrain)
+        Some(GeneratedPlanetSlab { terrain, entities })
     }
 
     pub async fn find_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {

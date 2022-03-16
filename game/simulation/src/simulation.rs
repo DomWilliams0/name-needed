@@ -10,6 +10,7 @@ use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
+use world_types::EntityDescription;
 
 use crate::activity::ActivitySystem;
 use crate::ai::{AiComponent, AiSystem};
@@ -361,15 +362,23 @@ impl<R: Renderer> Simulation<R> {
         self.world_loader.request_slabs(actual_requested_slabs);
         drop(requested_slabs);
 
-        let mut world = self.voxel_world.borrow_mut();
+        let mut entities_to_spawn = Vec::new();
+        {
+            let mut world = self.voxel_world.borrow_mut();
 
-        // apply occlusion updates
-        self.world_loader
-            .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
+            // apply occlusion updates
+            self.world_loader
+                .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
-        // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
-        world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
-        drop(world);
+            // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
+            world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
+
+            // move entity descriptions out of world to release lock asap
+            entities_to_spawn.extend(world.entities_to_spawn());
+        }
+
+        // spawn entities for newly generated terrain
+        self.spawn_entities_from_descriptions(&entities_to_spawn);
 
         // aggregate all terrain changes for this tick
         let updates = &mut self.terrain_changes;
@@ -400,6 +409,28 @@ impl<R: Renderer> Simulation<R> {
 
         // swap storage back and forget empty vec
         std::mem::forget(std::mem::replace(&mut self.change_events, events));
+    }
+
+    fn spawn_entities_from_descriptions(&mut self, entities: &[EntityDescription]) {
+        for entity in entities {
+            let res = self
+                .ecs_world
+                .build_entity("core_living_plant")
+                .expect("no plant definition")
+                // TODO procgen specifies plant rotation too
+                .with_position(entity.position)
+                .doesnt_need_to_be_accessible()
+                .spawn();
+
+            match res {
+                Err(err) => warn!("failed to spawn plant: {}", err),
+                Ok(e) => {
+                    debug!("spawned plant"; e, "pos" => %entity.position);
+                }
+            }
+
+            // TODO use plant species
+        }
     }
 
     fn process_ui_commands(

@@ -1,17 +1,16 @@
-use crate::loader::batch::UpdateBatcher;
-
-use crate::navigation::AreaNavEdge;
-use crate::neighbour::NeighbourOffset;
-use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldContext, WorldRef};
-use common::*;
 use futures::channel::mpsc as async_channel;
+
+use common::*;
+use unit::world::{ChunkLocation, SlabIndex};
 
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::WhichChunk;
-use crate::occlusion::NeighbourOpacity;
-
+use crate::loader::batch::UpdateBatcher;
 use crate::loader::loading::LoadedSlab;
-use unit::world::{ChunkLocation, SlabIndex};
+use crate::navigation::AreaNavEdge;
+use crate::neighbour::NeighbourOffset;
+use crate::occlusion::NeighbourOpacity;
+use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldContext, WorldRef};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
 
@@ -43,6 +42,8 @@ impl<C: WorldContext> SlabFinalizer<C> {
             slab.slab, slab.batch,
         );
 
+        let mut entities_to_spawn = vec![]; // TODO reuse
+
         self.batcher.submit(slab.batch, slab);
 
         // finalize completed batches only, which might not include this update
@@ -72,6 +73,8 @@ impl<C: WorldContext> SlabFinalizer<C> {
 
             log_scope!(o!(batch));
 
+            entities_to_spawn.extend(items.iter_mut().flat_map(|slab| slab.entities.drain(..)));
+
             let mut chunks = SmallVec::<[ChunkLocation; 8]>::new();
 
             // put slabs into their respective chunks
@@ -82,6 +85,7 @@ impl<C: WorldContext> SlabFinalizer<C> {
             {
                 log_scope!(o!(chunk));
                 debug!("populating chunk with slabs");
+
                 let mut world = self.world.borrow_mut();
                 world.populate_chunk_with_slabs(chunk, slab_range, slabs);
                 chunks.push(chunk);
@@ -94,6 +98,17 @@ impl<C: WorldContext> SlabFinalizer<C> {
             for chunk in chunks.into_iter() {
                 log_scope!(o!(chunk));
                 self.finalize_chunk_between_slabs(chunk, slab_range).await;
+            }
+
+            // spawn entities in now-finalized slabs
+            if !entities_to_spawn.is_empty() {
+                trace!(
+                    "passing {n} entity descriptions from newly finalized slabs to world to spawn next tick",
+                    n = entities_to_spawn.len()
+                );
+
+                let mut world = self.world.borrow_mut();
+                world.queue_entities_to_spawn(entities_to_spawn.drain(..));
             }
         }
     }

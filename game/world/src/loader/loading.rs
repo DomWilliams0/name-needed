@@ -19,6 +19,7 @@ use crate::world::slab_loading::SlabProcessingFuture;
 use futures::FutureExt;
 use std::collections::HashSet;
 use std::iter::repeat;
+use world_types::EntityDescription;
 
 pub struct WorldLoader<C: WorldContext> {
     source: TerrainSource,
@@ -36,6 +37,7 @@ pub struct LoadedSlab {
     pub(crate) terrain: Option<Slab>,
     pub(crate) navigation: SlabInternalNavigability,
     pub(crate) batch: UpdateBatch,
+    pub(crate) entities: Vec<EntityDescription>,
 }
 
 #[derive(Debug, Error)]
@@ -175,11 +177,16 @@ impl<C: WorldContext> WorldLoader<C> {
             let world = self.world();
             self.pool.submit_async(
                 async move {
+                    let mut entities = Vec::new();
+
                     let result = if let SlabType::Placeholder = slab_type {
                         // empty placeholder
                         Ok(None)
                     } else {
-                        source.load_slab(slab).await.map(Some)
+                        source.load_slab(slab).await.map(|generated| {
+                            entities = generated.entities;
+                            Some(generated.terrain)
+                        })
                     };
 
                     let terrain = match result {
@@ -215,6 +222,7 @@ impl<C: WorldContext> WorldLoader<C> {
                         terrain,
                         navigation,
                         batch,
+                        entities,
                     })
                 },
                 self.finalization_channel.clone(),
@@ -384,6 +392,7 @@ impl<C: WorldContext> WorldLoader<C> {
                         terrain: None, // owned by the world
                         navigation,
                         batch,
+                        entities: vec![], // no new entities to spawn for an update
                     })
                 },
                 self.finalization_channel.clone(),

@@ -1,0 +1,17 @@
+[
+  (
+    // TODO make plant abstract
+    uid: "core_living_plant",
+    components: [
+      {"kind": (singular: "Plant")},
+      {"render": (
+        color: "06BA0F",
+        shape: "Circle",
+      )},
+      {"physical": (
+        size: [3, 3, 3],
+        volume: 50,
+      )},
+    ],
+  ),
+]

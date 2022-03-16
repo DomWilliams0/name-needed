@@ -611,15 +611,7 @@ impl ChunkDescription {
                 // TODO calculate these better, and store them in data
                 use world_types::BlockType::*;
                 let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
-                    match biome {
-                        BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {
-                            (Dirt, Sand, Stone, 1)
-                        }
-                        BiomeType::Beach => (Sand, Dirt, Stone, 4),
-                        BiomeType::Plains => (LightGrass, Dirt, Stone, 3),
-                        BiomeType::Forest | BiomeType::Tundra => (Grass, Dirt, Stone, 3),
-                        BiomeType::Desert => (Sand, Sand, Stone, 6),
-                    };
+                    biome.block_distribution();
 
                 let bt = match (ground - z_global).slice() {
                     0 => surface_block,
@@ -640,20 +632,19 @@ impl ChunkDescription {
     pub fn block(&self, block: SliceBlock) -> &BlockHeight {
         self.ground_height.get_unchecked(SliceBlockAsCoord(block))
     }
-    /*
-        /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
-        /// a chunk size of 4:
-        ///
-        /// ```none
-        /// 12  13  14  15
-        /// 8   9   10  11
-        /// 4   5   6   7
-        /// 0   1   2   3
-        /// ```
-        pub(crate) fn blocks(&self) -> &[BlockHeight] {
-            self.ground_height.array()
-        }
-    */
+
+    /// Iterator over the block descriptions in this chunk. Note the order is per row, i.e. for
+    /// a chunk size of 4:
+    ///
+    /// ```none
+    /// 12  13  14  15
+    /// 8   9   10  11
+    /// 4   5   6   7
+    /// 0   1   2   3
+    /// ```
+    pub(crate) fn blocks(&self) -> &[BlockHeight] {
+        self.ground_height.array()
+    }
 }
 
 impl BlockHeight {

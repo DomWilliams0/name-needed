@@ -13,7 +13,7 @@ use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
     SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
 };
-use world_types::{BlockDurability, BlockType};
+use world_types::{BlockDurability, BlockType, EntityDescription};
 
 use crate::block::Block;
 use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
@@ -34,6 +34,7 @@ pub struct World<C: WorldContext> {
     chunks: Vec<Chunk<C>>,
     area_graph: AreaGraph,
     dirty_slabs: HashSet<SlabLocation>,
+    entities_to_spawn: Vec<EntityDescription>,
     load_notifier: LoadNotifier,
     block_search_context: BlockGraphSearchContext,
     area_search_context: AreaGraphSearchContext,
@@ -114,6 +115,7 @@ impl<C: WorldContext> World<C> {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
             dirty_slabs: HashSet::with_capacity(32),
+            entities_to_spawn: Vec::default(),
             load_notifier: LoadNotifier::default(),
             block_search_context: BlockGraph::search_context(),
             area_search_context: AreaGraph::search_context(),
@@ -496,8 +498,7 @@ impl<C: WorldContext> World<C> {
         // add all areas even if they currently have no edges
         {
             // safety: area graph is totally separate from chunk lookup
-            let naughty_area_graph: &mut AreaGraph =
-                unsafe { std::mem::transmute(&mut self.area_graph) };
+            let naughty_area_graph = unsafe { &mut *(&mut self.area_graph as *mut AreaGraph) };
 
             let chunk = self.find_chunk_with_pos(chunk_loc).expect("no such chunk");
 
@@ -635,6 +636,15 @@ impl<C: WorldContext> World<C> {
     /// Drains all dirty slabs
     pub fn dirty_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
         self.dirty_slabs.drain()
+    }
+
+    pub fn queue_entities_to_spawn(&mut self, entities: impl Iterator<Item = EntityDescription>) {
+        self.entities_to_spawn.extend(entities);
+    }
+
+    /// Drains all entities to spawn from world generation
+    pub fn entities_to_spawn(&mut self) -> impl Iterator<Item = EntityDescription> + '_ {
+        self.entities_to_spawn.drain(..)
     }
 
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block> {
