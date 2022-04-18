@@ -48,7 +48,7 @@ impl Activity for WanderActivity {
                 herds.get_info(comp.current().handle())
             })
             .map(|herd| {
-                let pos = herd.average_pos.floor();
+                let pos = herd.median_pos.floor();
                 const MAX_DISTANCE: i32 = 10; // TODO depends on size of herd
                 ExplorationFilter(Rc::new(move |candidate: WorldPosition| {
                     if candidate.distance2(pos) < MAX_DISTANCE.pow(2) {

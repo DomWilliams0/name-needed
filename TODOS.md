@@ -1,4 +1,4 @@
-# TODOs (413)
+# TODOs (415)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -243,8 +243,11 @@
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
- * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (1)
+ * [game/simulation/src/interact/herd/debug.rs](game/simulation/src/interact/herd/debug.rs) (1)
+   * `let leader = ecs_world.component::<TransformComponent>(info.leader); // TODO use storage`
+ * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
    * `// TODO reuse allocs`
+   * `// TODO abort early?`
  * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
    * `// TODO proper nutritional value`
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`

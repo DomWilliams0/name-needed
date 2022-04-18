@@ -35,3 +35,7 @@
     * [ ] growth of new plants from seeds/corpses/poo
     * [ ] approximate scattering of non quantitive growth like grass
     * [ ] sheep have hunger and find nearby plants to eat
+
+## Herd leader
+* [ ] herd wandering should be in its own activity
+* [X] identify leader of herd for others to follow

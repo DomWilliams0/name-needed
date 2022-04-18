@@ -73,12 +73,13 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
             };
 
             let name = alloc.alloc_str_from_debug(&herd);
-            renderer.debug_text(info.average_pos, name.as_str());
-            renderer.debug_add_square_around(info.average_pos, 2.0, Color::rgb(200, 40, 20));
+            renderer.debug_text(info.median_pos, name.as_str());
+            renderer.debug_add_square_around(info.median_pos, 2.0, Color::rgb(200, 40, 20));
 
             const PADDING: f32 = 3.0;
             let ((ax, bx), (ay, by), (z, _)) = info.range.ranges();
 
+            let color = herd_color(herd);
             renderer.debug_add_quad(
                 [
                     WorldPoint::new_unchecked(ax - PADDING, ay - PADDING, z),
@@ -86,8 +87,13 @@ impl<R: Renderer> DebugRenderer<R> for HerdDebugRenderer {
                     WorldPoint::new_unchecked(bx + PADDING, by + PADDING, z),
                     WorldPoint::new_unchecked(ax - PADDING, by + PADDING, z),
                 ],
-                herd_color(herd),
+                color,
             );
+
+            let leader = ecs_world.component::<TransformComponent>(info.leader); // TODO use storage
+            if let Some(leader) = info.leader.get(&transform) {
+                renderer.debug_add_square_around(leader.position, 1.5, color);
+            }
         }
     }
 }

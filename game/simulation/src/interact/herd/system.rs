@@ -2,19 +2,19 @@ use std::collections::{HashMap, VecDeque};
 
 use daggy::petgraph::graph::DiGraph;
 
-use common::rstar::{Envelope, Point, PointDistance, RTree, AABB};
 use common::*;
+use common::rstar::{AABB, Envelope, Point, PointDistance, RTree};
 use unit::world::{WorldPoint, WorldPointRange};
 
+use crate::{SpeciesComponent, Tick, TransformComponent};
 use crate::ecs::*;
 use crate::interact::herd::component::{CurrentHerd, HerdableComponent, HerdedComponent};
+use crate::interact::herd::HerdHandle;
 use crate::interact::herd::herds::{HerdInfo, Herds};
 use crate::interact::herd::system::rtree::{HerdTreeNode, SpeciesSelectionFunction};
-use crate::interact::herd::HerdHandle;
 use crate::simulation::EcsWorldRef;
 use crate::spatial::Spatial;
 use crate::species::Species;
-use crate::{SpeciesComponent, Tick, TransformComponent};
 
 /// Organises compatible entities into herds when nearby
 pub struct HerdJoiningSystem;
@@ -113,7 +113,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
                                 );
                             }
                         }
-                        discovered_herds.add_member(winning_herd, member.pos);
+                        discovered_herds.add_member(winning_herd, *member);
                     }
                 }
                 Subgraph::Single(alone) => {
@@ -161,7 +161,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
                     }
 
                     // register as part of herd
-                    discovered_herds.add_member(current.handle(), alone.pos);
+                    discovered_herds.add_member(current.handle(), alone);
                 }
             }
         }
@@ -310,22 +310,9 @@ fn collect_subgraphs(mut connectivity: DiGraph<ConnectivityNode, ()>) -> Vec<Sub
     subgraphs
 }
 
+#[derive(Default)]
 struct HerdInProgress {
-    summed_pos: (f32, f32, f32),
-    min_pos: (f32, f32, f32),
-    max_pos: (f32, f32, f32),
-    members: usize,
-}
-
-impl Default for HerdInProgress {
-    fn default() -> Self {
-        HerdInProgress {
-            summed_pos: (0.0, 0.0, 0.0),
-            min_pos: (f32::MAX, f32::MAX, f32::MAX),
-            max_pos: (f32::MIN, f32::MIN, f32::MIN),
-            members: 0,
-        }
-    }
+    all_members: SmallVec<[HerdedEntity; 4]>,
 }
 
 #[derive(Default)]
@@ -335,7 +322,7 @@ struct DiscoveredHerds {
 }
 
 impl DiscoveredHerds {
-    fn add_member(&mut self, herd: HerdHandle, pos: WorldPoint) {
+    fn add_member(&mut self, herd: HerdHandle, member: HerdedEntity) {
         let e = {
             let key = self.mapping.get(&herd).copied().unwrap_or(herd);
             self.herds
@@ -343,11 +330,7 @@ impl DiscoveredHerds {
                 .or_insert_with(HerdInProgress::default)
         };
 
-        let (x, y, z) = pos.xyz();
-        e.summed_pos = (e.summed_pos.0 + x, e.summed_pos.1 + y, e.summed_pos.2 + z);
-        e.min_pos = (e.min_pos.0.min(x), e.min_pos.1.min(y), e.min_pos.2.min(z));
-        e.max_pos = (e.max_pos.0.max(x), e.max_pos.1.max(y), e.max_pos.2.max(z));
-        e.members += 1;
+        e.all_members.push(member);
     }
 
     /// Returns true if not a duplicate
@@ -366,36 +349,110 @@ impl DiscoveredHerds {
     }
 
     fn finish(&mut self) -> impl Iterator<Item = (HerdHandle, HerdInfo)> + '_ {
-        self.herds.drain().map(|(herd, wip)| {
-            let average_pos = {
-                debug_assert_ne!(wip.members, 0);
-                let n = wip.members as f32;
-                WorldPoint::new(
-                    wip.summed_pos.0 / n,
-                    wip.summed_pos.1 / n,
-                    wip.summed_pos.2 / n,
-                )
-                .expect("invalid herd average position")
-            };
-            let range = {
-                let from = WorldPoint::new(wip.min_pos.0, wip.min_pos.1, wip.min_pos.2);
-                let to = WorldPoint::new(wip.max_pos.0, wip.max_pos.1, wip.max_pos.2);
-
-                let (from, to) = from.zip(to).expect("invalid herd min/max position");
-                WorldPointRange::with_inclusive_range(from, to)
-            };
+        self.herds.drain().map(|(herd, mut wip)| {
+            let (leader, median_pos) = wip.choose_leader();
+            let (min_pos, max_pos) = wip.range();
+            let range = WorldPointRange::with_inclusive_range(min_pos, max_pos);
 
             let out = (
                 herd,
                 HerdInfo {
-                    average_pos,
+                    median_pos,
                     range,
-                    members: wip.members,
+                    members: wip.count(),
+                    leader,
                 },
             );
             trace!("completed herd: {:?}", out);
             out
         })
+    }
+}
+
+impl HerdInProgress {
+    fn count(&self) -> usize {
+        self.all_members.len()
+    }
+
+    fn range(&self) -> (WorldPoint, WorldPoint) {
+        let mut min = (f32::MAX, f32::MAX, f32::MAX);
+        let mut max = (f32::MIN, f32::MIN, f32::MIN);
+
+        for member in self.all_members.iter() {
+            let (x, y, z) = member.pos.xyz();
+            min = (min.0.min(x), min.1.min(y), min.2.min(z));
+            max = (max.0.max(x), max.1.max(y), max.2.max(z));
+        }
+
+        WorldPoint::new(min.0, min.1, min.2)
+            .zip(WorldPoint::new(max.0, max.1, max.2))
+            .expect("invalid herd median")
+    }
+
+    /// Finds leader based on closest to geometric median.
+    /// Calculated with Weiszfeld's algorithm, tyvm
+    /// https://github.com/ialhashim/geometric-median
+    fn choose_leader(&self) -> (Entity, WorldPoint) {
+        assert!(!self.all_members.is_empty());
+
+        if self.all_members.len() < 3 {
+            // just take first member
+            let member = &self.all_members[0];
+            return (member.entity, member.pos);
+        }
+
+        let first = &self.all_members[0];
+        let mut guesses: [[f32; 3]; 2] = {
+            let pos = first.pos.into();
+            [pos, pos]
+        };
+
+        const ITERATIONS: usize = 50;
+        for iteration in 0..ITERATIONS {
+            fn distance(pos: WorldPoint, [x2, y2, z2]: [f32; 3]) -> f32 {
+                Vector3::new(x2, y2, z2).distance2(pos.into())
+            }
+
+            let mut numerator = [0.0; 3];
+            let mut denominator = 0.0;
+
+            // TODO abort early?
+            let t = iteration % 2;
+            for member in self.all_members.iter() {
+                let dist = distance(member.pos, guesses[t]);
+                if dist > f32::EPSILON {
+                    let (x, y, z) = member.pos.xyz();
+                    numerator[0] += x / dist;
+                    numerator[1] += y / dist;
+                    numerator[2] += z / dist;
+                    denominator += 1.0 / dist;
+                }
+            }
+
+            guesses[1 - t] = [
+                numerator[0] / denominator,
+                numerator[1] / denominator,
+                numerator[2] / denominator,
+            ];
+        }
+
+        let median = {
+            let [x, y, z] = guesses[ITERATIONS % 2];
+            WorldPoint::new(x, y, z).expect("bad geometric median")
+        };
+        let (leader, _) =
+            self.all_members
+                .iter()
+                .fold((first.entity, f32::MAX), |(leader, best), member| {
+                    let dist = member.pos.distance2(median);
+                    if dist < best {
+                        (member.entity, dist)
+                    } else {
+                        (leader, best)
+                    }
+                });
+
+        (leader, median)
     }
 }
 

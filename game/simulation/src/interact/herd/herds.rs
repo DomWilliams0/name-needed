@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
 use crate::species::Species;
+use crate::Entity;
 use common::FmtResult;
 use unit::world::{WorldPoint, WorldPointRange};
 
@@ -15,9 +16,10 @@ pub struct Herds {
 
 #[derive(Clone, Debug)]
 pub struct HerdInfo {
-    pub average_pos: WorldPoint,
+    pub median_pos: WorldPoint,
     pub range: WorldPointRange,
     pub members: usize,
+    pub leader: Entity,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
