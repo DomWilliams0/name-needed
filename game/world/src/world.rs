@@ -97,8 +97,7 @@ pub(crate) struct ContiguousChunkIterator<'a, C: WorldContext> {
 }
 
 /// Abort an exploration path-find early
-#[derive(Clone)]
-pub struct ExplorationFilter(pub Rc<dyn (Fn(WorldPosition) -> ExplorationResult) + Send + Sync>);
+pub struct ExplorationFilter(pub Box<dyn (Fn(WorldPosition) -> ExplorationResult) + Send + Sync>);
 
 // only used on main thread by synchronous systems
 unsafe impl Send for ExplorationFilter {}

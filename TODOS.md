@@ -1,4 +1,4 @@
-# TODOs (415)
+# TODOs (414)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -125,8 +125,6 @@
    * `// TODO destructive events on items should include moving/falling`
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
- * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
-   * `const MAX_DISTANCE: i32 = 10; // TODO depends on size of herd`
  * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
@@ -140,7 +138,8 @@
    * `// TODO ensure we break out of this wait early if job is finished during`
  * [game/simulation/src/activity/subactivity/equip.rs](game/simulation/src/activity/subactivity/equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
- * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (1)
+ * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (2)
+   * `// TODO dont always abort path for smooth transition to different targets/actions`
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
  * [game/simulation/src/activity/subactivity/haul.rs](game/simulation/src/activity/subactivity/haul.rs) (6)
    * `// TODO depends on item size`
@@ -243,8 +242,6 @@
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
- * [game/simulation/src/interact/herd/debug.rs](game/simulation/src/interact/herd/debug.rs) (1)
-   * `let leader = ecs_world.component::<TransformComponent>(info.leader); // TODO use storage`
  * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
    * `// TODO reuse allocs`
    * `// TODO abort early?`

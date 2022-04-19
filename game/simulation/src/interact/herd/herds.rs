@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
-use crate::species::Species;
-use crate::Entity;
 use common::FmtResult;
 use unit::world::{WorldPoint, WorldPointRange};
+
+use crate::species::Species;
+use crate::{Entity, TransformComponent};
 
 /// Resource to track herds
 pub struct Herds {
@@ -16,10 +17,11 @@ pub struct Herds {
 
 #[derive(Clone, Debug)]
 pub struct HerdInfo {
-    pub median_pos: WorldPoint,
-    pub range: WorldPointRange,
-    pub members: usize,
-    pub leader: Entity,
+    /// Centre of herd, close to leader and used as fallback if leader is invalidated
+    median_pos: WorldPoint,
+    leader: Entity,
+    range: WorldPointRange,
+    members: usize,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -61,5 +63,43 @@ impl Default for Herds {
 impl Debug for HerdHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Herd({}, {})", self.id, self.species)
+    }
+}
+
+impl HerdInfo {
+    pub(in crate::interact::herd) fn new(
+        median_pos: WorldPoint,
+        leader: Entity,
+        range: WorldPointRange,
+        members: usize,
+    ) -> Self {
+        HerdInfo {
+            median_pos,
+            leader,
+            range,
+            members,
+        }
+    }
+
+    pub const fn median_pos(&self) -> WorldPoint {
+        self.median_pos
+    }
+
+    pub const fn range(&self) -> &WorldPointRange {
+        &self.range
+    }
+
+    pub const fn member_count(&self) -> usize {
+        self.members
+    }
+
+    /// Not guaranteed to be valid/alive
+    pub fn leader_entity(&self) -> Entity {
+        self.leader
+    }
+
+    /// Leader position or median herd pos if invalidated
+    pub fn herd_centre(&self, get_pos: impl FnOnce(Entity) -> Option<WorldPoint>) -> WorldPoint {
+        get_pos(self.leader).unwrap_or(self.median_pos)
     }
 }

@@ -50,7 +50,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         Self::new_with_cached(definition, world, world.resource::<StringCache>().get(uid))
     }
 
-    pub fn with_position<P: EntityPosition + 'static>(mut self, pos: P) -> Self {
+    pub fn with_position<P: EntityPosition + 'static>(self, pos: P) -> Self {
         // TODO avoid box by resolving here and storing result
         Self {
             position: Some(Box::new(pos)),
@@ -58,7 +58,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         }
     }
 
-    pub fn doesnt_need_to_be_accessible(mut self) -> Self {
+    pub fn doesnt_need_to_be_accessible(self) -> Self {
         Self {
             accessibility_required: false,
             ..self

@@ -118,6 +118,7 @@ impl<'a> GoToSubactivity<'a> {
 impl Drop for GoToSubactivity<'_> {
     fn drop(&mut self) {
         if !self.complete {
+            // TODO dont always abort path for smooth transition to different targets/actions
             debug!("aborting incomplete goto"; self.context.entity());
             self.context.clear_path();
         }

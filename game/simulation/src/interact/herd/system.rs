@@ -2,19 +2,19 @@ use std::collections::{HashMap, VecDeque};
 
 use daggy::petgraph::graph::DiGraph;
 
+use common::rstar::{Envelope, Point, PointDistance, RTree, AABB};
 use common::*;
-use common::rstar::{AABB, Envelope, Point, PointDistance, RTree};
 use unit::world::{WorldPoint, WorldPointRange};
 
-use crate::{SpeciesComponent, Tick, TransformComponent};
 use crate::ecs::*;
 use crate::interact::herd::component::{CurrentHerd, HerdableComponent, HerdedComponent};
-use crate::interact::herd::HerdHandle;
 use crate::interact::herd::herds::{HerdInfo, Herds};
 use crate::interact::herd::system::rtree::{HerdTreeNode, SpeciesSelectionFunction};
+use crate::interact::herd::HerdHandle;
 use crate::simulation::EcsWorldRef;
 use crate::spatial::Spatial;
 use crate::species::Species;
+use crate::{SpeciesComponent, Tick, TransformComponent};
 
 /// Organises compatible entities into herds when nearby
 pub struct HerdJoiningSystem;
@@ -349,20 +349,12 @@ impl DiscoveredHerds {
     }
 
     fn finish(&mut self) -> impl Iterator<Item = (HerdHandle, HerdInfo)> + '_ {
-        self.herds.drain().map(|(herd, mut wip)| {
+        self.herds.drain().map(|(herd, wip)| {
             let (leader, median_pos) = wip.choose_leader();
             let (min_pos, max_pos) = wip.range();
             let range = WorldPointRange::with_inclusive_range(min_pos, max_pos);
 
-            let out = (
-                herd,
-                HerdInfo {
-                    median_pos,
-                    range,
-                    members: wip.count(),
-                    leader,
-                },
-            );
+            let out = (herd, HerdInfo::new(median_pos, leader, range, wip.count()));
             trace!("completed herd: {:?}", out);
             out
         })
