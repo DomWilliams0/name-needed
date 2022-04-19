@@ -329,7 +329,7 @@ impl Render {
                                 y,
                                 LocalSliceIndex::new_unchecked(z),
                             );
-                            let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
+                            let block = generated.terrain.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;
                             }
