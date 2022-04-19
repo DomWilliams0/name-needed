@@ -1,12 +1,11 @@
 use common::NormalizedFloat;
 use common::*;
 use unit::world::{WorldPoint, WorldPosition};
-use world::{EdgeCost, ExplorationFilter, SearchGoal, WorldPath};
+use world::{EdgeCost, SearchGoal, WorldPath};
 
 use crate::path::PathToken;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 pub enum PathRequest {
     // TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint
     NavigateTo {
@@ -14,13 +13,6 @@ pub enum PathRequest {
         goal: SearchGoal,
         speed: NormalizedFloat,
         token: PathToken,
-    },
-    Explore {
-        fuel: u32,
-        speed: NormalizedFloat,
-        token: PathToken,
-        #[derivative(Debug = "ignore")]
-        filter: Option<ExplorationFilter>,
     },
     ClearCurrent,
 }

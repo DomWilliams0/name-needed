@@ -37,5 +37,12 @@
     * [ ] sheep have hunger and find nearby plants to eat
 
 ## Herd leader
-* [ ] herd wandering should be in its own activity
 * [X] identify leader of herd for others to follow
+* [ ] event for a herd member becoming the leader of its herd
+    * [ ] and being demoted
+    * [ ] add associated herd leader AI DSEs
+* [ ] dev way to kill an entity to test dead herd leader
+* new sheep dses
+    * [ ] herd leader specific: lead herd to a new location
+    * [ ] stay near herd: if too far from leader, run towards it until in range
+        * [ ] new search goal: until in WorldPointRange

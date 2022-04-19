@@ -1,4 +1,4 @@
-# TODOs (412)
+# TODOs (413)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -125,6 +125,8 @@
    * `// TODO destructive events on items should include moving/falling`
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
+ * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
+   * `// TODO when in range, this produces a lot of single block paths, which look terrible`
  * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`

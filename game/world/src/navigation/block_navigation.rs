@@ -8,7 +8,7 @@ use common::*;
 use unit::world::{BlockPosition, ChunkLocation, SlabIndex, SlabPosition};
 
 use crate::navigation::path::{BlockPath, BlockPathNode};
-use crate::navigation::search::{self, SearchContext};
+use crate::navigation::search::{self, ExploreResult, SearchContext};
 use crate::navigation::{EdgeCost, SearchGoal};
 use crate::{ExplorationFilter, ExplorationResult};
 
@@ -123,7 +123,7 @@ impl BlockGraph {
             .ok_or(BlockPathError::NoPath(to, from))
     }
 
-    /// Uses as much fuel as possible. Returns None if empty
+    /// Uses as much fuel as possible to find a reachable block
     pub(crate) fn explore(
         &self,
         from: BlockPosition,
@@ -131,7 +131,7 @@ impl BlockGraph {
         context: &BlockGraphSearchContext,
         random: impl Rng,
         filter: Option<(&ExplorationFilter, ChunkLocation)>,
-    ) -> Option<BlockPath> {
+    ) -> (ExploreResult, Option<BlockPosition>) {
         let src = BlockNavNode(from);
 
         let filter = move |node: BlockNavNode| {
@@ -144,7 +144,7 @@ impl BlockGraph {
                 )
                 .unwrap_or_default()
         };
-        search::explore(
+        let result = search::explore(
             &self.graph,
             src,
             fuel,
@@ -154,7 +154,8 @@ impl BlockGraph {
             filter,
         );
 
-        self.block_path_from_search_result(context)
+        let path = &*context.result();
+        (result, path.last().map(|(_, (_, target))| target.0))
     }
 
     /// None if empty

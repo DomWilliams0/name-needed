@@ -1,6 +1,6 @@
 use common::*;
 use unit::world::WorldPoint;
-use world::{ExplorationFilter, NavigationError, SearchGoal};
+use world::{NavigationError, SearchGoal};
 
 use crate::activity::context::ActivityContext;
 use crate::activity::status::{NopStatus, Status};
@@ -68,26 +68,6 @@ impl<'a> GoToSubactivity<'a> {
                 .map_err(GotoError::MissingComponent)?;
 
             follow_path.request_navigation_with_goal(dest, goal, speed)
-        };
-
-        self.await_arrival(path_token).await
-    }
-
-    pub async fn explore(
-        &mut self,
-        fuel: u32,
-        speed: NormalizedFloat,
-        filter: Option<ExplorationFilter>,
-    ) -> Result<(), GotoError> {
-        let ctx = self.context;
-
-        let path_token = {
-            let mut follow_path = ctx
-                .world()
-                .component_mut::<FollowPathComponent>(ctx.entity())
-                .map_err(GotoError::MissingComponent)?;
-
-            follow_path.request_explore(fuel, speed, filter)
         };
 
         self.await_arrival(path_token).await

@@ -6,6 +6,7 @@ pub use cost::EdgeCost;
 pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
 };
+pub use search::ExploreResult;
 use unit::world::{ChunkLocation, SlabIndex};
 
 mod area_navigation;

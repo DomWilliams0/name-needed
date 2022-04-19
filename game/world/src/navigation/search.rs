@@ -44,9 +44,7 @@ pub fn astar<G, F, H, K, IsGoal>(
     mut edge_cost: F,
     mut estimate_cost: H,
     context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
-)
-// TODO return nothing, just read from context
-where
+) where
     G: IntoEdges + Visitable,
     IsGoal: FnMut(G::NodeId) -> bool,
     G::NodeId: Eq + Hash + Copy,
@@ -114,7 +112,15 @@ where
     debug_assert!(ctx.result.is_empty())
 }
 
-/// Goes until no more neighours (edge of graph) or out of fuel. Path so far is in context.
+#[derive(Debug)]
+pub enum ExploreResult {
+    AbortByFilter,
+    NoMoreEdges,
+    AtBorder,
+    OutOfFuel,
+}
+
+/// Goes until no more neighbours (edge of graph) or out of fuel. Path so far is in context.
 /// Aborts if filter returns true
 pub fn explore<G, K, R, F>(
     graph: G,
@@ -124,7 +130,8 @@ pub fn explore<G, K, R, F>(
     context: &SearchContext<G::NodeId, G::EdgeId, K, G::Map>,
     mut rand: R,
     filter: F,
-) where
+) -> ExploreResult
+where
     G: IntoEdges + Visitable,
     G::NodeId: Eq + Hash + Copy + Debug,
     K: Measure + Copy,
@@ -160,7 +167,7 @@ pub fn explore<G, K, R, F>(
             Ok((step, _)) => *step,
             Err(_) => {
                 // no neighbours, nvm
-                break;
+                return ExploreResult::NoMoreEdges;
             }
         };
 
@@ -172,13 +179,15 @@ pub fn explore<G, K, R, F>(
 
         // have a chance to terminate at the edge
         if is_at_edge(current) && rand.gen_bool(0.25) {
-            break;
+            return ExploreResult::AtBorder;
         }
 
         if filter(current) {
-            break;
+            return ExploreResult::AbortByFilter;
         }
     }
+
+    ExploreResult::OutOfFuel
 }
 
 struct PathTracker<N, E>

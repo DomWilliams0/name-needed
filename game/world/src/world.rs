@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::iter::once;
-use std::rc::Rc;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk};
 use crate::loader::{LoadedSlab, SlabTerrainUpdate};
 use crate::navigation::{
     AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
-    BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
+    BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::{EdgeCost, OcclusionChunkUpdate, SliceRange};
@@ -302,18 +302,18 @@ impl<C: WorldContext> World<C> {
         })
     }
 
-    pub fn find_exploratory_path(
+    /// Meanders randomly, using the given amount of fuel. Doesn't calculate a path
+    pub fn find_exploratory_destination(
         &self,
         from: WorldPosition,
         mut fuel: u32,
         filter: Option<ExplorationFilter>,
-    ) -> Result<WorldPath, NavigationError> {
+    ) -> Result<WorldPosition, NavigationError> {
         let (from, from_area) = self
             .find_accessible_block_in_column_with_range(from, None)
             .and_then(|pos| self.area(from).ok().map(|area| (pos, area)))
             .ok_or(NavigationError::SourceNotWalkable(from))?;
 
-        let mut full_path = Vec::new();
         let mut random = thread_rng();
 
         // loop vars
@@ -328,30 +328,26 @@ impl<C: WorldContext> World<C> {
                 .ok_or(NavigationError::NoSuchArea(current_area))?;
 
             // explore within current chunk, possibly ending early at a border
-            let block_path = match block_graph.explore(
+            let (explore_result, target_block) = block_graph.explore(
                 current_pos.into(),
                 &mut fuel,
                 &self.block_search_context,
                 &mut random,
                 filter.as_ref().map(|func| (func, current_chunk)),
-            ) {
-                Some(path) => path,
+            );
+
+            current_final_target = match target_block {
+                Some(block) => block.to_world_position(current_pos),
                 None => break,
             };
 
-            current_final_target = block_path.target.to_world_position(current_pos);
-
-            // add to path
-            // TODO assert path is fully connected
-            full_path.extend(Self::convert_block_path(current_area, block_path));
-
-            // fuel is exhausted
-            if fuel == 0 {
+            // fuel is exhausted or search is otherwise ended
+            if fuel == 0 || !matches!(explore_result, ExploreResult::AtBorder) {
                 break;
             }
 
             // determine if we should continue into the next area
-            let (next_block, next_area, edge_cost) = match self
+            let (next_block, next_area) = match self
                 .find_candidate_chunks_to_explore(current_final_target)
                 .collect::<ArrayVec<_, 3>>()
                 .choose(&mut random)
@@ -360,22 +356,17 @@ impl<C: WorldContext> World<C> {
                 _ => break,
             };
 
-            full_path.push(WorldPathNode {
-                block: current_final_target,
-                exit_cost: edge_cost,
-            });
-
             current_pos = next_block;
             current_area = next_area;
         }
 
-        Ok(WorldPath::new(full_path, current_final_target))
+        Ok(current_final_target)
     }
 
     fn find_candidate_chunks_to_explore(
         &self,
         exiting_block: WorldPosition,
-    ) -> impl Iterator<Item = (WorldPosition, WorldArea, EdgeCost)> + '_ {
+    ) -> impl Iterator<Item = (WorldPosition, WorldArea)> + '_ {
         let exiting_block_pos = BlockPosition::from(exiting_block);
         let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO
 
@@ -389,7 +380,7 @@ impl<C: WorldContext> World<C> {
             let edge = self.area_graph.get_adjacent_area_edge(src_area, tgt_area)?;
             if edge.contains(exiting_block_pos) {
                 let tgt_block = tgt_block.to_world_position(tgt_chunk);
-                Some((tgt_block, tgt_area, edge.cost))
+                Some((tgt_block, tgt_area))
             } else {
                 None
             }

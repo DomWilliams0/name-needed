@@ -6,7 +6,7 @@ use common::FmtResult;
 use unit::world::{WorldPoint, WorldPointRange};
 
 use crate::species::Species;
-use crate::{Entity, TransformComponent};
+use crate::Entity;
 
 /// Resource to track herds
 pub struct Herds {
