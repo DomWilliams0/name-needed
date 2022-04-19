@@ -1346,10 +1346,24 @@ mod tests {
         .into_inner();
 
         let path = w
-            .find_path((2, 2, 2), (3, 3, 2))
+            .find_path((2, 2, 2), (2, 3, 2))
             .expect("path should succeed");
 
-        assert_eq!(path.path().len(), 2);
+        assert_eq!(path.path().len(), 1);
+    }
+
+    #[test]
+    fn world_path_single_block_within_radius_of_one() {
+        let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_slice(1, BlockType::Grass)
+            .build((0, 0))])
+        .into_inner();
+
+        let path = w
+            .find_path_with_goal((2, 2, 2).into(), (4, 3, 2).into(), SearchGoal::Nearby(5)) // immediately satisfied
+            .expect("path should succeed");
+
+        assert_eq!(path.path().len(), 1);
     }
 
     #[test]

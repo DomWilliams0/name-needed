@@ -107,7 +107,7 @@ impl BlockGraph {
         let is_goal = |n: BlockNavNode| match goal {
             SearchGoal::Arrive => n == dst,
             SearchGoal::Adjacent => self.graph.edges(n).any(|e| e.target() == dst),
-            SearchGoal::Nearby(range) => manhattan(&n.0, &dst.0) <= range.into(),
+            SearchGoal::Nearby(range) => n != src && manhattan(&n.0, &dst.0) <= range.into(),
         };
 
         search::astar(

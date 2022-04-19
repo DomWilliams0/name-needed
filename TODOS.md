@@ -1,4 +1,4 @@
-# TODOs (414)
+# TODOs (412)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -452,8 +452,7 @@
    * `// TODO use unchecked unwrap here`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
- * [game/world/src/navigation/search.rs](game/world/src/navigation/search.rs) (2)
-   * `// TODO return nothing, just read from context`
+ * [game/world/src/navigation/search.rs](game/world/src/navigation/search.rs) (1)
    * `// TODO this might be expensive, can we build up the vec in order`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
@@ -468,10 +467,9 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [game/world/src/world.rs](game/world/src/world.rs) (8)
+ * [game/world/src/world.rs](game/world/src/world.rs) (7)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
-   * `// TODO assert path is fully connected`
    * `let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
