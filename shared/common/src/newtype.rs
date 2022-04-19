@@ -1,7 +1,9 @@
-use crate::*;
+use std::ops::{AddAssign, Mul, Sub, SubAssign};
+
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
+
+use crate::*;
 
 #[derive(Copy, Clone)]
 pub struct Proportion<T> {
@@ -206,7 +208,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::newtype::AccumulativeInt;
+    use super::*;
 
     #[test]
     fn accumulative_int() {
@@ -227,5 +229,11 @@ mod tests {
 
         int -= 4.5;
         assert_eq!(int.value(), BIG - 6); // .4
+    }
+
+    #[test]
+    #[should_panic]
+    fn normalised_nan() {
+        NormalizedFloat::new(f32::NAN);
     }
 }

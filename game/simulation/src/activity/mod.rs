@@ -12,13 +12,15 @@ mod subactivity;
 mod system;
 
 mod action_to_activity {
+    use std::rc::Rc;
+
+    use common::NormalizedFloat;
+    use world::SearchGoal;
+
     use crate::activity::activity::Activity;
     use crate::ai::AiAction;
 
     use super::*;
-    use common::NormalizedFloat;
-    use std::rc::Rc;
-    use world::SearchGoal;
 
     impl AiAction {
         pub fn into_activity(self) -> Rc<dyn Activity> {
@@ -42,6 +44,9 @@ mod action_to_activity {
                     NormalizedFloat::new(0.8),
                     SearchGoal::Arrive
                 )),
+                ReturnToHerd => {
+                    activity!(ReturnToHerdActivity::default())
+                }
                 Follow { target, radius } => {
                     activity!(FollowActivity::new(target, radius))
                 }

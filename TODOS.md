@@ -1,4 +1,4 @@
-# TODOs (413)
+# TODOs (415)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -155,6 +155,8 @@
    * `// TODO need to notify society here, as above?`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
+ * [game/simulation/src/ai/consideration/interact/is_far_from_herd_leader.rs](game/simulation/src/ai/consideration/interact/is_far_from_herd_leader.rs) (1)
+   * `// TODO should depend on herd`
  * [game/simulation/src/ai/consideration/items/find_local_graded_item.rs](game/simulation/src/ai/consideration/items/find_local_graded_item.rs) (1)
    * `/// TODO search society stores as well`
  * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)
@@ -183,9 +185,10 @@
    * `// TODO search range could depend on entity senses`
    * `// TODO share search range with food searching`
    * `// TODO check society containers too`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (3)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (4)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO should include check for n free slots anywhere in inventory (not just hands)`
+   * `CanFindGradedItemsLocally { .. } => todo!(), // TODO remove this`
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`

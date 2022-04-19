@@ -23,6 +23,9 @@ pub enum AiAction {
     /// Navigate to the given target
     Goto(WorldPoint),
 
+    /// Move towards the herd leader
+    ReturnToHerd,
+
     /// Go and pickup the given item
     GoEquip(Entity),
 
@@ -97,6 +100,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
             A::Nop => return Err(()),
             A::Wander => B::Wander,
             A::Goto(target) => B::Goto(*target),
+            A::ReturnToHerd => B::ReturnToHerd,
             A::GoEquip(item) => B::GoEquip(*item),
             A::EatHeldItem(item) => B::EatHeldItem(*item),
             A::GoBreakBlock(pos) => B::GoBreakBlock(*pos),

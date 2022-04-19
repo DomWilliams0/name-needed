@@ -10,7 +10,7 @@ use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
 use crate::activity::Activity;
-use crate::ecs::ComponentGetError;
+
 use crate::path::WANDER_SPEED;
 use crate::{ComponentWorld, HerdedComponent, Herds, TransformComponent};
 

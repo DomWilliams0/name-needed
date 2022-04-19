@@ -44,5 +44,5 @@
 * [ ] dev way to kill an entity to test dead herd leader
 * new sheep dses
     * [ ] herd leader specific: lead herd to a new location
-    * [ ] stay near herd: if too far from leader, run towards it until in range
-        * [ ] new search goal: until in WorldPointRange
+    * [X] stay near herd: if too far from leader, run towards it until in range
+* [ ] herd_centre() should return a transformcomponent ref instead of position, because its repeated too often

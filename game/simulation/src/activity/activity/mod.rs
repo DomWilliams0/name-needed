@@ -1,5 +1,4 @@
 pub use activity_trait::Activity;
-
 pub use eat_held_item::EatHeldItemActivity;
 pub use follow::FollowActivity;
 pub use go_break_block::GoBreakBlockActivity;
@@ -8,6 +7,7 @@ pub use go_equip::GoEquipActivity;
 pub use go_haul::GoHaulActivity;
 pub use go_to::GoToActivity;
 pub use nop::NopActivity;
+pub use return_to_herd::ReturnToHerdActivity;
 pub use wander::WanderActivity;
 
 mod eat_held_item;
@@ -18,13 +18,16 @@ mod go_equip;
 mod go_haul;
 mod go_to;
 mod nop;
+mod return_to_herd;
 mod wander;
 
 mod activity_trait {
+    use std::fmt::{Debug, Display};
+
+    use async_trait::async_trait;
+
     use crate::activity::context::{ActivityContext, ActivityResult, InterruptResult};
     use crate::{Entity, EntityEvent};
-    use async_trait::async_trait;
-    use std::fmt::{Debug, Display};
 
     #[async_trait]
     pub trait Activity: Debug {

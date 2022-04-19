@@ -6,7 +6,7 @@ use common::FmtResult;
 use unit::world::{WorldPoint, WorldPointRange};
 
 use crate::species::Species;
-use crate::Entity;
+use crate::{ComponentWorld, EcsWorld, Entity, HerdedComponent};
 
 /// Resource to track herds
 pub struct Herds {
@@ -101,5 +101,16 @@ impl HerdInfo {
     /// Leader position or median herd pos if invalidated
     pub fn herd_centre(&self, get_pos: impl FnOnce(Entity) -> Option<WorldPoint>) -> WorldPoint {
         get_pos(self.leader).unwrap_or(self.median_pos)
+    }
+
+    /// Helper
+    pub fn get(entity: Entity, world: &EcsWorld) -> Option<&HerdInfo> {
+        world
+            .component::<HerdedComponent>(entity)
+            .ok()
+            .and_then(|comp| {
+                let herds = world.resource::<Herds>();
+                herds.get_info(comp.current().handle())
+            })
     }
 }

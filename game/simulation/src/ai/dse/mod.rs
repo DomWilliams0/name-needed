@@ -5,6 +5,7 @@ pub use wander::*;
 
 pub use self::world::*;
 
+mod interact;
 mod items;
 mod obey_divine_command;
 mod wander;
@@ -19,13 +20,14 @@ pub enum AdditionalDse {
 pub mod species {
     use ai::{AiBox, Dse};
 
+    use crate::ai::dse::interact::StayCloseToHerdDse;
     use crate::ai::AiContext;
     use crate::dse;
 
     use super::*;
 
     pub fn human_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
-        vec![
+        [
             dse!(WanderDse),
             dse!(EatHeldFoodDse),
             dse!(FindLocalFoodDse),
@@ -34,10 +36,10 @@ pub mod species {
     }
 
     pub fn dog_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
-        vec![dse!(WanderDse)].into_iter()
+        [dse!(WanderDse)].into_iter()
     }
 
     pub fn sheep_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
-        vec![dse!(WanderDse)].into_iter()
+        [dse!(WanderDse), dse!(StayCloseToHerdDse)].into_iter()
     }
 }

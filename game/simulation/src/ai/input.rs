@@ -7,6 +7,7 @@ use world::block::BlockType;
 
 use crate::ai::{AiBlackboard, AiContext, AiTarget};
 use crate::ecs::*;
+use crate::interact::herd::HerdInfo;
 use crate::item::{
     FoundSlot, HaulableItemComponent, HauledItemComponent, InventoryComponent, ItemFilter,
 };
@@ -41,10 +42,13 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
-    /// Distance squared to given target
+    /// Distance squared to given target, -INF on error
     MyDistance2To(AiTarget),
 
-    /// Distance squared to target entity/position, f32::MAX on error
+    /// Distance squared to herd leader, or -INF if not in a herd
+    MyDistance2ToHerd,
+
+    /// Distance squared to target entity/position, -INF on error
     MyDistance2ToTarget,
 
     TargetBlockTypeMatches(BlockTypeMatch),
@@ -73,10 +77,15 @@ impl ai::Input<AiContext> for AiInput {
                 has_free_hands_to_hold_target(blackboard, target).unwrap_or(0.0)
             }
             CanUseHeldItem(filter) => can_use_held_item(blackboard, filter).unwrap_or(0.0),
-            CanFindGradedItemsLocally { .. } => todo!(),
+            CanFindGradedItemsLocally { .. } => todo!(), // TODO remove this
             Constant(f) => f.0,
-            MyDistance2To(tgt) => distance_to_target(blackboard, Some(tgt)).unwrap_or(f32::MAX),
-            MyDistance2ToTarget => distance_to_target(blackboard, target).unwrap_or(f32::MAX),
+            MyDistance2To(tgt) => distance_to_target(blackboard, tgt).unwrap_or(f32::NEG_INFINITY),
+            MyDistance2ToHerd => find_herd_target(blackboard)
+                .and_then(|tgt| distance_to_target(blackboard, &AiTarget::Point(tgt)))
+                .unwrap_or(f32::NEG_INFINITY),
+            MyDistance2ToTarget => target
+                .and_then(|target| distance_to_target(blackboard, target))
+                .unwrap_or(f32::NEG_INFINITY),
             TargetBlockTypeMatches(bt) => {
                 target_block_type_matches(blackboard, target, *bt).unwrap_or(0.0)
             }
@@ -163,10 +172,22 @@ fn can_use_held_item(blackboard: &mut AiBlackboard, filter: &ItemFilter) -> Opti
     })
 }
 
-/// 0 distance if in inventory
-fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) -> Option<f32> {
+fn find_herd_target(blackboard: &AiBlackboard) -> Option<WorldPoint> {
+    HerdInfo::get(blackboard.entity, blackboard.world).map(|herd| {
+        herd.herd_centre(|e| {
+            blackboard
+                .world
+                .component::<TransformComponent>(e)
+                .ok()
+                .map(|t| t.position)
+        })
+    })
+}
+
+/// Some(0.0) if in inventory, None if missing transform
+fn distance_to_target(blackboard: &mut AiBlackboard, target: &AiTarget) -> Option<f32> {
     let target_pos = match target {
-        Some(AiTarget::Entity(e)) => {
+        AiTarget::Entity(e) => {
             // check if held by us first
             if let Ok(hauled) = blackboard.world.component::<HauledItemComponent>(*e) {
                 if hauled.hauler == blackboard.entity {
@@ -193,9 +214,8 @@ fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) 
                 .ok()
                 .map(|pos| pos.position)?
         }
-        Some(AiTarget::Point(pos)) => *pos,
-        Some(AiTarget::Block(block)) => block.centred(),
-        _ => return None,
+        AiTarget::Point(pos) => *pos,
+        AiTarget::Block(block) => block.centred(),
     };
 
     Some(target_pos.distance2(blackboard.transform.position))
@@ -255,6 +275,7 @@ impl Display for AiInput {
             Constant(c) => write!(f, "Constant {:?}", c.0),
 
             MyDistance2To(pos) => write!(f, "Distance to {}", pos),
+            MyDistance2ToHerd => write!(f, "Distance to herd"),
             MyDistance2ToTarget => f.write_str("Distance to target"),
 
             // TODO lowercase BlockType

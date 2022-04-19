@@ -23,7 +23,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
-use crate::{EdgeCost, OcclusionChunkUpdate, SliceRange};
+use crate::{OcclusionChunkUpdate, SliceRange};
 
 pub trait WorldContext: 'static + Send + Sync {
     type AssociatedBlockData;
