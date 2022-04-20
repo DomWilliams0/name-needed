@@ -1,16 +1,19 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
 use common::FmtResult;
 use unit::world::{WorldPoint, WorldPointRange};
 
+use crate::event::EntityEventQueue;
 use crate::species::Species;
-use crate::{ComponentWorld, EcsWorld, Entity, HerdedComponent};
+use crate::{ComponentWorld, EcsWorld, Entity, EntityEvent, EntityEventPayload, HerdedComponent};
+
+type HerdId = NonZeroU32;
 
 /// Resource to track herds
 pub struct Herds {
-    next: NonZeroU32,
+    next: HerdId,
     /// Holds active herds only
     herds: HashMap<HerdHandle, HerdInfo>,
 }
@@ -24,9 +27,11 @@ pub struct HerdInfo {
     members: usize,
 }
 
+/// Unstable and ephemeral, should not be stored
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct HerdHandle {
-    id: NonZeroU32,
+    id: HerdId,
+    // TODO map species to a separate id count? or just use a u64
     species: Species,
 }
 
@@ -36,14 +41,48 @@ impl Herds {
             id: self.next,
             species,
         };
-        self.next = NonZeroU32::new(self.next.get() + 1).expect("herd handle overflow");
+        self.next = HerdId::new(self.next.get() + 1).expect("herd handle overflow");
 
         herd
     }
 
-    pub fn register_assigned_herds(&mut self, herds: impl Iterator<Item = (HerdHandle, HerdInfo)>) {
-        self.herds.clear();
-        self.herds.extend(herds);
+    pub fn register_assigned_herds(
+        &mut self,
+        world: &EcsWorld,
+        herds: impl Iterator<Item = (HerdHandle, HerdInfo)>,
+    ) {
+        // TODO reuse allocs
+        let mut old_leaders = self
+            .herds
+            .drain()
+            .map(|(h, info)| (info.leader, h))
+            .collect::<HashSet<_>>();
+        let mut new_leaders = vec![];
+
+        for (herd, info) in herds {
+            if old_leaders.remove(&(info.leader, herd)) {
+                // no change, this entity was already the leader for this herd
+            } else {
+                // demote old leader and promote new, deferring promotion event until after demotion
+                new_leaders.push(info.leader);
+            }
+
+            self.herds.insert(herd, info);
+        }
+
+        let events = world.resource_mut::<EntityEventQueue>();
+
+        // demote old leaders first
+        events.post_multiple(old_leaders.drain().map(|(e, herd)| EntityEvent {
+            subject: e,
+            payload: EntityEventPayload::DemotedFromHerdLeader(herd),
+        }));
+
+        // promote new leaders
+        events.post_multiple(new_leaders.drain(..).map(|e| EntityEvent {
+            subject: e,
+            payload: EntityEventPayload::PromotedToHerdLeader,
+        }));
     }
 
     pub fn get_info(&self, herd: HerdHandle) -> Option<&HerdInfo> {
@@ -54,7 +93,7 @@ impl Herds {
 impl Default for Herds {
     fn default() -> Self {
         Self {
-            next: unsafe { NonZeroU32::new_unchecked(1) },
+            next: unsafe { HerdId::new_unchecked(1) },
             herds: Default::default(),
         }
     }

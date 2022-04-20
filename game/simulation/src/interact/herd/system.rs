@@ -12,7 +12,6 @@ use crate::interact::herd::herds::{HerdInfo, Herds};
 use crate::interact::herd::system::rtree::{HerdTreeNode, SpeciesSelectionFunction};
 use crate::interact::herd::HerdHandle;
 use crate::simulation::EcsWorldRef;
-use crate::spatial::Spatial;
 use crate::species::Species;
 use crate::{SpeciesComponent, Tick, TransformComponent};
 
@@ -25,7 +24,6 @@ impl<'a> System<'a> for HerdJoiningSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
         Read<'a, EcsWorldRef>,
-        Read<'a, Spatial>,
         Write<'a, Herds>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HerdableComponent>,
@@ -35,7 +33,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
 
     fn run(
         &mut self,
-        (entities, _world, _spatial, mut herds, transform, herdable, mut herded, species): Self::SystemData,
+        (entities, world, mut herds, transform, herdable, mut herded, species): Self::SystemData,
     ) {
         // run occasionally
         if Tick::fetch().value() % RUN_FREQUENCY != 0 {
@@ -167,7 +165,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
         }
 
         // register alive herds
-        herds.register_assigned_herds(discovered_herds.finish());
+        herds.register_assigned_herds(&*world, discovered_herds.finish());
     }
 }
 

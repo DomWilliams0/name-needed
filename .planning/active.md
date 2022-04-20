@@ -38,8 +38,8 @@
 
 ## Herd leader
 * [X] identify leader of herd for others to follow
-* [ ] event for a herd member becoming the leader of its herd
-    * [ ] and being demoted
+* [o] event for a herd member becoming the leader of its herd
+    * [X] and being demoted
     * [ ] add associated herd leader AI DSEs
 * [ ] dev way to kill an entity to test dead herd leader
 * new sheep dses
