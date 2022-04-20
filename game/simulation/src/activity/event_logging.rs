@@ -38,6 +38,10 @@ pub enum LoggedEntityEvent {
     AiDecision(LoggedEntityDecision),
     /// Died
     Died(DeathReason),
+
+    /// Only used in dev builds
+    #[cfg(debug_assertions)]
+    Dev(Cow<'static, str>),
 }
 
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
@@ -124,6 +128,8 @@ impl Display for LoggedEntityEvent {
             Eaten(e) => write!(f, "ate {}", e),
             PickedUp(e) => write!(f, "picked up {}", e),
             Died(reason) => write!(f, "died because {}", reason),
+            #[cfg(debug_assertions)]
+            Dev(reason) => write!(f, "(DEV) {}", reason),
 
             AiDecision(decision) => {
                 write!(f, "decided to ")?;
@@ -140,6 +146,17 @@ impl Display for LoggedEntityEvent {
                     GoBuild(details) => write!(f, "build {} at {}", details.target, details.pos),
                 }
             }
+        }
+    }
+}
+
+impl LoggedEntityEvent {
+    pub fn dev(reason: impl Into<Cow<'static, str>>) -> Result<Self, ()> {
+        match () {
+            #[cfg(debug_assertions)]
+            _ => Ok(Self::Dev(reason.into())),
+            #[cfg(not(debug_assertions))]
+            _ => Err(()),
         }
     }
 }
