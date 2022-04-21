@@ -35,6 +35,10 @@ impl<'a> System<'a> for HerdJoiningSystem {
         &mut self,
         (entities, world, mut herds, transform, herdable, mut herded, species): Self::SystemData,
     ) {
+        // validation
+        #[cfg(debug_assertions)]
+        validate_leaders(&herds, &herded);
+
         // run occasionally
         if Tick::fetch().value() % RUN_FREQUENCY != 0 {
             return;
@@ -166,6 +170,23 @@ impl<'a> System<'a> for HerdJoiningSystem {
 
         // register alive herds
         herds.register_assigned_herds(&*world, discovered_herds.finish());
+    }
+}
+
+#[cfg(debug_assertions)]
+fn validate_leaders(herds: &Herds, herded: &WriteStorage<HerdedComponent>) {
+    let expected = herds
+        .iter()
+        .map(|(h, info)| (h, info.leader_entity()))
+        .collect::<HashMap<_, _>>();
+
+    for (handle, leader_entity) in expected.iter() {
+        let _leader_herd = leader_entity.get(&herded).unwrap_or_else(|| {
+            panic!(
+                "leader {:?} is not in expected herd {:?}",
+                leader_entity, handle
+            )
+        });
     }
 }
 

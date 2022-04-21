@@ -88,6 +88,10 @@ impl Herds {
     pub fn get_info(&self, herd: HerdHandle) -> Option<&HerdInfo> {
         self.herds.get(&herd)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (HerdHandle, &HerdInfo)> + '_ {
+        self.herds.iter().map(|(h, info)| (*h, info))
+    }
 }
 
 impl Default for Herds {
