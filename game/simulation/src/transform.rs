@@ -1,16 +1,16 @@
-use common::*;
 use std::rc::Rc;
 
+use serde::Deserialize;
+
+use common::cgmath::Rotation;
+use common::*;
+use unit::space::length::{Length, Length3};
+use unit::space::volume::Volume;
 use unit::world::{WorldPoint, WorldPosition};
 
 use crate::ecs::*;
 use crate::physics::{Bounds, PhysicsComponent};
-
 use crate::string::StringCache;
-use common::cgmath::Rotation;
-use serde::Deserialize;
-use unit::space::length::{Length, Length3};
-use unit::space::volume::Volume;
 
 /// Position and rotation component
 #[derive(Debug, Clone, Component, EcsComponent)]
@@ -158,6 +158,7 @@ struct Size {
 pub struct PhysicalComponentTemplate {
     size: Length3,
     volume: Volume,
+    has_physics: bool,
 }
 
 impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
@@ -170,9 +171,15 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
     {
         let volume = values.get_int("volume")?;
         let size: Size = values.get("size")?.into_type()?;
+        let has_physics = match values.get("has_physics") {
+            Err(ComponentBuildError::KeyNotFound(_)) => true, // default
+            Err(err) => return Err(err),
+            Ok(v) => v.into_bool()?,
+        };
         Ok(Rc::new(Self {
             volume: Volume::new(volume),
             size: Length3::new(size.x, size.y, size.z),
+            has_physics,
         }))
     }
 
@@ -180,10 +187,15 @@ impl<V: Value> ComponentTemplate<V> for PhysicalComponentTemplate {
         // position will be customized afterwards
         let pos = WorldPoint::default();
 
-        builder
+        let mut b = builder
             .with(TransformComponent::new(pos))
-            .with(PhysicsComponent::default())
-            .with(PhysicalComponent::new(self.volume, self.size))
+            .with(PhysicalComponent::new(self.volume, self.size));
+
+        if self.has_physics {
+            b = b.with(PhysicsComponent::default());
+        }
+
+        b
     }
 
     crate::as_any!();
