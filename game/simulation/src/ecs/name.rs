@@ -46,6 +46,12 @@ pub struct DisplayComponent {
     content: DisplayContent,
 }
 
+/// Don't show a display name when hovering near an entity
+#[derive(Component, EcsComponent, Default, Clone)]
+#[storage(NullStorage)]
+#[name("no-hover-display")]
+pub struct NoDisplayTextOnHoverComponent;
+
 #[derive(Clone)]
 enum DisplayContent {
     Prepared(Option<PreparedDisplay>),
@@ -103,6 +109,7 @@ impl<'a> System<'a> for DisplayTextSystem {
         ReadStorage<'a, UiElementComponent>,
         WriteStorage<'a, DisplayComponent>,
         ReadStorage<'a, ReservedMaterialComponent>,
+        ReadStorage<'a, NoDisplayTextOnHoverComponent>,
     );
 
     fn run(
@@ -121,11 +128,12 @@ impl<'a> System<'a> for DisplayTextSystem {
             ui,
             mut display,
             reserved,
+            no_hover,
         ): Self::SystemData,
     ) {
         // TODO dont bother applying to entities far away from camera/definitely not visible. via custom Joinable type?
 
-        for (e, _, society) in (&entities, &name, (&society).maybe()).join() {
+        for (e, _, society, _) in (&entities, &name, (&society).maybe(), !(&no_hover)).join() {
             // always display name for named society members
             if *player_soc == society.map(|soc| soc.handle()) {
                 self.preparation.insert(e, PreparedDisplay::Name);
@@ -139,16 +147,17 @@ impl<'a> System<'a> for DisplayTextSystem {
             .take(8)
             .collect::<ArrayVec<_, 8>>();
 
-        for (e, ui, stack, selected, _) in (
+        for (e, ui, stack, selected, _, no_hover) in (
             &entities,
             (&ui).maybe(),
             (&stack).maybe(),
             (&selected).maybe(),
             !(&reserved),
+            (&no_hover).maybe(),
         )
             .join()
         {
-            let more_info = selected.is_some() || nearby.contains(&e);
+            let more_info = selected.is_some() || (nearby.contains(&e) && no_hover.is_none());
 
             let prep = if let Some(stack) = stack {
                 match stack.stack.total_count() {

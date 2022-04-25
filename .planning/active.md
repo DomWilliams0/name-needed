@@ -30,6 +30,7 @@
 * simple fauna for sheep to eat
     * [o] generation of plants in procgen
         * [ ] species definition based on abstract plant
+            * ensure no display text on hover component is added
         * [ ] random position and rotation
     * [ ] growth/death of existing plants
     * [ ] growth of new plants from seeds/corpses/poo

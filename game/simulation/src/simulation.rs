@@ -472,6 +472,9 @@ impl<R: Renderer> Simulation<R> {
             // add species overrides manually (gross and temporary)
             let _ = self.ecs_world.add_now(e, physical);
             let _ = self.ecs_world.add_now(e, render);
+            let _ = self
+                .ecs_world
+                .add_now(e, NoDisplayTextOnHoverComponent::default());
         }
     }
 
