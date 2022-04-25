@@ -15,7 +15,9 @@ use rand_distr::Bernoulli;
 use tokio::sync::Mutex;
 
 use common::*;
-use unit::world::{BlockCoord, BlockPosition, GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{
+    BlockCoord, BlockPosition, GlobalSliceIndex, SlabLocation, WorldPosition, SLAB_SIZE,
+};
 
 use crate::region::region::{ChunkDescription, ChunkHeightMap};
 use crate::region::subfeature::{SharedSubfeature, Subfeature};
@@ -691,11 +693,21 @@ pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>
     let mut rando = SmallRng::from_entropy(); // non deterministic
 
     let skip_distr = Bernoulli::new(0.1).unwrap();
+    let slab_z_range = {
+        let min = ctx.slab.slab.as_slice().slice();
+        min..min + SLAB_SIZE.as_i32()
+    };
 
-    // occasional fauna
+    // generate occasional fauna at ground level
     for (i, block) in ctx.chunk_desc.blocks().iter().enumerate() {
-        let biome = block.biome();
+        // only consider blocks at ground height
+        let ground = block.ground();
+        if !slab_z_range.contains(&ground.slice()) {
+            // this slab doesn't contain the ground level
+            continue;
+        }
 
+        let biome = block.biome();
         if !biome.has_fauna() || !skip_distr.sample(&mut rando) {
             continue;
         }

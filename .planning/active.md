@@ -38,7 +38,7 @@
     * [ ] subfeatures can overlap because theyre generated in parallel, e.g. plants and tree trunks.
         prune collisions across all (sub)features during rasterization?
     * [ ] pass in a source of random to subfeature rasterization
-    * [ ] bug: higher concentration of plants in initial chunks only
+    * [X] bug: higher concentration of plants in initial chunks only
 
 ## Herd leader
 * [X] identify leader of herd for others to follow
