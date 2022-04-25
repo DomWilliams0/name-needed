@@ -226,7 +226,9 @@ impl SharedSubfeature {
         }
 
         self.lock().await.register_applied_slab(slab);
-        debug!("placed {count} blocks within slab", count = count; &self);
+        if count > 0 {
+            debug!("placed {count} blocks within slab", count = count; &self);
+        }
 
         if let Some(continuations) = continuations {
             // queue up blocks for other slabs

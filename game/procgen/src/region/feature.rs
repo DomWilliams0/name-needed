@@ -11,7 +11,7 @@ use geo::coords_iter::CoordsIter;
 use geo::prelude::*;
 use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
 use geo_booleanop::boolean::{BooleanOp, Operation};
-use rand_distr::{Bernoulli, Uniform};
+use rand_distr::Bernoulli;
 use tokio::sync::Mutex;
 
 use common::*;
@@ -689,7 +689,6 @@ impl BooleanOp<f64, Polygon<f64>> for RegionalFeatureBoundary {
 
 pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>) {
     let mut rando = SmallRng::from_entropy(); // non deterministic
-    let z = ctx.slab.slab.as_slice();
 
     let skip_distr = Bernoulli::new(0.1).unwrap();
 
@@ -710,9 +709,9 @@ pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>
             species: fauna_species,
         };
         let root = {
-            let [cx, cy, cz]: [i32; 3] = ChunkHeightMap::unflatten(i).unwrap(); // certainly valid
+            let [cx, cy, _]: [i32; 3] = ChunkHeightMap::unflatten(i).unwrap(); // certainly valid
             debug_assert!(BlockCoord::try_from(cx).is_ok()); // ensure dims are fine before casts
-            BlockPosition::new_unchecked(cx as BlockCoord, cy as BlockCoord, z)
+            BlockPosition::new_unchecked(cx as BlockCoord, cy as BlockCoord, block.ground())
                 .to_world_position(ctx.slab.chunk)
         };
         if let Err(err) = ctx

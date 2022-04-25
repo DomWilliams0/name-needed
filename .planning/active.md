@@ -35,6 +35,10 @@
     * [ ] growth of new plants from seeds/corpses/poo
     * [ ] approximate scattering of non quantitive growth like grass
     * [ ] sheep have hunger and find nearby plants to eat
+    * [ ] subfeatures can overlap because theyre generated in parallel, e.g. plants and tree trunks.
+        prune collisions across all (sub)features during rasterization?
+    * [ ] pass in a source of random to subfeature rasterization
+    * [ ] bug: higher concentration of plants in initial chunks only
 
 ## Herd leader
 * [X] identify leader of herd for others to follow
@@ -46,3 +50,5 @@
     * [ ] herd leader specific: lead herd to a new location
     * [X] stay near herd: if too far from leader, run towards it until in range
 * [ ] herd_centre() should return a transformcomponent ref instead of position, because its repeated too often
+
+

@@ -2,10 +2,13 @@ use std::collections::HashSet;
 use std::ops::{Add, Deref};
 use std::pin::Pin;
 
+use color::Color;
 use strum::EnumDiscriminants;
 
 use common::*;
 use resources::Resources;
+use unit::space::length::Length3;
+use unit::space::volume::Volume;
 use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
@@ -44,7 +47,7 @@ use crate::string::StringCache;
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
     definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent,
-    ThreadedWorldLoader, WorldRef, WorldViewer,
+    PhysicalComponent, RenderComponent, Shape2d, ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 
@@ -413,6 +416,39 @@ impl<R: Renderer> Simulation<R> {
 
     fn spawn_entities_from_descriptions(&mut self, entities: &[EntityDescription]) {
         for entity in entities {
+            // features are generated in parallel and might overlap, so skip entities that collide
+            // with blocks
+            // TODO depends on bounds of the physical entity size
+            // TODO cant hold voxel lock for long, but taking and releasing like this is insane
+            {
+                let voxel_world = self.voxel_world.borrow();
+                match voxel_world.block(entity.position.floor()) {
+                    Some(b) if b.block_type().is_air() => { /* safe to place */ }
+                    _ => {
+                        warn!("skipping plant due to block collision"; "pos" => %entity.position);
+                        continue;
+                    }
+                }
+            }
+
+            // TODO define species variations in definition files
+            let (physical, render) = match entity.desc.species.as_ref() {
+                "shrub" => (
+                    PhysicalComponent::new(Volume::new(40), Length3::new(3, 3, 4)),
+                    RenderComponent {
+                        shape: Shape2d::Circle,
+                        color: Color::rgb(92, 201, 28),
+                    },
+                ),
+                "long_grass" | _ => (
+                    PhysicalComponent::new(Volume::new(30), Length3::new(2, 2, 5)),
+                    RenderComponent {
+                        shape: Shape2d::Circle,
+                        color: Color::rgb(88, 227, 57),
+                    },
+                ),
+            };
+
             let res = self
                 .ecs_world
                 .build_entity("core_living_plant")
@@ -422,14 +458,20 @@ impl<R: Renderer> Simulation<R> {
                 .doesnt_need_to_be_accessible()
                 .spawn();
 
-            match res {
-                Err(err) => warn!("failed to spawn plant: {}", err),
+            let e = match res {
+                Err(err) => {
+                    warn!("failed to spawn plant: {}", err);
+                    continue;
+                }
                 Ok(e) => {
                     debug!("spawned plant"; e, "pos" => %entity.position);
+                    e
                 }
-            }
+            };
 
-            // TODO use plant species
+            // add species overrides manually (gross and temporary)
+            let _ = self.ecs_world.add_now(e, physical);
+            let _ = self.ecs_world.add_now(e, render);
         }
     }
 

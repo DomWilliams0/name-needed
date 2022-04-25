@@ -1,4 +1,4 @@
-# TODOs (417)
+# TODOs (419)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -99,7 +99,7 @@
    * `// TODO neighbour slab should wrap around the planet`
    * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
  * [game/procgen/src/region/subfeatures/fauna.rs](game/procgen/src/region/subfeatures/fauna.rs) (1)
-   * `// TODO randomise fauna position within block`
+   * `// TODO pass in a random source`
  * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (3)
    * `// TODO actual tree shape`
    * `// TODO entity for trees`
@@ -346,13 +346,15 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (6)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (8)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `// TODO depends on bounds of the physical entity size`
+   * `// TODO cant hold voxel lock for long, but taking and releasing like this is insane`
+   * `// TODO define species variations in definition files`
    * `// TODO procgen specifies plant rotation too`
-   * `// TODO use plant species`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
