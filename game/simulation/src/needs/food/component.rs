@@ -14,6 +14,7 @@ pub type Fuel = u16;
 #[derive(Component, EcsComponent, Clone, Debug)]
 #[storage(VecStorage)]
 #[name("hunger")]
+#[interactive]
 #[clone(disallow)]
 pub struct HungerComponent {
     pub(in crate::needs::food) current_fuel: AccumulativeInt<Fuel>,
@@ -77,3 +78,29 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
 }
 
 register_component_template!("hunger", HungerComponent);
+
+impl InteractiveComponent for HungerComponent {
+    fn as_debug(&self) -> Option<&dyn Debug> {
+        #[repr(transparent)]
+        struct Interactive(HungerComponent);
+
+        impl Debug for Interactive {
+            fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+                write!(f, "Interests: ")?;
+                let mut first = true;
+                for (interest, pref) in self.0.food_interest.interests() {
+                    if !first {
+                        write!(f, ", ")?
+                    } else {
+                        first = false;
+                    }
+                    write!(f, "{:?}={:.2}", interest, pref)?;
+                }
+
+                write!(f, "\nHunger: {:.2}", self.0.hunger().value())
+            }
+        }
+
+        Some(unsafe { &*(self as *const HungerComponent as *const Interactive) })
+    }
+}

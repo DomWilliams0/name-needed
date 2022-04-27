@@ -9,7 +9,7 @@ use common::{Itertools, SmallVec};
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, EnumString)]
 #[strum(serialize_all = "kebab-case")]
-enum FoodFlavour {
+pub enum FoodFlavour {
     RawMeat,
     CookedMeat,
     RawPlant,
@@ -36,6 +36,10 @@ impl FoodInterest {
 
     fn eats_flavour(&self, flavour: FoodFlavour) -> bool {
         self.0.iter().any(|(f, _)| *f == flavour)
+    }
+
+    pub fn interests(&self) -> impl Iterator<Item = (FoodFlavour, f32)> + '_ {
+        self.0.iter().copied()
     }
 }
 
