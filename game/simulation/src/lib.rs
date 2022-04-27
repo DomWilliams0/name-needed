@@ -60,7 +60,7 @@ pub use item::{
     EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
     ItemStackError, StackableComponent,
 };
-pub use needs::HungerComponent;
+pub use needs::food::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;

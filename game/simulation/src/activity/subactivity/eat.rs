@@ -2,7 +2,7 @@ use crate::activity::context::ActivityContext;
 
 use crate::event::prelude::*;
 use crate::item::ContainedInComponent;
-use crate::needs::{BeingEatenComponent, FoodEatingError};
+use crate::needs::food::{BeingEatenComponent, FoodEatingError};
 use crate::queued_update::QueuedUpdates;
 
 use crate::{ComponentWorld, Entity};

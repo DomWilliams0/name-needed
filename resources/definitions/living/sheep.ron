@@ -18,7 +18,7 @@
       {"species": (name: "sheep")},
       {"herdable": ()},
       {"intelligence": (species: "sheep")},
-      {"hunger": (max: 2000)},
+      {"hunger": (max: 2000, interests: "raw-plant=50,cooked-plant=40,fruit=30")},
       {"senses": (
         vision: (length: 11.0, angle: 60 /*degrees*/),
       )}

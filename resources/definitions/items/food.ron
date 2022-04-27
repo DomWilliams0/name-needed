@@ -13,6 +13,7 @@
       {"edible": (
         total_nutrition: 80,
         extra_hands: 0,
+        flavours: "fruit"
       )},
       {"render": (
         color: "b0e359",

@@ -4,6 +4,7 @@ use common::newtype::AccumulativeInt;
 use common::*;
 
 use crate::ecs::*;
+use crate::needs::food::FoodInterest;
 use crate::StringCache;
 
 // TODO newtype for Fuel
@@ -17,6 +18,7 @@ pub type Fuel = u16;
 pub struct HungerComponent {
     pub(in crate::needs::food) current_fuel: AccumulativeInt<Fuel>,
     max_fuel: Fuel,
+    pub food_interest: FoodInterest,
 }
 
 /// A food item is being eaten by the given eater
@@ -29,10 +31,11 @@ pub struct BeingEatenComponent {
 }
 
 impl HungerComponent {
-    pub fn new(max: Fuel) -> Self {
+    pub fn new(max: Fuel, food_interest: FoodInterest) -> Self {
         Self {
             current_fuel: AccumulativeInt::new(max),
             max_fuel: max,
+            food_interest,
         }
     }
 
@@ -60,7 +63,10 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
         Self: Sized,
     {
         let max = values.get_int("max")?;
-        Ok(Rc::new(Self::new(max)))
+        let interest = values.get_string("interests")?.parse().map_err(|e| {
+            ComponentBuildError::TemplateSpecific(format!("failed to parse interests: {e}"))
+        })?;
+        Ok(Rc::new(Self::new(max, interest)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {

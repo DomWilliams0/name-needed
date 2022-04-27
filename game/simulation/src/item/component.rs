@@ -1,9 +1,10 @@
-use common::derive_more::*;
 use std::rc::Rc;
+
+use common::derive_more::*;
 
 use crate::ecs::*;
 use crate::item::condition::ItemCondition;
-use crate::needs::Fuel;
+use crate::needs::food::{FoodFlavours, Fuel};
 use crate::string::StringCache;
 
 /// Condition/durability of an entity, e.g. a tool or food
@@ -23,6 +24,7 @@ pub struct EdibleItemComponent {
     pub extra_hands: u16,
     // TODO food debris - the last X fuel/proportion is inedible and has to be disposed of
     // TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place
+    pub flavours: FoodFlavours,
 }
 
 // TODO add aerodynamic-ness field
@@ -61,6 +63,9 @@ impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
         Ok(Rc::new(Self {
             total_nutrition: values.get_int("total_nutrition")?,
             extra_hands: values.get_int("extra_hands")?,
+            flavours: values.get_string("flavours")?.parse().map_err(|e| {
+                ComponentBuildError::TemplateSpecific(format!("failed to parse flavours: {e}"))
+            })?,
         }))
     }
 

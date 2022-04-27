@@ -17,7 +17,7 @@ use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::job::JobIndex;
-use crate::needs::HungerComponent;
+use crate::needs::food::HungerComponent;
 use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};

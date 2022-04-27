@@ -28,7 +28,7 @@ use crate::input::{
 use crate::interact::herd::{HerdDebugRenderer, HerdJoiningSystem, Herds};
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
-use crate::needs::{EatingSystem, HungerSystem};
+use crate::needs::food::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;

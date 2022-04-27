@@ -9,7 +9,7 @@ use world::NavigationError;
 use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
 use crate::interact::herd::HerdHandle;
-use crate::needs::FoodEatingError;
+use crate::needs::food::FoodEatingError;
 use crate::path::PathToken;
 
 #[derive(EnumDiscriminants, Clone, Debug)]
