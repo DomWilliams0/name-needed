@@ -293,11 +293,12 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food.rs](game/simulation/src/needs/food.rs) (10)
+ * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (2)
    * `// TODO newtype for Fuel`
+   * `// TODO generic needs component with hunger/thirst/toilet/social etc`
+ * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (8)
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
-   * `// TODO generic needs component with hunger/thirst/toilet/social etc`
    * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
    * `// TODO individual metabolism rate`
    * `// TODO elaborate and specify metabolism rate`
