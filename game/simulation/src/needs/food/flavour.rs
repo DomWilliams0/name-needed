@@ -20,9 +20,12 @@ pub enum FoodFlavour {
 
 /// Set of flavours that interests an entity
 // TODO specify explicit dislikes too?
-// TODO make this more compact - small integer type, or store a SoA in order of bitflag decl?
 #[derive(Debug, Clone)]
-pub struct FoodInterest(SmallVec<[(FoodFlavour, f32); 2]>);
+pub struct FoodInterest {
+    flavours: BitFlags<FoodFlavour>,
+    /// Associated with set bits in `self.flavours` in order of iteration
+    preferences: SmallVec<[f32; 2]>,
+}
 
 /// Set of flavours presented by an item of food
 #[derive(Debug, Clone)]
@@ -30,16 +33,16 @@ pub struct FoodFlavours(BitFlags<FoodFlavour>);
 
 impl FoodInterest {
     pub fn eats(&self, food: &FoodFlavours) -> bool {
-        // TODO use bitset AND
-        food.0.iter().all(|f| self.eats_flavour(f))
-    }
-
-    fn eats_flavour(&self, flavour: FoodFlavour) -> bool {
-        self.0.iter().any(|(f, _)| *f == flavour)
+        (food.0 & self.flavours) == food.0
     }
 
     pub fn interests(&self) -> impl Iterator<Item = (FoodFlavour, f32)> + '_ {
-        self.0.iter().copied()
+        self.flavours.iter().zip(self.preferences.iter().copied())
+    }
+
+    fn interest_for(&self, flavour: FoodFlavour) -> Option<f32> {
+        self.flavours.iter().position(|f| f == flavour)
+            .map(|i| self.preferences[i])
     }
 }
 
@@ -47,19 +50,21 @@ impl FromStr for FoodInterest {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut interests = vec![];
+        let mut flavours = BitFlags::empty();
+        let mut preferences = vec![];
 
         let mut total = 0u32;
         for entry in s.split(',') {
             let (interest, preference) = entry.split_once('=').ok_or("missing =")?;
-            let interest: FoodFlavour = interest.parse().map_err(|_| "unknown flavour")?;
+            let flavour: FoodFlavour = interest.parse().map_err(|_| "unknown flavour")?;
 
             let preference: u32 = preference.parse().map_err(|_| "bad preference")?;
+            preferences.push(preference);
             total += preference;
-            interests.push((interest, preference));
+            flavours.insert(flavour);
         }
 
-        if interests.is_empty() {
+        if flavours.is_empty() {
             return Err("empty flavours");
         };
         if total == 0 {
@@ -67,12 +72,13 @@ impl FromStr for FoodInterest {
         };
 
         let total = total as f32;
-        Ok(FoodInterest(
-            interests
+        Ok(FoodInterest {
+            flavours,
+            preferences: preferences
                 .into_iter()
-                .map(|(int, pref)| (int, pref as f32 / total))
-                .collect(),
-        ))
+                .map(|pref| pref as f32 / total)
+                .collect()
+        })
     }
 }
 
@@ -112,5 +118,21 @@ mod tests {
 
         assert!(!wolf.eats(&cooked_veg));
         assert!(human.eats(&cooked_veg));
+    }
+
+    #[test]
+    fn preferences() {
+        let wolf: FoodInterest = "raw-meat=10,cooked-meat=8,fruit=1"
+            .parse()
+            .expect("bad wolf input");
+        let calculate = |n| (n as f32) / (10 + 8 + 1) as f32;
+
+        assert_eq!(
+            wolf.interest_for(FoodFlavour::CookedMeat),
+            Some(calculate(8))
+        );
+        assert_eq!(wolf.interest_for(FoodFlavour::RawMeat), Some(calculate(10)));
+        assert_eq!(wolf.interest_for(FoodFlavour::Fruit), Some(calculate(1)));
+        assert!(wolf.interest_for(FoodFlavour::RawPlant).is_none());
     }
 }

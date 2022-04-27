@@ -1,4 +1,4 @@
-# TODOs (422)
+# TODOs (420)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -296,10 +296,8 @@
  * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (2)
    * `// TODO newtype for Fuel`
    * `// TODO generic needs component with hunger/thirst/toilet/social etc`
- * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (3)
+ * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (1)
    * `// TODO specify explicit dislikes too?`
-   * `// TODO make this more compact - small integer type, or store a SoA in order of bitflag decl?`
-   * `// TODO use bitset AND`
  * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (8)
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
