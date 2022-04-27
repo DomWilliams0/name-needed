@@ -41,7 +41,9 @@ impl FoodInterest {
     }
 
     fn interest_for(&self, flavour: FoodFlavour) -> Option<f32> {
-        self.flavours.iter().position(|f| f == flavour)
+        self.flavours
+            .iter()
+            .position(|f| f == flavour)
             .map(|i| self.preferences[i])
     }
 }
@@ -77,7 +79,7 @@ impl FromStr for FoodInterest {
             preferences: preferences
                 .into_iter()
                 .map(|pref| pref as f32 / total)
-                .collect()
+                .collect(),
         })
     }
 }

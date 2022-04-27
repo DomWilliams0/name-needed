@@ -42,8 +42,7 @@ impl<'a> System<'a> for HungerSystem {
             let metabolism = 1.0;
             let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
 
-            debug_assert!(fuel_used.is_sign_positive());
-            hunger.current_fuel -= fuel_used;
+            hunger.consume_fuel(fuel_used);
         }
     }
 }
@@ -77,32 +76,34 @@ impl<'a> System<'a> for EatingSystem {
             (&entities, &eating, &edible_item, &mut condition).join()
         {
             let item = item.into();
-            log_scope!(o!("system" => "being-eating", item));
+            log_scope!(o!("system" => "being-eaten", item));
 
             let mut do_eat = || {
                 // get eater
                 let (eater_inv, eater_hunger) = match ecs_world
-                    .components(being_eaten.eater, (&mut inv, &mut hunger))
+                    .components(being_eaten.eater, ((&mut inv).maybe(), &mut hunger))
                 {
                     Some(comps) => comps,
                     None => {
-                        warn!("food eater doesn't have inventory or hunger component"; "eater" => being_eaten.eater);
+                        warn!("food eater doesn't have hunger component"; "eater" => being_eaten.eater);
                         return Some(Err(FoodEatingError::NotEquipped));
                     }
                 };
 
                 // calculate how much to consume this tick
-                let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate
-                let proportion_to_eat = NormalizedFloat::clamped(
-                    fuel_to_consume as f32 / edible.total_nutrition as f32,
+                // TODO individual rate
+                // TODO depends on food type/consistency
+                let fuel_to_consume = BASE_EAT_RATE;
+                let proportion_to_eat = NormalizedFloat::new(
+                    (fuel_to_consume as f32 / edible.total_nutrition as f32).min(0.2),
                 );
 
                 // do the eat
-                eater_hunger.current_fuel.add(fuel_to_consume);
+                eater_hunger.add_fuel(fuel_to_consume);
                 condition.0 -= proportion_to_eat;
 
                 trace!("{eater} is eating", eater = being_eaten.eater;
-                    "new_hunger" => ?eater_hunger.current_fuel,
+                    "new_hunger" => ?eater_hunger.satiety(),
                     "new_food_condition" => ?condition.0,
                 );
 
@@ -111,9 +112,13 @@ impl<'a> System<'a> for EatingSystem {
                 if condition.0.value().value() <= 0.0 {
                     debug!("food has been consumed");
 
-                    // remove from eater's inventory
-                    let remove_count = eater_inv.remove_item(item);
-                    debug_assert!(remove_count > 0); // should have been in an equip slot
+                    // remove from eater's inventory if applicable
+                    if being_eaten.is_equipped {
+                        if let Some(eater_inv) = eater_inv {
+                            let remove_count = eater_inv.remove_item(item);
+                            debug_assert!(remove_count > 0); // should have been in an equip slot
+                        }
+                    }
 
                     // queue food entity for deletion
                     let delete_result = entities.delete(item.into());

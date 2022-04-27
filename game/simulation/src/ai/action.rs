@@ -29,6 +29,9 @@ pub enum AiAction {
     /// Go and pickup the given item
     GoEquip(Entity),
 
+    /// Go and eat the given entity without picking it up
+    GoEat(Entity),
+
     /// Equip and eat the given entity, assuming it's already in the inventory
     EatHeldItem(Entity),
 
@@ -102,6 +105,7 @@ impl TryInto<LoggedEntityEvent> for &AiAction {
             A::Goto(target) => B::Goto(*target),
             A::ReturnToHerd => B::ReturnToHerd,
             A::GoEquip(item) => B::GoEquip(*item),
+            A::GoEat(item) => B::GoEat(*item),
             A::EatHeldItem(item) => B::EatHeldItem(*item),
             A::GoBreakBlock(pos) => B::GoBreakBlock(*pos),
             A::Follow { target, .. } => B::Follow(*target),

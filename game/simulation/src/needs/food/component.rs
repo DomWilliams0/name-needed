@@ -17,7 +17,7 @@ pub type Fuel = u16;
 #[interactive]
 #[clone(disallow)]
 pub struct HungerComponent {
-    pub(in crate::needs::food) current_fuel: AccumulativeInt<Fuel>,
+    current_fuel: AccumulativeInt<Fuel>,
     max_fuel: Fuel,
     pub food_interest: FoodInterest,
 }
@@ -29,6 +29,8 @@ pub struct HungerComponent {
 #[clone(disallow)]
 pub struct BeingEatenComponent {
     pub eater: Entity,
+    /// True for eating a held item, false for grazing
+    pub is_equipped: bool,
 }
 
 impl HungerComponent {
@@ -52,6 +54,19 @@ impl HungerComponent {
     pub fn set_satiety(&mut self, proportion: NormalizedFloat) {
         let fuel = self.max_fuel as f64 * proportion.value() as f64;
         self.current_fuel = AccumulativeInt::new(fuel as Fuel)
+    }
+
+    pub(in crate::needs::food) fn add_fuel(&mut self, nutrition: Fuel) {
+        self.current_fuel.add(nutrition);
+        if self.current_fuel.value() > self.max_fuel {
+            self.current_fuel = AccumulativeInt::new(self.max_fuel);
+        }
+    }
+
+    pub(in crate::needs::food) fn consume_fuel(&mut self, nutrition: f32) {
+        debug_assert!(nutrition.is_sign_positive());
+        self.current_fuel -= nutrition;
+        // TODO can this underflow?
     }
 }
 

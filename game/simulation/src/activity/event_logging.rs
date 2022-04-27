@@ -49,6 +49,7 @@ pub enum LoggedEntityEvent {
 pub enum LoggedEntityDecision {
     GoPickup(Cow<'static, str>),
     GoEquip(Entity),
+    GoEat(Entity),
     EatHeldItem(Entity),
     Wander,
     Goto(WorldPoint),
@@ -136,6 +137,7 @@ impl Display for LoggedEntityEvent {
                 match decision {
                     GoPickup(what) => write!(f, "pickup nearby {}", what),
                     GoEquip(e) => write!(f, "go pickup {}", *e),
+                    GoEat(e) => write!(f, "go eat {}", *e),
                     EatHeldItem(e) => write!(f, "eat held {}", e),
                     Wander => write!(f, "wander around"),
                     Goto(target) => write!(f, "go to {}", target),

@@ -43,9 +43,12 @@
 
 ## Edible plants
 * [X] food interests and flavours
-* [ ] plants are edible
+* [X] plants are edible
 * [ ] use flavours and interests when choosing food to eat
-* [ ] eating of plants without needing to pick them up
+* [X] eating of plants without needing to pick them up
+    * [X] humans shouldn't consider eating these
+* [ ] instead of consuming a plant entirely in one sitting, grazing animals should nibble and
+    wander more
 
 ## Herd leader
 * [X] identify leader of herd for others to follow

@@ -38,6 +38,7 @@ mod action_to_activity {
                 GoBreakBlock(pos) => activity!(GoBreakBlockActivity::new(pos)),
                 GoBuild { job, details } => activity!(GoBuildActivity::new(job, details)),
                 GoEquip(e) => activity!(GoEquipActivity::new(e)),
+                GoEat(e) => activity!(GoEatActivity::new(e)),
                 EatHeldItem(item) => activity!(EatHeldItemActivity::new(item)),
                 Goto(target) => activity!(GoToActivity::new(
                     target,

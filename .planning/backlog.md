@@ -60,6 +60,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * reflection-like api on components to do actions per-component in ui
 * fix overlapping in-world display strings e.g. collision resolution
 * KindComponent should specify plural for stacked labels
+* in addition to currency activity, display the dse/decision that explains it
 
 ## Entity behaviour
 * ai incentive to choose the same action as last tick
@@ -105,7 +106,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* drop unconsumed materials
 * generic build material requirement engine - consumes generic requirements (not definition names), reports original reqs, tracks remaining reqs
 * more data oriented
-	* define builds and their required materials in data
 	* dont use definition names for materials, rather generic descriptions so it can be loose
 * allow multiple concurrent builders
 	* bug: if multiple people are sharing a gather task, they will keep collecting even after the last one is delivered - panics on extra unexpected delivery
@@ -119,7 +119,6 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * automatically downgrade a stack split into 1 to a single item
 * allow overflow into stacks bigger than 65k
 * implement actual item comparisons for collapsing identical items into a single stack (e.g. 16xarrow)
-
 
 
 ## World generation

@@ -25,7 +25,7 @@ pub enum AiInput {
     /// 1 if already hauling
     HasExtraHandsForHauling(u16, Option<Entity>),
 
-    /// 1.0=has enough hands free to hold/haul/equip target entity
+    /// 1.0=has enough hands free to hold/haul/equip target entity. 0.0 if not haulable
     HasFreeHandsToHoldTarget,
 
     /// Switch, 0=item is unusable e.g. being hauled, 1=usable immediately

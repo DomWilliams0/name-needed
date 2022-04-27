@@ -42,7 +42,7 @@ impl Activity for EatHeldItemActivity {
 
         // eaty eaty
         ctx.update_status(State::Eating);
-        ctx.eat(self.0).await?;
+        ctx.eat_held(self.0).await?;
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-# TODOs (420)
+# TODOs (426)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -117,6 +117,8 @@
    * `// TODO specify follow speed in activity too`
  * [game/simulation/src/activity/activity/go_build.rs](game/simulation/src/activity/activity/go_build.rs) (1)
    * `// TODO depends on build type`
+ * [game/simulation/src/activity/activity/go_eat.rs](game/simulation/src/activity/activity/go_eat.rs) (1)
+   * `// TODO destination depends on food size, not always adjacent block`
  * [game/simulation/src/activity/activity/go_haul.rs](game/simulation/src/activity/activity/go_haul.rs) (7)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
@@ -138,6 +140,8 @@
    * `// TODO stop hardcoding distance check for block actions`
    * `// TODO roll the dice for each step/hit/swing, e.g. injury`
    * `// TODO ensure we break out of this wait early if job is finished during`
+ * [game/simulation/src/activity/subactivity/eat.rs](game/simulation/src/activity/subactivity/eat.rs) (1)
+   * `// TODO any need to queue this to the next tick?`
  * [game/simulation/src/activity/subactivity/equip.rs](game/simulation/src/activity/subactivity/equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (2)
@@ -167,7 +171,9 @@
  * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (2)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
    * `// TODO cache searches as before in 2f1fc7a if necessary (profile!)`
- * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (2)
+ * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (4)
+   * `// TODO target food condition consideration`
+   * `// TODO "I can/want to move" consideration`
    * `// TODO target food condition consideration`
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
@@ -293,19 +299,21 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (2)
+ * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (3)
    * `// TODO newtype for Fuel`
    * `// TODO generic needs component with hunger/thirst/toilet/social etc`
+   * `// TODO can this underflow?`
  * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (1)
    * `// TODO specify explicit dislikes too?`
- * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (8)
+ * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (9)
    * `// fuel used per tick TODO depends on time rate`
    * `// TODO species metabolism`
    * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
    * `// TODO individual metabolism rate`
    * `// TODO elaborate and specify metabolism rate`
    * `// TODO take into account general movement speed in addition to this`
-   * `let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate`
+   * `// TODO individual rate`
+   * `// TODO depends on food type/consistency`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
    * `// TODO only render the top area in each slice`

@@ -13,6 +13,12 @@
         volume: 50,
         has_physics: false,
       )},
+      {"edible": (
+        total_nutrition: 100,
+        extra_hands: 0,
+        flavours: "raw-plant"
+      )},
+      {"breakable": ()},
     ],
   ),
 ]

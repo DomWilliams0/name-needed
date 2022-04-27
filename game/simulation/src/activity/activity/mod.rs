@@ -10,6 +10,8 @@ pub use nop::NopActivity;
 pub use return_to_herd::ReturnToHerdActivity;
 pub use wander::WanderActivity;
 
+mod go_eat;
+pub use go_eat::GoEatActivity;
 mod eat_held_item;
 mod follow;
 mod go_break_block;

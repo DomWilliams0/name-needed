@@ -177,9 +177,7 @@ impl<'a> AiBlackboard<'a> {
                 }
 
                 // check this item is accessible
-                let item_pos = entity
-                    .get(&transforms)
-                    .and_then(|t| t.accessible_position)?;
+                let item_pos = entity.get(&transforms).map(|t| t.accessible_position())?;
                 let item_area = voxel_world.area(item_pos).ok()?;
 
                 if item_area != self_area {

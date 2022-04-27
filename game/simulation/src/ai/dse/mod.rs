@@ -30,7 +30,7 @@ pub mod species {
         [
             dse!(WanderDse),
             dse!(EatHeldFoodDse),
-            dse!(FindLocalFoodDse),
+            dse!(FindLocalEquippableFoodDse),
         ]
         .into_iter()
     }
@@ -40,6 +40,11 @@ pub mod species {
     }
 
     pub fn sheep_dses() -> impl Iterator<Item = AiBox<dyn Dse<AiContext>>> {
-        [dse!(WanderDse), dse!(StayCloseToHerdDse)].into_iter()
+        [
+            dse!(WanderDse),
+            dse!(StayCloseToHerdDse),
+            dse![FindLocalGrazingFoodDse],
+        ]
+        .into_iter()
     }
 }
