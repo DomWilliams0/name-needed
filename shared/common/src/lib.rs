@@ -5,6 +5,7 @@ pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
 pub type BumpString<'a> = bumpalo::collections::String<'a>;
 pub type BumpBox<'a, T> = bumpalo::boxed::Box<'a, T>;
 
+pub use ::tap::*;
 pub use cgmath;
 pub use cgmath::{
     Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,

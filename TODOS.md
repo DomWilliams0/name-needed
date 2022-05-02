@@ -1,4 +1,4 @@
-# TODOs (426)
+# TODOs (425)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -171,9 +171,8 @@
  * [game/simulation/src/ai/context.rs](game/simulation/src/ai/context.rs) (2)
    * `/// TODO ideally this would use ai::Context<'a> to represent the AI tick lifetime: https://github.com/rust-lang/rust/issues/44265`
    * `// TODO cache searches as before in 2f1fc7a if necessary (profile!)`
- * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (4)
-   * `// TODO target food condition consideration`
-   * `// TODO "I can/want to move" consideration`
+ * [game/simulation/src/ai/dse/items/find_local_food.rs](game/simulation/src/ai/dse/items/find_local_food.rs) (3)
+   * `// TODO food interests`
    * `// TODO target food condition consideration`
    * `// TODO "I can/want to move" consideration`
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)

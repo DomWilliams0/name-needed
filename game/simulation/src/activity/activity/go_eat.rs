@@ -48,7 +48,7 @@ impl Activity for GoEatActivity {
         ctx.go_to(
             pos,
             NormalizedFloat::new(0.8),
-            SearchGoal::Nearby(2),
+            SearchGoal::Adjacent,
             GoingToStatus::target("food"),
         )
         .await?;

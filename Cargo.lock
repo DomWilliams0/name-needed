@@ -423,6 +423,7 @@ dependencies = [
  "rand 0.7.3",
  "rstar 0.9.2",
  "smallvec",
+ "tap",
  "thiserror",
  "tracy-client",
 ]
@@ -2959,6 +2960,12 @@ name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "term"
