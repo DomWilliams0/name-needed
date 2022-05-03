@@ -63,6 +63,7 @@ impl ConsiderationParameter {
 }
 
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize, Debug))]
 pub enum Curve {
     /// x
     Identity,
