@@ -4,7 +4,8 @@ use ai::{Considerations, DecisionWeight, Dse, TargetOutput, Targets};
 use common::*;
 
 use crate::ai::consideration::{
-    HasFreeHandsToHoldTargetConsideration, HungerConsideration, MyProximityToTargetConsideration,
+    HasFreeHandsToHoldTargetConsideration, HungerConsideration, LikesToEatTargetConsideration,
+    MyProximityToTargetConsideration,
 };
 use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use crate::item::ItemFilter;
@@ -23,7 +24,7 @@ const FOOD_MAX_RADIUS: u32 = 20;
 
 fn common_considerations(out: &mut Considerations<AiContext>) {
     out.add(HungerConsideration);
-    // TODO food interests
+    out.add(LikesToEatTargetConsideration);
     out.add(MyProximityToTargetConsideration);
     // TODO target food condition consideration
     // TODO "I can/want to move" consideration
@@ -43,9 +44,11 @@ fn find_targets(targets: &mut Targets<AiContext>, blackboard: &mut AiBlackboard)
                 .expect("found food expected to be edible");
 
             // only consider food as a target if it matches the interests at all
-            interests
-                .eats(&edible.flavours)
-                .tap(|_| targets.add(AiTarget::Entity(item.entity)))
+            interests.eats(&edible.flavours).tap(|edible| {
+                if *edible {
+                    targets.add(AiTarget::Entity(item.entity))
+                }
+            })
         });
     }
 

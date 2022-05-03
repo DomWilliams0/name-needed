@@ -35,7 +35,7 @@
     * [ ] growth/death of existing plants
     * [ ] growth of new plants from seeds/corpses/poo
     * [ ] approximate scattering of non quantitive growth like grass
-    * [.] sheep have hunger and find nearby plants to eat
+    * [X] sheep have hunger and find nearby plants to eat
     * [ ] subfeatures can overlap because theyre generated in parallel, e.g. plants and tree trunks.
         prune collisions across all (sub)features during rasterization?
     * [ ] pass in a source of random to subfeature rasterization
@@ -44,7 +44,7 @@
 ## Edible plants
 * [X] food interests and flavours
 * [X] plants are edible
-* [ ] use flavours and interests when choosing food to eat
+* [X] use flavours and interests when choosing food to eat
 * [X] eating of plants without needing to pick them up
     * [X] humans shouldn't consider eating these
 * [ ] instead of consuming a plant entirely in one sitting, grazing animals should nibble and

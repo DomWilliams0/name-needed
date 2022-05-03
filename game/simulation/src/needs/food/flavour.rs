@@ -1,13 +1,14 @@
+use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 
 use enumflags2::{bitflags, BitFlags};
 use strum::EnumString;
 
-use common::{Itertools, SmallVec};
+use common::{NormalizedFloat, SmallVec};
 
 #[bitflags]
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, EnumString)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, EnumString)]
 #[strum(serialize_all = "kebab-case")]
 pub enum FoodFlavour {
     RawMeat,
@@ -20,31 +21,49 @@ pub enum FoodFlavour {
 
 /// Set of flavours that interests an entity
 // TODO specify explicit dislikes too?
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FoodInterest {
     flavours: BitFlags<FoodFlavour>,
     /// Associated with set bits in `self.flavours` in order of iteration
-    preferences: SmallVec<[f32; 2]>,
+    preferences: SmallVec<[NormalizedFloat; 2]>,
 }
 
 /// Set of flavours presented by an item of food
-#[derive(Debug, Clone)]
-pub struct FoodFlavours(BitFlags<FoodFlavour>);
+// TODO food contains a set of flavours
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct FoodFlavours(FoodFlavour);
 
 impl FoodInterest {
     pub fn eats(&self, food: &FoodFlavours) -> bool {
-        (food.0 & self.flavours) == food.0
+        self.flavours.contains(food.0)
     }
 
-    pub fn interests(&self) -> impl Iterator<Item = (FoodFlavour, f32)> + '_ {
+    pub fn iter_interests(&self) -> impl Iterator<Item = (FoodFlavour, NormalizedFloat)> + '_ {
         self.flavours.iter().zip(self.preferences.iter().copied())
     }
 
-    fn interest_for(&self, flavour: FoodFlavour) -> Option<f32> {
+    pub fn interest_for(&self, flavours: &FoodFlavours) -> Option<NormalizedFloat> {
+        self.interest_for_flavour(flavours.0)
+    }
+
+    fn interest_for_flavour(&self, flavour: FoodFlavour) -> Option<NormalizedFloat> {
         self.flavours
             .iter()
             .position(|f| f == flavour)
             .map(|i| self.preferences[i])
+    }
+}
+
+impl Debug for FoodInterest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FoodInterest(")?;
+        let mut map = f.debug_map();
+
+        for (flav, pref) in self.iter_interests() {
+            map.entry(&flav, &pref.value());
+        }
+        map.finish()?;
+        write!(f, ")")
     }
 }
 
@@ -78,7 +97,7 @@ impl FromStr for FoodInterest {
             flavours,
             preferences: preferences
                 .into_iter()
-                .map(|pref| pref as f32 / total)
+                .map(|pref| NormalizedFloat::clamped(pref as f32 / total))
                 .collect(),
         })
     }
@@ -88,9 +107,8 @@ impl FromStr for FoodFlavours {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.split(',')
-            .map(|s| s.parse::<FoodFlavour>().map_err(|_| "unknown flavour"))
-            .try_collect::<_, _, _>()
+        s.parse::<FoodFlavour>()
+            .map_err(|_| "unknown flavour")
             .map(FoodFlavours)
     }
 }
@@ -127,14 +145,20 @@ mod tests {
         let wolf: FoodInterest = "raw-meat=10,cooked-meat=8,fruit=1"
             .parse()
             .expect("bad wolf input");
-        let calculate = |n| (n as f32) / (10 + 8 + 1) as f32;
+        let calculate = |n| NormalizedFloat::new((n as f32) / (10 + 8 + 1) as f32);
 
         assert_eq!(
-            wolf.interest_for(FoodFlavour::CookedMeat),
+            wolf.interest_for_flavour(FoodFlavour::CookedMeat),
             Some(calculate(8))
         );
-        assert_eq!(wolf.interest_for(FoodFlavour::RawMeat), Some(calculate(10)));
-        assert_eq!(wolf.interest_for(FoodFlavour::Fruit), Some(calculate(1)));
-        assert!(wolf.interest_for(FoodFlavour::RawPlant).is_none());
+        assert_eq!(
+            wolf.interest_for_flavour(FoodFlavour::RawMeat),
+            Some(calculate(10))
+        );
+        assert_eq!(
+            wolf.interest_for_flavour(FoodFlavour::Fruit),
+            Some(calculate(1))
+        );
+        assert!(wolf.interest_for_flavour(FoodFlavour::RawPlant).is_none());
     }
 }

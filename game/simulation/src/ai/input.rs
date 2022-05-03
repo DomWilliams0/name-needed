@@ -11,12 +11,15 @@ use crate::interact::herd::HerdInfo;
 use crate::item::{
     FoundSlot, HaulableItemComponent, HauledItemComponent, InventoryComponent, ItemFilter,
 };
-use crate::{ContainedInComponent, TransformComponent};
+use crate::{ContainedInComponent, EdibleItemComponent, HungerComponent, TransformComponent};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
     /// Hunger level, 0=starving 1=completely full
     Hunger,
+
+    /// Interest in target food flavours, 0=hates or doesn't eat, 1=absolutely loves
+    FoodInterestInTarget,
 
     /// Switch, 1=has at least 1 matching filter, 0=none
     HasInInventory(ItemFilter),
@@ -69,6 +72,7 @@ impl ai::Input<AiContext> for AiInput {
         use AiInput::*;
         match self {
             Hunger => hunger(blackboard),
+            FoodInterestInTarget => food_interest_in_target(blackboard, target).unwrap_or(0.0),
             HasInInventory(filter) => has_in_inventory(blackboard, filter).unwrap_or(0.0),
             HasExtraHandsForHauling(hands, item) => {
                 has_extra_hands_for_hauling(blackboard, *hands, *item, target).unwrap_or(0.0)
@@ -98,6 +102,28 @@ fn hunger(blackboard: &mut AiBlackboard) -> f32 {
         Some(hunger) => hunger.value(),
         None => 1.0, // not hungry if not applicable
     }
+}
+
+fn food_interest_in_target(
+    blackboard: &mut AiBlackboard,
+    target: Option<&AiTarget>,
+) -> Option<f32> {
+    let target = target.and_then(|t| t.entity())?;
+    let interest = blackboard
+        .world
+        .component::<HungerComponent>(blackboard.entity)
+        .ok()?;
+
+    let flavours = blackboard
+        .world
+        .component::<EdibleItemComponent>(target)
+        .ok()?;
+
+    // TODO differentiate CANNOT eat vs really hates to eat
+    interest
+        .food_interest
+        .interest_for(&flavours.flavours)
+        .map(|f| f.value())
 }
 
 fn has_in_inventory(blackboard: &mut AiBlackboard, filter: &ItemFilter) -> Option<f32> {
@@ -262,6 +288,7 @@ impl Display for AiInput {
         use AiInput::*;
         match self {
             Hunger => f.write_str("Hunger"),
+            FoodInterestInTarget => write!(f, "Interest in target food flavours"),
             HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
             CanFindGradedItemsLocally {
                 filter,

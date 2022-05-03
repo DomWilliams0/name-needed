@@ -103,13 +103,13 @@ impl InteractiveComponent for HungerComponent {
             fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
                 write!(f, "Interests: ")?;
                 let mut first = true;
-                for (interest, pref) in self.0.food_interest.interests() {
+                for (interest, pref) in self.0.food_interest.iter_interests() {
                     if !first {
                         write!(f, ", ")?
                     } else {
                         first = false;
                     }
-                    write!(f, "{:?}={:.2}", interest, pref)?;
+                    write!(f, "{:?}={:.2}", interest, pref.value())?;
                 }
 
                 write!(f, "\nHunger: {:.2}", self.0.hunger().value())
