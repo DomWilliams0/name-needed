@@ -7,7 +7,6 @@ pub type ValueImpl = ron::Value;
 #[cfg(test)]
 pub use load::load_from_str;
 
-mod helpers;
 mod load;
 mod step1_deserialization;
 mod step2_preprocessing;

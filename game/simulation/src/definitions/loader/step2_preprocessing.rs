@@ -9,7 +9,6 @@ use serde::de::Error;
 use common::derive_more::IntoIterator;
 use common::*;
 
-use crate::definitions::loader::helpers::{extract_map, extract_string_ref};
 use crate::definitions::loader::step1_deserialization::{Components, DeserializedDefinition};
 use crate::definitions::{DefinitionErrorKind, DefinitionErrors};
 
@@ -368,5 +367,21 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
         Err(DefinitionErrors(errors))
     } else {
         Ok(())
+    }
+}
+
+fn extract_map(value: ron::Value) -> Result<ron::Map, DefinitionErrorKind> {
+    match value {
+        ron::Value::Map(map) => Ok(map),
+        _ => Err(DefinitionErrorKind::Format(ron::Error::custom("not a map"))),
+    }
+}
+
+fn extract_string_ref(value: &ron::Value) -> Result<&str, DefinitionErrorKind> {
+    match value {
+        ron::Value::String(string) => Ok(string),
+        _ => Err(DefinitionErrorKind::Format(ron::Error::custom(
+            "not a string",
+        ))),
     }
 }

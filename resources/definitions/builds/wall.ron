@@ -1,6 +1,7 @@
 [
   (
     uid: "core_build_wall",
+    category: "builds",
     components: [
       {"build": (
         materials: [

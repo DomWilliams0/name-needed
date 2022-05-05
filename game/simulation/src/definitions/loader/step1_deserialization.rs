@@ -25,6 +25,9 @@ pub struct DeserializedDefinition {
     parent: String,
 
     #[serde(default)]
+    category: String,
+
+    #[serde(default)]
     r#abstract: bool,
 
     components: Components,
@@ -122,10 +125,22 @@ impl DeserializedDefinition {
             .map_err(|e| DefinitionError(source.clone(), DefinitionErrorKind::Format(e)))
     }
 
-    pub fn into_inner(self) -> (String, DefinitionSource, ProcessedComponents) {
+    pub fn into_inner(
+        self,
+    ) -> (
+        String,
+        DefinitionSource,
+        Option<String>,
+        ProcessedComponents,
+    ) {
         (
             self.uid,
             self.source,
+            if self.category.is_empty() {
+                None
+            } else {
+                Some(self.category)
+            },
             self.processed_components.into_inner(),
         )
     }

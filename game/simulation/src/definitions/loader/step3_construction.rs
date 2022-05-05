@@ -21,7 +21,7 @@ pub fn instantiate(
     defs: Vec<DeserializedDefinition>,
     templates: &TemplateLookup,
     string_cache: &StringCache,
-) -> Result<Vec<(CachedStr, Definition)>, DefinitionErrors> {
+) -> Result<Vec<(CachedStr, Definition, Option<String>)>, DefinitionErrors> {
     let mut errors = Vec::new();
 
     // instantiate components
@@ -75,12 +75,13 @@ impl Definition {
         self.source.clone()
     }
 
+    /// Returns (uid, definition, optional category)
     fn construct(
         deserialized: DeserializedDefinition,
         templates: &TemplateLookup,
         string_cache: &StringCache,
-    ) -> Result<(CachedStr, Definition), DefinitionError> {
-        let (uid, source, components) = deserialized.into_inner();
+    ) -> Result<(CachedStr, Definition, Option<String>), DefinitionError> {
+        let (uid, source, category, components) = deserialized.into_inner();
 
         let do_construct = || {
             let mut component_templates = Vec::with_capacity(components.len());
@@ -109,9 +110,11 @@ impl Definition {
         };
 
         match do_construct() {
-            Ok((uid, components)) => {
-                Ok((string_cache.get(&uid), Definition { source, components }))
-            }
+            Ok((uid, components)) => Ok((
+                string_cache.get(&uid),
+                Definition { source, components },
+                category,
+            )),
             Err(e) => Err(DefinitionError(source, e)),
         }
     }

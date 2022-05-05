@@ -239,10 +239,8 @@ impl EcsWorld {
         // collect and validate build templates
         let build_templates = {
             let templates = definitions
-                .iter_templates::<BuildTemplate>("build")
-                .filter_map(|def| {
-                    let definition = definitions.lookup_definition(def)?;
-
+                .iter_category("builds")
+                .filter_map(|(uid, definition)| {
                     let build = definition.find_component_ref::<BuildTemplate>("build")?;
 
                     let name = definition
@@ -250,7 +248,7 @@ impl EcsWorld {
                         .and_then(|any| any.downcast_ref::<KindComponent>())
                         .map(|kind| format!("{}", kind));
 
-                    Some((def, build, name))
+                    Some((uid, build, name))
                 })
                 .collect_vec();
 
