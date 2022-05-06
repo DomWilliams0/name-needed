@@ -1,16 +1,18 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid};
-use common::*;
-
-use crate::region::region::SlabContinuations;
-use grid::GridImpl;
 use std::sync::Arc;
+
 use tokio::sync::{Mutex, MutexGuard};
+
+use common::*;
+use grid::GridImpl;
 use unit::world::{
     ChunkLocation, RangePosition, SlabLocation, SlabPosition, SlabPositionAsCoord, WorldPosition,
 };
 use world_types::EntityDescription;
+
+use crate::region::region::SlabContinuations;
+use crate::{GeneratedBlock, PlanetParams, SlabGrid};
 
 /// Rasterizable object that places blocks within a slab, possibly leaking over the edge into other
 /// slabs. In case of seepage, the subfeature is queued as a continuation for the neighbour slab.
@@ -54,7 +56,7 @@ pub struct SlabNeighbour([i8; 3]);
 
 /// Subfeatures call into a Rasterizer to place blocks, so the internals can change transparently
 /// in the future
-pub struct Rasterizer {
+pub struct Rasterizer<'rng> {
     // TODO reuse borrowed vec allocation
     this_slab: Vec<(SlabPosition, GeneratedBlock)>,
 
@@ -65,16 +67,23 @@ pub struct Rasterizer {
     other_blocks: Vec<(SlabNeighbour, WorldPosition, GeneratedBlock)>,
 
     slab: SlabLocation,
+
+    rng: &'rng mut SmallRng,
 }
 
-impl Rasterizer {
-    pub fn new(slab: SlabLocation) -> Self {
+impl<'rng> Rasterizer<'rng> {
+    pub fn new(slab: SlabLocation, rng: &'rng mut SmallRng) -> Self {
         Self {
             slab,
             this_slab: Vec::new(),
             neighbours: ArrayVec::new(),
             other_blocks: Vec::new(),
+            rng,
         }
+    }
+
+    pub fn rng(&mut self) -> &mut impl Rng {
+        self.rng
     }
 
     pub fn place_block(&mut self, pos: WorldPosition, block: impl Into<GeneratedBlock>) {
@@ -207,10 +216,11 @@ impl SharedSubfeature {
         continuations: Option<&mut SlabContinuations>,
         params: &PlanetParams,
         protruding_blocks: &Arc<Mutex<Vec<(WorldPosition, GeneratedBlock)>>>,
+        rng: &mut SmallRng,
     ) -> Option<SubfeatureEntity> {
         debug!("rasterizing subfeature {}", if continuations.is_some() {"with propagation"} else {"in isolation"}; slab, &self);
         // TODO if continuations is None, set a flag to ignore boundary leaks
-        let mut rasterizer = Rasterizer::new(slab);
+        let mut rasterizer = Rasterizer::new(slab, rng);
 
         // collect blocks and potential entity from subfeature
         let entity = self.lock().await.rasterize(&mut rasterizer);

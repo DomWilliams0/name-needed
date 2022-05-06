@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use common::{thread_rng, Rng};
+use common::Rng;
 use unit::world::{WorldPoint, WorldPosition};
 use world_types::{EntityDescription, PlantDescription};
 
@@ -15,14 +15,13 @@ impl Subfeature for Fauna {
     fn rasterize(
         &mut self,
         root: WorldPosition,
-        _rasterizer: &mut Rasterizer,
+        rasterizer: &mut Rasterizer,
     ) -> Option<SubfeatureEntity> {
         // no blocks
 
         let position = {
-            // TODO pass in a random source
             let pos = root.centred();
-            let mut rng = thread_rng();
+            let rng = rasterizer.rng();
             const VARIATION: f32 = 0.2;
             WorldPoint::new_unchecked(
                 pos.x() + rng.gen_range(-VARIATION, VARIATION),
