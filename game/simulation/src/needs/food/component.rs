@@ -11,12 +11,21 @@ use crate::StringCache;
 #[derive(Component, EcsComponent, Debug, Clone)]
 #[storage(DenseVecStorage)]
 #[name("hunger")]
-// #[interactive] // TODO
+#[interactive]
 #[clone(disallow)]
 pub struct HungerComponent {
     hunger: Hunger,
     metabolism: Metabolism,
-    pub food_interest: FoodInterest, // TODO getter
+    food_interest: FoodInterest,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum EatType {
+    /// Food is in inventory while eating
+    Held,
+
+    /// Food is nearby while eating
+    Grazing,
 }
 
 /// A food item is being eaten by the given eater
@@ -26,8 +35,7 @@ pub struct HungerComponent {
 #[clone(disallow)]
 pub struct BeingEatenComponent {
     pub eater: Entity,
-    /// True for eating a held item, false for grazing
-    pub is_equipped: bool, // TODO enum
+    pub ty: EatType,
 }
 
 impl HungerComponent {
@@ -54,6 +62,10 @@ impl HungerComponent {
 
     pub fn metabolism(&self) -> Metabolism {
         self.metabolism
+    }
+
+    pub fn food_interest(&self) -> &FoodInterest {
+        &self.food_interest
     }
 }
 
@@ -100,8 +112,7 @@ impl InteractiveComponent for HungerComponent {
                     write!(f, "{:?}={:.2}", interest, pref.value())?;
                 }
 
-                todo!()
-                // write!(f, "\nHunger: {:.2}", self.0.hunger().value())
+                write!(f, "\nHunger: {:.4}", self.0.hunger().satiety().value())
             }
         }
 

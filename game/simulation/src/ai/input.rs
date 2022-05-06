@@ -121,7 +121,7 @@ fn food_interest_in_target(
 
     // TODO differentiate CANNOT eat vs really hates to eat
     interest
-        .food_interest
+        .food_interest()
         .interest_for(&flavours.flavours)
         .map(|f| f.value())
 }

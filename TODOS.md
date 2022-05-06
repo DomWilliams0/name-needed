@@ -1,4 +1,4 @@
-# TODOs (418)
+# TODOs (414)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -138,8 +138,6 @@
    * `// TODO stop hardcoding distance check for block actions`
    * `// TODO roll the dice for each step/hit/swing, e.g. injury`
    * `// TODO ensure we break out of this wait early if job is finished during`
- * [game/simulation/src/activity/subactivity/eat.rs](game/simulation/src/activity/subactivity/eat.rs) (1)
-   * `// TODO any need to queue this to the next tick?`
  * [game/simulation/src/activity/subactivity/equip.rs](game/simulation/src/activity/subactivity/equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
  * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (2)
@@ -295,10 +293,7 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (4)
-   * `// #[interactive] // TODO`
-   * `pub food_interest: FoodInterest, // TODO getter`
-   * `pub is_equipped: bool, // TODO enum`
+ * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (1)
    * `//     // TODO can this underflow?`
  * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (2)
    * `// TODO specify explicit dislikes too?`

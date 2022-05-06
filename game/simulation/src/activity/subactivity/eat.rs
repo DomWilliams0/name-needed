@@ -3,7 +3,7 @@ use common::*;
 use crate::activity::context::{ActivityContext, DistanceCheckResult};
 use crate::event::prelude::*;
 use crate::item::ContainedInComponent;
-use crate::needs::food::{BeingEatenComponent, FoodEatingError};
+use crate::needs::food::{BeingEatenComponent, EatType, FoodEatingError};
 use crate::queued_update::QueuedUpdates;
 use crate::{ComponentWorld, Entity};
 
@@ -68,7 +68,7 @@ impl<'a> EatItemSubactivity<'a> {
                     item,
                     BeingEatenComponent {
                         eater,
-                        is_equipped: true,
+                        ty: EatType::Held,
                     },
                 );
                 debug_assert!(insert_result.is_ok());
@@ -128,7 +128,7 @@ impl<'a> EatItemSubactivity<'a> {
                     item,
                     BeingEatenComponent {
                         eater,
-                        is_equipped: false,
+                        ty: EatType::Grazing,
                     },
                 );
                 Ok(())

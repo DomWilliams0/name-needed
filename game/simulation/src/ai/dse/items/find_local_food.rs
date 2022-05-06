@@ -35,7 +35,7 @@ fn find_targets(targets: &mut Targets<AiContext>, blackboard: &mut AiBlackboard)
         .world
         .component::<HungerComponent>(blackboard.entity)
     {
-        let interests = &hunger.food_interest;
+        let interests = hunger.food_interest();
         let edibles = blackboard.world.read_component::<EdibleItemComponent>();
         blackboard.search_local_entities(FOOD_FILTER, FOOD_MAX_RADIUS as f32, 10, |item| {
             let edible = item

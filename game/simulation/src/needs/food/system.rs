@@ -3,6 +3,7 @@ use common::*;
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
 use crate::needs::food::component::{BeingEatenComponent, HungerComponent};
+use crate::needs::food::EatType;
 use crate::simulation::EcsWorldRef;
 use crate::{
     ActivityComponent, ConditionComponent, EdibleItemComponent, EntityEvent, EntityEventPayload,
@@ -100,7 +101,7 @@ impl<'a> System<'a> for EatingSystem {
                     debug!("food has been consumed");
 
                     // remove from eater's inventory if applicable
-                    if being_eaten.is_equipped {
+                    if let EatType::Held = being_eaten.ty {
                         if let Some(eater_inv) = eater_inv {
                             let remove_count = eater_inv.remove_item(item);
                             debug_assert!(remove_count > 0); // should have been in an equip slot
