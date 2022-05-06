@@ -70,7 +70,7 @@ pub fn build_registry(
     let mut registry = DefinitionRegistryBuilder::new();
     for (uid, definition, category) in defs {
         if let Err((def, err)) = registry.register(uid, definition, category) {
-            errors.push(def.make_error(err));
+            errors.push(def.make_error(uid.to_string(), err));
         }
     }
 

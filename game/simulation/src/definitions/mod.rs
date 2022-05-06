@@ -15,9 +15,12 @@ use crate::definitions::loader::DefinitionSource;
 use crate::ecs::ComponentBuildError;
 use common::*;
 
-#[derive(Debug, Error)]
-#[error("Error loading definition {0}: {1}")]
-pub struct DefinitionError(pub DefinitionSource, pub DefinitionErrorKind);
+#[derive(Debug)]
+pub struct DefinitionError {
+    pub uid: Option<String>,
+    pub src: DefinitionSource,
+    pub kind: DefinitionErrorKind,
+}
 
 #[derive(Debug, Error, Clone)]
 pub enum DefinitionErrorKind {
@@ -33,8 +36,8 @@ pub enum DefinitionErrorKind {
     #[error("No such definition with UID {0:?}")]
     NoSuchDefinition(String),
 
-    #[error("Invalid UID {0:?}")]
-    InvalidUid(String),
+    #[error("Invalid UID")]
+    InvalidUid,
 
     #[error("No such component type {0:?}")]
     NoSuchComponent(String),
@@ -49,8 +52,8 @@ pub enum DefinitionErrorKind {
     #[error("Parent relation {0}->{1} would cause a cycle")]
     CyclicParentRelation(String, String),
 
-    #[error("Duplicate uid {0:?}")]
-    DuplicateUid(String),
+    #[error("Duplicate uid")]
+    DuplicateUid,
 
     #[error("Duplicate component with type {0:?}")]
     DuplicateComponent(String),
@@ -68,5 +71,17 @@ impl Display for DefinitionErrors {
         }
 
         write!(f, "]")
+    }
+}
+
+impl Display for DefinitionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Error loading definition")?;
+
+        if let Some(uid) = self.uid.as_ref() {
+            write!(f, " '{uid}'")?;
+        }
+
+        write!(f, " in {}: {}", self.src, self.kind)
     }
 }

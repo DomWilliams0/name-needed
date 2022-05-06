@@ -93,8 +93,10 @@ impl Definition {
                     ComponentFields::Negate => unimplemented!(),
                 };
 
-                let component_template =
-                    templates.construct(key.as_str(), &mut map, string_cache)?;
+                debug!("{uid}: constructing '{key}' template"; "values" => ?map);
+                let component_template = templates
+                    .construct(key.as_str(), &mut map, string_cache)
+                    .map_err(|e| (uid.clone(), e))?;
 
                 for leftover in map.keys() {
                     warn!(
@@ -115,12 +117,20 @@ impl Definition {
                 Definition { source, components },
                 category,
             )),
-            Err(e) => Err(DefinitionError(source, e)),
+            Err((uid, e)) => Err(DefinitionError {
+                uid: Some(uid),
+                src: source,
+                kind: e,
+            }),
         }
     }
 
-    pub fn make_error(&self, e: DefinitionErrorKind) -> DefinitionError {
-        DefinitionError(self.source(), e)
+    pub fn make_error(&self, uid: String, e: DefinitionErrorKind) -> DefinitionError {
+        DefinitionError {
+            uid: Some(uid),
+            src: self.source(),
+            kind: e,
+        }
     }
 
     #[cfg(test)]

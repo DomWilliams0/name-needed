@@ -1,11 +1,10 @@
 pub use load::load;
+#[cfg(test)]
+pub use load::load_from_str;
 pub use step1_deserialization::DefinitionSource;
 pub use step3_construction::Definition;
 
 pub type ValueImpl = ron::Value;
-
-#[cfg(test)]
-pub use load::load_from_str;
 
 mod load;
 mod step1_deserialization;
@@ -104,7 +103,7 @@ mod tests {
         "#;
 
         let errs = preprocess_from_str(input).expect_err("should fail");
-        let err = &errs.0[0].1;
+        let err = &errs.0[0].kind;
         assert!(matches!(
             *dbg!(err),
             DefinitionErrorKind::CyclicParentRelation(_, _)
@@ -121,7 +120,7 @@ mod tests {
         "#;
 
         let errs = preprocess_from_str(input).expect_err("should fail");
-        let err = &errs.0[0].1;
+        let err = &errs.0[0].kind;
         assert!(matches!(
             *err,
             DefinitionErrorKind::CyclicParentRelation(_, _)

@@ -245,7 +245,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
     // convert components into easy-to-use format
     for def in defs.iter_mut() {
         if let Err(errs) = def.validate_and_process_components() {
-            errors.extend(errs.into_iter().map(|e| def.make_error(e)));
+            errors.extend(
+                errs.into_iter()
+                    .map(|(uid, e)| def.make_error(Some(uid), e)),
+            );
         }
     }
 
@@ -257,7 +260,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
 
         if let Some(old) = lookup.insert(uid, node) {
             let def = dag.node_weight(old).unwrap();
-            errors.push(def.make_error(DefinitionErrorKind::DuplicateUid(def.uid().to_owned())));
+            errors.push(def.make_error(
+                Some(def.uid().to_owned()),
+                DefinitionErrorKind::DuplicateUid,
+            ));
         }
     }
 
@@ -270,9 +276,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
                 let parent_node = match lookup.get(parent) {
                     Some(n) => *n,
                     None => {
-                        return Err(
-                            def.make_error(DefinitionErrorKind::InvalidParent(parent.to_owned()))
-                        )
+                        return Err(def.make_error(
+                            Some(def.uid().to_owned()),
+                            DefinitionErrorKind::InvalidParent(parent.to_owned()),
+                        ))
                     }
                 };
 
@@ -285,10 +292,13 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
 
                 if is_cyclic {
                     let def = dag.node_weight(node).unwrap();
-                    return Err(def.make_error(DefinitionErrorKind::CyclicParentRelation(
-                        def.uid().to_owned(),
-                        def.parent().unwrap().to_owned(),
-                    )));
+                    return Err(def.make_error(
+                        Some(def.uid().to_owned()),
+                        DefinitionErrorKind::CyclicParentRelation(
+                            def.uid().to_owned(),
+                            def.parent().unwrap().to_owned(),
+                        ),
+                    ));
                 }
             }
             Ok(())
