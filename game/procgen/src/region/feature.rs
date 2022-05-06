@@ -692,7 +692,7 @@ impl BooleanOp<f64, Polygon<f64>> for RegionalFeatureBoundary {
 pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>) {
     let mut rando = SmallRng::from_entropy(); // non deterministic
 
-    let skip_distr = Bernoulli::new(0.1).unwrap();
+    let skip_distr = Bernoulli::new(ctx.params.fauna_skip_chance.clamp(0.0, 1.0)).unwrap();
     let slab_z_range = {
         let min = ctx.slab.slab.as_slice().slice();
         min..min + SLAB_SIZE.as_i32()
@@ -708,7 +708,7 @@ pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>
         }
 
         let biome = block.biome();
-        if !biome.has_fauna() || !skip_distr.sample(&mut rando) {
+        if !biome.has_fauna() || skip_distr.sample(&mut rando) {
             continue;
         }
 

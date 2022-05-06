@@ -17,3 +17,5 @@
 
 --region-feature-expansion 5
 --region-feature-vertical-expansion-threshold 0.5
+
+--fauna-skip-chance 0.9
