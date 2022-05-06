@@ -148,10 +148,10 @@ impl PhysicalComponent {
 }
 
 #[derive(Deserialize)]
-struct Size {
-    x: u16,
-    y: u16,
-    z: u16,
+pub(crate) struct Size {
+    pub x: u16,
+    pub y: u16,
+    pub z: u16,
 }
 
 #[derive(Debug)]

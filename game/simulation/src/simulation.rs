@@ -4,10 +4,8 @@ use std::pin::Pin;
 
 use strum::EnumDiscriminants;
 
-
 use common::*;
 use resources::Resources;
-
 
 use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
@@ -46,7 +44,8 @@ use crate::steer::{SteeringDebugRenderer, SteeringSystem};
 use crate::string::StringCache;
 use crate::world_debug::FeatureBoundaryDebugRenderer;
 use crate::{
-    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent, ThreadedWorldLoader, WorldRef, WorldViewer,
+    definitions, BackendData, EntityEvent, EntityEventPayload, EntityLoggingComponent,
+    ThreadedWorldLoader, WorldRef, WorldViewer,
 };
 use crate::{ComponentWorld, Societies, SocietyHandle};
 

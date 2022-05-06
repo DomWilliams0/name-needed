@@ -181,7 +181,7 @@ fn validate_leaders(herds: &Herds, herded: &WriteStorage<HerdedComponent>) {
         .collect::<HashMap<_, _>>();
 
     for (handle, leader_entity) in expected.iter() {
-        let _leader_herd = leader_entity.get(&herded).unwrap_or_else(|| {
+        let _leader_herd = leader_entity.get(herded).unwrap_or_else(|| {
             panic!(
                 "leader {:?} is not in expected herd {:?}",
                 leader_entity, handle

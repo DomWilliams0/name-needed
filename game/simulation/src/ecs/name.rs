@@ -390,8 +390,8 @@ impl<V: Value> ComponentTemplate<V> for NoDisplayTextOnHoverComponent {
         values: &mut Map<V>,
         _: &StringCache,
     ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         if !values.is_empty() {
             Err(ComponentBuildError::EmptyExpected)
