@@ -31,6 +31,10 @@ impl ItemCondition {
         }
     }
 
+    pub fn is_broken(&self) -> bool {
+        self.value.value() <= 0.0
+    }
+
     pub fn set(&mut self, proportion: NormalizedFloat) {
         *self = Self::new(proportion)
     }
@@ -42,13 +46,14 @@ impl ItemCondition {
 
 impl ItemConditionGrade {
     fn from_proportion(proportion: f32) -> Self {
+        use ItemConditionGrade::*;
         match proportion {
-            v if v <= 0.0 => ItemConditionGrade::Broken,
-            v if v <= 0.2 => ItemConditionGrade::Terrible,
-            v if v <= 0.55 => ItemConditionGrade::Reasonable,
-            v if v <= 0.8 => ItemConditionGrade::Good,
-            v if v <= 0.95 => ItemConditionGrade::Superb,
-            _ => ItemConditionGrade::Perfect,
+            v if v <= 0.0 => Broken,
+            v if v <= 0.2 => Terrible,
+            v if v <= 0.55 => Reasonable,
+            v if v <= 0.8 => Good,
+            v if v <= 0.95 => Superb,
+            _ => Perfect,
         }
     }
 }

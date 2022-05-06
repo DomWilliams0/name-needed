@@ -18,7 +18,11 @@
       )},
       {"species": (name: "dog")},
       {"intelligence": (species: "dog")},
-      {"hunger": (max: 2000, interests: "raw-meat=50,cooked-meat=50,cooked-plant=20,fruit=5")},
+      {"hunger": (
+        max: 2000,
+        interests: "raw-meat=50,cooked-meat=50,cooked-plant=20,fruit=5",
+        metabolism: 0.13,
+      )},
       {"senses": (
         vision: (length: 11.0, angle: 60 /*degrees*/),
       )}

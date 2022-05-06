@@ -338,7 +338,7 @@ mod helpers {
         pub fn with_satiety(self, satiety: NormalizedFloat) -> Self {
             self.0
                 .component_mut::<HungerComponent>(self.1)
-                .map(|mut hunger| hunger.set_satiety(satiety))
+                .map(|mut hunger| hunger.hunger_mut().set_satiety(satiety))
                 .expect("hunger component");
 
             self

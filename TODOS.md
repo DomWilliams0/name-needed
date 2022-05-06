@@ -1,4 +1,4 @@
-# TODOs (424)
+# TODOs (418)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -98,8 +98,6 @@
    * `// TODO if continuations is None, set a flag to ignore boundary leaks`
    * `// TODO neighbour slab should wrap around the planet`
    * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
- * [game/procgen/src/region/subfeatures/fauna.rs](game/procgen/src/region/subfeatures/fauna.rs) (1)
-   * `// TODO pass in a random source`
  * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (3)
    * `// TODO actual tree shape`
    * `// TODO entity for trees`
@@ -258,8 +256,7 @@
  * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
    * `// TODO reuse allocs`
    * `// TODO abort early?`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
-   * `// TODO proper nutritional value`
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (6)
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
    * `// TODO add aerodynamic-ness field`
@@ -298,22 +295,19 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (3)
-   * `// TODO newtype for Fuel`
-   * `// TODO generic needs component with hunger/thirst/toilet/social etc`
-   * `// TODO can this underflow?`
+ * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (4)
+   * `// #[interactive] // TODO`
+   * `pub food_interest: FoodInterest, // TODO getter`
+   * `pub is_equipped: bool, // TODO enum`
+   * `//     // TODO can this underflow?`
  * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (2)
    * `// TODO specify explicit dislikes too?`
    * `// TODO food contains a set of flavours`
- * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (9)
-   * `// fuel used per tick TODO depends on time rate`
-   * `// TODO species metabolism`
+ * [game/simulation/src/needs/food/hunger.rs](game/simulation/src/needs/food/hunger.rs) (1)
+   * `// TODO vary eater speed`
+ * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (3)
    * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
-   * `// TODO individual metabolism rate`
-   * `// TODO elaborate and specify metabolism rate`
-   * `// TODO take into account general movement speed in addition to this`
-   * `// TODO individual rate`
-   * `// TODO depends on food type/consistency`
+   * `// TODO variable speed for eating - hurried (fast) vs relaxed/idle (slow)`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
    * `// TODO only render the top area in each slice`
@@ -573,8 +567,8 @@
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
- * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
-   * `// TODO pub mod hunger;`
+ * [shared/unit/src/food.rs](shared/unit/src/food.rs) (1)
+   * `// TODO casting to floats leads to loss of precision when large`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)

@@ -12,6 +12,8 @@
       {"throwable": ()},
       {"edible": (
         total_nutrition: 80,
+        consumption_rate: 10,
+        efficiency: 0.8,
         extra_hands: 0,
         flavours: "fruit"
       )},

@@ -128,13 +128,13 @@ impl<V: Value> Map<V> {
         })
     }
 
-    pub fn get_float<F: num_traits::NumCast>(
+    pub fn get_float<F: num_traits::FromPrimitive>(
         &mut self,
         key: &str,
     ) -> Result<F, ComponentBuildError> {
         self.get(key).and_then(|val| {
             val.into_float().and_then(|float| {
-                F::from(float).ok_or_else(|| {
+                F::from_f64(float).ok_or_else(|| {
                     ComponentBuildError::InvalidFloatValue(
                         std::any::type_name::<F>().to_owned(),
                         float,

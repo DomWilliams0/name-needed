@@ -293,7 +293,7 @@ impl SelectionWindow {
                     "Satiety:",
                     || {
                         details.component::<HungerComponent>(context).map(|h| {
-                            let (current, max) = h.satiety();
+                            let (current, max) = h.hunger().satiety_raw();
                             ui_str!(in context, "{}/{}", current, max)
                         })
                     },
@@ -380,7 +380,7 @@ impl SelectionWindow {
             if tab.is_some() {
                 context.key_value(
                     "Nutrition:",
-                    || ui_str!(in context, "{}", edible.total_nutrition),
+                    || ui_str!(in context, "{}", edible.description.total_nutrition),
                     None,
                     COLOR_ORANGE,
                 );

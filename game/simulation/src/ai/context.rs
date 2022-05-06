@@ -99,7 +99,7 @@ impl<'a> AiBlackboard<'a> {
         AiBlackboard::<'a> {
             entity: e,
             transform,
-            hunger: hunger.map(|h| h.hunger()),
+            hunger: hunger.map(|h| h.hunger().satiety()),
             inventory_search_cache: HashMap::new(),
             local_area_search_cache: HashMap::new(),
             inventory,

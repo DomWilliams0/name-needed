@@ -9,7 +9,9 @@
       )},
       {"edible": (
         extra_hands: 0,
-        flavours: "raw-plant"
+        flavours: "raw-plant",
+        consumption_rate: 2,
+        efficiency: 0.7,
       )},
       {"breakable": ()},
       {"no-display-on-hover": ()},

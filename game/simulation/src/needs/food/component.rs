@@ -1,25 +1,22 @@
 use std::rc::Rc;
 
-use common::newtype::AccumulativeInt;
 use common::*;
+use unit::food::{Metabolism, Nutrition};
 
 use crate::ecs::*;
+use crate::needs::food::hunger::Hunger;
 use crate::needs::food::FoodInterest;
 use crate::StringCache;
 
-// TODO newtype for Fuel
-pub type Fuel = u16;
-
-// TODO generic needs component with hunger/thirst/toilet/social etc
-#[derive(Component, EcsComponent, Clone, Debug)]
-#[storage(VecStorage)]
+#[derive(Component, EcsComponent, Debug, Clone)]
+#[storage(DenseVecStorage)]
 #[name("hunger")]
-#[interactive]
+// #[interactive] // TODO
 #[clone(disallow)]
 pub struct HungerComponent {
-    current_fuel: AccumulativeInt<Fuel>,
-    max_fuel: Fuel,
-    pub food_interest: FoodInterest,
+    hunger: Hunger,
+    metabolism: Metabolism,
+    pub food_interest: FoodInterest, // TODO getter
 }
 
 /// A food item is being eaten by the given eater
@@ -30,43 +27,33 @@ pub struct HungerComponent {
 pub struct BeingEatenComponent {
     pub eater: Entity,
     /// True for eating a held item, false for grazing
-    pub is_equipped: bool,
+    pub is_equipped: bool, // TODO enum
 }
 
 impl HungerComponent {
-    pub fn new(max: Fuel, food_interest: FoodInterest) -> Self {
+    /// Defaults to full satiety
+    pub fn new(max: Nutrition, metabolism: Metabolism, food_interest: FoodInterest) -> Self {
         Self {
-            current_fuel: AccumulativeInt::new(max),
-            max_fuel: max,
+            hunger: Hunger::new(max),
+            metabolism,
             food_interest,
         }
     }
 
-    pub fn hunger(&self) -> NormalizedFloat {
-        NormalizedFloat::new(self.current_fuel.value() as f32 / self.max_fuel as f32)
+    // pub(in crate::needs::food) fn consume_fuel(&mut self, nutrition: f32) {
+    //     debug_assert!(nutrition.is_sign_positive());
+    //     self.current_fuel -= nutrition;
+    //     // TODO can this underflow?
+    // }
+    pub fn hunger(&self) -> &Hunger {
+        &self.hunger
+    }
+    pub fn hunger_mut(&mut self) -> &mut Hunger {
+        &mut self.hunger
     }
 
-    /// (a, b) -> a/b fuel
-    pub fn satiety(&self) -> (Fuel, Fuel) {
-        (self.current_fuel.value(), self.max_fuel)
-    }
-
-    pub fn set_satiety(&mut self, proportion: NormalizedFloat) {
-        let fuel = self.max_fuel as f64 * proportion.value() as f64;
-        self.current_fuel = AccumulativeInt::new(fuel as Fuel)
-    }
-
-    pub(in crate::needs::food) fn add_fuel(&mut self, nutrition: Fuel) {
-        self.current_fuel.add(nutrition);
-        if self.current_fuel.value() > self.max_fuel {
-            self.current_fuel = AccumulativeInt::new(self.max_fuel);
-        }
-    }
-
-    pub(in crate::needs::food) fn consume_fuel(&mut self, nutrition: f32) {
-        debug_assert!(nutrition.is_sign_positive());
-        self.current_fuel -= nutrition;
-        // TODO can this underflow?
+    pub fn metabolism(&self) -> Metabolism {
+        self.metabolism
     }
 }
 
@@ -78,11 +65,14 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
     where
         Self: Sized,
     {
-        let max = values.get_int("max")?;
+        let max = Nutrition::new(values.get_int("max")?);
+        let metabolism = Metabolism::new(values.get_float("metabolism")?).ok_or_else(|| {
+            ComponentBuildError::TemplateSpecific("invalid metabolism".to_string())
+        })?;
         let interest = values.get_string("interests")?.parse().map_err(|e| {
             ComponentBuildError::TemplateSpecific(format!("failed to parse interests: {e}"))
         })?;
-        Ok(Rc::new(Self::new(max, interest)))
+        Ok(Rc::new(Self::new(max, metabolism, interest)))
     }
 
     fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
@@ -91,8 +81,6 @@ impl<V: Value> ComponentTemplate<V> for HungerComponent {
 
     crate::as_any!();
 }
-
-register_component_template!("hunger", HungerComponent);
 
 impl InteractiveComponent for HungerComponent {
     fn as_debug(&self) -> Option<&dyn Debug> {
@@ -112,10 +100,12 @@ impl InteractiveComponent for HungerComponent {
                     write!(f, "{:?}={:.2}", interest, pref.value())?;
                 }
 
-                write!(f, "\nHunger: {:.2}", self.0.hunger().value())
+                todo!()
+                // write!(f, "\nHunger: {:.2}", self.0.hunger().value())
             }
         }
 
         Some(unsafe { &*(self as *const HungerComponent as *const Interactive) })
     }
 }
+register_component_template!("hunger", HungerComponent);

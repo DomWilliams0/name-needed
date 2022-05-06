@@ -1,7 +1,7 @@
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use derive_more::Deref;
-use num_traits::{clamp, clamp_max, AsPrimitive, FromPrimitive, NumCast, Saturating, Unsigned};
+use num_traits::{clamp, clamp_max, AsPrimitive, NumCast, Saturating, Unsigned};
 
 use crate::*;
 
@@ -102,6 +102,24 @@ impl From<NormalizedFloat> for f32 {
     }
 }
 
+impl num_traits::FromPrimitive for NormalizedFloat {
+    fn from_i64(_: i64) -> Option<Self> {
+        None
+    }
+
+    fn from_u64(_: u64) -> Option<Self> {
+        None
+    }
+
+    fn from_f64(n: f64) -> Option<Self> {
+        if (0.0..=1.0).contains(&n) {
+            Some(NormalizedFloat(n as f32))
+        } else {
+            None
+        }
+    }
+}
+
 impl SubAssign<f32> for NormalizedFloat {
     fn sub_assign(&mut self, rhs: f32) {
         *self = Self::clamped(self.0 - rhs)
@@ -137,16 +155,19 @@ impl Mul<Self> for NormalizedFloat {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct AccumulativeInt<T> {
+pub struct AccumulativeInt<T: Accumulative> {
     real_value: T,
     adjusted_value: T,
     acc: f32,
 }
 
-impl<T> AccumulativeInt<T>
-where
-    T: Unsigned + Copy + FromPrimitive + AddAssign<T> + Saturating,
-{
+// T: Unsigned + Copy + FromPrimitive + AddAssign<T> + Saturating,
+pub trait Accumulative: Copy + Add<Output = Self> {
+    fn from_f32(val: f32) -> Self;
+    fn saturating_sub(self, x: Self) -> Self;
+}
+
+impl<T: Accumulative> AccumulativeInt<T> {
     pub fn new(value: T) -> Self {
         Self {
             real_value: value,
@@ -160,7 +181,7 @@ where
     }
 
     pub fn add(&mut self, delta: T) {
-        self.real_value += delta;
+        self.real_value = self.real_value + delta;
         self.update_value();
     }
 
@@ -177,7 +198,7 @@ where
     #[inline]
     fn add_float(unsigned: T, delta: f32) -> T {
         let positive = delta.is_sign_positive();
-        let delta = T::from_f32(delta.abs()).unwrap();
+        let delta = T::from_f32(delta.abs());
         if positive {
             unsigned + delta
         } else {
@@ -186,25 +207,36 @@ where
     }
 }
 
-impl<T> SubAssign<f32> for AccumulativeInt<T>
-where
-    T: Unsigned + Copy + FromPrimitive + AddAssign<T> + Saturating,
-{
+impl<T: Accumulative> SubAssign<f32> for AccumulativeInt<T> {
     fn sub_assign(&mut self, rhs: f32) {
         self.acc -= rhs;
         self.update_value();
     }
 }
 
-impl<T> AddAssign<f32> for AccumulativeInt<T>
-where
-    T: Unsigned + Copy + FromPrimitive + AddAssign<T> + Saturating,
-{
+impl<T: Accumulative> AddAssign<f32> for AccumulativeInt<T> {
     fn add_assign(&mut self, rhs: f32) {
         self.acc += rhs;
         self.update_value();
     }
 }
+
+macro_rules! impl_accumulative {
+    ($ty:ty) => {
+        impl Accumulative for $ty {
+            fn from_f32(val: f32) -> Self {
+                val as $ty
+            }
+
+            fn saturating_sub(self, x: Self) -> Self {
+                self.saturating_sub(x)
+            }
+        }
+    };
+}
+
+impl_accumulative!(u64);
+impl_accumulative!(u16);
 
 #[cfg(test)]
 mod tests {
@@ -229,11 +261,36 @@ mod tests {
 
         int -= 4.5;
         assert_eq!(int.value(), BIG - 6); // .4
+
+        int.add(0);
+        assert_eq!(int.value(), BIG - 6); // unchanged
+
+        int.add(2);
+        assert_eq!(int.value(), BIG - 4);
     }
 
     #[test]
     #[should_panic]
     fn normalised_nan() {
         NormalizedFloat::new(f32::NAN);
+    }
+
+    #[test]
+    fn decrement() {
+        let mut val = AccumulativeInt::new(3000u16);
+
+        val -= 0.6;
+        assert_eq!(val.value(), 2999); // .4
+
+        val -= 0.6;
+        assert_eq!(val.value(), 2998); // .8
+
+        val -= 0.9;
+        assert_eq!(val.value(), 2997); // .9
+
+        for _ in 0..50000 {
+            val -= 0.0001;
+        }
+        assert_eq!(val.value(), 2992);
     }
 }

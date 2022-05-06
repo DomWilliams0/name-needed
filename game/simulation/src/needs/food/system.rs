@@ -2,19 +2,15 @@ use common::*;
 
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
-use crate::needs::food::component::{BeingEatenComponent, Fuel, HungerComponent};
+use crate::needs::food::component::{BeingEatenComponent, HungerComponent};
 use crate::simulation::EcsWorldRef;
 use crate::{
     ActivityComponent, ConditionComponent, EdibleItemComponent, EntityEvent, EntityEventPayload,
     InventoryComponent,
 };
 
-// fuel used per tick TODO depends on time rate
-// TODO species metabolism
-const BASE_METABOLISM: f32 = 0.5;
-
 // amount gained when eating per tick
-const BASE_EAT_RATE: Fuel = 5;
+// const BASE_EAT_RATE: Fuel = 5;
 
 #[derive(Error, Debug, Clone)]
 pub enum FoodEatingError {
@@ -36,13 +32,8 @@ impl<'a> System<'a> for HungerSystem {
 
     fn run(&mut self, (mut hunger, activity): Self::SystemData) {
         for (hunger, activity) in (&mut hunger, &activity).join() {
-            // TODO individual metabolism rate
-            // TODO elaborate and specify metabolism rate
-            // TODO take into account general movement speed in addition to this
-            let metabolism = 1.0;
-            let fuel_used = BASE_METABOLISM * metabolism * activity.exertion();
-
-            hunger.consume_fuel(fuel_used);
+            let metabolism = hunger.metabolism();
+            hunger.hunger_mut().burn(metabolism, activity.exertion());
         }
     }
 }
@@ -90,26 +81,22 @@ impl<'a> System<'a> for EatingSystem {
                     }
                 };
 
-                // calculate how much to consume this tick
-                // TODO individual rate
-                // TODO depends on food type/consistency
-                let fuel_to_consume = BASE_EAT_RATE;
-                let proportion_to_eat = NormalizedFloat::new(
-                    (fuel_to_consume as f32 / edible.total_nutrition as f32).min(0.2),
-                );
-
                 // do the eat
-                eater_hunger.add_fuel(fuel_to_consume);
-                condition.0 -= proportion_to_eat;
+                // TODO variable speed for eating - hurried (fast) vs relaxed/idle (slow)
+                let degradation = eater_hunger
+                    .hunger_mut()
+                    .eat(&edible.description, condition.0.value());
+                condition.0 -= degradation;
 
                 trace!("{eater} is eating", eater = being_eaten.eater;
-                    "new_hunger" => ?eater_hunger.satiety(),
+                    "new_hunger" => ?eater_hunger.hunger().satiety(),
+                    "food_degradation" => ?degradation,
                     "new_food_condition" => ?condition.0,
                 );
 
                 // TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2
 
-                if condition.0.value().value() <= 0.0 {
+                if condition.0.is_broken() {
                     debug!("food has been consumed");
 
                     // remove from eater's inventory if applicable

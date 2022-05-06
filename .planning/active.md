@@ -42,6 +42,8 @@
     * [X] pass in a source of random to subfeature rasterization
     * [X] bug: higher concentration of plants in initial chunks only
 * [ ] fix config before merging to develop
+* [ ] remove catchup frames between game start and waiting for initial terrain
+* [ ] remove hunger from ai blackboard, the input will be cached anyway
 
 ## Edible plants
 * [X] food interests and flavours
@@ -51,7 +53,7 @@
     * [X] humans shouldn't consider eating these
 * [ ] instead of consuming a plant entirely in one sitting, grazing animals should nibble and
     wander more
-    * [ ] different foods are eaten at different speeds
+    * [X] different foods are eaten at different speeds
 
 ## Herd leader
 * [X] identify leader of herd for others to follow
