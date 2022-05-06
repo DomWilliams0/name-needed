@@ -210,16 +210,16 @@ impl ComponentFields {
             }
             (ComponentFields::Unit, _) => {
                 // nothing to do
-                debug!("... skipping because self is unit and other is not negate");
+                debug!("skipping because self is unit and other is not negate");
             }
             (ComponentFields::Fields(mine), ComponentFields::Fields(urs)) => {
                 for (name, value) in urs.iter() {
                     if let Some(existing) = Self::field_mut(mine, name) {
-                        // override value
                         *existing = value.clone();
                         debug!("overriding value for field {field}", field = name);
                     } else {
-                        debug!("keeping inherited field {field}", field = name);
+                        mine.push((name.clone(), value.clone()));
+                        debug!("adding overridden field {field}", field = name);
                     }
                 }
             }
@@ -350,7 +350,7 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
                 .rev()
                 .skip(1) // root already cloned
                 .fold(root.processed_components().clone(), |mut acc, &def| {
-                    debug!("overriding with {ancestor}", ancestor = def.uid(); "definition" => ?this.uid());
+                    debug!("applying components from {ancestor}", ancestor = def.uid(); "result" => ?this.uid(), "root" => ?root.uid());
                     acc.override_with(&*def.processed_components());
                     acc
                 });
