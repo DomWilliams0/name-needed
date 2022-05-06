@@ -18,10 +18,10 @@ pub enum LogError {
 }
 
 impl LoggerBuilder {
-    pub fn with_env() -> Result<Self, LogError> {
+    pub fn with_env(env_var: &'static str) -> Result<Self, LogError> {
         let mut builder = Self::default();
 
-        if let Ok(env) = std::env::var("NN_LOG") {
+        if let Ok(env) = std::env::var(env_var) {
             let level = env.parse().map_err(|_| LogError::BadLevel(env.clone()))?;
             builder = builder.level(level)
         }

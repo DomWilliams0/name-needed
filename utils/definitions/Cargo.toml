@@ -9,3 +9,5 @@ edition = "2021"
 simulation = { path = "../../game/simulation", features = ["utils"] }
 resources = { path = "../../game/resources" }
 logging = { path = "../../shared/logging", features = ["to-file"] }
+
+structopt = "0.3"

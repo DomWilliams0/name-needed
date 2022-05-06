@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use common::*;
 
@@ -98,9 +98,32 @@ impl DefinitionRegistry {
             })
     }
 
+    /// Includes expensive allocations
     #[cfg(feature = "utils")]
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Definition)> + '_ {
-        self.definitions.iter().map(|(s, def)| (s.as_ref(), def))
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Definition, Option<String>)> + '_ {
+        let mut all = Vec::with_capacity(self.definitions.len());
+        let mut seen = HashSet::with_capacity_and_hasher(
+            self.definitions.len(),
+            CachedStringHasher::default(),
+        );
+
+        // gather categories
+        for cat in self.categories.keys() {
+            for (uid, def) in self.iter_category(cat) {
+                all.push((uid, def, Some(cat.to_owned())));
+                seen.insert(uid);
+            }
+        }
+
+        // gather remaining without a category
+        for (uid, def) in self.definitions.iter() {
+            if !seen.contains(uid) {
+                all.push((*uid, def, None));
+            }
+        }
+
+        all.into_iter()
+            .map(|(uid, def, cat)| (uid.as_ref_static(), def, cat))
     }
 }
 #[cfg(test)]

@@ -215,14 +215,15 @@ fn log_timestamp(io: &mut dyn Write) -> std::io::Result<()> {
 
 fn main() {
     // enable structured logging before anything else
-    let logger_guard =
-        match logging::LoggerBuilder::with_env().and_then(|builder| builder.init(log_timestamp)) {
-            Err(e) => {
-                eprintln!("failed to setup logging: {:?}", e);
-                std::process::exit(1);
-            }
-            Ok(l) => l,
-        };
+    let logger_guard = match logging::LoggerBuilder::with_env("NN_LOG")
+        .and_then(|builder| builder.init(log_timestamp))
+    {
+        Err(e) => {
+            eprintln!("failed to setup logging: {:?}", e);
+            std::process::exit(1);
+        }
+        Ok(l) => l,
+    };
 
     info!("initialized logging"; "level" => ?logger_guard.level());
 

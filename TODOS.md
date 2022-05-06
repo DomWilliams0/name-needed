@@ -1,4 +1,4 @@
-# TODOs (425)
+# TODOs (426)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -559,6 +559,8 @@
    * `{"intelligence": (species: "sheep")}, // TODO`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
+ * [resources/definitions/living/plant.ron](resources/definitions/living/plant.ron) (1)
+   * `// TODO make plant abstract`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)
    * `// TODO tree trunk size depends on the tree it came from`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

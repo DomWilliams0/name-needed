@@ -54,6 +54,12 @@ impl AsRef<str> for CachedStr {
     }
 }
 
+impl CachedStr {
+    pub fn as_ref_static(&self) -> &'static str {
+        self.0.as_str()
+    }
+}
+
 impl Display for CachedStr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)

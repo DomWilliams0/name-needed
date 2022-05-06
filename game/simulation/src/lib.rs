@@ -42,8 +42,9 @@ pub use activity::{
     LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
+
 #[cfg(feature = "utils")]
-pub use definitions::load as load_definitions;
+pub use definitions::{load as load_definitions, Definition};
 
 pub use ecs::{
     Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity, KindComponent,
