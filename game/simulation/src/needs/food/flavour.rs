@@ -52,6 +52,14 @@ impl FoodInterest {
             .position(|f| f == flavour)
             .map(|i| self.preferences[i])
     }
+
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self {
+            flavours: BitFlags::empty(),
+            preferences: SmallVec::new(),
+        }
+    }
 }
 
 impl Debug for FoodInterest {

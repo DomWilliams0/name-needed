@@ -17,7 +17,6 @@ use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::job::JobIndex;
-use crate::needs::food::HungerComponent;
 use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
@@ -189,7 +188,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
         Read<'a, Societies>,
         Read<'a, FrameAllocator>,
         ReadStorage<'a, TransformComponent>,
-        ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
         WriteStorage<'a, AiComponent>,
         ReadStorage<'a, SocietyComponent>, // optional
@@ -203,7 +201,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
             societies,
             alloc,
             transform,
-            hunger,
             inventory,
             mut ai,
             society,
@@ -211,10 +208,9 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
     ) {
         let shared_bb = Rc::new(RefCell::new(SharedBlackboard::default()));
 
-        for (e, transform, hunger_opt, inventory_opt, ai, society_opt) in (
+        for (e, transform, inventory_opt, ai, society_opt) in (
             &entities,
             &transform,
-            (&hunger).maybe(),
             (&inventory).maybe(),
             &mut ai,
             (&society).maybe(),
@@ -228,7 +224,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
             let bb = Box::new(AiBlackboard::new(
                 e,
                 transform,
-                hunger_opt,
                 inventory_opt,
                 society_opt,
                 shared_bb.clone(),

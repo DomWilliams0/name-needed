@@ -98,9 +98,12 @@ impl ai::Input<AiContext> for AiInput {
 }
 
 fn hunger(blackboard: &mut AiBlackboard) -> f32 {
-    match blackboard.hunger {
-        Some(hunger) => hunger.value(),
-        None => 1.0, // not hungry if not applicable
+    match blackboard
+        .world
+        .component::<HungerComponent>(blackboard.entity)
+    {
+        Ok(comp) => comp.hunger().satiety().value(),
+        Err(_) => 1.0, // not hungry if not applicable
     }
 }
 

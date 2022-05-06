@@ -15,8 +15,8 @@ use crate::ecs::*;
 use crate::item::{FoundSlot, ItemFilter, ItemFilterable};
 use crate::spatial::Spatial;
 use crate::{
-    AiAction, ContainedInComponent, EcsWorld, Entity, HungerComponent, InventoryComponent,
-    SocietyComponent, SocietyHandle, TransformComponent, WorldRef,
+    AiAction, ContainedInComponent, EcsWorld, Entity, InventoryComponent, SocietyComponent,
+    SocietyHandle, TransformComponent, WorldRef,
 };
 
 pub struct AiContext;
@@ -43,8 +43,6 @@ pub enum AiTarget {
 pub struct AiBlackboard<'a> {
     pub entity: Entity,
     pub transform: &'a TransformComponent,
-    /// None if missing component
-    pub hunger: Option<NormalizedFloat>,
     pub inventory: Option<&'a InventoryComponent>,
     pub inventory_search_cache: HashMap<ItemFilter, FoundSlot<'a>>,
     pub society: Option<SocietyHandle>,
@@ -90,7 +88,6 @@ impl<'a> AiBlackboard<'a> {
     pub fn new(
         e: Entity,
         transform: &'a TransformComponent,
-        hunger: Option<&'a HungerComponent>,
         inventory: Option<&'a InventoryComponent>,
         society: Option<&'a SocietyComponent>,
         shared: Rc<RefCell<SharedBlackboard>>,
@@ -99,7 +96,6 @@ impl<'a> AiBlackboard<'a> {
         AiBlackboard::<'a> {
             entity: e,
             transform,
-            hunger: hunger.map(|h| h.hunger().satiety()),
             inventory_search_cache: HashMap::new(),
             local_area_search_cache: HashMap::new(),
             inventory,
