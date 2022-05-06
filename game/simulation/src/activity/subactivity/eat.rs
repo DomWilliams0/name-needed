@@ -7,8 +7,13 @@ use crate::needs::food::{BeingEatenComponent, FoodEatingError};
 use crate::queued_update::QueuedUpdates;
 use crate::{ComponentWorld, Entity};
 
-/// Eats an item that's already equipped
-pub struct EatItemSubactivity;
+/// Eats an item that's equipped or nearby
+pub struct EatItemSubactivity<'a> {
+    /// If false in destructor, eating must be cancelled manually
+    complete: bool,
+    ctx: &'a ActivityContext,
+    item: Entity,
+}
 
 const MAX_EAT_DISTANCE: f32 = 2.0;
 
@@ -27,12 +32,21 @@ pub enum EatItemError {
     TooFarFromFood,
 }
 
-impl EatItemSubactivity {
-    pub async fn eat_held(&self, ctx: &ActivityContext, item: Entity) -> Result<(), EatItemError> {
-        let eater = ctx.entity();
-        ctx.world()
-            .resource::<QueuedUpdates>()
-            .queue("begin eating held food", move |world| {
+impl<'a> EatItemSubactivity<'a> {
+    pub fn new(ctx: &'a ActivityContext, item: Entity) -> Self {
+        Self {
+            ctx,
+            item,
+            complete: false,
+        }
+    }
+
+    pub async fn eat_held(&mut self) -> Result<(), EatItemError> {
+        let eater = self.ctx.entity();
+        let item = self.item;
+        self.ctx.world().resource::<QueuedUpdates>().queue(
+            "begin eating held food",
+            move |world| {
                 match world.component::<ContainedInComponent>(item).as_deref() {
                     Ok(ContainedInComponent::InventoryOf(holder)) if *holder == eater => {
                         // success
@@ -59,13 +73,14 @@ impl EatItemSubactivity {
                 );
                 debug_assert!(insert_result.is_ok());
                 Ok(())
-            });
+            },
+        );
 
-        self.wait_for_event(ctx, eater, item).await
+        self.wait_for_event(self.ctx, eater, item).await
     }
 
     async fn wait_for_event(
-        &self,
+        &mut self,
         ctx: &ActivityContext,
         eater: Entity,
         item: Entity,
@@ -82,32 +97,33 @@ impl EatItemSubactivity {
             })
             .await;
 
-        match eat_result {
+        let res = match eat_result {
             Some(Ok(_)) => Ok(()),
             Some(Err(err)) => Err(EatItemError::Food(err)),
             None => Err(EatItemError::Cancelled),
-        }
+        };
+        self.complete = res.is_ok();
+        res
     }
 
-    pub async fn eat_nearby(
-        &self,
-        ctx: &ActivityContext,
-        item: Entity,
-    ) -> Result<(), EatItemError> {
-        let eater = ctx.entity();
-        // TODO any need to queue this to the next tick?
+    pub async fn eat_nearby(&mut self) -> Result<(), EatItemError> {
+        let eater = self.ctx.entity();
+        let item = self.item;
 
         // ensure close enough
-        match ctx.check_entity_distance(item, MAX_EAT_DISTANCE.powi(2)) {
+        match self
+            .ctx
+            .check_entity_distance(item, MAX_EAT_DISTANCE.powi(2))
+        {
             DistanceCheckResult::NotAvailable => return Err(EatItemError::BadItemEntity),
             DistanceCheckResult::TooFar => return Err(EatItemError::TooFarFromFood),
             DistanceCheckResult::InRange => {} // good
         };
 
         // start eating
-        ctx.world()
-            .resource::<QueuedUpdates>()
-            .queue("begin eating nearby food", move |world| {
+        self.ctx.world().resource::<QueuedUpdates>().queue(
+            "begin eating nearby food",
+            move |world| {
                 let _ = world.add_now(
                     item,
                     BeingEatenComponent {
@@ -116,8 +132,25 @@ impl EatItemSubactivity {
                     },
                 );
                 Ok(())
-            });
+            },
+        );
 
-        self.wait_for_event(ctx, eater, item).await
+        self.wait_for_event(self.ctx, eater, item).await
+    }
+}
+
+impl Drop for EatItemSubactivity<'_> {
+    fn drop(&mut self) {
+        if !self.complete {
+            debug!("aborting incomplete eat"; self.ctx.entity());
+
+            // prevent eating any more this, starting from this tick
+            let _ = self
+                .ctx
+                .world()
+                .remove_now::<BeingEatenComponent>(self.item);
+
+            // dont post event because the food has not been finished
+        }
     }
 }
