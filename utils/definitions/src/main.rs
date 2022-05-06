@@ -37,6 +37,7 @@ fn main() {
     let params = Params::from_args();
 
     if do_it(params).is_err() {
+        drop(logger); // ensure flushed
         std::process::exit(1);
     }
 }
