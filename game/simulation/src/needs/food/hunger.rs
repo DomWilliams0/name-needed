@@ -22,6 +22,14 @@ pub struct FoodDescription {
     pub efficiency: NormalizedFloat,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum FoodConsumption {
+    /// Food is finished
+    Finished,
+    /// Degrade by this amount
+    Degrade(NormalizedFloat),
+}
+
 impl Hunger {
     /// Defaults to full satiety
     pub fn new(max: Nutrition) -> Self {
@@ -49,7 +57,7 @@ impl Hunger {
         &mut self,
         food: &FoodDescription,
         food_condition: NormalizedFloat,
-    ) -> NormalizedFloat {
+    ) -> FoodConsumption {
         let food_remaining = food.total_nutrition * food_condition;
         let hunger_remaining = self.current.value().remaining(self.max);
 
@@ -71,7 +79,12 @@ impl Hunger {
         );
 
         // calculate proportion of food to degrade
-        food_degradation.proportion_of(food.total_nutrition)
+        let degrade = food_degradation.proportion_of(food.total_nutrition);
+        if degrade.value() <= 0.0 {
+            FoodConsumption::Finished
+        } else {
+            FoodConsumption::Degrade(degrade)
+        }
     }
 
     /// Panics on invalid exertion. Returns amount of fuel burned

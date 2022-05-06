@@ -43,7 +43,10 @@
     * [X] bug: higher concentration of plants in initial chunks only
 * [ ] fix config before merging to develop
 * [ ] remove catchup frames between game start and waiting for initial terrain
-* [ ] remove hunger from ai blackboard, the input will be cached anyway
+* [X] remove hunger from ai blackboard, the input will be cached anyway
+* [ ] bug: can't select treetop blocks?
+* [ ] entity selection - choose better in z direction e.g. from top down
+* [ ] grazing animals often get stuck between 2 nearby plants and keep switching between them
 
 ## Edible plants
 * [X] food interests and flavours

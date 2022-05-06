@@ -3,6 +3,7 @@ use common::*;
 use crate::ecs::*;
 use crate::event::EntityEventQueue;
 use crate::needs::food::component::{BeingEatenComponent, HungerComponent};
+use crate::needs::food::hunger::FoodConsumption;
 use crate::needs::food::EatType;
 use crate::simulation::EcsWorldRef;
 use crate::{
@@ -84,14 +85,18 @@ impl<'a> System<'a> for EatingSystem {
 
                 // do the eat
                 // TODO variable speed for eating - hurried (fast) vs relaxed/idle (slow)
-                let degradation = eater_hunger
+                let result = eater_hunger
                     .hunger_mut()
                     .eat(&edible.description, condition.0.value());
-                condition.0 -= degradation;
+
+                match result {
+                    FoodConsumption::Finished => condition.0.set(NormalizedFloat::zero()),
+                    FoodConsumption::Degrade(n) => condition.0 -= n,
+                }
 
                 trace!("{eater} is eating", eater = being_eaten.eater;
                     "new_hunger" => ?eater_hunger.hunger().satiety(),
-                    "food_degradation" => ?degradation,
+                    "food_degradation" => ?result,
                     "new_food_condition" => ?condition.0,
                 );
 
