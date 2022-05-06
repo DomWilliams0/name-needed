@@ -28,10 +28,11 @@
 * [X] frame allocator helpers for debug/display/vec
 * [ ] reuse some allocaions in herd joining system
 * simple fauna for sheep to eat
-    * [o] generation of plants in procgen
-        * [ ] species definition based on abstract plant
+    * [O] generation of plants in procgen
+        * [X] species definition based on abstract plant
             * ensure no display text on hover component is added
-        * [ ] random position and rotation
+        * [X] random position offset
+        * [ ] random rotation
     * [ ] growth/death of existing plants
     * [ ] growth of new plants from seeds/corpses/poo
     * [ ] approximate scattering of non quantitive growth like grass
@@ -49,6 +50,7 @@
     * [X] humans shouldn't consider eating these
 * [ ] instead of consuming a plant entirely in one sitting, grazing animals should nibble and
     wander more
+    * [ ] different foods are eaten at different speeds
 
 ## Herd leader
 * [X] identify leader of herd for others to follow
@@ -60,5 +62,3 @@
     * [ ] herd leader specific: lead herd to a new location
     * [X] stay near herd: if too far from leader, run towards it until in range
 * [ ] herd_centre() should return a transformcomponent ref instead of position, because its repeated too often
-
-

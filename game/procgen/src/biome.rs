@@ -499,9 +499,13 @@ impl BiomeType {
     /// Returns species name. None if no fauna in this biome (see [Self::has_fauna])
     pub(crate) fn choose_fauna(self, rando: &mut dyn RngCore) -> Option<&'static str> {
         use BiomeType::*;
+
+        const SHRUB: &str = "core_living_plant:shrub";
+        const TALL_GRASS: &str = "core_living_plant:tall_grass";
+
         match self {
-            Plains => Some("tall_grass"),
-            Forest => ["tall_grass", "shrub"].into_iter().choose(rando),
+            Plains => Some(TALL_GRASS),
+            Forest => [TALL_GRASS, SHRUB].into_iter().choose(rando),
             _ => None,
         }
     }

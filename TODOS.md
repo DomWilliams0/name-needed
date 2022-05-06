@@ -1,4 +1,4 @@
-# TODOs (426)
+# TODOs (424)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -357,15 +357,14 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (8)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (7)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
    * `// TODO depends on bounds of the physical entity size`
    * `// TODO cant hold voxel lock for long, but taking and releasing like this is insane`
-   * `// TODO define species variations in definition files`
-   * `// TODO procgen specifies plant rotation too`
+   * `// TODO procgen specifies plant rotation too?`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
@@ -559,8 +558,6 @@
    * `{"intelligence": (species: "sheep")}, // TODO`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
- * [resources/definitions/living/plant.ron](resources/definitions/living/plant.ron) (1)
-   * `// TODO make plant abstract`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)
    * `// TODO tree trunk size depends on the tree it came from`
  * [shared/common/Cargo.toml](shared/common/Cargo.toml) (1)

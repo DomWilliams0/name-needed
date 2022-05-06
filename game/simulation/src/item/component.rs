@@ -91,7 +91,6 @@ impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
     crate::as_any!();
 }
 
-register_component_template!("kind", KindComponent);
 register_component_template!("breakable", ConditionComponent);
 register_component_template!("edible", EdibleItemComponent);
 register_component_template!("throwable", ThrowableItemComponent);

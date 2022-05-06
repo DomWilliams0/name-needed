@@ -47,7 +47,7 @@ pub struct DisplayComponent {
 }
 
 /// Don't show a display name when hovering near an entity
-#[derive(Component, EcsComponent, Default, Clone)]
+#[derive(Component, EcsComponent, Default, Clone, Debug)]
 #[storage(NullStorage)]
 #[name("no-hover-display")]
 pub struct NoDisplayTextOnHoverComponent;
@@ -384,3 +384,28 @@ impl<V: Value> ComponentTemplate<V> for KindComponent {
 
     crate::as_any!();
 }
+
+impl<V: Value> ComponentTemplate<V> for NoDisplayTextOnHoverComponent {
+    fn construct(
+        values: &mut Map<V>,
+        _: &StringCache,
+    ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError>
+        where
+            Self: Sized,
+    {
+        if !values.is_empty() {
+            Err(ComponentBuildError::EmptyExpected)
+        } else {
+            Ok(Rc::new(Self))
+        }
+    }
+
+    fn instantiate<'b>(&self, builder: EntityBuilder<'b>) -> EntityBuilder<'b> {
+        builder.with(self.clone())
+    }
+
+    crate::as_any!();
+}
+
+register_component_template!("kind", KindComponent);
+register_component_template!("no-display-on-hover", NoDisplayTextOnHoverComponent);

@@ -609,7 +609,6 @@ impl ChunkDescription {
                     *self.ground_height.get_unchecked(SlabPositionAsCoord(pos));
 
                 // TODO calculate these better, and store them in data
-                use world_types::BlockType::*;
                 let (surface_block, shallow_under_block, deep_under_block, shallow_depth) =
                     biome.block_distribution();
 

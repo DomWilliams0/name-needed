@@ -71,7 +71,7 @@ impl Rasterizer {
     pub fn new(slab: SlabLocation) -> Self {
         Self {
             slab,
-            this_slab: Vec::with_capacity(16),
+            this_slab: Vec::new(),
             neighbours: ArrayVec::new(),
             other_blocks: Vec::new(),
         }
