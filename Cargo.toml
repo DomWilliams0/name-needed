@@ -22,6 +22,7 @@ members = [
 	"shared/unit",
 
     "utils/ai-curve-vis",
+    "utils/definitions",
 
 	# ensure this is the last member! so it can be sed'd out in CI on unsupported OSs
 	"testing",

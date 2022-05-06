@@ -97,6 +97,11 @@ impl DefinitionRegistry {
                 ),
             })
     }
+
+    #[cfg(feature = "utils")]
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Definition)> + '_ {
+        self.definitions.iter().map(|(s, def)| (s.as_ref(), def))
+    }
 }
 #[cfg(test)]
 mod tests {
