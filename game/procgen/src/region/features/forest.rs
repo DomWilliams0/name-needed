@@ -9,6 +9,7 @@ use crate::{BiomeType, PlanetParams};
 use common::*;
 
 use crate::region::subfeatures::Tree;
+use common::random::SmallRngExt;
 use geo::prelude::{Contains, Intersects};
 use geo::Rect;
 use geo_booleanop::boolean::BooleanOp;
@@ -53,7 +54,7 @@ impl Feature for ForestFeature {
         let mut rando_placement = ctx.slab_rando();
 
         // non deterministic tree characteristics
-        let mut tree_rando = SmallRng::from_entropy();
+        let mut tree_rando = SmallRng::new_quick();
 
         self.trees.spread(
             &mut rando_placement,

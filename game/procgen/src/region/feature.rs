@@ -14,6 +14,7 @@ use geo_booleanop::boolean::{BooleanOp, Operation};
 use rand_distr::Bernoulli;
 use tokio::sync::Mutex;
 
+use common::random::SmallRngExt;
 use common::*;
 use unit::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, SlabLocation, WorldPosition, SLAB_SIZE,
