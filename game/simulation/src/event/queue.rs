@@ -70,7 +70,9 @@ impl EntityEventQueue {
         self.events.extend(events);
 
         let n = self.events.len() - len_before;
-        debug!("posting {} events", n; "events" => ?&self.events[len_before..]);
+        if n != 0 {
+            debug!("posting {} events", n; "events" => ?&self.events[len_before..]);
+        }
     }
 
     pub fn unsubscribe_all(&mut self, subscriber: Entity) {

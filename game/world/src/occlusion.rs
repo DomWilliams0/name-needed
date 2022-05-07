@@ -1,11 +1,11 @@
 use common::derive_more::{Deref, DerefMut};
 use common::*;
 
-use crate::block::BlockOpacity;
 use crate::chunk::slice::Slice;
 use crate::neighbour::NeighbourOffset;
 use std::ops::Add;
 use unit::world::SliceBlock;
+use world_types::BlockOpacity;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum VertexOcclusion {

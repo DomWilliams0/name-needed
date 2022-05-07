@@ -1,4 +1,5 @@
 use std::iter::once;
+use world_types::BlockType;
 
 use common::derive_more::*;
 use unit::world::{
@@ -6,7 +7,6 @@ use unit::world::{
     WorldRange,
 };
 
-use crate::block::BlockType;
 use crate::loader::update::split::split_range_across_slabs;
 use common::Hash;
 
@@ -76,8 +76,8 @@ mod split {
         ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
         WorldRange, SLAB_SIZE,
     };
+    use world_types::BlockType;
 
-    use crate::block::BlockType;
     use crate::loader::update::{GenericTerrainUpdate, SlabTerrainUpdate};
 
     pub fn split_range_across_slabs(

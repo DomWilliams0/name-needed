@@ -1,6 +1,6 @@
-use crate::loader::terrain_source::TerrainSourceError;
+use crate::loader::terrain_source::{GeneratedSlab, TerrainSourceError};
 
-use crate::block::{Block, BlockType};
+use crate::block::Block;
 use crate::chunk::slab::{Slab, SlabType};
 
 use common::*;
@@ -28,14 +28,18 @@ impl GeneratedTerrainSource {
         &self.planet
     }
 
-    pub async fn load_slab(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+    pub async fn load_slab(&self, slab: SlabLocation) -> Result<GeneratedSlab, TerrainSourceError> {
         // TODO handle wrapping of slabs around planet boundaries
         let slab = self
             .planet
             .generate_slab(slab)
             .await
             .ok_or(TerrainSourceError::SlabOutOfBounds(slab))?;
-        Ok(slab.into())
+
+        Ok(GeneratedSlab {
+            terrain: slab.terrain.into(),
+            entities: slab.entities,
+        })
     }
 
     pub async fn get_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
@@ -51,24 +55,6 @@ impl From<procgen::SlabGrid> for Slab {
 
 impl From<&procgen::GeneratedBlock> for Block {
     fn from(block: &GeneratedBlock) -> Self {
-        Block::with_block_type(block.into())
-    }
-}
-
-impl From<&procgen::GeneratedBlock> for BlockType {
-    fn from(block: &GeneratedBlock) -> Self {
-        use crate::block::BlockType as B;
-        use procgen::BlockType as A;
-        match block.ty {
-            A::Air => B::Air,
-            A::Stone => B::Stone,
-            A::Dirt => B::Dirt,
-            A::Grass => B::Grass,
-            A::LightGrass => B::LightGrass,
-            A::Sand => B::Sand,
-            A::SolidWater => B::SolidWater,
-            A::Leaves => B::Leaves,
-            A::TreeTrunk => B::TreeTrunk,
-        }
+        Block::with_block_type(block.ty)
     }
 }

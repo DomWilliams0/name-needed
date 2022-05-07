@@ -10,14 +10,13 @@ use ai::{
 use common::*;
 
 use crate::activity::ActivityComponent;
-use crate::ai::dse::{dog_dses, human_dses, AdditionalDse, ObeyDivineCommandDse};
+use crate::ai::dse::{dog_dses, human_dses, sheep_dses, AdditionalDse, ObeyDivineCommandDse};
 use crate::ai::system::candidates::BestNCandidates;
 use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget, SharedBlackboard};
 use crate::alloc::FrameAllocator;
 use crate::ecs::*;
 use crate::item::InventoryComponent;
 use crate::job::JobIndex;
-use crate::needs::HungerComponent;
 use crate::simulation::{EcsWorldRef, Tick};
 use crate::society::job::SocietyTask;
 use crate::society::{Society, SocietyComponent};
@@ -39,6 +38,7 @@ impl AiComponent {
         let intelligence = match species {
             Species::Human => Intelligence::new(human_dses()),
             Species::Dog => Intelligence::new(dog_dses()),
+            Species::Sheep => Intelligence::new(sheep_dses()),
         };
 
         Self {
@@ -188,7 +188,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
         Read<'a, Societies>,
         Read<'a, FrameAllocator>,
         ReadStorage<'a, TransformComponent>,
-        ReadStorage<'a, HungerComponent>,    // optional
         ReadStorage<'a, InventoryComponent>, // optional
         WriteStorage<'a, AiComponent>,
         ReadStorage<'a, SocietyComponent>, // optional
@@ -202,7 +201,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
             societies,
             alloc,
             transform,
-            hunger,
             inventory,
             mut ai,
             society,
@@ -210,10 +208,9 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
     ) {
         let shared_bb = Rc::new(RefCell::new(SharedBlackboard::default()));
 
-        for (e, transform, hunger_opt, inventory_opt, ai, society_opt) in (
+        for (e, transform, inventory_opt, ai, society_opt) in (
             &entities,
             &transform,
-            (&hunger).maybe(),
             (&inventory).maybe(),
             &mut ai,
             (&society).maybe(),
@@ -227,7 +224,6 @@ impl<'a> System<'a> for MakeInitialChoice<'a> {
             let bb = Box::new(AiBlackboard::new(
                 e,
                 transform,
-                hunger_opt,
                 inventory_opt,
                 society_opt,
                 shared_bb.clone(),
@@ -554,10 +550,12 @@ fn collect_society_tasks(
     }
 }
 
+/// Temporary way to assign DSEs
 #[derive(Debug, Clone)]
 pub enum Species {
     Human,
     Dog,
+    Sheep,
 }
 
 #[derive(Debug)]
@@ -577,6 +575,7 @@ impl<V: Value> ComponentTemplate<V> for IntelligenceComponentTemplate {
         let species = match species.as_str() {
             "human" => Species::Human,
             "dog" => Species::Dog,
+            "sheep" => Species::Sheep,
             _ => {
                 return Err(ComponentBuildError::TemplateSpecific(format!(
                     "unknown species {:?}",

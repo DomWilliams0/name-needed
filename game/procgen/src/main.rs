@@ -22,7 +22,7 @@ fn log_time(out: &mut dyn Write) -> std::io::Result<()> {
 fn main() {
     use procgen::*;
 
-    let logger = logging::LoggerBuilder::with_env()
+    let logger = logging::LoggerBuilder::with_env("NN_LOG")
         .and_then(|builder| builder.init(log_time))
         .expect("logging failed");
     info!("initialized logging"; "level" => ?logger.level());

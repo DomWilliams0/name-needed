@@ -1,16 +1,18 @@
 //! Rasterization of features to actual blocks via subfeatures
 
-use crate::{GeneratedBlock, PlanetParams, SlabGrid};
-use common::*;
-
-use crate::region::region::SlabContinuations;
-use grid::GridImpl;
-use std::ops::DerefMut;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+
+use tokio::sync::{Mutex, MutexGuard};
+
+use common::*;
+use grid::GridImpl;
 use unit::world::{
     ChunkLocation, RangePosition, SlabLocation, SlabPosition, SlabPositionAsCoord, WorldPosition,
 };
+use world_types::EntityDescription;
+
+use crate::region::region::SlabContinuations;
+use crate::{GeneratedBlock, PlanetParams, SlabGrid};
 
 /// Rasterizable object that places blocks within a slab, possibly leaking over the edge into other
 /// slabs. In case of seepage, the subfeature is queued as a continuation for the neighbour slab.
@@ -18,8 +20,15 @@ use unit::world::{
 /// Note the neighbour slab could already be loaded!!
 pub trait Subfeature: Send + Debug {
     // TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour
-    fn rasterize(&mut self, root: WorldPosition, rasterizer: &mut Rasterizer);
+    fn rasterize(
+        &mut self,
+        root: WorldPosition,
+        rasterizer: &mut Rasterizer,
+    ) -> Option<SubfeatureEntity>;
 }
+
+/// Entity corresponding to a rasterized subfeature
+pub struct SubfeatureEntity(pub EntityDescription);
 
 /// Wrapper around an Arc<Mutex>
 #[derive(Clone)]
@@ -27,6 +36,7 @@ pub struct SharedSubfeature(Arc<tokio::sync::Mutex<SubfeatureInner>>);
 
 pub struct SubfeatureInner<F: ?Sized + Subfeature = dyn Subfeature> {
     /// A slab is added when this subfeature has been applied to it
+    // TODO reduce smallvec inline size, this is excessive and never spills
     completed: SmallVec<[SlabLocation; 9]>,
 
     /// Root block in starting slab - all neighbours are relative to this slab
@@ -46,7 +56,7 @@ pub struct SlabNeighbour([i8; 3]);
 
 /// Subfeatures call into a Rasterizer to place blocks, so the internals can change transparently
 /// in the future
-pub struct Rasterizer {
+pub struct Rasterizer<'rng> {
     // TODO reuse borrowed vec allocation
     this_slab: Vec<(SlabPosition, GeneratedBlock)>,
 
@@ -57,16 +67,23 @@ pub struct Rasterizer {
     other_blocks: Vec<(SlabNeighbour, WorldPosition, GeneratedBlock)>,
 
     slab: SlabLocation,
+
+    rng: &'rng mut SmallRng,
 }
 
-impl Rasterizer {
-    pub fn new(slab: SlabLocation) -> Self {
+impl<'rng> Rasterizer<'rng> {
+    pub fn new(slab: SlabLocation, rng: &'rng mut SmallRng) -> Self {
         Self {
             slab,
-            this_slab: Vec::with_capacity(16),
+            this_slab: Vec::new(),
             neighbours: ArrayVec::new(),
             other_blocks: Vec::new(),
+            rng,
         }
+    }
+
+    pub fn rng(&mut self) -> &mut impl Rng {
+        self.rng
     }
 
     pub fn place_block(&mut self, pos: WorldPosition, block: impl Into<GeneratedBlock>) {
@@ -112,8 +129,8 @@ impl Rasterizer {
 }
 
 impl SubfeatureInner {
-    pub fn rasterize(&mut self, rasterizer: &mut Rasterizer) {
-        self.subfeature.rasterize(self.root, rasterizer);
+    pub fn rasterize(&mut self, rasterizer: &mut Rasterizer) -> Option<SubfeatureEntity> {
+        self.subfeature.rasterize(self.root, rasterizer)
     }
 
     pub fn register_applied_slab(&mut self, slab: SlabLocation) {
@@ -185,7 +202,7 @@ impl SharedSubfeature {
         })))
     }
 
-    pub async fn lock(&self) -> impl DerefMut<Target = SubfeatureInner> + '_ {
+    pub async fn lock(&self) -> MutexGuard<'_, SubfeatureInner> {
         self.0.lock().await
     }
 
@@ -199,13 +216,14 @@ impl SharedSubfeature {
         continuations: Option<&mut SlabContinuations>,
         params: &PlanetParams,
         protruding_blocks: &Arc<Mutex<Vec<(WorldPosition, GeneratedBlock)>>>,
-    ) {
+        rng: &mut SmallRng,
+    ) -> Option<SubfeatureEntity> {
         debug!("rasterizing subfeature {}", if continuations.is_some() {"with propagation"} else {"in isolation"}; slab, &self);
         // TODO if continuations is None, set a flag to ignore boundary leaks
-        let mut rasterizer = Rasterizer::new(slab);
+        let mut rasterizer = Rasterizer::new(slab, rng);
 
-        // collect blocks from subfeature
-        self.lock().await.rasterize(&mut rasterizer);
+        // collect blocks and potential entity from subfeature
+        let entity = self.lock().await.rasterize(&mut rasterizer);
         rasterizer.finish();
 
         // apply blocks within this slab
@@ -218,14 +236,16 @@ impl SharedSubfeature {
         }
 
         self.lock().await.register_applied_slab(slab);
-        debug!("placed {count} blocks within slab", count = count; &self);
+        if count > 0 {
+            debug!("placed {count} blocks within slab", count = count; &self);
+        }
 
         if let Some(continuations) = continuations {
             // queue up blocks for other slabs
             let neighbours = rasterizer.touched_neighbours();
             if neighbours.is_empty() {
                 // nothing to do
-                return;
+                return entity;
             }
 
             debug!("subfeature leaks into {count} neighbours", count = neighbours.len(); &self, "neighbours" => ?neighbours);
@@ -279,6 +299,8 @@ impl SharedSubfeature {
                 };
             }
         }
+
+        entity
     }
 }
 

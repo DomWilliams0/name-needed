@@ -73,44 +73,53 @@ impl<'a> System<'a> for PathSteeringSystem {
                 path.path = None;
                 path.current_token = None;
 
-                match req {
+                let new_path = match req {
                     PathRequest::ClearCurrent => {
                         debug!("clearing current path by request");
+                        None
                     }
-                    PathRequest::NewTarget {
+                    PathRequest::NavigateTo {
                         target,
                         goal,
                         speed,
                         token,
                     } => {
-                        let world = (*world).borrow();
-                        let new_path = world.find_path_with_goal(
-                            transform.accessible_position(),
-                            target.floor(),
+                        let world = world.borrow();
+                        Some((
+                            world.find_path_with_goal(
+                                transform.accessible_position(),
+                                target.floor(),
+                                goal,
+                            ),
+                            speed,
+                            token,
                             goal,
-                        );
-
-                        match new_path {
-                            Err(err) => {
-                                warn!("failed to find path"; "target" => ?target, "error" => %err);
-
-                                event_queue.post(EntityEvent {
-                                    subject: e,
-                                    payload: EntityEventPayload::Arrived(token, Err(err)),
-                                });
-                            }
-                            Ok(new_path) => {
-                                let path_len = new_path.path().len();
-                                let new_following = PathFollowing::new(new_path, target, goal);
-                                debug!("following new path"; "target" => ?new_following.target(), "path_nodes" => path_len);
-
-                                path.path = Some(new_following);
-                                path.follow_speed = speed;
-                                path.current_token = Some(token);
-                            }
-                        };
+                            Some(target),
+                        ))
                     }
-                }
+                };
+
+                match new_path {
+                    Some((Err(err), _, token, _, target)) => {
+                        warn!("failed to find path"; "target" => ?target, "error" => %err);
+
+                        event_queue.post(EntityEvent {
+                            subject: e,
+                            payload: EntityEventPayload::Arrived(token, Err(err)),
+                        });
+                    }
+                    Some((Ok(new_path), speed, token, goal, _)) => {
+                        let path_len = new_path.path().len();
+                        let target = new_path.target().centred(); // TODO return random target point for unspecified too
+                        let new_following = PathFollowing::new(new_path, target, goal);
+                        debug!("following new path"; "target" => ?new_following.target(), "path_nodes" => path_len);
+
+                        path.path = Some(new_following);
+                        path.follow_speed = speed;
+                        path.current_token = Some(token);
+                    }
+                    None => {}
+                };
             }
 
             let following = match path.path.as_mut() {
@@ -145,7 +154,7 @@ impl<'a> System<'a> for PathSteeringSystem {
 
 impl FollowPathComponent {
     fn set_request(&mut self, req: PathRequest) {
-        if let Some(prev @ PathRequest::NewTarget { .. }) = self.request.as_ref() {
+        if let Some(prev @ PathRequest::NavigateTo { .. }) = self.request.as_ref() {
             warn!("follow path target was overwritten before it could be used";
                 "previous" => ?prev, "new" => ?req
             );
@@ -155,29 +164,29 @@ impl FollowPathComponent {
         self.request = Some(req);
     }
 
-    pub fn new_path_to(&mut self, target: WorldPoint, speed: NormalizedFloat) -> PathToken {
-        self.new_path_with_goal(target, SearchGoal::Arrive, speed)
+    pub fn request_navigation(&mut self, target: WorldPoint, speed: NormalizedFloat) -> PathToken {
+        self.request_navigation_with_goal(target, SearchGoal::Arrive, speed)
     }
 
-    pub fn new_path_with_goal(
+    pub fn request_navigation_with_goal(
         &mut self,
         target: WorldPoint,
         goal: SearchGoal,
         speed: NormalizedFloat,
     ) -> PathToken {
-        let token = PathToken(self.next_token);
-        self.next_token = self.next_token.wrapping_add(1);
-
-        let req = PathRequest::NewTarget {
+        let token = self.alloc_token();
+        self.set_request(PathRequest::NavigateTo {
             target,
             goal,
             speed,
             token,
-        };
+        });
+        token
+    }
 
-        self.set_request(req);
-
-        // preserve current_token until done
+    fn alloc_token(&mut self) -> PathToken {
+        let token = PathToken(self.next_token);
+        self.next_token = self.next_token.wrapping_add(1);
         token
     }
 

@@ -1,28 +1,31 @@
-use std::sync::{Arc, Weak};
-
-use geo::prelude::*;
-use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
-
-use tokio::sync::Mutex;
-
-use common::*;
-use unit::world::{GlobalSliceIndex, SlabLocation, WorldPosition};
-
-use crate::region::region::ChunkDescription;
-use crate::region::subfeature::{SharedSubfeature, Subfeature};
-use crate::region::PlanetPoint;
-use crate::{PlanetParams, PlanetParamsRef};
-use geo::algorithm::map_coords::MapCoordsInplace;
-use geo::concave_hull::ConcaveHull;
-use geo::coords_iter::CoordsIter;
-use geo_booleanop::boolean::{BooleanOp, Operation};
 use std::any::{Any, TypeId};
-
-use crate::region::unit::RegionLocation;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::hint::unreachable_unchecked;
 use std::ops::Deref;
+use std::sync::{Arc, Weak};
+
+use geo::algorithm::map_coords::MapCoordsInplace;
+use geo::concave_hull::ConcaveHull;
+use geo::coords_iter::CoordsIter;
+use geo::prelude::*;
+use geo::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
+use geo_booleanop::boolean::{BooleanOp, Operation};
+use rand_distr::Bernoulli;
+use tokio::sync::Mutex;
+
+use common::random::SmallRngExt;
+use common::*;
+use unit::world::{
+    BlockCoord, BlockPosition, GlobalSliceIndex, SlabLocation, WorldPosition, SLAB_SIZE,
+};
+
+use crate::region::region::{ChunkDescription, ChunkHeightMap};
+use crate::region::subfeature::{SharedSubfeature, Subfeature};
+use crate::region::subfeatures::Flora;
+use crate::region::unit::RegionLocation;
+use crate::region::PlanetPoint;
+use crate::{PlanetParams, PlanetParamsRef};
 
 /// Feature discovered during region initialization.
 /// Generic param should be `dyn Feature`, but can't use defaults and const params at the same
@@ -683,6 +686,53 @@ impl BooleanOp<f64, Polygon<f64>> for RegionalFeatureBoundary {
                 // safety: struct cant be created with another type
                 unsafe { unreachable_debug() }
             }
+        }
+    }
+}
+
+pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>) {
+    let mut rando = SmallRng::new_quick();
+
+    let skip_distr = Bernoulli::new(ctx.params.flora_skip_chance.clamp(0.0, 1.0)).unwrap();
+    let slab_z_range = {
+        let min = ctx.slab.slab.as_slice().slice();
+        min..min + SLAB_SIZE.as_i32()
+    };
+
+    // generate occasional flora at ground level
+    for (i, block) in ctx.chunk_desc.blocks().iter().enumerate() {
+        // only consider blocks at ground height
+        let ground = block.ground();
+        if !slab_z_range.contains(&ground.slice()) {
+            // this slab doesn't contain the ground level
+            continue;
+        }
+
+        let biome = block.biome();
+        if !biome.has_flora() || skip_distr.sample(&mut rando) {
+            continue;
+        }
+
+        let flora_species = block
+            .biome()
+            .choose_flora(&mut rando)
+            .expect("bad flora biome definition");
+
+        let subfeature = Flora {
+            species: flora_species,
+        };
+        let root = {
+            let [cx, cy, _]: [i32; 3] = ChunkHeightMap::unflatten(i).unwrap(); // certainly valid
+            debug_assert!(BlockCoord::try_from(cx).is_ok()); // ensure dims are fine before casts
+            BlockPosition::new_unchecked(cx as BlockCoord, cy as BlockCoord, block.ground())
+                .to_world_position(ctx.slab.chunk)
+        };
+        if let Err(err) = ctx
+            .subfeatures_tx
+            .send(SharedSubfeature::new(subfeature, root))
+        {
+            warn!("failed to send subfeature"; "err" => %err);
+            break;
         }
     }
 }

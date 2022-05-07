@@ -13,9 +13,9 @@ use simulation::job::BuildThingJob;
 use simulation::{
     ActivityComponent, AssociatedBlockData, AssociatedBlockDataType, BlockType, ComponentRef,
     ComponentWorld, ConditionComponent, Container, ContainerComponent, EdibleItemComponent, Entity,
-    EntityLoggingComponent, FollowPathComponent, HungerComponent, IntoEnumIterator,
-    InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent, Societies,
-    SocietyComponent, TransformComponent, UiElementComponent,
+    EntityLoggingComponent, FollowPathComponent, HerdedComponent, HungerComponent,
+    IntoEnumIterator, InventoryComponent, ItemStackComponent, NameComponent, PhysicalComponent,
+    Societies, SocietyComponent, SpeciesComponent, TransformComponent, UiElementComponent,
 };
 
 use crate::render::sdl::ui::context::{DefaultOpen, EntityDesc, UiContext};
@@ -197,37 +197,43 @@ impl SelectionWindow {
 
         let components_node = context.new_tree_node("Components", DefaultOpen::Closed);
         if components_node.is_some() {
-            // TODO component-specific widget
-            for (name, component) in context.simulation().ecs.all_components_for(details.entity) {
-                let interactive = match component.as_interactive() {
-                    None => {
-                        // just show name
-                        context.text(ui_str!(in context, " - {}", name));
-                        continue;
-                    }
-                    Some(i) => i,
-                };
+            ChildWindow::new("scrolledcomponents")
+                .size([0.0, 150.0])
+                .build(context, || {
+                    // TODO component-specific widget
+                    for (name, component) in
+                        context.simulation().ecs.all_components_for(details.entity)
+                    {
+                        let interactive = match component.as_interactive() {
+                            None => {
+                                // just show name
+                                context.text(ui_str!(in context, " - {}", name));
+                                continue;
+                            }
+                            Some(i) => i,
+                        };
 
-                // nice tree node
-                let title = ui_str!(in context, "{}", name);
-                let node = context.new_tree_node(title, DefaultOpen::Closed);
-                if node.is_none() {
-                    continue;
-                }
-
-                context.key_value(
-                    "Summary",
-                    || {
-                        if let Some(dbg) = interactive.as_debug() {
-                            Value::Wrapped(ui_str!(in context, "{:?}", dbg))
-                        } else {
-                            Value::None("Not implemented")
+                        // nice tree node
+                        let title = ui_str!(in context, "{}", name);
+                        let node = context.new_tree_node(title, DefaultOpen::Closed);
+                        if node.is_none() {
+                            continue;
                         }
-                    },
-                    None,
-                    COLOR_ORANGE,
-                );
-            }
+
+                        context.key_value(
+                            "Summary",
+                            || {
+                                if let Some(dbg) = interactive.as_debug() {
+                                    Value::Wrapped(ui_str!(in context, "{:?}", dbg))
+                                } else {
+                                    Value::None("Not implemented")
+                                }
+                            },
+                            None,
+                            COLOR_ORANGE,
+                        );
+                    }
+                });
         }
 
         let tabbar = context.new_tab_bar("##entitydetailstabbar");
@@ -242,6 +248,8 @@ impl SelectionWindow {
         if !matches!(details.ty, EntityType::UiElement(_)) {
             self.do_logs(context, &details);
         }
+
+        self.do_debug(context, &details);
     }
 
     //noinspection DuplicatedCode
@@ -251,6 +259,26 @@ impl SelectionWindow {
         {
             let tab = context.new_tab("Living");
             if tab.is_some() {
+                context.key_value(
+                    "Species:",
+                    || {
+                        details
+                            .component::<SpeciesComponent>(context)
+                            .map(|s| ui_str!(in context, "{}", s.species()))
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
+                context.key_value(
+                    "Herd:",
+                    || {
+                        details
+                            .component::<HerdedComponent>(context)
+                            .map(|h| ui_str!(in context, "{}", h.current()))
+                    },
+                    None,
+                    COLOR_ORANGE,
+                );
                 context.key_value(
                     "Velocity:",
                     || {
@@ -267,7 +295,7 @@ impl SelectionWindow {
                     "Satiety:",
                     || {
                         details.component::<HungerComponent>(context).map(|h| {
-                            let (current, max) = h.satiety();
+                            let (current, max) = h.hunger().satiety_raw();
                             ui_str!(in context, "{}/{}", current, max)
                         })
                     },
@@ -354,7 +382,7 @@ impl SelectionWindow {
             if tab.is_some() {
                 context.key_value(
                     "Nutrition:",
-                    || ui_str!(in context, "{}", edible.total_nutrition),
+                    || ui_str!(in context, "{}", edible.description.total_nutrition),
                     None,
                     COLOR_ORANGE,
                 );
@@ -527,6 +555,14 @@ impl SelectionWindow {
                 entity: details.entity,
                 enabled: req,
             });
+        }
+    }
+
+    fn do_debug(&mut self, context: &UiContext, details: &SelectedEntityDetails) {
+        let _tab = open_or_ret!(context.new_tab("Debug"));
+
+        if context.button("Kill") {
+            context.issue_request(UiRequest::Kill(details.entity));
         }
     }
 

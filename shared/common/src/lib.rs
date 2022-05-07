@@ -2,8 +2,10 @@ pub use arrayvec::*;
 pub use boolinator::Boolinator;
 pub use bumpalo;
 pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
+pub type BumpString<'a> = bumpalo::collections::String<'a>;
 pub type BumpBox<'a, T> = bumpalo::boxed::Box<'a, T>;
 
+pub use ::tap::*;
 pub use cgmath;
 pub use cgmath::{
     Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3, SquareMatrix,
@@ -21,6 +23,7 @@ pub use ordered_float::{NotNan, OrderedFloat};
 pub use parking_lot;
 pub use parse_display;
 pub use rand::{self, prelude::*};
+pub use rstar;
 pub use smallvec::{self, *};
 pub use thiserror::{self, Error};
 pub use tracy_client;
@@ -88,6 +91,7 @@ pub mod dynslot;
 pub mod input;
 pub mod newtype;
 pub mod random;
+pub mod sized_iter;
 
 pub fn seeded_rng(seed: Option<u64>) -> StdRng {
     match seed {

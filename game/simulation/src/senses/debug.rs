@@ -15,10 +15,6 @@ const COLOR_HEARING: Color = Color::rgb(180, 200, 80);
 pub struct SensesDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for SensesDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "senses"
-    }
-
     fn name(&self) -> &'static str {
         "Senses"
     }

@@ -3,8 +3,8 @@ use std::iter::once;
 use common::*;
 use config::WorldPreset;
 use unit::world::CHUNK_SIZE;
+use world_types::BlockType;
 
-use crate::block::BlockType;
 use crate::chunk::ChunkBuilder;
 use crate::loader::MemoryTerrainSource;
 #[cfg(test)]
@@ -166,7 +166,7 @@ pub fn bottleneck() -> MemoryTerrainSource {
                 BlockType::Stone
             })
             .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| BlockType::Air)
-            .fill_slice(-5, BlockType::Stone)
+            // .fill_slice(-5, BlockType::Stone)
             .build((0, i))
     });
 

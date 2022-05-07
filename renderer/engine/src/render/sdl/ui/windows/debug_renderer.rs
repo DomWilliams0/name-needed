@@ -116,7 +116,13 @@ impl Default for DebugWindow {
         // default debug renderers
         let enabled_debug_renderers = {
             let mut vec = Vec::with_capacity(16);
-            vec.extend(["axes", "steering"].into_iter().map(Cow::Borrowed));
+            vec.extend(
+                [
+                    "simulation::render::debug::AxesDebugRenderer",
+                    "simulation::steer::debug::SteeringDebugRenderer",
+                ]
+                .map(Cow::Borrowed),
+            );
             vec
         };
 

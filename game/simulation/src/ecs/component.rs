@@ -15,6 +15,9 @@ pub enum ComponentBuildError {
     #[error("Failed to deserialize ron: {0}")]
     Deserialize(#[from] ron::Error),
 
+    #[error("Component expects no values but got some")]
+    EmptyExpected,
+
     #[error("Key {0:?} not found")]
     KeyNotFound(String),
 
@@ -125,13 +128,13 @@ impl<V: Value> Map<V> {
         })
     }
 
-    pub fn get_float<F: num_traits::NumCast>(
+    pub fn get_float<F: num_traits::FromPrimitive>(
         &mut self,
         key: &str,
     ) -> Result<F, ComponentBuildError> {
         self.get(key).and_then(|val| {
             val.into_float().and_then(|float| {
-                F::from(float).ok_or_else(|| {
+                F::from_f64(float).ok_or_else(|| {
                     ComponentBuildError::InvalidFloatValue(
                         std::any::type_name::<F>().to_owned(),
                         float,
@@ -150,6 +153,10 @@ impl<V: Value> Map<V> {
 
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &V)> + '_ {

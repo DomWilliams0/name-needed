@@ -11,8 +11,6 @@ use unit::space::view::ViewPoint;
 use unit::world::{WorldPoint, CHUNK_SIZE};
 
 pub trait DebugRenderer<R: Renderer> {
-    fn identifier(&self) -> &'static str;
-
     fn name(&self) -> &'static str;
 
     fn render(
@@ -26,6 +24,10 @@ pub trait DebugRenderer<R: Renderer> {
 
     #[allow(unused_variables)]
     fn on_toggle(&mut self, enabled: bool, world: &EcsWorld) {}
+
+    fn identifier(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 pub struct DebugRenderers<R: Renderer> {
@@ -153,10 +155,6 @@ pub struct AxesDebugRenderer;
 pub struct ChunkBoundariesDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "axes"
-    }
-
     fn name(&self) -> &'static str {
         "Axes"
     }
@@ -180,10 +178,6 @@ impl<R: Renderer> DebugRenderer<R> for AxesDebugRenderer {
 }
 
 impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "chunk boundaries"
-    }
-
     fn name(&self) -> &'static str {
         "Chunk boundaries"
     }

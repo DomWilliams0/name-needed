@@ -9,7 +9,10 @@ pub use component::{ComponentBuildError, ComponentEntry, InteractiveComponent, M
 pub use debug::{AllSocietyVisibilityDebugRenderer, EntityIdDebugRenderer};
 pub use ecs_derive::EcsComponent;
 pub use entity::{Entity, EntityBomb, EntityWrapper};
-pub use name::{DisplayComponent, DisplayTextSystem, KindComponent, NameComponent};
+pub use name::{
+    DisplayComponent, DisplayTextSystem, KindComponent, NameComponent,
+    NoDisplayTextOnHoverComponent,
+};
 pub use template::{ComponentTemplate, ComponentTemplateEntry, ValueImpl};
 
 pub use crate::register_component_template;

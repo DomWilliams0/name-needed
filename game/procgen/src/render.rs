@@ -16,6 +16,7 @@ use unit::world::{
 };
 
 use crate::params::{AirLayer, RenderOverlay, RenderProgressParams};
+use crate::rasterize::block_color_hs;
 use crate::region::{PlanetPoint, RegionLocation, CHUNKS_PER_REGION_SIDE};
 use crate::{map_range, Planet};
 
@@ -328,7 +329,7 @@ impl Render {
                                 y,
                                 LocalSliceIndex::new_unchecked(z),
                             );
-                            let block = generated.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
+                            let block = generated.terrain.get(SlabPositionAsCoord(pos)).unwrap(); // definitely valid
                             if block.is_air() {
                                 continue;
                             }
@@ -395,7 +396,7 @@ impl Render {
                             clamp(z as f32, min_height, max_height),
                         );
 
-                        let (h, s) = block_type.color_hs();
+                        let (h, s) = block_color_hs(block_type);
                         Color::hsl(h, s, l)
                     }
                     None => {

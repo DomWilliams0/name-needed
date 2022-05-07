@@ -1,15 +1,17 @@
-use crate::continent::ContinentMap;
-use crate::{map_range, PlanetParams, RegionLocation};
-use common::*;
-use noise::{Fbm, NoiseFn, Seedable};
+use std::f64::consts::{PI, TAU};
 
-use crate::region::PlanetPoint;
+use noise::{Fbm, NoiseFn, Seedable};
 use rstar::{Envelope, Point, RTree, AABB};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
-use std::f64::consts::{PI, TAU};
 
+use common::*;
 pub(crate) use deserialize::BiomeConfig;
+use world_types::BlockType;
+
+use crate::continent::ContinentMap;
+use crate::region::PlanetPoint;
+use crate::{map_range, PlanetParams, RegionLocation};
 
 pub struct BiomeSampler {
     latitude_coefficient: f64,
@@ -479,6 +481,40 @@ impl BiomeType {
             elevation: Range::full(),
         }
     }
+
+    /// (surface_block, shallow_under_block, deep_under_block, shallow_depth)
+    pub(crate) fn block_distribution(self) -> (BlockType, BlockType, BlockType, i32) {
+        use world_types::BlockType::*;
+        match self {
+            BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {
+                (Dirt, Sand, Stone, 1)
+            }
+            BiomeType::Beach => (Sand, Dirt, Stone, 4),
+            BiomeType::Plains => (LightGrass, Dirt, Stone, 3),
+            BiomeType::Forest | BiomeType::Tundra => (Grass, Dirt, Stone, 3),
+            BiomeType::Desert => (Sand, Sand, Stone, 6),
+        }
+    }
+
+    /// Returns species name. None if no flora in this biome (see [Self::has_flora])
+    pub(crate) fn choose_flora(self, rando: &mut dyn RngCore) -> Option<&'static str> {
+        use BiomeType::*;
+
+        const SHRUB: &str = "core_living_plant:shrub";
+        const TALL_GRASS: &str = "core_living_plant:tall_grass";
+
+        match self {
+            Plains => Some(TALL_GRASS),
+            Forest => [TALL_GRASS, SHRUB].into_iter().choose(rando),
+            _ => None,
+        }
+    }
+
+    /// Must fit with [choose_flora]. Will be defined in data in the future
+    pub(crate) fn has_flora(self) -> bool {
+        use BiomeType::*;
+        matches!(self, Plains | Forest)
+    }
 }
 
 impl rstar::RTreeObject for BiomeNode {
@@ -597,14 +633,16 @@ impl<'a> From<&'a BiomeConfig> for BiomeParams {
 }
 
 mod deserialize {
+    use std::fmt::Formatter;
+    use std::marker::PhantomData;
+
+    use serde::de::{Error, SeqAccess, Visitor};
+    use serde::{de, Deserialize, Deserializer};
+
     use crate::biome::{
         BiomeConfigError, BiomeType, CoastlineLimit, ElevationLimit, NormalizedLimit, Range,
         RangeLimit,
     };
-    use serde::de::{Error, SeqAccess, Visitor};
-    use serde::{de, Deserialize, Deserializer};
-    use std::fmt::Formatter;
-    use std::marker::PhantomData;
 
     /// Serialized biome config
     #[derive(Deserialize, Debug)]

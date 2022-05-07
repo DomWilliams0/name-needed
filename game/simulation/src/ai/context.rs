@@ -15,8 +15,8 @@ use crate::ecs::*;
 use crate::item::{FoundSlot, ItemFilter, ItemFilterable};
 use crate::spatial::Spatial;
 use crate::{
-    AiAction, ContainedInComponent, EcsWorld, Entity, HungerComponent, InventoryComponent,
-    SocietyComponent, SocietyHandle, TransformComponent, WorldRef,
+    AiAction, ContainedInComponent, EcsWorld, Entity, InventoryComponent, SocietyComponent,
+    SocietyHandle, TransformComponent, WorldRef,
 };
 
 pub struct AiContext;
@@ -43,8 +43,6 @@ pub enum AiTarget {
 pub struct AiBlackboard<'a> {
     pub entity: Entity,
     pub transform: &'a TransformComponent,
-    /// None if missing component
-    pub hunger: Option<NormalizedFloat>,
     pub inventory: Option<&'a InventoryComponent>,
     pub inventory_search_cache: HashMap<ItemFilter, FoundSlot<'a>>,
     pub society: Option<SocietyHandle>,
@@ -66,12 +64,9 @@ impl ai::Blackboard for AiBlackboard<'_> {
     #[cfg(feature = "metrics")]
     fn entity(&self) -> std::borrow::Cow<str> {
         use crate::alloc::FrameAllocator;
-        use std::fmt::Write;
 
         let alloc = self.world.resource::<FrameAllocator>();
-        let mut s = bumpalo::collections::String::new_in(alloc.allocator());
-        let _ = write!(&mut s, "{}", self.entity);
-        std::borrow::Cow::Borrowed(s.into_bump_str())
+        std::borrow::Cow::Borrowed(alloc.alloc_str_from_display(&self.entity).into_bump_str())
     }
 }
 
@@ -93,7 +88,6 @@ impl<'a> AiBlackboard<'a> {
     pub fn new(
         e: Entity,
         transform: &'a TransformComponent,
-        hunger: Option<&'a HungerComponent>,
         inventory: Option<&'a InventoryComponent>,
         society: Option<&'a SocietyComponent>,
         shared: Rc<RefCell<SharedBlackboard>>,
@@ -102,7 +96,6 @@ impl<'a> AiBlackboard<'a> {
         AiBlackboard::<'a> {
             entity: e,
             transform,
-            hunger: hunger.map(|h| h.hunger()),
             inventory_search_cache: HashMap::new(),
             local_area_search_cache: HashMap::new(),
             inventory,
@@ -180,9 +173,7 @@ impl<'a> AiBlackboard<'a> {
                 }
 
                 // check this item is accessible
-                let item_pos = entity
-                    .get(&transforms)
-                    .and_then(|t| t.accessible_position)?;
+                let item_pos = entity.get(&transforms).map(|t| t.accessible_position())?;
                 let item_area = voxel_world.area(item_pos).ok()?;
 
                 if item_area != self_area {

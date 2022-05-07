@@ -130,10 +130,10 @@ impl<'a, C: Context> InputCache<'a, C> {
     ) -> f32 {
         // TODO use an arena-allocator hashmap
         // TODO perfect hash on C::Input
-        if let Some((_, _, val)) = self.0.iter().find(|(ty, tgt, _)| {
+        if let Some((_, _, val)) = self.0.iter().find(|(ty, cached_target, _)| {
             if *ty == input {
-                match (tgt, target) {
-                    (None, None) => true, // no target for either
+                match (cached_target, target) {
+                    (None, _) => true, // was cached without a target, use that and ignore current target
                     (Some(a), Some(b)) if a == b => true,
                     _ => false,
                 }

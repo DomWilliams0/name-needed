@@ -18,8 +18,9 @@
         max_speed: 0.16,
         acceleration: 0.08,
       )},
+      {"species": (name: "human")},
       {"intelligence": (species: "human")},
-      {"hunger": (max: 3000)},
+      {"hunger": (max: 3000, interests: "cooked-meat=50,fruit=48,cooked-plant=45", metabolism: 0.1)},
       {"senses": (
         vision: (length: 15.0, angle: 100 /*degrees*/),
       )}

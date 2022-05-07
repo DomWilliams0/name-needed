@@ -1,15 +1,18 @@
 use async_trait::async_trait;
+use specs::WorldExt;
 
+use common::rand::distributions::Uniform;
 use common::*;
+use unit::world::WorldPosition;
+use world::{ExplorationFilter, ExplorationResult, SearchGoal};
 
 use crate::activity::context::{ActivityContext, ActivityResult};
 use crate::activity::status::Status;
 use crate::activity::subactivity::GoingToStatus;
 use crate::activity::Activity;
-use crate::ecs::ComponentGetError;
+
 use crate::path::WANDER_SPEED;
-use crate::{ComponentWorld, TransformComponent, WorldPosition};
-use world::SearchGoal;
+use crate::{ComponentWorld, HerdedComponent, Herds, TransformComponent};
 
 /// Wandering aimlessly
 #[derive(Debug, Default, Display)]
@@ -22,14 +25,9 @@ enum State {
 
 #[derive(Debug, Error)]
 pub enum WanderError {
-    #[error("Wanderer has no transform: {0}")]
-    MissingTransform(#[from] ComponentGetError),
-
-    #[error("Can't find an accessible wander destination, possibly stuck")]
-    Inaccessible,
+    #[error("Wanderer has no transform")]
+    MissingTransform,
 }
-
-const WANDER_RADIUS: u16 = 10;
 
 #[async_trait]
 impl Activity for WanderActivity {
@@ -38,43 +36,79 @@ impl Activity for WanderActivity {
     }
 
     async fn dew_it(&self, ctx: &ActivityContext) -> ActivityResult {
+        let distr_wander_distance = Uniform::new(2, 50);
+        let distr_loiter_ticks = Uniform::new(5, 20);
+        let world_ref = ctx.world().voxel_world();
+
         loop {
-            // wander to a new target
-            let tgt = find_target(ctx)?;
-            trace!("wandering to {:?}", tgt);
+            let (wander_distance, loiter_ticks) = {
+                let mut random = thread_rng();
+                (
+                    distr_wander_distance.sample(&mut random),
+                    distr_loiter_ticks.sample(&mut random),
+                )
+            };
+
+            ctx.update_status(State::Wander);
+
+            let wander_destination = {
+                let transforms = ctx.world().read_storage::<TransformComponent>();
+                let explore_filter = ctx
+                    .world()
+                    .component::<HerdedComponent>(ctx.entity())
+                    .ok()
+                    .and_then(|comp| {
+                        let herds = ctx.world().resource::<Herds>();
+                        herds.get_info(comp.current().handle())
+                    })
+                    .map(|herd| {
+                        let pos = herd
+                            .herd_centre(|e| e.get(&transforms).map(|t| t.position))
+                            .floor();
+                        let max_distance2 = {
+                            let (min, max) = herd.range().bounds();
+                            let w = max.x() - min.x();
+                            let h = max.y() - min.y();
+                            let range = w.max(h).max(5.0);
+                            ((range * 0.5) as i32).pow(2)
+                        };
+                        // TODO when in range, this produces a lot of single block paths, which look terrible
+                        ExplorationFilter(Box::new(move |candidate: WorldPosition| {
+                            if candidate.distance2(pos) < max_distance2 {
+                                ExplorationResult::Continue
+                            } else {
+                                // too far away
+                                ExplorationResult::Abort
+                            }
+                        }))
+                    });
+
+                let explore_src = ctx
+                    .entity()
+                    .get(&transforms)
+                    .map(|t| t.accessible_position())
+                    .ok_or(WanderError::MissingTransform)?;
+
+                world_ref.borrow().find_exploratory_destination(
+                    explore_src,
+                    wander_distance,
+                    explore_filter,
+                )?
+            };
+
             ctx.go_to(
-                tgt.centred(),
+                wander_destination.centred(),
                 NormalizedFloat::new(WANDER_SPEED),
-                SearchGoal::Arrive,
+                SearchGoal::Nearby(1),
                 GoingToStatus::Custom(State::Wander),
             )
             .await?;
 
             // loiter for a bit
             ctx.update_status(State::Loiter);
-            let loiter_ticks = random::get().gen_range(5, 60);
             ctx.wait(loiter_ticks).await;
         }
     }
-}
-
-fn find_target(ctx: &ActivityContext) -> Result<WorldPosition, WanderError> {
-    // TODO special SearchGoal for wandering instead of randomly choosing an accessible target
-    let transform = ctx
-        .world()
-        .component::<TransformComponent>(ctx.entity())
-        .map_err(WanderError::MissingTransform)?;
-
-    let world = ctx.world().voxel_world();
-    let world = world.borrow();
-
-    world
-        .choose_random_accessible_block_in_radius(
-            transform.accessible_position(),
-            WANDER_RADIUS,
-            20,
-        )
-        .ok_or(WanderError::Inaccessible)
 }
 
 impl Display for State {

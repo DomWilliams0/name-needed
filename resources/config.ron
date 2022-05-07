@@ -9,14 +9,14 @@ Config(
         persist_ui: true,
     ),
     world: (
-        //source: Preset(OneChunkWonder),
+        // source: Preset(FlatLands),
         source: Generate("planet_generation.txt"),
         load_timeout: 30,
         worker_threads: None,
         initial_chunk: (33, 512), // near a forest
 
         /// keep these low <=8
-        initial_slab_depth: 0,
+        initial_slab_depth: 1,
         initial_chunk_radius: 1,
     ),
     simulation: (
@@ -24,13 +24,17 @@ Config(
         friction: 0.85,
         start_delay: 0,
         spawn_counts: {
-            "humans": 20,
+            "humans": 10,
             "dogs": 5,
-            "food": 50,
+            "sheep": 15,
+            "cows": 10,
+            "food": 40,
             "bricks": 80,
             "build_jobs": 2,
         },
         entity_logging_by_default: true,
         entity_logging_capacity: 64,
+        herd_radius: 12.0,
+        herd_expiry_ticks: 80,
      ),
 )

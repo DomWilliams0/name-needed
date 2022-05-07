@@ -1,7 +1,9 @@
-use std::hint::unreachable_unchecked;
+use std::convert::{TryFrom, TryInto};
+
 use std::marker::PhantomData;
 
-use std::convert::{TryFrom, TryInto};
+use common::sized_iter::SizedIterator;
+use common::Itertools;
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation};
 
@@ -21,7 +23,7 @@ pub struct Slab;
 pub struct World;
 
 #[derive(Copy, Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
+#[cfg_attr(test, derive(Eq, PartialEq, Ord, PartialOrd))]
 #[repr(u8)]
 pub enum NeighbourOffset {
     South,
@@ -181,7 +183,7 @@ impl NeighbourOffset {
     }
 
     pub fn is_vertical(self) -> bool {
-        debug_assert!(self.is_aligned());
+        assert!(self.is_aligned());
         matches!(self, NeighbourOffset::North | NeighbourOffset::South)
     }
 
@@ -198,22 +200,79 @@ impl NeighbourOffset {
         }
     }
 
-    pub fn extend_across_boundary(self, pos: BlockPosition) -> BlockPosition {
-        debug_assert!(self.is_aligned());
+    pub fn extend_across_boundary_aligned(self, pos: BlockPosition) -> BlockPosition {
+        use NeighbourOffset::*;
+        assert!(self.is_aligned());
 
         let (mut x, mut y, z) = pos.into();
         match self {
-            NeighbourOffset::South => y = CHUNK_SIZE.as_block_coord() - 1,
-            NeighbourOffset::North => y = 0,
-            NeighbourOffset::East => x = 0,
-            NeighbourOffset::West => x = CHUNK_SIZE.as_block_coord() - 1,
-            _ => {
-                // safety: asserted self is aligned
-                unsafe { unreachable_unchecked() }
-            }
+            South => y = CHUNK_SIZE.as_block_coord() - 1,
+            North => y = 0,
+            East => x = 0,
+            West => x = CHUNK_SIZE.as_block_coord() - 1,
+            _ => unreachable!("should be aligned"),
         };
 
         BlockPosition::new_unchecked(x, y, z)
+    }
+
+    pub fn extend_across_any_boundary(
+        self,
+        source_block: BlockPosition,
+        source_chunk: ChunkLocation,
+    ) -> (BlockPosition, ChunkLocation) {
+        use NeighbourOffset::*;
+        const MAX: BlockCoord = CHUNK_SIZE.as_block_coord() - 1;
+
+        let (mut bx, mut by, bz) = source_block.xyz();
+        let (mut cx, mut cy) = source_chunk.xy();
+        match self {
+            South => {
+                by = MAX;
+                cy -= 1;
+            }
+            North => {
+                by = 0;
+                cy += 1;
+            }
+            East => {
+                bx = 0;
+                cx += 1;
+            }
+            West => {
+                bx = MAX;
+                cx -= 1;
+            }
+            SouthEast => {
+                bx = 0;
+                by = MAX;
+                cx += 1;
+                cy -= 1;
+            }
+            NorthEast => {
+                bx = 0;
+                by = 0;
+                cx += 1;
+                cy += 1;
+            }
+            SouthWest => {
+                bx = MAX;
+                by = MAX;
+                cx -= 1;
+                cy -= 1;
+            }
+            NorthWest => {
+                bx = MAX;
+                by = 0;
+                cx -= 1;
+                cy += 1;
+            }
+        };
+
+        (
+            BlockPosition::new_unchecked(bx, by, bz),
+            ChunkLocation(cx, cy),
+        )
     }
 
     pub fn position_on_boundary(self, other_coord: BlockCoord) -> (BlockCoord, BlockCoord) {
@@ -223,10 +282,92 @@ impl NeighbourOffset {
             NeighbourOffset::East => (CHUNK_SIZE.as_block_coord() - 1, other_coord),
             NeighbourOffset::North => (other_coord, CHUNK_SIZE.as_block_coord() - 1),
             NeighbourOffset::West => (0, other_coord),
-            _ => {
-                // safety: asserted self is aligned
-                unsafe { unreachable_unchecked() }
-            }
+            _ => unreachable!("should be aligned"),
+        }
+    }
+
+    fn from_offset(offset: (i16, i16)) -> Option<NeighbourOffset> {
+        use NeighbourOffset::*;
+        Some(match offset {
+            (0, -1) => South,
+            (1, -1) => SouthEast,
+            (1, 0) => East,
+            (1, 1) => NorthEast,
+            (0, 1) => North,
+            (-1, 1) => NorthWest,
+            (-1, 0) => West,
+            (-1, -1) => SouthWest,
+            _ => return None,
+        })
+    }
+
+    pub fn accessible_neighbours(pos: BlockPosition) -> impl Iterator<Item = NeighbourOffset> {
+        const MAX: BlockCoord = CHUNK_SIZE.as_block_coord() - 1;
+        const MIN: BlockCoord = 0;
+        let x_range = match pos.x() {
+            MIN => -1..=0,
+            MAX => 0..=1,
+            _ => 0..=0,
+        };
+        let y_range = match pos.y() {
+            MIN => -1..=0,
+            MAX => 0..=1,
+            _ => 0..=0,
+        };
+
+        let iter = x_range
+            .cartesian_product(y_range)
+            .filter_map(Self::from_offset);
+
+        // maximum 3 results
+        SizedIterator::new(iter, 3)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use common::Itertools;
+    use unit::world::GlobalSliceIndex;
+
+    use super::*;
+
+    #[test]
+    fn accessible_neighbours() {
+        use NeighbourOffset::*;
+        fn check(pos: (BlockCoord, BlockCoord), mut expected: Vec<NeighbourOffset>) {
+            let block_pos =
+                BlockPosition::new(pos.0, pos.1, GlobalSliceIndex::top()).expect("bad coords");
+
+            expected.sort();
+            let actual = NeighbourOffset::accessible_neighbours(block_pos)
+                .sorted()
+                .collect_vec();
+
+            assert_eq!(expected, actual, "failed for {:?}", pos);
+        }
+
+        check((0, 0), vec![West, SouthWest, South]);
+        check((2, 0), vec![South]);
+        check((2, 2), vec![]);
+        check((2, CHUNK_SIZE.as_block_coord() - 1), vec![North]);
+        check(
+            (
+                CHUNK_SIZE.as_block_coord() - 1,
+                CHUNK_SIZE.as_block_coord() - 1,
+            ),
+            vec![East, NorthEast, North],
+        );
+    }
+
+    #[test]
+    fn max_accessible_neighbours() {
+        for (x, y) in
+            (0..CHUNK_SIZE.as_block_coord()).cartesian_product(0..CHUNK_SIZE.as_block_coord())
+        {
+            let block_pos = BlockPosition::new_unchecked(x, y, GlobalSliceIndex::top());
+
+            let n = NeighbourOffset::accessible_neighbours(block_pos).count();
+            assert!(n <= 3, "too many, got {}", n);
         }
     }
 }

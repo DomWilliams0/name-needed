@@ -42,6 +42,10 @@ pub use activity::{
     LoggedEntityDecision, LoggedEntityEvent,
 };
 pub use definitions::EntityPosition;
+
+#[cfg(feature = "utils")]
+pub use definitions::{load as load_definitions, Definition};
+
 pub use ecs::{
     Component, ComponentRef, ComponentRefMut, ComponentWorld, EcsWorld, Entity, KindComponent,
     NameComponent,
@@ -49,6 +53,8 @@ pub use ecs::{
 pub use event::{DeathReason, EntityEvent, EntityEventPayload};
 #[cfg(feature = "testing")]
 pub use event::{EntityEventDebugPayload, TaskResultSummary};
+
+pub use interact::herd::{HerdedComponent, Herds};
 
 pub use build::{BuildMaterial, BuildTemplate};
 #[cfg(debug_assertions)]
@@ -58,7 +64,7 @@ pub use item::{
     EdibleItemComponent, InventoryComponent, ItemCondition, ItemStack, ItemStackComponent,
     ItemStackError, StackableComponent,
 };
-pub use needs::HungerComponent;
+pub use needs::food::HungerComponent;
 pub use path::FollowPathComponent;
 pub use perf::{Perf, PerfAvg, Timing};
 pub use queued_update::QueuedUpdates;
@@ -67,6 +73,7 @@ pub use society::{
     job, NameGeneration, PlayerSociety, Societies, SocietyComponent, SocietyHandle,
     SocietyVisibility,
 };
+pub use species::SpeciesComponent;
 pub use string::{CachedStr, StringCache};
 pub use strum::IntoEnumIterator;
 pub use unit::world::{
@@ -108,6 +115,7 @@ pub mod dev;
 mod ecs;
 mod event;
 pub mod input;
+mod interact;
 mod item;
 mod movement;
 mod needs;
@@ -122,6 +130,7 @@ mod senses;
 mod simulation;
 mod society;
 mod spatial;
+mod species;
 mod steer;
 mod string;
 mod transform;

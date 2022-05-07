@@ -14,10 +14,6 @@ pub struct EntityIdDebugRenderer(String);
 pub struct AllSocietyVisibilityDebugRenderer;
 
 impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "entity ids"
-    }
-
     fn name(&self) -> &'static str {
         "Entity IDs"
     }
@@ -47,17 +43,12 @@ impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
             const OFFSET: f32 = 0.7;
 
             let mut pos = transform.position;
-            pos.modify_y(|y| y + OFFSET);
-            renderer.debug_text(pos, &self.0);
+            renderer.debug_text(pos.modify_y(|y| y + OFFSET), &self.0);
         }
     }
 }
 
 impl<R: Renderer> DebugRenderer<R> for AllSocietyVisibilityDebugRenderer {
-    fn identifier(&self) -> &'static str {
-        "all societies"
-    }
-
     fn name(&self) -> &'static str {
         "All societies"
     }

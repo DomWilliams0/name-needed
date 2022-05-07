@@ -12,6 +12,7 @@ unit = { path = "../../shared/unit" }
 grid = { path = "../../shared/grid", default-features = false, features = ["8neighbours"] }
 color = { path = "../../shared/color", optional = true }
 resources = { path = "../resources" }
+world_types = { path = "../world/world_types" }
 noise = { version = "0.6", default-features = false } # 0.7 changes noise parameters, avoid upgrade for now
 rand_distr = "0.3" # cannot be upgraded until rand can be too (to 0.8)
 strum = { version = "0.19", features = ["derive"] }
@@ -19,7 +20,6 @@ tokio = { version = "1.0", default-features = false, features = ["rt", "rt-multi
 futures = { version = "0.3", default-features = false, features = ["std", "alloc", "async-await"] }
 geo = "0.16"
 geo-booleanop = "0.3"
-rstar = "0.9"
 spiral = "0.1"
 
 line_drawing = "1.0"

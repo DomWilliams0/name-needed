@@ -1,0 +1,56 @@
+[
+  (
+    uid: "core_living_plant",
+    abstract: true,
+    components: [
+      {"kind": (singular: "Plant")},
+      {"physical": (
+        has_physics: false,
+      )},
+      {"edible": (
+        extra_hands: 0,
+        flavours: "raw-plant",
+        consumption_rate: 2,
+        efficiency: 0.7,
+      )},
+      {"breakable": ()},
+      {"no-display-on-hover": ()},
+    ],
+  ),
+  (
+    uid: "core_living_plant:shrub",
+    parent: "core_living_plant",
+    components: [
+      {"kind": (singular: "Shrub")},
+      {"render": (
+        color: "81CC10",
+        shape: "Circle",
+      )},
+      {"physical": (
+        size: [3, 3, 4],
+        volume: 40,
+      )},
+      {"edible": (
+        total_nutrition: 250,
+      )},
+    ],
+  ),
+  (
+    uid: "core_living_plant:tall_grass",
+    parent: "core_living_plant",
+    components: [
+      {"kind": (singular: "Tall grass")},
+      {"render": (
+        color: "5BC91C",
+        shape: "Circle",
+      )},
+      {"physical": (
+        size: [2, 2, 5],
+        volume: 30,
+      )},
+      {"edible": (
+        total_nutrition: 140,
+      )},
+    ],
+  ),
+]

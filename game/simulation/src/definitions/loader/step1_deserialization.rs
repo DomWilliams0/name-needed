@@ -25,6 +25,9 @@ pub struct DeserializedDefinition {
     parent: String,
 
     #[serde(default)]
+    category: String,
+
+    #[serde(default)]
     r#abstract: bool,
 
     components: Components,
@@ -76,21 +79,32 @@ impl DeserializedDefinition {
         self.r#abstract
     }
 
-    pub fn make_error(&self, e: DefinitionErrorKind) -> DefinitionError {
-        DefinitionError(self.source(), e)
+    pub fn make_error(&self, uid: Option<String>, e: DefinitionErrorKind) -> DefinitionError {
+        DefinitionError {
+            uid,
+            src: self.source(),
+            kind: e,
+        }
     }
 
-    pub fn validate_and_process_components(&mut self) -> Result<(), Vec<DefinitionErrorKind>> {
+    pub fn validate_and_process_components(
+        &mut self,
+    ) -> Result<(), Vec<(String, DefinitionErrorKind)>> {
         // validation
         let mut errors = Vec::new();
-        if self.uid.is_empty() || !self.uid.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            errors.push(DefinitionErrorKind::InvalidUid(self.uid.clone()));
+        if self.uid.is_empty()
+            || !self
+                .uid
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == ':')
+        {
+            errors.push((self.uid.clone(), DefinitionErrorKind::InvalidUid));
         }
 
         let components = std::mem::take(&mut self.components);
         match components.into_processed().map(RefCell::new) {
             Err(errs) => {
-                errors.extend(errs.into_iter());
+                errors.extend(errs.into_iter().map(|err| (self.uid.clone(), err)));
             }
             Ok(comps) => {
                 self.processed_components = comps;
@@ -119,13 +133,29 @@ impl DeserializedDefinition {
                 }
                 vec
             })
-            .map_err(|e| DefinitionError(source.clone(), DefinitionErrorKind::Format(e)))
+            .map_err(|e| DefinitionError {
+                uid: None,
+                src: source.clone(),
+                kind: DefinitionErrorKind::Format(e),
+            })
     }
 
-    pub fn into_inner(self) -> (String, DefinitionSource, ProcessedComponents) {
+    pub fn into_inner(
+        self,
+    ) -> (
+        String,
+        DefinitionSource,
+        Option<String>,
+        ProcessedComponents,
+    ) {
         (
             self.uid,
             self.source,
+            if self.category.is_empty() {
+                None
+            } else {
+                Some(self.category)
+            },
             self.processed_components.into_inner(),
         )
     }
@@ -140,11 +170,10 @@ pub fn collect_raw_definitions(
     // collect unprocessed definitions
     for file in resources::recurse::<_, (File, resources::Mmap, Rc<Path>)>(&resources, "ron") {
         // handle resource error
-        let file = file.map_err(|ResourceError(path, e)| {
-            DefinitionError(
-                DefinitionSource::File(path.into()),
-                DefinitionErrorKind::Resource(e),
-            )
+        let file = file.map_err(|ResourceError(path, e)| DefinitionError {
+            uid: None,
+            src: DefinitionSource::File(path.into()),
+            kind: DefinitionErrorKind::Resource(e),
         });
 
         // deserialize
@@ -159,7 +188,7 @@ pub fn collect_raw_definitions(
                 definitions.extend(loaded.into_iter());
             }
             Err(e) => {
-                debug!("failed to load definitions"; "error" => %e);
+                debug!("failed to deserialize definitions"; "error" => %e);
                 errors.push(e)
             }
         }
@@ -222,7 +251,7 @@ impl Default for DefinitionSource {
 impl Display for DefinitionSource {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DefinitionSource::File(_) => write!(f, "file"),
+            DefinitionSource::File(path) => Display::fmt(&path.display(), f),
             DefinitionSource::Memory => write!(f, "in-memory buffer"),
         }
     }

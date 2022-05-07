@@ -34,13 +34,15 @@ mod tests {
     use ai::{Consideration, InputCache};
     use common::bumpalo::Bump;
     use common::NormalizedFloat;
+    use unit::food::{Metabolism, Nutrition};
     use unit::world::WorldPoint;
 
     use crate::ai::consideration::HungerConsideration;
     use crate::ai::system::Species;
     use crate::ai::{AiBlackboard, AiComponent, SharedBlackboard};
     use crate::ecs::Builder;
-    use crate::{ComponentWorld, EcsWorld, TransformComponent, WorldPosition};
+    use crate::needs::food::FoodInterest;
+    use crate::{ComponentWorld, EcsWorld, HungerComponent, TransformComponent, WorldPosition};
 
     struct NoLeaksGuard(*mut EcsWorld, *mut TransformComponent);
 
@@ -69,7 +71,6 @@ mod tests {
         let blackboard = AiBlackboard {
             entity: world.create_entity().build().into(),
             transform,
-            hunger: None,
             inventory: None,
             society: None,
             inventory_search_cache: Default::default(),
@@ -90,21 +91,39 @@ mod tests {
 
         let hunger = HungerConsideration;
 
-        blackboard.hunger = Some(NormalizedFloat::one());
+        let _ = blackboard.world.add_now(
+            blackboard.entity,
+            HungerComponent::new(
+                Nutrition::new(100),
+                Metabolism::new(0.5).unwrap(),
+                FoodInterest::empty(),
+            ),
+        );
+        macro_rules! set_hunger {
+            ($f:expr) => {{
+                let mut comp = blackboard
+                    .world
+                    .component_mut::<HungerComponent>(blackboard.entity)
+                    .unwrap();
+                comp.hunger_mut().set_satiety(NormalizedFloat::new($f));
+            }};
+        }
+
+        set_hunger!(1.0);
         let score_when_full =
             hunger
                 .curve()
                 .evaluate(hunger.consider(&mut blackboard, None, &mut cache));
         cache = InputCache::new(&alloc);
 
-        blackboard.hunger = Some(NormalizedFloat::new(0.2));
+        set_hunger!(0.2);
         let score_when_hungry =
             hunger
                 .curve()
                 .evaluate(hunger.consider(&mut blackboard, None, &mut cache));
         cache = InputCache::new(&alloc);
 
-        blackboard.hunger = Some(NormalizedFloat::new(0.01));
+        set_hunger!(0.01);
         let score_when_empty =
             hunger
                 .curve()

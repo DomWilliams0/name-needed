@@ -21,7 +21,7 @@ pub fn instantiate(
     defs: Vec<DeserializedDefinition>,
     templates: &TemplateLookup,
     string_cache: &StringCache,
-) -> Result<Vec<(CachedStr, Definition)>, DefinitionErrors> {
+) -> Result<Vec<(CachedStr, Definition, Option<String>)>, DefinitionErrors> {
     let mut errors = Vec::new();
 
     // instantiate components
@@ -75,12 +75,13 @@ impl Definition {
         self.source.clone()
     }
 
+    /// Returns (uid, definition, optional category)
     fn construct(
         deserialized: DeserializedDefinition,
         templates: &TemplateLookup,
         string_cache: &StringCache,
-    ) -> Result<(CachedStr, Definition), DefinitionError> {
-        let (uid, source, components) = deserialized.into_inner();
+    ) -> Result<(CachedStr, Definition, Option<String>), DefinitionError> {
+        let (uid, source, category, components) = deserialized.into_inner();
 
         let do_construct = || {
             let mut component_templates = Vec::with_capacity(components.len());
@@ -92,8 +93,10 @@ impl Definition {
                     ComponentFields::Negate => unimplemented!(),
                 };
 
-                let component_template =
-                    templates.construct(key.as_str(), &mut map, string_cache)?;
+                debug!("{uid}: constructing '{key}' template"; "values" => ?map);
+                let component_template = templates
+                    .construct(key.as_str(), &mut map, string_cache)
+                    .map_err(|e| (uid.clone(), e))?;
 
                 for leftover in map.keys() {
                     warn!(
@@ -109,15 +112,25 @@ impl Definition {
         };
 
         match do_construct() {
-            Ok((uid, components)) => {
-                Ok((string_cache.get(&uid), Definition { source, components }))
-            }
-            Err(e) => Err(DefinitionError(source, e)),
+            Ok((uid, components)) => Ok((
+                string_cache.get(&uid),
+                Definition { source, components },
+                category,
+            )),
+            Err((uid, e)) => Err(DefinitionError {
+                uid: Some(uid),
+                src: source,
+                kind: e,
+            }),
         }
     }
 
-    pub fn make_error(&self, e: DefinitionErrorKind) -> DefinitionError {
-        DefinitionError(self.source(), e)
+    pub fn make_error(&self, uid: String, e: DefinitionErrorKind) -> DefinitionError {
+        DefinitionError {
+            uid: Some(uid),
+            src: self.source(),
+            kind: e,
+        }
     }
 
     #[cfg(test)]

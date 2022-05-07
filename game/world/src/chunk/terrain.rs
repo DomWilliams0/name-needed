@@ -9,8 +9,9 @@ use unit::world::{
     SLAB_SIZE,
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
+use world_types::BlockDurability;
 
-use crate::block::{Block, BlockDurability};
+use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slab::Slab;

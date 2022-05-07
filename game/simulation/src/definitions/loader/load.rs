@@ -61,15 +61,16 @@ pub fn load_and_preprocess_with<
     }
 }
 
+/// defs: (uid, def, category)
 pub fn build_registry(
-    defs: Vec<(CachedStr, Definition)>,
+    defs: Vec<(CachedStr, Definition, Option<String>)>,
 ) -> Result<DefinitionRegistry, DefinitionErrors> {
     let mut errors = Vec::new();
 
     let mut registry = DefinitionRegistryBuilder::new();
-    for (uid, definition) in defs {
-        if let Err((def, err)) = registry.register(uid, definition) {
-            errors.push(def.make_error(err));
+    for (uid, definition, category) in defs {
+        if let Err((def, err)) = registry.register(uid, definition, category) {
+            errors.push(def.make_error(uid.to_string(), err));
         }
     }
 

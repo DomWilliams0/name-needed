@@ -57,6 +57,8 @@ pub struct Simulation {
     pub entity_logging_by_default: bool,
     /// Ring buffer size
     pub entity_logging_capacity: usize,
+    pub herd_radius: f32,
+    pub herd_expiry_ticks: u32,
 }
 
 impl WorldSource {

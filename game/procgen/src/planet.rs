@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use geo::{Coordinate, Rect};
 use tokio::sync::{Mutex, RwLock};
 
 use common::*;
@@ -7,18 +8,17 @@ use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SlabPosition,
     SliceIndex, WorldPosition, CHUNK_SIZE,
 };
+use world_types::EntityDescription;
 
 use crate::biome::BlockQueryResult;
 use crate::continent::ContinentMap;
 use crate::params::PlanetParamsRef;
 use crate::rasterize::SlabGrid;
-use crate::region::Regions;
+use crate::region::{generate_loose_subfeatures, Regions};
 use crate::region::{
     ApplyFeatureContext, LoadedRegionRef, PlanetPoint, RegionLocation, SlabContinuation,
 };
-
 use crate::GeneratedBlock;
-use geo::{Coordinate, Rect};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]
@@ -42,6 +42,21 @@ pub struct PlanetInner {
 
     #[cfg(feature = "cache")]
     was_loaded: bool,
+}
+
+pub struct GeneratedPlanetSlab {
+    pub terrain: SlabGrid,
+    pub entities: Vec<EntityDescription>,
+}
+
+/// Wrapper around rng pointer that is Copy and Send so it can be lent temporarily to an async task
+#[derive(Copy, Clone)]
+struct SubfeatureRngRef(*mut SmallRng);
+unsafe impl Send for SubfeatureRngRef {}
+impl SubfeatureRngRef {
+    unsafe fn get(&mut self) -> &mut SmallRng {
+        &mut *self.0
+    }
 }
 
 impl Planet {
@@ -179,7 +194,7 @@ impl Planet {
     }
 
     /// Generates now and does not cache. Returns None if slab is out of range
-    pub async fn generate_slab(&self, slab: SlabLocation) -> Option<SlabGrid> {
+    pub async fn generate_slab(&self, slab: SlabLocation) -> Option<GeneratedPlanetSlab> {
         let inner = self.0.read().await;
         let params = inner.params.clone();
         let slab_continuations = inner.regions.slab_continuations();
@@ -208,26 +223,45 @@ impl Planet {
         // spawn a task to apply subfeatures to the terrain as they're produced
         let mut slab_continuations_for_task = slab_continuations.clone();
 
+        // use non-deterministic rng for subfeature rasterization
+        let mut rng = SmallRng::from_rng(thread_rng()).expect("rng seeding failed");
+        let mut rng_ref = SubfeatureRngRef(&mut rng as *mut _);
+
         let world_updates_task = world_updates.clone();
         let task = tokio::spawn(async move {
+            // safety: this task is joined on before any other accesses to rng
+            let rng_ref = unsafe { rng_ref.get() };
+
+            let mut entities = vec![];
             while let Some(subfeature) = subfeatures_rx.recv().await {
-                subfeature
+                let entity = subfeature
                     .apply(
                         slab,
                         &mut terrain,
                         Some(&mut slab_continuations_for_task),
                         &params,
                         &world_updates_task,
+                        rng_ref,
                     )
                     .await;
+
+                if let Some(e) = entity {
+                    entities.push(e.0);
+                }
             }
 
-            terrain
+            (terrain, entities)
         });
 
+        // apply relevant features
         for feature in region.features_for_slab(slab, &slab_bounds) {
             feature.apply_to_slab(&mut ctx).await;
         }
+
+        // generate subfeatures not associated with any particular feature. don't use rasterization
+        // rng here as that runs in parallel to this, and we don't want 2 mutable refs at the same
+        // time
+        generate_loose_subfeatures(&mut ctx).await;
 
         // mark slab as completed
         let old_continuations = slab_continuations
@@ -244,19 +278,26 @@ impl Planet {
         drop(inner);
 
         // wait for all subfeatures to be rasterized
-        let mut terrain = task.await.expect("future panicked");
+        let (mut terrain, entities) = task.await.expect("future panicked");
 
         // add any extra leaked subfeatures to this slab
+
         if let Some(SlabContinuation::Unloaded(extra)) = old_continuations {
             debug!("applying {count} leaked subfeatures to slab", count = extra.len(); slab);
+
+            // safety: async task has terminated, so this is now the only reference
+            let rng_ref = unsafe { rng_ref.get() };
+
             for subfeature in extra.into_iter() {
-                subfeature
-                    .apply(slab, &mut terrain, None, &params, &world_updates)
+                // ignore entity description from other slabs, it's already handled by the owning
+                // slab
+                let _entity = subfeature
+                    .apply(slab, &mut terrain, None, &params, &world_updates, rng_ref)
                     .await;
             }
         }
 
-        Some(terrain)
+        Some(GeneratedPlanetSlab { terrain, entities })
     }
 
     pub async fn find_ground_level(&self, block: WorldPosition) -> Option<GlobalSliceIndex> {
@@ -393,9 +434,11 @@ pub(crate) fn slab_bounds(slab: SlabLocation) -> Rect<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::RegionLocation;
     use geo::coords_iter::CoordsIter;
+
+    use crate::RegionLocation;
+
+    use super::*;
 
     #[test]
     fn slab_bounds_in_region() {

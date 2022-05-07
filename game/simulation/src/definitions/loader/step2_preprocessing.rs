@@ -9,7 +9,6 @@ use serde::de::Error;
 use common::derive_more::IntoIterator;
 use common::*;
 
-use crate::definitions::loader::helpers::{extract_map, extract_string_ref};
 use crate::definitions::loader::step1_deserialization::{Components, DeserializedDefinition};
 use crate::definitions::{DefinitionErrorKind, DefinitionErrors};
 
@@ -211,16 +210,16 @@ impl ComponentFields {
             }
             (ComponentFields::Unit, _) => {
                 // nothing to do
-                debug!("... skipping because self is unit and other is not negate");
+                debug!("skipping because self is unit and other is not negate");
             }
             (ComponentFields::Fields(mine), ComponentFields::Fields(urs)) => {
                 for (name, value) in urs.iter() {
                     if let Some(existing) = Self::field_mut(mine, name) {
-                        // override value
                         *existing = value.clone();
                         debug!("overriding value for field {field}", field = name);
                     } else {
-                        debug!("keeping inherited field {field}", field = name);
+                        mine.push((name.clone(), value.clone()));
+                        debug!("adding overridden field {field}", field = name);
                     }
                 }
             }
@@ -246,7 +245,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
     // convert components into easy-to-use format
     for def in defs.iter_mut() {
         if let Err(errs) = def.validate_and_process_components() {
-            errors.extend(errs.into_iter().map(|e| def.make_error(e)));
+            errors.extend(
+                errs.into_iter()
+                    .map(|(uid, e)| def.make_error(Some(uid), e)),
+            );
         }
     }
 
@@ -258,7 +260,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
 
         if let Some(old) = lookup.insert(uid, node) {
             let def = dag.node_weight(old).unwrap();
-            errors.push(def.make_error(DefinitionErrorKind::DuplicateUid(def.uid().to_owned())));
+            errors.push(def.make_error(
+                Some(def.uid().to_owned()),
+                DefinitionErrorKind::DuplicateUid,
+            ));
         }
     }
 
@@ -271,9 +276,10 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
                 let parent_node = match lookup.get(parent) {
                     Some(n) => *n,
                     None => {
-                        return Err(
-                            def.make_error(DefinitionErrorKind::InvalidParent(parent.to_owned()))
-                        )
+                        return Err(def.make_error(
+                            Some(def.uid().to_owned()),
+                            DefinitionErrorKind::InvalidParent(parent.to_owned()),
+                        ))
                     }
                 };
 
@@ -286,10 +292,13 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
 
                 if is_cyclic {
                     let def = dag.node_weight(node).unwrap();
-                    return Err(def.make_error(DefinitionErrorKind::CyclicParentRelation(
-                        def.uid().to_owned(),
-                        def.parent().unwrap().to_owned(),
-                    )));
+                    return Err(def.make_error(
+                        Some(def.uid().to_owned()),
+                        DefinitionErrorKind::CyclicParentRelation(
+                            def.uid().to_owned(),
+                            def.parent().unwrap().to_owned(),
+                        ),
+                    ));
                 }
             }
             Ok(())
@@ -341,7 +350,7 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
                 .rev()
                 .skip(1) // root already cloned
                 .fold(root.processed_components().clone(), |mut acc, &def| {
-                    debug!("overriding with {ancestor}", ancestor = def.uid(); "definition" => ?this.uid());
+                    debug!("applying components from {ancestor}", ancestor = def.uid(); "result" => ?this.uid(), "root" => ?root.uid());
                     acc.override_with(&*def.processed_components());
                     acc
                 });
@@ -368,5 +377,21 @@ pub fn preprocess(defs: &mut Vec<DeserializedDefinition>) -> Result<(), Definiti
         Err(DefinitionErrors(errors))
     } else {
         Ok(())
+    }
+}
+
+fn extract_map(value: ron::Value) -> Result<ron::Map, DefinitionErrorKind> {
+    match value {
+        ron::Value::Map(map) => Ok(map),
+        _ => Err(DefinitionErrorKind::Format(ron::Error::custom("not a map"))),
+    }
+}
+
+fn extract_string_ref(value: &ron::Value) -> Result<&str, DefinitionErrorKind> {
+    match value {
+        ron::Value::String(string) => Ok(string),
+        _ => Err(DefinitionErrorKind::Format(ron::Error::custom(
+            "not a string",
+        ))),
     }
 }

@@ -18,16 +18,11 @@ struct ScenarioEntry {
 inventory::collect!(ScenarioEntry);
 
 pub fn resolve(name: Option<&str>) -> Option<(&str, Scenario)> {
-    match name {
-        None => {
-            let default = resolve(Some(DEFAULT_SCENARIO)).expect("bad default");
-            Some(default)
-        }
-        Some(name) => inventory::iter::<ScenarioEntry>
-            .into_iter()
-            .find(|e| e.name == name)
-            .map(|e| (e.name, e.func)),
-    }
+    let name = name.unwrap_or("wander_and_eat"); // default
+    inventory::iter::<ScenarioEntry>
+        .into_iter()
+        .find(|e| e.name == name)
+        .map(|e| (e.name, e.func))
 }
 
 pub fn all_names() -> impl Iterator<Item = &'static str> {
@@ -51,6 +46,7 @@ scenario!(nop);
 scenario!(wander_and_eat);
 scenario!(haul_to_container);
 scenario!(building);
+scenario!(herding);
 
 fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
@@ -185,6 +181,49 @@ fn building(ecs: &EcsWorld) {
     }
 }
 
+fn herding(ecs: &EcsWorld) {
+    let world = ecs.voxel_world();
+    let world = world.borrow();
+
+    let mut colors = helpers::entity_colours();
+
+    let _sheep = spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("sheep"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_sheep", ecs, pos)
+                .with_satiety(NormalizedFloat::clamped(0.6))
+                .thanks()
+        },
+    );
+
+    spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("cows"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_cow", ecs, pos)
+                .with_satiety(NormalizedFloat::clamped(0.6))
+                .thanks()
+        },
+    );
+
+    spawn_entities_randomly(
+        &world,
+        helpers::get_config_count("humans"),
+        Placement::RandomPos,
+        |pos| {
+            helpers::new_entity("core_living_human", ecs, pos)
+                .with_color(colors.next().unwrap())
+                .with_player_society()
+                .with_satiety(NormalizedFloat::new(0.2))
+                .with_name()
+                .thanks()
+        },
+    );
+}
+
 fn haul_to_container(ecs: &EcsWorld) {
     let world = ecs.voxel_world();
     let world = world.borrow();
@@ -299,7 +338,7 @@ mod helpers {
         pub fn with_satiety(self, satiety: NormalizedFloat) -> Self {
             self.0
                 .component_mut::<HungerComponent>(self.1)
-                .map(|mut hunger| hunger.set_satiety(satiety))
+                .map(|mut hunger| hunger.hunger_mut().set_satiety(satiety))
                 .expect("hunger component");
 
             self
@@ -345,7 +384,7 @@ mod helpers {
 
     pub fn random_walkable_pos(world: &InnerWorldRef) -> WorldPosition {
         world
-            .choose_random_walkable_block(50)
+            .choose_random_walkable_block(500)
             .expect("failed to find a random walkable position")
     }
 

@@ -1,7 +1,6 @@
 use std::ops::Add;
 
 use common::derive_more::*;
-
 use common::*;
 
 use crate::space::view::ViewPoint;
@@ -34,6 +33,13 @@ impl WorldPosition {
 
     pub fn above(self) -> WorldPosition {
         Self(self.0, self.1, self.2 + 1)
+    }
+
+    pub fn distance2(&self, other: impl Into<Self>) -> i32 {
+        let other = other.into();
+        (self.0 - other.0).pow(2)
+            + (self.1 - other.1).pow(2)
+            + (self.2.slice() - other.2.slice()).pow(2)
     }
 }
 

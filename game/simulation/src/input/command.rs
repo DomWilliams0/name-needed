@@ -58,6 +58,8 @@ pub enum UiRequest {
     TogglePaused,
 
     ChangeGameSpeed(GameSpeedChange),
+
+    Kill(Entity),
 }
 
 pub enum SelectionModification {

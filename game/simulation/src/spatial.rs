@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::collections::HashSet;
 
 use common::*;
@@ -119,25 +119,48 @@ impl Spatial {
 
         let radius2 = radius.powi(2);
 
-        // safety: query cache is not referenced anywhere else
-        let query_cache = unsafe { &mut *(&mut inner.query_cache as *mut Vec<_>) };
-        debug_assert!(query_cache.is_empty());
+        {
+            // safety: query cache is not referenced anywhere else
+            let query_cache = unsafe { &mut *(&mut inner.query_cache as *mut Vec<_>) };
+            query_cache.clear();
 
-        query_cache.extend(
-            inner
-                .positions
-                .iter()
-                .map(|(e, point)| {
-                    let distance2 = point.distance2(centre);
-                    (e, point, distance2)
-                })
-                // positions are cached so check transform is still present after filtering by distance
-                .filter(|(e, _, dist2)| *dist2 < radius2 && e.has(&transforms))
-                .map(|(e, point, dist2)| (*e, *point, dist2.sqrt())),
-        );
+            query_cache.extend(
+                inner
+                    .positions
+                    .iter()
+                    .map(|(e, point)| {
+                        let distance2 = point.distance2(centre);
+                        (e, point, distance2)
+                    })
+                    // positions are cached so check transform is still present after filtering by distance
+                    .filter(|(e, _, dist2)| *dist2 < radius2 && e.has(&transforms))
+                    .map(|(e, point, dist2)| (*e, *point, dist2.sqrt())),
+            );
+        }
 
-        query_cache.sort_unstable_by_key(|(_, _, dist)| OrderedFloat(*dist));
-        query_cache.drain(..)
+        inner
+            .query_cache
+            .sort_unstable_by_key(|(_, _, dist)| OrderedFloat(*dist));
+
+        struct QueryIterator<'a> {
+            result: RefMut<'a, Vec<(Entity, WorldPoint, f32)>>,
+            idx: usize,
+        }
+
+        impl<'a> Iterator for QueryIterator<'a> {
+            type Item = (Entity, WorldPoint, f32);
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let res = self.result.get(self.idx);
+                self.idx += 1;
+                res.copied()
+            }
+        }
+
+        QueryIterator {
+            result: RefMut::map(inner, |inner| &mut inner.query_cache),
+            idx: 0,
+        }
     }
 }
 

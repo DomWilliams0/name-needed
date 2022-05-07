@@ -146,8 +146,13 @@ impl ActivityContext {
     }
 
     /// Item should already be equipped
-    pub async fn eat(&self, item: Entity) -> Result<(), EatItemError> {
-        EatItemSubactivity.eat(self, item).await
+    pub async fn eat_held(&self, item: Entity) -> Result<(), EatItemError> {
+        EatItemSubactivity::new(self, item).eat_held().await
+    }
+
+    /// Eat food that doesn't need to be equipped
+    pub async fn eat_nearby(&self, item: Entity) -> Result<(), EatItemError> {
+        EatItemSubactivity::new(self, item).eat_nearby().await
     }
 
     /// Picks up thing for hauling, checks if close enough first

@@ -1,13 +1,15 @@
-use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
-use crate::ecs::*;
-
-use crate::needs::FoodEatingError;
-use crate::path::PathToken;
-use common::{num_derive::FromPrimitive, num_traits, Display};
 use std::convert::TryInto;
+
 use strum::EnumDiscriminants;
+
+use common::{num_derive::FromPrimitive, num_traits, Display};
 use unit::world::WorldPoint;
 use world::NavigationError;
+
+use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
+use crate::ecs::*;
+use crate::needs::food::FoodEatingError;
+use crate::path::PathToken;
 
 #[derive(EnumDiscriminants, Clone, Debug)]
 #[strum_discriminants(
@@ -58,6 +60,13 @@ pub enum EntityEventPayload {
     /// Entity died for the given reason
     Died(DeathReason),
 
+    /*
+        /// Subject has been promoted to leader of its herd
+        PromotedToHerdLeader,
+
+        /// Subject is no longer the leader of the given herd
+        DemotedFromHerdLeader(HerdHandle),
+    */
     /// Debug event needed for tests only
     #[cfg(feature = "testing")]
     Debug(crate::event::subscription::debug_events::EntityEventDebugPayload),
@@ -93,10 +102,10 @@ pub enum DeathReason {
 
 #[cfg(feature = "testing")]
 pub mod debug_events {
+    use crate::runtime::TaskResult;
+
     #[cfg(not(debug_assertions))]
     compile_error!("no testing in release builds!");
-
-    use crate::runtime::TaskResult;
 
     #[derive(Debug, Clone)]
     pub enum TaskResultSummary {
@@ -218,6 +227,9 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasEaten(e) => Ok(E::Eaten(*e)),
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
             Died(reason) => Ok(E::Died(*reason)),
+
+            // PromotedToHerdLeader => E::dev("promoted to herd leader"),
+            // DemotedFromHerdLeader(h) => E::dev(format!("demoted from leader of {:?}", h)),
             BeenEaten(_)
             | BeenPickedUp(_, _)
             | Arrived(_, _)

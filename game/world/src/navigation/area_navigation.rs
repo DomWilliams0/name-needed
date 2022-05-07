@@ -10,8 +10,8 @@ use common::*;
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 
-use crate::navigation::astar::{astar, SearchContext};
 use crate::navigation::path::AreaPathNode;
+use crate::navigation::search::{astar, SearchContext};
 use crate::navigation::{AreaPath, WorldArea};
 use crate::neighbour::NeighbourOffset;
 use crate::EdgeCost;
@@ -39,6 +39,7 @@ pub struct AreaNavEdge {
 #[cfg_attr(test, derive(Clone))]
 pub struct AreaGraph {
     graph: AreaNavGraph,
+    // TODO use graphmap to just use areas as nodes? but we need parallel edges
     node_lookup: HashMap<WorldArea, NodeIndex>,
 }
 
@@ -134,37 +135,43 @@ impl AreaNavEdge {
         }
     }
 
-    /// Finds the block along the full width of the port that is closest to the given source block.
-    pub fn exit_closest(self, source: BlockPosition) -> BlockPosition {
-        let source = (source.x() as i16, source.y() as i16);
-
-        let first = SliceBlock::from(self.exit);
-        let mut closest = (first, i16::MAX);
-
-        let flip = self.direction.is_vertical();
-        for i in 0..self.width as i16 {
-            let offset = if flip { (i, 0) } else { (0, i) };
-
-            let candidate = first.try_add(offset).unwrap_or_else(|| {
-                unreachable!(
-                    "exit width is too wide: {:?} with width {:?} and offset {:?}",
-                    self.exit, self.width, offset
-                )
-            });
-
-            let distance = {
-                let (x, y) = candidate.xy();
-                let dx = (x as i16 - source.0).abs();
-                let dy = (y as i16 - source.1).abs();
-                dx + dy
+    fn iter_exit_blocks(&self) -> impl Iterator<Item = SliceBlock> + '_ {
+        let start = SliceBlock::from(self.exit);
+        (0..self.width as i16).map(move |i| {
+            let offset = if self.direction.is_vertical() {
+                (i, 0)
+            } else {
+                (0, i)
             };
 
-            if distance < closest.1 {
-                closest = (candidate, distance);
-            }
-        }
+            start.try_add(offset).unwrap_or_else(|| {
+                unreachable!(
+                    "exit width is too wide: {:?} with width {:?} at offset {}",
+                    self.exit, self.width, i
+                )
+            })
+        })
+    }
 
-        closest.0.to_block_position(self.exit.z())
+    /// Finds the block along the full width of the port that is closest to the given source block.
+    pub fn exit_closest(self, source: BlockPosition) -> BlockPosition {
+        let (src_x, src_y) = (source.x() as i16, source.y() as i16);
+        self.iter_exit_blocks()
+            .min_by_key(|candidate| {
+                let (x, y) = candidate.xy();
+                let dx = (x as i16 - src_x).abs();
+                let dy = (y as i16 - src_y).abs();
+                dx + dy
+            })
+            .expect("exit cannot be zero width")
+            .to_block_position(self.exit.z())
+    }
+
+    pub fn contains(&self, block: BlockPosition) -> bool {
+        block.z() == self.exit.z()
+            && self
+                .iter_exit_blocks()
+                .any(|b| b.xy() == (block.x(), block.y()))
     }
 }
 
@@ -186,7 +193,7 @@ impl AreaGraph {
         debug_assert!(self.graph.contains_node(src_node), "start: {:?}", start);
         debug_assert!(self.graph.contains_node(dst_node), "goal: {:?}", goal);
 
-        let path = astar(
+        astar(
             &self.graph,
             src_node,
             |n| n == dst_node,
@@ -201,8 +208,12 @@ impl AreaGraph {
                 (dx + dy) as f32
             },
             context,
-        )
-        .ok_or(AreaPathError::NoPath)?;
+        );
+
+        let path = &*context.result();
+        if path.is_empty() && src_node != dst_node {
+            return Err(AreaPathError::NoPath);
+        }
 
         let mut out_path = Vec::with_capacity(path.len() + 1);
 
@@ -219,13 +230,30 @@ impl AreaGraph {
         Ok(AreaPath(out_path))
     }
 
+    pub(crate) fn get_adjacent_area_edge(
+        &self,
+        from: WorldArea,
+        to: WorldArea,
+    ) -> Option<&AreaNavEdge> {
+        let src_node = self.get_node(from).ok()?;
+        let dst_node = self.get_node(to).ok()?;
+
+        // node lookup should be in sync with graph
+        debug_assert!(self.graph.contains_node(src_node), "start: {:?}", from);
+        debug_assert!(self.graph.contains_node(dst_node), "goal: {:?}", to);
+
+        self.graph
+            .find_edge(src_node, dst_node)
+            .map(|e| self.graph.edge_weight(e).expect("bad edge"))
+    }
+
     pub(crate) fn path_exists(
         &self,
         start: WorldArea,
         goal: WorldArea,
         context: &AreaGraphSearchContext,
     ) -> bool {
-        // TODO avoid calcultaing path just to throw it away
+        // TODO avoid calculating path just to throw it away
         self.find_area_path(start, goal, context).is_ok()
     }
 

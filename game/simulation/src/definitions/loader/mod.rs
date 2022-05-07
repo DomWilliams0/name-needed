@@ -1,13 +1,11 @@
 pub use load::load;
+#[cfg(test)]
+pub use load::load_from_str;
 pub use step1_deserialization::DefinitionSource;
 pub use step3_construction::Definition;
 
 pub type ValueImpl = ron::Value;
 
-#[cfg(test)]
-pub use load::load_from_str;
-
-mod helpers;
 mod load;
 mod step1_deserialization;
 mod step2_preprocessing;
@@ -17,14 +15,23 @@ mod template_lookup;
 // TODO consider using `nested` vecs as an optimization
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::definitions::loader::load::preprocess_from_str;
     use crate::definitions::loader::step1_deserialization::DeserializedDefinition;
+    use crate::definitions::loader::step2_preprocessing::ComponentFields;
     use crate::definitions::DefinitionErrorKind;
     use crate::ecs::*;
     use crate::string::StringCache;
-    use std::rc::Rc;
 
     use super::*;
+
+    fn get_comp(def: &DeserializedDefinition, name: &str) -> Option<ComponentFields> {
+        def.processed_components()
+            .iter()
+            .find(|(comp_name, _)| name == comp_name)
+            .map(|(_, fields)| fields.to_owned())
+    }
 
     #[test]
     fn duplicates() {
@@ -105,7 +112,7 @@ mod tests {
         "#;
 
         let errs = preprocess_from_str(input).expect_err("should fail");
-        let err = &errs.0[0].1;
+        let err = &errs.0[0].kind;
         assert!(matches!(
             *dbg!(err),
             DefinitionErrorKind::CyclicParentRelation(_, _)
@@ -122,7 +129,7 @@ mod tests {
         "#;
 
         let errs = preprocess_from_str(input).expect_err("should fail");
-        let err = &errs.0[0].1;
+        let err = &errs.0[0].kind;
         assert!(matches!(
             *err,
             DefinitionErrorKind::CyclicParentRelation(_, _)
@@ -194,20 +201,11 @@ mod tests {
         );
 
         let get_comps = |def: &DeserializedDefinition| {
-            let comps = def.processed_components();
-
-            let get_comp = |name| {
-                comps
-                    .iter()
-                    .find(|(comp_name, _)| name == comp_name)
-                    .map(|(_, fields)| fields.to_owned())
-            };
-
             (
-                get_comp("nice"),
-                get_comp("cool"),
-                get_comp("sweet"),
-                get_comp("epic"),
+                get_comp(def, "nice"),
+                get_comp(def, "cool"),
+                get_comp(def, "sweet"),
+                get_comp(def, "epic"),
             )
         };
 
@@ -316,14 +314,16 @@ mod tests {
         components: [
             {"nice": ()},
             {"cool": ()},
-            {"sweet": (int: 500)},
+            {"sweet": (int: 500, thing: "inherit me")},
         ],
     ),
     (
         uid: "real",
         parent: "base",
 
-        components: [],
+        components: [
+            {"sweet": (int: 600, additional_field: 5)},
+        ],
     ),
 ]
         "#;
@@ -333,5 +333,23 @@ mod tests {
         let real = dbg!(&definitions[0]);
         assert_eq!(real.uid(), "real");
         assert_eq!(real.processed_components().len(), 3);
+
+        let sweet = get_comp(real, "sweet").expect("missing component");
+
+        use ron::Value::*;
+        assert_eq!(
+            *sweet.field("thing").unwrap(),
+            String("inherit me".to_owned())
+        ); // from parent
+
+        assert_eq!(
+            *sweet.field("int").unwrap(),
+            Number(ron::Number::Integer(600))
+        ); // overridden
+
+        assert_eq!(
+            *sweet.field("additional_field").unwrap(),
+            Number(ron::Number::Integer(5))
+        ); // added
     }
 }

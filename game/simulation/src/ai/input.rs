@@ -7,15 +7,19 @@ use world::block::BlockType;
 
 use crate::ai::{AiBlackboard, AiContext, AiTarget};
 use crate::ecs::*;
+use crate::interact::herd::HerdInfo;
 use crate::item::{
     FoundSlot, HaulableItemComponent, HauledItemComponent, InventoryComponent, ItemFilter,
 };
-use crate::{ContainedInComponent, TransformComponent};
+use crate::{ContainedInComponent, EdibleItemComponent, HungerComponent, TransformComponent};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum AiInput {
     /// Hunger level, 0=starving 1=completely full
     Hunger,
+
+    /// Interest in target food flavours, 0=hates or doesn't eat, 1=absolutely loves
+    FoodInterestInTarget,
 
     /// Switch, 1=has at least 1 matching filter, 0=none
     HasInInventory(ItemFilter),
@@ -24,7 +28,7 @@ pub enum AiInput {
     /// 1 if already hauling
     HasExtraHandsForHauling(u16, Option<Entity>),
 
-    /// 1.0=has enough hands free to hold/haul/equip target entity
+    /// 1.0=has enough hands free to hold/haul/equip target entity. 0.0 if not haulable
     HasFreeHandsToHoldTarget,
 
     /// Switch, 0=item is unusable e.g. being hauled, 1=usable immediately
@@ -41,10 +45,13 @@ pub enum AiInput {
 
     Constant(OrderedFloat<f32>),
 
-    /// Distance squared to given target
+    /// Distance squared to given target, -INF on error
     MyDistance2To(AiTarget),
 
-    /// Distance squared to target entity/position, f32::MAX on error
+    /// Distance squared to herd leader, or -INF if not in a herd
+    MyDistance2ToHerd,
+
+    /// Distance squared to target entity/position, -INF on error
     MyDistance2ToTarget,
 
     TargetBlockTypeMatches(BlockTypeMatch),
@@ -65,6 +72,7 @@ impl ai::Input<AiContext> for AiInput {
         use AiInput::*;
         match self {
             Hunger => hunger(blackboard),
+            FoodInterestInTarget => food_interest_in_target(blackboard, target).unwrap_or(0.0),
             HasInInventory(filter) => has_in_inventory(blackboard, filter).unwrap_or(0.0),
             HasExtraHandsForHauling(hands, item) => {
                 has_extra_hands_for_hauling(blackboard, *hands, *item, target).unwrap_or(0.0)
@@ -73,10 +81,15 @@ impl ai::Input<AiContext> for AiInput {
                 has_free_hands_to_hold_target(blackboard, target).unwrap_or(0.0)
             }
             CanUseHeldItem(filter) => can_use_held_item(blackboard, filter).unwrap_or(0.0),
-            CanFindGradedItemsLocally { .. } => todo!(),
+            CanFindGradedItemsLocally { .. } => todo!(), // TODO remove this
             Constant(f) => f.0,
-            MyDistance2To(tgt) => distance_to_target(blackboard, Some(tgt)).unwrap_or(f32::MAX),
-            MyDistance2ToTarget => distance_to_target(blackboard, target).unwrap_or(f32::MAX),
+            MyDistance2To(tgt) => distance_to_target(blackboard, tgt).unwrap_or(f32::NEG_INFINITY),
+            MyDistance2ToHerd => find_herd_target(blackboard)
+                .and_then(|tgt| distance_to_target(blackboard, &AiTarget::Point(tgt)))
+                .unwrap_or(f32::NEG_INFINITY),
+            MyDistance2ToTarget => target
+                .and_then(|target| distance_to_target(blackboard, target))
+                .unwrap_or(f32::NEG_INFINITY),
             TargetBlockTypeMatches(bt) => {
                 target_block_type_matches(blackboard, target, *bt).unwrap_or(0.0)
             }
@@ -85,10 +98,35 @@ impl ai::Input<AiContext> for AiInput {
 }
 
 fn hunger(blackboard: &mut AiBlackboard) -> f32 {
-    match blackboard.hunger {
-        Some(hunger) => hunger.value(),
-        None => 1.0, // not hungry if not applicable
+    match blackboard
+        .world
+        .component::<HungerComponent>(blackboard.entity)
+    {
+        Ok(comp) => comp.hunger().satiety().value(),
+        Err(_) => 1.0, // not hungry if not applicable
     }
+}
+
+fn food_interest_in_target(
+    blackboard: &mut AiBlackboard,
+    target: Option<&AiTarget>,
+) -> Option<f32> {
+    let target = target.and_then(|t| t.entity())?;
+    let interest = blackboard
+        .world
+        .component::<HungerComponent>(blackboard.entity)
+        .ok()?;
+
+    let flavours = blackboard
+        .world
+        .component::<EdibleItemComponent>(target)
+        .ok()?;
+
+    // TODO differentiate CANNOT eat vs really hates to eat
+    interest
+        .food_interest()
+        .interest_for(&flavours.flavours)
+        .map(|f| f.value())
 }
 
 fn has_in_inventory(blackboard: &mut AiBlackboard, filter: &ItemFilter) -> Option<f32> {
@@ -163,10 +201,22 @@ fn can_use_held_item(blackboard: &mut AiBlackboard, filter: &ItemFilter) -> Opti
     })
 }
 
-/// 0 distance if in inventory
-fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) -> Option<f32> {
+fn find_herd_target(blackboard: &AiBlackboard) -> Option<WorldPoint> {
+    HerdInfo::get(blackboard.entity, blackboard.world).map(|herd| {
+        herd.herd_centre(|e| {
+            blackboard
+                .world
+                .component::<TransformComponent>(e)
+                .ok()
+                .map(|t| t.position)
+        })
+    })
+}
+
+/// Some(0.0) if in inventory, None if missing transform
+fn distance_to_target(blackboard: &mut AiBlackboard, target: &AiTarget) -> Option<f32> {
     let target_pos = match target {
-        Some(AiTarget::Entity(e)) => {
+        AiTarget::Entity(e) => {
             // check if held by us first
             if let Ok(hauled) = blackboard.world.component::<HauledItemComponent>(*e) {
                 if hauled.hauler == blackboard.entity {
@@ -193,9 +243,8 @@ fn distance_to_target(blackboard: &mut AiBlackboard, target: Option<&AiTarget>) 
                 .ok()
                 .map(|pos| pos.position)?
         }
-        Some(AiTarget::Point(pos)) => *pos,
-        Some(AiTarget::Block(block)) => block.centred(),
-        _ => return None,
+        AiTarget::Point(pos) => *pos,
+        AiTarget::Block(block) => block.centred(),
     };
 
     Some(target_pos.distance2(blackboard.transform.position))
@@ -242,6 +291,7 @@ impl Display for AiInput {
         use AiInput::*;
         match self {
             Hunger => f.write_str("Hunger"),
+            FoodInterestInTarget => write!(f, "Interest in target food flavours"),
             HasInInventory(filter) => write!(f, "Has an item matching {}", filter),
             CanFindGradedItemsLocally {
                 filter,
@@ -255,6 +305,7 @@ impl Display for AiInput {
             Constant(c) => write!(f, "Constant {:?}", c.0),
 
             MyDistance2To(pos) => write!(f, "Distance to {}", pos),
+            MyDistance2ToHerd => write!(f, "Distance to herd"),
             MyDistance2ToTarget => f.write_str("Distance to target"),
 
             // TODO lowercase BlockType

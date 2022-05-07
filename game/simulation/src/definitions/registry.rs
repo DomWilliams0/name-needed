@@ -1,36 +1,51 @@
+use std::collections::{HashMap, HashSet};
+
+use common::*;
+
 use crate::definitions::builder::DefinitionBuilder;
 use crate::definitions::{Definition, DefinitionErrorKind};
-
 use crate::string::{CachedStr, CachedStringHasher, StringCache};
 use crate::ComponentWorld;
-use common::*;
-use std::collections::HashMap;
 
-pub struct DefinitionRegistry(HashMap<CachedStr, Definition, CachedStringHasher>);
+pub struct DefinitionRegistry {
+    definitions: HashMap<CachedStr, Definition, CachedStringHasher>,
+    categories: HashMap<String, Vec<CachedStr>>,
+}
 
-pub struct DefinitionRegistryBuilder(HashMap<CachedStr, Definition, CachedStringHasher>);
+pub struct DefinitionRegistryBuilder {
+    definitions: HashMap<CachedStr, Definition, CachedStringHasher>,
+    categories: HashMap<String, Vec<CachedStr>>,
+}
 
 impl DefinitionRegistryBuilder {
     pub fn new() -> Self {
-        Self(HashMap::with_capacity_and_hasher(
-            512,
-            CachedStringHasher::default(),
-        ))
+        Self {
+            definitions: HashMap::with_capacity_and_hasher(512, CachedStringHasher::default()),
+            categories: HashMap::new(),
+        }
     }
 
     pub fn register(
         &mut self,
         uid: CachedStr,
         definition: Definition,
+        category: Option<String>,
     ) -> Result<(), (Definition, DefinitionErrorKind)> {
         #[allow(clippy::map_entry)]
-        if self.0.contains_key(&uid) {
+        if self.definitions.contains_key(&uid) {
             Err((
                 definition,
                 DefinitionErrorKind::AlreadyRegistered(uid.as_ref().to_owned()),
             ))
         } else {
-            self.0.insert(uid, definition);
+            self.definitions.insert(uid, definition);
+
+            if let Some(category) = category {
+                self.categories
+                    .entry(category)
+                    .and_modify(|defs| defs.push(uid))
+                    .or_insert_with(|| vec![uid]);
+            }
             Ok(())
         }
     }
@@ -38,9 +53,12 @@ impl DefinitionRegistryBuilder {
     pub fn build(self) -> DefinitionRegistry {
         info!(
             "creating definition registry with {count} entries",
-            count = self.0.len()
+            count = self.definitions.len()
         );
-        DefinitionRegistry(self.0)
+        DefinitionRegistry {
+            definitions: self.definitions,
+            categories: self.categories,
+        }
     }
 }
 
@@ -51,7 +69,7 @@ impl DefinitionRegistry {
         world: &'w W,
     ) -> Result<DefinitionBuilder<'s, W>, DefinitionErrorKind> {
         let uid = world.resource::<StringCache>().get(uid);
-        match self.0.get(&uid) {
+        match self.definitions.get(&uid) {
             Some(def) => Ok(DefinitionBuilder::new_with_cached(def, world, uid)),
             None => Err(DefinitionErrorKind::NoSuchDefinition(
                 uid.as_ref().to_owned(),
@@ -60,22 +78,52 @@ impl DefinitionRegistry {
     }
 
     pub fn lookup_definition(&self, uid: CachedStr) -> Option<&Definition> {
-        self.0.get(&uid)
+        self.definitions.get(&uid)
     }
 
-    pub fn iter_templates<T: 'static>(
+    pub fn iter_category(
         &self,
-        component: &'static str,
-    ) -> impl Iterator<Item = CachedStr> + '_ {
-        self.0.iter().filter_map(move |(name, def)| {
-            def.find_component(component).and_then(|template| {
-                if template.is::<T>() {
-                    Some(*name)
-                } else {
-                    None
-                }
+        category: &str,
+    ) -> impl Iterator<Item = (CachedStr, &Definition)> + '_ {
+        self.categories
+            .get(category)
+            .map(|defs| defs.iter().copied())
+            .into_iter()
+            .flatten()
+            .map(move |uid| match self.definitions.get(&uid) {
+                Some(def) => (uid, def),
+                None => panic!(
+                    "expected definition '{uid}' to exist since it's registered under a category"
+                ),
             })
-        })
+    }
+
+    /// Includes expensive allocations
+    #[cfg(feature = "utils")]
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Definition, Option<String>)> + '_ {
+        let mut all = Vec::with_capacity(self.definitions.len());
+        let mut seen = HashSet::with_capacity_and_hasher(
+            self.definitions.len(),
+            CachedStringHasher::default(),
+        );
+
+        // gather categories
+        for cat in self.categories.keys() {
+            for (uid, def) in self.iter_category(cat) {
+                all.push((uid, def, Some(cat.to_owned())));
+                seen.insert(uid);
+            }
+        }
+
+        // gather remaining without a category
+        for (uid, def) in self.definitions.iter() {
+            if !seen.contains(uid) {
+                all.push((*uid, def, None));
+            }
+        }
+
+        all.into_iter()
+            .map(|(uid, def, cat)| (uid.as_ref_static(), def, cat))
     }
 }
 #[cfg(test)]
@@ -85,8 +133,14 @@ mod tests {
     #[test]
     fn duplicates() {
         let mut reg = DefinitionRegistryBuilder::new();
-        assert!(reg.register("nice".into(), Definition::dummy()).is_ok());
-        assert!(reg.register("nice".into(), Definition::dummy()).is_err()); // duplicate
-        assert!(reg.register("nice2".into(), Definition::dummy()).is_ok());
+        assert!(reg
+            .register("nice".into(), Definition::dummy(), None)
+            .is_ok());
+        assert!(reg
+            .register("nice".into(), Definition::dummy(), None)
+            .is_err()); // duplicate
+        assert!(reg
+            .register("nice2".into(), Definition::dummy(), None)
+            .is_ok());
     }
 }

@@ -14,7 +14,7 @@ pub struct InputSystem<'a> {
     events: &'a [InputEvent],
 }
 
-const TILE_SELECTION_LIMIT: f32 = 50.0;
+const TILE_SELECTION_LIMIT: f32 = 100.0;
 const DISTANCE_THRESHOLD: f32 = 2.0;
 
 /// Marker for entity selection by the player

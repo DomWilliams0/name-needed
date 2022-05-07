@@ -6,10 +6,12 @@ use strum::EnumDiscriminants;
 
 use common::*;
 use resources::Resources;
+
 use unit::world::{WorldPosition, WorldPositionRange};
 use world::block::BlockType;
 use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
 use world::WorldChangeEvent;
+use world_types::EntityDescription;
 
 use crate::activity::ActivitySystem;
 use crate::ai::{AiComponent, AiSystem};
@@ -21,9 +23,10 @@ use crate::input::{
     BlockPlacement, InputEvent, InputSystem, MouseLocation, SelectedEntities, SelectedTiles,
     UiCommand, UiPopup, UiRequest, UiResponsePayload,
 };
+use crate::interact::herd::{HerdDebugRenderer, HerdJoiningSystem, Herds};
 use crate::item::{ContainerComponent, HaulSystem};
 use crate::movement::MovementFulfilmentSystem;
-use crate::needs::{EatingSystem, HungerSystem};
+use crate::needs::food::{EatingSystem, HungerSystem};
 use crate::path::{NavigationAreaDebugRenderer, PathDebugRenderer, PathSteeringSystem};
 use crate::physics::PhysicsSystem;
 use crate::queued_update::QueuedUpdates;
@@ -111,6 +114,7 @@ pub struct SimulationRef<'s> {
     pub debug_renderers: &'s DebugRenderersState,
 }
 
+/// Resource to get the world reference in a system
 pub struct EcsWorldRef(Pin<&'static EcsWorld>);
 
 impl world::WorldContext for WorldContext {
@@ -250,6 +254,9 @@ impl<R: Renderer> Simulation<R> {
             // update senses
             run!(SensesSystem);
 
+            // update herds
+            run!(HerdJoiningSystem);
+
             // choose and tick activity
             run!(AiSystem);
             run!(
@@ -356,15 +363,23 @@ impl<R: Renderer> Simulation<R> {
         self.world_loader.request_slabs(actual_requested_slabs);
         drop(requested_slabs);
 
-        let mut world = self.voxel_world.borrow_mut();
+        let mut entities_to_spawn = Vec::new();
+        {
+            let mut world = self.voxel_world.borrow_mut();
 
-        // apply occlusion updates
-        self.world_loader
-            .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
+            // apply occlusion updates
+            self.world_loader
+                .iter_occlusion_updates(|update| world.apply_occlusion_update(update));
 
-        // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
-        world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
-        drop(world);
+            // mark modified slabs as dirty in world viewer, which will cache it until the slab is visible
+            world.dirty_slabs().for_each(|s| world_viewer.mark_dirty(s));
+
+            // move entity descriptions out of world to release lock asap
+            entities_to_spawn.extend(world.entities_to_spawn());
+        }
+
+        // spawn entities for newly generated terrain
+        self.spawn_entities_from_descriptions(&entities_to_spawn);
 
         // aggregate all terrain changes for this tick
         let updates = &mut self.terrain_changes;
@@ -397,6 +412,52 @@ impl<R: Renderer> Simulation<R> {
         std::mem::forget(std::mem::replace(&mut self.change_events, events));
     }
 
+    fn spawn_entities_from_descriptions(&mut self, entities: &[EntityDescription]) {
+        for entity in entities {
+            // features are generated in parallel and might overlap, so skip entities that collide
+            // with blocks
+            // TODO depends on bounds of the physical entity size
+            // TODO cant hold voxel lock for long, but taking and releasing like this is insane
+            {
+                let voxel_world = self.voxel_world.borrow();
+                match voxel_world.block(entity.position.floor()) {
+                    Some(b) if b.block_type().is_air() => { /* safe to place */ }
+                    _ => {
+                        warn!("skipping plant due to block collision"; "pos" => %entity.position);
+                        continue;
+                    }
+                }
+            }
+
+            let builder = match self.ecs_world.build_entity(&entity.desc.species) {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!(
+                        "unknown species '{species}'",
+                        species = entity.desc.species.as_ref();
+                        "error" => %e,
+                    );
+                    continue;
+                }
+            };
+
+            // TODO procgen specifies plant rotation too?
+            let res = builder
+                .with_position(entity.position)
+                .doesnt_need_to_be_accessible()
+                .spawn();
+
+            match res {
+                Err(err) => {
+                    warn!("failed to spawn plant: {}", err);
+                }
+                Ok(e) => {
+                    debug!("spawned plant"; e, "pos" => %entity.position);
+                }
+            };
+        }
+    }
+
     fn process_ui_commands(
         &mut self,
         commands: impl Iterator<Item = UiCommand>,
@@ -415,6 +476,9 @@ impl<R: Renderer> Simulation<R> {
                             .set_enabled(ident, enabled, &self.ecs_world)
                     {
                         warn!("failed to set debug renderer state"; "error" => %e);
+                        if cfg!(debug_assertions) {
+                            panic!("unknown debug renderer: {}", e)
+                        }
                     }
                 }
 
@@ -572,6 +636,10 @@ impl<R: Renderer> Simulation<R> {
                 }
                 UiRequest::ChangeGameSpeed(change) => {
                     tick.speed_change = Some(change);
+                }
+                UiRequest::Kill(e) => {
+                    debug!("killing entity with god powers"; e);
+                    self.ecs_world.kill_entity(e, DeathReason::Unknown);
                 }
             }
         }
@@ -776,6 +844,7 @@ fn register_resources(world: &mut EcsWorld, resources: Resources) -> BoxedResult
     world.insert(NameGeneration::load(&resources)?);
     world.insert(FrameAllocator::default());
     world.insert(UiPopup::default());
+    world.insert(Herds::default());
 
     Ok(())
 }
@@ -793,6 +862,7 @@ fn register_debug_renderers<R: Renderer>() -> Result<DebugRenderers<R>, DebugRen
     builder.register::<FeatureBoundaryDebugRenderer>()?;
     builder.register::<EntityIdDebugRenderer>()?;
     builder.register::<AllSocietyVisibilityDebugRenderer>()?;
+    builder.register::<HerdDebugRenderer>()?;
 
     Ok(builder.build())
 }

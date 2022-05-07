@@ -1,15 +1,15 @@
-use unit::world::WorldPosition;
+use common::*;
+use unit::world::{WorldPoint, WorldPosition};
 
 use crate::definitions::loader::Definition;
 use crate::definitions::DefinitionNameComponent;
 use crate::ecs::*;
 use crate::string::{CachedStr, StringCache};
 use crate::{ComponentWorld, InnerWorldRef, TransformComponent};
-use common::*;
 
 pub trait EntityPosition {
     /// (position, optional rotation)
-    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPosition, Option<Deg>), BuilderError>;
+    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPoint, Option<Deg>), BuilderError>;
 }
 
 #[derive(Debug, Error, Clone)]
@@ -32,6 +32,7 @@ pub struct DefinitionBuilder<'d, W: ComponentWorld> {
     world: &'d W,
 
     position: Option<Box<dyn EntityPosition>>,
+    accessibility_required: bool,
 }
 
 impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
@@ -41,6 +42,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
             world,
             uid,
             position: None,
+            accessibility_required: true,
         }
     }
 
@@ -48,10 +50,19 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         Self::new_with_cached(definition, world, world.resource::<StringCache>().get(uid))
     }
 
-    pub fn with_position<P: EntityPosition + 'static>(mut self, pos: P) -> Self {
+    pub fn with_position<P: EntityPosition + 'static>(self, pos: P) -> Self {
         // TODO avoid box by resolving here and storing result
-        self.position = Some(Box::new(pos));
-        self
+        Self {
+            position: Some(Box::new(pos)),
+            ..self
+        }
+    }
+
+    pub fn doesnt_need_to_be_accessible(self) -> Self {
+        Self {
+            accessibility_required: false,
+            ..self
+        }
     }
 
     pub fn spawn(self) -> Result<Entity, BuilderError> {
@@ -60,9 +71,10 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         let world = world_ref.borrow();
         let (pos, rot) = match self.position {
             Some(pos) => {
-                let (pos, rot) = pos.resolve(&world)?;
-                if world.area(pos).ok().is_some() {
-                    (Some(pos), rot)
+                let (point, rot) = pos.resolve(&world)?;
+                let pos = point.floor();
+                if !self.accessibility_required || world.area(pos).ok().is_some() {
+                    (Some(point), rot)
                 } else {
                     return Err(BuilderError::PositionNotWalkable(pos));
                 }
@@ -87,7 +99,7 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
         // set position in transform if present
         if let Ok(mut transform) = self.world.component_mut::<TransformComponent>(entity) {
             if let Some(pos) = pos {
-                transform.reset_position(pos.centred())
+                transform.reset_position(pos)
             } else {
                 return Err(BuilderError::MissingPosition);
             }
@@ -102,23 +114,29 @@ impl<'d, W: ComponentWorld> DefinitionBuilder<'d, W> {
 }
 
 impl EntityPosition for WorldPosition {
-    fn resolve(&self, _: &InnerWorldRef) -> Result<(WorldPosition, Option<Deg>), BuilderError> {
+    fn resolve(&self, _: &InnerWorldRef) -> Result<(WorldPoint, Option<Deg>), BuilderError> {
+        Ok((self.centred(), None))
+    }
+}
+
+impl EntityPosition for WorldPoint {
+    fn resolve(&self, _: &InnerWorldRef) -> Result<(WorldPoint, Option<Deg>), BuilderError> {
         Ok((*self, None))
     }
 }
 
 impl EntityPosition for (i32, i32) {
-    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPosition, Option<Deg>), BuilderError> {
+    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPoint, Option<Deg>), BuilderError> {
         let (x, y) = *self;
         world
             .find_accessible_block_in_column(x, y)
             .ok_or(BuilderError::InaccessibleColumn((x, y)))
-            .map(|pos| (pos, None))
+            .map(|pos| (pos.centred(), None))
     }
 }
 
 impl EntityPosition for (WorldPosition, f32) {
-    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPosition, Option<Deg>), BuilderError> {
+    fn resolve(&self, world: &InnerWorldRef) -> Result<(WorldPoint, Option<Deg>), BuilderError> {
         let (pos, _) = EntityPosition::resolve(&self.0, world)?;
         let rot = deg(self.1);
         Ok((pos, Some(rot)))

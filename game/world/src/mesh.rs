@@ -11,6 +11,7 @@ use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
+use world_types::BlockType;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
@@ -53,7 +54,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
                 // render as normal
                 make_corners_with_ao(
                     block_pos,
-                    block.block_type().color(),
+                    block_color(block.block_type()),
                     block.occlusion(),
                     slice_index,
                 )
@@ -88,6 +89,22 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
     }
 
     vertices
+}
+
+fn block_color(ty: BlockType) -> Color {
+    match ty {
+        BlockType::Air => Color::rgb(0, 0, 0),
+        BlockType::Dirt => Color::rgb(86, 38, 23),
+        BlockType::Grass => Color::rgb(49, 152, 56),
+        BlockType::LightGrass => Color::rgb(91, 152, 51),
+        BlockType::Leaves => Color::rgb(49, 132, 2),
+        BlockType::TreeTrunk => Color::rgb(79, 52, 16),
+        BlockType::Stone => Color::rgb(106, 106, 117),
+        BlockType::Sand => 0xBCA748FF.into(),
+        BlockType::SolidWater => 0x3374BCFF.into(),
+        BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
+        BlockType::Chest => Color::rgb(184, 125, 31),
+    }
 }
 
 fn block_centre(block: SliceBlock) -> (f32, f32) {

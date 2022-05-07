@@ -26,24 +26,20 @@ jobs:
         shell: bash
 
       - uses: actions-rs/toolchain@v1
-        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         with:
           profile: minimal
           toolchain: stable
 
       - name: Setup Rust cache
-        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         uses: Swatinem/rust-cache@v1
         with:
           cache-on-failure: true
 
       - name: Build and run tests
-        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         run: ./.build/run-tests.sh
         shell: bash
 
       - name: Build and run headless game
-        if: "!contains(github.event.head_commit.message, 'skip-ci-build')"
         run: ./.build/run-headless.sh
         shell: bash
 

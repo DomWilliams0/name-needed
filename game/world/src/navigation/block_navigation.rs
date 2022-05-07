@@ -5,11 +5,12 @@ use petgraph::prelude::EdgeRef;
 use petgraph::visit::Visitable;
 
 use common::*;
-use unit::world::{BlockPosition, SlabIndex, SlabPosition};
+use unit::world::{BlockPosition, ChunkLocation, SlabIndex, SlabPosition};
 
-use crate::navigation::astar::{astar, SearchContext};
 use crate::navigation::path::{BlockPath, BlockPathNode};
+use crate::navigation::search::{self, ExploreResult, SearchContext};
 use crate::navigation::{EdgeCost, SearchGoal};
+use crate::{ExplorationFilter, ExplorationResult};
 
 type BlockNavGraph = DiGraphMap<BlockNavNode, BlockNavEdge>;
 pub type BlockGraphSearchContext = SearchContext<
@@ -103,26 +104,86 @@ impl BlockGraph {
         let src = BlockNavNode(from);
         let dst = BlockNavNode(to);
 
-        let is_goal = |n: BlockNavNode| match goal {
-            SearchGoal::Arrive => n == dst,
-            SearchGoal::Adjacent => self.graph.edges(n).any(|e| e.target() == dst),
-            SearchGoal::Nearby(range) => manhattan(&n.0, &dst.0) <= range.into(),
+        let heuristic: Box<dyn FnMut(BlockNavNode) -> f32> = match goal {
+            SearchGoal::Nearby(range) => {
+                let range = range as f32;
+                Box::new(move |n| (manhattan(&n.0, &dst.0) as f32 - range).max(0.0))
+            }
+            _ => Box::new(|n| manhattan(&n.0, &dst.0) as f32),
         };
 
-        let path = astar(
+        let is_goal: Box<dyn FnMut(BlockNavNode) -> bool> = match goal {
+            SearchGoal::Arrive => Box::new(|n| n == dst),
+            SearchGoal::Adjacent => {
+                Box::new(|n: BlockNavNode| self.graph.edges(n).any(|e| e.target() == dst))
+            }
+            SearchGoal::Nearby(range) => {
+                Box::new(move |n: BlockNavNode| n != src && manhattan(&n.0, &dst.0) <= range.into())
+            }
+        };
+
+        search::astar(
             &self.graph,
             src,
             is_goal,
             |(_, _, e)| e.0.weight(),
-            |n| manhattan(&n.0, &dst.0) as f32,
+            heuristic,
             context,
-        )
-        .ok_or(BlockPathError::NoPath(to, from))?;
+        );
 
-        // TODO reuse vec allocation
+        self.block_path_from_search_result(context)
+            .ok_or(BlockPathError::NoPath(to, from))
+    }
+
+    /// Uses as much fuel as possible to find a reachable block
+    pub(crate) fn explore(
+        &self,
+        from: BlockPosition,
+        fuel: &mut u32,
+        context: &BlockGraphSearchContext,
+        random: impl Rng,
+        filter: Option<(&ExplorationFilter, ChunkLocation)>,
+    ) -> (ExploreResult, Option<BlockPosition>) {
+        let src = BlockNavNode(from);
+
+        let filter = move |node: BlockNavNode| {
+            filter
+                .map(
+                    |(func, this_chunk)| match func.0(node.0.to_world_position(this_chunk)) {
+                        ExplorationResult::Abort => true,
+                        ExplorationResult::Continue => false,
+                    },
+                )
+                .unwrap_or_default()
+        };
+        let result = search::explore(
+            &self.graph,
+            src,
+            fuel,
+            |n| n.0.is_edge(),
+            context,
+            random,
+            filter,
+        );
+
+        let path = &*context.result();
+        (result, path.last().map(|(_, (_, target))| target.0))
+    }
+
+    /// None if empty
+    fn block_path_from_search_result(
+        &self,
+        context: &BlockGraphSearchContext,
+    ) -> Option<BlockPath> {
+        let path = &*context.result();
+        if path.is_empty() {
+            return None;
+        };
+
+        // TODO improve allocations
         let mut out_path = Vec::with_capacity(path.len());
 
-        let target = path.last().map(|(_, (_, target))| target).unwrap_or(&dst).0;
+        let target = path.last().map(|(_, (_, target))| target.0).unwrap(); // not empty
 
         for &(_, (from, to)) in path.iter() {
             let edge = self.graph.edge_weight(from, to).unwrap();
@@ -131,8 +192,7 @@ impl BlockGraph {
                 exit_cost: edge.0,
             });
         }
-
-        Ok(BlockPath {
+        Some(BlockPath {
             path: out_path,
             target,
         })

@@ -1,9 +1,11 @@
-use common::derive_more::*;
 use std::rc::Rc;
+
+use common::derive_more::*;
+use unit::food::Nutrition;
 
 use crate::ecs::*;
 use crate::item::condition::ItemCondition;
-use crate::needs::Fuel;
+use crate::needs::food::{FoodDescription, FoodFlavours};
 use crate::string::StringCache;
 
 /// Condition/durability of an entity, e.g. a tool or food
@@ -16,13 +18,15 @@ pub struct ConditionComponent(pub ItemCondition);
 #[name("edible")]
 #[storage(DenseVecStorage)]
 pub struct EdibleItemComponent {
-    /// All fuel available from this item - never changes, decrease base item condition instead
-    pub total_nutrition: Fuel,
-    // TODO proper nutritional value
+    /// Immutable description of food properties
+    pub description: FoodDescription,
+
     /// Extra number of hands needed to eat this
     pub extra_hands: u16,
+
     // TODO food debris - the last X fuel/proportion is inedible and has to be disposed of
     // TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place
+    pub flavours: FoodFlavours,
 }
 
 // TODO add aerodynamic-ness field
@@ -58,9 +62,20 @@ impl<V: Value> ComponentTemplate<V> for EdibleItemComponent {
         values: &mut Map<V>,
         _: &StringCache,
     ) -> Result<Rc<dyn ComponentTemplate<V>>, ComponentBuildError> {
+        let description = FoodDescription {
+            total_nutrition: Nutrition::new(values.get_int("total_nutrition")?),
+            consumption_rate: Nutrition::new(values.get_int("consumption_rate")?),
+            efficiency: values.get_float("efficiency")?,
+        };
+        let extra_hands = values.get_int("extra_hands")?;
+        let flavours = values.get_string("flavours")?.parse().map_err(|e| {
+            ComponentBuildError::TemplateSpecific(format!("failed to parse flavours: {e}"))
+        })?;
+
         Ok(Rc::new(Self {
-            total_nutrition: values.get_int("total_nutrition")?,
-            extra_hands: values.get_int("extra_hands")?,
+            description,
+            extra_hands,
+            flavours,
         }))
     }
 
@@ -86,7 +101,6 @@ impl<V: Value> ComponentTemplate<V> for ThrowableItemComponent {
     crate::as_any!();
 }
 
-register_component_template!("kind", KindComponent);
 register_component_template!("breakable", ConditionComponent);
 register_component_template!("edible", EdibleItemComponent);
 register_component_template!("throwable", ThrowableItemComponent);

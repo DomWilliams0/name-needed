@@ -30,6 +30,8 @@ backtrace = "0.3"
 displaydoc = "0.2"
 derivative = "2.2"
 tracy-client = { version = "0.12", default-features = false }
+rstar = "0.9"
+tap = "1.0"
 
 # TODO feature for cgmath
 [features]

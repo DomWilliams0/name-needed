@@ -1,4 +1,4 @@
-# TODOs (397)
+# TODOs (413)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -89,16 +89,18 @@
    * `// TODO move directly with pointer magic instead`
  * [game/procgen/src/region/row_scanning.rs](game/procgen/src/region/row_scanning.rs) (1)
    * `// TODO ensure no bounds checking here`
- * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (7)
+ * [game/procgen/src/region/subfeature.rs](game/procgen/src/region/subfeature.rs) (8)
    * `// TODO pass in a "mask" of xyz ranges that can optionally be used to trim trying to place blocks in a neighbour`
+   * `// TODO reduce smallvec inline size, this is excessive and never spills`
    * `// TODO use dynstack here`
    * `// TODO reuse borrowed vec allocation`
    * `/// TODO handle case where block is multiple slabs over from root slab`
    * `// TODO if continuations is None, set a flag to ignore boundary leaks`
    * `// TODO neighbour slab should wrap around the planet`
    * `// TODO beware that subfeatures dont live for long so the pointer is likely to be reused`
- * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (2)
+ * [game/procgen/src/region/subfeatures/tree.rs](game/procgen/src/region/subfeatures/tree.rs) (3)
    * `// TODO actual tree shape`
+   * `// TODO entity for trees`
    * `// TODO tree configuration based on its planet location - branch count, leaf spread, etc`
  * [game/procgen/src/render.rs](game/procgen/src/render.rs) (2)
    * `// TODO per land layer?`
@@ -113,6 +115,8 @@
    * `// TODO specify follow speed in activity too`
  * [game/simulation/src/activity/activity/go_build.rs](game/simulation/src/activity/activity/go_build.rs) (1)
    * `// TODO depends on build type`
+ * [game/simulation/src/activity/activity/go_eat.rs](game/simulation/src/activity/activity/go_eat.rs) (1)
+   * `// TODO destination depends on food size, not always adjacent block`
  * [game/simulation/src/activity/activity/go_haul.rs](game/simulation/src/activity/activity/go_haul.rs) (7)
    * `// TODO support for hauling multiple things at once to the same loc, if the necessary amount of hands are available`
    * `// TODO support hauling multiple things to multiple locations (or via multiple activities?)`
@@ -122,7 +126,7 @@
    * `// TODO destructive events on the container? society job handles this but not always the source`
    * `// TODO arrival radius depends on the size of the item`
  * [game/simulation/src/activity/activity/wander.rs](game/simulation/src/activity/activity/wander.rs) (1)
-   * `// TODO special SearchGoal for wandering instead of randomly choosing an accessible target`
+   * `// TODO when in range, this produces a lot of single block paths, which look terrible`
  * [game/simulation/src/activity/context.rs](game/simulation/src/activity/context.rs) (2)
    * `// TODO other subscribe method to batch up a few subscriptions before adding to evt queue`
    * `// TODO possible to compare std::mem::discriminants instead of converting to evt type enum?`
@@ -136,7 +140,8 @@
    * `// TODO ensure we break out of this wait early if job is finished during`
  * [game/simulation/src/activity/subactivity/equip.rs](game/simulation/src/activity/subactivity/equip.rs) (1)
    * `// TODO inventory operations should not be immediate`
- * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (1)
+ * [game/simulation/src/activity/subactivity/go_to.rs](game/simulation/src/activity/subactivity/go_to.rs) (2)
+   * `// TODO dont always abort path for smooth transition to different targets/actions`
    * `// TODO use target moving speed or get the actual speed when applying exertion in other system?`
  * [game/simulation/src/activity/subactivity/haul.rs](game/simulation/src/activity/subactivity/haul.rs) (6)
    * `// TODO depends on item size`
@@ -150,6 +155,8 @@
    * `// TODO need to notify society here, as above?`
  * [game/simulation/src/ai/action.rs](game/simulation/src/ai/action.rs) (1)
    * `// TODO speed should be specified as an enum for all go??? actions`
+ * [game/simulation/src/ai/consideration/interact/is_far_from_herd_leader.rs](game/simulation/src/ai/consideration/interact/is_far_from_herd_leader.rs) (1)
+   * `// TODO should depend on herd`
  * [game/simulation/src/ai/consideration/items/find_local_graded_item.rs](game/simulation/src/ai/consideration/items/find_local_graded_item.rs) (1)
    * `/// TODO search society stores as well`
  * [game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs](game/simulation/src/ai/consideration/items/has_extra_hands_for_hauling.rs) (1)
@@ -166,7 +173,7 @@
  * [game/simulation/src/ai/dse/items/haul.rs](game/simulation/src/ai/dse/items/haul.rs) (1)
    * `// TODO consider distance to source too`
  * [game/simulation/src/ai/dse/mod.rs](game/simulation/src/ai/dse/mod.rs) (1)
-   * `// TODO species concept is temporary`
+   * `// TODO species concept for ai is temporary`
  * [game/simulation/src/ai/dse/world/break_block.rs](game/simulation/src/ai/dse/world/break_block.rs) (2)
    * `// TODO calculate path and use length, cache path which can be reused by movement system`
    * `// TODO has the right tool/is the right tool nearby/close enough in society storage`
@@ -178,9 +185,11 @@
    * `// TODO search range could depend on entity senses`
    * `// TODO share search range with food searching`
    * `// TODO check society containers too`
- * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (3)
+ * [game/simulation/src/ai/input.rs](game/simulation/src/ai/input.rs) (5)
    * `// TODO HasInInventoryGraded - returns number,quality of matches`
    * `// TODO should include check for n free slots anywhere in inventory (not just hands)`
+   * `CanFindGradedItemsLocally { .. } => todo!(), // TODO remove this`
+   * `// TODO differentiate CANNOT eat vs really hates to eat`
    * `// TODO lowercase BlockType`
  * [game/simulation/src/ai/system.rs](game/simulation/src/ai/system.rs) (5)
    * `// TODO only run occasionally - FIXME TERRIBLE HACK`
@@ -239,8 +248,13 @@
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
- * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (7)
-   * `// TODO proper nutritional value`
+ * [game/simulation/src/interact/herd/herds.rs](game/simulation/src/interact/herd/herds.rs) (2)
+   * `// TODO map species to a separate id count? or just use a u64`
+   * `// TODO introduce promote and demote events again if needed`
+ * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
+   * `// TODO reuse allocs`
+   * `// TODO abort early?`
+ * [game/simulation/src/item/component.rs](game/simulation/src/item/component.rs) (6)
    * `// TODO food debris - the last X fuel/proportion is inedible and has to be disposed of`
    * `// TODO depending on their mood/personality this will be tossed to the ground or taken to a proper place`
    * `// TODO add aerodynamic-ness field`
@@ -279,16 +293,14 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food.rs](game/simulation/src/needs/food.rs) (10)
-   * `// TODO newtype for Fuel`
-   * `// fuel used per tick TODO depends on time rate`
-   * `// TODO species metabolism`
-   * `// TODO generic needs component with hunger/thirst/toilet/social etc`
+ * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (2)
+   * `// TODO specify explicit dislikes too?`
+   * `// TODO food contains a set of flavours`
+ * [game/simulation/src/needs/food/hunger.rs](game/simulation/src/needs/food/hunger.rs) (1)
+   * `// TODO vary eater speed`
+ * [game/simulation/src/needs/food/system.rs](game/simulation/src/needs/food/system.rs) (3)
    * `ReadStorage<'a, ActivityComponent>, // for current exertion TODO moving average`
-   * `// TODO individual metabolism rate`
-   * `// TODO elaborate and specify metabolism rate`
-   * `// TODO take into account general movement speed in addition to this`
-   * `let fuel_to_consume = BASE_EAT_RATE; // TODO individual rate`
+   * `// TODO variable speed for eating - hurried (fast) vs relaxed/idle (slow)`
    * `// TODO while eating/for a short time afterwards, add a hunger multiplier e.g. 0.2`
  * [game/simulation/src/path/debug.rs](game/simulation/src/path/debug.rs) (1)
    * `// TODO only render the top area in each slice`
@@ -296,6 +308,8 @@
    * `// TODO dont manually set the exact follow speed - choose a preset e.g. wander,dawdle,walk,fastwalk,run,sprint`
  * [game/simulation/src/path/mod.rs](game/simulation/src/path/mod.rs) (1)
    * `// TODO remove WANDER_SPEED`
+ * [game/simulation/src/path/system.rs](game/simulation/src/path/system.rs) (1)
+   * `let target = new_path.target().centred(); // TODO return random target point for unspecified too`
  * [game/simulation/src/perf.rs](game/simulation/src/perf.rs) (1)
    * `// TODO detect if changed`
  * [game/simulation/src/physics/bounds.rs](game/simulation/src/physics/bounds.rs) (1)
@@ -330,11 +344,14 @@
    * `// TODO consider using expiry times rather than decrementing a decay counter`
    * `// TODO specialize query e.g. only detect those with a given component combo e.g. Transform + Render (+ Visible/!Invisible?)`
    * `.filter(|(entity, _, _)| *entity != e) // TODO self is probably the first in the list`
- * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (4)
+ * [game/simulation/src/simulation.rs](game/simulation/src/simulation.rs) (7)
    * `/// TODO if order matters, use an IndexSet instead`
    * `// TODO sort out systems so they all have an ecs_world reference and can keep state`
    * `// TODO limit time/count`
    * `let discovered = empty(); // TODO include slabs discovered by members of player's society`
+   * `// TODO depends on bounds of the physical entity size`
+   * `// TODO cant hold voxel lock for long, but taking and releasing like this is insane`
+   * `// TODO procgen specifies plant rotation too?`
  * [game/simulation/src/society/job/job.rs](game/simulation/src/society/job/job.rs) (1)
    * `/// TODO provide size hint that could be used as an optimisation for a small number of tasks (e.g. smallvec)`
  * [game/simulation/src/society/job/jobs/build.rs](game/simulation/src/society/job/jobs/build.rs) (10)
@@ -378,12 +395,9 @@
    * `// TODO cache allocation in system`
  * [game/simulation/src/string.rs](game/simulation/src/string.rs) (1)
    * `// TODO report panic when cache is empty`
- * [game/world/src/block.rs](game/world/src/block.rs) (5)
+ * [game/world/src/block.rs](game/world/src/block.rs) (2)
    * `// TODO store sparse block data in the slab instead of inline in the block`
-   * `// TODO define block types in data instead of code`
    * `// TODO this should return an Option if area is uninitialized`
-   * `// TODO define these in data`
-   * `/// TODO very temporary "walkability" for block types`
  * [game/world/src/chunk/double_sided_vec.rs](game/world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
  * [game/world/src/chunk/slab.rs](game/world/src/chunk/slab.rs) (5)
@@ -402,7 +416,8 @@
    * `// TODO use an enum for the slice range rather than Options`
    * `// TODO set_block trait to reuse in ChunkBuilder (#46)`
    * `// TODO 1 area at z=0`
- * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (9)
+ * [game/world/src/loader/finalizer.rs](game/world/src/loader/finalizer.rs) (10)
+   * `let mut entities_to_spawn = vec![]; // TODO reuse`
    * `// TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`
    * `let mut links = Vec::new(); // TODO reuse buf`
@@ -429,14 +444,13 @@
    * `// TODO blocks filling in gaps should be tinted the colour of the block they're suggesting`
    * `// TODO consider rendering a blurred buffer of slices below`
    * `// TODO also rotate texture`
- * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (2)
+ * [game/world/src/navigation/area_navigation.rs](game/world/src/navigation/area_navigation.rs) (3)
+   * `// TODO use graphmap to just use areas as nodes? but we need parallel edges`
    * `|edge| edge.weight().cost.weight(), // TODO could prefer wider ports`
-   * `// TODO avoid calcultaing path just to throw it away`
- * [game/world/src/navigation/astar.rs](game/world/src/navigation/astar.rs) (1)
-   * `// TODO this might be expensive, can we build up the vec in order`
+   * `// TODO avoid calculating path just to throw it away`
  * [game/world/src/navigation/block_navigation.rs](game/world/src/navigation/block_navigation.rs) (2)
    * `// TODO use vertical distance differently?`
-   * `// TODO reuse vec allocation`
+   * `// TODO improve allocations`
  * [game/world/src/navigation/cost.rs](game/world/src/navigation/cost.rs) (1)
    * `// TODO currently arbitrary, should depend on physical attributes`
  * [game/world/src/navigation/discovery.rs](game/world/src/navigation/discovery.rs) (3)
@@ -445,6 +459,8 @@
    * `// TODO use unchecked unwrap here`
  * [game/world/src/navigation/path.rs](game/world/src/navigation/path.rs) (1)
    * `// TODO smallvecs`
+ * [game/world/src/navigation/search.rs](game/world/src/navigation/search.rs) (1)
+   * `// TODO this might be expensive, can we build up the vec in order`
  * [game/world/src/occlusion.rs](game/world/src/occlusion.rs) (3)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
@@ -458,13 +474,21 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [game/world/src/world.rs](game/world/src/world.rs) (6)
+ * [game/world/src/world.rs](game/world/src/world.rs) (7)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
+   * `let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`
    * `// TODO make stresser use generated terrain again`
+ * [game/world/world_types/src/block.rs](game/world/world_types/src/block.rs) (2)
+   * `// TODO define block types in data`
+   * `/// TODO very temporary "walkability" for block types`
+ * [game/world/world_types/src/entity.rs](game/world/world_types/src/entity.rs) (3)
+   * `// TODO trait object for other types`
+   * `// TODO species, initial growth progress, initial state (dehydrated, blooming, etc)`
+   * `// TODO tree entity: list of blocks for trunk/roots/leaves, age, height, species`
  * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
    * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
@@ -517,6 +541,8 @@
    * `// TODO middle of requested chunk instead of corner`
  * [renderer/main/src/scenarios.rs](renderer/main/src/scenarios.rs) (1)
    * `// TODO random pos offset away from the voxel centre`
+ * [resources/definitions/living/cow.ron](resources/definitions/living/cow.ron) (1)
+   * `{"intelligence": (species: "sheep")}, // TODO`
  * [resources/definitions/living/dog.ron](resources/definitions/living/dog.ron) (1)
    * `// TODO dog mouth inventory`
  * [resources/definitions/trees/trunk.ron](resources/definitions/trees/trunk.ron) (1)
@@ -534,8 +560,8 @@
  * [shared/unit/src/dim.rs](shared/unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
- * [shared/unit/src/lib.rs](shared/unit/src/lib.rs) (1)
-   * `// TODO pub mod hunger;`
+ * [shared/unit/src/food.rs](shared/unit/src/food.rs) (1)
+   * `// TODO casting to floats leads to loss of precision when large`
  * [shared/unit/src/world/slab_position.rs](shared/unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [shared/unit/src/world/slice_index.rs](shared/unit/src/world/slice_index.rs) (1)

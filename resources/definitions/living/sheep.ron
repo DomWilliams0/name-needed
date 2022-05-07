@@ -1,0 +1,27 @@
+[
+  (
+    uid: "core_living_sheep",
+    components: [
+      {"kind": (singular: "Sheep")},
+      {"render": (
+        color: "E0E0E0",
+        shape: "Circle",
+      )},
+      {"physical": (
+        size: [4, 6, 4],
+        volume: 400,
+      )},
+      {"movement": (
+        max_speed: 0.15,
+        acceleration: 0.11,
+      )},
+      {"species": (name: "sheep")},
+      {"herdable": ()},
+      {"intelligence": (species: "sheep")},
+      {"hunger": (max: 2000, interests: "raw-plant=50,cooked-plant=40,fruit=30", metabolism: 0.05)},
+      {"senses": (
+        vision: (length: 11.0, angle: 60 /*degrees*/),
+      )}
+    ],
+  ),
+]

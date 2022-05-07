@@ -38,6 +38,10 @@ pub enum LoggedEntityEvent {
     AiDecision(LoggedEntityDecision),
     /// Died
     Died(DeathReason),
+
+    /// Only used in dev builds
+    #[cfg(debug_assertions)]
+    Dev(Cow<'static, str>),
 }
 
 #[cfg_attr(feature = "testing", derive(Eq, PartialEq))]
@@ -45,9 +49,11 @@ pub enum LoggedEntityEvent {
 pub enum LoggedEntityDecision {
     GoPickup(Cow<'static, str>),
     GoEquip(Entity),
+    GoEat(Entity),
     EatHeldItem(Entity),
     Wander,
     Goto(WorldPoint),
+    ReturnToHerd,
     GoBreakBlock(WorldPosition),
     Follow(Entity),
     Haul { item: Entity, dest: HaulTarget },
@@ -123,21 +129,36 @@ impl Display for LoggedEntityEvent {
             Eaten(e) => write!(f, "ate {}", e),
             PickedUp(e) => write!(f, "picked up {}", e),
             Died(reason) => write!(f, "died because {}", reason),
+            #[cfg(debug_assertions)]
+            Dev(reason) => write!(f, "(DEV) {}", reason),
 
             AiDecision(decision) => {
                 write!(f, "decided to ")?;
                 match decision {
                     GoPickup(what) => write!(f, "pickup nearby {}", what),
                     GoEquip(e) => write!(f, "go pickup {}", *e),
+                    GoEat(e) => write!(f, "go eat {}", *e),
                     EatHeldItem(e) => write!(f, "eat held {}", e),
                     Wander => write!(f, "wander around"),
                     Goto(target) => write!(f, "go to {}", target),
+                    ReturnToHerd => write!(f, "return to herd"),
                     GoBreakBlock(pos) => write!(f, "break the block at {}", pos),
                     Follow(e) => write!(f, "follow {}", e),
                     Haul { item, dest } => write!(f, "haul {} to {}", item, dest),
                     GoBuild(details) => write!(f, "build {} at {}", details.target, details.pos),
                 }
             }
+        }
+    }
+}
+
+impl LoggedEntityEvent {
+    pub fn dev(reason: impl Into<Cow<'static, str>>) -> Result<Self, ()> {
+        match () {
+            #[cfg(debug_assertions)]
+            _ => Ok(Self::Dev(reason.into())),
+            #[cfg(not(debug_assertions))]
+            _ => Err(()),
         }
     }
 }

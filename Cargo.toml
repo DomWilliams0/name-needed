@@ -8,6 +8,7 @@ members = [
 	"game/simulation",
 	"game/simulation/ecs-derive",
 	"game/world",
+	"game/world/world_types",
 
 	"renderer/engine",
 	"renderer/main",
@@ -19,6 +20,9 @@ members = [
 	"shared/metrics",
 	"shared/logging",
 	"shared/unit",
+
+    "utils/ai-curve-vis",
+    "utils/definitions",
 
 	# ensure this is the last member! so it can be sed'd out in CI on unsupported OSs
 	"testing",

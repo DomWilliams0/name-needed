@@ -1,7 +1,7 @@
-use crate::region::subfeature::{Rasterizer, Subfeature};
+use crate::region::subfeature::{Rasterizer, Subfeature, SubfeatureEntity};
 use unit::world::WorldPosition;
+use world_types::BlockType;
 
-use crate::BlockType;
 use common::Itertools;
 
 #[derive(Debug)]
@@ -11,7 +11,11 @@ pub struct Tree {
 }
 
 impl Subfeature for Tree {
-    fn rasterize(&mut self, root: WorldPosition, rasterizer: &mut Rasterizer) {
+    fn rasterize(
+        &mut self,
+        root: WorldPosition,
+        rasterizer: &mut Rasterizer,
+    ) -> Option<SubfeatureEntity> {
         // TODO actual tree shape
         // just a column of random block for now
         for y in 0..self.height as i32 {
@@ -27,6 +31,9 @@ impl Subfeature for Tree {
             let pos = root + (x, y, self.height as i32);
             rasterizer.place_block(pos, BlockType::Leaves);
         }
+
+        // TODO entity for trees
+        None
     }
 }
 

@@ -2,17 +2,19 @@ pub use area_navigation::{AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPa
 pub use block_navigation::{BlockGraph, BlockGraphSearchContext, BlockPathError};
 use common::*;
 pub use cost::EdgeCost;
+
 pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
 };
+pub use search::ExploreResult;
 use unit::world::{ChunkLocation, SlabIndex};
 
 mod area_navigation;
-mod astar;
 mod block_navigation;
 mod cost;
 pub(crate) mod discovery;
 mod path;
+mod search;
 
 /// Area index in a slab. 0 is uninitialized, starts at 1
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
