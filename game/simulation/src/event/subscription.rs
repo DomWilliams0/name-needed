@@ -8,7 +8,6 @@ use world::NavigationError;
 
 use crate::activity::{EquipItemError, HaulError, LoggedEntityEvent};
 use crate::ecs::*;
-use crate::interact::herd::HerdHandle;
 use crate::needs::food::FoodEatingError;
 use crate::path::PathToken;
 
@@ -61,12 +60,13 @@ pub enum EntityEventPayload {
     /// Entity died for the given reason
     Died(DeathReason),
 
-    /// Subject has been promoted to leader of its herd
-    PromotedToHerdLeader,
+    /*
+        /// Subject has been promoted to leader of its herd
+        PromotedToHerdLeader,
 
-    /// Subject is no longer the leader of the given herd
-    DemotedFromHerdLeader(HerdHandle),
-
+        /// Subject is no longer the leader of the given herd
+        DemotedFromHerdLeader(HerdHandle),
+    */
     /// Debug event needed for tests only
     #[cfg(feature = "testing")]
     Debug(crate::event::subscription::debug_events::EntityEventDebugPayload),
@@ -200,13 +200,9 @@ impl EntityEventPayload {
             | EnteredContainer(Err(_)) => false,
 
             // not destructive in any case
-            Arrived(_, _)
-            | HasPickedUp(_)
-            | HasEaten(_)
-            | HasEquipped(_)
-            | BeenEquipped(_)
-            | PromotedToHerdLeader
-            | DemotedFromHerdLeader(_) => false,
+            Arrived(_, _) | HasPickedUp(_) | HasEaten(_) | HasEquipped(_) | BeenEquipped(_) => {
+                false
+            }
 
             // always destructive
             JoinedStack(_) | Died(_) => true,
@@ -232,9 +228,8 @@ impl TryInto<LoggedEntityEvent> for &EntityEventPayload {
             HasPickedUp(e) => Ok(E::PickedUp(*e)),
             Died(reason) => Ok(E::Died(*reason)),
 
-            PromotedToHerdLeader => E::dev("promoted to herd leader"),
-            DemotedFromHerdLeader(h) => E::dev(format!("demoted from leader of {:?}", h)),
-
+            // PromotedToHerdLeader => E::dev("promoted to herd leader"),
+            // DemotedFromHerdLeader(h) => E::dev(format!("demoted from leader of {:?}", h)),
             BeenEaten(_)
             | BeenPickedUp(_, _)
             | Arrived(_, _)

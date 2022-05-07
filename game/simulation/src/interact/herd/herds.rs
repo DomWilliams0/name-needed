@@ -1,13 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use specs::WriteStorage;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroU32;
 
-use common::FmtResult;
+use common::{trace, FmtResult};
 use unit::world::{WorldPoint, WorldPointRange};
 
-use crate::event::EntityEventQueue;
+use crate::interact::herd::system::DiscoveredHerds;
 use crate::species::Species;
-use crate::{ComponentWorld, EcsWorld, Entity, EntityEvent, EntityEventPayload, HerdedComponent};
+use crate::{ComponentWorld, EcsWorld, Entity, HerdedComponent};
 
 type HerdId = NonZeroU32;
 
@@ -46,43 +47,59 @@ impl Herds {
         herd
     }
 
-    pub fn register_assigned_herds(
+    /// Does not write to herded_comps, but the system has a mutable reference already
+    pub(in crate::interact::herd) fn register_assigned_herds(
         &mut self,
-        world: &EcsWorld,
-        herds: impl Iterator<Item = (HerdHandle, HerdInfo)>,
+        herded_comps: &WriteStorage<HerdedComponent>,
+        herds: &mut DiscoveredHerds,
     ) {
-        // TODO reuse allocs
+        // don't bother reusing alloc, this happens only once and not very often
         let mut old_leaders = self
             .herds
             .drain()
-            .map(|(h, info)| (info.leader, h))
-            .collect::<HashSet<_>>();
-        let mut new_leaders = vec![];
+            .map(|(h, info)| (herds.map_herd(h), info.leader))
+            .collect::<HashMap<_, _>>();
 
-        for (herd, info) in herds {
-            if old_leaders.remove(&(info.leader, herd)) {
-                // no change, this entity was already the leader for this herd
-            } else {
-                // demote old leader and promote new, deferring promotion event until after demotion
-                new_leaders.push(info.leader);
-            }
+        for (herd, herd_wip) in herds.iter_herds() {
+            trace!(
+                "registering herd {:?} with {} members",
+                herd,
+                herd_wip.count()
+            );
 
-            self.herds.insert(herd, info);
+            // find old leader, if any
+            let leader = old_leaders.remove(&herd).and_then(|prev| {
+                match prev.get(herded_comps) {
+                    Some(comp) if comp.current().handle() == herd => Some(prev),
+                    _ => None, // dead or not in the same herd anymore
+                }
+            });
+
+            // find geometric median and possibly new leader
+            let (leader, median) = match leader {
+                None => {
+                    let (leader, median) = herd_wip.choose_leader();
+                    trace!("old leader is invalid, chose new"; "leader" => leader);
+                    (leader, median)
+                }
+                Some(e) => {
+                    trace!("keeping same leader"; "leader" => e);
+                    (e, herd_wip.find_geometric_median())
+                }
+            };
+
+            // register herd and leader
+            let (min_pos, max_pos) = herd_wip.range();
+            let range = WorldPointRange::with_inclusive_range(min_pos, max_pos);
+
+            let herd_info = HerdInfo::new(median, leader, range, herd_wip.count());
+            trace!("completed herd: {:?}", herd_info; "herd" => ?herd);
+            self.herds.insert(herd, herd_info);
         }
 
-        let events = world.resource_mut::<EntityEventQueue>();
-
-        // demote old leaders first
-        events.post_multiple(old_leaders.drain().map(|(e, herd)| EntityEvent {
-            subject: e,
-            payload: EntityEventPayload::DemotedFromHerdLeader(herd),
-        }));
-
-        // promote new leaders
-        events.post_multiple(new_leaders.drain(..).map(|e| EntityEvent {
-            subject: e,
-            payload: EntityEventPayload::PromotedToHerdLeader,
-        }));
+        // TODO there might be old herd leaders to demote
+        // TODO introduce promote and demote events again if needed
+        debug_assert!(old_leaders.is_empty());
     }
 
     pub fn get_info(&self, herd: HerdHandle) -> Option<&HerdInfo> {

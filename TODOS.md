@@ -1,4 +1,4 @@
-# TODOs (414)
+# TODOs (415)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -248,9 +248,10 @@
    * `// TODO spatial lookup for ui elements too`
    * `// TODO spatial lookup for all entities contained in the given range`
    * `// TODO additive tile selection`
- * [game/simulation/src/interact/herd/herds.rs](game/simulation/src/interact/herd/herds.rs) (2)
+ * [game/simulation/src/interact/herd/herds.rs](game/simulation/src/interact/herd/herds.rs) (3)
    * `// TODO map species to a separate id count? or just use a u64`
-   * `// TODO reuse allocs`
+   * `// TODO there might be old herd leaders to demote`
+   * `// TODO introduce promote and demote events again if needed`
  * [game/simulation/src/interact/herd/system.rs](game/simulation/src/interact/herd/system.rs) (2)
    * `// TODO reuse allocs`
    * `// TODO abort early?`

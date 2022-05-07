@@ -4,14 +4,13 @@ use daggy::petgraph::graph::DiGraph;
 
 use common::rstar::{Envelope, Point, PointDistance, RTree, AABB};
 use common::*;
-use unit::world::{WorldPoint, WorldPointRange};
+use unit::world::WorldPoint;
 
 use crate::ecs::*;
 use crate::interact::herd::component::{CurrentHerd, HerdableComponent, HerdedComponent};
-use crate::interact::herd::herds::{HerdInfo, Herds};
+use crate::interact::herd::herds::Herds;
 use crate::interact::herd::system::rtree::{HerdTreeNode, SpeciesSelectionFunction};
 use crate::interact::herd::HerdHandle;
-use crate::simulation::EcsWorldRef;
 use crate::species::Species;
 use crate::{SpeciesComponent, Tick, TransformComponent};
 
@@ -23,7 +22,6 @@ const RUN_FREQUENCY: u32 = 5;
 impl<'a> System<'a> for HerdJoiningSystem {
     type SystemData = (
         Read<'a, EntitiesRes>,
-        Read<'a, EcsWorldRef>,
         Write<'a, Herds>,
         ReadStorage<'a, TransformComponent>,
         ReadStorage<'a, HerdableComponent>,
@@ -33,7 +31,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
 
     fn run(
         &mut self,
-        (entities, world, mut herds, transform, herdable, mut herded, species): Self::SystemData,
+        (entities, mut herds, transform, herdable, mut herded, species): Self::SystemData,
     ) {
         // validation
         #[cfg(debug_assertions)]
@@ -169,7 +167,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
         }
 
         // register alive herds
-        herds.register_assigned_herds(&*world, discovered_herds.finish());
+        herds.register_assigned_herds(&herded, &mut discovered_herds);
     }
 }
 
@@ -330,12 +328,12 @@ fn collect_subgraphs(mut connectivity: DiGraph<ConnectivityNode, ()>) -> Vec<Sub
 }
 
 #[derive(Default)]
-struct HerdInProgress {
+pub(in crate::interact::herd) struct HerdInProgress {
     all_members: SmallVec<[HerdedEntity; 4]>,
 }
 
 #[derive(Default)]
-struct DiscoveredHerds {
+pub(in crate::interact::herd) struct DiscoveredHerds {
     herds: HashMap<HerdHandle, HerdInProgress>,
     mapping: HashMap<HerdHandle, HerdHandle>,
 }
@@ -367,25 +365,21 @@ impl DiscoveredHerds {
         false
     }
 
-    fn finish(&mut self) -> impl Iterator<Item = (HerdHandle, HerdInfo)> + '_ {
-        self.herds.drain().map(|(herd, wip)| {
-            let (leader, median_pos) = wip.choose_leader();
-            let (min_pos, max_pos) = wip.range();
-            let range = WorldPointRange::with_inclusive_range(min_pos, max_pos);
+    pub fn iter_herds(&self) -> impl Iterator<Item = (HerdHandle, &HerdInProgress)> + '_ {
+        self.herds.iter().map(|(handle, wip)| (*handle, wip))
+    }
 
-            let out = (herd, HerdInfo::new(median_pos, leader, range, wip.count()));
-            trace!("completed herd: {:?}", out);
-            out
-        })
+    pub fn map_herd(&self, handle: HerdHandle) -> HerdHandle {
+        self.mapping.get(&handle).copied().unwrap_or(handle)
     }
 }
 
 impl HerdInProgress {
-    fn count(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.all_members.len()
     }
 
-    fn range(&self) -> (WorldPoint, WorldPoint) {
+    pub(crate) fn range(&self) -> (WorldPoint, WorldPoint) {
         let mut min = (f32::MAX, f32::MAX, f32::MAX);
         let mut max = (f32::MIN, f32::MIN, f32::MIN);
 
@@ -400,16 +394,41 @@ impl HerdInProgress {
             .expect("invalid herd median")
     }
 
-    /// Finds leader based on closest to geometric median.
+    /// Calculates geometric median then finds closest member to it.
+    pub fn choose_leader(&self) -> (Entity, WorldPoint) {
+        let median = self.find_geometric_median();
+
+        let first = &self.all_members[0]; // not empty
+        let calc_dist = |member: &HerdedEntity| member.pos.distance2(median);
+
+        let (leader, _) = self
+            .all_members
+            .iter()
+            .skip(1) // already done first
+            .fold(
+                (first.entity, calc_dist(first)),
+                |(leader, best), member| {
+                    let dist = calc_dist(member);
+                    if dist < best {
+                        (member.entity, dist)
+                    } else {
+                        (leader, best)
+                    }
+                },
+            );
+
+        (leader, median)
+    }
+
     /// Calculated with Weiszfeld's algorithm, tyvm
     /// https://github.com/ialhashim/geometric-median
-    fn choose_leader(&self) -> (Entity, WorldPoint) {
+    pub fn find_geometric_median(&self) -> WorldPoint {
         assert!(!self.all_members.is_empty());
 
         if self.all_members.len() < 3 {
-            // just take first member
+            // just take first member's position
             let member = &self.all_members[0];
-            return (member.entity, member.pos);
+            return member.pos;
         }
 
         let first = &self.all_members[0];
@@ -447,23 +466,8 @@ impl HerdInProgress {
             ];
         }
 
-        let median = {
-            let [x, y, z] = guesses[ITERATIONS % 2];
-            WorldPoint::new(x, y, z).expect("bad geometric median")
-        };
-        let (leader, _) =
-            self.all_members
-                .iter()
-                .fold((first.entity, f32::MAX), |(leader, best), member| {
-                    let dist = member.pos.distance2(median);
-                    if dist < best {
-                        (member.entity, dist)
-                    } else {
-                        (leader, best)
-                    }
-                });
-
-        (leader, median)
+        let [x, y, z] = guesses[ITERATIONS % 2];
+        WorldPoint::new(x, y, z).expect("bad geometric median")
     }
 }
 
