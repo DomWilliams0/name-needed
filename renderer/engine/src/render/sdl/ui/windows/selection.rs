@@ -248,6 +248,8 @@ impl SelectionWindow {
         if !matches!(details.ty, EntityType::UiElement(_)) {
             self.do_logs(context, &details);
         }
+
+        self.do_debug(context, &details);
     }
 
     //noinspection DuplicatedCode
@@ -553,6 +555,14 @@ impl SelectionWindow {
                 entity: details.entity,
                 enabled: req,
             });
+        }
+    }
+
+    fn do_debug(&mut self, context: &UiContext, details: &SelectedEntityDetails) {
+        let _tab = open_or_ret!(context.new_tab("Debug"));
+
+        if context.button("Kill") {
+            context.issue_request(UiRequest::Kill(details.entity));
         }
     }
 

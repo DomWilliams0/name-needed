@@ -63,7 +63,7 @@
 * [o] event for a herd member becoming the leader of its herd
     * [X] and being demoted
     * [ ] add associated herd leader AI DSEs
-* [ ] dev way to kill an entity to test dead herd leader
+* [X] dev way to kill an entity to test dead herd leader
 * new sheep dses
     * [ ] herd leader specific: lead herd to a new location
     * [X] stay near herd: if too far from leader, run towards it until in range

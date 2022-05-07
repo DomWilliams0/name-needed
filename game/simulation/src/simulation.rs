@@ -637,6 +637,10 @@ impl<R: Renderer> Simulation<R> {
                 UiRequest::ChangeGameSpeed(change) => {
                     tick.speed_change = Some(change);
                 }
+                UiRequest::Kill(e) => {
+                    debug!("killing entity with god powers"; e);
+                    self.ecs_world.kill_entity(e, DeathReason::Unknown);
+                }
             }
         }
     }

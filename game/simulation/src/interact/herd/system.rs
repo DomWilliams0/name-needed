@@ -35,7 +35,7 @@ impl<'a> System<'a> for HerdJoiningSystem {
     ) {
         // validation
         #[cfg(debug_assertions)]
-        validate_leaders(&herds, &herded);
+        validate_leaders(&herds, &herded, &entities);
 
         // run occasionally
         if Tick::fetch().value() % RUN_FREQUENCY != 0 {
@@ -172,19 +172,23 @@ impl<'a> System<'a> for HerdJoiningSystem {
 }
 
 #[cfg(debug_assertions)]
-fn validate_leaders(herds: &Herds, herded: &WriteStorage<HerdedComponent>) {
+fn validate_leaders(herds: &Herds, herded: &WriteStorage<HerdedComponent>, entities: &EntitiesRes) {
     let expected = herds
         .iter()
         .map(|(h, info)| (h, info.leader_entity()))
         .collect::<HashMap<_, _>>();
 
     for (handle, leader_entity) in expected.iter() {
-        let _leader_herd = leader_entity.get(herded).unwrap_or_else(|| {
-            panic!(
-                "leader {:?} is not in expected herd {:?}",
-                leader_entity, handle
-            )
-        });
+        if !entities.is_alive(leader_entity.into()) {
+            warn!("herd leader is dead"; "leader" => *leader_entity, "herd" => ?handle);
+        } else {
+            let _leader_herd = leader_entity.get(herded).unwrap_or_else(|| {
+                panic!(
+                    "leader {:?} is not in expected herd {:?}",
+                    leader_entity, handle
+                )
+            });
+        }
     }
 }
 
