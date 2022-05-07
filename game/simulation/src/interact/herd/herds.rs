@@ -99,7 +99,7 @@ impl Herds {
 
         // TODO there might be old herd leaders to demote
         // TODO introduce promote and demote events again if needed
-        debug_assert!(old_leaders.is_empty());
+        debug_assert!(old_leaders.is_empty(), "old leaders: {:?}", old_leaders);
     }
 
     pub fn get_info(&self, herd: HerdHandle) -> Option<&HerdInfo> {

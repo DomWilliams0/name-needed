@@ -104,10 +104,22 @@ impl BlockGraph {
         let src = BlockNavNode(from);
         let dst = BlockNavNode(to);
 
-        let is_goal = |n: BlockNavNode| match goal {
-            SearchGoal::Arrive => n == dst,
-            SearchGoal::Adjacent => self.graph.edges(n).any(|e| e.target() == dst),
-            SearchGoal::Nearby(range) => n != src && manhattan(&n.0, &dst.0) <= range.into(),
+        let heuristic: Box<dyn FnMut(BlockNavNode) -> f32> = match goal {
+            SearchGoal::Nearby(range) => {
+                let range = range as f32;
+                Box::new(move |n| (manhattan(&n.0, &dst.0) as f32 - range).max(0.0))
+            }
+            _ => Box::new(|n| manhattan(&n.0, &dst.0) as f32),
+        };
+
+        let is_goal: Box<dyn FnMut(BlockNavNode) -> bool> = match goal {
+            SearchGoal::Arrive => Box::new(|n| n == dst),
+            SearchGoal::Adjacent => {
+                Box::new(|n: BlockNavNode| self.graph.edges(n).any(|e| e.target() == dst))
+            }
+            SearchGoal::Nearby(range) => {
+                Box::new(move |n: BlockNavNode| n != src && manhattan(&n.0, &dst.0) <= range.into())
+            }
         };
 
         search::astar(
@@ -115,7 +127,7 @@ impl BlockGraph {
             src,
             is_goal,
             |(_, _, e)| e.0.weight(),
-            |n| manhattan(&n.0, &dst.0) as f32,
+            heuristic,
             context,
         );
 

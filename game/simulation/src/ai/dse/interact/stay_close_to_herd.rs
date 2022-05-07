@@ -13,7 +13,7 @@ impl Dse<AiContext> for StayCloseToHerdDse {
     }
 
     fn weight(&self) -> DecisionWeight {
-        DecisionWeight::Normal
+        DecisionWeight::Idle
     }
 
     fn action(&self, _: &mut AiBlackboard, _: Option<AiTarget>) -> AiAction {

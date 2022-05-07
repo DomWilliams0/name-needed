@@ -67,6 +67,5 @@
 * new sheep dses
     * [ ] herd leader specific: lead herd to a new location
     * [X] stay near herd: if too far from leader, run towards it until in range
-* [ ] herd_centre() should return a transformcomponent ref instead of position, because its repeated too often
 * [X] stick with herd leader until death/leaves
-* [ ] better follow/return to herd path finding
+* [X] better follow/return to herd path finding
