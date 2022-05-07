@@ -187,7 +187,7 @@ fn herding(ecs: &EcsWorld) {
 
     let mut colors = helpers::entity_colours();
 
-    let sheep = spawn_entities_randomly(
+    let _sheep = spawn_entities_randomly(
         &world,
         helpers::get_config_count("sheep"),
         Placement::RandomPos,

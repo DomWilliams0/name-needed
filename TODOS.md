@@ -1,4 +1,4 @@
-# TODOs (414)
+# TODOs (413)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -293,8 +293,6 @@
  * [game/simulation/src/movement.rs](game/simulation/src/movement.rs) (2)
    * `// TODO actually use body health to determine how much movement is allowed`
    * `// TODO scale max speed based on applied effects?`
- * [game/simulation/src/needs/food/component.rs](game/simulation/src/needs/food/component.rs) (1)
-   * `//     // TODO can this underflow?`
  * [game/simulation/src/needs/food/flavour.rs](game/simulation/src/needs/food/flavour.rs) (2)
    * `// TODO specify explicit dislikes too?`
    * `// TODO food contains a set of flavours`

@@ -48,11 +48,6 @@ impl HungerComponent {
         }
     }
 
-    // pub(in crate::needs::food) fn consume_fuel(&mut self, nutrition: f32) {
-    //     debug_assert!(nutrition.is_sign_positive());
-    //     self.current_fuel -= nutrition;
-    //     // TODO can this underflow?
-    // }
     pub fn hunger(&self) -> &Hunger {
         &self.hunger
     }
