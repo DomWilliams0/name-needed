@@ -42,6 +42,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* click and drag to select multiple
 	* multiple clicks in the same place to iterate through overlapping entities
 	* list of society members in UI to click instead
+    * when multiple candidates, choose highest z as it's more likely the intention
 * interactive terminal to replace/extend dev ui
 	* custom log! handler to show warnings and errors
 	* in-game OR pop out OR out of process [ncurses] terminal console that persists over restarts
@@ -61,13 +62,14 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * fix overlapping in-world display strings e.g. collision resolution
 * KindComponent should specify plural for stacked labels
 * in addition to currency activity, display the dse/decision that explains it
+* bug: can't select treetop blocks?
 
 ## Entity behaviour
 * ai incentive to choose the same action as last tick
 * (sub)activities take an amount of ticks to complete
 * be able to block subactivities for a number of ticks, show progress bar up until end tick - work items?
 * food/drink vessels and wastage
-* define ai in definitions with a collection of "features"/tags/capabilities rather than raw DSEs/behaviours
+* define ai in definitions with a collection of "features"/tags/capabilities rather than raw DSEs/behaviours and current "species"
 * if only have 2 hands but have a very high priority to carry something, they can jam it somewhere (armpit or somewhere) and carry more capacity at a slow speed/high risk of falling/tripping/dropping
 * if new activity fails immediately on the first tick, they stand there stupidly doing nothing until the next system tick - can this schedule an activity update next tick for them?
 * revamp hauling to add different methods
@@ -129,7 +131,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* dont treat as a fixed width border around continents
 	* merge continents that intersect, instead of forcing a coastline through them
 * continent blobs should wrap across planet boundaries
-* features e.g. trees, caves, mountain ranges
+* features e.g. caves, mountain ranges
 	* accurate-ish rivers, caves
 		* varying river width from streams to large uncrossable rivers
 		* varying river flow speed
@@ -158,6 +160,18 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 * bug: a change in the middle of 1 chunk triggers bogus occlusion updates across neighbouring slabs. something to do with occlusion comparison
 * grass colour and flora depends on biome/moisture
 * different continents could have different variations
+* subfeatures can overlap because theyre generated in parallel, e.g. plants and tree trunks. prune collisions across all (sub)features during rasterization? ensure mixing of features is possible, e.g. rivers through forests
+
+### Plants
+
+* more variations with proper characteristics
+* better placement in procgen
+* better graphics - (procedural) texture?
+* growth/death lifecycle of plants
+* seeds that can spread and grow new plants
+    * grow from corpses/poo
+* approximate scattering of nonquantitative growth like grass - no individual entities but rather a distribution of densities. animals can graze on grass at any point and it becomes visibly worn there
+    * could be rendered with a shader as it's very dynamic
 
 ## Voxel world mechanics
 * fluid blocks
@@ -269,6 +283,7 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* autorun scripts in a dir on startup
 	* port scenarios from rust to scripts
 * saving and loading should use its own entity id/referencing (calculated during save) so that on load new entities are spawned starting from generation 1 again. this might be critical for long running games to ensure the monotonic id+generation count doesn't exceed the max
+* remove catchup frames between game start and waiting for initial terrain (only noticeable in debug builds for now
 
 ## Entity diversity
 * animal species
@@ -292,6 +307,13 @@ An unorganized, unordered list of tasks to eventually get to. Tasks are deleted 
 	* can also play fetch with a stick and other riveting games
 * dogs play together e.g. tag
 * bug: dogs can break blocks if ordered to
+
+### Sheep
+
+* startlement based on senses
+    * propagation through herd
+* lambs have a bond with parents, stay near and run to them when startled
+* herd DSEs specific to the leader? e.g. lead herd to a new location
 
 
 ## Simulation depth
