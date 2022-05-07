@@ -43,8 +43,7 @@ impl<R: Renderer> DebugRenderer<R> for EntityIdDebugRenderer {
             const OFFSET: f32 = 0.7;
 
             let mut pos = transform.position;
-            pos.modify_y(|y| y + OFFSET);
-            renderer.debug_text(pos, &self.0);
+            renderer.debug_text(pos.modify_y(|y| y + OFFSET), &self.0);
         }
     }
 }

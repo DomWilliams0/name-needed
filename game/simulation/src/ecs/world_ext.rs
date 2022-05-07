@@ -138,10 +138,10 @@ impl EcsExtComponents<'_> {
 
                     let pos = {
                         let mut rand = thread_rng();
-                        let mut pos = transform.position;
-                        pos.modify_x(|x| x + rand.gen_range(-1.0, 1.0));
-                        pos.modify_y(|y| y + rand.gen_range(-1.0, 1.0));
-                        pos
+                        transform
+                            .position
+                            .modify_x(|x| x + rand.gen_range(-1.0, 1.0))
+                            .modify_y(|y| y + rand.gen_range(-1.0, 1.0))
                     };
 
                     transform.reset_position(pos)
