@@ -116,9 +116,9 @@ pub struct PlanetParams {
     #[structopt(long, default_value = "0.15")]
     pub region_feature_vertical_expansion_threshold: f64,
 
-    /// 0-1 chance of skipping fauna placement (evaluated per block)
+    /// 0-1 chance of skipping flora placement (evaluated per block)
     #[structopt(long, default_value = "0.9")]
-    pub fauna_skip_chance: f64,
+    pub flora_skip_chance: f64,
 }
 
 #[derive(Debug, Clone, Default, StructOpt)]

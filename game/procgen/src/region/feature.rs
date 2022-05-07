@@ -22,7 +22,7 @@ use unit::world::{
 
 use crate::region::region::{ChunkDescription, ChunkHeightMap};
 use crate::region::subfeature::{SharedSubfeature, Subfeature};
-use crate::region::subfeatures::Fauna;
+use crate::region::subfeatures::Flora;
 use crate::region::unit::RegionLocation;
 use crate::region::PlanetPoint;
 use crate::{PlanetParams, PlanetParamsRef};
@@ -693,13 +693,13 @@ impl BooleanOp<f64, Polygon<f64>> for RegionalFeatureBoundary {
 pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>) {
     let mut rando = SmallRng::new_quick();
 
-    let skip_distr = Bernoulli::new(ctx.params.fauna_skip_chance.clamp(0.0, 1.0)).unwrap();
+    let skip_distr = Bernoulli::new(ctx.params.flora_skip_chance.clamp(0.0, 1.0)).unwrap();
     let slab_z_range = {
         let min = ctx.slab.slab.as_slice().slice();
         min..min + SLAB_SIZE.as_i32()
     };
 
-    // generate occasional fauna at ground level
+    // generate occasional flora at ground level
     for (i, block) in ctx.chunk_desc.blocks().iter().enumerate() {
         // only consider blocks at ground height
         let ground = block.ground();
@@ -709,17 +709,17 @@ pub(crate) async fn generate_loose_subfeatures(ctx: &mut ApplyFeatureContext<'_>
         }
 
         let biome = block.biome();
-        if !biome.has_fauna() || skip_distr.sample(&mut rando) {
+        if !biome.has_flora() || skip_distr.sample(&mut rando) {
             continue;
         }
 
-        let fauna_species = block
+        let flora_species = block
             .biome()
-            .choose_fauna(&mut rando)
-            .expect("bad fauna biome definition");
+            .choose_flora(&mut rando)
+            .expect("bad flora biome definition");
 
-        let subfeature = Fauna {
-            species: fauna_species,
+        let subfeature = Flora {
+            species: flora_species,
         };
         let root = {
             let [cx, cy, _]: [i32; 3] = ChunkHeightMap::unflatten(i).unwrap(); // certainly valid

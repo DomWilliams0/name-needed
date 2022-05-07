@@ -7,11 +7,11 @@ use world_types::{EntityDescription, PlantDescription};
 use crate::region::subfeature::{Rasterizer, Subfeature, SubfeatureEntity};
 
 #[derive(Debug)]
-pub struct Fauna {
+pub struct Flora {
     pub species: &'static str,
 }
 
-impl Subfeature for Fauna {
+impl Subfeature for Flora {
     fn rasterize(
         &mut self,
         root: WorldPosition,

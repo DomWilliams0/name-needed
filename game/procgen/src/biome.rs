@@ -496,8 +496,8 @@ impl BiomeType {
         }
     }
 
-    /// Returns species name. None if no fauna in this biome (see [Self::has_fauna])
-    pub(crate) fn choose_fauna(self, rando: &mut dyn RngCore) -> Option<&'static str> {
+    /// Returns species name. None if no flora in this biome (see [Self::has_flora])
+    pub(crate) fn choose_flora(self, rando: &mut dyn RngCore) -> Option<&'static str> {
         use BiomeType::*;
 
         const SHRUB: &str = "core_living_plant:shrub";
@@ -510,8 +510,8 @@ impl BiomeType {
         }
     }
 
-    /// Must fit with [choose_fauna]. Will be defined in data in the future
-    pub(crate) fn has_fauna(self) -> bool {
+    /// Must fit with [choose_flora]. Will be defined in data in the future
+    pub(crate) fn has_flora(self) -> bool {
         use BiomeType::*;
         matches!(self, Plains | Forest)
     }

@@ -1,5 +1,5 @@
-pub use fauna::Fauna;
+pub use flora::Flora;
 pub use tree::Tree;
 
-mod fauna;
+mod flora;
 mod tree;

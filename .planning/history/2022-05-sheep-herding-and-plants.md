@@ -26,7 +26,7 @@
 * [X] add chained modify_x|y|z helper to worldpoint
 * [X] frame allocator helpers for debug/display/vec
 * [~] reuse some allocaions in herd joining system
-* simple fauna for sheep to eat
+* simple flora for sheep to eat
     * [X] generation of plants in procgen
         * [X] species definition based on abstract plant
             * ensure no display text on hover component is added
