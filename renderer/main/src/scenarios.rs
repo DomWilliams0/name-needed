@@ -3,50 +3,79 @@
 use common::*;
 use engine::simulation;
 use simulation::job::BuildThingJob;
-use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Societies};
+use simulation::{ComponentWorld, EcsWorld, PlayerSociety, Scenario, Societies};
 
 use crate::scenarios::helpers::{spawn_entities_randomly, Placement};
 
-pub type Scenario = fn(&EcsWorld);
-const DEFAULT_SCENARIO: &str = "wander_and_eat";
-
-struct ScenarioEntry {
-    pub name: &'static str,
-    pub func: Scenario,
-}
+const DEFAULT_SCENARIO: &str = stringify!(wander_and_eat);
 
 inventory::collect!(ScenarioEntry);
 
-pub fn resolve(name: Option<&str>) -> Option<(&str, Scenario)> {
-    let name = name.unwrap_or("wander_and_eat"); // default
-    inventory::iter::<ScenarioEntry>
-        .into_iter()
-        .find(|e| e.name == name)
-        .map(|e| (e.name, e.func))
+struct ScenarioEntry {
+    /// Friendly name e.g. "Wander and eat"
+    pub name: &'static str,
+    /// Name for cmd line e.g. "wander_and_eat"
+    pub id: &'static str,
+    pub desc: &'static str,
+    pub func: fn(&EcsWorld),
 }
 
-pub fn all_names() -> impl Iterator<Item = &'static str> {
-    inventory::iter::<ScenarioEntry>.into_iter().map(|e| e.name)
+impl From<&ScenarioEntry> for Scenario {
+    fn from(e: &ScenarioEntry) -> Self {
+        Self {
+            name: e.name,
+            id: e.id,
+            desc: e.desc,
+            func: e.func,
+        }
+    }
+}
+
+pub fn resolve(id: Option<&str>) -> Option<Scenario> {
+    let id = id.unwrap_or(DEFAULT_SCENARIO);
+    iter().find(|e| e.id == id)
+}
+
+pub fn iter() -> impl Iterator<Item = Scenario> {
+    inventory::iter::<ScenarioEntry>
+        .into_iter()
+        .map(Scenario::from)
 }
 
 macro_rules! scenario {
-    ($name:expr, $func:path) => {
-        inventory::submit! { ScenarioEntry {name: $name, func: $func}, }
-    };
-
-    ($func:path) => {
-        inventory::submit! { ScenarioEntry {name: stringify!($func), func: $func} }
+    ($func:path, $name:expr, $desc:expr) => {
+        inventory::submit! { ScenarioEntry {name: $name, desc: $desc, func: $func, id: stringify!($func)} }
     };
 }
 
 // -------------
 
-scenario!(following_dogs);
-scenario!(nop);
-scenario!(wander_and_eat);
-scenario!(haul_to_container);
-scenario!(building);
-scenario!(herding);
+scenario!(
+    wander_and_eat,
+    "Wander and eat",
+    "Spawn some people who wander around and pick up food"
+);
+scenario!(
+    following_dogs,
+    "Following dogs",
+    "Spawn some dogs that follow people around"
+);
+scenario!(nop, "Empty", "Spawn nothing and do nothing");
+scenario!(
+    haul_to_container,
+    "Haul to container",
+    "Spawn some people to haul items into a container"
+);
+scenario!(
+    building,
+    "Wall building",
+    "Spawn some people and bricks to build walls"
+);
+scenario!(
+    herding,
+    "Animal herding",
+    "Spawn some animals that form into herds and wander around"
+);
 
 fn following_dogs(ecs: &EcsWorld) {
     let world = ecs.voxel_world();

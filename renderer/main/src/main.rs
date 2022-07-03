@@ -10,9 +10,11 @@ use engine::Engine;
 use resources::ResourceContainer;
 use resources::Resources;
 use simulation::state::BackendState;
-use simulation::{Exit, InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
+use simulation::{
+    Exit, InitializedSimulationBackend, PersistentSimulationBackend, Scenario, WorldViewer,
+};
 
-use crate::scenarios::Scenario;
+use crate::simulation::MainMenuAction;
 
 // TODO "jemalloc support for `x86_64-pc-windows-msvc` is untested"
 #[cfg(windows)]
@@ -79,35 +81,26 @@ enum StartError {
     NoSuchScenario(String),
 }
 
-fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
-    let name;
-    #[cfg(feature = "tests")]
-    {
-        name = Some("nop");
-    }
-    #[cfg(not(feature = "tests"))]
-    {
-        name = args.scenario.as_deref();
-    }
-
-    let resolved = scenarios::resolve(name);
+/// None for default
+fn resolve_scenario(id: Option<&str>) -> BoxedResult<Scenario> {
+    let resolved = scenarios::resolve(id);
     match resolved {
-        Some((name, s)) => {
+        Some(s) => {
             info!(
                 "resolved scenario '{scenario}' to {:#x}",
-                s as usize,
-                scenario = name,
+                s.func as usize,
+                scenario = s.id,
             );
             Ok(s)
         }
         None => {
-            let name = name.unwrap(); // would have panicked already if bad default
-            error!("failed to resolve scenario"; "name" => ?name);
+            let id = id.unwrap_or_else(|| unreachable!("default scenario not found"));
+            error!("failed to resolve scenario"; "id" => ?id);
 
-            let possibilities = scenarios::all_names().collect_vec();
+            let possibilities = scenarios::iter().map(|s| s.id).collect_vec();
             info!("available scenarios: {:?}", possibilities);
 
-            Err(StartError::NoSuchScenario(name.to_owned()).into())
+            Err(StartError::NoSuchScenario(id.to_owned()).into())
         }
     }
 }
@@ -115,7 +108,6 @@ fn resolve_scenario(args: &Args) -> BoxedResult<Scenario> {
 #[allow(unused_mut)]
 fn do_main() -> BoxedResult<()> {
     let args = argh::from_env::<Args>();
-    let scenario = resolve_scenario(&args)?;
 
     // start metrics server
     #[cfg(feature = "metrics")]
@@ -147,6 +139,39 @@ fn do_main() -> BoxedResult<()> {
     let mut backend_state = {
         log_scope!(o!("backend" => Backend::name()));
         BackendState::<Backend>::new(&resources)?
+    };
+
+    let scenario = {
+        // given explicitly on command line
+        let mut given_id;
+        #[cfg(feature = "tests")]
+        {
+            given_id = Some("nop");
+        }
+        #[cfg(not(feature = "tests"))]
+        {
+            given_id = args.scenario.as_deref();
+        }
+
+        if given_id.is_none() {
+            // show main menu
+            let player_cfg = {
+                let scenarios = scenarios::iter().collect_vec();
+                let config = config::get();
+                backend_state.show_main_menu(&scenarios, &*config)?
+            };
+
+            match player_cfg.action {
+                MainMenuAction::Exit => {
+                    info!("exiting from main menu");
+                    return Ok(());
+                }
+                MainMenuAction::PlayScenario(id) => given_id = id,
+            }
+        }
+
+        // scenario name is now chosen or None for default
+        resolve_scenario(given_id)?
     };
 
     let ret = loop {
@@ -277,12 +302,10 @@ mod start {
     use common::*;
     use config::WorldSource;
     use engine::simulation::{
-        self, all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, Simulation,
+        self, all_slabs_in_range, presets, AsyncWorkerPool, ChunkLocation, Scenario, Simulation,
         SlabLocation, TerrainSourceError, WorldLoader, WorldPosition,
     };
     use resources::Resources;
-
-    use crate::scenarios::Scenario;
 
     use super::Renderer;
 
@@ -440,7 +463,7 @@ mod start {
         sim.set_player_society(player_society);
 
         // defer to scenario for entity spawning
-        scenario(sim.world());
+        (scenario.func)(sim.world());
         Ok(())
     }
 }

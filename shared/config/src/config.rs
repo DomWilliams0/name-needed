@@ -2,14 +2,14 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Config {
     pub display: Display,
     pub world: World,
     pub simulation: Simulation,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Display {
     pub resolution: (u32, u32),
     pub resizable: bool,
@@ -20,7 +20,7 @@ pub struct Display {
     pub persist_ui: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct World {
     pub source: WorldSource,
     /// Seconds
@@ -48,7 +48,7 @@ pub enum WorldPreset {
     Stairs,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Simulation {
     pub random_seed: Option<u64>,
     pub friction: f32,

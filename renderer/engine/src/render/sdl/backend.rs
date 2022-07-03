@@ -1,4 +1,5 @@
 use std::hint::unreachable_unchecked;
+use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
 
 use sdl2::event::{Event, WindowEvent};
@@ -10,14 +11,16 @@ use sdl2::{EventPump, Sdl, VideoSubsystem};
 use color::Color;
 use common::input::{CameraDirection, EngineKey, GameKey, KeyAction, RendererKey};
 use common::*;
+use config::Config;
 use resources::ResourceError;
 use resources::Resources;
 use simulation::input::{
     InputEvent, SelectType, UiCommand, UiCommands, UiPopup, UiRequest, WorldColumn,
 };
 use simulation::{
-    BackendData, ComponentWorld, Exit, GameSpeedChange, InitializedSimulationBackend, PerfAvg,
-    PersistentSimulationBackend, Simulation, WorldViewer,
+    BackendData, ComponentWorld, Exit, GameSpeedChange, InitializedSimulationBackend,
+    MainMenuAction, MainMenuConfig, MainMenuOutput, PerfAvg, PersistentSimulationBackend, Scenario,
+    Simulation, WorldViewer,
 };
 use unit::world::{WorldPoint, WorldPoint2d, WorldPosition};
 
@@ -36,6 +39,7 @@ pub struct SdlBackendPersistent {
     sdl_events: Option<EventPump>,
     keep_alive: GraphicsKeepAlive,
     window: Window,
+    window_id: u32,
 
     renderer: GlRenderer,
     ui: Ui,
@@ -103,6 +107,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             }
             builder.build()?
         };
+        let window_id = window.id();
 
         let gl = Gl::new(&window, &video).map_err(SdlBackendError::Sdl)?;
         Gl::set_clear_color(Color::rgb(17, 17, 20));
@@ -124,6 +129,7 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
             sdl_events: Some(events),
             keep_alive: GraphicsKeepAlive { sdl, video, gl },
             window,
+            window_id,
             renderer,
             ui,
             sim_input_events: Vec::with_capacity(32),
@@ -144,6 +150,68 @@ impl PersistentSimulationBackend for SdlBackendPersistent {
         }
 
         backend
+    }
+
+    fn show_main_menu(
+        &mut self,
+        scenarios: &[Scenario],
+        initial_config: &Config,
+    ) -> Result<MainMenuOutput, Self::Error> {
+        let mut main_menu = self.ui.main_menu(scenarios);
+        let mut config = MainMenuConfig {
+            config: initial_config.clone(),
+        };
+
+        Gl::set_clear_color(Color::rgb(144, 151, 163));
+
+        let action = 'outer: loop {
+            // take events out temporarily
+            let mut event_pump = match self.sdl_events.take() {
+                Some(e) => e,
+                _ => {
+                    debug_assert!(false, "bad event pump state");
+                    unsafe { unreachable_unchecked() }
+                }
+            };
+
+            for event in event_pump.poll_iter() {
+                if let EventConsumed::Consumed = main_menu.handle_event(&event) {
+                    continue;
+                }
+
+                match &event {
+                    Event::Quit { .. } => {
+                        break 'outer MainMenuAction::Exit;
+                    }
+                    Event::Window {
+                        win_event: WindowEvent::Close,
+                        window_id,
+                        ..
+                    } if *window_id == self.window_id => {
+                        break 'outer MainMenuAction::Exit;
+                    }
+
+                    _ => {}
+                }
+            }
+
+            Gl::clear();
+
+            let mouse_state = MouseState::new(&event_pump);
+            let action = main_menu.render_main_menu(&self.window, &mouse_state, &mut config);
+
+            // put back event pump like we never took it
+            let none = ManuallyDrop::new(std::mem::replace(&mut self.sdl_events, Some(event_pump)));
+            debug_assert!(none.is_none());
+
+            self.window.gl_swap_window();
+
+            if let Some(action) = action {
+                break action;
+            }
+        };
+
+        Ok(MainMenuOutput { action, config })
     }
 
     fn name() -> &'static str {
@@ -177,6 +245,14 @@ impl InitializedSimulationBackend for SdlBackendInit {
 
             match event {
                 Event::Quit { .. } => {
+                    commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
+                    break;
+                }
+                Event::Window {
+                    win_event: WindowEvent::Close,
+                    window_id,
+                    ..
+                } if window_id == self.window_id => {
                     commands.push(UiCommand::new(UiRequest::ExitGame(Exit::Stop)));
                     break;
                 }

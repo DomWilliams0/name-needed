@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use common::BoxedResult;
 use simulation::input::{PreparedUiPopup, UiCommand, UiCommands, UiRequest};
-use simulation::{PerfAvg, SimulationRef};
+use simulation::{PerfAvg, Scenario, SimulationRef};
 
 use crate::render::sdl::ui::context::UiContext;
+use crate::render::sdl::ui::main_menu::MainMenu;
 use crate::render::sdl::ui::memory::PerFrameStrings;
 use crate::render::sdl::ui::windows::{
     DebugWindow, PerformanceWindow, SelectionWindow, SocietyWindow,
@@ -22,9 +23,9 @@ use crate::render::sdl::ui::windows::{
 use crate::ui_str;
 
 pub struct Ui {
-    imgui: Context,
-    imgui_sdl2: ImguiSdl2,
-    renderer: Renderer,
+    pub(in crate::render::sdl::ui) imgui: Context,
+    pub(in crate::render::sdl::ui) imgui_sdl2: ImguiSdl2,
+    pub(in crate::render::sdl::ui) renderer: Renderer,
 
     state: State,
     strings_arena: PerFrameStrings,
@@ -133,6 +134,10 @@ impl Ui {
 
         // cleanup
         self.strings_arena.reset();
+    }
+
+    pub fn main_menu<'a>(&'a mut self, scenarios: &'a [Scenario]) -> MainMenu<'a> {
+        MainMenu::new(self, scenarios)
     }
 
     /// Persist to file. Any returned error is not treated as fatal

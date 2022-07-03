@@ -1,12 +1,13 @@
 use std::time::{Duration, Instant};
 
 use common::*;
+use config::Config;
 use resources::Resources;
 use simulation::input::{UiCommand, UiCommands, UiRequest};
 use simulation::{
-    BackendData, Exit, InitializedSimulationBackend, PerfAvg, PersistentSimulationBackend,
-    PhysicalComponent, RenderComponent, Renderer, Simulation, TransformRenderDescription,
-    UiElementComponent, WorldViewer,
+    BackendData, Exit, InitializedSimulationBackend, MainMenuAction, MainMenuConfig,
+    MainMenuOutput, PerfAvg, PersistentSimulationBackend, PhysicalComponent, RenderComponent,
+    Renderer, Scenario, Simulation, TransformRenderDescription, UiElementComponent, WorldViewer,
 };
 use unit::world::{WorldPoint, WorldPosition};
 
@@ -109,6 +110,19 @@ impl PersistentSimulationBackend for DummyBackendPersistent {
             end_time: Instant::now() + Duration::from_secs(30),
             world_viewer,
         }
+    }
+
+    fn show_main_menu(
+        &mut self,
+        scenarios: &[Scenario],
+        initial_config: &Config,
+    ) -> Result<MainMenuOutput, Self::Error> {
+        Ok(MainMenuOutput {
+            action: MainMenuAction::PlayScenario(None),
+            config: MainMenuConfig {
+                config: initial_config.clone(),
+            },
+        })
     }
 
     fn name() -> &'static str {

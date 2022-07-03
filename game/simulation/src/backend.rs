@@ -1,7 +1,8 @@
 use crate::input::UiCommands;
 use crate::perf::PerfAvg;
-use crate::{Renderer, Simulation, WorldViewer};
+use crate::{EcsWorld, Renderer, Simulation, WorldViewer};
 use common::Error;
+use config::Config;
 use resources::Resources;
 use unit::world::{WorldPoint2d, WorldPosition};
 
@@ -38,6 +39,33 @@ pub struct TickResponse {
     pub speed_change: Option<GameSpeedChange>,
 }
 
+#[derive(Copy, Clone)]
+pub struct Scenario {
+    /// Friendly name e.g. "Wander and eat"
+    pub name: &'static str,
+    /// Name for cmd line e.g. "wander_and_eat"
+    pub id: &'static str,
+    pub desc: &'static str,
+    pub func: fn(&EcsWorld),
+}
+
+/// Options selected in main menu
+pub struct MainMenuOutput {
+    pub action: MainMenuAction,
+    pub config: MainMenuConfig,
+}
+
+pub struct MainMenuConfig {
+    // TODO actual settings
+    pub config: Config,
+}
+
+pub enum MainMenuAction {
+    Exit,
+    /// Scenario id. If None use default scenario
+    PlayScenario(Option<&'static str>),
+}
+
 pub trait InitializedSimulationBackend: Sized {
     type Renderer: Renderer;
     type Persistent: PersistentSimulationBackend<Initialized = Self>;
@@ -71,11 +99,19 @@ pub trait PersistentSimulationBackend: Sized {
 
     fn start(self, world: WorldViewer, initial_block: WorldPosition) -> Self::Initialized;
 
+    fn show_main_menu(
+        &mut self,
+        scenarios: &[Scenario],
+        initial_config: &Config,
+    ) -> Result<MainMenuOutput, Self::Error>;
+
     fn name() -> &'static str;
 }
 
 pub mod state {
-    use crate::{InitializedSimulationBackend, PersistentSimulationBackend, WorldViewer};
+    use crate::backend::MainMenuOutput;
+    use crate::{InitializedSimulationBackend, PersistentSimulationBackend, Scenario, WorldViewer};
+    use config::Config;
     use resources::Resources;
     use unit::world::WorldPosition;
 
@@ -97,6 +133,17 @@ pub mod state {
         ) -> Result<Self, <B as PersistentSimulationBackend>::Error> {
             let backend = B::new(resources)?;
             Ok(Self(State::Uninit(backend)))
+        }
+
+        pub fn show_main_menu(
+            &mut self,
+            scenarios: &[Scenario],
+            initial_config: &Config,
+        ) -> Result<MainMenuOutput, <B as PersistentSimulationBackend>::Error> {
+            match &mut self.0 {
+                State::Uninit(b) => b.show_main_menu(scenarios, initial_config),
+                _ => panic!("must be uninitialized to show main menu"),
+            }
         }
 
         pub fn start(

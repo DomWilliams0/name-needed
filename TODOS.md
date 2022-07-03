@@ -1,4 +1,4 @@
-# TODOs (413)
+# TODOs (415)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -197,6 +197,8 @@
    * `// TODO fix eventually false assumption that all stream DSEs come from a society`
    * `// TODO limit the number of times a single entity can appear in best candidates`
    * `// TODO collect jobs from society directly, which can filter them from the applicable work items too`
+ * [game/simulation/src/backend.rs](game/simulation/src/backend.rs) (1)
+   * `// TODO actual settings`
  * [game/simulation/src/build/material.rs](game/simulation/src/build/material.rs) (1)
    * `// TODO flexible list of reqs based on components`
  * [game/simulation/src/build/world_helper.rs](game/simulation/src/build/world_helper.rs) (1)
@@ -489,7 +491,8 @@
    * `// TODO trait object for other types`
    * `// TODO species, initial growth progress, initial state (dehydrated, blooming, etc)`
    * `// TODO tree entity: list of blocks for trunk/roots/leaves, age, height, species`
- * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (1)
+ * [renderer/engine/src/engine.rs](renderer/engine/src/engine.rs) (2)
+   * `// TODO remove this`
    * `// TODO clamp to 1.0 in gameloop crate`
  * [renderer/engine/src/render/sdl/backend.rs](renderer/engine/src/render/sdl/backend.rs) (2)
    * `// TODO per-world save directory abstraction`

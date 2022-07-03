@@ -63,6 +63,7 @@ impl<'b, R: Renderer, B: InitializedSimulationBackend<Renderer = R>> Engine<'b, 
     /// Game loop
     pub fn run(mut self) -> Exit {
         // initial sleep
+        // TODO remove this
         let delay = config::get().simulation.start_delay;
         if delay > 0 {
             info!("sleeping for {delay}ms before starting", delay = delay);
