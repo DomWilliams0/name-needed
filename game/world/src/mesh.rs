@@ -6,12 +6,11 @@ use crate::chunk::slice::unflatten_index;
 use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFlip};
 use crate::viewer::SliceRange;
-use crate::{BaseTerrain, WorldContext};
+use crate::{BaseTerrain, BlockType, WorldContext};
 use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
-use world_types::BlockType;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
@@ -54,7 +53,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
                 // render as normal
                 make_corners_with_ao(
                     block_pos,
-                    block_color(block.block_type()),
+                    block.block_type().render_color(),
                     block.occlusion(),
                     slice_index,
                 )
@@ -89,22 +88,6 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
     }
 
     vertices
-}
-
-fn block_color(ty: BlockType) -> Color {
-    match ty {
-        BlockType::Air => Color::rgb(0, 0, 0),
-        BlockType::Dirt => Color::rgb(86, 38, 23),
-        BlockType::Grass => Color::rgb(49, 152, 56),
-        BlockType::LightGrass => Color::rgb(91, 152, 51),
-        BlockType::Leaves => Color::rgb(49, 132, 2),
-        BlockType::TreeTrunk => Color::rgb(79, 52, 16),
-        BlockType::Stone => Color::rgb(106, 106, 117),
-        BlockType::Sand => 0xBCA748FF.into(),
-        BlockType::SolidWater => 0x3374BCFF.into(),
-        BlockType::StoneBrickWall => 0x4A4A4AFF.into(),
-        BlockType::Chest => Color::rgb(184, 125, 31),
-    }
 }
 
 fn block_centre(block: SliceBlock) -> (f32, f32) {
@@ -196,8 +179,8 @@ const fn min_const(a: usize, b: usize) -> usize {
 /// more idiomatic and less dense but it stops working in subtle ways so I'm leaving it at this :^)
 ///  - [0] https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/
 ///  - [1] https://github.com/mikolalysenko/mikolalysenko.github.com/blob/master/MinecraftMeshes/js/greedy.js
-pub(crate) fn make_collision_mesh(
-    slab: &Slab,
+pub(crate) fn make_collision_mesh<C: WorldContext>(
+    slab: &Slab<C>,
     out_vertices: &mut Vec<f32>,
     out_indices: &mut Vec<u32>,
 ) {
@@ -349,17 +332,18 @@ pub(crate) fn make_collision_mesh(
 
 #[cfg(test)]
 mod tests {
-    use crate::block::BlockType;
+
     use crate::chunk::slab::Slab;
+    use crate::helpers::{DummyBlockType, DummyWorldContext};
     use crate::mesh::make_collision_mesh;
     use unit::world::LocalSliceIndex;
 
     #[test]
     fn greedy_single_block() {
         let slab = {
-            let mut slab = Slab::empty();
+            let mut slab = Slab::<DummyWorldContext>::empty();
             slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-                .set_block((0, 0), BlockType::Stone);
+                .set_block((0, 0), DummyBlockType::Stone);
             slab
         };
 
@@ -380,11 +364,11 @@ mod tests {
     #[test]
     fn greedy_column() {
         let slab = {
-            let mut slab = Slab::empty();
+            let mut slab = Slab::<DummyWorldContext>::empty();
             slab.slice_mut(LocalSliceIndex::new_unchecked(1))
-                .set_block((1, 1), BlockType::Stone);
+                .set_block((1, 1), DummyBlockType::Stone);
             slab.slice_mut(LocalSliceIndex::new_unchecked(2))
-                .set_block((1, 1), BlockType::Stone);
+                .set_block((1, 1), DummyBlockType::Stone);
             slab
         };
 
@@ -400,11 +384,11 @@ mod tests {
     #[test]
     fn greedy_plane() {
         let slab = {
-            let mut slab = Slab::empty();
+            let mut slab = Slab::<DummyWorldContext>::empty();
             slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-                .fill(BlockType::Stone);
+                .fill(DummyBlockType::Stone);
             slab.slice_mut(LocalSliceIndex::new_unchecked(1))
-                .set_block((1, 1), BlockType::Grass);
+                .set_block((1, 1), DummyBlockType::Grass);
             slab
         };
 

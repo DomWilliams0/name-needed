@@ -8,11 +8,9 @@ edition = "2021"
 
 [dependencies]
 unit = { path = "../../shared/unit" }
-config = { path = "../../shared/config" }
 common = { path = "../../shared/common" }
 color = { path = "../../shared/color" }
 grid = { path = "../../shared/grid" }
-world_types = { path = "../world/world_types" }
 procgen = { path = "../procgen", default-features = false, features = ["cache"], optional = true } # no bin
 
 petgraph = "0.6"

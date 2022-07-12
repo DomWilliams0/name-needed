@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-pub type LoadTerrainResult = Result<LoadedSlab, TerrainSourceError>;
+pub type LoadTerrainResult<C> = Result<LoadedSlab<C>, TerrainSourceError>;
 
 pub struct AsyncWorkerPool {
     pool: tokio::runtime::Runtime,
@@ -55,7 +55,7 @@ impl AsyncWorkerPool {
     pub fn start_finalizer<C: WorldContext>(
         &mut self,
         world: WorldRef<C>,
-        mut finalize_rx: async_channel::Receiver<LoadTerrainResult>,
+        mut finalize_rx: async_channel::Receiver<LoadTerrainResult<C>>,
         chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
     ) {
         let mut success_tx = self.success_tx.clone();
@@ -117,10 +117,10 @@ impl AsyncWorkerPool {
         })
     }
 
-    pub fn submit_async(
+    pub fn submit_async<C: WorldContext>(
         &mut self,
-        task: impl Future<Output = LoadTerrainResult> + Send + 'static,
-        done_channel: async_channel::Sender<LoadTerrainResult>,
+        task: impl Future<Output = LoadTerrainResult<C>> + Send + 'static,
+        done_channel: async_channel::Sender<LoadTerrainResult<C>>,
     ) {
         self.pool.spawn(async move {
             let result = task.await;
@@ -135,9 +135,9 @@ impl AsyncWorkerPool {
         self.pool.spawn(async move { task.await })
     }
 
-    async fn send_result(
-        mut done_channel: async_channel::Sender<LoadTerrainResult>,
-        result: LoadTerrainResult,
+    async fn send_result<C: WorldContext>(
+        mut done_channel: async_channel::Sender<LoadTerrainResult<C>>,
+        result: LoadTerrainResult<C>,
     ) {
         // terrain has been processed in isolation on worker thread, now post to
         // finalization thread

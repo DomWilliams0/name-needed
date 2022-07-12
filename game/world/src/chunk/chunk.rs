@@ -20,7 +20,7 @@ pub struct Chunk<C: WorldContext> {
     /// Unique for each chunk
     pos: ChunkLocation,
 
-    terrain: RawChunkTerrain,
+    terrain: RawChunkTerrain<C>,
 
     /// Sparse associated data with each block
     block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
@@ -28,12 +28,13 @@ pub struct Chunk<C: WorldContext> {
     /// Navigation lookup
     areas: HashMap<ChunkArea, BlockGraph>,
 
-    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
+    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus<C>>>,
     slab_notify: LoadNotifier,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum SlabLoadingStatus {
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
+pub(crate) enum SlabLoadingStatus<C: WorldContext> {
     /// Not available
     Unloaded,
 
@@ -43,20 +44,20 @@ pub(crate) enum SlabLoadingStatus {
     /// Is in progress
     InProgress {
         /// Slab's top slice
-        top: SliceOwned,
+        top: SliceOwned<C>,
 
         /// Slab's bottom slice
-        bottom: SliceOwned,
+        bottom: SliceOwned<C>,
     },
 
     /// Finished and present in chunk.terrain
     Done,
 }
 
-enum SlabAvailability {
+enum SlabAvailability<C: WorldContext> {
     Never,
     OnItsWay,
-    TadaItsAvailable(SliceOwned),
+    TadaItsAvailable(SliceOwned<C>),
 }
 
 impl<C: WorldContext> Chunk<C> {
@@ -139,7 +140,7 @@ impl<C: WorldContext> Chunk<C> {
     pub fn slice_range(
         &self,
         range: SliceRange,
-    ) -> impl Iterator<Item = (GlobalSliceIndex, Slice)> {
+    ) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>)> {
         range
             .as_range()
             .map(move |i| self.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
@@ -147,7 +148,7 @@ impl<C: WorldContext> Chunk<C> {
             .while_some()
     }
 
-    pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice {
+    pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice<C> {
         #[allow(clippy::redundant_closure)]
         self.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
@@ -176,7 +177,7 @@ impl<C: WorldContext> Chunk<C> {
         // no notification necessary, nothing waits for a slab to be requested
     }
 
-    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab) {
+    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab<C>) {
         let top = terrain.slice_owned(LocalSliceIndex::top());
         let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
 
@@ -191,7 +192,7 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
+    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus<C>) {
         self.update_slabs_status(once(slab), state)
     }
 
@@ -199,7 +200,7 @@ impl<C: WorldContext> Chunk<C> {
     fn update_slabs_status(
         &self,
         mut slabs: impl Iterator<Item = SlabIndex>,
-        state: SlabLoadingStatus,
+        state: SlabLoadingStatus<C>,
     ) {
         let mut map = self.slab_progress.write();
 
@@ -225,7 +226,7 @@ impl<C: WorldContext> Chunk<C> {
     pub(crate) fn get_neighbouring_slabs(
         &self,
         slab: SlabIndex,
-    ) -> Option<(Option<SliceOwned>, Option<SliceOwned>)> {
+    ) -> Option<(Option<SliceOwned<C>>, Option<SliceOwned<C>>)> {
         // slice below is mandatory as it's used for navigation. if its in progress then we need to wait
         let below_availability = self.get_slab_slice_availability(slab - 1, true);
 
@@ -248,7 +249,7 @@ impl<C: WorldContext> Chunk<C> {
         Some((above, below))
     }
 
-    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
+    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus<C> {
         let guard = self.slab_progress.read();
         guard
             .get(&slab)
@@ -256,7 +257,7 @@ impl<C: WorldContext> Chunk<C> {
             .clone()
     }
 
-    fn get_slab_slice_availability(&self, slab: SlabIndex, top_slice: bool) -> SlabAvailability {
+    fn get_slab_slice_availability(&self, slab: SlabIndex, top_slice: bool) -> SlabAvailability<C> {
         let state = self.slab_progress(slab);
         match state {
             SlabLoadingStatus::InProgress { top, bottom } => {
@@ -286,10 +287,10 @@ impl<C: WorldContext> Chunk<C> {
 
     fn get_slab_slice(
         &self,
-        state: SlabLoadingStatus,
+        state: SlabLoadingStatus<C>,
         slab: SlabIndex,
         top_slice: bool,
-    ) -> Option<SliceOwned> {
+    ) -> Option<SliceOwned<C>> {
         match state {
             SlabLoadingStatus::InProgress { top, bottom } => {
                 Some(if top_slice { top } else { bottom })
@@ -342,12 +343,12 @@ impl<C: WorldContext> Chunk<C> {
     }
 }
 
-impl<C: WorldContext> BaseTerrain for Chunk<C> {
-    fn raw_terrain(&self) -> &RawChunkTerrain {
+impl<C: WorldContext> BaseTerrain<C> for Chunk<C> {
+    fn raw_terrain(&self) -> &RawChunkTerrain<C> {
         &self.terrain
     }
 
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
+    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
         &mut self.terrain
     }
 }
@@ -356,53 +357,55 @@ impl<C: WorldContext> BaseTerrain for Chunk<C> {
 mod tests {
     use unit::world::GlobalSliceIndex;
 
-    use crate::block::BlockType;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder};
-    use crate::helpers::DummyWorldContext;
+    use crate::helpers::{DummyBlockType, DummyWorldContext};
     use unit::world::CHUNK_SIZE;
 
     #[test]
     fn chunk_ops() {
         // check setting and getting blocks works
-        let chunk = ChunkBuilder::new()
+        let chunk = ChunkBuilder::<DummyWorldContext>::new()
             .apply(|c| {
                 // a bit on slice 0
                 for i in 0..3 {
-                    c.set_block((i, i, 0), BlockType::Dirt);
+                    c.set_block((i, i, 0), DummyBlockType::Dirt);
                 }
             })
-            .set_block((2, 3, 1), BlockType::Dirt)
+            .set_block((2, 3, 1), DummyBlockType::Dirt)
             .into_inner();
 
         // slice 1 was filled
         assert_eq!(
             chunk.get_block_tup((2, 3, 1)).map(|b| b.block_type()),
-            Some(BlockType::Dirt)
+            Some(DummyBlockType::Dirt)
         );
 
         // collect slice
-        let slice: Vec<BlockType> = chunk
+        let slice: Vec<DummyBlockType> = chunk
             .slice(GlobalSliceIndex::new(0))
             .unwrap()
             .iter()
             .map(|b| b.block_type())
             .collect();
         assert_eq!(slice.len(), CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize()); // ensure exact length
-        assert_eq!(slice.iter().filter(|b| **b != BlockType::Air).count(), 3); // ensure exact number of filled blocks
+        assert_eq!(
+            slice.iter().filter(|b| **b != DummyBlockType::Air).count(),
+            3
+        ); // ensure exact number of filled blocks
 
         // ensure each exact coord was filled
         assert_eq!(
             chunk.get_block_tup((0, 0, 0)).map(|b| b.block_type()),
-            Some(BlockType::Dirt)
+            Some(DummyBlockType::Dirt)
         );
         assert_eq!(
             chunk.get_block_tup((1, 1, 0)).map(|b| b.block_type()),
-            Some(BlockType::Dirt)
+            Some(DummyBlockType::Dirt)
         );
         assert_eq!(
             chunk.get_block_tup((2, 2, 0)).map(|b| b.block_type()),
-            Some(BlockType::Dirt)
+            Some(DummyBlockType::Dirt)
         );
     }
 
@@ -425,15 +428,15 @@ mod tests {
         let mut b = blocks.into_iter();
         assert_eq!(
             b.next().map(|(p, b)| (p.xyz(), b.block_type())),
-            Some(((0, 0, 0.into()), BlockType::Air))
+            Some(((0, 0, 0.into()), DummyBlockType::Air))
         );
         assert_eq!(
             b.next().map(|(p, b)| (p.xyz(), b.block_type())),
-            Some(((1, 0, 0.into()), BlockType::Air))
+            Some(((1, 0, 0.into()), DummyBlockType::Air))
         );
         assert_eq!(
             b.next().map(|(p, b)| (p.xyz(), b.block_type())),
-            Some(((2, 0, 0.into()), BlockType::Air))
+            Some(((2, 0, 0.into()), DummyBlockType::Air))
         );
     }
 }

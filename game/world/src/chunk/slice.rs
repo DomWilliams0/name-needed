@@ -4,51 +4,53 @@ use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::Block;
+use crate::{BlockType, WorldContext};
+use common::Derivative;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
-use world_types::BlockType;
 
-const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
-const DUMMY_SLICE_BLOCKS: [Block; SLICE_SIZE] = [Block::air(); SLICE_SIZE];
+pub(crate) const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
-#[derive(Clone, Copy)]
-pub struct Slice<'a> {
-    slice: &'a [Block],
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Copy(bound = ""))]
+pub struct Slice<'a, C: WorldContext> {
+    slice: &'a [Block<C>],
 }
 
-pub struct SliceMut<'a> {
-    slice: &'a mut [Block],
+pub struct SliceMut<'a, C: WorldContext> {
+    slice: &'a mut [Block<C>],
 }
 
 // TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity
 
-#[derive(Clone)]
-pub struct SliceOwned {
-    slice: Box<[Block; SLICE_SIZE]>,
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct SliceOwned<C: WorldContext> {
+    slice: Box<[Block<C>; SLICE_SIZE]>,
 }
 
-impl<'a> Slice<'a> {
-    pub fn new(slice: &'a [Block]) -> Self {
+impl<'a, C: WorldContext> Slice<'a, C> {
+    pub fn new(slice: &'a [Block<C>]) -> Self {
         Self { slice }
     }
 
-    pub fn dummy() -> Slice<'static> {
+    pub fn dummy() -> Slice<'static, C> {
         Slice {
-            slice: &DUMMY_SLICE_BLOCKS,
+            slice: C::air_slice(),
         }
     }
 
-    pub fn non_air_blocks(&self) -> impl Iterator<Item = (usize, SliceBlock, &Block)> {
-        self.filter_blocks(move |&b| b.block_type() != BlockType::Air)
+    pub fn non_air_blocks(&self) -> impl Iterator<Item = (usize, SliceBlock, &Block<C>)> {
+        self.filter_blocks(move |&b| !b.block_type().is_air())
     }
 
-    pub fn slice(&self) -> &[Block] {
+    pub fn slice(&self) -> &[Block<C>] {
         self.slice
     }
 
-    pub fn filter_blocks<F>(&self, f: F) -> impl Iterator<Item = (usize, SliceBlock, &Block)>
+    pub fn filter_blocks<F>(&self, f: F) -> impl Iterator<Item = (usize, SliceBlock, &Block<C>)>
     where
-        F: Fn(&Block) -> bool,
+        F: Fn(&Block<C>) -> bool,
     {
         self.slice
             .iter()
@@ -60,67 +62,67 @@ impl<'a> Slice<'a> {
             })
     }
 
-    pub fn all_blocks_are(&self, block_type: BlockType) -> bool {
+    pub fn all_blocks_are(&self, block_type: C::BlockType) -> bool {
         self.filter_blocks(move |&b| b.block_type() != block_type)
             .count()
             == 0
     }
 
-    pub fn blocks(&self) -> impl Iterator<Item = (SliceBlock, &Block)> {
+    pub fn blocks(&self) -> impl Iterator<Item = (SliceBlock, &Block<C>)> {
         self.slice.iter().enumerate().map(|(i, b)| {
             let pos = unflatten_index(i);
             (pos, b)
         })
     }
 
-    pub fn index_unchecked(&self, idx: usize) -> &Block {
+    pub fn index_unchecked(&self, idx: usize) -> &Block<C> {
         debug_assert!(idx < self.slice.len());
         unsafe { self.slice.get_unchecked(idx) }
     }
 
-    pub fn to_owned(self) -> SliceOwned {
+    pub fn to_owned(self) -> SliceOwned<C> {
         let slice = self.slice.try_into().expect("slice is the wrong length");
         SliceOwned {
             slice: Box::new(slice),
         }
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = &'a Block> {
+    pub fn into_iter(self) -> impl Iterator<Item = &'a Block<C>> {
         self.slice.iter()
     }
 }
 
-impl<'a> Deref for Slice<'a> {
-    type Target = [Block];
+impl<'a, C: WorldContext> Deref for Slice<'a, C> {
+    type Target = [Block<C>];
 
     fn deref(&self) -> &Self::Target {
         self.slice
     }
 }
 
-impl SliceOwned {
-    pub fn borrow(&self) -> Slice {
+impl<C: WorldContext> SliceOwned<C> {
+    pub fn borrow(&self) -> Slice<C> {
         Slice {
             slice: &*self.slice,
         }
     }
 }
 
-impl<'a> From<&'a SliceOwned> for Slice<'a> {
-    fn from(slice: &'a SliceOwned) -> Self {
+impl<'a, C: WorldContext> From<&'a SliceOwned<C>> for Slice<'a, C> {
+    fn from(slice: &'a SliceOwned<C>) -> Self {
         Slice {
             slice: &*slice.slice,
         }
     }
 }
 
-impl<'a> From<SliceMut<'a>> for Slice<'a> {
-    fn from(slice: SliceMut<'a>) -> Self {
+impl<'a, C: WorldContext> From<SliceMut<'a, C>> for Slice<'a, C> {
+    fn from(slice: SliceMut<'a, C>) -> Self {
         Slice { slice: slice.slice }
     }
 }
 
-impl Debug for SliceOwned {
+impl<C: WorldContext> Debug for SliceOwned<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SliceOwned({} blocks)", self.slice.len())
     }
@@ -128,51 +130,47 @@ impl Debug for SliceOwned {
 
 // -------
 
-impl<'a> SliceMut<'a> {
-    pub fn new(slice: &'a mut [Block]) -> Self {
+impl<'a, C: WorldContext> SliceMut<'a, C> {
+    pub fn new(slice: &'a mut [Block<C>]) -> Self {
         Self { slice }
     }
 
     /// Must point to a slice of length CHUNK_SIZE * CHUNK_SIZE
-    pub unsafe fn from_ptr(ptr: *mut Block) -> Self {
+    pub unsafe fn from_ptr(ptr: *mut Block<C>) -> Self {
         let slice =
             std::slice::from_raw_parts_mut(ptr, CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize());
         Self::new(slice)
     }
 
-    pub(crate) fn set_block<P, B>(&mut self, pos: P, block: B) -> BlockType
+    pub(crate) fn set_block<P>(&mut self, pos: P, block_type: C::BlockType) -> C::BlockType
     where
         P: Into<SliceBlock>,
-        B: Into<Block>,
     {
         let index = flatten_coords(pos.into());
         let b = &mut self.slice[index];
 
         let prev = b.block_type();
-        *b = block.into();
+        *b = Block::with_block_type(block_type);
         prev
     }
 
-    pub fn fill<B>(&mut self, block: B)
-    where
-        B: Into<Block>,
-    {
-        let block = block.into();
+    pub fn fill(&mut self, block: C::BlockType) {
+        let block = Block::with_block_type(block);
         for b in self.slice.iter_mut() {
             *b = block;
         }
     }
 }
 
-impl Deref for SliceMut<'_> {
-    type Target = [Block];
+impl<C: WorldContext> Deref for SliceMut<'_, C> {
+    type Target = [Block<C>];
 
     fn deref(&self) -> &Self::Target {
         self.slice
     }
 }
 
-impl DerefMut for SliceMut<'_> {
+impl<C: WorldContext> DerefMut for SliceMut<'_, C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.slice
     }
@@ -180,16 +178,16 @@ impl DerefMut for SliceMut<'_> {
 
 // -------
 
-impl<I: Into<SliceBlock>> Index<I> for Slice<'_> {
-    type Output = Block;
+impl<I: Into<SliceBlock>, C: WorldContext> Index<I> for Slice<'_, C> {
+    type Output = Block<C>;
 
     fn index(&self, index: I) -> &Self::Output {
         &self.slice[flatten_coords(index.into())]
     }
 }
 
-impl<I: Into<SliceBlock>> Index<I> for SliceMut<'_> {
-    type Output = Block;
+impl<I: Into<SliceBlock>, C: WorldContext> Index<I> for SliceMut<'_, C> {
+    type Output = Block<C>;
 
     fn index(&self, index: I) -> &Self::Output {
         let i = flatten_coords(index.into());
@@ -197,7 +195,7 @@ impl<I: Into<SliceBlock>> Index<I> for SliceMut<'_> {
     }
 }
 
-impl<I: Into<SliceBlock>> IndexMut<I> for SliceMut<'_> {
+impl<I: Into<SliceBlock>, C: WorldContext> IndexMut<I> for SliceMut<'_, C> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         &mut self.slice[flatten_coords(index.into())]
     }

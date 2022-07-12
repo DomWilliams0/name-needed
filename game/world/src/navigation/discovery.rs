@@ -10,6 +10,7 @@ use crate::chunk::slice::Slice;
 use crate::navigation::{BlockGraph, ChunkArea, EdgeCost, SlabAreaIndex};
 use crate::neighbour::SlabNeighbours;
 use crate::occlusion::OcclusionOpacity;
+use crate::WorldContext;
 use grid::{grid_declare, GridImpl};
 use std::ops::Deref;
 
@@ -27,7 +28,7 @@ struct AreaDiscoveryGridBlock {
 }
 
 #[derive(Default)]
-pub(crate) struct AreaDiscovery<'a> {
+pub(crate) struct AreaDiscovery<'a, C: WorldContext> {
     grid: AreaDiscoveryGrid,
 
     /// flood fill queue, pair of (pos, pos this was reached from) TODO share between slabs
@@ -44,11 +45,11 @@ pub(crate) struct AreaDiscovery<'a> {
 
     slab_index: SlabIndex,
 
-    below_top_slice: Option<Slice<'a>>,
+    below_top_slice: Option<Slice<'a, C>>,
 }
 
-impl From<&Block> for AreaDiscoveryGridBlock {
-    fn from(block: &Block) -> Self {
+impl<C: WorldContext> From<&Block<C>> for AreaDiscoveryGridBlock {
+    fn from(block: &Block<C>) -> Self {
         AreaDiscoveryGridBlock {
             opacity: block.opacity().into(),
             area: Default::default(),
@@ -62,11 +63,11 @@ enum VerticalOffset {
     Below,
 }
 
-impl<'a> AreaDiscovery<'a> {
+impl<'a, C: WorldContext> AreaDiscovery<'a, C> {
     pub fn from_slab(
-        slab: &impl Deref<Target = SlabGridImpl>,
+        slab: &impl Deref<Target = SlabGridImpl<C>>,
         slab_index: SlabIndex,
-        below_top_slice: Option<Slice<'a>>,
+        below_top_slice: Option<Slice<'a, C>>,
     ) -> Self {
         let mut grid = AreaDiscoveryGrid::default();
 
@@ -289,7 +290,7 @@ impl<'a> AreaDiscovery<'a> {
     }
 
     /// Assign areas to the blocks in the slab
-    pub fn apply(self, slab: &mut SlabGridImpl) {
+    pub fn apply(self, slab: &mut SlabGridImpl<C>) {
         for i in slab.indices() {
             // indices are valid
             // TODO use unchecked unwrap here

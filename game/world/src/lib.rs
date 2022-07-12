@@ -7,12 +7,11 @@ pub use self::chunk::{
     BaseTerrain, BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone,
     OcclusionChunkUpdate,
 };
+pub use self::context::{BlockType, WorldContext};
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};
 pub use self::viewer::{SliceRange, WorldViewer};
-pub use self::world::{
-    helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent, WorldContext,
-};
+pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 
 #[cfg(feature = "procgen")]
@@ -20,6 +19,7 @@ pub use procgen::{BiomeType, RegionLocation};
 
 pub mod block;
 mod chunk;
+mod context;
 pub mod loader;
 mod mesh;
 mod navigation;

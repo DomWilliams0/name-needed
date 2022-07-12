@@ -112,6 +112,7 @@ impl<C: WorldContext> WorldViewer<C> {
     pub fn with_world(
         world: WorldRef<C>,
         initial_block: WorldPosition,
+        initial_view_size: u16,
     ) -> Result<Self, WorldViewerError> {
         let world_bounds = {
             let w = world.borrow();
@@ -119,8 +120,7 @@ impl<C: WorldContext> WorldViewer<C> {
         };
 
         let view_range = {
-            let range_size = config::get().display.initial_view_range;
-            let half_range = (range_size / 2) as i32;
+            let half_range = (initial_view_size / 2) as i32;
             let centre_slice = initial_block.slice();
             SliceRange::from_bounds(
                 (centre_slice - half_range).max(world_bounds.bottom()),

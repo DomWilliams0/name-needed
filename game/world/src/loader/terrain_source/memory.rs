@@ -2,21 +2,21 @@ use std::collections::HashMap;
 
 use common::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
-use world_types::BlockType;
 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
+use crate::{BlockType, WorldContext};
 
 /// Used for testing
-pub struct MemoryTerrainSource {
-    chunk_map: HashMap<ChunkLocation, RawChunkTerrain>,
+pub struct MemoryTerrainSource<C: WorldContext> {
+    chunk_map: HashMap<ChunkLocation, RawChunkTerrain<C>>,
     bounds: (ChunkLocation, ChunkLocation),
 }
 
-impl MemoryTerrainSource {
-    pub fn from_chunks<P: Into<ChunkLocation>, C: Into<(P, RawChunkTerrain)>>(
-        chunks: impl Iterator<Item = C>,
+impl<C: WorldContext> MemoryTerrainSource<C> {
+    pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, RawChunkTerrain<C>)>>(
+        chunks: impl Iterator<Item = T>,
     ) -> Result<Self, TerrainSourceError> {
         let size = chunks.size_hint().1.unwrap_or(8);
         let mut chunk_map = HashMap::with_capacity(size);
@@ -31,7 +31,7 @@ impl MemoryTerrainSource {
                     if slab.is_placeholder() {
                         for (_, slice) in slab.slices_from_bottom() {
                             assert!(
-                                slice.all_blocks_are(BlockType::Air),
+                                slice.all_blocks_are(C::BlockType::AIR),
                                 "non air blocks in \"placeholder\" slab {:?}",
                                 SlabLocation::new(idx, chunk)
                             );
@@ -75,7 +75,7 @@ impl MemoryTerrainSource {
         })
     }
 
-    pub fn get_slab_copy(&self, slab: SlabLocation) -> Result<Slab, TerrainSourceError> {
+    pub fn get_slab_copy(&self, slab: SlabLocation) -> Result<Slab<C>, TerrainSourceError> {
         let slab = self
             .chunk_map
             .get(&slab.chunk)

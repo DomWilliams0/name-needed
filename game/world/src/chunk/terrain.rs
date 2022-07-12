@@ -2,6 +2,7 @@ use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
 
+use crate::block::BlockDurability;
 use common::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
@@ -9,7 +10,6 @@ use unit::world::{
     SLAB_SIZE,
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
-use world_types::BlockDurability;
 
 use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;
@@ -20,18 +20,18 @@ use crate::chunk::slice::{Slice, SliceMut};
 use crate::navigation::ChunkArea;
 use crate::neighbour::NeighbourOffset;
 use crate::occlusion::NeighbourOpacity;
-use crate::{EdgeCost, SliceRange};
+use crate::{BlockType, EdgeCost, SliceRange, WorldContext};
 
 /// Terrain only. Clone with `deep_clone`
-pub struct RawChunkTerrain {
-    slabs: DoubleSidedVec<Slab>,
+pub struct RawChunkTerrain<C: WorldContext> {
+    slabs: DoubleSidedVec<Slab<C>>,
 }
 
-pub trait BaseTerrain {
-    fn raw_terrain(&self) -> &RawChunkTerrain;
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain;
+pub trait BaseTerrain<C: WorldContext> {
+    fn raw_terrain(&self) -> &RawChunkTerrain<C>;
+    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C>;
 
-    fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice> {
+    fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain()
@@ -40,13 +40,13 @@ pub trait BaseTerrain {
             .map(|ptr| ptr.slice(chunk_slice_idx.to_local()))
     }
 
-    fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice {
+    fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice<C> {
         // TODO actually add get_{mut_}unchecked to slabs for performance
         self.slice(index).unwrap()
     }
 
     /// Calls `Slab::expect_mut`, panics if not the exclusive reference
-    fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
+    fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain_mut()
@@ -56,7 +56,7 @@ pub trait BaseTerrain {
     }
 
     /// Calls `Slab::cow_clone`, triggering a slab copy if necessary
-    fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut> {
+    fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
         self.raw_terrain_mut()
@@ -66,17 +66,17 @@ pub trait BaseTerrain {
     }
 
     /// Will clone CoW slab if necessary
-    fn slice_mut_unchecked_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> SliceMut {
+    fn slice_mut_unchecked_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> SliceMut<C> {
         self.slice_mut_with_cow(index).unwrap()
     }
 
-    fn get_block(&self, pos: BlockPosition) -> Option<Block> {
+    fn get_block(&self, pos: BlockPosition) -> Option<Block<C>> {
         self.slice(pos.z()).map(|slice| slice[pos])
     }
 
     /// Panics if invalid position
     #[cfg(test)]
-    fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block> {
+    fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block<C>> {
         let pos = BlockPosition::try_from(pos).expect("bad position");
         self.slice(pos.z()).map(|slice| slice[pos])
     }
@@ -94,8 +94,8 @@ pub trait BaseTerrain {
     #[cfg(test)]
     fn blocks<'a>(
         &self,
-        out: &'a mut Vec<(BlockPosition, Block)>,
-    ) -> &'a mut Vec<(BlockPosition, Block)> {
+        out: &'a mut Vec<(BlockPosition, Block<C>)>,
+    ) -> &'a mut Vec<(BlockPosition, Block<C>)> {
         let (_bottom_slab, bottom_slab_index) =
             self.raw_terrain().slabs_from_bottom().next().unwrap();
 
@@ -143,25 +143,25 @@ pub enum BlockDamageResult {
     Unbroken,
 }
 
-impl BaseTerrain for RawChunkTerrain {
-    fn raw_terrain(&self) -> &RawChunkTerrain {
+impl<C: WorldContext> BaseTerrain<C> for RawChunkTerrain<C> {
+    fn raw_terrain(&self) -> &RawChunkTerrain<C> {
         self
     }
 
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain {
+    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
         self
     }
 }
 
-impl RawChunkTerrain {
-    pub(crate) fn slabs_from_top(&self) -> impl Iterator<Item = (&Slab, SlabIndex)> {
+impl<C: WorldContext> RawChunkTerrain<C> {
+    pub(crate) fn slabs_from_top(&self) -> impl Iterator<Item = (&Slab<C>, SlabIndex)> {
         self.slabs
             .iter_decreasing()
             .zip(self.slabs.indices_decreasing())
             .map(|(ptr, idx)| (ptr, SlabIndex(idx)))
     }
 
-    pub(crate) fn slabs_from_bottom(&self) -> impl Iterator<Item = (&Slab, SlabIndex)> {
+    pub(crate) fn slabs_from_bottom(&self) -> impl Iterator<Item = (&Slab<C>, SlabIndex)> {
         self.slabs
             .iter_increasing()
             .zip(self.slabs.indices_increasing())
@@ -169,7 +169,7 @@ impl RawChunkTerrain {
     }
 
     /// Adds slab, returning old if it exists
-    pub fn replace_slab(&mut self, index: SlabIndex, new_slab: Slab) -> Option<Slab> {
+    pub fn replace_slab(&mut self, index: SlabIndex, new_slab: Slab<C>) -> Option<Slab<C>> {
         if let Some(old) = self.slabs.get_mut(index) {
             Some(std::mem::replace(old, new_slab))
         } else {
@@ -183,16 +183,16 @@ impl RawChunkTerrain {
         self.slabs.add(Slab::empty_placeholder(), slab.into());
     }
 
-    pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab> {
+    pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab<C>> {
         self.slabs.get(index)
     }
 
     /// Cow-copies the slab if not already the exclusive holder
-    pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab> {
+    pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab<C>> {
         self.slabs.get_mut(index).map(|s| s.cow_clone())
     }
 
-    pub(crate) fn copy_slab(&self, index: SlabIndex) -> Option<Slab> {
+    pub(crate) fn copy_slab(&self, index: SlabIndex) -> Option<Slab<C>> {
         self.slabs.get(index).map(|s| s.deep_clone())
     }
 
@@ -222,13 +222,13 @@ impl RawChunkTerrain {
         SliceRange::from_bounds_unchecked(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
     }
 
-    pub fn slices_from_bottom(&self) -> impl Iterator<Item = (LocalSliceIndex, Slice)> {
+    pub fn slices_from_bottom(&self) -> impl Iterator<Item = (LocalSliceIndex, Slice<C>)> {
         self.slabs_from_bottom()
             .flat_map(|(slab, _)| slab.slices_from_bottom())
     }
 
     /// (global slice index, slice)
-    pub fn slices_from_top_offset(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice)> {
+    pub fn slices_from_top_offset(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>)> {
         self.slabs_from_top().flat_map(|(slab, idx)| {
             slab.slices_from_bottom()
                 .rev()
@@ -236,7 +236,9 @@ impl RawChunkTerrain {
         })
     }
 
-    pub fn slab_boundary_slices(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice, Slice)> {
+    pub fn slab_boundary_slices(
+        &self,
+    ) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>, Slice<C>)> {
         self.slabs
             .indices_increasing()
             .zip(self.slabs.iter_increasing())
@@ -251,7 +253,7 @@ impl RawChunkTerrain {
     }
 
     /// If slab doesn't exist, does nothing and returns false
-    pub fn try_set_block(&mut self, pos: BlockPosition, block: impl Into<Block>) -> bool {
+    pub fn try_set_block(&mut self, pos: BlockPosition, block: C::BlockType) -> bool {
         self.set_block(pos, block, SlabCreationPolicy::PleaseDont)
     }
 
@@ -259,14 +261,14 @@ impl RawChunkTerrain {
     pub fn set_block(
         &mut self,
         pos: BlockPosition,
-        block: impl Into<Block>,
+        block: C::BlockType,
         policy: SlabCreationPolicy,
     ) -> bool {
-        let block = block.into();
+        let block = Block::with_block_type(block);
         self.slice_mut_with_policy(pos.z(), policy, |mut slice| slice[pos] = block)
     }
 
-    pub fn slice_mut_with_policy<S: Into<GlobalSliceIndex>, F: FnOnce(SliceMut)>(
+    pub fn slice_mut_with_policy<S: Into<GlobalSliceIndex>, F: FnOnce(SliceMut<C>)>(
         &mut self,
         slice: S,
         policy: SlabCreationPolicy,
@@ -298,7 +300,11 @@ impl RawChunkTerrain {
         }
     }
 
-    pub fn with_block_mut_unchecked<F: FnMut(&mut Block)>(&mut self, pos: BlockPosition, mut f: F) {
+    pub fn with_block_mut_unchecked<F: FnMut(&mut Block<C>)>(
+        &mut self,
+        pos: BlockPosition,
+        mut f: F,
+    ) {
         let mut slice = self.slice_mut(pos.z()).unwrap();
         let block = &mut slice[pos];
         f(block);
@@ -653,7 +659,7 @@ impl RawChunkTerrain {
         pos: SliceBlock,
         start_from: Option<GlobalSliceIndex>,
         end_at: Option<GlobalSliceIndex>,
-        mut filter: impl FnMut(Block, Block) -> bool,
+        mut filter: impl FnMut(Block<C>, Block<C>) -> bool,
     ) -> Option<BlockPosition> {
         let start_from = start_from.unwrap_or_else(GlobalSliceIndex::top);
         let end_at = end_at.unwrap_or_else(GlobalSliceIndex::bottom);
@@ -683,12 +689,12 @@ mod pair_walking {
         OtherChunk,
     }
 
-    pub fn yield_corner<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity)>(
+    pub fn yield_corner<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity), C: WorldContext>(
         which_chunk: WhichChunk,
-        lower_slice_above: Option<Slice>,
+        lower_slice_above: Option<Slice<C>>,
         lower_slab: SlabIndex,
         lower_slice: LocalSliceIndex,
-        upper: Slice,
+        upper: Slice<C>,
         direction: NeighbourOffset,
         f: &mut F,
     ) {
@@ -785,12 +791,12 @@ mod pair_walking {
         }
     }
 
-    pub fn yield_side<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity)>(
+    pub fn yield_side<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity), C: WorldContext>(
         which_chunk: WhichChunk,
-        lower_slice_above: Option<Slice>,
+        lower_slice_above: Option<Slice<C>>,
         lower_slab: SlabIndex,
         lower_slice: LocalSliceIndex,
-        upper: Slice,
+        upper: Slice<C>,
         direction: NeighbourOffset,
         f: &mut F,
     ) {
@@ -841,7 +847,7 @@ mod pair_walking {
     }
 }
 
-impl Default for RawChunkTerrain {
+impl<C: WorldContext> Default for RawChunkTerrain<C> {
     /// Has a single empty placeholder slab at index 0
     fn default() -> Self {
         let mut terrain = Self {
@@ -859,7 +865,6 @@ mod tests {
     use unit::world::CHUNK_SIZE;
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
-    use crate::block::BlockType;
     use crate::chunk::slab::Slab;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::ChunkBuilder;
@@ -870,27 +875,27 @@ mod tests {
     use crate::{World, WorldArea, WorldRef};
 
     use super::*;
-    use crate::helpers::loader_from_chunks_blocking;
+    use crate::helpers::{loader_from_chunks_blocking, DummyBlockType};
     use crate::loader::WorldTerrainUpdate;
     use crate::navigation::discovery::AreaDiscovery;
     use std::convert::TryInto;
 
     #[test]
     fn empty() {
-        let terrain = RawChunkTerrain::default();
+        let terrain = RawChunkTerrain::<DummyWorldContext>::default();
         assert_eq!(terrain.slab_count(), 1);
     }
 
     #[test]
     #[should_panic]
     fn no_dupes() {
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
         terrain.add_empty_placeholder_slab(0);
     }
 
     #[test]
     fn slabs() {
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
 
         terrain.add_empty_placeholder_slab(1);
         terrain.add_empty_placeholder_slab(2);
@@ -922,37 +927,37 @@ mod tests {
 
     #[test]
     fn block_views() {
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
 
-        *terrain.slice_mut(0).unwrap()[(0, 0)].block_type_mut() = BlockType::Stone;
+        *terrain.slice_mut(0).unwrap()[(0, 0)].block_type_mut() = DummyBlockType::Stone;
         assert_eq!(
             terrain.slice(GlobalSliceIndex::new(0)).unwrap()[(0, 0)].block_type(),
-            BlockType::Stone
+            DummyBlockType::Stone
         );
         assert_eq!(
             terrain.slice(10).unwrap()[(0, 0)].block_type(),
-            BlockType::Air
+            DummyBlockType::Air
         );
 
         assert!(terrain.slice(SLAB_SIZE.as_i32()).is_none());
         assert!(terrain.slice(-1).is_none());
 
         terrain.add_empty_placeholder_slab(-1);
-        *terrain.slice_mut(-1).unwrap()[(3, 3)].block_type_mut() = BlockType::Grass;
+        *terrain.slice_mut(-1).unwrap()[(3, 3)].block_type_mut() = DummyBlockType::Grass;
         assert_eq!(
             terrain.slice(-1).unwrap()[(3, 3)].block_type(),
-            BlockType::Grass
+            DummyBlockType::Grass
         );
         assert_eq!(
             terrain.get_block_tup((3, 3, -1)).unwrap().block_type(),
-            BlockType::Grass
+            DummyBlockType::Grass
         );
 
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
         assert_eq!(
             terrain.set_block(
                 (2, 0, 0).try_into().unwrap(),
-                BlockType::Stone,
+                DummyBlockType::Stone,
                 SlabCreationPolicy::PleaseDont
             ),
             true
@@ -960,7 +965,7 @@ mod tests {
         assert_eq!(
             terrain.set_block(
                 (2, 0, -2).try_into().unwrap(),
-                BlockType::Stone,
+                DummyBlockType::Stone,
                 SlabCreationPolicy::PleaseDont
             ),
             false
@@ -973,7 +978,7 @@ mod tests {
         assert_eq!(
             blocks
                 .iter()
-                .filter(|(_, b)| b.block_type() == BlockType::Stone)
+                .filter(|(_, b)| b.block_type() == DummyBlockType::Stone)
                 .count(),
             1
         );
@@ -982,19 +987,19 @@ mod tests {
     #[test]
     fn slab_areas() {
         // slab with flat slice 0 should have 1 area
-        let mut slab = Slab::empty();
+        let mut slab = Slab::<DummyWorldContext>::empty();
         slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-            .fill(BlockType::Stone);
+            .fill(DummyBlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
         assert_eq!(area_count, 1);
 
         // slab with 2 unconnected floors should have 2
-        let mut slab = Slab::empty();
+        let mut slab = Slab::<DummyWorldContext>::empty();
         slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-            .fill(BlockType::Stone);
+            .fill(DummyBlockType::Stone);
         slab.slice_mut(LocalSliceIndex::new_unchecked(5))
-            .fill(BlockType::Stone);
+            .fill(DummyBlockType::Stone);
 
         let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
         assert_eq!(area_count, 2);
@@ -1005,13 +1010,13 @@ mod tests {
     fn slab_areas_jump() {
         // terrain with accessible jumps should still be 1 area
 
-        let mut terrain = ChunkBuilder::default().set_block((2, 2, 2), BlockType::Stone); // solid walkable
+        let mut terrain = ChunkBuilder::default().set_block((2, 2, 2), DummyBlockType::Stone); // solid walkable
 
         // full jump staircase next to it
         terrain = terrain
-            .set_block((3, 2, 3), BlockType::Stone)
-            .set_block((4, 2, 4), BlockType::Stone)
-            .set_block((5, 2, 4), BlockType::Stone);
+            .set_block((3, 2, 3), DummyBlockType::Stone)
+            .set_block((4, 2, 4), DummyBlockType::Stone)
+            .set_block((5, 2, 4), DummyBlockType::Stone);
 
         // 1 area still
         let chunk = load_single_chunk(terrain);
@@ -1019,18 +1024,18 @@ mod tests {
 
         // too big jump out of reach is still unreachable
         let terrain = ChunkBuilder::default()
-            .set_block((2, 2, 2), BlockType::Stone)
-            .set_block((3, 2, 3), BlockType::Stone)
-            .set_block((4, 2, 7), BlockType::Stone);
+            .set_block((2, 2, 2), DummyBlockType::Stone)
+            .set_block((3, 2, 3), DummyBlockType::Stone)
+            .set_block((4, 2, 7), DummyBlockType::Stone);
 
         let chunk = load_single_chunk(terrain);
         assert_eq!(chunk.areas().count(), 2);
 
         // if above is blocked, can't jump
         let terrain = ChunkBuilder::default()
-            .set_block((2, 2, 2), BlockType::Stone)
-            .set_block((3, 2, 3), BlockType::Stone)
-            .set_block((2, 2, 4), BlockType::Stone); // blocks jump!
+            .set_block((2, 2, 2), DummyBlockType::Stone)
+            .set_block((3, 2, 3), DummyBlockType::Stone)
+            .set_block((2, 2, 4), DummyBlockType::Stone); // blocks jump!
 
         // so 2 areas expected
         let chunk = load_single_chunk(terrain);
@@ -1042,8 +1047,8 @@ mod tests {
         // a slab whose top layer is solid should mean the slab above's z=0 is walkable
 
         let terrain = ChunkBuilder::default()
-            .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Air) // add upper slab
-            .fill_slice(SLAB_SIZE.as_i32() - 1, BlockType::Stone); // fill top layer of first slab
+            .set_block((0, 0, SLAB_SIZE.as_i32()), DummyBlockType::Air) // add upper slab
+            .fill_slice(SLAB_SIZE.as_i32() - 1, DummyBlockType::Stone); // fill top layer of first slab
 
         let terrain = load_single_chunk(terrain);
 
@@ -1056,12 +1061,12 @@ mod tests {
         // setting blocks in non-existent places should create a slab to fill it
 
         const SLAB_SIZE_I32: i32 = SLAB_SIZE.as_i32();
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
 
         // 1 slab below should not yet exist
         assert!(!terrain.set_block(
             (0, 0, -5).try_into().unwrap(),
-            BlockType::Stone,
+            DummyBlockType::Stone,
             SlabCreationPolicy::PleaseDont
         ));
         assert!(terrain.get_block_tup((0, 0, -5)).is_none());
@@ -1074,7 +1079,7 @@ mod tests {
         // now really set
         assert!(terrain.set_block(
             (0, 0, -5).try_into().unwrap(),
-            BlockType::Stone,
+            DummyBlockType::Stone,
             SlabCreationPolicy::CreateAll
         ));
         assert_eq!(
@@ -1082,7 +1087,7 @@ mod tests {
                 .get_block_tup((0, 0, -5))
                 .map(|b| b.block_type())
                 .unwrap(),
-            BlockType::Stone
+            DummyBlockType::Stone
         );
         assert_eq!(terrain.slab_count(), 2);
         assert_eq!(
@@ -1093,7 +1098,7 @@ mod tests {
         // set a high block that will fill the rest in with air
         assert!(terrain.set_block(
             (0, 0, 100).try_into().unwrap(),
-            BlockType::Grass,
+            DummyBlockType::Grass,
             SlabCreationPolicy::CreateAll
         ));
         assert_eq!(
@@ -1101,7 +1106,7 @@ mod tests {
                 .get_block_tup((0, 0, 100))
                 .map(|b| b.block_type())
                 .unwrap(),
-            BlockType::Grass
+            DummyBlockType::Grass
         );
         assert_eq!(terrain.slab_count(), 5);
         assert!(terrain.slice_bounds_as_slabs().contains(100));
@@ -1113,7 +1118,7 @@ mod tests {
                     .get_block_tup((0, 0, z))
                     .map(|b| b.block_type())
                     .unwrap(),
-                BlockType::Air
+                DummyBlockType::Air
             );
         }
     }
@@ -1123,9 +1128,9 @@ mod tests {
         // there should be no edge that is a jump of > 1.0
 
         let terrain = ChunkBuilder::new()
-            .set_block((2, 2, 2), BlockType::Stone)
+            .set_block((2, 2, 2), DummyBlockType::Stone)
             // technically a vertical neighbour but the jump is too high
-            .set_block((3, 2, 4), BlockType::Stone);
+            .set_block((3, 2, 4), DummyBlockType::Stone);
 
         let chunk = load_single_chunk(terrain);
         assert_eq!(chunk.areas().count(), 2); // 2 disconnected areas
@@ -1135,8 +1140,8 @@ mod tests {
     #[test]
     fn discovery_block_graph() {
         let terrain = ChunkBuilder::new()
-            .fill_slice(51, BlockType::Stone)
-            .set_block((2, 2, 52), BlockType::Grass);
+            .fill_slice(51, DummyBlockType::Stone)
+            .set_block((2, 2, 52), DummyBlockType::Grass);
 
         let chunk = load_single_chunk(terrain);
 
@@ -1219,9 +1224,9 @@ mod tests {
     fn occlusion_in_slab() {
         // no occlusion because the block directly above 2,2,2 is solid
         let mut terrain = ChunkBuilder::default()
-            .set_block((2, 2, 2), BlockType::Dirt)
-            .set_block((2, 2, 3), BlockType::Stone)
-            .set_block((2, 3, 3), BlockType::Dirt);
+            .set_block((2, 2, 2), DummyBlockType::Dirt)
+            .set_block((2, 2, 3), DummyBlockType::Stone)
+            .set_block((2, 3, 3), DummyBlockType::Dirt);
 
         let chunk = load_single_chunk(terrain.deep_clone());
 
@@ -1242,7 +1247,7 @@ mod tests {
         );
 
         // occlusion will be populated if block directly above it is air
-        terrain = terrain.set_block((2, 2, 3), BlockType::Air);
+        terrain = terrain.set_block((2, 2, 3), DummyBlockType::Air);
         let chunk = load_single_chunk(terrain);
 
         let (occlusion, _) = chunk
@@ -1265,10 +1270,10 @@ mod tests {
     #[test]
     fn occlusion_across_slab() {
         let terrain = ChunkBuilder::default()
-            .set_block((2, 2, SLAB_SIZE.as_i32() - 1), BlockType::Dirt)
+            .set_block((2, 2, SLAB_SIZE.as_i32() - 1), DummyBlockType::Dirt)
             .set_block(
                 (2, 3, SLAB_SIZE.as_i32()), // next slab up
-                BlockType::Dirt,
+                DummyBlockType::Dirt,
             );
 
         let terrain = load_single_chunk(terrain);
@@ -1306,18 +1311,18 @@ mod tests {
         // logging::for_tests();
 
         let a = ChunkBuilder::new()
-            .set_block((0, 0, SLAB_SIZE.as_i32()), BlockType::Grass) // slab 1
-            .set_block((0, 0, 0), BlockType::Grass) // slab 0
+            .set_block((0, 0, SLAB_SIZE.as_i32()), DummyBlockType::Grass) // slab 1
+            .set_block((0, 0, 0), DummyBlockType::Grass) // slab 0
             .build((0, 0));
 
         let b = ChunkBuilder::new()
             // occludes 0,0,0 in slab 0
-            .set_block((CHUNK_SIZE.as_i32() - 1, 0, 1), BlockType::Stone)
+            .set_block((CHUNK_SIZE.as_i32() - 1, 0, 1), DummyBlockType::Stone)
             .build((-1, 0));
 
         // occludes 0,0,0 in slab 0
         let c = ChunkBuilder::new()
-            .set_block((0, CHUNK_SIZE.as_i32() - 1, 1), BlockType::Stone)
+            .set_block((0, CHUNK_SIZE.as_i32() - 1, 1), DummyBlockType::Stone)
             .build((0, -1));
 
         let world = world_from_chunks_blocking(vec![a, b, c]).into_inner();
@@ -1340,18 +1345,18 @@ mod tests {
     fn lazy_occlusion_top_only() {
         fn mk_chunks(block_off: bool) -> WorldRef<DummyWorldContext> {
             let a = ChunkBuilder::new()
-                .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), BlockType::Grass)
+                .set_block((CHUNK_SIZE.as_i32() - 1, 0, 0), DummyBlockType::Grass)
                 .build((-1, 0));
 
             let blockage = if block_off {
-                BlockType::Grass
+                DummyBlockType::Grass
             } else {
-                BlockType::Air
+                DummyBlockType::Air
             };
 
             let b = ChunkBuilder::new()
-                .set_block((0, 0, -1), BlockType::Stone)
-                .set_block((1, 0, 0), BlockType::Stone)
+                .set_block((0, 0, -1), DummyBlockType::Stone)
+                .set_block((1, 0, 0), DummyBlockType::Stone)
                 .set_block((0, 0, 0), blockage)
                 .build((0, 0));
 
@@ -1395,17 +1400,17 @@ mod tests {
     fn occlusion_across_chunk_corner() {
         let a = ChunkBuilder::new()
             // 0, 15, 0
-            .set_block((0, CHUNK_SIZE.as_i32() - 1, 0), BlockType::Stone)
+            .set_block((0, CHUNK_SIZE.as_i32() - 1, 0), DummyBlockType::Stone)
             .build((0, 0));
 
         let b = ChunkBuilder::new()
             // -1, 16, 1, occludes 0,0,0
-            .set_block((CHUNK_SIZE.as_i32() - 1, 0, 1), BlockType::Grass)
+            .set_block((CHUNK_SIZE.as_i32() - 1, 0, 1), DummyBlockType::Grass)
             .build((-1, 1));
 
         let c = ChunkBuilder::new()
             // 0, 16, 1, occludes 0,0,0
-            .set_block((0, 0, 1), BlockType::Grass)
+            .set_block((0, 0, 1), DummyBlockType::Grass)
             .build((0, 1));
 
         let world = world_from_chunks_blocking(vec![a, b, c]).into_inner();
@@ -1439,17 +1444,21 @@ mod tests {
 
     #[test]
     fn cloned_slab_cow_is_updated() {
-        let mut terrain = RawChunkTerrain::default();
+        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
         let old = terrain.slabs.get(0).unwrap().clone(); // reference to force a cow clone
 
         let slab = terrain.slab_mut(SlabIndex(0)).unwrap();
         let slice_0 = LocalSliceIndex::new_unchecked(0);
-        slab.slice_mut(slice_0).set_block((0, 0), BlockType::Stone);
+        slab.slice_mut(slice_0)
+            .set_block((0, 0), DummyBlockType::Stone);
 
         // old reference is "dangling", pointing to old
         let immut = terrain.slab(SlabIndex(0)).unwrap();
-        assert_eq!(old.slice(slice_0)[(0, 0)].block_type(), BlockType::Air);
-        assert_eq!(immut.slice(slice_0)[(0, 0)].block_type(), BlockType::Stone);
+        assert_eq!(old.slice(slice_0)[(0, 0)].block_type(), DummyBlockType::Air);
+        assert_eq!(
+            immut.slice(slice_0)[(0, 0)].block_type(),
+            DummyBlockType::Stone
+        );
     }
 
     #[test]
@@ -1457,7 +1466,7 @@ mod tests {
         // regression test for bug where area discovery was only looking for jump ups and not down
 
         let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_range((0, 0, 0), (2, 2, 1), |_| BlockType::Stone)
+            .fill_range((0, 0, 0), (2, 2, 1), |_| DummyBlockType::Stone)
             .build((0, 0))]);
 
         let world_ref = loader.world();
@@ -1479,7 +1488,7 @@ mod tests {
         // dig out a block
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_single((0, 0, 1)),
-            BlockType::Air,
+            DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 
@@ -1488,7 +1497,7 @@ mod tests {
         // dig out another block
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_single((1, 1, 1)),
-            BlockType::Air,
+            DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 
@@ -1498,8 +1507,8 @@ mod tests {
     #[test]
     fn stale_areas_removed_after_modification() {
         let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_range((0, 0, 0), (5, 0, 0), |_| BlockType::Stone) // 5x1x1 ground
-            .fill_range((3, 0, 0), (3, 0, 5), |_| BlockType::Stone) // 1x1xz wall cutting it in half
+            .fill_range((0, 0, 0), (5, 0, 0), |_| DummyBlockType::Stone) // 5x1x1 ground
+            .fill_range((3, 0, 0), (3, 0, 5), |_| DummyBlockType::Stone) // 1x1xz wall cutting it in half
             .build((0, 0))]);
 
         let world_ref = loader.world();
@@ -1519,7 +1528,7 @@ mod tests {
         // remove some of the wall to combine the 2 areas
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_inclusive_range((3, 0, 1), (3, 0, 2)),
-            BlockType::Air,
+            DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 
@@ -1529,7 +1538,7 @@ mod tests {
         // remove the wall completely
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_inclusive_range((3, 0, 1), (3, 0, 10)),
-            BlockType::Air,
+            DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 
@@ -1539,7 +1548,7 @@ mod tests {
         // remove the ground too
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_inclusive_range((0, 0, 0), (5, 5, 5)),
-            BlockType::Air,
+            DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 

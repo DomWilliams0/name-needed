@@ -358,15 +358,15 @@ mod tests {
     use unit::world::CHUNK_SIZE;
     use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SLAB_SIZE};
 
-    use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
+    use crate::helpers::{DummyBlockType, DummyWorldContext};
     use crate::navigation::path::AreaPathNode;
     use crate::navigation::{AreaGraph, AreaNavEdge, AreaPathError, SlabAreaIndex, WorldArea};
     use crate::neighbour::NeighbourOffset;
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkDescriptor, EdgeCost};
 
-    fn make_graph(chunks: Vec<ChunkDescriptor>) -> AreaGraph {
+    fn make_graph(chunks: Vec<ChunkDescriptor<DummyWorldContext>>) -> AreaGraph {
         // gross but allows for neater tests
         let world = world_from_chunks_blocking(chunks).into_inner();
         (*world.area_graph()).clone()
@@ -387,10 +387,10 @@ mod tests {
     fn one_block_one_side_flat() {
         let chunks = vec![
             ChunkBuilder::new()
-                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), BlockType::Stone)
+                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), DummyBlockType::Stone)
                 .build((0, 0)),
             ChunkBuilder::new()
-                .set_block((0, 5, 0), BlockType::Grass)
+                .set_block((0, 5, 0), DummyBlockType::Grass)
                 .build((1, 0)),
         ];
 
@@ -404,13 +404,13 @@ mod tests {
     fn one_block_two_sides_flat() {
         let chunks = vec![
             ChunkBuilder::new()
-                .set_block((15, 0, 0), BlockType::Stone)
+                .set_block((15, 0, 0), DummyBlockType::Stone)
                 .build((0, 0)),
             ChunkBuilder::new()
-                .set_block((0, 0, 0), BlockType::Grass)
+                .set_block((0, 0, 0), DummyBlockType::Grass)
                 .build((1, 0)),
             ChunkBuilder::new()
-                .set_block((15, 15, 0), BlockType::Grass)
+                .set_block((15, 15, 0), DummyBlockType::Grass)
                 .build((0, -1)),
         ];
 
@@ -435,10 +435,10 @@ mod tests {
         // step up from chunk 0 (0,5,N-1) to chunk 1 (-1, 5, N) slab 1
         let graph = make_graph(vec![
             ChunkBuilder::new()
-                .set_block((0, 5, -1), BlockType::Grass)
+                .set_block((0, 5, -1), DummyBlockType::Grass)
                 .build((0, 0)),
             ChunkBuilder::new()
-                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), BlockType::Stone)
+                .set_block((CHUNK_SIZE.as_i32() - 1, 5, 0), DummyBlockType::Stone)
                 .build((-1, 0)),
         ]);
 
@@ -459,12 +459,12 @@ mod tests {
         // -1, 5, 16 -> 0, 5, 15
         let graph = make_graph(vec![
             ChunkBuilder::new()
-                .set_block((0, 5, SLAB_SIZE.as_i32() - 1), BlockType::Grass)
+                .set_block((0, 5, SLAB_SIZE.as_i32() - 1), DummyBlockType::Grass)
                 .build((0, 0)),
             ChunkBuilder::new()
                 .set_block(
                     (CHUNK_SIZE.as_i32() - 1, 5, SLAB_SIZE.as_i32()),
-                    BlockType::Stone,
+                    DummyBlockType::Stone,
                 )
                 .build((-1, 0)),
         ]);
@@ -492,7 +492,7 @@ mod tests {
 
         let graph = make_graph(vec![ChunkBuilder::new()
             // 1 block in second slab
-            .set_block((2, 2, SLAB_SIZE.as_i32()), BlockType::Stone)
+            .set_block((2, 2, SLAB_SIZE.as_i32()), DummyBlockType::Stone)
             .build((0, 0))]);
 
         // BUG: area is not created because no neighbouring chunks found
@@ -503,19 +503,19 @@ mod tests {
     fn full_slices_flat() {
         let chunks = vec![
             ChunkBuilder::new()
-                .fill_slice(0, BlockType::Stone)
+                .fill_slice(0, DummyBlockType::Stone)
                 .build((0, 0)),
             ChunkBuilder::new()
-                .fill_slice(0, BlockType::Stone)
+                .fill_slice(0, DummyBlockType::Stone)
                 .build((1, 0)),
             ChunkBuilder::new()
-                .fill_slice(0, BlockType::Stone)
+                .fill_slice(0, DummyBlockType::Stone)
                 .build((-1, 0)),
             ChunkBuilder::new()
-                .fill_slice(0, BlockType::Stone)
+                .fill_slice(0, DummyBlockType::Stone)
                 .build((0, 1)),
             ChunkBuilder::new()
-                .fill_slice(0, BlockType::Stone)
+                .fill_slice(0, DummyBlockType::Stone)
                 .build((0, -1)),
         ];
 
@@ -606,20 +606,20 @@ mod tests {
     fn world_port_discovery() {
         let graph = make_graph(vec![
             ChunkBuilder::new()
-                .fill_slice(3, BlockType::Stone)
+                .fill_slice(3, DummyBlockType::Stone)
                 .build((-4, -4)),
             ChunkBuilder::new()
                 // 3 wide port
-                .set_block((0, 5, 3), BlockType::Grass)
-                .set_block((0, 6, 3), BlockType::Grass)
-                .set_block((0, 7, 3), BlockType::Grass)
+                .set_block((0, 5, 3), DummyBlockType::Grass)
+                .set_block((0, 6, 3), DummyBlockType::Grass)
+                .set_block((0, 7, 3), DummyBlockType::Grass)
                 // little bridge to have 1 connected area
-                .set_block((1, 7, 3), BlockType::Stone)
-                .set_block((1, 8, 3), BlockType::Stone)
-                .set_block((1, 9, 4), BlockType::Stone)
-                .set_block((1, 10, 4), BlockType::Stone)
+                .set_block((1, 7, 3), DummyBlockType::Stone)
+                .set_block((1, 8, 3), DummyBlockType::Stone)
+                .set_block((1, 9, 4), DummyBlockType::Stone)
+                .set_block((1, 10, 4), DummyBlockType::Stone)
                 // another disconnected 1 wide port
-                .set_block((0, 10, 4), BlockType::Grass)
+                .set_block((0, 10, 4), DummyBlockType::Grass)
                 .build((-3, -4)),
             ChunkBuilder::new().build((0, 0)),
         ]);
@@ -758,18 +758,18 @@ mod tests {
         let graph = make_graph(vec![
             ChunkBuilder::new()
                 // 2 wide port going east
-                .set_block((14, 2, 1), BlockType::Stone)
-                .set_block((14, 3, 1), BlockType::Stone)
-                .set_block((15, 2, 2), BlockType::Stone)
-                .set_block((15, 3, 2), BlockType::Stone)
+                .set_block((14, 2, 1), DummyBlockType::Stone)
+                .set_block((14, 3, 1), DummyBlockType::Stone)
+                .set_block((15, 2, 2), DummyBlockType::Stone)
+                .set_block((15, 3, 2), DummyBlockType::Stone)
                 .build((-1, 0)),
             ChunkBuilder::new()
-                .fill_slice(3, BlockType::Grass)
+                .fill_slice(3, DummyBlockType::Grass)
                 .build((0, 0)),
             ChunkBuilder::new()
                 // 1 wide port still going east
-                .set_block((0, 5, 2), BlockType::Stone)
-                .set_block((1, 5, 1), BlockType::Stone)
+                .set_block((0, 5, 2), DummyBlockType::Stone)
+                .set_block((1, 5, 1), DummyBlockType::Stone)
                 .build((1, 0)),
         ]);
         let path = graph
@@ -812,11 +812,11 @@ mod tests {
 
         let w = world_from_chunks_blocking(vec![
             ChunkBuilder::new()
-                .set_block((14, 2, 201), BlockType::Stone)
-                .set_block((15, 2, 201), BlockType::Stone)
+                .set_block((14, 2, 201), DummyBlockType::Stone)
+                .set_block((15, 2, 201), DummyBlockType::Stone)
                 .build((-1, 0)),
             ChunkBuilder::new()
-                .fill_slice(201, BlockType::Grass)
+                .fill_slice(201, DummyBlockType::Grass)
                 .build((0, 0)),
         ])
         .into_inner();
@@ -850,7 +850,7 @@ mod tests {
         const SLAB: SlabIndex = SlabIndex(202 / SLAB_SIZE.as_i32());
 
         let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_slice(201, BlockType::Grass)
+            .fill_slice(201, DummyBlockType::Grass)
             .build((0, 0))])
         .into_inner();
 
@@ -873,7 +873,7 @@ mod tests {
     #[test]
     fn area_path_bad() {
         let graph = make_graph(vec![ChunkBuilder::new()
-            .fill_slice(1, BlockType::Grass)
+            .fill_slice(1, DummyBlockType::Grass)
             .build((0, 0))]);
 
         let err = graph.find_area_path(

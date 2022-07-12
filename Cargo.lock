@@ -3748,7 +3748,6 @@ version = "0.1.0"
 dependencies = [
  "color",
  "common",
- "config",
  "criterion",
  "futures",
  "grid",
@@ -3759,7 +3758,6 @@ dependencies = [
  "strum",
  "tokio",
  "unit",
- "world_types",
 ]
 
 [[package]]

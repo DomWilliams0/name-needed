@@ -19,25 +19,24 @@ use crate::world::slab_loading::SlabProcessingFuture;
 use futures::FutureExt;
 use std::collections::HashSet;
 use std::iter::repeat;
-use world_types::EntityDescription;
 
 pub struct WorldLoader<C: WorldContext> {
-    source: TerrainSource,
+    source: TerrainSource<C>,
     pool: AsyncWorkerPool,
-    finalization_channel: async_channel::Sender<LoadTerrainResult>,
+    finalization_channel: async_channel::Sender<LoadTerrainResult<C>>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
     world: WorldRef<C>,
     last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
 }
 
-pub struct LoadedSlab {
+pub struct LoadedSlab<C: WorldContext> {
     pub(crate) slab: SlabLocation,
     /// If None the terrain has already been updated
-    pub(crate) terrain: Option<Slab>,
+    pub(crate) terrain: Option<Slab<C>>,
     pub(crate) navigation: SlabInternalNavigability,
     pub(crate) batch: UpdateBatch,
-    pub(crate) entities: Vec<EntityDescription>,
+    pub(crate) entities: Vec<C::GeneratedEntityDesc>,
 }
 
 #[derive(Debug, Error)]
@@ -53,7 +52,7 @@ pub enum BlockForAllError {
 }
 
 impl<C: WorldContext> WorldLoader<C> {
-    pub fn new<S: Into<TerrainSource>>(source: S, mut pool: AsyncWorkerPool) -> Self {
+    pub fn new<S: Into<TerrainSource<C>>>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
         let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
 
@@ -246,8 +245,8 @@ impl<C: WorldContext> WorldLoader<C> {
     /// because navigation/occlusion/finalization is queued to the loader thread pool.
     pub fn apply_terrain_updates(
         &mut self,
-        terrain_updates: &mut HashSet<WorldTerrainUpdate>,
-        changes_out: &mut Vec<WorldChangeEvent>,
+        terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>,
+        changes_out: &mut Vec<WorldChangeEvent<C>>,
     ) {
         let world_ref = self.world.clone();
 
@@ -509,7 +508,7 @@ impl<C: WorldContext> WorldLoader<C> {
         let _ = fut.now_or_never();
     }
 
-    pub fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
+    pub fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate<C>>) {
         let fut = self.source.steal_queued_block_updates(out);
         self.pool.runtime().block_on(fut)
     }
@@ -525,9 +524,8 @@ mod tests {
         CHUNK_SIZE,
     };
 
-    use crate::block::BlockType;
     use crate::chunk::ChunkBuilder;
-    use crate::helpers::test_world_timeout;
+    use crate::helpers::{test_world_timeout, DummyBlockType};
     use crate::loader::loading::WorldLoader;
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
@@ -540,11 +538,11 @@ mod tests {
     #[test]
     fn thread_flow() {
         let a = ChunkBuilder::new()
-            .set_block((0, 4, 60), BlockType::Stone)
+            .set_block((0, 4, 60), DummyBlockType::Stone)
             .into_inner();
 
         let b = ChunkBuilder::new()
-            .set_block((CHUNK_SIZE.as_i32() - 1, 4, 60), BlockType::Grass)
+            .set_block((CHUNK_SIZE.as_i32() - 1, 4, 60), DummyBlockType::Grass)
             .into_inner();
 
         let source =
@@ -594,7 +592,7 @@ mod tests {
         // create block updates before requesting slabs so there's no wait
         let mut rando = SmallRng::from_entropy();
         let blocks_to_set = {
-            let block_types = vec![BlockType::Stone, BlockType::Dirt];
+            let block_types = vec![DummyBlockType::Stone, DummyBlockType::Dirt];
 
             // set each block once only
             (0..UPDATE_COUNT)
@@ -686,7 +684,7 @@ mod tests {
                 for (block_pos, block) in blocks.drain(..) {
                     let block_type = block.block_type();
 
-                    if !matches!(block_type, BlockType::Air) {
+                    if !matches!(block_type, DummyBlockType::Air) {
                         let world_pos = block_pos.to_world_position(chunk.pos());
                         actual_blocks.push((world_pos, block_type));
                     }
@@ -727,7 +725,7 @@ mod tests {
                 None => panic!("expected block {:?} does not exist", pos),
                 Some(b) => {
                     let ty = b.block_type();
-                    if let BlockType::Air = ty {
+                    if let DummyBlockType::Air = ty {
                         panic!(
                             "block at {:?} is unset but should been set to {:?}",
                             pos, ty

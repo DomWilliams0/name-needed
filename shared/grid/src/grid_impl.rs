@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::Range;
 
 use derive_more::*;
 
@@ -182,21 +182,13 @@ impl<G: GridImpl> std::ops::IndexMut<Range<usize>> for Grid<G> {
 impl<G: GridImpl> GridImplExt for G {
     /// The grid may be too big for the stack, build directly on the heap
     fn default_boxed() -> Box<Self> {
-        let mut vec: Vec<G::Item> = Vec::with_capacity(G::FULL_SIZE);
-
-        // safety: length is same as capacity
-        unsafe {
-            vec.set_len(G::FULL_SIZE);
-        }
-
-        let mut slice = vec.into_boxed_slice();
-        for elem in &mut slice[..] {
-            *elem = Default::default();
-        }
+        let vec = (0..G::FULL_SIZE)
+            .map(|_| Default::default())
+            .collect::<Vec<G::Item>>();
 
         // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
         unsafe {
-            let raw_slice = Box::into_raw(slice);
+            let raw_slice = Box::into_raw(vec.into_boxed_slice());
             Box::from_raw(raw_slice as *mut Self)
         }
     }

@@ -7,7 +7,6 @@
 
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
-    block::BlockType,
     loader::{
         AsyncWorkerPool, BlockForAllError, TerrainSourceError, TerrainUpdatesRes, WorldLoader,
         WorldTerrainUpdate,
@@ -80,6 +79,8 @@ pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,
 };
+// Exports from world so the renderer only needs to link against simulation
+pub use world::block::BlockType;
 
 pub const TICKS_PER_SECOND: usize = 20;
 

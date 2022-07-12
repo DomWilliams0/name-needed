@@ -9,10 +9,10 @@ pub use memory::MemoryTerrainSource;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
 };
-use world_types::EntityDescription;
 
 use crate::chunk::slab::Slab;
 use crate::loader::WorldTerrainUpdate;
+use crate::WorldContext;
 
 #[cfg(feature = "procgen")]
 mod generate;
@@ -42,15 +42,16 @@ pub enum TerrainSourceError {
     Async(#[from] tokio::task::JoinError),
 }
 
-#[derive(Clone)]
-pub enum TerrainSource {
-    Memory(Arc<RwLock<MemoryTerrainSource>>),
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub enum TerrainSource<C: WorldContext> {
+    Memory(Arc<RwLock<MemoryTerrainSource<C>>>),
     #[cfg(feature = "procgen")]
     Generated(GeneratedTerrainSource),
 }
 
-unsafe impl Send for TerrainSource {}
-unsafe impl Sync for TerrainSource {}
+unsafe impl<C: WorldContext> Send for TerrainSource<C> {}
+unsafe impl<C: WorldContext> Sync for TerrainSource<C> {}
 
 #[cfg(feature = "procgen")]
 pub struct BlockDetails {
@@ -63,25 +64,25 @@ pub struct BlockDetails {
     pub region: Option<(procgen::RegionLocation, SmallVec<[String; 4]>)>,
 }
 
-pub struct GeneratedSlab {
-    pub terrain: Slab,
-    pub entities: Vec<EntityDescription>,
+pub struct GeneratedSlab<C: WorldContext> {
+    pub terrain: Slab<C>,
+    pub entities: Vec<C::GeneratedEntityDesc>,
 }
 
-impl From<MemoryTerrainSource> for TerrainSource {
-    fn from(src: MemoryTerrainSource) -> Self {
+impl<C: WorldContext> From<MemoryTerrainSource<C>> for TerrainSource<C> {
+    fn from(src: MemoryTerrainSource<C>) -> Self {
         Self::Memory(Arc::new(RwLock::new(src)))
     }
 }
 
 #[cfg(feature = "procgen")]
-impl From<GeneratedTerrainSource> for TerrainSource {
+impl<C: WorldContext> From<GeneratedTerrainSource> for TerrainSource<C> {
     fn from(src: GeneratedTerrainSource) -> Self {
         Self::Generated(src)
     }
 }
 
-impl TerrainSource {
+impl<C: WorldContext> TerrainSource<C> {
     pub async fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
         match self {
             TerrainSource::Memory(_) => {}
@@ -90,7 +91,10 @@ impl TerrainSource {
         }
     }
 
-    pub async fn load_slab(&self, slab: SlabLocation) -> Result<GeneratedSlab, TerrainSourceError> {
+    pub async fn load_slab(
+        &self,
+        slab: SlabLocation,
+    ) -> Result<GeneratedSlab<C>, TerrainSourceError> {
         match self {
             TerrainSource::Memory(src) => src
                 .read()
@@ -158,7 +162,7 @@ impl TerrainSource {
         }
     }
 
-    pub async fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate>) {
+    pub async fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate<C>>) {
         match self {
             TerrainSource::Memory(_) => {}
             #[cfg(feature = "procgen")]
@@ -184,8 +188,8 @@ impl TerrainSource {
     }
 }
 
-impl GeneratedSlab {
-    pub fn with_terrain(terrain: Slab) -> Self {
+impl<C: WorldContext> GeneratedSlab<C> {
+    pub fn with_terrain(terrain: Slab<C>) -> Self {
         Self {
             terrain,
             entities: Vec::new(),
@@ -198,17 +202,21 @@ mod tests {
     use std::iter::once;
 
     use crate::chunk::RawChunkTerrain;
+    use crate::helpers::DummyWorldContext;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
 
     use super::*;
 
     #[test]
     fn invalid() {
-        let no_chunks: Vec<(ChunkLocation, RawChunkTerrain)> = vec![];
-        let empty = MemoryTerrainSource::from_chunks(no_chunks.into_iter());
+        let no_chunks: Vec<(ChunkLocation, _)> = vec![];
+        let empty = MemoryTerrainSource::<DummyWorldContext>::from_chunks(no_chunks.into_iter());
         assert!(matches!(empty.err().unwrap(), TerrainSourceError::NoChunks));
 
-        let random = MemoryTerrainSource::from_chunks(once(((5, 5), RawChunkTerrain::default())));
+        let random = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
+            (5, 5),
+            RawChunkTerrain::default(),
+        )));
         assert!(matches!(
             random.err().unwrap(),
             TerrainSourceError::MissingCentreChunk
@@ -217,8 +225,11 @@ mod tests {
 
     #[test]
     fn bounds() {
-        let just_one =
-            MemoryTerrainSource::from_chunks(once(((0, 0), RawChunkTerrain::default()))).unwrap();
+        let just_one = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
+            (0, 0),
+            RawChunkTerrain::default(),
+        )))
+        .unwrap();
         assert_eq!(
             just_one.world_bounds(),
             (ChunkLocation(0, 0), ChunkLocation(0, 0))
@@ -234,7 +245,7 @@ mod tests {
             just_one.get_slab_copy(SlabLocation::new(0, (1, 1))),
             Err(TerrainSourceError::SlabOutOfBounds(_))
         ));
-        let sparse = MemoryTerrainSource::from_chunks(
+        let sparse = MemoryTerrainSource::<DummyWorldContext>::from_chunks(
             vec![
                 ((0, 0), RawChunkTerrain::default()),
                 ((2, 5), RawChunkTerrain::default()),

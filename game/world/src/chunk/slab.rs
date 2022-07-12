@@ -11,15 +11,37 @@ use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
-use crate::WorldChangeEvent;
-use grid::{grid_declare, Grid, GridImpl};
+use crate::{WorldChangeEvent, WorldContext};
+use grid::{Grid, GridImpl, GridImplExt};
 use std::sync::Arc;
 
-grid_declare!(pub struct SlabGrid<SlabGridImpl, Block>,
-    CHUNK_SIZE.as_usize(),
-    CHUNK_SIZE.as_usize(),
-    SLAB_SIZE.as_usize()
-);
+const GRID_DIM_X: usize = CHUNK_SIZE.as_usize();
+const GRID_DIM_Y: usize = CHUNK_SIZE.as_usize();
+const GRID_DIM_Z: usize = SLAB_SIZE.as_usize();
+
+// manual expansion of grid_declare! to allow for generic parameter
+pub type SlabGrid<C> = ::grid::Grid<SlabGridImpl<C>>;
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+#[repr(transparent)]
+pub struct SlabGridImpl<C: WorldContext> {
+    array: [Block<C>; GRID_DIM_X * GRID_DIM_Y * GRID_DIM_Z],
+}
+
+impl<C: WorldContext> ::grid::GridImpl for SlabGridImpl<C> {
+    type Item = Block<C>;
+    const DIMS: [usize; 3] = [GRID_DIM_X, GRID_DIM_Y, GRID_DIM_Z];
+    const FULL_SIZE: usize = GRID_DIM_X * GRID_DIM_Y * GRID_DIM_Z;
+
+    fn array(&self) -> &[Self::Item] {
+        &self.array
+    }
+
+    fn array_mut(&mut self) -> &mut [Self::Item] {
+        &mut self.array
+    }
+}
 
 #[derive(Copy, Clone)]
 pub enum SlabType {
@@ -30,8 +52,9 @@ pub enum SlabType {
 }
 
 /// CoW slab terrain
-#[derive(Clone)]
-pub struct Slab(Arc<SlabGridImpl>, SlabType);
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct Slab<C: WorldContext>(Arc<SlabGridImpl<C>>, SlabType);
 
 #[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
@@ -40,7 +63,7 @@ pub trait DeepClone {
     fn deep_clone(&self) -> Self;
 }
 
-impl Slab {
+impl<C: WorldContext> Slab<C> {
     pub fn empty() -> Self {
         Self::new_empty(SlabType::Normal)
     }
@@ -53,7 +76,7 @@ impl Slab {
         Self::from_grid(SlabGrid::default(), ty)
     }
 
-    pub fn from_grid(grid: SlabGrid, ty: SlabType) -> Self {
+    pub fn from_grid(grid: SlabGrid<C>, ty: SlabType) -> Self {
         let terrain = grid.into_boxed_impl();
         let arc = Arc::from(terrain);
         Self(arc, ty)
@@ -61,7 +84,7 @@ impl Slab {
 
     pub fn from_other_grid<I, G>(other: Grid<G>, ty: SlabType) -> Self
     where
-        for<'a> &'a I: Into<<SlabGridImpl as GridImpl>::Item>,
+        for<'a> &'a I: Into<<SlabGridImpl<C> as GridImpl>::Item>,
         G: GridImpl<Item = I>,
     {
         let new_vals = other.array().iter().map(|item| item.into());
@@ -70,12 +93,12 @@ impl Slab {
         Self(arc, ty)
     }
 
-    pub fn cow_clone(&mut self) -> &mut Slab {
+    pub fn cow_clone(&mut self) -> &mut Slab<C> {
         let _ = Arc::make_mut(&mut self.0);
         self
     }
 
-    pub fn expect_mut(&mut self) -> &mut SlabGridImpl {
+    pub fn expect_mut(&mut self) -> &mut SlabGridImpl<C> {
         let grid = Arc::get_mut(&mut self.0).expect("expected to be the only slab reference");
 
         if let SlabType::Placeholder = std::mem::replace(&mut self.1, SlabType::Normal) {
@@ -85,7 +108,7 @@ impl Slab {
         grid
     }
 
-    pub fn expect_mut_self(&mut self) -> &mut Slab {
+    pub fn expect_mut_self(&mut self) -> &mut Slab<C> {
         let _ = self.expect_mut();
         self
     }
@@ -100,24 +123,26 @@ impl Slab {
 
     /// Leaks
     #[cfg(test)]
-    pub fn raw(&self) -> *const SlabGridImpl {
+    pub fn raw(&self) -> *const SlabGridImpl<C> {
         Arc::into_raw(Arc::clone(&self.0))
     }
 
-    pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice {
+    pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice<C> {
         let index = index.into();
         let (from, to) = self.slice_range(index.slice_unsigned());
         Slice::new(&self.array()[from..to])
     }
 
-    pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut {
+    pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut<C> {
         let index = index.into();
         let (from, to) = self.slice_range(index.slice_unsigned());
         SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 
     /// (slice index *relative to this slab*, slice)
-    pub fn slices_from_bottom(&self) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice)> {
+    pub fn slices_from_bottom(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice<C>)> {
         LocalSliceIndex::slices().map(move |idx| (idx, self.slice(idx)))
     }
 
@@ -129,9 +154,9 @@ impl Slab {
         above: Option<&'a Self>,
     ) -> impl Iterator<
         Item = (
-            Option<SliceSource<'a>>,
-            Option<SliceSource<'a>>,
-            Option<SliceSource<'a>>,
+            Option<SliceSource<'a, C>>,
+            Option<SliceSource<'a, C>>,
+            Option<SliceSource<'a, C>>,
         ),
     > {
         let first = below.map(|slab| SliceSource::BelowSlab(slab.slice(LocalSliceIndex::top())));
@@ -144,7 +169,7 @@ impl Slab {
     }
 }
 
-impl DeepClone for Slab {
+impl<C: WorldContext> DeepClone for Slab<C> {
     fn deep_clone(&self) -> Self {
         // don't go via the stack to avoid overflow
         let mut new_copy = SlabGridImpl::default_boxed();
@@ -154,8 +179,8 @@ impl DeepClone for Slab {
     }
 }
 
-impl Deref for Slab {
-    type Target = SlabGridImpl;
+impl<C: WorldContext> Deref for Slab<C> {
+    type Target = SlabGridImpl<C>;
 
     fn deref(&self) -> &Self::Target {
         self.0.deref()
@@ -172,13 +197,13 @@ impl IntoIterator for SlabInternalNavigability {
 }
 
 /// Initialization functions
-impl Slab {
+impl<C: WorldContext> Slab<C> {
     /// Discover navigability and occlusion
     pub(crate) fn process_terrain<'s>(
         &mut self,
         index: SlabIndex,
-        above: Option<impl Into<Slice<'s>>>,
-        below: Option<impl Into<Slice<'s>>>,
+        above: Option<impl Into<Slice<'s, C>>>,
+        below: Option<impl Into<Slice<'s, C>>>,
     ) -> SlabInternalNavigability {
         log_scope!(o!(index));
 
@@ -197,7 +222,7 @@ impl Slab {
     fn discover_areas(
         &mut self,
         this_slab: SlabIndex,
-        slice_below: Option<Slice>,
+        slice_below: Option<Slice<C>>,
     ) -> SlabInternalNavigability {
         // TODO if exclusive we're in deep water with CoW
         assert!(self.is_exclusive(), "not exclusive?");
@@ -220,7 +245,7 @@ impl Slab {
         SlabInternalNavigability(slab_areas)
     }
 
-    fn init_occlusion(&mut self, slice_above: Option<Slice>) {
+    fn init_occlusion(&mut self, slice_above: Option<Slice<C>>) {
         self.ascending_slice_pairs(slice_above, |mut slice_this, slice_next| {
             slice_this.iter_mut().enumerate().for_each(|(i, b)| {
                 let this_block = b.opacity();
@@ -242,16 +267,16 @@ impl Slab {
 
     fn ascending_slice_pairs(
         &mut self,
-        next_slab_up_bottom_slice: Option<Slice>,
-        mut f: impl FnMut(SliceMut, Slice),
+        next_slab_up_bottom_slice: Option<Slice<C>>,
+        mut f: impl FnMut(SliceMut<C>, Slice<C>),
     ) {
         for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
-            let this_slice_mut: SliceMut = self.slice_mut(this_slice_idx);
+            let this_slice_mut: SliceMut<C> = self.slice_mut(this_slice_idx);
 
             // transmute lifetime to allow a mut and immut reference
             // safety: slices don't overlap and this_slice_idx != next_slice_idx
-            let this_slice_mut: SliceMut = unsafe { std::mem::transmute(this_slice_mut) };
-            let next_slice: Slice = self.slice(next_slice_idx);
+            let this_slice_mut: SliceMut<C> = unsafe { std::mem::transmute(this_slice_mut) };
+            let next_slice: Slice<C> = self.slice(next_slice_idx);
 
             f(this_slice_mut, next_slice);
         }
@@ -261,24 +286,25 @@ impl Slab {
             let this_slab_top_slice = self.slice_mut(LocalSliceIndex::top());
 
             // safety: mutable and immutable slices don't overlap
-            let this_slab_top_slice: SliceMut = unsafe { std::mem::transmute(this_slab_top_slice) };
+            let this_slab_top_slice: SliceMut<C> =
+                unsafe { std::mem::transmute(this_slab_top_slice) };
 
             f(this_slab_top_slice, next_slab_bottom_slice);
         }
     }
 
-    pub fn slice_owned<S: Into<LocalSliceIndex>>(&self, index: S) -> SliceOwned {
+    pub fn slice_owned<S: Into<LocalSliceIndex>>(&self, index: S) -> SliceOwned<C> {
         self.slice(index).to_owned()
     }
 
     pub(crate) fn apply_terrain_updates(
         &mut self,
         this_slab: SlabLocation,
-        updates: impl Iterator<Item = SlabTerrainUpdate>,
-        changes_out: &mut Vec<WorldChangeEvent>,
+        updates: impl Iterator<Item = SlabTerrainUpdate<C>>,
+        changes_out: &mut Vec<WorldChangeEvent<C>>,
     ) {
         for update in updates {
-            let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate = update;
+            let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate<C> = update;
             trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
 
             // TODO consider resizing/populating changes_out initially with empty events for performance
@@ -314,16 +340,17 @@ impl Slab {
 
 // ---------
 
-#[derive(Clone)]
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
 #[allow(clippy::enum_variant_names)]
-pub enum SliceSource<'a> {
-    BelowSlab(Slice<'a>),
-    ThisSlab(Slice<'a>),
-    AboveSlab(Slice<'a>),
+pub enum SliceSource<'a, C: WorldContext> {
+    BelowSlab(Slice<'a, C>),
+    ThisSlab(Slice<'a, C>),
+    AboveSlab(Slice<'a, C>),
 }
 
-impl<'a> Deref for SliceSource<'a> {
-    type Target = Slice<'a>;
+impl<'a, C: WorldContext> Deref for SliceSource<'a, C> {
+    type Target = Slice<'a, C>;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -334,7 +361,7 @@ impl<'a> Deref for SliceSource<'a> {
     }
 }
 
-impl SliceSource<'_> {
+impl<C: WorldContext> SliceSource<'_, C> {
     pub fn relative_slab_index(self, this_slab: SlabIndex) -> SlabIndex {
         match self {
             SliceSource::BelowSlab(_) => this_slab - 1,
@@ -347,11 +374,12 @@ impl SliceSource<'_> {
 #[cfg(test)]
 mod tests {
     use crate::chunk::slab::Slab;
+    use crate::helpers::DummyWorldContext;
     use crate::DeepClone;
 
     #[test]
     fn deep_clone() {
-        let a = Slab::empty();
+        let a = Slab::<DummyWorldContext>::empty();
         let b = a.clone();
         let c = a.deep_clone();
 

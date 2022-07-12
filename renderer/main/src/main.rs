@@ -178,7 +178,9 @@ fn do_main() -> BoxedResult<()> {
         let (simulation, initial_block) = start::create_simulation(resources.clone(), scenario)?;
 
         // initialize backend with simulation world
-        let world_viewer = WorldViewer::with_world(simulation.voxel_world(), initial_block)?;
+        let initial_view_size = config::get().display.initial_view_range;
+        let world_viewer =
+            WorldViewer::with_world(simulation.voxel_world(), initial_block, initial_view_size)?;
         let backend = backend_state.start(world_viewer, initial_block);
 
         // initialize engine
@@ -346,7 +348,8 @@ mod start {
         Ok(match source {
             config::WorldSource::Preset(preset) => {
                 debug!("loading world preset"; "preset" => ?preset);
-                let source = presets::from_preset(preset);
+                // TODO remove worldpreset enum
+                let source = presets::from_preset(&format!("{:?}", preset), &mut *random::get());
                 WorldLoader::new(source, pool)
             }
             #[cfg(feature = "procgen")]

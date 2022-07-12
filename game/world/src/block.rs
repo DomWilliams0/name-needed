@@ -1,15 +1,16 @@
-use common::Proportion;
+use crate::context::{BlockType, WorldContext};
+use common::*;
 use unit::world::GlobalSliceIndex;
-pub use world_types::{BlockDurability, BlockOpacity, BlockType};
 
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::occlusion::BlockOcclusion;
 
 /// A single block in a chunk
 // TODO store sparse block data in the slab instead of inline in the block
-#[derive(Debug, Copy, Clone)]
-pub struct Block {
-    block_type: BlockType,
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""), Copy(bound = ""), Clone(bound = ""))]
+pub struct Block<C: WorldContext> {
+    block_type: C::BlockType,
 
     /// How damaged the block is
     durability: Proportion<BlockDurability>,
@@ -20,11 +21,22 @@ pub struct Block {
     occlusion: BlockOcclusion,
 }
 
-impl Block {
-    pub fn with_block_type(block_type: BlockType) -> Self {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BlockOpacity {
+    Transparent,
+    Solid,
+}
+
+pub type BlockDurability = u8;
+
+impl<C: WorldContext> Block<C> {
+    pub fn with_block_type(block_type: C::BlockType) -> Self {
         Self {
             block_type,
-            durability: block_type.durability(),
+            durability: {
+                let max = block_type.durability();
+                Proportion::with_value(max, max)
+            },
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default(),
         }
@@ -32,18 +44,18 @@ impl Block {
 
     pub const fn air() -> Self {
         Self {
-            block_type: BlockType::Air,
+            block_type: C::BlockType::AIR,
             durability: Proportion::default_empty(),
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default_const(),
         }
     }
 
-    pub const fn block_type(self) -> BlockType {
+    pub const fn block_type(self) -> C::BlockType {
         self.block_type
     }
 
-    pub fn block_type_mut(&mut self) -> &mut BlockType {
+    pub fn block_type_mut(&mut self) -> &mut C::BlockType {
         &mut self.block_type
     }
 
@@ -98,19 +110,22 @@ impl Block {
 
     /// True if air or durability == 0
     pub fn is_destroyed(&self) -> bool {
-        self.durability.value() == 0 || self.block_type == BlockType::Air
+        self.durability.value() == 0 || self.block_type.is_air()
     }
 }
 
-impl Default for Block {
+impl<C: WorldContext> Default for Block<C> {
     fn default() -> Self {
-        Self::with_block_type(BlockType::Air)
+        Self::with_block_type(C::BlockType::AIR)
     }
 }
 
-/// Helper
-impl From<BlockType> for Block {
-    fn from(bt: BlockType) -> Self {
-        Block::with_block_type(bt)
+impl BlockOpacity {
+    pub fn solid(self) -> bool {
+        matches!(self, Self::Solid)
+    }
+
+    pub fn transparent(self) -> bool {
+        matches!(self, Self::Transparent)
     }
 }

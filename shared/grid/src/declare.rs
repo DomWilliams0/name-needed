@@ -1,4 +1,3 @@
-use crate::GridImpl;
 #[macro_export]
 macro_rules! grid_declare {
     ($vis:vis struct $name:ident < $implname:ident, $t:ty > , $x:expr, $y:expr, $z:expr) => {

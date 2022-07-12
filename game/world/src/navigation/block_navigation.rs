@@ -213,7 +213,7 @@ mod tests {
 
     use unit::world::ChunkLocation;
 
-    use crate::block::BlockType;
+    use crate::helpers::DummyBlockType;
     use crate::navigation::{BlockGraph, BlockPathNode, SearchGoal, WorldArea};
     use crate::world::helpers::world_from_chunks_blocking;
     use crate::{ChunkBuilder, EdgeCost};
@@ -221,9 +221,9 @@ mod tests {
     #[test]
     fn simple_path() {
         let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_slice(1, BlockType::Stone)
-            .set_block((5, 5, 2), BlockType::Grass)
-            .set_block((6, 5, 3), BlockType::Grass)
+            .fill_slice(1, DummyBlockType::Stone)
+            .set_block((5, 5, 2), DummyBlockType::Grass)
+            .set_block((6, 5, 3), DummyBlockType::Grass)
             .build((0, 0))])
         .into_inner();
         let chunk = world.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
@@ -290,9 +290,9 @@ mod tests {
         // dont bang ur head with ur hoppity
 
         let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_slice(1, BlockType::Stone)
-            .set_block((3, 3, 2), BlockType::Stone) // step up
-            .set_block((2, 3, 3), BlockType::Stone) // step up from the step up
+            .fill_slice(1, DummyBlockType::Stone)
+            .set_block((3, 3, 2), DummyBlockType::Stone) // step up
+            .set_block((2, 3, 3), DummyBlockType::Stone) // step up from the step up
             .build((0, 0))])
         .into_inner();
 

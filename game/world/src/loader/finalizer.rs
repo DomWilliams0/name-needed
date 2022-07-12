@@ -17,7 +17,7 @@ const SEND_FAILURE_THRESHOLD: usize = 20;
 pub struct SlabFinalizer<C: WorldContext> {
     world: WorldRef<C>,
     updates: async_channel::UnboundedSender<OcclusionChunkUpdate>,
-    batcher: UpdateBatcher<LoadedSlab>,
+    batcher: UpdateBatcher<LoadedSlab<C>>,
     send_failures: usize,
 }
 
@@ -34,7 +34,7 @@ impl<C: WorldContext> SlabFinalizer<C> {
         }
     }
 
-    pub async fn finalize(&mut self, slab: LoadedSlab) {
+    pub async fn finalize(&mut self, slab: LoadedSlab<C>) {
         // world lock is taken and released often to prevent holding up the main thread
 
         debug!(
