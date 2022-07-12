@@ -350,12 +350,12 @@ mod tests {
         let row = 2 * CHUNK_SIZE.as_usize(); // start on 3rd row
         let (rows, overflow) = do_scan(|chunks| {
             // fill up row 4 to end
-            (**chunks[0].biomes_mut())[row + 4..row + CHUNK_SIZE.as_usize()]
+            chunks[0].biomes_mut()[row + 4..row + CHUNK_SIZE.as_usize()]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
 
             // continue row into next chunk
-            (**chunks[1].biomes_mut())[row..row + 4]
+            chunks[1].biomes_mut()[row..row + 4]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
@@ -377,9 +377,9 @@ mod tests {
         let idx = (6 * CHUNK_SIZE.as_usize()) + 3;
 
         let (rows, overflow) = do_scan(|chunks| {
-            (**chunks[0].biomes_mut())[idx].set_biome(BiomeType::Forest);
-            (**chunks[1].biomes_mut())[idx].set_biome(BiomeType::Forest);
-            (**chunks[2].biomes_mut())[idx].set_biome(BiomeType::Forest);
+            chunks[0].biomes_mut()[idx].set_biome(BiomeType::Forest);
+            chunks[1].biomes_mut()[idx].set_biome(BiomeType::Forest);
+            chunks[2].biomes_mut()[idx].set_biome(BiomeType::Forest);
         });
 
         assert_eq!(
@@ -422,7 +422,7 @@ mod tests {
     fn scan_first_row_overflow_down() {
         let (rows, overflow) = do_scan(|chunks| {
             // 1st row, 4-9
-            (**chunks[0].biomes_mut())[4..10]
+            chunks[0].biomes_mut()[4..10]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
@@ -444,10 +444,10 @@ mod tests {
         // fill top row of region
         let idx = (CHUNK_SIZE.as_usize().pow(2)) - CHUNK_SIZE.as_usize();
         let (rows, overflow) = do_scan(|chunks| {
-            (**chunks[2].biomes_mut())[idx..idx + CHUNK_SIZE.as_usize()]
+            chunks[2].biomes_mut()[idx..idx + CHUNK_SIZE.as_usize()]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
-            (**chunks[3].biomes_mut())[idx..idx + CHUNK_SIZE.as_usize()]
+            chunks[3].biomes_mut()[idx..idx + CHUNK_SIZE.as_usize()]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });
@@ -471,11 +471,11 @@ mod tests {
 
         let (rows, overflow) = do_scan(|chunks| {
             // 3rd row has 2 separate
-            (**chunks[0].biomes_mut())[start + 1..start + 4]
+            chunks[0].biomes_mut()[start + 1..start + 4]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
 
-            (**chunks[0].biomes_mut())[start + 10..start + 12]
+            chunks[0].biomes_mut()[start + 10..start + 12]
                 .iter_mut()
                 .for_each(|b| b.set_biome(BiomeType::Forest));
         });

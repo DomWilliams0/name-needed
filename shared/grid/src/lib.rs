@@ -1,6 +1,6 @@
 pub use dynamic::CoordRange;
 pub use dynamic::DynamicGrid;
-pub use grid_impl::{CoordType, Grid, GridImpl};
+pub use grid_impl::{CoordType, Grid, GridImpl, GridImplExt};
 
 mod declare;
 mod dynamic;
