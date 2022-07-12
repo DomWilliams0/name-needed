@@ -7,7 +7,7 @@ use std::rc::Rc;
 use specs::storage::StorageEntry;
 
 use common::*;
-use world::block::BlockType;
+use world_types::BlockType;
 
 use crate::build::ReservedMaterialComponent;
 use crate::ecs::*;

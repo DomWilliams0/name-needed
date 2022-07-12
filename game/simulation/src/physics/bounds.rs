@@ -3,6 +3,7 @@ use common::Vector2;
 use crate::World;
 use unit::world::{WorldPoint, WorldPointRange, WorldPosition, WorldPositionRange, WorldRange};
 use world::block::BlockOpacity;
+use world::BlockType;
 
 #[derive(Clone, Debug)]
 pub struct Bounds {

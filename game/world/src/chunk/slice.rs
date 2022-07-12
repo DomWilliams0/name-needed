@@ -9,7 +9,7 @@ use common::Derivative;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 
-pub(crate) const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
+pub const SLICE_SIZE: usize = CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize();
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Copy(bound = ""))]

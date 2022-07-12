@@ -3,12 +3,14 @@ use std::pin::Pin;
 
 use common::*;
 use unit::world::{WorldPosition, WorldPositionRange};
-use world::block::{BlockDurability, BlockType};
-use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
+use world::block::BlockDurability;
+use world::loader::WorldTerrainUpdate;
 use world::BlockDamageResult;
+use world_types::BlockType;
 
 use crate::ecs::EcsWorld;
-use crate::ComponentWorld;
+use crate::simulation::TerrainUpdatesRes;
+use crate::{ComponentWorld, WorldContext};
 
 pub type QueuedUpdates = RawQueuedUpdates<naive::NaiveImpl>;
 

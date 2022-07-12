@@ -481,17 +481,17 @@ impl<C: WorldContext> WorldLoader<C> {
         self.pool.runtime().block_on(fut)
     }
 
-    #[cfg(feature = "procgen")]
+    #[cfg(feature = "worldprocgen")]
     pub fn query_block(&self, block: WorldPosition) -> Option<terrain_source::BlockDetails> {
         let fut = self.source.query_block(block);
         self.pool.runtime().block_on(fut)
     }
 
     pub fn is_generated(&self) -> bool {
-        #[cfg(feature = "procgen")]
+        #[cfg(feature = "worldprocgen")]
         return matches!(self.source, TerrainSource::Generated(_));
 
-        #[cfg(not(feature = "procgen"))]
+        #[cfg(not(feature = "worldprocgen"))]
         false
     }
 

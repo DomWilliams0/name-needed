@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use ai::Context;
 use common::*;
 use unit::world::WorldPoint;
-use world::block::BlockType;
+use world_types::BlockType;
 
 use crate::ai::{AiBlackboard, AiContext, AiTarget};
 use crate::ecs::*;

@@ -35,7 +35,7 @@ ron = "0.7"
 [features]
 default = ["common/log-to-file", "panik/use-slog", "common/binary", "scripting"]
 use-sdl = ["sdl2", "sdl2-sys", "gl", "imgui-sdl2", "imgui-opengl-renderer", "imgui", "rusttype"]
-procgen = ["simulation/procgen"]
+worldprocgen = ["simulation/worldprocgen"]
 metrics = ["simulation/metrics"]
 lite = []
 gl-trace-log = []

@@ -16,9 +16,8 @@ use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::SocietyTaskResult;
 use crate::society::job::{SocietyJobHandle, SocietyTask};
 use crate::string::{CachedStr, CachedStringHasher};
-use crate::{
-    BlockType, ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition,
-};
+use crate::{ComponentWorld, Entity, ItemStackComponent, TransformComponent, WorldPosition};
+use world_types::BlockType;
 
 // TODO build requirement engine for generic material combining
 //      each job owns an instance, lends it to UI for rendering

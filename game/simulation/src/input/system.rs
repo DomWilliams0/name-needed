@@ -286,7 +286,7 @@ mod selected_tiles {
     use std::fmt::Write;
 
     use unit::world::SlabLocation;
-    use world::block::BlockType;
+    use world_types::BlockType;
 
     use crate::input::SelectionModification;
     use crate::InnerWorldRef;
@@ -528,7 +528,7 @@ mod selected_tiles {
 
     #[cfg(test)]
     mod tests {
-        use world::block::BlockType;
+        use world_types::BlockType;
 
         use crate::input::system::selected_tiles::BlockOccurrences;
 

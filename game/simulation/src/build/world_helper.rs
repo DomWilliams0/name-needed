@@ -3,14 +3,15 @@ use std::sync::Arc;
 use common::*;
 use unit::space::length::{Length, Length2};
 use unit::world::WorldPositionRange;
-use world::block::BlockType;
-use world::loader::{TerrainUpdatesRes, WorldTerrainUpdate};
+use world::loader::WorldTerrainUpdate;
+use world_types::BlockType;
 
 use crate::ecs::*;
 use crate::event::DeathReason;
 use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
 use crate::render::UiElementComponent;
-use crate::{QueuedUpdates, SocietyComponent, TransformComponent};
+use crate::simulation::TerrainUpdatesRes;
+use crate::{QueuedUpdates, SocietyComponent, TransformComponent, WorldContext};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtBuild<'w>(&'w EcsWorld);

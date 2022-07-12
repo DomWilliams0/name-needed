@@ -1,4 +1,4 @@
-use world::block::BlockType;
+use world_types::BlockType;
 
 use crate::ecs::Entity;
 use crate::scripting::ScriptingError;

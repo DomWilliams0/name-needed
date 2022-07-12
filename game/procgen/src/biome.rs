@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use common::*;
 pub(crate) use deserialize::BiomeConfig;
+use world_types::BlockType;
 
 use crate::continent::ContinentMap;
 use crate::region::PlanetPoint;
@@ -483,7 +484,7 @@ impl BiomeType {
 
     /// (surface_block, shallow_under_block, deep_under_block, shallow_depth)
     pub(crate) fn block_distribution(self) -> (BlockType, BlockType, BlockType, i32) {
-        use world::block::BlockType::*;
+        use BlockType::*;
         match self {
             BiomeType::Ocean | BiomeType::IcyOcean | BiomeType::CoastOcean => {
                 (Dirt, Sand, Stone, 1)

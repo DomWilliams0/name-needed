@@ -17,6 +17,7 @@ grid_declare!(pub struct SlabGrid<SlabGridImpl, GeneratedBlock>,
 
 impl GeneratedBlock {
     pub fn is_air(&self) -> bool {
+        use world::BlockType;
         self.ty.is_air()
     }
 }

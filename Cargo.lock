@@ -2450,6 +2450,7 @@ dependencies = [
  "strum",
  "tokio",
  "unit",
+ "world",
  "world_types",
 ]
 
@@ -3012,6 +3013,7 @@ dependencies = [
  "hex-serde",
  "inventory",
  "markov",
+ "procgen",
  "rbl_circular_buffer",
  "resources",
  "rlua",
@@ -3754,7 +3756,6 @@ dependencies = [
  "nd_iter",
  "num_cpus",
  "petgraph",
- "procgen",
  "strum",
  "tokio",
  "unit",
@@ -3764,9 +3765,11 @@ dependencies = [
 name = "world_types"
 version = "0.1.0"
 dependencies = [
+ "color",
  "common",
  "strum",
  "unit",
+ "world",
 ]
 
 [[package]]

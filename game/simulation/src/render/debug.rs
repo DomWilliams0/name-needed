@@ -190,7 +190,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
         _: &EcsWorld,
         viewer: &WorldViewer,
     ) {
-        #[cfg(feature = "procgen")]
+        #[cfg(feature = "worldprocgen")]
         let mut seen_regions = SmallVec::<[world::RegionLocation; 4]>::new();
 
         let (from, to) = viewer.chunk_range();
@@ -208,7 +208,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
             );
 
             // collect unique regions
-            #[cfg(feature = "procgen")]
+            #[cfg(feature = "worldprocgen")]
             if let Some(region) = world::RegionLocation::try_from_chunk(slab.chunk) {
                 if !seen_regions.contains(&region) {
                     seen_regions.push(region)
@@ -216,7 +216,7 @@ impl<R: Renderer> DebugRenderer<R> for ChunkBoundariesDebugRenderer {
             }
         }
 
-        #[cfg(feature = "procgen")]
+        #[cfg(feature = "worldprocgen")]
         for region in seen_regions.into_iter() {
             let min = WorldPoint::from(region.chunk_bounds().0.get_block(0));
             let sz = (world::RegionLocation::chunks_per_side() * CHUNK_SIZE.as_usize()) as f32;

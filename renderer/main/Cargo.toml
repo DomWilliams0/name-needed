@@ -26,8 +26,8 @@ argh = "0.1"
 jemallocator = "0.3"
 
 [features]
-default = ["use-sdl", "procgen"]
-procgen = ["engine/procgen"]
+default = ["use-sdl", "worldprocgen"]
+worldprocgen = ["engine/worldprocgen"]
 use-sdl = ["engine/use-sdl"]
 lite = ["engine/lite"]
 metrics = ["engine/metrics"]

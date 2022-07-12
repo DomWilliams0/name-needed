@@ -8,7 +8,7 @@ use crate::ai::{AiAction, AiBlackboard, AiContext, AiTarget};
 use ai::{Considerations, DecisionWeight, Dse, TargetOutput, Targets};
 
 use unit::world::WorldPosition;
-use world::block::BlockType;
+use world_types::BlockType;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BreakBlockDse(pub WorldPosition);

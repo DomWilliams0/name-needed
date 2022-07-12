@@ -352,7 +352,7 @@ mod start {
                 let source = presets::from_preset(&format!("{:?}", preset), &mut *random::get());
                 WorldLoader::new(source, pool)
             }
-            #[cfg(feature = "procgen")]
+            #[cfg(feature = "worldprocgen")]
             config::WorldSource::Generate(file) => {
                 debug!("generating world from config"; "path" => %file.display());
 
@@ -364,7 +364,7 @@ mod start {
                 })?;
                 WorldLoader::new(source, pool)
             }
-            #[cfg(not(feature = "procgen"))]
+            #[cfg(not(feature = "worldprocgen"))]
             config::WorldSource::Generate(_) => {
                 unreachable!("procgen feature disabled")
             }

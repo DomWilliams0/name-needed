@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use serde::Deserialize;
 
-use world::block::BlockType;
+use world_types::BlockType;
 
 use crate::ecs::*;
 use crate::string::StringCache;

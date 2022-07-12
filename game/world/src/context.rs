@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockDurability, BlockOpacity};
-use crate::chunk::slice::SLICE_SIZE;
+pub use crate::chunk::slice::SLICE_SIZE;
 use std::fmt::Debug;
 use std::hash::Hash;
 

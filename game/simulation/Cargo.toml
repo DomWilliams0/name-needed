@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 world = { path = "../world" }
+procgen = { path = "../procgen", default-features = false, features = ["cache"], optional = true } # no binary
 world_types = { path = "../world/world_types" }
 
 unit = { path = "../../shared/unit" }
@@ -44,7 +45,7 @@ rlua = { version = "0.19", optional = true }
 
 [features]
 default = []
-procgen = ["world/procgen"]
+worldprocgen = ["world/worldprocgen", "procgen"]
 metrics = ["ai/logging", "common/metrics"]
 scripting = ["rlua"]
 testing = []

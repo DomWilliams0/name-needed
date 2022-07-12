@@ -1,11 +1,12 @@
 use common::derive_more::*;
 use common::*;
+use world_types::BlockType;
 
 use crate::ecs::{CachedWorldRef, EcsWorld};
 use crate::job::job::{CompletedTasks, SocietyJobImpl};
 use crate::job::{SocietyJobHandle, SocietyTaskResult};
 use crate::society::job::SocietyTask;
-use crate::{BlockType, ComponentWorld, WorldPositionRange};
+use crate::{ComponentWorld, WorldPositionRange};
 
 #[derive(Constructor, Debug)]
 pub struct BreakBlocksJob(WorldPositionRange);

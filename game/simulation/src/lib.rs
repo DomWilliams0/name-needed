@@ -8,13 +8,14 @@
 // Exports from world so the renderer only needs to link against simulation
 pub use world::{
     loader::{
-        AsyncWorkerPool, BlockForAllError, TerrainSourceError, TerrainUpdatesRes, WorldLoader,
-        WorldTerrainUpdate,
+        AsyncWorkerPool, BlockForAllError, TerrainSourceError, WorldLoader, WorldTerrainUpdate,
     },
     presets, BaseVertex, SliceRange,
 };
 
-#[cfg(feature = "procgen")]
+pub use world_types::BlockType;
+
+#[cfg(feature = "worldprocgen")]
 pub use world::loader::{GeneratedTerrainSource, PlanetParams};
 
 // Rexports for specialised world types
@@ -33,7 +34,7 @@ pub use crate::backend::{
 pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
-    Tick, WorldContext,
+    TerrainUpdatesRes, Tick, WorldContext,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent, TransformRenderDescription};
 pub use activity::{
@@ -79,8 +80,6 @@ pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,
 };
-// Exports from world so the renderer only needs to link against simulation
-pub use world::block::BlockType;
 
 pub const TICKS_PER_SECOND: usize = 20;
 

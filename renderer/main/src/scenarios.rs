@@ -299,11 +299,10 @@ mod helpers {
     use simulation::{
         BlockType, ComponentWorld, ConditionComponent, EcsWorld, Entity, EntityLoggingComponent,
         EntityPosition, HungerComponent, InnerWorldRef, PlayerSociety, RenderComponent,
-        SocietyComponent, SocietyHandle, TerrainUpdatesRes, WorldPosition, WorldPositionRange,
-        WorldTerrainUpdate,
+        SocietyComponent, SocietyHandle, WorldPosition, WorldPositionRange, WorldTerrainUpdate,
     };
 
-    use crate::simulation::NameComponent;
+    use crate::simulation::{NameComponent, TerrainUpdatesRes};
 
     pub fn get_config_count(wat: &str) -> usize {
         let counts = &config::get().simulation.spawn_counts;
