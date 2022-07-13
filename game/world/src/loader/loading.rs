@@ -12,7 +12,7 @@ use crate::world::{ContiguousChunkIterator, WorldChangeEvent};
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use crate::loader::{
-    terrain_source, AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch,
+    AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch,
     WorldTerrainUpdate,
 };
 use crate::world::slab_loading::SlabProcessingFuture;
@@ -482,7 +482,7 @@ impl<C: WorldContext> WorldLoader<C> {
     }
 
     #[cfg(feature = "worldprocgen")]
-    pub fn query_block(&self, block: WorldPosition) -> Option<terrain_source::BlockDetails> {
+    pub fn query_block(&self, block: WorldPosition) -> Option<C::GeneratedBlockDetails> {
         let fut = self.source.query_block(block);
         self.pool.runtime().block_on(fut)
     }
@@ -498,13 +498,13 @@ impl<C: WorldContext> WorldLoader<C> {
     /// Nop if any mutexes cannot be taken immediately
     pub fn feature_boundaries_in_range(
         &self,
-        chunks: impl Iterator<Item = ChunkLocation>,
+        chunks: &[ChunkLocation],
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        per_point: impl FnMut(usize, WorldPosition),
+        output: &mut Vec<(usize, WorldPosition)>,
     ) {
         let fut = self
             .source
-            .feature_boundaries_in_range(chunks, z_range, per_point);
+            .feature_boundaries_in_range(chunks, z_range, output);
         let _ = fut.now_or_never();
     }
 

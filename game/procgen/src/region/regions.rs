@@ -752,8 +752,8 @@ impl<const SIZE: usize, const SIZE_2: usize> RegionEntry<SIZE, SIZE_2> {
     /// # Safety
     /// Must be in the Partially or Fully loaded state
     #[allow(clippy::needless_lifetimes)]
-    async unsafe fn region_ref_with_guard<'a>(
-        &self,
+    async unsafe fn region_ref_with_guard<'a, 'b>(
+        &'b self,
         guard: RwLockReadGuard<'a, RegionLoadState<SIZE, SIZE_2>>,
     ) -> LoadedRegionRef<'a, SIZE, SIZE_2> {
         use RegionLoadState::*;

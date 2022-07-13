@@ -2,6 +2,7 @@ use crate::render::DebugRenderer;
 use crate::{EcsWorld, InnerWorldRef, Renderer, ThreadedWorldLoader, WorldViewer};
 use color::Color;
 
+use common::Itertools;
 use std::hash::Hasher;
 use unit::world::WorldPoint;
 
@@ -29,9 +30,13 @@ impl<R: Renderer> DebugRenderer<R> for FeatureBoundaryDebugRenderer {
         let z_range = viewer.terrain_range();
 
         let mut frame = Frame::new(&mut self.cache);
-        loader.feature_boundaries_in_range(chunks, z_range.into(), |feat, point| {
+        let chunk_range = chunks.collect_vec();
+        let mut output = vec![];
+        loader.feature_boundaries_in_range(&chunk_range, z_range.into(), &mut output);
+
+        for (feat, point) in output {
             frame.submit(feat, point);
-        });
+        }
 
         frame.consume(renderer);
     }

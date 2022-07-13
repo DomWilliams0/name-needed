@@ -16,14 +16,14 @@ pub use world::{
 pub use world_types::BlockType;
 
 #[cfg(feature = "worldprocgen")]
-pub use world::loader::{GeneratedTerrainSource, PlanetParams};
+pub use procgen::{Planet, PlanetParams};
 
 // Rexports for specialised world types
-pub type WorldRef = world::WorldRef<simulation::WorldContext>;
-pub type World = world::World<simulation::WorldContext>;
-pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, simulation::WorldContext>;
-pub type WorldViewer = world::WorldViewer<simulation::WorldContext>;
-pub type ThreadedWorldLoader = WorldLoader<simulation::WorldContext>;
+pub type WorldRef = world::WorldRef<crate::WorldContext>;
+pub type World = world::World<crate::WorldContext>;
+pub type InnerWorldRef<'a> = world::InnerWorldRef<'a, crate::WorldContext>;
+pub type WorldViewer = world::WorldViewer<crate::WorldContext>;
+pub type ThreadedWorldLoader = WorldLoader<crate::WorldContext>;
 
 pub use self::ai::AiAction;
 pub use self::simulation::current_tick;
@@ -34,7 +34,7 @@ pub use crate::backend::{
 pub use crate::render::{RenderComponent, Renderer, Shape2d, UiElementComponent};
 pub use crate::simulation::{
     AssociatedBlockData, AssociatedBlockDataType, Simulation, SimulationRef, SimulationRefLite,
-    TerrainUpdatesRes, Tick, WorldContext,
+    TerrainUpdatesRes, Tick,
 };
 pub use crate::transform::{PhysicalComponent, TransformComponent, TransformRenderDescription};
 pub use activity::{
@@ -80,6 +80,9 @@ pub use unit::world::{
     all_slabs_in_range, BlockPosition, ChunkLocation, SlabLocation, WorldPosition,
     WorldPositionRange,
 };
+pub use voxel_world::{WorldContext};
+#[cfg(feature = "worldprocgen")]
+pub use voxel_world::{PlanetTerrainSource};
 
 pub const TICKS_PER_SECOND: usize = 20;
 
@@ -134,4 +137,5 @@ mod species;
 mod steer;
 mod string;
 mod transform;
+mod voxel_world;
 mod world_debug;

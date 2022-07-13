@@ -18,7 +18,7 @@ use crate::region::{generate_loose_subfeatures, Regions};
 use crate::region::{
     ApplyFeatureContext, LoadedRegionRef, PlanetPoint, RegionLocation, SlabContinuation,
 };
-use crate::GeneratedBlock;
+use crate::{ GeneratedBlock};
 
 /// Global (heh) state for a full planet, shared between threads
 #[derive(Clone)]

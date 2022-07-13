@@ -1,6 +1,5 @@
 use std::iter::once;
 
-use common::derive_more::*;
 use unit::world::{
     ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition, WorldPositionRange,
     WorldRange,

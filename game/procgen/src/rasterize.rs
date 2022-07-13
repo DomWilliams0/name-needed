@@ -1,14 +1,14 @@
-use grid::{grid_declare, GridImpl};
+use grid::{grid_declare,};
 use unit::world::{CHUNK_SIZE, SLAB_SIZE};
 use world_types::BlockType;
 
-// TODO custom block types for procgen that are translated to game blocks
 #[derive(Clone, Debug, Copy)]
 pub struct GeneratedBlock {
     pub ty: BlockType,
 }
 
 // redeclaration of slab grid
+// TODO possible to use world::SlabGrid<simulation::WorldContext> directly?
 grid_declare!(pub struct SlabGrid<SlabGridImpl, GeneratedBlock>,
     CHUNK_SIZE.as_usize(),
     CHUNK_SIZE.as_usize(),

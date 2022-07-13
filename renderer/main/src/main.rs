@@ -356,11 +356,14 @@ mod start {
             config::WorldSource::Generate(file) => {
                 debug!("generating world from config"; "path" => %file.display());
 
-                use simulation::{GeneratedTerrainSource, PlanetParams};
+                use simulation::{PlanetParams, PlanetTerrainSource};
                 let params = PlanetParams::load_with_only_file(resources, file.as_os_str());
                 let source = params.and_then(|params| {
-                    pool.runtime()
-                        .block_on(async { GeneratedTerrainSource::new(params).await })
+                    pool.runtime().block_on(async {
+                        let mut planet = simulation::Planet::new(params)?;
+                        planet.initial_generation().await?;
+                        Ok(PlanetTerrainSource(planet))
+                    })
                 })?;
                 WorldLoader::new(source, pool)
             }

@@ -29,7 +29,7 @@ impl PerFrameStrings {
 macro_rules! ui_str {
     ( in $ctx:expr, $fmt:expr, $($args:expr),* ) => {{
         use core::fmt::Write;
-        let bump = $ctx.strings().arena();
+        let bump = $ctx.arena();
         let mut s = ::common::bumpalo::collections::String::new_in(bump);
         let _ = write!(&mut s, $fmt, $($args),*);
         // safety: s is utf8 from string literal

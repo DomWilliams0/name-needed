@@ -923,7 +923,7 @@ impl SelectionWindow {
             (Some(t), _) => t,
         };
 
-        let (primary_biome, _) = details.biome_choices.iter().next().expect("missing biome");
+        let primary_biome = details.biome_choices.primary().ty();
 
         context.key_value(
             "Biome:",
@@ -932,9 +932,10 @@ impl SelectionWindow {
             COLOR_GREEN,
         );
 
-        context.text(ui_str!(in context, "{} biome candidates", details.biome_choices.len()));
-        for (biome, weight) in details.biome_choices.iter() {
-            context.text(ui_str!(in context, "   {:?} ({})", biome, weight));
+        let candidates = BumpVec::from_iter_in(details.biome_choices.choices(), context.arena());
+        context.text(ui_str!(in context, "{} biome candidates", candidates.len()));
+        for (biome, weight) in candidates.iter() {
+            context.text(ui_str!(in context, "   {:?} ({})", biome.ty(), weight.value()));
         }
 
         context.key_value(

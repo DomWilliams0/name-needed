@@ -3,19 +3,16 @@ use std::sync::Arc;
 
 use common::parking_lot::RwLock;
 use common::*;
-#[cfg(feature = "worldprocgen")]
-pub use generate::GeneratedTerrainSource;
 pub use memory::MemoryTerrainSource;
 use unit::world::{
-    ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
+    ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
 };
 
 use crate::chunk::slab::Slab;
+use crate::context::GeneratedTerrainSource;
 use crate::loader::WorldTerrainUpdate;
 use crate::WorldContext;
 
-#[cfg(feature = "worldprocgen")]
-mod generate;
 mod memory;
 
 #[derive(Debug, Error)]
@@ -47,22 +44,11 @@ pub enum TerrainSourceError {
 pub enum TerrainSource<C: WorldContext> {
     Memory(Arc<RwLock<MemoryTerrainSource<C>>>),
     #[cfg(feature = "worldprocgen")]
-    Generated(GeneratedTerrainSource),
+    Generated(C::GeneratedTerrainSource),
 }
 
 unsafe impl<C: WorldContext> Send for TerrainSource<C> {}
 unsafe impl<C: WorldContext> Sync for TerrainSource<C> {}
-
-#[cfg(feature = "worldprocgen")]
-pub struct BlockDetails {
-    pub biome_choices: SmallVec<[(procgen::BiomeType, f32); 4]>,
-    pub coastal_proximity: f64,
-    pub base_elevation: f64,
-    pub moisture: f64,
-    pub temperature: f64,
-    /// (region location, dirty string representation of features affecting this block)
-    pub region: Option<(procgen::RegionLocation, SmallVec<[String; 4]>)>,
-}
 
 pub struct GeneratedSlab<C: WorldContext> {
     pub terrain: Slab<C>,
@@ -75,19 +61,12 @@ impl<C: WorldContext> From<MemoryTerrainSource<C>> for TerrainSource<C> {
     }
 }
 
-#[cfg(feature = "worldprocgen")]
-impl<C: WorldContext> From<GeneratedTerrainSource> for TerrainSource<C> {
-    fn from(src: GeneratedTerrainSource) -> Self {
-        Self::Generated(src)
-    }
-}
-
 impl<C: WorldContext> TerrainSource<C> {
     pub async fn prepare_for_chunks(&self, range: (ChunkLocation, ChunkLocation)) {
         match self {
             TerrainSource::Memory(_) => {}
             #[cfg(feature = "worldprocgen")]
-            TerrainSource::Generated(src) => src.planet().prepare_for_chunks(range).await,
+            TerrainSource::Generated(src) => src.prepare_for_chunks(range).await,
         }
     }
 
@@ -101,7 +80,12 @@ impl<C: WorldContext> TerrainSource<C> {
                 .get_slab_copy(slab)
                 .map(GeneratedSlab::with_terrain),
             #[cfg(feature = "worldprocgen")]
-            TerrainSource::Generated(src) => src.load_slab(slab).await,
+            TerrainSource::Generated(src) => {
+                // TODO handle wrapping of slabs around planet boundaries
+                src.generate_slab(slab)
+                    .await
+                    .ok_or(TerrainSourceError::SlabOutOfBounds(slab))
+            }
         }
     }
 
@@ -114,49 +98,31 @@ impl<C: WorldContext> TerrainSource<C> {
             TerrainSource::Memory(src) => src.read().get_ground_level(block),
             #[cfg(feature = "worldprocgen")]
             TerrainSource::Generated(src) => src
-                .get_ground_level(block)
+                .find_ground_level(block)
                 .await
                 .ok_or(TerrainSourceError::BlockOutOfBounds(block)),
         }
     }
 
     #[cfg(feature = "worldprocgen")]
-    pub async fn query_block(&self, block: WorldPosition) -> Option<BlockDetails> {
+    pub async fn query_block(&self, block: WorldPosition) -> Option<C::GeneratedBlockDetails> {
         match self {
             TerrainSource::Memory(_) => None,
-            TerrainSource::Generated(src) => {
-                src.planet()
-                    .query_block(block)
-                    .await
-                    .map(|result| BlockDetails {
-                        biome_choices: result
-                            .biome_choices
-                            .choices()
-                            .map(|(b, w)| (b.ty(), w.value()))
-                            .collect(),
-                        coastal_proximity: result.coastal_proximity,
-                        base_elevation: result.base_elevation,
-                        moisture: result.moisture,
-                        temperature: result.temperature,
-                        region: result.region,
-                    })
-            }
+            TerrainSource::Generated(src) => src.query_block(block).await,
         }
     }
 
     pub async fn feature_boundaries_in_range(
         &self,
-        chunks: impl Iterator<Item = ChunkLocation>,
+        chunks: &[ChunkLocation],
         z_range: (GlobalSliceIndex, GlobalSliceIndex),
-        per_point: impl FnMut(usize, WorldPosition),
+        output: &mut Vec<(usize, WorldPosition)>,
     ) {
         match self {
             TerrainSource::Memory(_) => {}
             #[cfg(feature = "worldprocgen")]
-            TerrainSource::Generated(planet) => {
-                planet
-                    .planet()
-                    .feature_boundaries_in_range(chunks, z_range, per_point)
+            TerrainSource::Generated(src) => {
+                src.feature_boundaries_in_range(chunks, z_range, output)
                     .await
             }
         }
@@ -166,16 +132,9 @@ impl<C: WorldContext> TerrainSource<C> {
         match self {
             TerrainSource::Memory(_) => {}
             #[cfg(feature = "worldprocgen")]
-            TerrainSource::Generated(planet) => {
+            TerrainSource::Generated(src) => {
                 let len_before = out.len();
-                planet
-                    .planet()
-                    .steal_world_updates(|updates| {
-                        out.extend(updates.map(|(pos, block)| {
-                            WorldTerrainUpdate::new(WorldPositionRange::with_single(pos), block.ty)
-                        }));
-                    })
-                    .await;
+                src.steal_queued_block_updates(out).await;
                 let n = out.len() - len_before;
                 if n > 0 {
                     debug!(

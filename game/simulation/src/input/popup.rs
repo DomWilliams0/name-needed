@@ -574,7 +574,7 @@ mod content {
 
     impl fmt::Display for Button {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt::Display::fmt(self.ty.as_ref().take().expect("reusing consumed button"), f)
+            fmt::Display::fmt(self.ty.as_ref().expect("reusing consumed button"), f)
         }
     }
 

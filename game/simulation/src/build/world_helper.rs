@@ -11,7 +11,7 @@ use crate::event::DeathReason;
 use crate::job::{BuildDetails, BuildThingJob, SocietyJobHandle};
 use crate::render::UiElementComponent;
 use crate::simulation::TerrainUpdatesRes;
-use crate::{QueuedUpdates, SocietyComponent, TransformComponent, WorldContext};
+use crate::{QueuedUpdates, SocietyComponent, TransformComponent,};
 
 #[derive(common::derive_more::Deref, common::derive_more::DerefMut)]
 pub struct EcsExtBuild<'w>(&'w EcsWorld);

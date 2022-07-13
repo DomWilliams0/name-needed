@@ -3748,6 +3748,7 @@ dependencies = [
 name = "world"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "color",
  "common",
  "criterion",

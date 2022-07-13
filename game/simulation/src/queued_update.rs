@@ -10,7 +10,7 @@ use world_types::BlockType;
 
 use crate::ecs::EcsWorld;
 use crate::simulation::TerrainUpdatesRes;
-use crate::{ComponentWorld, WorldContext};
+use crate::{ComponentWorld};
 
 pub type QueuedUpdates = RawQueuedUpdates<naive::NaiveImpl>;
 

@@ -5,13 +5,16 @@ pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{
     BaseTerrain, BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone,
-    OcclusionChunkUpdate,
+    OcclusionChunkUpdate, Slab, SlabType,
 };
-pub use self::context::{BlockType, GeneratedEntityDesc, WorldContext, SLICE_SIZE};
+pub use self::context::{
+    BlockType, GeneratedTerrainSource, WorldContext, NopGeneratedTerrainSource,
+    SLICE_SIZE,
+};
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};
 pub use self::viewer::{SliceRange, WorldViewer};
-pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
+pub use self::world::{ExplorationFilter, ExplorationResult, World, WorldChangeEvent, helpers};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 
 pub mod block;

@@ -22,9 +22,9 @@ mod climate;
 #[cfg(feature = "cache")]
 mod cache;
 
-pub use biome::BiomeType;
+pub use biome::{BiomeType, BlockQueryResult};
 pub use params::{PlanetParams, PlanetParamsRef};
-pub use planet::Planet;
+pub use planet::{Planet};
 pub use rasterize::{GeneratedBlock, SlabGrid};
 pub use region::RegionLocation;
 

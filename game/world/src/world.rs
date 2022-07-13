@@ -1218,9 +1218,9 @@ pub mod helpers {
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
     use crate::chunk::slice::SLICE_SIZE;
-    use crate::context::GeneratedEntityDesc;
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::{BlockType, Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
+    use crate::context::NopGeneratedTerrainSource;
 
     pub struct DummyWorldContext;
 
@@ -1234,11 +1234,11 @@ pub mod helpers {
         LightGrass,
     }
 
-    impl GeneratedEntityDesc for () {}
-
     impl WorldContext for DummyWorldContext {
         type AssociatedBlockData = ();
         type BlockType = DummyBlockType;
+        type GeneratedTerrainSource = NopGeneratedTerrainSource<Self>;
+        type GeneratedBlockDetails = ();
         type GeneratedEntityDesc = ();
 
         fn air_slice() -> &'static [Block<Self>; SLICE_SIZE] {

@@ -82,12 +82,12 @@ impl<C: WorldContext> Slab<C> {
         Self(arc, ty)
     }
 
-    pub fn from_other_grid<I, G>(other: Grid<G>, ty: SlabType) -> Self
+    pub fn from_other_grid<G, T>(other: Grid<G>, ty: SlabType, conv: T) -> Self
     where
-        for<'a> &'a I: Into<<SlabGridImpl<C> as GridImpl>::Item>,
-        G: GridImpl<Item = I>,
+        G: GridImpl,
+        T: Fn(&G::Item) -> <SlabGridImpl<C> as GridImpl>::Item,
     {
-        let new_vals = other.array().iter().map(|item| item.into());
+        let new_vals = other.array().iter().map(conv);
         let terrain = SlabGridImpl::from_iter(new_vals);
         let arc = Arc::from(terrain);
         Self(arc, ty)

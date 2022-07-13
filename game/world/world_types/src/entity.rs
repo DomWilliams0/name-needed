@@ -16,4 +16,3 @@ pub struct PlantDescription {
 
 // TODO tree entity: list of blocks for trunk/roots/leaves, age, height, species
 
-impl world::GeneratedEntityDesc for EntityDescription {}

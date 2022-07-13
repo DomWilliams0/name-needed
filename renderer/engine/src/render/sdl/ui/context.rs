@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use std::ops::Deref;
 
+use common::bumpalo::Bump;
 use imgui::{TabBarFlags, TabBarToken, TabItemToken, TreeNode, TreeNodeToken};
 
 use simulation::input::{UiCommand, UiCommands, UiRequest, UiResponse};
@@ -62,8 +63,8 @@ impl<'a> UiContext<'a> {
         self.ui
     }
 
-    pub fn strings(&self) -> &PerFrameStrings {
-        self.strings
+    pub const fn arena(&self) -> &Bump {
+        self.strings.arena()
     }
 
     pub fn perf(&self) -> &PerfAvg {
