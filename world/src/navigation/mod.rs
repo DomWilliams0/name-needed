@@ -1,7 +1,8 @@
 pub use area_navigation::{AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPathError};
 pub use block_navigation::{BlockGraph, BlockGraphSearchContext, BlockPathError};
-use misc::*;
 pub use cost::EdgeCost;
+use misc::*;
+use std::fmt::{Debug, Formatter};
 
 pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
@@ -104,7 +105,7 @@ impl From<WorldArea> for Vector3 {
     }
 }
 impl Debug for WorldArea {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "WorldArea(chunk={:?}, slab={:?}, area={:?})",

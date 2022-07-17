@@ -1,14 +1,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+pub use memory::MemoryTerrainSource;
 use misc::parking_lot::RwLock;
 use misc::*;
-pub use memory::MemoryTerrainSource;
-use unit::world::{
-    ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
-};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::Slab;
+#[cfg(feature = "worldprocgen")]
 use crate::context::GeneratedTerrainSource;
 use crate::loader::WorldTerrainUpdate;
 use crate::WorldContext;

@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::Add;
 
 use misc::derive_more::*;
@@ -44,13 +45,13 @@ impl WorldPosition {
 }
 
 impl Display for WorldPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.0, self.1, self.2.slice())
     }
 }
 
 impl Debug for WorldPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }

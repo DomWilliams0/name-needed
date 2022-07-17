@@ -1,4 +1,4 @@
-# TODOs (92)
+# TODOs (91)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -32,8 +32,6 @@
  * [unit/src/dim.rs](unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
- * [unit/src/food.rs](unit/src/food.rs) (1)
-   * `// TODO casting to floats leads to loss of precision when large`
  * [unit/src/world/slab_position.rs](unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [unit/src/world/slice_index.rs](unit/src/world/slice_index.rs) (1)

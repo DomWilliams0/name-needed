@@ -1,9 +1,8 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use derive_more::Deref;
 use num_traits::{clamp, clamp_max, AsPrimitive, NumCast, Saturating, Unsigned};
-
-use crate::*;
 
 #[derive(Copy, Clone)]
 pub struct Proportion<T> {
@@ -135,13 +134,13 @@ impl Sub<NormalizedFloat> for NormalizedFloat {
 }
 
 impl<T: Debug> Debug for Proportion<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Proportion({:?}/{:?})", self.value, self.max)
     }
 }
 
 impl<T: Display> Display for Proportion<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}/{}", self.value, self.max)
     }
 }

@@ -14,7 +14,6 @@ grid = { path = "../grid" }
 
 petgraph = "0.6"
 nd_iter = "0.0"
-strum = { version = "0.19", features = ["derive"] }
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 tokio = { version = "1.0", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"] }
 async-trait = "0.1"

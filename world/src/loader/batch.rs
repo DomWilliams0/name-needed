@@ -1,6 +1,7 @@
 use misc::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
 type BatchId = u16;
 type BatchSize = u16;
@@ -135,7 +136,7 @@ impl<U> Default for UpdateBatcher<U> {
 }
 
 impl Debug for UpdateBatch {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "UpdateBatch(id={}, {}/{})",

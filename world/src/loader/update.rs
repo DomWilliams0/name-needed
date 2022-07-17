@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::iter::once;
 
 use unit::world::{
@@ -7,7 +8,7 @@ use unit::world::{
 
 use crate::loader::update::split::split_range_across_slabs;
 use crate::WorldContext;
-use misc::{Derivative, Hash};
+use misc::Derivative;
 
 // TODO include reason for terrain update? (god magic, explosion, tool, etc)
 

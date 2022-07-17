@@ -1,4 +1,4 @@
-use misc::*;
+use std::fmt::{Debug, Formatter};
 use std::i32;
 
 use crate::chunk::slab::DeepClone;
@@ -154,7 +154,7 @@ impl<T> DoubleSidedVec<T> {
 }
 
 impl<T: Debug> Debug for DoubleSidedVec<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "DoubleSidedVec({} items, ", self.len())?;
         f.debug_list().entries(self.iter_increasing()).finish()?;
         write!(f, ")")

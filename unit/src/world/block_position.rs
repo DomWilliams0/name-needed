@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt::{Debug, Display, Formatter};
 
 use misc::derive_more::*;
 use misc::*;
@@ -93,7 +94,7 @@ impl BlockPosition {
 }
 
 impl Display for BlockPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "BlockPosition({}, {}, {})",
@@ -105,7 +106,7 @@ impl Display for BlockPosition {
 }
 
 impl Debug for BlockPosition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }

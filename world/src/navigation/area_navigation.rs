@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::iter::once;
 
 use petgraph::graph::EdgeIndex;
@@ -342,7 +343,7 @@ impl AreaGraph {
 }
 
 impl Debug for AreaNavEdge {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "AreaNavEdge(direction={:?}, {:?}, exit={}, width={})",

@@ -1,5 +1,7 @@
 use misc::derive_more::*;
 use misc::*;
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
@@ -188,13 +190,13 @@ impl From<SliceIndex<Chunk>> for SlabIndex {
 }
 
 impl Debug for SliceIndex<Chunk> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("GlobalSliceIndex").field(&self.0).finish()
     }
 }
 
 impl Debug for SliceIndex<Slab> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("LocalSliceIndex").field(&self.0).finish()
     }
 }

@@ -1,5 +1,6 @@
 use color::Color;
 use misc::*;
+use std::fmt::Debug;
 
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::unflatten_index;

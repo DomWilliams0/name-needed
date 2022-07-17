@@ -13,6 +13,7 @@ use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldContext};
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::iter::once;
 
 pub type ChunkId = u64;
 

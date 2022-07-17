@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Sub};
 
-use misc::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
+use misc::{NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
@@ -277,13 +277,13 @@ impl Add<(f32, f32, f32)> for WorldPoint {
 }
 
 impl Display for WorldPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({:.2}, {:.2}, {:.2})", self.0, self.1, self.2)
     }
 }
 
 impl Debug for WorldPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }
 }

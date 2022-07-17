@@ -3,6 +3,7 @@ use misc::*;
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
 use unit::world::{
     all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
@@ -89,7 +90,7 @@ impl SliceRange {
 }
 
 impl Display for SliceRange {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{} => {}]", self.0.slice(), self.1.slice())
     }
 }

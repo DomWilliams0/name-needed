@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-use misc::*;
 use futures::channel::mpsc as async_channel;
+use misc::*;
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
@@ -12,8 +12,7 @@ use crate::world::{ContiguousChunkIterator, WorldChangeEvent};
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
 use crate::loader::{
-    AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch,
-    WorldTerrainUpdate,
+    AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::FutureExt;

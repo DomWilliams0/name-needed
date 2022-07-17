@@ -2,11 +2,11 @@ use crate::block::{Block, BlockDurability, BlockOpacity};
 pub use crate::chunk::slice::SLICE_SIZE;
 use crate::loader::{GeneratedSlab, WorldTerrainUpdate};
 use async_trait::async_trait;
+use misc::Derivative;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use misc::Derivative;
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 pub trait WorldContext: 'static + Send + Sync + Sized {
@@ -14,8 +14,8 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
     type BlockType: BlockType;
 
     type GeneratedTerrainSource: GeneratedTerrainSource<Self> + Send + Sync;
-    type GeneratedBlockDetails:  Send + Sync;
-    type GeneratedEntityDesc:  Send + Sync;
+    type GeneratedBlockDetails: Send + Sync;
+    type GeneratedEntityDesc: Send + Sync;
 
     fn air_slice() -> &'static [Block<Self>; SLICE_SIZE];
 
@@ -25,7 +25,7 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
 
 /// Panics in all methods
 #[derive(Derivative)]
-#[derivative(Clone(bound=""))]
+#[derivative(Clone(bound = ""))]
 pub struct NopGeneratedTerrainSource<C: WorldContext>(PhantomData<C>);
 
 pub trait BlockType: Copy + Debug + Eq + Hash + Sync + Send {
@@ -62,7 +62,7 @@ pub trait GeneratedTerrainSource<C: WorldContext>: Clone {
 
 // lol
 #[async_trait]
-impl <C: WorldContext>GeneratedTerrainSource<C> for NopGeneratedTerrainSource<C> {
+impl<C: WorldContext> GeneratedTerrainSource<C> for NopGeneratedTerrainSource<C> {
     async fn prepare_for_chunks(&self, _: (ChunkLocation, ChunkLocation)) {
         unreachable!()
     }
@@ -71,7 +71,12 @@ impl <C: WorldContext>GeneratedTerrainSource<C> for NopGeneratedTerrainSource<C>
         unreachable!()
     }
 
-    async fn feature_boundaries_in_range(&self, _: &[ChunkLocation], _: (GlobalSliceIndex, GlobalSliceIndex), _: &mut Vec<(usize, WorldPosition)>) {
+    async fn feature_boundaries_in_range(
+        &self,
+        _: &[ChunkLocation],
+        _: (GlobalSliceIndex, GlobalSliceIndex),
+        _: &mut Vec<(usize, WorldPosition)>,
+    ) {
         unreachable!()
     }
 

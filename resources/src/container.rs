@@ -1,7 +1,8 @@
 use crate::error::{ResourceError, ResourceErrorKind};
-use misc::*;
 use memmap::Mmap;
+use misc::*;
 use std::ffi::OsStr;
+use std::fmt::{Debug, Display, Formatter};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;

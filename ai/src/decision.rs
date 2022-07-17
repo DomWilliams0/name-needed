@@ -1,5 +1,6 @@
 use std::any::{Any, TypeId};
-use std::hash::Hasher;
+use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 
 use misc::bumpalo::Bump;
 use misc::*;
@@ -65,7 +66,7 @@ pub trait Dse<C: Context>: DseExt<C> {
 }
 
 impl<'a, C: Context> Debug for dyn Dse<C> + 'a {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let alloc = Bump::new();
         let mut considerations = Considerations::new(&alloc);
         self.considerations(&mut considerations);

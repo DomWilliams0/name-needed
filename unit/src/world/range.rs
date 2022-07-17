@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
 
-use misc::num_traits::*;
-use misc::Itertools;
+use misc::num_traits::{AsPrimitive, Num, One, Zero};
+use misc::*;
 
 use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,

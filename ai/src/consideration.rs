@@ -1,6 +1,6 @@
 use misc::bumpalo::Bump;
 use misc::*;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::fmt::{Debug, Formatter};
 
 use crate::context::pretty_type_name;
 use crate::intelligence::InputCache;
@@ -98,7 +98,7 @@ impl Curve {
 }
 
 impl<'a, C: Context> Debug for Considerations<'a, C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_list()
             .entries(self.vec.iter().map(|c| c.name()))
             .finish()

@@ -1,5 +1,5 @@
 use misc::derive_more::{Deref, DerefMut};
-use misc::*;
+use std::fmt::{Debug, Formatter};
 
 use crate::block::BlockOpacity;
 use crate::chunk::slice::Slice;
@@ -82,7 +82,7 @@ impl NeighbourOpacity {
 }
 
 impl Debug for NeighbourOpacity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let solids = self
             .0
             .iter()

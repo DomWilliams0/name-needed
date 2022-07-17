@@ -3,6 +3,7 @@ use misc::*;
 
 use crate::world::{GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE};
 use std::convert::From;
+use std::fmt::{Debug, Formatter};
 use std::ops::{Add, Sub};
 
 /// Location of a chunk in the world
@@ -88,7 +89,7 @@ impl Add<(i16, i16)> for ChunkLocation {
 }
 
 impl Debug for ChunkLocation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}, {}]", self.0, self.1)
     }
 }

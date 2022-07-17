@@ -1,4 +1,3 @@
-use misc::cgmath::num_traits::clamp;
 use misc::{NormalizedFloat, Rng, RngCore};
 use std::convert::TryFrom;
 use std::ops::Mul;
@@ -24,7 +23,7 @@ impl Color {
     /// Clamps inputs to 0-1
     pub fn rgba_f(r: f32, g: f32, b: f32, a: f32) -> Self {
         let clamp = |f: f32| {
-            let val = clamp(f, 0.0, 1.0);
+            let val = f.clamp(0.0, 1.0);
             (val * 255.0).round() as u8
         };
 

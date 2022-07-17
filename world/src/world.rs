@@ -666,17 +666,16 @@ impl<C: WorldContext> World<C> {
         choice: RandomWalkableBlock,
         mut extra_filter: impl FnMut(WorldPosition) -> bool,
         max_attempts: usize,
+        random: &mut dyn RngCore,
     ) -> Option<WorldPosition> {
-        let mut rand = random::get();
-
         (0..max_attempts).find_map(|_| {
             let candidate = match choice {
                 RandomWalkableBlock::Global => {
                     // choose from all global chunks
-                    let chunk = self.all_chunks().choose(&mut *rand).unwrap(); // never empty
+                    let chunk = self.all_chunks().choose(random).unwrap(); // never empty
 
-                    let x = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
-                    let y = rand.gen_range(0, CHUNK_SIZE.as_block_coord());
+                    let x = random.gen_range(0, CHUNK_SIZE.as_block_coord());
+                    let y = random.gen_range(0, CHUNK_SIZE.as_block_coord());
                     chunk
                         .raw_terrain()
                         .find_accessible_block(SliceBlock::new_unchecked(x, y), None, None)
@@ -685,8 +684,8 @@ impl<C: WorldContext> World<C> {
 
                 RandomWalkableBlock::Local { from, radius } => {
                     let radius = radius as i32;
-                    let dx = rand.gen_range(-radius, radius);
-                    let dy = rand.gen_range(-radius, radius);
+                    let dx = random.gen_range(-radius, radius);
+                    let dy = random.gen_range(-radius, radius);
 
                     let candidate = from + (dx, dy, 0);
                     self.find_chunk_with_pos(candidate.into())
@@ -704,11 +703,16 @@ impl<C: WorldContext> World<C> {
         })
     }
 
-    pub fn choose_random_walkable_block(&self, max_attempts: usize) -> Option<WorldPosition> {
+    pub fn choose_random_walkable_block(
+        &self,
+        max_attempts: usize,
+        random: &mut dyn RngCore,
+    ) -> Option<WorldPosition> {
         self.choose_random_walkable_block_filtered(
             RandomWalkableBlock::Global,
             |_| true,
             max_attempts,
+            random,
         )
     }
 
@@ -717,6 +721,7 @@ impl<C: WorldContext> World<C> {
         accessible_from: WorldPosition,
         radius: u16,
         max_attempts: usize,
+        random: &mut dyn RngCore,
     ) -> Option<WorldPosition> {
         let src_area = self.area(accessible_from).ok()?;
 
@@ -732,6 +737,7 @@ impl<C: WorldContext> World<C> {
                     .unwrap_or(false)
             },
             max_attempts,
+            random,
         )
     }
 
@@ -887,6 +893,7 @@ impl LoadNotifier {
 
 pub mod slab_loading {
     use std::hint::unreachable_unchecked;
+    use std::marker::PhantomData;
 
     use futures::task::{Context, Poll};
     use futures::Future;
@@ -1218,9 +1225,9 @@ pub mod helpers {
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
     use crate::chunk::slice::SLICE_SIZE;
+    use crate::context::NopGeneratedTerrainSource;
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::{BlockType, Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
-    use crate::context::NopGeneratedTerrainSource;
 
     pub struct DummyWorldContext;
 
@@ -1365,7 +1372,7 @@ mod tests {
     use std::convert::TryFrom;
     use std::time::Duration;
 
-    use misc::{logging, seeded_rng, thread_rng, Itertools, Rng};
+    use misc::{logging, thread_rng, Itertools, Rng, SeedableRng, StdRng};
     use unit::world::{all_slabs_in_range, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
@@ -1804,13 +1811,13 @@ mod tests {
 
         let world = loader.world();
 
-        let mut randy = seeded_rng(None);
+        let mut randy = StdRng::from_entropy();
         for i in 0..UPDATE_SETS {
             let updates = (0..UPDATE_REPS)
                 .map(|_| {
                     let w = world.borrow();
                     let pos = w
-                        .choose_random_walkable_block(1000)
+                        .choose_random_walkable_block(1000, &mut randy)
                         .expect("ran out of walkable blocks");
                     let blocktype = if randy.gen_bool(0.5) {
                         DummyBlockType::Stone

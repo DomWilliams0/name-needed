@@ -1,6 +1,7 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::hint::unreachable_unchecked;
+use std::iter::empty;
 
 use misc::bumpalo::Bump;
 use misc::*;
@@ -755,9 +756,9 @@ mod realisation {
 
 #[cfg(test)]
 mod tests {
-    use std::iter::empty;
+    use std::iter::{empty, once};
 
-    use misc::{bumpalo, once, Itertools, OrderedFloat};
+    use misc::{bumpalo, Itertools, OrderedFloat};
 
     use crate::consideration::Considerations;
     use crate::decision::WeightedDse;

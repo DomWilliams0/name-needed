@@ -1,4 +1,5 @@
 use misc::{derive_more::*, *};
+use std::fmt::{Display, Formatter};
 
 /// Rough measurement of both mass and volume. 1 ~= 1 apple, i.e. ~100 grams
 #[derive(
@@ -19,7 +20,7 @@ use misc::{derive_more::*, *};
 pub struct Volume(u16);
 
 impl Display for Volume {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)
     }
 }

@@ -2,7 +2,6 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use serde::{Deserialize, Serialize};
 
-use misc::cgmath::num_traits::clamp;
 use misc::{ArrayVec, Boolinator, Itertools};
 
 // TODO use same CoordType for DynamicGrid
@@ -65,7 +64,7 @@ impl<T: Default> DynamicGrid<T> {
         }
 
         // clamp, dont wrap z
-        *z0 = clamp(*z0, 0, z1 - 1);
+        *z0 = (*z0).clamp(0, z1 - 1);
 
         let new_coord = [*x0 as usize, *y0 as usize, *z0 as usize];
         debug_assert!(

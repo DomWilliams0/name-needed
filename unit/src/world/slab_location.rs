@@ -1,6 +1,7 @@
 use crate::world::{ChunkLocation, SlabIndex};
 use misc::derive_more::{From, Into};
 use misc::*;
+use std::fmt::{Debug, Display, Formatter};
 
 /// A slab in the world
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]
