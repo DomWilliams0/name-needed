@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Mul, SubAssign};
 
-use common::num_traits::*;
-use common::Itertools;
+use misc::num_traits::*;
+use misc::Itertools;
 
 use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
@@ -342,7 +342,7 @@ impl WorldRange<WorldPosition> {
 mod tests {
     use std::collections::HashSet;
 
-    use common::{ApproxEq, Itertools};
+    use misc::{ApproxEq, Itertools};
 
     use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
 

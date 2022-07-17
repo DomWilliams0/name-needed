@@ -1,5 +1,5 @@
 [package]
-name = "common"
+name = "misc"
 version = "0.1.0"
 authors = ["Dom Williams <me@domwillia.ms>"]
 edition = "2021"

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::*;
+use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::Slab;

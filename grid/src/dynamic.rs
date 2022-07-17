@@ -2,8 +2,8 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use serde::{Deserialize, Serialize};
 
-use common::cgmath::num_traits::clamp;
-use common::{ArrayVec, Boolinator, Itertools};
+use misc::cgmath::num_traits::clamp;
+use misc::{ArrayVec, Boolinator, Itertools};
 
 // TODO use same CoordType for DynamicGrid
 #[derive(Serialize, Deserialize)]

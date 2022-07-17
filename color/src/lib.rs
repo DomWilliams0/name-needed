@@ -1,5 +1,5 @@
-use common::cgmath::num_traits::clamp;
-use common::{NormalizedFloat, Rng, RngCore};
+use misc::cgmath::num_traits::clamp;
+use misc::{NormalizedFloat, Rng, RngCore};
 use std::convert::TryFrom;
 use std::ops::Mul;
 
@@ -171,7 +171,7 @@ mod tests {
     #![allow(clippy::many_single_char_names)]
 
     use super::*;
-    use common::{thread_rng, Itertools};
+    use misc::{thread_rng, Itertools};
 
     #[test]
     fn try_convert_from_slice() {

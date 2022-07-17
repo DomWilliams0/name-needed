@@ -7,7 +7,7 @@ use unit::world::{
 
 use crate::loader::update::split::split_range_across_slabs;
 use crate::WorldContext;
-use common::{Derivative, Hash};
+use misc::{Derivative, Hash};
 
 // TODO include reason for terrain update? (god magic, explosion, tool, etc)
 
@@ -80,7 +80,7 @@ impl<C: WorldContext> WorldTerrainUpdate<C> {
 mod split {
     use std::iter::once;
 
-    use common::*;
+    use misc::*;
     use unit::world::CHUNK_SIZE;
     use unit::world::{
         ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition, WorldPositionRange,
@@ -179,7 +179,7 @@ mod split {
 
     #[cfg(test)]
     mod tests {
-        use common::*;
+        use misc::*;
         use unit::world::{ChunkLocation, SlabIndex, WorldPositionRange, WorldRange, SLAB_SIZE};
         use unit::world::{SlabPosition, CHUNK_SIZE};
 

@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
-use common::*;
+use misc::*;
 use unit::world::WorldPositionRange;
 use unit::world::CHUNK_SIZE;
 use world::block::BlockType;
@@ -29,7 +29,7 @@ fn small_world_chunks(sz: i32) -> Vec<ChunkDescriptor> {
 }
 
 fn tall_world_chunks(height_radius: i32) -> Vec<ChunkDescriptor> {
-    let mut rng = common::seeded_rng(Some(1238273873));
+    let mut rng = misc::seeded_rng(Some(1238273873));
     vec![ChunkBuilder::new()
         .fill_range(
             (0, 0, -height_radius),

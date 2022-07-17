@@ -1,6 +1,6 @@
 use crate::world::{ChunkLocation, SlabIndex};
-use common::derive_more::{From, Into};
-use common::*;
+use misc::derive_more::{From, Into};
+use misc::*;
 
 /// A slab in the world
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]

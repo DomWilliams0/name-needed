@@ -36,7 +36,7 @@ dependencies = [
 name = "ai"
 version = "0.1.0"
 dependencies = [
- "common",
+ "misc",
  "serde",
 ]
 
@@ -45,7 +45,7 @@ name = "ai-curve-vis"
 version = "0.1.0"
 dependencies = [
  "ai",
- "common",
+ "misc",
  "plotters",
  "ron",
 ]
@@ -242,7 +242,7 @@ dependencies = [
 name = "color"
 version = "0.1.0"
 dependencies = [
- "common",
+ "misc",
 ]
 
 [[package]]
@@ -250,35 +250,6 @@ name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
-
-[[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "backtrace",
- "boolinator",
- "bumpalo",
- "cgmath",
- "derivative",
- "derive_more",
- "displaydoc",
- "float-cmp",
- "itertools",
- "lazy_static",
- "logging",
- "num-derive",
- "num-traits",
- "ordered-float",
- "parking_lot",
- "parse-display",
- "rand",
- "rstar",
- "smallvec",
- "tap",
- "thiserror",
- "tracy-client",
-]
 
 [[package]]
 name = "convert_case"
@@ -773,8 +744,8 @@ checksum = "78cc372d058dcf6d5ecd98510e7fbc9e5aec4d21de70f65fea8fecebcd881bd4"
 name = "grid"
 version = "0.1.0"
 dependencies = [
- "common",
  "derive_more",
+ "misc",
  "serde",
 ]
 
@@ -974,6 +945,35 @@ checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
 dependencies = [
  "adler",
  "autocfg",
+]
+
+[[package]]
+name = "misc"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "backtrace",
+ "boolinator",
+ "bumpalo",
+ "cgmath",
+ "derivative",
+ "derive_more",
+ "displaydoc",
+ "float-cmp",
+ "itertools",
+ "lazy_static",
+ "logging",
+ "num-derive",
+ "num-traits",
+ "ordered-float",
+ "parking_lot",
+ "parse-display",
+ "rand",
+ "rstar",
+ "smallvec",
+ "tap",
+ "thiserror",
+ "tracy-client",
 ]
 
 [[package]]
@@ -1404,8 +1404,8 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 name = "resources"
 version = "0.1.0"
 dependencies = [
- "common",
  "memmap",
+ "misc",
  "walkdir",
 ]
 
@@ -1847,8 +1847,8 @@ checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 name = "unit"
 version = "0.1.0"
 dependencies = [
- "common",
  "grid",
+ "misc",
  "newtype_derive",
  "paste",
 ]
@@ -2041,10 +2041,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "color",
- "common",
  "criterion",
  "futures",
  "grid",
+ "misc",
  "nd_iter",
  "num_cpus",
  "petgraph",

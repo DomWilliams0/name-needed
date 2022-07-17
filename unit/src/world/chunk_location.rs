@@ -1,5 +1,5 @@
-use common::derive_more::{From, Into};
-use common::*;
+use misc::derive_more::{From, Into};
+use misc::*;
 
 use crate::world::{GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE};
 use std::convert::From;

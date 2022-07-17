@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use common::*;
+use misc::*;
 use futures::channel::mpsc as async_channel;
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition};
 
@@ -531,7 +531,7 @@ mod tests {
     use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
     use crate::world::helpers::DummyWorldContext;
     use crate::BaseTerrain;
-    use common::{Itertools, Rng, SeedableRng, SliceRandom, SmallRng};
+    use misc::{Itertools, Rng, SeedableRng, SliceRandom, SmallRng};
     use std::collections::{HashMap, HashSet};
     use unit::world::SlabLocation;
 
@@ -569,7 +569,7 @@ mod tests {
         const BATCH_SIZE_RANGE: (usize, usize) = (5, 200);
         const Z_RANGE: i32 = 8;
 
-        // common::logging::for_tests();
+        // misc::logging::for_tests();
         let source = {
             let chunks = (-WORLD_SIZE..WORLD_SIZE)
                 .cartesian_product(-WORLD_SIZE..WORLD_SIZE)
@@ -640,7 +640,7 @@ mod tests {
         while !update_batches.is_empty() {
             let mut batch = update_batches.pop().unwrap(); // not empty
             let log_str = batch.iter().map(|x| format!("{:?}", x)).join("\n"); // gross
-            common::trace!(
+            misc::trace!(
                 "test: requesting batch of {} updates {}",
                 batch.len(),
                 log_str
@@ -655,7 +655,7 @@ mod tests {
         // wait for everything to settle down
         let timeout = test_world_timeout();
         loop {
-            common::info!(
+            misc::info!(
                 "test: waiting {:?} for world to settle down",
                 timeout.min(Duration::from_secs(10))
             );

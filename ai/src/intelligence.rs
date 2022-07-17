@@ -2,8 +2,8 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::hint::unreachable_unchecked;
 
-use common::bumpalo::Bump;
-use common::*;
+use misc::bumpalo::Bump;
+use misc::*;
 
 use crate::context::Action;
 use crate::decision::Dse;
@@ -519,9 +519,9 @@ impl<'a, C: Context> DseToScore<'a, C> {
 }
 
 mod realisation {
-    use common::bumpalo::collections::CollectIn;
-    use common::bumpalo::Bump;
-    use common::*;
+    use misc::bumpalo::collections::CollectIn;
+    use misc::bumpalo::Bump;
+    use misc::*;
 
     use crate::intelligence::{DseIndex, DseToScore};
     use crate::{
@@ -757,7 +757,7 @@ mod realisation {
 mod tests {
     use std::iter::empty;
 
-    use common::{bumpalo, once, Itertools, OrderedFloat};
+    use misc::{bumpalo, once, Itertools, OrderedFloat};
 
     use crate::consideration::Considerations;
     use crate::decision::WeightedDse;

@@ -1,7 +1,7 @@
 use std::ops::Add;
 
-use common::derive_more::*;
-use common::*;
+use misc::derive_more::*;
+use misc::*;
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPoint, BLOCKS_SCALE};

@@ -1,5 +1,5 @@
 use crate::error::{ResourceError, ResourceErrorKind};
-use common::*;
+use misc::*;
 use memmap::Mmap;
 use std::ffi::OsStr;
 use std::fs::File;

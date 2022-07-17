@@ -16,16 +16,16 @@
    * `// TODO perfect hash on C::Input`
    * `// TODO add momentum to initial weight to discourage changing mind so often`
    * `// TODO reuse allocation`
- * [common/Cargo.toml](common/Cargo.toml) (1)
-   * `# TODO feature for cgmath`
- * [common/src/newtype.rs](common/src/newtype.rs) (1)
-   * `// TODO support f64 too`
  * [grid/src/dynamic.rs](grid/src/dynamic.rs) (3)
    * `// TODO use same CoordType for DynamicGrid`
    * `// TODO profile and improve coord wrapping`
    * `// TODO return <C: GridCoord>`
  * [grid/src/grid_impl.rs](grid/src/grid_impl.rs) (1)
    * `// TODO can still panic`
+ * [misc/Cargo.toml](misc/Cargo.toml) (1)
+   * `# TODO feature for cgmath`
+ * [misc/src/newtype.rs](misc/src/newtype.rs) (1)
+   * `// TODO support f64 too`
  * [resources/src/container.rs](resources/src/container.rs) (2)
    * `// TODO depends on feature gate`
    * `// TODO add feature gate info e.g. from disk, from archive`

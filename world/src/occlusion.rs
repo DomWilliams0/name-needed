@@ -1,5 +1,5 @@
-use common::derive_more::{Deref, DerefMut};
-use common::*;
+use misc::derive_more::{Deref, DerefMut};
+use misc::*;
 
 use crate::block::BlockOpacity;
 use crate::chunk::slice::Slice;

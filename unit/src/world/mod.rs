@@ -38,7 +38,7 @@ mod world_position;
 #[cfg(test)]
 mod tests {
 
-    use common::*;
+    use misc::*;
 
     use crate::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,

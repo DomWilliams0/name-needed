@@ -6,7 +6,7 @@ use petgraph::stable_graph::StableGraph;
 use petgraph::visit::Visitable;
 use petgraph::Directed;
 
-use common::*;
+use misc::*;
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SliceBlock};
 

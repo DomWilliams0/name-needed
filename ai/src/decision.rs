@@ -1,8 +1,8 @@
 use std::any::{Any, TypeId};
 use std::hash::Hasher;
 
-use common::bumpalo::Bump;
-use common::*;
+use misc::bumpalo::Bump;
+use misc::*;
 
 use crate::consideration::Considerations;
 use crate::context::pretty_type_name;

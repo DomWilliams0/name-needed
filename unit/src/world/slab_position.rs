@@ -1,4 +1,4 @@
-use common::derive_more::*;
+use misc::derive_more::*;
 
 use crate::world::{
     BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE,

@@ -1,5 +1,5 @@
-use common::bumpalo::Bump;
-use common::*;
+use misc::bumpalo::Bump;
+use misc::*;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use crate::context::pretty_type_name;
@@ -133,7 +133,7 @@ impl<'a, C: Context> Considerations<'a, C> {
 
 #[cfg(test)]
 mod tests {
-    use common::{ApproxEq, NormalizedFloat};
+    use misc::{ApproxEq, NormalizedFloat};
 
     use crate::Curve;
 

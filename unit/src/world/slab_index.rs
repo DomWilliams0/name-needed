@@ -1,6 +1,6 @@
 use crate::dim::SmallUnsignedConstant;
 use crate::world::{GlobalSliceIndex, SLAB_SIZE};
-use common::{derive_more::*, *};
+use misc::{derive_more::*, *};
 use newtype_derive::*;
 use std::ops::{Div, Mul};
 

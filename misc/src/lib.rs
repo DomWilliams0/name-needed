@@ -36,7 +36,7 @@ pub use logging::{
 pub use metrics::{self, declare_entity_metric, entity_metric}; // nop macro declared below for disabled feature
 pub use newtype::{NormalizedFloat, Proportion};
 
-// common imports that annoyingly get resolved to other pub exports of std/core
+// misc imports that annoyingly get resolved to other pub exports of std/core
 // https://github.com/intellij-rust/intellij-rust/issues/5654
 pub use std::{
     error::Error,

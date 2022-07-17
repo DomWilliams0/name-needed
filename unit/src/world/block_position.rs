@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-use common::derive_more::*;
-use common::*;
+use misc::derive_more::*;
+use misc::*;
 
 use crate::world::{
     BlockCoord, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,

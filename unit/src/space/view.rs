@@ -1,7 +1,7 @@
-use common::derive_more::*;
+use misc::derive_more::*;
 
 use crate::world::{WorldPoint, BLOCKS_SCALE};
-use common::{Point2, Vector3};
+use misc::{Point2, Vector3};
 use std::convert::TryFrom;
 
 /// A point anywhere in the world, in meters

@@ -4,7 +4,7 @@ use petgraph::graphmap::DiGraphMap;
 use petgraph::prelude::EdgeRef;
 use petgraph::visit::Visitable;
 
-use common::*;
+use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, SlabIndex, SlabPosition};
 
 use crate::navigation::path::{BlockPath, BlockPathNode};

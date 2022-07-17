@@ -5,7 +5,7 @@ use unit::world::{BlockCoord, SliceBlock};
 
 use crate::block::Block;
 use crate::{BlockType, WorldContext};
-use common::Derivative;
+use misc::Derivative;
 use std::convert::TryInto;
 use std::fmt::{Debug, Formatter};
 

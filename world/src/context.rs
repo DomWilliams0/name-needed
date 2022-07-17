@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use common::Derivative;
+use misc::Derivative;
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 pub trait WorldContext: 'static + Send + Sync + Sized {

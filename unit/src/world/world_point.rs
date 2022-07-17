@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::ops::{Add, AddAssign, Sub};
 
-use common::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
+use misc::{Display, FmtResult, Formatter, NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};

@@ -11,8 +11,8 @@ use std::ops::Deref;
 use petgraph::algo::Measure;
 use petgraph::visit::{EdgeRef, IntoEdges, VisitMap, Visitable};
 
-use common::Rng;
-use common::{SliceRandom, SmallVec};
+use misc::Rng;
+use misc::{SliceRandom, SmallVec};
 
 /// Contains allocations to reuse
 pub struct SearchContext<N, E, K, V>(RefCell<SearchContextInner<N, E, K, V>>)

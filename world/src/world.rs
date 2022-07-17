@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
-use common::derive_more::Constructor;
-use common::*;
+use misc::derive_more::Constructor;
+use misc::*;
 use unit::world::CHUNK_SIZE;
 use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
@@ -892,7 +892,7 @@ pub mod slab_loading {
     use futures::Future;
     use tokio::macros::support::Pin;
 
-    use common::*;
+    use misc::*;
     use unit::world::SlabLocation;
 
     use crate::chunk::slab::{Slab, SlabInternalNavigability};
@@ -1213,7 +1213,7 @@ pub mod helpers {
     use color::Color;
     use std::time::Duration;
 
-    use common::Itertools;
+    use misc::Itertools;
     use unit::world::ChunkLocation;
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
@@ -1365,7 +1365,7 @@ mod tests {
     use std::convert::TryFrom;
     use std::time::Duration;
 
-    use common::{logging, seeded_rng, thread_rng, Itertools, Rng};
+    use misc::{logging, seeded_rng, thread_rng, Itertools, Rng};
     use unit::world::{all_slabs_in_range, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,

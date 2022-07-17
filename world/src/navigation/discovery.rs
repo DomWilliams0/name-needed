@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::*;
+use misc::*;
 use unit::world::{BlockCoord, SlabIndex, SlabPositionAsCoord, SLAB_SIZE};
 use unit::world::{LocalSliceIndex, RangePosition, SlabPosition, CHUNK_SIZE};
 

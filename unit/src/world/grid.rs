@@ -1,5 +1,5 @@
 use crate::world::{BlockCoord, LocalSliceIndex, RangePosition, SlabPosition, SliceBlock};
-use common::derive_more::{Deref, From};
+use misc::derive_more::{Deref, From};
 use std::convert::TryFrom;
 use std::fmt::{Debug, Formatter};
 

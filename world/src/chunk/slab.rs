@@ -1,7 +1,7 @@
 use std::iter::once;
 use std::ops::Deref;
 
-use common::*;
+use misc::*;
 use unit::world::CHUNK_SIZE;
 use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, WorldRange, SLAB_SIZE};
 

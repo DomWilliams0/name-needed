@@ -1,5 +1,5 @@
-use common::derive_more::*;
-use common::*;
+use misc::derive_more::*;
+use misc::*;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
 use std::ops::{Add, AddAssign, Sub, SubAssign};

@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use common::parking_lot::RwLock;
-use common::*;
+use misc::parking_lot::RwLock;
+use misc::*;
 pub use memory::MemoryTerrainSource;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,

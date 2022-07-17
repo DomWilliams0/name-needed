@@ -2,8 +2,8 @@ use std::convert::{TryFrom, TryInto};
 
 use std::marker::PhantomData;
 
-use common::sized_iter::SizedIterator;
-use common::Itertools;
+use misc::sized_iter::SizedIterator;
+use misc::Itertools;
 use unit::world::CHUNK_SIZE;
 use unit::world::{BlockCoord, BlockPosition, ChunkLocation};
 
@@ -326,7 +326,7 @@ impl NeighbourOffset {
 
 #[cfg(test)]
 mod tests {
-    use common::Itertools;
+    use misc::Itertools;
     use unit::world::GlobalSliceIndex;
 
     use super::*;

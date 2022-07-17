@@ -1,5 +1,5 @@
 #![allow(clippy::non_send_fields_in_send_ty)]
-use common::parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use misc::parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{World, WorldContext};
 use std::sync::Arc;

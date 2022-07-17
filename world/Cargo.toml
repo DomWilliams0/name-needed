@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 unit = { path = "../unit" }
-common = { path = "../common" }
+misc = { path = "../misc" }
 color = { path = "../color" }
 grid = { path = "../grid" }
 

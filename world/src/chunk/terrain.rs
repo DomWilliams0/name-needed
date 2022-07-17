@@ -3,7 +3,7 @@ use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
 
 use crate::block::BlockDurability;
-use common::*;
+use misc::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
@@ -389,13 +389,13 @@ impl<C: WorldContext> RawChunkTerrain<C> {
             )
         }
 
-        // continue from the common min = max of the mins
-        let first_common_slab = my_min.max(ur_min);
+        // continue from the misc min = max of the mins
+        let first_misc_slab = my_min.max(ur_min);
 
         // yield slices up until first max
         let first_max = my_max.min(ur_max);
 
-        for (slab_index, next_slab_index) in (first_common_slab.as_i32()..=first_max.as_i32())
+        for (slab_index, next_slab_index) in (first_misc_slab.as_i32()..=first_max.as_i32())
             .map(Some)
             .chain(once(None))
             .tuple_windows()

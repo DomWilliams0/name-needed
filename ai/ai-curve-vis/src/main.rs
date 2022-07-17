@@ -8,7 +8,7 @@ use plotters::prelude::*;
 use plotters::style::WHITE;
 
 use ai::Curve;
-use common::NormalizedFloat;
+use misc::NormalizedFloat;
 
 fn main() {
     let stdin = std::io::stdin();

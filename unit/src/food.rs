@@ -1,9 +1,9 @@
 use std::ops::Mul;
 
-use common::derive_more::{Add, Display};
-use common::newtype::Accumulative;
+use misc::derive_more::{Add, Display};
+use misc::newtype::Accumulative;
 
-use common::*;
+use misc::*;
 
 /// Base unit of nutrition for hunger and eating
 #[derive(Copy, Clone, Debug, Add, Display, Ord, PartialOrd, PartialEq, Eq)]

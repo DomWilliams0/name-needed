@@ -1,6 +1,6 @@
 use futures::channel::mpsc as async_channel;
 
-use common::*;
+use misc::*;
 use unit::world::{ChunkLocation, SlabIndex};
 
 use crate::chunk::slice::unflatten_index;

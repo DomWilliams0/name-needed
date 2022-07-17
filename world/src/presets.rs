@@ -1,6 +1,6 @@
 use std::iter::once;
 
-use common::*;
+use misc::*;
 use unit::world::CHUNK_SIZE;
 
 use crate::chunk::ChunkBuilder;

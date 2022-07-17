@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use common::*;
+use misc::*;
 use unit::world::SlabLocation;
 
 use crate::loader::finalizer::SlabFinalizer;
