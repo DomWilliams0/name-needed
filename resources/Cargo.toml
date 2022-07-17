@@ -1,0 +1,13 @@
+[package]
+name = "resources"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "../common" }
+
+memmap = "0.7"
+walkdir = "2.3"

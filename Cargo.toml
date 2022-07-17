@@ -1,35 +1,16 @@
 [workspace]
 
 members = [
-	"game/ai",
-	"game/markov",
-	"game/procgen",
-	"game/resources",
-	"game/simulation",
-	"game/simulation/ecs-derive",
-	"game/world",
-	"game/world/world_types",
-
-	"renderer/engine",
-	"renderer/main",
-
-	"shared/color",
-	"shared/common",
-	"shared/config",
-	"shared/grid",
-	"shared/metrics",
-	"shared/logging",
-	"shared/unit",
-
-    "utils/ai-curve-vis",
-    "utils/definitions",
-
-	# ensure this is the last member! so it can be sed'd out in CI on unsupported OSs
-	"testing",
-] # end members
+	"ai",
+	"ai/ai-curve-vis",
+	"color",
+	"common",
+	"grid",
+	"logging",
+	"resources",
+	"unit",
+	"world",
+]
 
 [profile.dev]
 debug = 0 # for faster build times
-
-[profile.dev.package."procgen"]
-opt-level = 2 # this is way too slow in debug mode
