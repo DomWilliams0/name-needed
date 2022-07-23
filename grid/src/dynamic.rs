@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use serde::{Deserialize, Serialize};
 
-use misc::{ArrayVec, Boolinator, Itertools};
+use misc::{ArrayVec, Itertools};
 
 // TODO use same CoordType for DynamicGrid
 #[derive(Serialize, Deserialize)]
@@ -140,27 +140,27 @@ impl<T: Default> DynamicGrid<T> {
         pub fn coord_above(&self, [x, y, z]: [usize; 3]) -> Option<usize> {
             let new = [x, y.wrapping_sub(1), z];
             self.is_coord_in_range(new)
-                .as_some_from(|| self.flatten_coords(new))
+                .then(|| self.flatten_coords(new))
         }
 
         /// y+1
         pub fn coord_below(&self, [x, y, z]: [usize; 3]) -> Option<usize> {
             let new = [x, y + 1, z];
             self.is_coord_in_range(new)
-                .as_some_from(|| self.flatten_coords(new))
+                .then(|| self.flatten_coords(new))
         }
 
         /// x-1
         pub fn coord_left(&self, [x, y, z]: [usize; 3]) -> Option<usize> {
             let new = [x.wrapping_sub(1), y, z];
             self.is_coord_in_range(new)
-                .as_some_from(|| self.flatten_coords(new))
+                .then(|| self.flatten_coords(new))
         }
         /// x+1
         pub fn coord_right(&self, [x, y, z]: [usize; 3]) -> Option<usize> {
             let new = [x + 1, y, z];
             self.is_coord_in_range(new)
-                .as_some_from(|| self.flatten_coords(new))
+                .then(|| self.flatten_coords(new))
         }
     */
 
@@ -211,9 +211,9 @@ impl<T: Default> DynamicGrid<T> {
     ) -> impl Iterator<Item = (usize, [isize; 3])> + '_ {
         let [x, y, z] = coord.into_coord(self);
 
-        let below = (z > 0).as_some_from(|| z - 1);
+        let below = (z > 0).then(|| z - 1);
         let this = Some(z);
-        let above = (z < self.dims[2]).as_some_from(|| z + 1);
+        let above = (z < self.dims[2]).then(|| z + 1);
 
         let zs = below.into_iter().chain(this).chain(above.into_iter());
         zs.flat_map(move |z| {

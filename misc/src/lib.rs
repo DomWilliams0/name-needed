@@ -1,5 +1,4 @@
 pub use arrayvec::*;
-pub use boolinator::Boolinator;
 pub use bumpalo;
 
 pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;

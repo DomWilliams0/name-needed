@@ -100,7 +100,7 @@ impl SliceIndex<Slab> {
         let range = Slab::MIN..=Slab::MAX;
         range
             .contains(&slice)
-            .as_some_from(|| Self(slice, PhantomData))
+            .then(|| Self(slice, PhantomData))
     }
 
     /// Panics if out of range for scale

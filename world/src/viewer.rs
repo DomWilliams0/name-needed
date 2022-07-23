@@ -151,7 +151,7 @@ impl<C: WorldContext> WorldViewer<C> {
 
         for dirty_chunk in self
             .visible_slabs(range)
-            .filter_map(|slab| self.is_slab_dirty(&slab).as_some(slab.chunk))
+            .filter_map(|slab| self.is_slab_dirty(&slab).then_some(slab.chunk))
             .dedup()
             .filter_map(|chunk| world.find_chunk_with_pos(chunk))
         {
