@@ -6,7 +6,7 @@ use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, 
 use crate::chunk::slab::Slab;
 use crate::chunk::RawChunkTerrain;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::{BlockType, WorldContext};
+use crate::{BaseTerrain, BlockType, WorldContext};
 
 /// Used for testing
 pub struct MemoryTerrainSource<C: WorldContext> {

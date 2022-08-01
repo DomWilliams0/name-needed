@@ -1,8 +1,9 @@
 use misc::derive_more::{Deref, DerefMut};
+use std::cell::Cell;
 use std::fmt::{Debug, Formatter};
 
 use crate::block::BlockOpacity;
-use crate::chunk::slice::Slice;
+use crate::chunk::slice::{Slice, SliceMut};
 use crate::neighbour::NeighbourOffset;
 use crate::WorldContext;
 use std::ops::Add;
@@ -35,6 +36,7 @@ impl From<VertexOcclusion> for f32 {
     }
 }
 
+/// Holds opacity of 8 surrounding neighbours
 /// TODO bitset of Opacities will be much smaller, 2 bits each
 #[derive(Deref, DerefMut, Default, Copy, Clone)]
 pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
@@ -43,6 +45,20 @@ impl NeighbourOpacity {
     pub const fn default_const() -> Self {
         // TODO this is different to the actual Default!
         Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
+    }
+
+    pub const fn unknown() -> Self {
+        Self([OcclusionOpacity::Unknown; NeighbourOffset::COUNT])
+    }
+
+    pub fn is_all_transparent(&self) -> bool {
+        self.0.iter().all(|o| !o.solid())
+    }
+
+    pub fn is_all_unknown(&self) -> bool {
+        self.0
+            .iter()
+            .all(|o| matches!(o, OcclusionOpacity::Unknown))
     }
 
     /// Reduce to `[0 = transparent/unknown, 1 = solid]`
@@ -65,6 +81,7 @@ impl NeighbourOpacity {
         Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
     }
 
+    /// Top face only
     pub fn with_slice_above<C: WorldContext>(
         this_block: SliceBlock,
         slice_above: Slice<C>,
@@ -73,7 +90,73 @@ impl NeighbourOpacity {
         let mut opacity = NeighbourOpacity::default();
         for (n, offset) in NeighbourOffset::offsets() {
             if let Some(neighbour_block) = this_block.try_add(offset) {
-                opacity[n as usize] = slice_above[neighbour_block].opacity().into();
+                opacity[n as usize] =
+                    OcclusionOpacity::Known(slice_above[neighbour_block].opacity());
+            }
+        }
+
+        opacity
+    }
+
+    /// Sideways faces only (not top).
+    /// extended_block: protruded from src block in direction of face
+    pub fn with_neighbouring_slices<C: WorldContext>(
+        extended_block: SliceBlock,
+        this_slice: &SliceMut<C>,
+        slice_below: Option<Slice<C>>,
+        slice_above: Option<Slice<C>>,
+        face: OcclusionFace,
+    ) -> NeighbourOpacity {
+        debug_assert!(!matches!(face, OcclusionFace::Top));
+
+        // defaults to unknown
+        let mut opacity = NeighbourOpacity::default();
+
+        enum Relative {
+            SliceBelow,
+            ThisSlice,
+            SliceAbove,
+        }
+
+        // (which slice, movement in RELATIVE axis)
+        // order matches NeighbourOffset::OFFSETS
+        const RELATIVES: [(Relative, i16); 8] = [
+            (Relative::SliceBelow, 0),
+            (Relative::SliceBelow, 1),
+            (Relative::ThisSlice, 1),
+            (Relative::SliceAbove, 1),
+            (Relative::SliceAbove, 0),
+            (Relative::SliceAbove, -1),
+            (Relative::ThisSlice, -1),
+            (Relative::SliceBelow, -1),
+        ];
+
+        let (pos_idx, mul) = match face {
+            OcclusionFace::North => (0, -1),
+            OcclusionFace::East => (1, 1),
+            OcclusionFace::South => (0, 1),
+            OcclusionFace::West => (1, -1),
+            OcclusionFace::Top => unreachable!(),
+        };
+
+        for (i, (relative, offset)) in RELATIVES.iter().enumerate() {
+            let mut pos = [0, 0];
+            // safety: idx is 0 or 1
+            unsafe {
+                *pos.get_unchecked_mut(pos_idx) = *offset * mul;
+            }
+
+            if let Some(pos) = extended_block.try_add((pos[0], pos[1])) {
+                // TODO ideally check the slice first before calculating offset but whatever
+
+                let neighbour_opacity = match (relative, slice_below, slice_above) {
+                    (Relative::SliceBelow, Some(slice), _) => slice[pos].opacity(),
+                    (Relative::SliceAbove, _, Some(slice)) => slice[pos].opacity(),
+                    (Relative::ThisSlice, _, _) => this_slice[pos].opacity(),
+                    _ => continue,
+                };
+
+                opacity[i] = OcclusionOpacity::Known(neighbour_opacity);
             }
         }
 
@@ -83,16 +166,29 @@ impl NeighbourOpacity {
 
 impl Debug for NeighbourOpacity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let solids = self
-            .0
-            .iter()
-            .enumerate()
-            .filter(|(_, o)| o.solid())
-            .map(|(i, _)| {
+        // TODO only for debugging
+        let known = self.0.iter().enumerate().filter_map(|(i, o)| match o {
+            OcclusionOpacity::Unknown => None,
+            OcclusionOpacity::Known(o) => {
                 // safety: limited to NeighbourOffset::COUNT
-                unsafe { std::mem::transmute::<_, NeighbourOffset>(i as u8) }
-            });
-        f.debug_list().entries(solids).finish()
+                let n = unsafe { std::mem::transmute::<_, NeighbourOffset>(i as u8) };
+                Some((n, *o))
+            }
+        });
+
+        f.debug_list().entries(known).finish()
+    }
+}
+
+impl Debug for BlockOcclusion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let solid_only = !f.alternate();
+        let entries = OcclusionFace::FACES
+            .iter()
+            .zip(self.neighbours.iter())
+            .filter(|(f, n)| !(n.is_all_transparent() && solid_only));
+
+        f.debug_map().entries(entries).finish()
     }
 }
 
@@ -134,19 +230,6 @@ impl OcclusionOpacity {
     }
 }
 
-/// "Is occluded"
-impl From<OcclusionOpacity> for bool {
-    fn from(o: OcclusionOpacity) -> Self {
-        o.solid()
-    }
-}
-
-impl From<BlockOpacity> for OcclusionOpacity {
-    fn from(o: BlockOpacity) -> Self {
-        Self::Known(o)
-    }
-}
-
 impl Add<VertexOcclusion> for VertexOcclusion {
     type Output = u8;
 
@@ -156,28 +239,61 @@ impl Add<VertexOcclusion> for VertexOcclusion {
 }
 
 /// If a quad should be flipped for nicer AO
-pub(crate) enum OcclusionFlip {
+pub enum OcclusionFlip {
     Flip,
     DontFlip,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct BlockOcclusion(NeighbourOpacity);
+#[derive(Debug, Copy, Clone)]
+#[repr(usize)]
+pub enum OcclusionFace {
+    Top,
+    /// +Y
+    North,
+    /// +X
+    East,
+    /// -Y
+    South,
+    /// -X
+    West,
+    // dont ever see bottom
+}
+
+impl OcclusionFace {
+    pub const COUNT: usize = 5;
+
+    pub const FACES: [OcclusionFace; Self::COUNT] = [
+        OcclusionFace::South,
+        OcclusionFace::West,
+        OcclusionFace::East,
+        OcclusionFace::Top,
+        OcclusionFace::North,
+    ];
+}
+
+#[derive(Copy, Clone)]
+pub struct BlockOcclusion {
+    /// Maps to [FACES]
+    neighbours: [NeighbourOpacity; OcclusionFace::COUNT],
+}
 
 impl BlockOcclusion {
+    #[deprecated]
     pub fn from_neighbour_opacities(neighbours: NeighbourOpacity) -> Self {
-        Self(neighbours)
+        todo!()
     }
 
-    pub(crate) fn resolve_vertices(&self) -> ([VertexOcclusion; 4], OcclusionFlip) {
+    // TODO pub(crate)
+    pub fn resolve_vertices(&self, face: OcclusionFace) -> ([VertexOcclusion; 4], OcclusionFlip) {
+        let neighbours = self.neighbours[face as usize];
         let get_vertex = |corner_offset: NeighbourOffset| -> VertexOcclusion {
-            let s1 = self.0[corner_offset.next() as usize];
-            let s2 = self.0[corner_offset.prev() as usize];
+            let s1 = neighbours[corner_offset.next() as usize];
+            let s2 = neighbours[corner_offset.prev() as usize];
 
-            let int_value = if s1.into() && s2.into() {
+            let int_value = if s1.solid() && s2.solid() {
                 0
             } else {
-                let corner = self.0[corner_offset as usize];
+                let corner = neighbours[corner_offset as usize];
                 3 - (s1.as_u8() + s2.as_u8() + corner.as_u8())
             };
 
@@ -186,10 +302,10 @@ impl BlockOcclusion {
         };
 
         let vertices = [
-            get_vertex(NeighbourOffset::SouthWest), // vertices 0 and 5
-            get_vertex(NeighbourOffset::SouthEast), // vertex 1
-            get_vertex(NeighbourOffset::NorthEast), // vertices 2 and 3
-            get_vertex(NeighbourOffset::NorthWest), // vertex 4
+            get_vertex(NeighbourOffset::SouthEast),
+            get_vertex(NeighbourOffset::NorthEast),
+            get_vertex(NeighbourOffset::NorthWest),
+            get_vertex(NeighbourOffset::SouthWest),
         ];
 
         let flip = if vertices[0] + vertices[2] < vertices[1] + vertices[3] {
@@ -200,21 +316,38 @@ impl BlockOcclusion {
         (vertices, flip)
     }
 
+    pub const fn all_transparent() -> Self {
+        Self {
+            neighbours: [NeighbourOpacity::unknown(); OcclusionFace::COUNT],
+        }
+    }
+
     pub const fn default_const() -> Self {
-        Self(NeighbourOpacity::default_const())
+        Self {
+            neighbours: [NeighbourOpacity::default_const(); OcclusionFace::COUNT],
+        }
     }
 
     pub fn update_from_neighbour_opacities(&mut self, neighbours: NeighbourOpacity) {
-        (self.0)
-            .0
-            .iter_mut()
-            .zip(neighbours.0.iter())
-            .for_each(|(a, b)| *a = (*a).update(*b));
+        /*        (self.neighbours)
+                    .0
+                    .iter_mut()
+                    .zip(neighbours.0.iter())
+                    .for_each(|(a, b)| *a = (*a).update(*b));
+        */
+    }
+
+    pub fn set_face(&mut self, face: OcclusionFace, neighbours: NeighbourOpacity) {
+        self.neighbours[face as usize] = neighbours;
+    }
+
+    pub fn get_face(&self, face: OcclusionFace) -> NeighbourOpacity {
+        self.neighbours[face as usize]
     }
 
     #[cfg(test)]
-    pub fn corner(&self, i: usize) -> VertexOcclusion {
-        let (vertices, _) = self.resolve_vertices();
+    pub fn top_corner(&self, i: usize) -> VertexOcclusion {
+        let (vertices, _) = self.resolve_vertices(OcclusionFace::Top);
         vertices[i]
     }
 }
@@ -227,15 +360,18 @@ impl Default for BlockOcclusion {
 
 impl PartialEq<NeighbourOpacity> for BlockOcclusion {
     fn eq(&self, other: &NeighbourOpacity) -> bool {
-        let my_opacities = self.0.opacities();
-        let ur_opacities = other.opacities();
-        my_opacities == ur_opacities
+        // let my_opacities = self.0.opacities();
+        // let ur_opacities = other.opacities();
+        // my_opacities == ur_opacities
+        // TODO comparison by face or against all faces
+        false
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::helpers::DummyWorldContext;
     use unit::world::ChunkLocation;
 
     #[test]
@@ -273,9 +409,9 @@ mod tests {
         };
 
         let mut occlusion = BlockOcclusion::from_neighbour_opacities(neighbour_occluded);
-        assert_eq!(occlusion.corner(0), VertexOcclusion::Mildly);
+        assert_eq!(occlusion.top_corner(0), VertexOcclusion::Mildly);
 
         occlusion.update_from_neighbour_opacities(neighbour_not_occluded);
-        assert_eq!(occlusion.corner(0), VertexOcclusion::NotAtAll);
+        assert_eq!(occlusion.top_corner(0), VertexOcclusion::NotAtAll);
     }
 }

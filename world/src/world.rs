@@ -23,7 +23,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
-use crate::{OcclusionChunkUpdate, SliceRange};
+use crate::{BlockType, OcclusionChunkUpdate, SliceRange};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
@@ -516,6 +516,15 @@ impl<C: WorldContext> World<C> {
         let slabs = slab_range.0.as_i32()..=slab_range.1.as_i32();
         self.dirty_slabs
             .extend(slabs.map(|s| SlabLocation::new(s, chunk_loc)));
+
+        // TODO logging
+        // let mut blocks = vec![];
+        // self.find_chunk_with_pos(ChunkLocation(0,0)).unwrap().blocks(&mut blocks);
+        // for (pos, b) in blocks {
+        //     if !b.block_type().is_air() {
+        //         misc::debug!("{:?}: {:?} {:#?}", pos, b.block_type(), b.occlusion());
+        //     }
+        // }
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
@@ -1672,7 +1681,7 @@ mod tests {
                 w.block((CHUNK_SIZE.as_i32(), 5, 4))
                     .unwrap()
                     .occlusion()
-                    .corner(3), // occluded by other chunk
+                    .top_corner(3), // occluded by other chunk
                 VertexOcclusion::Mildly
             );
         }
@@ -1703,7 +1712,7 @@ mod tests {
                 w.block((CHUNK_SIZE.as_i32(), 5, 4))
                     .unwrap()
                     .occlusion()
-                    .corner(3), // no longer occluded by other chunk
+                    .top_corner(3), // no longer occluded by other chunk
                 VertexOcclusion::NotAtAll
             );
         }
@@ -1721,7 +1730,7 @@ mod tests {
 
         let mut w = world.borrow_mut();
         assert_eq!(
-            w.block(pos).unwrap().occlusion().corner(0),
+            w.block(pos).unwrap().occlusion().top_corner(0),
             VertexOcclusion::NotAtAll
         );
 
@@ -1742,13 +1751,13 @@ mod tests {
 
         // use old slab reference to keep it alive until here
         assert_eq!(
-            w.block(pos).unwrap().occlusion().corner(0),
+            w.block(pos).unwrap().occlusion().top_corner(0),
             VertexOcclusion::Full
         );
 
         // check world uses new CoW slab
         assert_eq!(
-            w.block(pos).unwrap().occlusion().corner(0),
+            w.block(pos).unwrap().occlusion().top_corner(0),
             VertexOcclusion::Full
         );
 

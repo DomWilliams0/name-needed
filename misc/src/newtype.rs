@@ -76,7 +76,11 @@ impl NormalizedFloat {
     }
 
     pub fn try_new(f: f32) -> Option<Self> {
-            if (0.0..=1.0).contains(&f) {Some(Self(f))} else {None}
+        if (0.0..=1.0).contains(&f) {
+            Some(Self(f))
+        } else {
+            None
+        }
     }
 
     pub const fn zero() -> Self {

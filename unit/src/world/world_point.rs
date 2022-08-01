@@ -11,6 +11,7 @@ use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
 pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
 
+#[deprecated(note = "camera is not 2d anymore")]
 #[derive(Copy, Clone)]
 pub struct WorldPoint2d(NotNan<f32>, NotNan<f32>);
 
@@ -220,6 +221,14 @@ impl AddAssign<Vector2> for WorldPoint {
     fn add_assign(&mut self, rhs: Vector2) {
         self.0 += rhs.x;
         self.1 += rhs.y;
+    }
+}
+
+impl AddAssign<[f32; 3]> for WorldPoint {
+    fn add_assign(&mut self, [x, y, z]: [f32; 3]) {
+        self.0 += x;
+        self.1 += y;
+        self.2 += z;
     }
 }
 

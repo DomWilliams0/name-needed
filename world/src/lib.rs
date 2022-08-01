@@ -15,6 +15,8 @@ pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, Wor
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
+pub use occlusion::{BlockOcclusion, OcclusionFace};
+pub use ray::VoxelRay;
 
 pub mod block;
 mod chunk;
@@ -25,6 +27,7 @@ mod navigation;
 mod neighbour;
 mod occlusion;
 pub mod presets;
+mod ray;
 mod viewer;
 mod world;
 mod world_ref;

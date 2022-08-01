@@ -1,17 +1,20 @@
 use color::Color;
 use misc::*;
 use std::fmt::Debug;
+use std::hint::unreachable_unchecked;
 
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::unflatten_index;
 use crate::chunk::Chunk;
-use crate::occlusion::{BlockOcclusion, OcclusionFlip};
+use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip, VertexOcclusion};
 use crate::viewer::SliceRange;
 use crate::{BaseTerrain, BlockType, WorldContext};
 use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
+
+const VERTICES_PER_BLOCK: usize = 6;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
@@ -41,51 +44,13 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
         let slice_index = shifted_slice_index(slice_index);
 
         for (i, block_pos, block) in slice.non_air_blocks() {
-            // if above is solid, render a "blocked" colour
-            let tile = if slice_above
-                .index_unchecked(i)
-                .block_type()
-                .opacity()
-                .solid()
-            {
-                let color = Color::rgb(50, 50, 50);
-                make_corners(block_pos, color, slice_index)
-            } else {
-                // render as normal
-                make_corners_with_ao(
-                    block_pos,
-                    block.block_type().render_color(),
-                    block.occlusion(),
-                    slice_index,
-                )
-            };
-
-            vertices.extend_from_slice(&tile);
+            vertices.extend_from_slice(&make_corners_with_ao(
+                block_pos,
+                block.block_type().render_color(),
+                block.occlusion(),
+                slice_index,
+            ));
         }
-    }
-
-    // render 1 slice below in shadow to indicate where there are blocks out of view
-    // TODO blocks filling in gaps should be tinted the colour of the block they're suggesting
-    // TODO consider rendering a blurred buffer of slices below
-    if let Some(slice_bottom) = chunk.slice(slice_range.bottom()) {
-        let slice_below = chunk.slice_or_dummy(slice_range.bottom() - 1);
-
-        slice_bottom
-            .slice()
-            .iter()
-            .zip(slice_below.slice())
-            .enumerate()
-            .filter(|&(_, (bottom, below))| {
-                bottom.opacity().transparent() && below.opacity().solid()
-            })
-            .for_each(|(i, (_, _))| {
-                let color = Color::rgb(70, 70, 70);
-                vertices.extend_from_slice(&make_corners(
-                    unflatten_index(i),
-                    color,
-                    shifted_slice_index(slice_range.bottom()),
-                ));
-            });
     }
 
     vertices
@@ -105,38 +70,77 @@ fn make_corners_with_ao<V: BaseVertex>(
     color: Color,
     occlusion: &BlockOcclusion,
     slice_index: f32,
-) -> [V; 6] {
+) -> [V; 36] {
     let (bx, by) = block_centre(block_pos);
 
-    let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
-    let (ao_corners, ao_flip) = occlusion.resolve_vertices();
+    let mut corners = [MaybeUninit::uninit(); 6 * 4];
+    let mut v = 0;
 
-    for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
-        let ao_lightness = f32::from(ao_corners[i]);
+    for face in OcclusionFace::FACES {
+        // TODO ignore occluded face, return maybeuninit array and len of how much is initialised
 
-        let color = color * ao_lightness;
-        block_corners[i] = MaybeUninit::new(V::new(
-            (
-                fx + bx * unit::world::BLOCKS_SCALE,
-                fy + by * unit::world::BLOCKS_SCALE,
-                slice_index * unit::world::BLOCKS_SCALE,
-            ),
-            color,
-        ));
-    }
+        let (ao_corners, ao_flip) = occlusion.resolve_vertices(face);
+        // start in the bottom right/relative south east
+        let face_corners = match face {
+            OcclusionFace::Top => [[X, -X, X], [X, X, X], [-X, X, X], [-X, -X, X]],
+            OcclusionFace::East => [[X, X, -X], [X, X, X], [X, -X, X], [X, -X, -X]],
+            OcclusionFace::West => [[-X, -X, -X], [-X, -X, X], [-X, X, X], [-X, X, -X]],
+            OcclusionFace::South => [[X, -X, -X], [X, -X, X], [-X, -X, X], [-X, -X, -X]],
+            OcclusionFace::North => [[-X, X, -X], [-X, X, X], [X, X, X], [X, X, -X]],
+        };
 
-    // flip quad if necessary for AO
-    if let OcclusionFlip::Flip = ao_flip {
-        // TODO also rotate texture
+        for ([fx, fy, fz], ao) in face_corners.iter().zip(ao_corners.iter()) {
+            let color = color * f32::from(*ao);
 
-        let last = block_corners[3];
-        block_corners.copy_within(0..3, 1);
-        block_corners[0] = last;
+            corners[v] = MaybeUninit::new(V::new(
+                (
+                    fx + bx * unit::world::BLOCKS_SCALE,
+                    fy + by * unit::world::BLOCKS_SCALE,
+                    fz + slice_index * unit::world::BLOCKS_SCALE,
+                ),
+                color,
+            ));
+            v += 1;
+        }
+
+        // flip quad if necessary for AO
+        if let OcclusionFlip::Flip = ao_flip {
+            // TODO also rotate texture
+            let mut quad = &mut corners[v - 4..v];
+            let last = quad[3];
+            quad.copy_within(0..3, 1);
+            quad[0] = last;
+        }
     }
 
     // safety: all corners have been initialized
-    unsafe { corners_to_vertices(block_corners) }
+    unsafe { to_corners::corners_to_vertices(corners) }
 }
+
+#[rustfmt::skip]
+mod to_corners {
+    use super::*;
+
+    #[inline]
+    pub unsafe fn corners_to_vertices<V: BaseVertex>(
+        block_corners: [MaybeUninit<V>; 24],
+    ) -> [V; 36] {
+        macro_rules! c {
+            ($idx:expr) => {
+                block_corners[$idx].assume_init()
+            };
+        }
+        [
+            c![0],  c![1],  c![2],  c![2],  c![3],  c![0],
+            c![4],  c![5],  c![6],  c![6],  c![7],  c![4],
+            c![8],  c![9],  c![10], c![10], c![11], c![8],
+            c![12], c![13], c![14], c![14], c![15], c![12],
+            c![16], c![17], c![18], c![18], c![19], c![16],
+            c![20], c![21], c![22], c![22], c![23], c![20],
+        ]
+    }
+}
+
 fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: Color, slice_index: f32) -> [V; 6] {
     let (bx, by) = block_centre(block_pos);
 

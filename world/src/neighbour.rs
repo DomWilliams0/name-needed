@@ -22,6 +22,7 @@ pub trait NeighboursBehaviour {
 pub struct Slab;
 pub struct World;
 
+// In XY axes
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq, Ord, PartialOrd))]
 #[repr(u8)]

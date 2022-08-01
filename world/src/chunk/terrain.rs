@@ -389,7 +389,7 @@ impl<C: WorldContext> RawChunkTerrain<C> {
             )
         }
 
-        // continue from the misc min = max of the mins
+        // continue from the common min = max of the mins
         let first_misc_slab = my_min.max(ur_min);
 
         // yield slices up until first max
@@ -679,6 +679,8 @@ impl<C: WorldContext> RawChunkTerrain<C> {
 
 mod pair_walking {
     //! Helpers for cross_chunk_pairs_*
+
+    use crate::occlusion::OcclusionOpacity;
     use unit::world::SlabIndex;
 
     use super::*;
@@ -727,7 +729,7 @@ mod pair_walking {
 
         if opacity.solid() {
             let mut opacities = NeighbourOpacity::default();
-            opacities[direction as usize] = opacity.into();
+            opacities[direction as usize] = OcclusionOpacity::Known(opacity);
 
             // get block pos in this chunk
             let block_pos = {
@@ -743,8 +745,6 @@ mod pair_walking {
         direction: NeighbourOffset,
         coords: &mut [(BlockCoord, BlockCoord); CHUNK_SIZE.as_usize()],
     ) {
-        debug_assert!(direction.is_aligned());
-
         match direction {
             NeighbourOffset::North => {
                 let xs = (0..CHUNK_SIZE.as_block_coord()).rev(); // reverse to iterate anti clockwise
@@ -766,10 +766,7 @@ mod pair_walking {
                 let ys = 0..CHUNK_SIZE.as_block_coord();
                 xs.zip(ys).enumerate().for_each(|(i, c)| coords[i] = c);
             }
-            _ => {
-                // safety: direction is asserted to be aligned
-                unsafe { unreachable_unchecked() }
-            }
+            _ => unreachable!(),
         }
     }
 
@@ -777,17 +774,12 @@ mod pair_walking {
         direction: NeighbourOffset,
         (x, y): (BlockCoord, BlockCoord),
     ) -> (BlockCoord, BlockCoord) {
-        debug_assert!(direction.is_aligned());
-
         match direction {
             NeighbourOffset::North => (x, 0),
             NeighbourOffset::South => (x, CHUNK_SIZE.as_block_coord() - 1),
             NeighbourOffset::West => (CHUNK_SIZE.as_block_coord() - 1, y),
             NeighbourOffset::East => (0, y),
-            _ => {
-                // safety: direction is asserted to be aligned
-                unsafe { unreachable_unchecked() }
-            }
+            _ => unreachable!(),
         }
     }
 
@@ -826,14 +818,17 @@ mod pair_walking {
             let mut opacities = NeighbourOpacity::default();
 
             // directly across is certainly present
-            opacities[direction as usize] = upper[centre.unwrap()].opacity().into();
+            opacities[direction as usize] =
+                OcclusionOpacity::Known(upper[centre.unwrap()].opacity());
 
             if let Some(left) = left {
-                opacities[direction.next() as usize] = upper[left].opacity().into();
+                opacities[direction.next() as usize] =
+                    OcclusionOpacity::Known(upper[left].opacity());
             }
 
             if let Some(right) = right {
-                opacities[direction.prev() as usize] = upper[right].opacity().into();
+                opacities[direction.prev() as usize] =
+                    OcclusionOpacity::Known(upper[right].opacity());
             }
 
             // get block pos in this chunk
@@ -868,7 +863,7 @@ mod tests {
     use crate::chunk::slab::Slab;
     use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::ChunkBuilder;
-    use crate::occlusion::VertexOcclusion;
+    use crate::occlusion::{OcclusionFace, VertexOcclusion};
     use crate::world::helpers::{
         apply_updates, load_single_chunk, world_from_chunks_blocking, DummyWorldContext,
     };
@@ -1234,7 +1229,7 @@ mod tests {
             .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
-            .resolve_vertices();
+            .resolve_vertices(OcclusionFace::Top);
 
         assert_eq!(
             occlusion,
@@ -1254,7 +1249,7 @@ mod tests {
             .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
-            .resolve_vertices();
+            .resolve_vertices(OcclusionFace::Top);
 
         assert_eq!(
             occlusion,
@@ -1269,6 +1264,7 @@ mod tests {
 
     #[test]
     fn occlusion_across_slab() {
+        logging::for_tests();
         let terrain = ChunkBuilder::default()
             .set_block((2, 2, SLAB_SIZE.as_i32() - 1), DummyBlockType::Dirt)
             .set_block(
@@ -1282,7 +1278,7 @@ mod tests {
             .get_block_tup((2, 2, SLAB_SIZE.as_i32() - 1))
             .unwrap()
             .occlusion()
-            .resolve_vertices();
+            .resolve_vertices(OcclusionFace::Top);
 
         assert_eq!(
             occlusion,
@@ -1299,10 +1295,11 @@ mod tests {
         world: &World<DummyWorldContext>,
         chunk: ChunkLocation,
         block: (i32, i32, i32),
+        face: OcclusionFace,
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
         let block = chunk.get_block(block.try_into().unwrap()).unwrap();
-        let (occlusion, _) = block.occlusion().resolve_vertices();
+        let (occlusion, _) = block.occlusion().resolve_vertices(face);
         occlusion
     }
 
@@ -1331,7 +1328,7 @@ mod tests {
         assert!(world.block((-1, 0, 1)).unwrap().opacity().solid());
         assert!(world.block((0, -1, 1)).unwrap().opacity().solid());
         assert!(matches!(
-            occlusion(&world, ChunkLocation(0, 0), (0, 0, 0)),
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, 0), OcclusionFace::Top),
             [
                 VertexOcclusion::Full,
                 VertexOcclusion::Mildly,
@@ -1370,30 +1367,30 @@ mod tests {
         assert!(world.block((0, 0, -1)).unwrap().opacity().solid());
         assert!(world.block((-1, 0, 0)).unwrap().opacity().solid());
         assert!(world.block((0, 0, 0)).unwrap().opacity().transparent());
-        assert!(matches!(
-            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
+        assert_eq!(
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1), OcclusionFace::Top),
             [
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mildly
             ]
-        ));
+        );
 
         // ... but when (0,0,0) is solid, (0,0,-1) is hidden so it shouldnt be updated
         let world_ref = mk_chunks(true);
         let world = world_ref.borrow();
 
         assert!(world.block((0, 0, 0)).unwrap().opacity().solid());
-        assert!(matches!(
-            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1)),
+        assert_eq!(
+            occlusion(&world, ChunkLocation(0, 0), (0, 0, -1), OcclusionFace::Top),
             [
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll
             ]
-        ));
+        );
     }
 
     #[test]
@@ -1432,7 +1429,12 @@ mod tests {
             .opacity()
             .solid());
         assert!(matches!(
-            occlusion(&world, ChunkLocation(0, 0), (0, CHUNK_SIZE.as_i32() - 1, 0)),
+            occlusion(
+                &world,
+                ChunkLocation(0, 0),
+                (0, CHUNK_SIZE.as_i32() - 1, 0),
+                OcclusionFace::Top
+            ),
             [
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,

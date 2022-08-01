@@ -2,16 +2,16 @@ use std::iter::once;
 use std::ops::Deref;
 
 use misc::*;
-use unit::world::CHUNK_SIZE;
 use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, WorldRange, SLAB_SIZE};
+use unit::world::{LocalSliceIndexBelowTop, CHUNK_SIZE};
 
-use crate::block::Block;
+use crate::block::{Block, BlockOpacity};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
 use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
-use crate::occlusion::{BlockOcclusion, NeighbourOpacity};
-use crate::{WorldChangeEvent, WorldContext};
+use crate::occlusion::{BlockOcclusion, NeighbourOpacity, OcclusionFace};
+use crate::{BlockType, WorldChangeEvent, WorldContext};
 use grid::{Grid, GridImpl, GridImplExt};
 use std::sync::Arc;
 
@@ -101,7 +101,8 @@ impl<C: WorldContext> Slab<C> {
     pub fn expect_mut(&mut self) -> &mut SlabGridImpl<C> {
         let grid = Arc::get_mut(&mut self.0).expect("expected to be the only slab reference");
 
-        if let SlabType::Placeholder = std::mem::replace(&mut self.1, SlabType::Normal) {
+        if let SlabType::Placeholder = self.1 {
+            self.1 = SlabType::Normal;
             trace!("promoting placeholder slab to normal due to mutable reference");
         }
 
@@ -205,16 +206,18 @@ impl<C: WorldContext> Slab<C> {
         above: Option<impl Into<Slice<'s, C>>>,
         below: Option<impl Into<Slice<'s, C>>>,
     ) -> SlabInternalNavigability {
-        log_scope!(o!(index));
+        let above = above.map(Into::into);
+        let below = below.map(Into::into);
 
+        log_scope!(o!(index));
         // TODO detect when slab is all air and avoid expensive processing
         // but remember an all air slab above a solid slab DOES have an area on the first slice..
 
         // flood fill to discover navigability
-        let navigation = self.discover_areas(index, below.map(Into::into));
+        let navigation = self.discover_areas(index, below);
 
         // occlusion
-        self.init_occlusion(above.map(Into::into));
+        self.init_occlusion(above, below);
 
         navigation
     }
@@ -245,51 +248,151 @@ impl<C: WorldContext> Slab<C> {
         SlabInternalNavigability(slab_areas)
     }
 
-    fn init_occlusion(&mut self, slice_above: Option<Slice<C>>) {
-        self.ascending_slice_pairs(slice_above, |mut slice_this, slice_next| {
-            slice_this.iter_mut().enumerate().for_each(|(i, b)| {
-                let this_block = b.opacity();
-                let block_above = (*slice_next)[i].opacity();
+    fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
+        // TODO sucks to do this because we cant mutate the block directly while iterating
+        let mut occlusion_updates = vec![];
+        self.ascending_slice_window(
+            slice_above,
+            slice_below,
+            |slice_below, mut slice_this, slice_above| {
+                for (i, b) in slice_this.iter().enumerate() {
+                    let this_block = b.opacity();
+                    if this_block.transparent() {
+                        // TODO if leaving alone, ensure default is correct
+                        continue;
+                    }
 
-                // this block should be solid and the one above it should not be
-                let opacity = if this_block.solid() && block_above.transparent() {
-                    let this_block = unflatten_index(i);
+                    let pos = unflatten_index(i);
 
-                    NeighbourOpacity::with_slice_above(this_block, slice_next)
-                } else {
-                    NeighbourOpacity::default()
-                };
+                    let mut block_occlusion = *b.occlusion();
 
-                *b.occlusion_mut() = BlockOcclusion::from_neighbour_opacities(opacity);
-            });
-        });
+                    for face in OcclusionFace::FACES {
+                        use OcclusionFace::*;
+
+                        // extend in direction of face
+                        let sideways_neighbour_pos = match face {
+                            Top => None,
+                            North => pos.try_add((0, 1)),
+                            East => pos.try_add((1, 0)),
+                            South => pos.try_add((0, -1)),
+                            West => pos.try_add((-1, 0)),
+                        };
+
+                        // check if totally occluded
+                        let neighbour_opacity = match face {
+                            Top => slice_above.map(|s| (*s)[i].opacity()),
+                            North => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
+                            East => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
+                            South => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
+                            West => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
+                        };
+
+                        let neighbour_opacity = if let Some(BlockOpacity::Solid) = neighbour_opacity
+                        {
+                            // totally occluded
+                            NeighbourOpacity::unknown()
+                        } else if let Top = face {
+                            // special case, top face only needs the slice above
+                            if let Some(slice_above) = slice_above {
+                                NeighbourOpacity::with_slice_above(pos, slice_above)
+                            } else {
+                                // no chunk above
+                                NeighbourOpacity::unknown()
+                            }
+                        } else if let Some(relative_pos) = sideways_neighbour_pos {
+                            NeighbourOpacity::with_neighbouring_slices(
+                                relative_pos,
+                                &slice_this,
+                                slice_below,
+                                slice_above,
+                                face,
+                            )
+                        } else {
+                            // missing chunk
+                            NeighbourOpacity::unknown()
+                        };
+
+                        block_occlusion.set_face(face, neighbour_opacity);
+                    }
+
+                    occlusion_updates.push((i, block_occlusion));
+                }
+
+                for &(i, occ) in &occlusion_updates {
+                    // safety: indices were just calculated above
+                    unsafe {
+                        *slice_this.get_unchecked_mut(i).occlusion_mut() = occ;
+                    }
+                }
+
+                occlusion_updates.clear();
+            },
+        );
     }
 
-    fn ascending_slice_pairs(
+    /// f(maybe slice below, this slice, slice above)
+    fn ascending_slice_window(
         &mut self,
         next_slab_up_bottom_slice: Option<Slice<C>>,
-        mut f: impl FnMut(SliceMut<C>, Slice<C>),
+        prev_slab_top_slice: Option<Slice<C>>,
+        mut f: impl FnMut(Option<Slice<C>>, SliceMut<C>, Option<Slice<C>>),
     ) {
-        for (this_slice_idx, next_slice_idx) in LocalSliceIndex::slices().tuple_windows() {
-            let this_slice_mut: SliceMut<C> = self.slice_mut(this_slice_idx);
+        // top slice of prev slab and bottom of this one
+        {
+            let (this_slab_bottom_slice_idx, next_slice_idx) =
+                LocalSliceIndex::slices().tuple_windows().next().unwrap();
 
-            // transmute lifetime to allow a mut and immut reference
-            // safety: slices don't overlap and this_slice_idx != next_slice_idx
-            let this_slice_mut: SliceMut<C> = unsafe { std::mem::transmute(this_slice_mut) };
-            let next_slice: Slice<C> = self.slice(next_slice_idx);
+            // transmute lifetime to allow a mut and immut references
+            // safety: mutable and immutable slices don't overlap
+            let this_slab_bottom_slice = unsafe {
+                std::mem::transmute::<SliceMut<C>, SliceMut<C>>(
+                    self.slice_mut(this_slab_bottom_slice_idx),
+                )
+            };
 
-            f(this_slice_mut, next_slice);
+            let next_slice = self.slice(next_slice_idx);
+
+            f(
+                prev_slab_top_slice,
+                this_slab_bottom_slice,
+                Some(next_slice),
+            );
         }
 
-        // top slice of this slab and bottom of next
-        if let Some(next_slab_bottom_slice) = next_slab_up_bottom_slice {
-            let this_slab_top_slice = self.slice_mut(LocalSliceIndex::top());
+        for (prev_slice_idx, this_slice_idx, next_slice_idx) in
+            LocalSliceIndex::slices().tuple_windows()
+        {
+            let this_slice_mut: SliceMut<C> = self.slice_mut(this_slice_idx);
 
+            // transmute lifetime to allow a mut and immut references
+            // safety: slices don't overlap and indices are distinct
+            let this_slice_mut =
+                unsafe { std::mem::transmute::<SliceMut<C>, SliceMut<C>>(this_slice_mut) };
+            let prev_slice = self.slice(prev_slice_idx);
+            let next_slice = self.slice(next_slice_idx);
+
+            f(Some(prev_slice), this_slice_mut, Some(next_slice));
+        }
+
+        // top slice of this slab and optionally bottom of next
+        {
             // safety: mutable and immutable slices don't overlap
-            let this_slab_top_slice: SliceMut<C> =
-                unsafe { std::mem::transmute(this_slab_top_slice) };
-
-            f(this_slab_top_slice, next_slab_bottom_slice);
+            let this_slab_top_slice = unsafe {
+                std::mem::transmute::<SliceMut<C>, SliceMut<C>>(
+                    self.slice_mut(LocalSliceIndex::top()),
+                )
+            };
+            let this_slab_below_top_slice = self.slice(
+                LocalSliceIndex::slices_except_last()
+                    .last()
+                    .unwrap()
+                    .current(),
+            );
+            f(
+                Some(this_slab_below_top_slice),
+                this_slab_top_slice,
+                next_slab_up_bottom_slice,
+            );
         }
     }
 

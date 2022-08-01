@@ -98,9 +98,7 @@ impl SliceIndex<Slab> {
     /// None if out of range for scale
     pub fn new(slice: i32) -> Option<Self> {
         let range = Slab::MIN..=Slab::MAX;
-        range
-            .contains(&slice)
-            .then(|| Self(slice, PhantomData))
+        range.contains(&slice).then(|| Self(slice, PhantomData))
     }
 
     /// Panics if out of range for scale
@@ -114,11 +112,12 @@ impl SliceIndex<Slab> {
     }
 
     /// All slices 0..=SLAB_SIZE-1
-    pub fn slices() -> impl DoubleEndedIterator<Item = Self> {
+    pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator {
         (Slab::MIN..=Slab::MAX).map(|i| Self(i, PhantomData))
     }
     /// All slices except the last, 0..=SLAB_SIZE-2
-    pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> {
+    pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> + ExactSizeIterator
+    {
         (Slab::MIN..Slab::MAX).map(|i| LocalSliceIndexBelowTop(Self(i, PhantomData)))
     }
 

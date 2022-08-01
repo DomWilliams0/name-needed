@@ -103,6 +103,7 @@ pub fn one_chunk_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
                 s.set_block((x, 13, 2), C::PRESET_TYPES[2]);
             }
         })
+        .set_block((2, 2, 1), C::PRESET_TYPES[2])
         .build((0, 0));
 
     MemoryTerrainSource::from_chunks(once(chunk)).expect("hardcoded world preset is wrong??!!1!")

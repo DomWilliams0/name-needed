@@ -1,4 +1,4 @@
-# TODOs (91)
+# TODOs (101)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -41,10 +41,12 @@
    * `// TODO this should return an Option if area is uninitialized`
  * [world/src/chunk/double_sided_vec.rs](world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [world/src/chunk/slab.rs](world/src/chunk/slab.rs) (5)
+ * [world/src/chunk/slab.rs](world/src/chunk/slab.rs) (7)
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO if exclusive we're in deep water with CoW`
    * `// TODO discover internal area links`
+   * `// TODO sucks to do this because we cant mutate the block directly while iterating`
+   * `// TODO if leaving alone, ensure default is correct`
    * `// TODO consider resizing/populating changes_out initially with empty events for performance`
    * `// TODO reserve space in changes_out first`
  * [world/src/chunk/slice.rs](world/src/chunk/slice.rs) (2)
@@ -81,11 +83,10 @@
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [world/src/loader/worker_pool.rs](world/src/loader/worker_pool.rs) (1)
    * `// TODO detect this as an error condition?`
- * [world/src/mesh.rs](world/src/mesh.rs) (5)
+ * [world/src/mesh.rs](world/src/mesh.rs) (4)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
    * `// TODO skip if slice knows it is empty`
-   * `// TODO blocks filling in gaps should be tinted the colour of the block they're suggesting`
-   * `// TODO consider rendering a blurred buffer of slices below`
+   * `// TODO ignore occluded face, return maybeuninit array and len of how much is initialised`
    * `// TODO also rotate texture`
  * [world/src/navigation/area_navigation.rs](world/src/navigation/area_navigation.rs) (3)
    * `// TODO use graphmap to just use areas as nodes? but we need parallel edges`
@@ -104,11 +105,19 @@
    * `// TODO smallvecs`
  * [world/src/navigation/search.rs](world/src/navigation/search.rs) (1)
    * `// TODO this might be expensive, can we build up the vec in order`
- * [world/src/occlusion.rs](world/src/occlusion.rs) (3)
+ * [world/src/occlusion.rs](world/src/occlusion.rs) (7)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
    * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
- * [world/src/viewer.rs](world/src/viewer.rs) (8)
+   * `// TODO ideally check the slice first before calculating offset but whatever`
+   * `// TODO only for debugging`
+   * `// TODO pub(crate)`
+   * `// TODO comparison by face or against all faces`
+ * [world/src/ray.rs](world/src/ray.rs) (3)
+   * `// TODO optimise to reuse chunk ref and avoid duplicate block pos checks`
+   * `// TODO capture face`
+   * `// TODO skip if slab is not visible to the player`
+ * [world/src/viewer.rs](world/src/viewer.rs) (9)
    * `assert!(size > 0); // TODO Result`
    * `chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?`
    * `// TODO do mesh generation on a worker thread? or just do this bit in a parallel iter`
@@ -117,10 +126,12 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
- * [world/src/world.rs](world/src/world.rs) (7)
+   * `// FIXME tepmorary`
+ * [world/src/world.rs](world/src/world.rs) (8)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`
    * `let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO`
+   * `// TODO logging`
    * `// TODO benchmark filter_blocks_in_range, then optimize slab and slice lookups`
    * `// TODO filter_blocks_in_range should pass chunk+slab reference to predicate`
    * `// TODO build area graph in loader`

@@ -51,7 +51,7 @@ pub(crate) struct AreaDiscovery<'a, C: WorldContext> {
 impl<C: WorldContext> From<&Block<C>> for AreaDiscoveryGridBlock {
     fn from(block: &Block<C>) -> Self {
         AreaDiscoveryGridBlock {
-            opacity: block.opacity().into(),
+            opacity: OcclusionOpacity::Known(block.opacity()),
             area: Default::default(),
         }
     }
