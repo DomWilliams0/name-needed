@@ -7,6 +7,12 @@ use std::ops::Mul;
 pub struct Color([u8; 4]);
 
 impl Color {
+    pub const RED: Color = Color::rgb(255, 0, 0);
+    pub const GREEN: Color = Color::rgb(0, 255, 0);
+    pub const BLUE: Color = Color::rgb(0, 0, 255);
+    pub const YELLOW: Color = Color::rgb(255, 255, 0);
+    pub const PURPLE: Color = Color::rgb(255, 0, 255);
+
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self::rgba(r, g, b, u8::MAX)
     }
