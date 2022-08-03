@@ -270,13 +270,7 @@ impl<C: WorldContext> Slab<C> {
                         use OcclusionFace::*;
 
                         // extend in direction of face
-                        let sideways_neighbour_pos = match face {
-                            Top => None,
-                            North => pos.try_add((0, 1)),
-                            East => pos.try_add((1, 0)),
-                            South => pos.try_add((0, -1)),
-                            West => pos.try_add((-1, 0)),
-                        };
+                        let sideways_neighbour_pos = face.extend_sideways(pos);
 
                         // check if totally occluded
                         let neighbour_opacity = match face {
@@ -284,13 +278,13 @@ impl<C: WorldContext> Slab<C> {
                             North => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
                             East => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
                             South => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
-                            West => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
+                            West => sideways_neighbour_pos.map(|pos| (&slice_this)[pos].opacity()),
                         };
 
                         let neighbour_opacity = if let Some(BlockOpacity::Solid) = neighbour_opacity
                         {
                             // totally occluded
-                            NeighbourOpacity::unknown()
+                            NeighbourOpacity::all_solid()
                         } else if let Top = face {
                             // special case, top face only needs the slice above
                             if let Some(slice_above) = slice_above {

@@ -1745,7 +1745,8 @@ mod tests {
             ChunkLocation(0, 0),
             vec![(
                 BlockPosition::try_from(pos).unwrap(),
-                NeighbourOpacity::all_solid(),
+                // NeighbourOpacity::all_solid(),
+                todo!(),
             )],
         ));
 

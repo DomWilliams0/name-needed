@@ -133,8 +133,8 @@ pub fn one_block_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
 
 /// Multiple flat chunks at z=0
 pub fn flat_lands<C: WorldContext>() -> MemoryTerrainSource<C> {
-    let chunks = (-2..4).flat_map(|x| {
-        (-2..2).map(move |y| {
+    let chunks = (-8..8).flat_map(|x| {
+        (-8..8).map(move |y| {
             ChunkBuilder::new()
                 .fill_slice(0, C::PRESET_TYPES[0])
                 .fill_slice(1, C::PRESET_TYPES[1])

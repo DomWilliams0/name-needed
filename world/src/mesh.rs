@@ -44,6 +44,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
         let slice_index = shifted_slice_index(slice_index);
 
         for (i, block_pos, block) in slice.non_air_blocks() {
+            // TODO use indices and dont repeat vertices?
             vertices.extend_from_slice(&make_corners_with_ao(
                 block_pos,
                 block.block_type().render_color(),
@@ -70,14 +71,16 @@ fn make_corners_with_ao<V: BaseVertex>(
     color: Color,
     occlusion: &BlockOcclusion,
     slice_index: f32,
-) -> [V; 36] {
+) -> ArrayVec<V, { 6 * OcclusionFace::COUNT }> {
     let (bx, by) = block_centre(block_pos);
 
-    let mut corners = [MaybeUninit::uninit(); 6 * 4];
-    let mut v = 0;
+    let mut corners = ArrayVec::<V, { 4 * OcclusionFace::COUNT }>::new();
 
     for face in OcclusionFace::FACES {
         // TODO ignore occluded face, return maybeuninit array and len of how much is initialised
+        if occlusion.get_face(face).is_all_solid() {
+            continue;
+        }
 
         let (ao_corners, ao_flip) = occlusion.resolve_vertices(face);
         // start in the bottom right/relative south east
@@ -92,29 +95,31 @@ fn make_corners_with_ao<V: BaseVertex>(
         for ([fx, fy, fz], ao) in face_corners.iter().zip(ao_corners.iter()) {
             let color = color * f32::from(*ao);
 
-            corners[v] = MaybeUninit::new(V::new(
-                (
-                    fx + bx * unit::world::BLOCKS_SCALE,
-                    fy + by * unit::world::BLOCKS_SCALE,
-                    fz + slice_index * unit::world::BLOCKS_SCALE,
-                ),
-                color,
-            ));
-            v += 1;
+            // safety: max number of iterations is enough to fit
+            unsafe {
+                corners.push_unchecked(V::new(
+                    (
+                        fx + bx * unit::world::BLOCKS_SCALE,
+                        fy + by * unit::world::BLOCKS_SCALE,
+                        fz + slice_index * unit::world::BLOCKS_SCALE,
+                    ),
+                    color,
+                ));
+            }
         }
 
         // flip quad if necessary for AO
         if let OcclusionFlip::Flip = ao_flip {
             // TODO also rotate texture
-            let mut quad = &mut corners[v - 4..v];
+            let n = corners.len();
+            let mut quad = &mut corners[n - 4..];
             let last = quad[3];
             quad.copy_within(0..3, 1);
             quad[0] = last;
         }
     }
 
-    // safety: all corners have been initialized
-    unsafe { to_corners::corners_to_vertices(corners) }
+    to_corners::corners_to_vertices(corners)
 }
 
 #[rustfmt::skip]
@@ -122,7 +127,29 @@ mod to_corners {
     use super::*;
 
     #[inline]
-    pub unsafe fn corners_to_vertices<V: BaseVertex>(
+    pub fn corners_to_vertices<V: BaseVertex>(
+        block_corners: ArrayVec<V, 20>,
+    ) -> ArrayVec<V, 30> {
+        macro_rules! c {
+            ($idx:expr) => {
+                unsafe {*block_corners.get_unchecked($idx)}
+            };
+        }
+
+        let mut vertices = ArrayVec::new();
+        let n = block_corners.len() / 4;
+
+        for face in 0..n {
+            let base = face * 4;
+            vertices.extend([
+                c![base+0], c![base+1], c![base+2], c![base+2], c![base+3], c![base+0],
+            ].into_iter());
+        }
+
+        vertices
+    }
+    #[inline]
+    pub unsafe fn corners_to_vertices2<V: BaseVertex>(
         block_corners: [MaybeUninit<V>; 24],
     ) -> [V; 36] {
         macro_rules! c {

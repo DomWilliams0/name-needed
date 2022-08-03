@@ -157,7 +157,7 @@ impl<C: WorldContext> WorldViewer<C> {
         {
             // TODO do mesh generation on a worker thread? or just do this bit in a parallel iter
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
-            trace!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
+            info!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
             f(dirty_chunk.pos(), mesh);
         }
 

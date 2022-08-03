@@ -9,8 +9,8 @@ use crate::loader::batch::UpdateBatcher;
 use crate::loader::loading::LoadedSlab;
 use crate::navigation::AreaNavEdge;
 use crate::neighbour::NeighbourOffset;
-use crate::occlusion::NeighbourOpacity;
-use crate::{BaseTerrain, OcclusionChunkUpdate, WorldArea, WorldContext, WorldRef};
+use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
+use crate::{BaseTerrain, OcclusionChunkUpdate, OcclusionFace, WorldArea, WorldContext, WorldRef};
 
 const SEND_FAILURE_THRESHOLD: usize = 20;
 
@@ -250,8 +250,8 @@ impl<C: WorldContext> SlabFinalizer<C> {
 
             // queue occlusion updates for next tick
             // TODO prevent mesh being rendered if there are queued occlusion changes?
-            self.send_update(OcclusionChunkUpdate(chunk, this_terrain_updates));
-            self.send_update(OcclusionChunkUpdate(neighbour, other_terrain_updates));
+            // self.send_update(OcclusionChunkUpdate(chunk, this_terrain_updates));
+            // self.send_update(OcclusionChunkUpdate(neighbour, other_terrain_updates));
         }
 
         // propagate across slab boundaries within chunk
@@ -259,27 +259,50 @@ impl<C: WorldContext> SlabFinalizer<C> {
             let world = self.world.borrow();
             let this_terrain = world.find_chunk_with_pos(chunk).unwrap(); // should be present
 
-            let chunk_updates = this_terrain
-                .raw_terrain()
-                .slab_boundary_slices()
-                .flat_map(|(lower_slice_idx, lower, upper)| {
-                    lower.into_iter().enumerate().filter_map(move |(i, b)| {
-                        let this_block = b.opacity();
-                        let block_above = (*upper)[i].opacity();
+            let mut chunk_updates = vec![];
+            for (lower_slice_idx, lower, upper) in this_terrain.raw_terrain().slab_boundary_slices()
+            {
+                let upper_slice_idx = lower_slice_idx + 1;
 
-                        // this block should be solid and the one above it should not be
-                        if this_block.solid() && block_above.transparent() {
-                            let this_block = unflatten_index(i);
+                // update side faces for solid upper blocks
+                for (i, _) in upper
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, b)| b.opacity().solid())
+                {
+                    let pos = unflatten_index(i);
 
-                            let block_pos = this_block.to_block_position(lower_slice_idx);
-                            let opacity = NeighbourOpacity::with_slice_above(this_block, upper);
-                            Some((block_pos, opacity))
-                        } else {
-                            None
+                    let mut update = BlockOcclusionUpdate::default();
+                    for face in OcclusionFace::SIDE_FACES {
+                        if let Some(extended) = face.extend_sideways(pos) {
+                            update.set_face(
+                                face,
+                                NeighbourOpacity::with_neighbouring_slices(
+                                    extended,
+                                    upper,
+                                    Some(lower),
+                                    None,
+                                    face,
+                                ),
+                            );
                         }
-                    })
-                })
-                .collect_vec();
+                    }
+
+                    chunk_updates.push((pos.to_block_position(upper_slice_idx), update))
+                }
+
+                // update top face for solid lower blocks with transparent above
+                for (i, _) in lower.iter().enumerate().filter(|(i, lower)| {
+                    lower.opacity().solid() && (*upper)[*i].opacity().transparent()
+                }) {
+                    let pos = unflatten_index(i);
+                    let opacity = NeighbourOpacity::with_slice_above(pos, upper);
+                    chunk_updates.push((
+                        pos.to_block_position(lower_slice_idx),
+                        BlockOcclusionUpdate::with_single_face(OcclusionFace::Top, opacity),
+                    ));
+                }
+            }
 
             drop(world);
             self.send_update(OcclusionChunkUpdate(chunk, chunk_updates));

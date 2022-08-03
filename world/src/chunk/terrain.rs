@@ -19,8 +19,8 @@ use crate::chunk::slice::{Slice, SliceMut};
 
 use crate::navigation::ChunkArea;
 use crate::neighbour::NeighbourOffset;
-use crate::occlusion::NeighbourOpacity;
-use crate::{BlockType, EdgeCost, SliceRange, WorldContext};
+use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
+use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
 /// Terrain only. Clone with `deep_clone`
 pub struct RawChunkTerrain<C: WorldContext> {
@@ -126,7 +126,7 @@ pub trait BaseTerrain<C: WorldContext> {
 
 pub struct OcclusionChunkUpdate(
     pub ChunkLocation,
-    pub Vec<(BlockPosition, NeighbourOpacity)>,
+    pub Vec<(BlockPosition, BlockOcclusionUpdate)>,
 );
 
 #[derive(Copy, Clone)]
@@ -591,7 +591,7 @@ impl<C: WorldContext> RawChunkTerrain<C> {
     /// Returns iter of slabs affected, probably duplicated but in order
     pub fn apply_occlusion_updates<'a>(
         &'a mut self,
-        updates: &'a [(BlockPosition, NeighbourOpacity)],
+        updates: &'a [(BlockPosition, BlockOcclusionUpdate)],
     ) -> impl Iterator<Item = SlabIndex> + 'a {
         updates
             .iter()
@@ -612,7 +612,7 @@ impl<C: WorldContext> RawChunkTerrain<C> {
 
                     block_mut
                         .occlusion_mut()
-                        .update_from_neighbour_opacities(new_opacities);
+                        .update_from_neighbour_opacities(&new_opacities);
 
                     trace!(
                         "new AO for block";
@@ -953,7 +953,7 @@ mod tests {
             terrain.set_block(
                 (2, 0, 0).try_into().unwrap(),
                 DummyBlockType::Stone,
-                SlabCreationPolicy::PleaseDont
+                SlabCreationPolicy::PleaseDont,
             ),
             true
         );
@@ -961,7 +961,7 @@ mod tests {
             terrain.set_block(
                 (2, 0, -2).try_into().unwrap(),
                 DummyBlockType::Stone,
-                SlabCreationPolicy::PleaseDont
+                SlabCreationPolicy::PleaseDont,
             ),
             false
         );
@@ -1062,7 +1062,7 @@ mod tests {
         assert!(!terrain.set_block(
             (0, 0, -5).try_into().unwrap(),
             DummyBlockType::Stone,
-            SlabCreationPolicy::PleaseDont
+            SlabCreationPolicy::PleaseDont,
         ));
         assert!(terrain.get_block_tup((0, 0, -5)).is_none());
         assert_eq!(terrain.slab_count(), 1);
@@ -1075,7 +1075,7 @@ mod tests {
         assert!(terrain.set_block(
             (0, 0, -5).try_into().unwrap(),
             DummyBlockType::Stone,
-            SlabCreationPolicy::CreateAll
+            SlabCreationPolicy::CreateAll,
         ));
         assert_eq!(
             terrain
@@ -1094,7 +1094,7 @@ mod tests {
         assert!(terrain.set_block(
             (0, 0, 100).try_into().unwrap(),
             DummyBlockType::Grass,
-            SlabCreationPolicy::CreateAll
+            SlabCreationPolicy::CreateAll,
         ));
         assert_eq!(
             terrain
@@ -1255,9 +1255,9 @@ mod tests {
             occlusion,
             [
                 VertexOcclusion::NotAtAll,
-                VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly,
-                VertexOcclusion::Mildly
+                VertexOcclusion::Mildly,
+                VertexOcclusion::NotAtAll,
             ]
         );
     }
@@ -1274,21 +1274,65 @@ mod tests {
 
         let terrain = load_single_chunk(terrain);
 
-        let (occlusion, _) = terrain
+        let below_block_occlusion = *terrain
             .get_block_tup((2, 2, SLAB_SIZE.as_i32() - 1))
             .unwrap()
-            .occlusion()
-            .resolve_vertices(OcclusionFace::Top);
+            .occlusion();
 
+        let above_block_occlusion = *terrain
+            .get_block_tup((2, 2, SLAB_SIZE.as_i32()))
+            .unwrap()
+            .occlusion();
+
+        // below should have top like this and the rest not
         assert_eq!(
-            occlusion,
+            below_block_occlusion.resolve_vertices(OcclusionFace::Top).0,
             [
+                VertexOcclusion::NotAtAll,
+                VertexOcclusion::Mildly,
+                VertexOcclusion::Mildly,
+                VertexOcclusion::NotAtAll,
+            ]
+        );
+
+        for f in OcclusionFace::FACES
+            .iter()
+            .filter(|f| !matches!(**f, OcclusionFace::Top))
+        {
+            assert!(
+                below_block_occlusion.get_face(*f).is_all_transparent(),
+                "not all transparent for face {:?} - {:?}",
+                f,
+                below_block_occlusion.get_face(*f)
+            );
+        }
+
+        // above should have south like this and the rest not
+        assert_eq!(
+            above_block_occlusion
+                .resolve_vertices(OcclusionFace::South)
+                .0,
+            [
+                VertexOcclusion::Mildly,
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly,
-                VertexOcclusion::Mildly
             ]
         );
+
+        for f in OcclusionFace::FACES
+            .iter()
+            .filter(|f| !matches!(**f, OcclusionFace::South))
+        {
+            assert!(
+                above_block_occlusion.get_face(*f).is_all_transparent(),
+                "not all transparent for face {:?} - {:?}",
+                f,
+                above_block_occlusion.get_face(*f)
+            );
+        }
+
+        // above should have south like this and the rest not
     }
 
     fn occlusion(
@@ -1330,10 +1374,10 @@ mod tests {
         assert!(matches!(
             occlusion(&world, ChunkLocation(0, 0), (0, 0, 0), OcclusionFace::Top),
             [
-                VertexOcclusion::Full,
                 VertexOcclusion::Mildly,
                 VertexOcclusion::NotAtAll,
-                VertexOcclusion::Mildly
+                VertexOcclusion::Mildly,
+                VertexOcclusion::Full,
             ]
         ));
     }
@@ -1437,9 +1481,9 @@ mod tests {
             ),
             [
                 VertexOcclusion::NotAtAll,
-                VertexOcclusion::NotAtAll,
                 VertexOcclusion::Mildly,
                 VertexOcclusion::Mostly,
+                VertexOcclusion::NotAtAll,
             ]
         ));
     }

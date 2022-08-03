@@ -29,6 +29,12 @@ pub struct SliceOwned<C: WorldContext> {
     slice: Box<[Block<C>; SLICE_SIZE]>,
 }
 
+pub trait IndexableSlice<C: WorldContext> {
+    // can't use normal Index trait because it's auto implemented for references, and we need the
+    // manual impl
+    fn index(&self, pos: SliceBlock) -> &Block<C>;
+}
+
 impl<'a, C: WorldContext> Slice<'a, C> {
     pub fn new(slice: &'a [Block<C>]) -> Self {
         Self { slice }
@@ -89,6 +95,12 @@ impl<'a, C: WorldContext> Slice<'a, C> {
 
     pub fn into_iter(self) -> impl Iterator<Item = &'a Block<C>> {
         self.slice.iter()
+    }
+}
+
+impl<C: WorldContext> IndexableSlice<C> for Slice<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
     }
 }
 
@@ -159,6 +171,18 @@ impl<'a, C: WorldContext> SliceMut<'a, C> {
         for b in self.slice.iter_mut() {
             *b = block;
         }
+    }
+}
+
+impl<C: WorldContext> IndexableSlice<C> for SliceMut<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
+    }
+}
+
+impl<C: WorldContext> IndexableSlice<C> for &SliceMut<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
     }
 }
 

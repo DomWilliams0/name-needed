@@ -1,12 +1,13 @@
 use misc::derive_more::{Deref, DerefMut};
 use std::cell::Cell;
+use std::convert::identity;
 use std::fmt::{Debug, Formatter};
 
-use crate::block::BlockOpacity;
-use crate::chunk::slice::{Slice, SliceMut};
+use crate::block::{Block, BlockOpacity};
+use crate::chunk::slice::{IndexableSlice, Slice, SliceMut};
 use crate::neighbour::NeighbourOffset;
 use crate::WorldContext;
-use std::ops::Add;
+use std::ops::{Add, Index};
 use unit::world::SliceBlock;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -43,8 +44,7 @@ pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
 
 impl NeighbourOpacity {
     pub const fn default_const() -> Self {
-        // TODO this is different to the actual Default!
-        Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
+        Self([OcclusionOpacity::Unknown; NeighbourOffset::COUNT])
     }
 
     pub const fn unknown() -> Self {
@@ -53,6 +53,10 @@ impl NeighbourOpacity {
 
     pub fn is_all_transparent(&self) -> bool {
         self.0.iter().all(|o| !o.solid())
+    }
+
+    pub fn is_all_solid(&self) -> bool {
+        self.0.iter().all(|o| o.solid())
     }
 
     pub fn is_all_unknown(&self) -> bool {
@@ -76,7 +80,6 @@ impl NeighbourOpacity {
         ]
     }
 
-    #[cfg(test)]
     pub fn all_solid() -> Self {
         Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
     }
@@ -102,12 +105,17 @@ impl NeighbourOpacity {
     /// extended_block: protruded from src block in direction of face
     pub fn with_neighbouring_slices<C: WorldContext>(
         extended_block: SliceBlock,
-        this_slice: &SliceMut<C>,
+        this_slice: impl IndexableSlice<C>,
         slice_below: Option<Slice<C>>,
         slice_above: Option<Slice<C>>,
         face: OcclusionFace,
     ) -> NeighbourOpacity {
         debug_assert!(!matches!(face, OcclusionFace::Top));
+
+        if this_slice.index(extended_block).opacity().solid() {
+            // face is not visible
+            return NeighbourOpacity::all_solid();
+        }
 
         // defaults to unknown
         let mut opacity = NeighbourOpacity::default();
@@ -152,7 +160,7 @@ impl NeighbourOpacity {
                 let neighbour_opacity = match (relative, slice_below, slice_above) {
                     (Relative::SliceBelow, Some(slice), _) => slice[pos].opacity(),
                     (Relative::SliceAbove, _, Some(slice)) => slice[pos].opacity(),
-                    (Relative::ThisSlice, _, _) => this_slice[pos].opacity(),
+                    (Relative::ThisSlice, _, _) => this_slice.index(pos).opacity(),
                     _ => continue,
                 };
 
@@ -269,6 +277,24 @@ impl OcclusionFace {
         OcclusionFace::Top,
         OcclusionFace::North,
     ];
+
+    pub const SIDE_FACES: [OcclusionFace; Self::COUNT - 1] = [
+        OcclusionFace::South,
+        OcclusionFace::West,
+        OcclusionFace::East,
+        OcclusionFace::North,
+    ];
+
+    pub fn extend_sideways(self, pos: SliceBlock) -> Option<SliceBlock> {
+        use OcclusionFace::*;
+        match self {
+            Top => None,
+            North => pos.try_add((0, 1)),
+            East => pos.try_add((1, 0)),
+            South => pos.try_add((0, -1)),
+            West => pos.try_add((-1, 0)),
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -277,12 +303,10 @@ pub struct BlockOcclusion {
     neighbours: [NeighbourOpacity; OcclusionFace::COUNT],
 }
 
-impl BlockOcclusion {
-    #[deprecated]
-    pub fn from_neighbour_opacities(neighbours: NeighbourOpacity) -> Self {
-        todo!()
-    }
+#[derive(Default, Deref, Debug, Copy, Clone)]
+pub struct BlockOcclusionUpdate([Option<NeighbourOpacity>; OcclusionFace::COUNT]);
 
+impl BlockOcclusion {
     // TODO pub(crate)
     pub fn resolve_vertices(&self, face: OcclusionFace) -> ([VertexOcclusion; 4], OcclusionFlip) {
         let neighbours = self.neighbours[face as usize];
@@ -328,13 +352,17 @@ impl BlockOcclusion {
         }
     }
 
-    pub fn update_from_neighbour_opacities(&mut self, neighbours: NeighbourOpacity) {
-        /*        (self.neighbours)
-                    .0
-                    .iter_mut()
-                    .zip(neighbours.0.iter())
-                    .for_each(|(a, b)| *a = (*a).update(*b));
-        */
+    pub fn update_from_neighbour_opacities(&mut self, neighbours: &BlockOcclusionUpdate) {
+        for (a, b) in self
+            .neighbours
+            .iter_mut()
+            .zip(neighbours.iter())
+            .filter_map(|(a, b)| b.map(|b| (a, b)))
+        {
+            for (a, b) in a.iter_mut().zip(b.iter()) {
+                *a = a.update(*b);
+            }
+        }
     }
 
     pub fn set_face(&mut self, face: OcclusionFace, neighbours: NeighbourOpacity) {
@@ -352,19 +380,38 @@ impl BlockOcclusion {
     }
 }
 
-impl Default for BlockOcclusion {
-    fn default() -> Self {
-        Self::default_const()
+impl BlockOcclusionUpdate {
+    pub fn with_single_face(face: OcclusionFace, opacities: NeighbourOpacity) -> Self {
+        let mut occ = [None; OcclusionFace::COUNT];
+        occ[face as usize] = Some(opacities);
+        Self(occ)
+    }
+
+    pub fn set_face(&mut self, face: OcclusionFace, opacity: NeighbourOpacity) {
+        self.0[face as usize] = Some(opacity);
     }
 }
 
-impl PartialEq<NeighbourOpacity> for BlockOcclusion {
-    fn eq(&self, other: &NeighbourOpacity) -> bool {
-        // let my_opacities = self.0.opacities();
-        // let ur_opacities = other.opacities();
-        // my_opacities == ur_opacities
-        // TODO comparison by face or against all faces
-        false
+impl Default for BlockOcclusion {
+    fn default() -> Self {
+        Self {
+            neighbours: [NeighbourOpacity::unknown(); OcclusionFace::COUNT],
+        }
+    }
+}
+
+impl PartialEq<BlockOcclusionUpdate> for BlockOcclusion {
+    /// Only compares Some faces against self's faces
+    fn eq(&self, opacities: &BlockOcclusionUpdate) -> bool {
+        for (i, ur_opacity) in opacities.iter().enumerate() {
+            if let Some(ur_opacity) = ur_opacity {
+                let my_opacity = self.neighbours[i];
+                if my_opacity.opacities() != ur_opacity.opacities() {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -408,10 +455,14 @@ mod tests {
             o
         };
 
-        let mut occlusion = BlockOcclusion::from_neighbour_opacities(neighbour_occluded);
+        let mut occlusion = BlockOcclusion::default();
+        occlusion.set_face(OcclusionFace::Top, neighbour_occluded);
         assert_eq!(occlusion.top_corner(0), VertexOcclusion::Mildly);
 
-        occlusion.update_from_neighbour_opacities(neighbour_not_occluded);
+        occlusion.update_from_neighbour_opacities(&BlockOcclusionUpdate::with_single_face(
+            OcclusionFace::Top,
+            neighbour_not_occluded,
+        ));
         assert_eq!(occlusion.top_corner(0), VertexOcclusion::NotAtAll);
     }
 }
