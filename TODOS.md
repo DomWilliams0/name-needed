@@ -113,7 +113,7 @@
    * `// TODO only for debugging`
    * `// TODO pub(crate)`
  * [world/src/ray.rs](world/src/ray.rs) (3)
-   * `// TODO optimise to reuse chunk ref and avoid duplicate block pos checks`
+   * `// TODO skip ahead over unloaded chunks`
    * `// TODO capture face`
    * `// TODO skip if slab is not visible to the player`
  * [world/src/viewer.rs](world/src/viewer.rs) (9)

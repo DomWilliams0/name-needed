@@ -87,7 +87,7 @@ struct ContiguousChunkIteratorMut<'a, C: WorldContext> {
 
 pub(crate) struct ContiguousChunkIterator<'a, C: WorldContext> {
     world: &'a World<C>,
-    last_chunk: Option<(ChunkLocation, usize)>,
+    last_chunk: Option<(ChunkLocation, Option<usize>)>,
     #[cfg(test)]
     matched_last: bool,
 }
@@ -1189,9 +1189,14 @@ impl<'a, C: WorldContext> ContiguousChunkIterator<'a, C> {
                     self.matched_last = true;
                 }
 
-                // safety: index returned by last call and no chunks added since because this holds
-                // a world reference
-                Some(unsafe { self.world.chunks.get_unchecked(idx) })
+                if let Some(idx) = idx {
+                    // safety: index returned by last call and no chunks added since because this holds
+                    // a world reference
+                    Some(unsafe { self.world.chunks.get_unchecked(idx) })
+                } else {
+                    // does not exist
+                    None
+                }
             }
             _ => {
                 // new chunk
@@ -1203,12 +1208,15 @@ impl<'a, C: WorldContext> ContiguousChunkIterator<'a, C> {
 
                 match self.world.find_chunk_index(chunk) {
                     Ok(idx) => {
-                        self.last_chunk = Some((chunk, idx));
+                        self.last_chunk = Some((chunk, Some(idx)));
 
                         // safety: index returned by find_chunk_index
                         Some(unsafe { self.world.chunks.get_unchecked(idx) })
                     }
-                    Err(_) => None,
+                    Err(_) => {
+                        self.last_chunk = Some((chunk, None));
+                        None
+                    }
                 }
             }
         }
@@ -1982,8 +1990,13 @@ mod tests {
         assert!(chunk.is_none());
         assert!(!iter.matched_last);
 
-        // still bad
+        // still bad but matched
         chunk = iter.next(ChunkLocation(5, 0));
+        assert!(chunk.is_none());
+        assert!(iter.matched_last);
+
+        // another bad
+        chunk = iter.next(ChunkLocation(6, 0));
         assert!(chunk.is_none());
         assert!(!iter.matched_last);
     }
