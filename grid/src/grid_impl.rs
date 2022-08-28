@@ -147,6 +147,11 @@ impl<I: GridImpl> Grid<I> {
     pub fn unflatten<C: CoordType>(index: usize) -> Option<C> {
         I::unflatten(index)
     }
+
+    pub fn from_iter(items: impl Iterator<Item = I::Item>) -> Self {
+        let inner = I::from_iter(items);
+        Self(inner)
+    }
 }
 
 // should use safe Option-returning version instead

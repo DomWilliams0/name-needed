@@ -1,4 +1,4 @@
-# TODOs (100)
+# TODOs (102)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -32,6 +32,8 @@
  * [unit/src/dim.rs](unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
+ * [unit/src/world/range.rs](unit/src/world/range.rs) (1)
+   * `// TODO fix on creation so no need to redo this every time`
  * [unit/src/world/slab_position.rs](unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [unit/src/world/slice_index.rs](unit/src/world/slice_index.rs) (1)
@@ -84,9 +86,9 @@
  * [world/src/loader/worker_pool.rs](world/src/loader/worker_pool.rs) (1)
    * `// TODO detect this as an error condition?`
  * [world/src/mesh.rs](world/src/mesh.rs) (5)
+   * `// TODO use indices and dont duplicate vertices?`
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
    * `// TODO skip if slice knows it is empty`
-   * `// TODO use indices and dont repeat vertices?`
    * `// TODO ignore occluded face, return maybeuninit array and len of how much is initialised`
    * `// TODO also rotate texture`
  * [world/src/navigation/area_navigation.rs](world/src/navigation/area_navigation.rs) (3)
@@ -112,11 +114,13 @@
    * `// TODO ideally check the slice first before calculating offset but whatever`
    * `// TODO only for debugging`
    * `// TODO pub(crate)`
- * [world/src/ray.rs](world/src/ray.rs) (3)
+ * [world/src/ray.rs](world/src/ray.rs) (5)
+   * `// TODO if found block is fully occluded, go upwards/some direction to find better candidate`
    * `// TODO skip ahead over unloaded chunks`
+   * `// TODO filter out invisible here`
    * `// TODO capture face`
-   * `// TODO skip if slab is not visible to the player`
- * [world/src/viewer.rs](world/src/viewer.rs) (9)
+   * `// TODO return a point instead of block`
+ * [world/src/viewer.rs](world/src/viewer.rs) (8)
    * `assert!(size > 0); // TODO Result`
    * `chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?`
    * `// TODO do mesh generation on a worker thread? or just do this bit in a parallel iter`
@@ -125,7 +129,6 @@
    * `// TODO only request slabs that are newly visible`
    * `// TODO which direction to stretch view range in? automatically determine or player input?`
    * `// TODO submit only the new chunks in range`
-   * `// FIXME tepmorary`
  * [world/src/world.rs](world/src/world.rs) (8)
    * `// TODO optimize path with raytracing (#50)`
    * `// TODO only calculate path for each area as needed (#51)`

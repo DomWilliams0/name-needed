@@ -53,6 +53,10 @@ impl Length3 {
         self.2
     }
 
+    pub const fn xyz(self) -> [Length; 3] {
+        [self.0, self.1, self.2]
+    }
+
     pub fn xy_max(self) -> Length {
         self.x().max(self.y())
     }
@@ -82,6 +86,10 @@ impl Length2 {
 
     pub const fn xy(self) -> (Length, Length) {
         (self.0, self.1)
+    }
+
+    pub fn as_length3(self, z: u16) -> Length3 {
+        Length3(self.0, self.1, Length::new(z))
     }
 }
 

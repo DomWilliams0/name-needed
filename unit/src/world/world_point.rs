@@ -11,10 +11,6 @@ use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
 pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
 
-#[deprecated(note = "camera is not 2d anymore")]
-#[derive(Copy, Clone)]
-pub struct WorldPoint2d(NotNan<f32>, NotNan<f32>);
-
 #[inline]
 fn not_nan(x: f32) -> Option<NotNan<f32>> {
     if x.is_finite() {
@@ -140,34 +136,6 @@ impl WorldPoint {
         let new_z = f(self.2.into_inner());
         self.2 = not_nan(new_z).expect("new value is not finite");
         *self
-    }
-}
-
-impl WorldPoint2d {
-    /// None if any coord is not finite
-    pub fn new_checked(x: f32, y: f32) -> Option<Self> {
-        match (not_nan(x), not_nan(y)) {
-            (Some(x), Some(y)) => Some(Self(x, y)),
-            _ => None,
-        }
-    }
-
-    pub fn new(x: NotNan<f32>, y: NotNan<f32>) -> Self {
-        Self(x, y)
-    }
-
-    pub fn into_world_point(self, z: NotNan<f32>) -> WorldPoint {
-        WorldPoint(self.0, self.1, z)
-    }
-
-    #[inline]
-    pub fn x(self) -> f32 {
-        self.0.into_inner()
-    }
-
-    #[inline]
-    pub fn y(self) -> f32 {
-        self.1.into_inner()
     }
 }
 

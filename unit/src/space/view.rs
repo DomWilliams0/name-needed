@@ -24,8 +24,16 @@ impl ViewPoint {
         Self::new(x, y, z).unwrap_or_else(|| panic!("bad coords {:?}", (x, y, z)))
     }
 
+    pub fn new_arr([x, y, z]: [f32; 3]) -> Option<Self> {
+        Self::new(x, y, z)
+    }
+
     pub const fn xyz(&self) -> (f32, f32, f32) {
         (self.0, self.1, self.2)
+    }
+
+    pub const fn xyz_arr(&self) -> [f32; 3] {
+        [self.0, self.1, self.2]
     }
 }
 

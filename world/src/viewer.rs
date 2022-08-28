@@ -91,7 +91,7 @@ impl SliceRange {
 
 impl Display for SliceRange {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{} => {}]", self.0.slice(), self.1.slice())
+        write!(f, "{}:{}", self.0.slice(), self.1.slice())
     }
 }
 
@@ -302,12 +302,11 @@ impl<C: WorldContext> WorldViewer<C> {
         drop(world);
 
         if len_before > 0 {
-            // FIXME tepmorary
-            //debug!(
-            //    "filtered {unfiltered} slab requests down to {filtered}",
-            //    unfiltered = len_before,
-            //    filtered = self.requested_slabs.len()
-            //);
+            debug!(
+                "filtered {unfiltered} slab requests down to {filtered}",
+                unfiltered = len_before,
+                filtered = self.requested_slabs.len()
+            );
 
             trace!("slab requests"; "slabs" => ?self.requested_slabs);
         }

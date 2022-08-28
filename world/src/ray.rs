@@ -1,5 +1,5 @@
 use crate::world::ContiguousChunkIterator;
-use crate::{BaseTerrain, BlockType, InnerWorldRef, WorldContext};
+use crate::{BaseTerrain, BlockType, InnerWorldRef, SliceRange, WorldContext};
 use misc::cgmath::Array;
 use misc::num_traits::signum;
 use misc::{debug, InnerSpace, Vector3};
@@ -30,14 +30,20 @@ impl VoxelRay {
         self.dir
     }
 
-    pub fn find_first<C: WorldContext>(&self, world: &InnerWorldRef<C>) -> Option<WorldPosition> {
-        self.find_first_with_callback(world, |_| {})
+    // TODO if found block is fully occluded, go upwards/some direction to find better candidate
+    pub fn find_first_visible<C: WorldContext>(
+        &self,
+        world: &InnerWorldRef<C>,
+        range: SliceRange,
+    ) -> Option<WorldPosition> {
+        self.find_first_with_callback(world, |_| {}, |pos| range.contains(pos.slice()))
     }
 
     pub fn find_first_with_callback<C: WorldContext>(
         &self,
         world: &InnerWorldRef<C>,
         mut cb: impl FnMut(WorldPosition),
+        mut filter: impl FnMut(WorldPosition) -> bool,
     ) -> Option<WorldPosition> {
         if self.dir.magnitude2() < 0.9 {
             misc::warn!("invalid raycast direction {:?}", self.dir);
@@ -70,27 +76,30 @@ impl VoxelRay {
         let mut has_seen_a_block = false;
         let mut chunk_iter = ContiguousChunkIterator::new(world);
         loop {
-            let block_pos = WorldPoint::new_unchecked(pos.x, pos.y, pos.z).round();
-            if Some(block_pos) != last_block {
-                let block = chunk_iter
-                    .next(ChunkLocation::from(block_pos))
-                    .and_then(|chunk| chunk.get_block(block_pos.into()));
+            let block_pos = WorldPoint::new_unchecked(pos.x, pos.y, pos.z).floor();
+            if filter(block_pos) {
+                // TODO filter out invisible here
+                if Some(block_pos) != last_block {
+                    let block = chunk_iter
+                        .next(ChunkLocation::from(block_pos))
+                        .and_then(|chunk| chunk.get_block(block_pos.into()));
 
-                if let Some(b) = block {
-                    has_seen_a_block = true;
-                    if !b.block_type().is_air() {
-                        // found a solid block
-                        // TODO capture face
-                        // TODO skip if slab is not visible to the player
-                        return Some(block_pos);
+                    if let Some(b) = block {
+                        has_seen_a_block = true;
+                        if !b.block_type().is_air() {
+                            // found a solid block
+                            // TODO capture face
+                            // TODO return a point instead of block
+                            return Some(block_pos);
+                        }
+                    } else if has_seen_a_block {
+                        // we have visited some blocks but passed through the whole world, abort
+                        break;
                     }
-                } else if has_seen_a_block {
-                    // we have visited some blocks but passed through the whole world, abort
-                    break;
-                }
 
-                last_block = Some(block_pos);
-                cb(block_pos);
+                    last_block = Some(block_pos);
+                    cb(block_pos);
+                }
             }
 
             let face = if t_max[0] < t_max[1] {

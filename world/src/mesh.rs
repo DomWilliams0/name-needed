@@ -19,9 +19,6 @@ const VERTICES_PER_BLOCK: usize = 6;
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
 
-// 0, 1, 2 | 2, 3, 0
-const TILE_CORNERS: [(f32, f32); 4] = [(-X, -X), (X, -X), (X, X), (-X, X)];
-
 pub trait BaseVertex: Copy + Debug {
     fn new(pos: (f32, f32, f32), color: Color) -> Self;
 }
@@ -30,6 +27,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
     chunk: &Chunk<C>,
     slice_range: SliceRange,
 ) -> Vec<V> {
+    // TODO use indices and dont duplicate vertices?
     let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first
 
     let shifted_slice_index = |slice_index: GlobalSliceIndex| {
@@ -44,7 +42,14 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
         let slice_index = shifted_slice_index(slice_index);
 
         for (i, block_pos, block) in slice.non_air_blocks() {
-            // TODO use indices and dont repeat vertices?
+            let above = unsafe { slice_above.get_unchecked(i) };
+            if above.opacity().solid() {
+                vertices.extend_from_slice(&make_corners(
+                    block_pos,
+                    Color::rgb(50, 50, 50),
+                    slice_index,
+                ));
+            }
             vertices.extend_from_slice(&make_corners_with_ao(
                 block_pos,
                 block.block_type().render_color(),
@@ -148,44 +153,41 @@ mod to_corners {
 
         vertices
     }
-    #[inline]
-    pub unsafe fn corners_to_vertices2<V: BaseVertex>(
-        block_corners: [MaybeUninit<V>; 24],
-    ) -> [V; 36] {
-        macro_rules! c {
-            ($idx:expr) => {
-                block_corners[$idx].assume_init()
-            };
-        }
-        [
-            c![0],  c![1],  c![2],  c![2],  c![3],  c![0],
-            c![4],  c![5],  c![6],  c![6],  c![7],  c![4],
-            c![8],  c![9],  c![10], c![10], c![11], c![8],
-            c![12], c![13], c![14], c![14], c![15], c![12],
-            c![16], c![17], c![18], c![18], c![19], c![16],
-            c![20], c![21], c![22], c![22], c![23], c![20],
-        ]
-    }
 }
 
 fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: Color, slice_index: f32) -> [V; 6] {
     let (bx, by) = block_centre(block_pos);
+    let top_offsets = [[X, -X, X], [X, X, X], [-X, X, X], [-X, -X, X]];
 
-    let mut block_corners = [MaybeUninit::uninit(); TILE_CORNERS.len()];
+    let mut block_corners = ArrayVec::<V, 4>::new();
 
-    for (i, (fx, fy)) in TILE_CORNERS.iter().enumerate() {
-        block_corners[i] = MaybeUninit::new(V::new(
+    for [fx, fy, fz] in top_offsets.into_iter() {
+        let vertex = V::new(
             (
                 fx + bx * unit::world::BLOCKS_SCALE,
                 fy + by * unit::world::BLOCKS_SCALE,
-                slice_index * unit::world::BLOCKS_SCALE,
+                fz + slice_index * unit::world::BLOCKS_SCALE,
             ),
             color,
-        ));
+        );
+        // safety: limited to 4
+        unsafe {
+            block_corners.push_unchecked(vertex);
+        }
     }
 
     // safety: all corners have been initialized
-    unsafe { corners_to_vertices(block_corners) }
+    let c = block_corners;
+    unsafe {
+        [
+            *c.get_unchecked(0),
+            *c.get_unchecked(1),
+            *c.get_unchecked(2),
+            *c.get_unchecked(2),
+            *c.get_unchecked(3),
+            *c.get_unchecked(0),
+        ]
+    }
 }
 
 unsafe fn corners_to_vertices<V: BaseVertex>(block_corners: [MaybeUninit<V>; 4]) -> [V; 6] {
