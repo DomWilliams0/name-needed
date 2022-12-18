@@ -270,6 +270,7 @@ pub enum OcclusionFace {
 impl OcclusionFace {
     pub const COUNT: usize = 5;
 
+    /// Not in same order as ordinal!!!
     pub const FACES: [OcclusionFace; Self::COUNT] = [
         OcclusionFace::South,
         OcclusionFace::West,
@@ -283,6 +284,15 @@ impl OcclusionFace {
         OcclusionFace::West,
         OcclusionFace::East,
         OcclusionFace::North,
+    ];
+
+    /// In same order as ordinal
+    pub const ORDINALS: [OcclusionFace; Self::COUNT] = [
+        OcclusionFace::Top,
+        OcclusionFace::North,
+        OcclusionFace::East,
+        OcclusionFace::South,
+        OcclusionFace::West,
     ];
 
     pub fn extend_sideways(self, pos: SliceBlock) -> Option<SliceBlock> {
@@ -299,7 +309,7 @@ impl OcclusionFace {
 
 #[derive(Copy, Clone)]
 pub struct BlockOcclusion {
-    /// Maps to [FACES]
+    /// Maps to [OcclusionFace::ORDINALS]
     neighbours: [NeighbourOpacity; OcclusionFace::COUNT],
 }
 
@@ -371,6 +381,13 @@ impl BlockOcclusion {
 
     pub fn get_face(&self, face: OcclusionFace) -> NeighbourOpacity {
         self.neighbours[face as usize]
+    }
+
+    pub fn visible_faces(&self) -> impl Iterator<Item = OcclusionFace> + '_ {
+        self.neighbours
+            .iter()
+            .zip(OcclusionFace::ORDINALS.iter())
+            .filter_map(|(n, &face)| if !n.is_all_solid() { Some(face) } else { None })
     }
 
     #[cfg(test)]

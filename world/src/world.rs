@@ -52,10 +52,8 @@ pub enum WaitResult {
 }
 
 #[derive(Constructor)]
-pub struct WorldChangeEvent<C: WorldContext> {
-    pub pos: WorldPosition,
-    pub prev: C::BlockType,
-    pub new: C::BlockType,
+pub struct WorldChangeEvent {
+    pub slab: SlabLocation,
 }
 
 impl<C: WorldContext> Default for World<C> {
@@ -450,7 +448,7 @@ impl<C: WorldContext> World<C> {
         None
     }
 
-    pub(in crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<C> {
+    pub(crate) fn ensure_chunk(&mut self, chunk: ChunkLocation) -> &mut Chunk<C> {
         let idx = match self.find_chunk_index(chunk) {
             Ok(idx) => idx,
             Err(idx) => {
@@ -558,7 +556,6 @@ impl<C: WorldContext> World<C> {
     pub(crate) fn apply_terrain_updates_in_place(
         &mut self,
         updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate<C>>)>,
-        changes_out: &mut Vec<WorldChangeEvent<C>>,
         mut per_slab: impl FnMut(SlabLocation),
     ) {
         let mut contiguous_chunks = ContiguousChunkIteratorMut::new(self);
@@ -583,10 +580,8 @@ impl<C: WorldContext> World<C> {
                 }
             };
 
-            let prev_len = changes_out.len();
-            slab.apply_terrain_updates(slab_loc, slab_updates, changes_out);
-            let count = changes_out.len() - prev_len;
-            debug!("applied {count} terrain updates to slab", count = count; slab_loc);
+            let count = slab.apply_terrain_updates(slab_loc, slab_updates);
+            debug!("applied {count} terrain block updates to slab", count = count; slab_loc);
 
             per_slab(slab_loc);
         }

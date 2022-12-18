@@ -5,10 +5,7 @@ use std::ops::{Add, Mul, SubAssign};
 use misc::num_traits::{AsPrimitive, Num, One, Zero};
 use misc::*;
 
-use crate::world::{
-    BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPoint,
-    WorldPosition,
-};
+use crate::world::{BlockCoord, BlockPosition, CHUNK_SIZE, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition, WorldPoint, WorldPosition};
 
 #[derive(Clone, Debug, PartialOrd)]
 pub enum WorldRange<P: RangePosition> {
@@ -336,6 +333,14 @@ impl WorldRange<WorldPosition> {
             ]
             .into_iter(),
         )
+    }
+
+    pub fn contains_slab(&self, slab: SlabLocation) -> bool {
+        let (bottom, top) = slab.slab.slice_range();
+        let min = BlockPosition::new_unchecked(0, 0, bottom).to_world_position(slab.chunk);
+        let max = BlockPosition::new_unchecked(CHUNK_SIZE.as_block_coord(), CHUNK_SIZE.as_block_coord(), top).to_world_position(slab.chunk);
+
+        true // TODO FIXME
     }
 }
 

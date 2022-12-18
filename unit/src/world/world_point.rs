@@ -45,6 +45,17 @@ impl WorldPoint {
         Self::new(x, y, z).unwrap_or_else(|| panic!("bad coords {:?}", (x, y, z)))
     }
 
+    pub fn new_really_unchecked(x: f32, y: f32, z: f32) -> Self {
+        debug_assert!(x.is_finite() && y.is_finite() && z.is_finite());
+        unsafe {
+            Self(
+                NotNan::new_unchecked(x),
+                NotNan::new_unchecked(y),
+                NotNan::new_unchecked(z),
+            )
+        }
+    }
+
     pub fn slice(&self) -> GlobalSliceIndex {
         GlobalSliceIndex::new(self.z() as i32)
     }

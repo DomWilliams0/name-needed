@@ -245,7 +245,7 @@ impl<C: WorldContext> WorldLoader<C> {
     pub fn apply_terrain_updates(
         &mut self,
         terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>,
-        changes_out: &mut Vec<WorldChangeEvent<C>>,
+        changes_out: &mut Vec<WorldChangeEvent>,
     ) {
         let world_ref = self.world.clone();
 
@@ -355,11 +355,9 @@ impl<C: WorldContext> WorldLoader<C> {
         // TODO reuse buf
         let mut slab_locs = Vec::with_capacity(upper_slab_limit);
         let mut world = world_ref.borrow_mut();
-        world.apply_terrain_updates_in_place(
-            grouped_updates.into_iter(),
-            changes_out,
-            |slab_loc| slab_locs.push(slab_loc),
-        );
+        world.apply_terrain_updates_in_place(grouped_updates.into_iter(), |slab_loc| {
+            slab_locs.push(slab_loc)
+        });
 
         let real_slab_count = slab_locs.len();
         debug!(

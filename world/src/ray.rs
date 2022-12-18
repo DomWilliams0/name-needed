@@ -1,8 +1,9 @@
 use crate::world::ContiguousChunkIterator;
 use crate::{BaseTerrain, BlockType, InnerWorldRef, SliceRange, WorldContext};
 use misc::cgmath::Array;
+use misc::cgmath::Vector3;
 use misc::num_traits::signum;
-use misc::{debug, InnerSpace, Vector3};
+use misc::{debug, InnerSpace, F};
 use unit::space::view::ViewPoint;
 use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, BLOCKS_PER_METRE,
@@ -11,11 +12,11 @@ use unit::world::{
 #[derive(Debug, Clone)]
 pub struct VoxelRay {
     pos: ViewPoint,
-    dir: Vector3,
+    dir: Vector3<F>,
 }
 
 impl VoxelRay {
-    pub fn new(pos: ViewPoint, dir: Vector3) -> Self {
+    pub fn new(pos: ViewPoint, dir: Vector3<F>) -> Self {
         Self {
             pos,
             dir: dir.normalize(),
@@ -26,7 +27,7 @@ impl VoxelRay {
         self.pos
     }
 
-    pub fn direction(&self) -> Vector3 {
+    pub fn direction(&self) -> Vector3<F> {
         self.dir
     }
 
@@ -51,32 +52,30 @@ impl VoxelRay {
         }
 
         // TODO skip ahead over unloaded chunks
-        let step: [f32; 3] = {
-            let vec = self.dir / 10.0;
+        let step: [f64; 3] = {
+            let vec = (self.dir / 10.0).cast::<f64>().unwrap(); // cant fail
             *vec.as_ref()
         };
 
         // https://gamedev.stackexchange.com/a/49423j
         let range = 800.0;
         let cam_pos = WorldPoint::from(self.pos);
-        let mut pos = Vector3::new(cam_pos.x(), cam_pos.y(), cam_pos.z());
+        let mut pos = Vector3::new(cam_pos.x() as f64, cam_pos.y() as f64, cam_pos.z() as f64);
+        let dir = self.dir.cast::<f64>().unwrap(); // cant fail
         let mut t_max = Vector3::new(
-            intbound(pos.x, self.dir.x),
-            intbound(pos.y, self.dir.y),
-            intbound(pos.z, self.dir.z),
+            intbound(pos.x, dir.x),
+            intbound(pos.y, dir.y),
+            intbound(pos.z, dir.z),
         );
 
-        let t_delta = Vector3::new(
-            step[0] / self.dir.x,
-            step[1] / self.dir.y,
-            step[2] / self.dir.z,
-        );
+        let t_delta = Vector3::new(step[0] / dir.x, step[1] / dir.y, step[2] / dir.z);
 
         let mut last_block = None;
         let mut has_seen_a_block = false;
         let mut chunk_iter = ContiguousChunkIterator::new(world);
         loop {
-            let block_pos = WorldPoint::new_unchecked(pos.x, pos.y, pos.z).floor();
+            let block_pos =
+                WorldPoint::new_unchecked(pos.x as f32, pos.y as f32, pos.z as f32).floor();
             if filter(block_pos) {
                 // TODO filter out invisible here
                 if Some(block_pos) != last_block {
@@ -143,14 +142,14 @@ impl VoxelRay {
     }
 }
 
-fn intbound(s: f32, ds: f32) -> f32 {
+fn intbound(s: f64, ds: f64) -> f64 {
     if ds < 0.0 {
         intbound(-s, -ds)
     } else {
-        1.0 - (s.rem_euclid(1.0))
+        1.0 - (s.rem_euclid(1.0) as f64)
     }
 }
 
-fn modulus(value: f32, modulus: f32) -> f32 {
+fn modulus(value: f64, modulus: f64) -> f64 {
     (value.rem_euclid(modulus) + modulus).rem_euclid(modulus)
 }

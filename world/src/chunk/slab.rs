@@ -398,40 +398,34 @@ impl<C: WorldContext> Slab<C> {
         &mut self,
         this_slab: SlabLocation,
         updates: impl Iterator<Item = SlabTerrainUpdate<C>>,
-        changes_out: &mut Vec<WorldChangeEvent<C>>,
-    ) {
+    ) -> usize {
+        let mut count = 0;
         for update in updates {
             let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate<C> = update;
             trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
 
-            // TODO consider resizing/populating changes_out initially with empty events for performance
             match range {
                 WorldRange::Single(pos) => {
-                    let prev_block = self.slice_mut(pos.z()).set_block(pos, block_type);
-                    let world_pos = pos.to_world_position(this_slab);
-                    let event = WorldChangeEvent::new(world_pos, prev_block, block_type);
-                    changes_out.push(event);
+                    let _prev_block = self.slice_mut(pos.z()).set_block(pos, block_type);
+                    count += 1;
                 }
                 range @ WorldRange::Range(_, _) => {
                     let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
                     for z in za..=zb {
                         let z = LocalSliceIndex::new_unchecked(z);
                         let mut slice = self.slice_mut(z);
-                        // TODO reserve space in changes_out first
                         for x in xa..=xb {
                             for y in ya..=yb {
-                                let prev_block = slice.set_block((x, y), block_type);
-                                let world_pos = SlabPosition::new_unchecked(x, y, z)
-                                    .to_world_position(this_slab);
-                                let event =
-                                    WorldChangeEvent::new(world_pos, prev_block, block_type);
-                                changes_out.push(event);
+                                let _prev_block = slice.set_block((x, y), block_type);
+                                count += 1;
                             }
                         }
                     }
                 }
             }
         }
+
+        count
     }
 }
 

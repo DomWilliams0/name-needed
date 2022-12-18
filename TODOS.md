@@ -1,4 +1,4 @@
-# TODOs (102)
+# TODOs (101)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -32,8 +32,9 @@
  * [unit/src/dim.rs](unit/src/dim.rs) (2)
    * `// TODO unsafe unchecked casts with no panicking code`
    * `// TODO helper for this-1`
- * [unit/src/world/range.rs](unit/src/world/range.rs) (1)
+ * [unit/src/world/range.rs](unit/src/world/range.rs) (2)
    * `// TODO fix on creation so no need to redo this every time`
+   * `true // TODO FIXME`
  * [unit/src/world/slab_position.rs](unit/src/world/slab_position.rs) (1)
    * `// TODO consider using same generic pattern as SliceIndex for all points and positions`
  * [unit/src/world/slice_index.rs](unit/src/world/slice_index.rs) (1)
@@ -43,14 +44,12 @@
    * `// TODO this should return an Option if area is uninitialized`
  * [world/src/chunk/double_sided_vec.rs](world/src/chunk/double_sided_vec.rs) (1)
    * `// TODO refactor to use a single vec allocation`
- * [world/src/chunk/slab.rs](world/src/chunk/slab.rs) (7)
+ * [world/src/chunk/slab.rs](world/src/chunk/slab.rs) (5)
    * `// TODO detect when slab is all air and avoid expensive processing`
    * `// TODO if exclusive we're in deep water with CoW`
    * `// TODO discover internal area links`
    * `// TODO sucks to do this because we cant mutate the block directly while iterating`
    * `// TODO if leaving alone, ensure default is correct`
-   * `// TODO consider resizing/populating changes_out initially with empty events for performance`
-   * `// TODO reserve space in changes_out first`
  * [world/src/chunk/slice.rs](world/src/chunk/slice.rs) (2)
    * `// TODO consider generalising Slice{,Mut,Owned} to hold other types than just Block e.g. opacity`
    * `// TODO make not pub`
