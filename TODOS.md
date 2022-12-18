@@ -1,4 +1,4 @@
-# TODOs (100)
+# TODOs (101)
  * [.build/build-release.sh](.build/build-release.sh) (1)
    * `# TODO declare sdl version somewhere else`
  * [.build/run-tests.sh](.build/run-tests.sh) (1)
@@ -83,10 +83,9 @@
    * `// TODO include reason for terrain update? (god magic, explosion, tool, etc)`
  * [world/src/loader/worker_pool.rs](world/src/loader/worker_pool.rs) (1)
    * `// TODO detect this as an error condition?`
- * [world/src/mesh.rs](world/src/mesh.rs) (5)
+ * [world/src/mesh.rs](world/src/mesh.rs) (4)
    * `let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first`
    * `// TODO skip if slice knows it is empty`
-   * `// TODO use indices and dont repeat vertices?`
    * `// TODO ignore occluded face, return maybeuninit array and len of how much is initialised`
    * `// TODO also rotate texture`
  * [world/src/navigation/area_navigation.rs](world/src/navigation/area_navigation.rs) (3)
@@ -106,12 +105,14 @@
    * `// TODO smallvecs`
  * [world/src/navigation/search.rs](world/src/navigation/search.rs) (1)
    * `// TODO this might be expensive, can we build up the vec in order`
- * [world/src/occlusion.rs](world/src/occlusion.rs) (5)
+ * [world/src/occlusion.rs](world/src/occlusion.rs) (7)
    * `/// TODO bitset of Opacities will be much smaller, 2 bits each`
+   * `// TODO this is different to the actual Default!`
    * `// TODO return a transmuted u16 when bitset is used, much cheaper to create and compare`
    * `// TODO ideally check the slice first before calculating offset but whatever`
    * `// TODO only for debugging`
    * `// TODO pub(crate)`
+   * `// TODO comparison by face or against all faces`
  * [world/src/ray.rs](world/src/ray.rs) (3)
    * `// TODO optimise to reuse chunk ref and avoid duplicate block pos checks`
    * `// TODO capture face`
