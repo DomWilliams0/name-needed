@@ -1,8 +1,4 @@
-# TODOs (101)
- * [.build/build-release.sh](.build/build-release.sh) (1)
-   * `# TODO declare sdl version somewhere else`
- * [.build/run-tests.sh](.build/run-tests.sh) (1)
-   * `# TODO fix "LNK1189: library limit of 65535 objects exceeded" on windows when building `testing` crate`
+# TODOs (99)
  * [ai/src/consideration.rs](ai/src/consideration.rs) (1)
    * `// TODO dont bother running destructors`
  * [ai/src/context.rs](ai/src/context.rs) (1)
