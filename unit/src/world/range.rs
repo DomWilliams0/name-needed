@@ -5,7 +5,10 @@ use std::ops::{Add, Mul, SubAssign};
 use misc::num_traits::{AsPrimitive, Num, One, Zero};
 use misc::*;
 
-use crate::world::{BlockCoord, BlockPosition, CHUNK_SIZE, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition, WorldPoint, WorldPosition};
+use crate::world::{
+    BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition,
+    WorldPoint, WorldPosition, CHUNK_SIZE,
+};
 
 #[derive(Clone, Debug, PartialOrd)]
 pub enum WorldRange<P: RangePosition> {
@@ -146,6 +149,36 @@ impl<P: RangePosition> WorldRange<P> {
                 .above()
                 .zip(to.above())
                 .map(|(from, to)| WorldRange::Range(from, to)),
+        }
+    }
+
+    pub fn expand_up(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => todo!(),
+            WorldRange::Range(from, to) => to.above().map(|to| WorldRange::Range(*from, to)),
+        }
+    }
+
+    pub fn expand_down(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => todo!(),
+            WorldRange::Range(from, to) => from.below().map(|from| WorldRange::Range(from, *to)),
+        }
+    }
+
+    pub fn contract_up(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => todo!(),
+            WorldRange::Range(from, to) if to.xyz().2 == from.xyz().2 => None,
+            WorldRange::Range(from, to) => from.above().map(|from| WorldRange::Range(from, *to)),
+        }
+    }
+
+    pub fn contract_down(&self) -> Option<Self> {
+        match self {
+            WorldRange::Single(pos) => todo!(),
+            WorldRange::Range(from, to) if to.xyz().2 == from.xyz().2 => None,
+            WorldRange::Range(from, to) => to.below().map(|to| WorldRange::Range(*from, to)),
         }
     }
 
@@ -336,9 +369,9 @@ impl WorldRange<WorldPosition> {
     }
 
     pub fn contains_slab(&self, slab: SlabLocation) -> bool {
-        let (bottom, top) = slab.slab.slice_range();
-        let min = BlockPosition::new_unchecked(0, 0, bottom).to_world_position(slab.chunk);
-        let max = BlockPosition::new_unchecked(CHUNK_SIZE.as_block_coord(), CHUNK_SIZE.as_block_coord(), top).to_world_position(slab.chunk);
+        // let (bottom, top) = slab.slab.slice_range();
+        // let min = BlockPosition::new_unchecked(0, 0, bottom).to_world_position(slab.chunk);
+        // let max = BlockPosition::new_unchecked(CHUNK_SIZE.as_block_coord(), CHUNK_SIZE.as_block_coord(), top).to_world_position(slab.chunk);
 
         true // TODO FIXME
     }
