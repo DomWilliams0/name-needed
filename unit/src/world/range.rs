@@ -10,24 +10,24 @@ use crate::world::{
     WorldPoint, WorldPosition, CHUNK_SIZE,
 };
 
-#[derive(Clone, Debug, PartialOrd)]
-pub enum WorldRange<P: RangePosition> {
-    /// Single block
-    Single(P),
-
-    /// Inclusive range
-    Range(P, P),
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+pub struct WorldRange<P: RangePosition> {
+    /// Inclusive and always valid element-wise
+    min: P,
+    /// Inclusive and always valid element-wise
+    max: P,
 }
 
 pub trait RangeNum: Num + Zero + Copy + PartialOrd + PartialEq + SubAssign + Mul {
     fn range_step() -> Self;
 }
 
-pub trait RangePosition: Copy + Sized {
+pub trait RangePosition: Copy + Sized + PartialEq {
     type XY: RangeNum + AsPrimitive<Self::Count>;
     type Z: RangeNum + AsPrimitive<Self::Count>;
     type Count: Num + Copy + 'static;
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z);
+    fn get_z(&self) -> Self::Z;
 
     /// None if invalid coords
     fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Option<Self>;
@@ -48,12 +48,36 @@ pub trait RangePosition: Copy + Sized {
 
 impl<P: RangePosition> WorldRange<P> {
     pub fn with_single<I: Into<P>>(pos: I) -> Self {
-        Self::Single(pos.into())
+        let p = pos.into();
+        Self { min: p, max: p }
+    }
+
+    pub fn is_single(&self) -> bool {
+        self.min == self.max
+    }
+
+    pub fn as_single(&self) -> Option<P> {
+        self.is_single().then_some(self.min)
+    }
+
+    fn min_max(a: P, b: P) -> (P, P) {
+        let (ax, ay, az) = a.xyz();
+        let (bx, by, bz) = b.xyz();
+
+        let (ax, bx) = if ax < bx { (ax, bx) } else { (bx, ax) };
+        let (ay, by) = if ay < by { (ay, by) } else { (by, ay) };
+        let (az, bz) = if az < bz { (az, bz) } else { (bz, az) };
+
+        (
+            P::new_unchecked((ax, ay, az)),
+            P::new_unchecked((bx, by, bz)),
+        )
     }
 
     /// `[from, to]`
     pub fn with_inclusive_range<F: Into<P>, T: Into<P>>(from: F, to: T) -> Self {
-        Self::Range(from.into(), to.into())
+        let (min, max) = Self::min_max(from.into(), to.into());
+        Self { min, max }
     }
 
     /// `[from, to)`
@@ -80,43 +104,26 @@ impl<P: RangePosition> WorldRange<P> {
         }
 
         let max = P::new_unchecked((x, y, z)); // derived from valid `P`
-        Self::Range(min, max)
+        Self { min, max }
     }
 
     /// Inclusive
     pub fn bounds(&self) -> (P, P) {
-        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
-        // derived from valid `P`s
-        (
-            P::new_unchecked((ax, ay, az)),
-            P::new_unchecked((bx, by, bz)),
-        )
+        (self.min, self.max)
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
     #[allow(clippy::type_complexity)]
     pub fn ranges(&self) -> ((P::XY, P::XY), (P::XY, P::XY), (P::Z, P::Z)) {
-        // TODO fix on creation so no need to redo this every time
-        let (from, to) = match self {
-            WorldRange::Single(pos) => (pos, pos),
-            WorldRange::Range(from, to) => (from, to),
-        };
-
-        let (ax, ay, az) = from.xyz();
-        let (bx, by, bz) = to.xyz();
-
-        let (ax, bx) = if ax < bx { (ax, bx) } else { (bx, ax) };
-        let (ay, by) = if ay < by { (ay, by) } else { (by, ay) };
-        let (az, bz) = if az < bz { (az, bz) } else { (bz, az) };
-
+        let (ax, ay, az) = self.min.xyz();
+        let (bx, by, bz) = self.max.xyz();
         ((ax, bx), (ay, by), (az, bz))
     }
 
     pub fn count(&self) -> P::Count {
         let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
 
-        // b? is guaranteed to be greater than a? from ranges()
-        // add range step for inclusive count
+        // b* is guaranteed to be >= than a* from ranges()
 
         let dxy = {
             let dx = (bx - ax) + P::XY::range_step();
@@ -133,52 +140,40 @@ impl<P: RangePosition> WorldRange<P> {
     }
 
     pub fn below(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => pos.below().map(WorldRange::Single),
-            WorldRange::Range(from, to) => from
-                .below()
-                .zip(to.below())
-                .map(|(from, to)| WorldRange::Range(from, to)),
+        match (self.min.below(), self.max.below()) {
+            (Some(min), Some(max)) => Some(Self { min, max }),
+            _ => None,
         }
     }
 
     pub fn above(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => pos.above().map(WorldRange::Single),
-            WorldRange::Range(from, to) => from
-                .above()
-                .zip(to.above())
-                .map(|(from, to)| WorldRange::Range(from, to)),
+        match (self.min.above(), self.max.above()) {
+            (Some(min), Some(max)) => Some(Self { min, max }),
+            _ => None,
         }
     }
 
     pub fn expand_up(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => todo!(),
-            WorldRange::Range(from, to) => to.above().map(|to| WorldRange::Range(*from, to)),
-        }
+        self.max.above().map(|max| Self { max, ..*self })
     }
 
     pub fn expand_down(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => todo!(),
-            WorldRange::Range(from, to) => from.below().map(|from| WorldRange::Range(from, *to)),
-        }
+        self.min.below().map(|min| Self { min, ..*self })
     }
 
     pub fn contract_up(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => todo!(),
-            WorldRange::Range(from, to) if to.xyz().2 == from.xyz().2 => None,
-            WorldRange::Range(from, to) => from.above().map(|from| WorldRange::Range(from, *to)),
+        if self.min.get_z() == self.max.get_z() {
+            None
+        } else {
+            self.min.above().map(|min| Self { min, ..*self })
         }
     }
 
     pub fn contract_down(&self) -> Option<Self> {
-        match self {
-            WorldRange::Single(pos) => todo!(),
-            WorldRange::Range(from, to) if to.xyz().2 == from.xyz().2 => None,
-            WorldRange::Range(from, to) => to.below().map(|to| WorldRange::Range(*from, to)),
+        if self.min.get_z() == self.max.get_z() {
+            None
+        } else {
+            self.max.below().map(|max| Self { max, ..*self })
         }
     }
 
@@ -196,9 +191,10 @@ impl<XY: Copy, Z: Copy, P: RangePosition + Add<(XY, XY, Z), Output = P>> Add<(XY
     type Output = Self;
 
     fn add(self, delta: (XY, XY, Z)) -> Self::Output {
-        match self {
-            Self::Single(pos) => Self::Single(pos + delta),
-            Self::Range(from, to) => Self::Range(from + delta, to + delta),
+        // can't fail because P implements Add already
+        Self {
+            min: self.min + delta,
+            max: self.max + delta,
         }
     }
 }
@@ -215,6 +211,10 @@ impl RangePosition for WorldPosition {
 
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {
         (self.0, self.1, self.2.slice())
+    }
+
+    fn get_z(&self) -> Self::Z {
+        self.2.slice()
     }
 
     fn new(xyz: (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
@@ -235,6 +235,9 @@ impl RangePosition for SlabPosition {
         (self.x(), self.y(), self.z().slice())
     }
 
+    fn get_z(&self) -> Self::Z {
+        self.z().slice()
+    }
     fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
         LocalSliceIndex::new(z).and_then(|z| Self::new(x, y, z))
     }
@@ -251,6 +254,9 @@ impl RangePosition for BlockPosition {
 
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {
         (self.x(), self.y(), self.z().slice())
+    }
+    fn get_z(&self) -> Self::Z {
+        self.z().slice()
     }
 
     fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
@@ -271,6 +277,10 @@ impl RangePosition for WorldPoint {
         (*self).into()
     }
 
+    fn get_z(&self) -> Self::Z {
+        self.z()
+    }
+
     fn new((x, y, z): (Self::XY, Self::XY, Self::Z)) -> Option<Self> {
         Self::new(x, y, z)
     }
@@ -285,11 +295,13 @@ impl RangeNum for i32 {
         1
     }
 }
+
 impl RangeNum for BlockCoord {
     fn range_step() -> Self {
         1
     }
 }
+
 impl RangeNum for f32 {
     fn range_step() -> Self {
         // no difference between inclusive and exclusive ranges
@@ -298,33 +310,21 @@ impl RangeNum for f32 {
 }
 
 impl<P: RangePosition + Eq> Eq for WorldRange<P> {}
+
 impl<P: RangePosition + Hash> Hash for WorldRange<P> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
-        match self {
-            WorldRange::Single(a) => a.hash(state),
-            WorldRange::Range(a, b) => {
-                a.hash(state);
-                b.hash(state);
-            }
-        }
+        self.min.hash(state);
+        self.max.hash(state);
     }
 }
 
-impl<P: RangePosition + PartialEq> PartialEq for WorldRange<P> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (WorldRange::Single(a0), WorldRange::Single(b0)) => a0 == b0,
-            (WorldRange::Range(a0, a1), WorldRange::Range(b0, b1)) => a0 == b0 && a1 == b1,
-            _ => false,
-        }
-    }
-}
 impl<P: RangePosition + Display> Display for WorldRange<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WorldRange::Single(b) => write!(f, "{}", b),
-            WorldRange::Range(from, to) => write!(f, "({} -> {})", from, to),
+        if self.is_single() {
+            write!(f, "{}", self.min)
+        } else {
+            write!(f, "({} -> {})", self.min, self.max)
         }
     }
 }
@@ -377,13 +377,24 @@ impl WorldRange<WorldPosition> {
     }
 }
 
+impl WorldRange<WorldPoint> {
+    pub fn to_world_position(self) -> WorldPositionRange {
+        WorldRange {
+            min: self.min.floor(),
+            max: self.max.ceil(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
     use misc::{ApproxEq, Itertools};
 
-    use crate::world::{WorldPoint, WorldPointRange, WorldPositionRange};
+    use crate::world::{
+        BlockPositionRange, WorldPoint, WorldPointRange, WorldPositionRange, CHUNK_SIZE,
+    };
 
     #[test]
     fn count() {
@@ -458,5 +469,15 @@ mod tests {
             .expect("smallest possible")
             .collect_vec();
         assert_eq!(outline.iter().flat_map(|r| r.iter_blocks()).count(), 8);
+    }
+
+    #[test]
+    fn expand() {
+        let range = WorldPositionRange::with_inclusive_range((5, 5, 0), (7, 7, 0));
+        assert!(range.contract_down().is_none());
+        assert!(range.contract_up().is_none());
+
+        let up = range.expand_up().unwrap();
+        assert_eq!(up.bounds().1, (7, 7, 1).into());
     }
 }

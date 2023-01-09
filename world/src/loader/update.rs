@@ -46,21 +46,18 @@ impl<C: WorldContext> WorldTerrainUpdate<C> {
 
         let WorldTerrainUpdate(GenericTerrainUpdate(range, block_type)) = self;
 
-        match range {
-            WorldRange::Single(pos) => {
-                let chunk = ChunkLocation::from(pos);
-                let block = SlabPosition::from(pos);
-                let slab = pos.slice().slab_index();
-                let result = (
-                    SlabLocation::new(slab, chunk),
-                    GenericTerrainUpdate(WorldRange::Single(block), block_type),
-                );
-                block_iter = Some(once(result));
-            }
-            range @ WorldRange::Range(_, _) => {
-                range_iter = Some(split_range_across_slabs(range, block_type));
-            }
-        };
+        if let Some(pos) = range.as_single() {
+            let chunk = ChunkLocation::from(pos);
+            let block = SlabPosition::from(pos);
+            let slab = pos.slice().slab_index();
+            let result = (
+                SlabLocation::new(slab, chunk),
+                GenericTerrainUpdate(WorldRange::with_single(block), block_type),
+            );
+            block_iter = Some(once(result));
+        } else {
+            range_iter = Some(split_range_across_slabs(range, block_type));
+        }
 
         block_iter
             .into_iter()
@@ -125,7 +122,7 @@ mod split {
             let chunk = ChunkLocation::from(corner_bl);
             let slab = GlobalSliceIndex::new(z1.as_from()).slab_index();
             let update =
-                GenericTerrainUpdate(WorldRange::Range(corner_bl.into(), corner_tr.into()), bt);
+                GenericTerrainUpdate(WorldRange::with_inclusive_range(corner_bl, corner_tr), bt);
             (SlabLocation::new(slab, chunk), update)
         })
     }
@@ -207,7 +204,7 @@ mod split {
             // across 3 chunks
             assert_eq!(
                 inter_chunk_boundaries(-2, (CHUNK_SIZE.as_i32() * 2) + 2).collect_vec(),
-                vec![0, CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2,]
+                vec![0, CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2]
             );
 
             // exactly on the chunk boundary still yields it - not this functions responsibility
@@ -273,9 +270,9 @@ mod split {
                         (-1, 0),
                         SlabIndex(0),
                         (CHUNK_SIZE.as_i32() - 1, 3, 0),
-                        (CHUNK_SIZE.as_i32() - 1, 4, 0)
+                        (CHUNK_SIZE.as_i32() - 1, 4, 0),
                     ),
-                    slab_update((0, 0), SlabIndex(0), (0, 3, 0), (1, 4, 0))
+                    slab_update((0, 0), SlabIndex(0), (0, 3, 0), (1, 4, 0)),
                 ]
             );
         }
@@ -290,13 +287,13 @@ mod split {
                         (-1, 0),
                         SlabIndex(0),
                         (CHUNK_SIZE.as_i32() - 1, 3, 0),
-                        (CHUNK_SIZE.as_i32() - 1, 5, 0)
+                        (CHUNK_SIZE.as_i32() - 1, 5, 0),
                     ),
                     slab_update(
                         (0, 0),
                         SlabIndex(0),
                         (0, 3, 0),
-                        (CHUNK_SIZE.as_i32() - 1, 5, 0)
+                        (CHUNK_SIZE.as_i32() - 1, 5, 0),
                     ),
                     slab_update((1, 0), SlabIndex(0), (0, 3, 0), (4, 5, 0)),
                 ]
@@ -345,19 +342,19 @@ mod split {
                         (0, -1),
                         SlabIndex(-1),
                         (0, CHUNK_SIZE.as_i32() - 2, SLAB_SIZE.as_i32() - 2),
-                        (1, CHUNK_SIZE.as_i32() - 1, SLAB_SIZE.as_i32() - 1)
+                        (1, CHUNK_SIZE.as_i32() - 1, SLAB_SIZE.as_i32() - 1),
                     ),
                     slab_update(
                         (0, -1),
                         SlabIndex(0),
                         (0, CHUNK_SIZE.as_i32() - 2, 0),
-                        (1, CHUNK_SIZE.as_i32() - 1, 1)
+                        (1, CHUNK_SIZE.as_i32() - 1, 1),
                     ),
                     slab_update(
                         (0, 0),
                         SlabIndex(-1),
                         (0, 0, SLAB_SIZE.as_i32() - 2),
-                        (1, 1, SLAB_SIZE.as_i32() - 1)
+                        (1, 1, SLAB_SIZE.as_i32() - 1),
                     ),
                     slab_update((0, 0), SlabIndex(0), (0, 0, 0), (1, 1, 1)),
                 ]

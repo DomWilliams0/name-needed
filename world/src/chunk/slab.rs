@@ -404,21 +404,18 @@ impl<C: WorldContext> Slab<C> {
             let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate<C> = update;
             trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
 
-            match range {
-                WorldRange::Single(pos) => {
-                    let _prev_block = self.slice_mut(pos.z()).set_block(pos, block_type);
-                    count += 1;
-                }
-                range @ WorldRange::Range(_, _) => {
-                    let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
-                    for z in za..=zb {
-                        let z = LocalSliceIndex::new_unchecked(z);
-                        let mut slice = self.slice_mut(z);
-                        for x in xa..=xb {
-                            for y in ya..=yb {
-                                let _prev_block = slice.set_block((x, y), block_type);
-                                count += 1;
-                            }
+            if let Some(pos) = range.as_single() {
+                let _prev_block = self.slice_mut(pos.z()).set_block(pos, block_type);
+                count += 1;
+            } else {
+                let ((xa, xb), (ya, yb), (za, zb)) = range.ranges();
+                for z in za..=zb {
+                    let z = LocalSliceIndex::new_unchecked(z);
+                    let mut slice = self.slice_mut(z);
+                    for x in xa..=xb {
+                        for y in ya..=yb {
+                            let _prev_block = slice.set_block((x, y), block_type);
+                            count += 1;
                         }
                     }
                 }
