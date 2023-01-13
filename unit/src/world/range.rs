@@ -35,12 +35,12 @@ pub trait RangePosition: Copy + Sized + PartialEq {
     /// Panics if invalid coords
     fn new_unchecked(xyz: (Self::XY, Self::XY, Self::Z)) -> Self;
 
-    fn below(self) -> Option<Self> {
+    fn below(&self) -> Option<Self> {
         let (x, y, z) = self.xyz();
         Self::new((x, y, z - Self::Z::one()))
     }
 
-    fn above(self) -> Option<Self> {
+    fn above(&self) -> Option<Self> {
         let (x, y, z) = self.xyz();
         Self::new((x, y, z + Self::Z::one()))
     }
@@ -110,6 +110,15 @@ impl<P: RangePosition> WorldRange<P> {
     /// Inclusive
     pub fn bounds(&self) -> (P, P) {
         (self.min, self.max)
+    }
+
+    pub fn center(&self) -> P {
+        let ((ax, bx), (ay, by), (az, bz)) = self.ranges();
+        P::new_unchecked((
+            (ax + bx) / (P::XY::one() + P::XY::one()), // lmao
+            (ay + by) / (P::XY::one() + P::XY::one()),
+            (az + bz) / (P::Z::one() + P::Z::one()),
+        ))
     }
 
     /// (min x, max x), (min y, max y), (min z, max z) inclusive
