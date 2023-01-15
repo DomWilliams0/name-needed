@@ -332,3 +332,9 @@ impl AsRef<[SlabLocation]> for RequestedSlabs<'_> {
         self.0
     }
 }
+
+impl RequestedSlabs<'_> {
+    pub fn filter(&mut self, pred: impl Fn(SlabLocation) -> bool) {
+        self.0.retain(|s| pred(*s));
+    }
+}

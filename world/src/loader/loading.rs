@@ -492,6 +492,14 @@ impl<C: WorldContext> WorldLoader<C> {
         false
     }
 
+    pub fn is_in_bounds(&self, slab: SlabLocation) -> bool {
+        if let TerrainSource::Memory(src) = &self.source {
+            src.read().is_in_bounds(slab)
+        } else {
+            true
+        }
+    }
+
     /// Nop if any mutexes cannot be taken immediately
     pub fn feature_boundaries_in_range(
         &self,
