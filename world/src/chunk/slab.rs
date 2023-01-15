@@ -216,8 +216,12 @@ impl<C: WorldContext> Slab<C> {
         // flood fill to discover navigability
         let navigation = self.discover_areas(index, below);
 
-        // occlusion
-        self.init_occlusion(above, below);
+        if navigation.0.is_empty() && matches!(self.1, SlabType::Placeholder) {
+            // skip mutable references
+        } else {
+            // occlusion
+            self.init_occlusion(above, below);
+        }
 
         navigation
     }
@@ -240,10 +244,13 @@ impl<C: WorldContext> Slab<C> {
         // collect areas and graphs
         let slab_areas = discovery.areas_with_graph().collect_vec();
 
-        // TODO discover internal area links
+        // skip expensive mutable reference cloning if no areas (empty slab)
+        if area_count > 0 {
+            // TODO discover internal area links
 
-        // apply areas to blocks
-        discovery.apply(self.expect_mut());
+            // apply areas to blocks
+            discovery.apply(self.expect_mut());
+        }
 
         SlabInternalNavigability(slab_areas)
     }
