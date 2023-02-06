@@ -70,7 +70,48 @@ impl LoggerBuilder {
                         .map_err(LogError::Io)?;
                     let decorator = slog_term::PlainDecorator::new(file);
                     slog_term::FullFormat::new(decorator)
+                        .use_custom_header_print({
+                            fn do_it(
+                                fn_timestamp: &dyn ThreadSafeTimestampFn<
+                                    Output = std::io::Result<()>,
+                                >,
+                                mut rd: &mut dyn slog_term::RecordDecorator,
+                                record: &slog::Record,
+                                use_file_location: bool,
+                            ) -> std::io::Result<bool> {
+                                rd.start_timestamp()?;
+                                fn_timestamp(&mut rd)?;
+
+                                rd.start_whitespace()?;
+                                write!(rd, " ")?;
+
+                                rd.start_level()?;
+                                write!(rd, "{}", record.level().as_short_str())?;
+
+                                if use_file_location {
+                                    rd.start_location()?;
+                                    write!(
+                                        rd,
+                                        "[{}]",
+                                        record.module() // <----------
+                                    )?;
+                                }
+
+                                rd.start_whitespace()?;
+                                write!(rd, " ")?;
+
+                                rd.start_msg()?;
+                                let mut count_rd = slog_term::CountingWriter::new(&mut rd);
+
+                                use std::io::Write;
+                                write!(count_rd, "{}", record.msg())?;
+                                Ok(count_rd.count() != 0)
+                            };
+
+                            do_it
+                        })
                         .use_custom_timestamp(timestamp_fn)
+                        .use_file_location()
                         .build()
                         .fuse()
                 };
