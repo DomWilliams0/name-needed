@@ -1903,7 +1903,7 @@ mod tests {
         let w = world.borrow();
 
         let is_reachable = |xyz: (i32, i32, i32)| {
-            let range = WorldPositionRange::Single(xyz.into());
+            let range = WorldPositionRange::with_single(xyz);
             w.filter_reachable_blocks_in_range(&range, |bt| !bt.is_air())
                 .count()
                 == 1

@@ -238,7 +238,10 @@ mod split {
             (
                 chunk.into(),
                 slab,
-                GenericTerrainUpdate(WorldRange::Range(from, to), DummyBlockType::Stone),
+                GenericTerrainUpdate(
+                    WorldRange::with_inclusive_range(from, to),
+                    DummyBlockType::Stone,
+                ),
             )
         }
 
