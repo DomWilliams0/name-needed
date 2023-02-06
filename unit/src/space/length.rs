@@ -17,11 +17,6 @@ impl Length3 {
         Self(xyz)
     }
 
-    #[deprecated] // use meters instead
-    pub fn with_old_scale(x: u16, y: u16, z: u16) -> Self {
-        Length3::with_meters([x as f32 / 10.0, y as f32 / 10.0, z as f32 / 10.0])
-    }
-
     pub const fn x(self) -> f32 {
         self.0[0]
     }
