@@ -4,7 +4,7 @@ pub use loading::{BlockForAllError, LoadedSlab, WorldLoader};
 // pub use {procgen::PlanetParams, terrain_source::GeneratedTerrainSource};
 
 pub use terrain_source::{GeneratedSlab, MemoryTerrainSource, TerrainSource, TerrainSourceError};
-pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, WorldTerrainUpdate};
+pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, WorldTerrainUpdate, split_range_across_slabs};
 pub use worker_pool::AsyncWorkerPool;
 
 mod batch;

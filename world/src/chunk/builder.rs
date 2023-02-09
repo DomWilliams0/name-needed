@@ -1,16 +1,24 @@
 use nd_iter::iter_3d;
+use std::collections::HashMap;
 
 use misc::*;
-use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex};
+use unit::world::{
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, WorldPosition,
+    WorldPositionRange,
+};
 
+use crate::block::Block;
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
 use crate::chunk::BaseTerrain;
-use crate::WorldContext;
+use crate::loader::split_range_across_slabs;
+use crate::{BlockType, WorldContext};
 use std::convert::TryFrom;
 
 pub struct ChunkBuilder<C: WorldContext>(Option<RawChunkTerrain<C>>);
+
+pub struct WorldBuilder<C: WorldContext>(HashMap<ChunkLocation, ChunkBuilder<C>>);
 
 pub struct ChunkBuilderApply<C: WorldContext>(RawChunkTerrain<C>);
 
@@ -149,6 +157,53 @@ impl<C: WorldContext> DeepClone for ChunkDescriptor<C> {
 impl<C: WorldContext> DeepClone for ChunkBuilder<C> {
     fn deep_clone(&self) -> Self {
         ChunkBuilder(self.0.as_ref().map(|t| t.deep_clone()))
+    }
+}
+
+impl<C: WorldContext> WorldBuilder<C> {
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+    pub fn set(mut self, pos: (i32, i32, i32), b: C::BlockType) -> Self {
+        let chunk = ChunkLocation::from(WorldPosition::from(pos));
+        let c = self.0.entry(chunk).or_insert_with(|| ChunkBuilder::new());
+
+        let tmp = std::mem::replace(c, ChunkBuilder(None));
+        *c = tmp.set_block(pos, b); // wtf
+        self
+    }
+
+    pub fn fill_range(
+        mut self,
+        from: (i32, i32, i32),
+        to: (i32, i32, i32),
+        b: C::BlockType,
+    ) -> Self {
+        let range = WorldPositionRange::with_inclusive_range(from, to);
+        for (slab, update) in split_range_across_slabs::<C>(range, b) {
+            let chunk = slab.chunk;
+            let c = self.0.entry(chunk).or_insert_with(|| ChunkBuilder::new());
+
+            let tmp = std::mem::replace(c, ChunkBuilder(None));
+            let (xs, ys, zs) = update.0.ranges();
+
+            let zs = (
+                LocalSliceIndex::new_unchecked(zs.0).to_global(slab.slab),
+                LocalSliceIndex::new_unchecked(zs.1).to_global(slab.slab),
+            );
+
+            *c = tmp.fill_range(
+                (xs.0 as i32, ys.0 as i32, zs.0.slice()),
+                (xs.1 as i32, ys.1 as i32, zs.1.slice()),
+                |_| b,
+            );
+        }
+
+        self
+    }
+
+    pub fn build(self) -> impl Iterator<Item = ChunkDescriptor<C>> {
+        self.0.into_iter().map(|(loc, c)| c.build(loc))
     }
 }
 

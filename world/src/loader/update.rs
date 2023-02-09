@@ -6,7 +6,7 @@ use unit::world::{
     WorldRange,
 };
 
-use crate::loader::update::split::split_range_across_slabs;
+pub use crate::loader::update::split::split_range_across_slabs;
 use crate::WorldContext;
 use misc::Derivative;
 

@@ -1,6 +1,6 @@
 pub use slab::DeepClone;
 
-pub use self::builder::{ChunkBuilder, ChunkDescriptor};
+pub use self::builder::{ChunkBuilder, ChunkDescriptor, WorldBuilder};
 pub use self::chunk::{Chunk, ChunkId};
 pub use self::slab::{Slab, SlabType};
 pub use self::terrain::{BaseTerrain, BlockDamageResult, OcclusionChunkUpdate};
