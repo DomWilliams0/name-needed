@@ -4,8 +4,9 @@
 pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{
-    BaseTerrain, BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone,
-    OcclusionChunkUpdate, Slab, SlabType,
+    flatten_coords, slice_navmesh::ABSOLUTE_MAX_FREE_VERTICAL_SPACE, unflatten_index, BaseTerrain,
+    BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone, OcclusionChunkUpdate, Slab,
+    SlabType,
 };
 pub use self::context::{
     BlockType, GeneratedTerrainSource, NopGeneratedTerrainSource, WorldContext, SLICE_SIZE,
@@ -23,7 +24,9 @@ mod chunk;
 mod context;
 pub mod loader;
 mod mesh;
+#[deprecated]
 mod navigation;
+mod navigationv2;
 mod neighbour;
 mod occlusion;
 pub mod presets;

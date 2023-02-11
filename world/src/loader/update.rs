@@ -1,12 +1,15 @@
 use std::hash::Hash;
 use std::iter::once;
+use std::sync::Arc;
 
 use unit::world::{
     ChunkLocation, RangePosition, SlabLocation, SlabPosition, WorldPosition, WorldPositionRange,
     WorldRange,
 };
 
+use crate::chunk::slab::SliceNavArea;
 pub use crate::loader::update::split::split_range_across_slabs;
+use crate::loader::SlabVerticalSpace;
 use crate::WorldContext;
 use misc::Derivative;
 

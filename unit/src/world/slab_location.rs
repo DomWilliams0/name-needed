@@ -22,6 +22,11 @@ impl SlabLocation {
         self.slab.0 -= 1;
         self
     }
+
+    pub fn above(mut self) -> Self {
+        self.slab.0 += 1;
+        self
+    }
 }
 
 impl Debug for SlabLocation {

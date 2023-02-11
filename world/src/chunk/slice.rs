@@ -225,7 +225,6 @@ impl<I: Into<SliceBlock>, C: WorldContext> IndexMut<I> for SliceMut<'_, C> {
     }
 }
 
-// TODO make not pub
 pub fn unflatten_index(index: usize) -> SliceBlock {
     SliceBlock::new_unchecked(
         (index % CHUNK_SIZE.as_usize()) as BlockCoord,
@@ -233,7 +232,7 @@ pub fn unflatten_index(index: usize) -> SliceBlock {
     )
 }
 
-fn flatten_coords(block: SliceBlock) -> usize {
+pub fn flatten_coords(block: SliceBlock) -> usize {
     let (x, y) = block.xy();
     ((y * CHUNK_SIZE.as_block_coord()) + x) as usize
 }

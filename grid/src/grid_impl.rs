@@ -90,7 +90,7 @@ pub trait GridImpl {
 
     /// Vertical slices in z direction, [from..to)
     fn slice_range_multiple(&self, from: u32, to: u32) -> (usize, usize) {
-        assert!(from < to);
+        debug_assert!(from < to);
 
         let [xs, ys, _] = Self::DIMS;
         let slice_count = (xs * ys) as u32;

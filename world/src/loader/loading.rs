@@ -1,29 +1,40 @@
 use std::time::{Duration, Instant};
 
+use crate::context::BlockType;
 use futures::channel::mpsc as async_channel;
 use misc::*;
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition};
+use unit::world::{
+    ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition,
+    WorldPosition, CHUNK_SIZE, SLAB_SIZE,
+};
 
-use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType};
+use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType, SliceNavArea};
 
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::worker_pool::LoadTerrainResult;
-use crate::world::{ContiguousChunkIterator, WorldChangeEvent};
-use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
+use crate::world::{get_or_wait_for_slab, ContiguousChunkIterator, WorldChangeEvent};
+use crate::{OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
 
+use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, VerticalSpacePlease};
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
 use crate::world::slab_loading::SlabProcessingFuture;
-use futures::FutureExt;
+use futures::{FutureExt, SinkExt};
 use std::collections::HashSet;
 use std::iter::repeat;
+use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct WorldLoader<C: WorldContext> {
     source: TerrainSource<C>,
     pool: AsyncWorkerPool,
-    finalization_channel: async_channel::Sender<LoadTerrainResult<C>>,
+    finalization_channel: async_channel::Sender<LoadTerrainResult>,
     chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
+    nav_updates: (
+        async_channel::Sender<SlabNavigationUpdate>,
+        async_channel::Receiver<SlabNavigationUpdate>,
+    ),
     world: WorldRef<C>,
     last_batch_size: usize,
     batch_ids: UpdateBatchUniqueId,
@@ -33,8 +44,8 @@ pub struct LoadedSlab<C: WorldContext> {
     pub(crate) slab: SlabLocation,
     /// If None the terrain has already been updated
     pub(crate) terrain: Option<Slab<C>>,
-    pub(crate) navigation: SlabInternalNavigability,
-    pub(crate) batch: UpdateBatch,
+    // pub(crate) vertical_space: Arc<SlabVerticalSpace>,
+    // pub(crate) batch: UpdateBatch,
     pub(crate) entities: Vec<C::GeneratedEntityDesc>,
 }
 
@@ -50,19 +61,38 @@ pub enum BlockForAllError {
     Error(#[from] TerrainSourceError),
 }
 
+pub struct SlabNavigationUpdate {
+    pub slab: SlabLocation,
+    pub new_areas: Vec<SliceNavArea>,
+    pub replace_all: bool,
+}
+
+struct InitialNavLoaded {
+    pub slab: SlabLocation,
+    pub new_areas: Vec<SliceNavArea>,
+    pub vs: SlabVerticalSpace,
+}
+
+lazy_static! {
+    static ref EMPTY_SLAB_VERTICAL_SPACE: Arc<SlabVerticalSpace> =
+        Arc::new(SlabVerticalSpace::empty());
+}
+
 impl<C: WorldContext> WorldLoader<C> {
     pub fn new<S: Into<TerrainSource<C>>>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let (finalize_tx, finalize_rx) = async_channel::channel(16);
         let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
+        let nav_updates = async_channel::channel(64);
 
         let world = WorldRef::default();
-        pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
+        // pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
 
         Self {
             source: source.into(),
             pool,
             finalization_channel: finalize_tx,
             chunk_updates_rx,
+            nav_updates,
             world,
             last_batch_size: 0,
             batch_ids: UpdateBatchUniqueId::default(),
@@ -129,8 +159,7 @@ impl<C: WorldContext> WorldLoader<C> {
             // should have seen some slabs
             assert_ne!(highest, SlabIndex::MIN);
 
-            // request the slab above the highest as all-air if it's missing, so navigation
-            // discovery works properly
+            // request the slab above the highest as all-air if it's missing
             let empty = highest + 1;
             if !chunk.has_slab(empty) {
                 extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
@@ -173,58 +202,92 @@ impl<C: WorldContext> WorldLoader<C> {
 
             // load raw terrain and do as much processing in isolation as possible on a worker thread
             let world = self.world();
-            self.pool.submit_async(
-                async move {
-                    let mut entities = Vec::new();
+            let mut nav_tx = self.nav_updates.0.clone();
+            let mut terrain_tx = self.pool.success_tx();
 
-                    let result = if let SlabType::Placeholder = slab_type {
-                        // empty placeholder
-                        Ok(None)
-                    } else {
-                        source.load_slab(slab).await.map(|generated| {
-                            entities = generated.entities;
-                            Some(generated.terrain)
-                        })
+            self.pool.submit_any_async_with_handle(async move {
+                // generate terrain
+                let (terrain, vs, entities) =
+                    match Self::step1_generate_terrain(slab, slab_type, &source).await {
+                        Ok(tup) => tup,
+                        Err(err) => {
+                            // give up
+                            if let Err(e) = terrain_tx.send(Err(err)).await {
+                                error!("failed to send failed terrain result"; "error" => %e);
+                            }
+                            return;
+                        }
                     };
 
-                    let terrain = match result {
-                        Ok(Some(terrain)) => terrain,
-                        Ok(None) => {
-                            debug!("adding placeholder slab to the top of the chunk"; slab);
-                            Slab::empty_placeholder()
-                        }
-                        Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
-                            // soft error, we're at the world edge. treat as all air instead of
-                            // crashing and burning
-                            debug!("slab is out of bounds, swapping in an empty one"; slab);
+                // slab terrain is now fixed, TODO try to update occlusion from any loaded/available
+                // neighbours without blocking
 
-                            // TODO shared instance of CoW for empty slab
-                            Slab::empty_placeholder()
-                        }
-                        Err(err) => return Err(err),
-                    };
+                // put into world immediately
+                let mut notifications;
+                {
+                    let mut world = world.borrow_mut();
+                    notifications = world.load_notifications(); // might be pointless sometimes
 
-                    // slab terrain is now fixed, process it concurrently on a worker thread.
-                    // may require waiting for another slab to finish, and world lock must be
-                    // released during the wait to prevent a deadlock.
-                    let (terrain, navigation) =
-                        SlabProcessingFuture::with_provided_terrain(world, slab, terrain)
-                            .await
-                            .expect("chunk should be present");
+                    // spawn entities
+                    if !entities.is_empty() {
+                        trace!(
+                            "passing {n} entity descriptions from slab to world to spawn next tick",
+                            n = entities.len()
+                        );
 
-                    assert!(terrain.is_some(), "slab ownership expected");
+                        // TODO maybe delay until nav is done?
+                        world.queue_entities_to_spawn(entities.into_iter());
+                    }
 
-                    // submit slab for finalization
-                    Ok(LoadedSlab {
+                    // put terrain into chunk
+                    world.populate_chunk_with_slab(slab, Some(terrain.clone()), vs.clone());
+                    world.mark_slabs_dirty(slab.chunk, (slab.slab, slab.slab));
+                }
+
+                // ----- slab is now TerrainInWorld
+
+                // notify loader
+                if let Err(e) = terrain_tx.send(Ok(slab)).await {
+                    error!("failed to send terrain result"; "error" => %e);
+                    return;
+                }
+
+                // wait for slab above to be loaded if needed
+                // TODO use this slab vertical space to see if above slab will even influence
+                //  this one, if not then dont wait
+                let above = get_or_wait_for_slab(&mut notifications, &world, slab.above()).await;
+
+                // generate nav areas skipping the bottom slice
+                let mut areas = terrain.discover_navmesh(&vs, above.as_ref());
+
+                // bottom slice nav requires below slab vertical space, now wait for that
+                let below = get_or_wait_for_slab(&mut notifications, &world, slab.below()).await;
+                if let Some(below) = below.as_ref() {
+                    terrain.discover_bottom_slice_areas(&vs, below, &mut areas);
+                }
+
+                // mark slab as done in isolation
+                {
+                    let mut world = world.borrow_mut();
+                    if let Some(c) = world.find_chunk_with_pos_mut(slab.chunk) {
+                        c.mark_slab_as_done_in_isolation(slab.slab);
+                    }
+                }
+
+                // post update for blocks to be updated with their new areas
+                nav_tx
+                    .send(SlabNavigationUpdate {
                         slab,
-                        terrain,
-                        navigation,
-                        batch,
-                        entities,
+                        new_areas: areas,
+                        replace_all: true,
                     })
-                },
-                self.finalization_channel.clone(),
-            );
+                    .await
+                    .expect("failed to send nav update");
+
+                // ----- slab is now DoneInIsolation
+
+                // TODO link up slice areas in this slab
+            });
 
             real_count += 1;
         }
@@ -237,11 +300,81 @@ impl<C: WorldContext> WorldLoader<C> {
             count, real_count
         );
 
+        // TODO remove batches
         self.last_batch_size = count;
     }
 
-    /// Note changes are made immediately to the terrain but are not immediate to the player,
-    /// because navigation/occlusion/finalization is queued to the loader thread pool.
+    async fn step1_generate_terrain(
+        slab: SlabLocation,
+        slab_type: SlabType,
+        source: &TerrainSource<C>,
+    ) -> Result<(Slab<C>, SlabVerticalSpace, Vec<C::GeneratedEntityDesc>), TerrainSourceError> {
+        let mut entities = Vec::new();
+        let result = if let SlabType::Placeholder = slab_type {
+            // empty placeholder
+            Ok(None)
+        } else {
+            source.load_slab(slab).await.map(|generated| {
+                entities = generated.entities;
+                Some(generated.terrain)
+            })
+        };
+
+        let (terrain, vs) = match result {
+            Ok(Some(terrain)) => {
+                let vs = SlabVerticalSpace::discover(&terrain);
+                (terrain, vs)
+            }
+            Ok(None) => {
+                debug!("adding placeholder slab to the top of the chunk"; slab);
+                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
+            }
+            Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
+                // soft error, we're at the world edge. treat as all air instead of
+                // crashing and burning
+                debug!("slab is out of bounds, swapping in an empty one"; slab);
+
+                // TODO shared instance of CoW for empty slab
+                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
+            }
+            Err(err) => return Err(err),
+        };
+        Ok((terrain, vs, entities))
+    }
+
+    pub fn apply_navigation_updates(&mut self) {
+        let mut w = self.world.borrow_mut();
+
+        // TODO limit number done per tick
+        while let Ok(update) = self.nav_updates.1.try_next() {
+            let update = match update {
+                Some(u) => u,
+                None => return, // channel closed
+            };
+
+            let mut do_it = || {
+                let chunk = w.find_chunk_with_pos_mut(update.slab.chunk)?;
+
+                if update.replace_all {
+                    // clear old slice areas
+                    chunk.replace_all_slice_areas(
+                        update.slab.slab,
+                        update.new_areas.iter().copied(),
+                    );
+                }
+
+                let slab = w.get_slab_mut(update.slab)?;
+                // TODO clear previous if indicated - but remember update to bottom slice is additive
+                slab.apply_navigation_updates(&update.new_areas, update.replace_all);
+
+                Some(())
+            };
+
+            let _ = do_it();
+        }
+    }
+
+    /// Note changes are made immediately to the terrain but are delayed for navigation.
     pub fn apply_terrain_updates(
         &mut self,
         terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>,
@@ -365,11 +498,11 @@ impl<C: WorldContext> WorldLoader<C> {
             count = real_slab_count
         );
         debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
-
         // submit slabs for finalization
-        let mut batches = UpdateBatch::builder(&mut self.batch_ids, real_slab_count);
+        // let mut batches = UpdateBatch::builder(&mut self.batch_ids, real_slab_count);
+        // unreachable!()
 
-        for slab_loc in slab_locs.into_iter() {
+        /*   for slab_loc in slab_locs.into_iter() {
             debug!("submitting slab for finalization"; slab_loc);
 
             let batch = batches.next_batch();
@@ -386,7 +519,7 @@ impl<C: WorldContext> WorldLoader<C> {
                     Ok(LoadedSlab {
                         slab: slab_loc,
                         terrain: None, // owned by the world
-                        navigation,
+                        vertical_space: todo!(),
                         batch,
                         entities: vec![], // no new entities to spawn for an update
                     })
@@ -402,7 +535,7 @@ impl<C: WorldContext> WorldLoader<C> {
             );
         }
 
-        self.last_batch_size = real_slab_count;
+        self.last_batch_size = real_slab_count*/
     }
 
     pub fn block_on_next_finalization(
@@ -521,7 +654,6 @@ impl<C: WorldContext> WorldLoader<C> {
 
 #[cfg(test)]
 mod tests {
-
     use std::time::Duration;
 
     use unit::world::{
@@ -644,7 +776,8 @@ mod tests {
 
         while !update_batches.is_empty() {
             let mut batch = update_batches.pop().unwrap(); // not empty
-            let log_str = batch.iter().map(|x| format!("{:?}", x)).join("\n"); // gross
+            let log_str = batch.iter().map(|x| format!("{:?}", x)).join("\n");
+            // gross
             misc::trace!(
                 "test: requesting batch of {} updates {}",
                 batch.len(),

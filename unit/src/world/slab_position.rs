@@ -1,15 +1,18 @@
 use misc::derive_more::*;
+use std::cmp::Ordering;
 
 use crate::world::{
-    BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, WorldPosition, CHUNK_SIZE,
+    BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, WorldPosition,
+    CHUNK_SIZE,
 };
+use misc::*;
 use std::convert::TryFrom;
 
 // TODO consider using same generic pattern as SliceIndex for all points and positions
 //  e.g. single Position where x/y can be Global/Block, z is Global/Slab/None
 
 /// A block in a slab
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, From)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Into, From)]
 pub struct SlabPosition(BlockCoord, BlockCoord, LocalSliceIndex);
 
 impl SlabPosition {
@@ -32,6 +35,10 @@ impl SlabPosition {
             .to_world_position(slab.chunk)
     }
 
+    pub fn to_slice_block(self) -> SliceBlock {
+        SliceBlock::new_srsly_unchecked(self.0, self.1)
+    }
+
     pub fn to_block_position(self, slab_index: SlabIndex) -> BlockPosition {
         BlockPosition::new_unchecked(self.0, self.1, self.2.to_global(slab_index))
     }
@@ -44,6 +51,27 @@ impl SlabPosition {
     }
     pub const fn z(self) -> LocalSliceIndex {
         self.2
+    }
+}
+
+// sort by z so slices are together, then y and x, so indices into slices are contiguous for contiguous blocks
+impl PartialOrd for SlabPosition {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(
+            self.2
+                .cmp(&other.2)
+                .then(self.1.cmp(&other.1))
+                .then(self.0.cmp(&other.0)),
+        )
+    }
+}
+
+impl Ord for SlabPosition {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.2
+            .cmp(&other.2)
+            .then(self.1.cmp(&other.1))
+            .then(self.0.cmp(&other.0))
     }
 }
 
@@ -79,5 +107,11 @@ impl From<WorldPosition> for SlabPosition {
     fn from(p: WorldPosition) -> Self {
         let p = BlockPosition::from(p);
         Self::new_unchecked(p.x(), p.y(), p.z().to_local())
+    }
+}
+
+impl Display for SlabPosition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.0, self.1, self.2.slice())
     }
 }

@@ -4,18 +4,30 @@ use unit::world::{
     BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
 };
 
-use crate::chunk::slab::Slab;
+use crate::chunk::chunk::VerticalSpaceOrWait::Failure;
+use crate::chunk::slab::{Slab, SliceNavArea};
 use crate::chunk::slice::{Slice, SliceOwned};
+use crate::chunk::slice_navmesh::SlabVerticalSpace;
+use crate::chunk::slice_navmesh::{FreeVerticalSpace, VerticalSpacePlease};
 use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
-use crate::navigation::{BlockGraph, ChunkArea, WorldArea};
+use crate::navigation::{BlockGraph, WorldArea};
+use crate::navigationv2::{ChunkArea, SlabArea};
 use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldContext};
 use parking_lot::RwLock;
+use petgraph::visit::Walker;
 use std::collections::HashMap;
 use std::iter::once;
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
 
 pub type ChunkId = u64;
+
+#[derive(Copy, Clone)]
+pub struct AreaInfo {
+    pub height: u8,
+}
 
 pub struct Chunk<C: WorldContext> {
     /// Unique for each chunk
@@ -23,35 +35,35 @@ pub struct Chunk<C: WorldContext> {
 
     terrain: RawChunkTerrain<C>,
 
-    /// Sparse associated data with each block
+    /// Sparse associated data with each block. Unused atm?
     block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
 
-    /// Navigation lookup
-    areas: HashMap<ChunkArea, BlockGraph>,
+    areas: HashMap<ChunkArea, AreaInfo>,
 
-    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus<C>>>,
+    vertical_space: HashMap<SlabIndex, SlabVerticalSpace>,
+
+    slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
     slab_notify: LoadNotifier,
 }
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub(crate) enum SlabLoadingStatus<C: WorldContext> {
+pub(crate) enum SlabLoadingStatus {
     /// Not available
     Unloaded,
 
     /// Has been requested
     Requested,
 
-    /// Is in progress
-    InProgress {
-        /// Slab's top slice
-        top: SliceOwned<C>,
+    /// Terrain is in chunk with isolated occlusion and vertical space and nav areas (both are *missing bottom slice*).
+    /// Depends on slab above
+    TerrainInWorld,
 
-        /// Slab's bottom slice
-        bottom: SliceOwned<C>,
-    },
+    /// Bottom slice of and nav has been provided by slab below, so now full nav areas
+    /// are available. Internal area links are known
+    DoneInIsolation,
 
-    /// Finished and present in chunk.terrain
+    /// All neighbouring slabs are present and inter-slab links are known
     Done,
 }
 
@@ -68,6 +80,7 @@ impl<C: WorldContext> Chunk<C> {
             terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
             areas: HashMap::new(),
+            vertical_space: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: world.load_notifications(),
         }
@@ -80,6 +93,7 @@ impl<C: WorldContext> Chunk<C> {
             pos: pos.into(),
             terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
+            vertical_space: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: LoadNotifier::default(),
@@ -94,6 +108,20 @@ impl<C: WorldContext> Chunk<C> {
     pub fn id(&self) -> ChunkId {
         let ChunkLocation(x, y) = self.pos;
         (x as u64) << 32 | (y as u64)
+    }
+
+    pub fn area_info_for_block(&self, block: BlockPosition) -> Option<AreaInfo> {
+        let b = self.get_block(block)?;
+        let area = b.nav_area()?;
+        self.areas
+            .get(&ChunkArea {
+                slab_idx: block.z().slab_index(),
+                slab_area: SlabArea {
+                    slice_idx: block.z().to_local(),
+                    slice_area: area,
+                },
+            })
+            .copied()
     }
 
     pub(crate) fn area_for_block(&self, block_pos: BlockPosition) -> Option<WorldArea> {
@@ -116,26 +144,45 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub(crate) fn remove_block_graphs(&mut self, (min, max): (SlabIndex, SlabIndex)) {
-        let n = self.areas.len();
-        self.areas
-            .retain(|area, _| !(area.slab >= min && area.slab <= max));
-        let m = self.areas.len();
-        debug!("removed {removed} nodes in slab range", removed=n-m; "lower"=>min, "upper"=>max);
+        unreachable!()
     }
 
     pub(crate) fn block_graph_for_area(&self, area: WorldArea) -> Option<&BlockGraph> {
-        self.areas.get(&area.into())
+        unreachable!()
+    }
+
+    pub fn replace_all_slice_areas(
+        &mut self,
+        slab: SlabIndex,
+        new_areas: impl Iterator<Item = SliceNavArea>,
+    ) {
+        // remove all for this slab
+        self.areas.retain(|a, _| a.slab_idx != slab);
+
+        self.areas.extend(new_areas.map(|a| {
+            (
+                ChunkArea {
+                    slab_idx: slab,
+                    slab_area: SlabArea {
+                        slice_idx: LocalSliceIndex::new_unchecked(a.slice as i32), // gross
+                        slice_area: a.area,
+                    },
+                },
+                AreaInfo { height: a.height },
+            )
+        }));
     }
 
     pub(crate) fn update_block_graphs(
         &mut self,
         slab_nav: impl Iterator<Item = (ChunkArea, BlockGraph)>,
     ) {
-        for (area, graph) in slab_nav {
-            let (new_edges, new_nodes) = graph.len();
-            self.areas.insert(area, graph);
-            debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
-        }
+        // for (area, graph) in slab_nav {
+        //     let (new_edges, new_nodes) = graph.len();
+        //     self.areas.insert(area, graph);
+        //     debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
+        // }
+        unreachable!()
     }
 
     pub fn slice_range(
@@ -173,146 +220,49 @@ impl<C: WorldContext> Chunk<C> {
         self.block_data.remove(&pos)
     }
 
+    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: SlabVerticalSpace) {
+        self.vertical_space.insert(slab, vs);
+    }
+
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
         // no notification necessary, nothing waits for a slab to be requested
     }
 
-    pub(crate) fn mark_slab_in_progress(&self, slab: SlabIndex, terrain: &Slab<C>) {
-        let top = terrain.slice_owned(LocalSliceIndex::top());
-        let bottom = terrain.slice_owned(LocalSliceIndex::bottom());
-
-        self.update_slab_status(slab, SlabLoadingStatus::InProgress { top, bottom });
+    pub(crate) fn mark_slab_as_in_world(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::TerrainInWorld);
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
-    pub(crate) fn mark_slabs_complete(&self, slabs: impl Iterator<Item = SlabIndex> + Clone) {
-        self.update_slabs_status(slabs.clone(), SlabLoadingStatus::Done);
-        for slab in slabs {
-            self.slab_notify.notify(SlabLocation::new(slab, self.pos));
-        }
+    pub(crate) fn mark_slab_as_done_in_isolation(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::DoneInIsolation);
+        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
-    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus<C>) {
-        self.update_slabs_status(once(slab), state)
+    fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
+        trace!("updating slab progress"; SlabLocation::new(slab, self.pos), "state" => ?state);
+        self.slab_progress.write().insert(slab, state);
     }
 
     /// Does not notify
     fn update_slabs_status(
         &self,
         mut slabs: impl Iterator<Item = SlabIndex>,
-        state: SlabLoadingStatus<C>,
+        state: SlabLoadingStatus,
     ) {
         let mut map = self.slab_progress.write();
-
-        let mut do_update = |slab, state| {
-            trace!("updating slab progress"; SlabLocation::new(slab, self.pos), "state" => ?state);
-            map.insert(slab, state);
-        };
-
-        let first = slabs.next();
-
-        // clone for all except first
         for slab in slabs {
-            do_update(slab, state.clone());
-        }
-
-        // use original for first
-        if let Some(slab) = first {
-            do_update(slab, state);
+            trace!("updating slab progress"; SlabLocation::new(slab, self.pos), "state" => ?state);
+            map.insert(slab, state.clone());
         }
     }
 
-    /// None if should wait
-    pub(crate) fn get_neighbouring_slabs(
-        &self,
-        slab: SlabIndex,
-    ) -> Option<(Option<SliceOwned<C>>, Option<SliceOwned<C>>)> {
-        // slice below is mandatory as it's used for navigation. if its in progress then we need to wait
-        let below_availability = self.get_slab_slice_availability(slab - 1, true);
-
-        let below = match below_availability {
-            SlabAvailability::Never => {
-                // make do without
-                None
-            }
-            SlabAvailability::OnItsWay => {
-                // wait required
-                return None;
-            }
-            SlabAvailability::TadaItsAvailable(slice) => Some(slice),
-        };
-
-        // slice above is optional, only used to calculate occlusion which can be updated later
-        let above = slab + 1;
-        let above = self.get_slab_slice(self.slab_progress(above), above, false);
-
-        Some((above, below))
-    }
-
-    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus<C> {
+    fn slab_progress(&self, slab: SlabIndex) -> SlabLoadingStatus {
         let guard = self.slab_progress.read();
         guard
             .get(&slab)
             .unwrap_or(&SlabLoadingStatus::Unloaded)
             .clone()
-    }
-
-    fn get_slab_slice_availability(&self, slab: SlabIndex, top_slice: bool) -> SlabAvailability<C> {
-        let state = self.slab_progress(slab);
-        match state {
-            SlabLoadingStatus::InProgress { top, bottom } => {
-                let slice = if top_slice { top } else { bottom };
-                SlabAvailability::TadaItsAvailable(slice)
-            }
-            SlabLoadingStatus::Done => {
-                let slice = if top_slice {
-                    LocalSliceIndex::top()
-                } else {
-                    LocalSliceIndex::bottom()
-                };
-                let global_slice = slice.to_global(slab);
-                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
-                    panic!(
-                        "slab {:?} is apparently loaded but could not be found",
-                        slab
-                    )
-                });
-                SlabAvailability::TadaItsAvailable(slice.to_owned())
-            }
-
-            SlabLoadingStatus::Unloaded => SlabAvailability::Never,
-            SlabLoadingStatus::Requested => SlabAvailability::OnItsWay,
-        }
-    }
-
-    fn get_slab_slice(
-        &self,
-        state: SlabLoadingStatus<C>,
-        slab: SlabIndex,
-        top_slice: bool,
-    ) -> Option<SliceOwned<C>> {
-        match state {
-            SlabLoadingStatus::InProgress { top, bottom } => {
-                Some(if top_slice { top } else { bottom })
-            }
-            SlabLoadingStatus::Done => {
-                let slice = if top_slice {
-                    LocalSliceIndex::top()
-                } else {
-                    LocalSliceIndex::bottom()
-                };
-                let global_slice = slice.to_global(slab);
-                let slice = self.terrain.slice(global_slice).unwrap_or_else(|| {
-                    panic!(
-                        "slab {:?} is apparently loaded but could not be found",
-                        slab
-                    )
-                });
-                Some(slice.to_owned())
-            }
-            _ => None,
-        }
     }
 
     /// Returns true if slab has not been already requested/loaded or is a placeholder
@@ -322,14 +272,14 @@ impl<C: WorldContext> Chunk<C> {
                 // has not been requested, pls load
                 true
             }
-            SlabLoadingStatus::Requested | SlabLoadingStatus::InProgress { .. } => {
-                // is currently in progress, don't request again
-                false
-            }
             SlabLoadingStatus::Done => {
                 // is already loaded, only load again if it is a placeholder
                 let slab = self.terrain.slab(slab).unwrap();
                 slab.is_placeholder()
+            }
+            _ => {
+                // is currently in progress, don't request again
+                false
             }
         }
     }
@@ -339,9 +289,31 @@ impl<C: WorldContext> Chunk<C> {
         matches!(progress, SlabLoadingStatus::Done)
     }
 
+    /// If true it has not been requested and is not loading
+    pub fn slab_vertical_space_or_wait(&self, slab: SlabIndex) -> VerticalSpaceOrWait {
+        use VerticalSpaceOrWait::*;
+        let progress = self.slab_progress(slab);
+
+        match progress {
+            SlabLoadingStatus::Unloaded => Failure,
+            SlabLoadingStatus::Requested => Wait,
+            _ => Loaded(self.slab_vertical_space(slab).unwrap().clone()),
+        }
+    }
+
     pub fn has_slab(&self, slab: SlabIndex) -> bool {
         self.terrain.slab(slab).is_some()
     }
+
+    pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<&SlabVerticalSpace> {
+        self.vertical_space.get(&slab)
+    }
+}
+
+pub enum VerticalSpaceOrWait {
+    Wait,
+    Failure,
+    Loaded(SlabVerticalSpace),
 }
 
 impl<C: WorldContext> BaseTerrain<C> for Chunk<C> {

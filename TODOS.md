@@ -62,7 +62,6 @@
    * `// TODO 1 area at z=0`
  * [world/src/context.rs](world/src/context.rs) (1)
    * `/// TODO very temporary "walkability" for block types`
- * [world/src/loader/finalizer.rs](world/src/loader/finalizer.rs) (10)
    * `let mut entities_to_spawn = vec![]; // TODO reuse`
    * `// TODO mark chunk as "not ready" so its mesh is only rendered when it is finalized`
    * `let mut area_edges = Vec::new(); // TODO reuse buf`

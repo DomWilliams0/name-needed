@@ -1,3 +1,4 @@
+use crate::chunk::slice_navmesh::SliceAreaIndex;
 use crate::context::{BlockType, WorldContext};
 use misc::*;
 use unit::world::GlobalSliceIndex;
@@ -17,6 +18,13 @@ pub struct Block<C: WorldContext> {
 
     /// Navigability
     area: SlabAreaIndex,
+
+    /// Only for navigation if [is_accessible] is set
+    nav_area: SliceAreaIndex,
+
+    // TODO pack into a bit
+    is_accessible: bool,
+
     /// Lighting
     occlusion: BlockOcclusion,
 }
@@ -39,6 +47,8 @@ impl<C: WorldContext> Block<C> {
             },
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default(),
+            nav_area: SliceAreaIndex::DEFAULT, // irrelevant because not accessible
+            is_accessible: false,
         }
     }
 
@@ -48,6 +58,8 @@ impl<C: WorldContext> Block<C> {
             durability: Proportion::default_empty(),
             area: SlabAreaIndex::UNINITIALIZED,
             occlusion: BlockOcclusion::default_const(),
+            nav_area: SliceAreaIndex::DEFAULT, // irrelevant because not accessible
+            is_accessible: false,
         }
     }
 
@@ -63,10 +75,30 @@ impl<C: WorldContext> Block<C> {
         self.block_type.opacity()
     }
 
+    pub fn nav_area(&self) -> Option<SliceAreaIndex> {
+        self.is_accessible.then_some(self.nav_area)
+    }
+
+    pub fn is_walkable(&self) -> bool {
+        self.is_accessible
+    }
+
+    pub fn clear_nav_area(&mut self) {
+        self.is_accessible = false;
+        // no need to clear actual area
+    }
+
+    pub fn set_nav_area(&mut self, area: SliceAreaIndex) {
+        self.nav_area = area;
+        self.is_accessible = true;
+    }
+
+    #[deprecated]
     pub fn walkable(self) -> bool {
         self.area.initialized()
     }
 
+    #[deprecated]
     pub fn walkable_area(self) -> Option<SlabAreaIndex> {
         if self.area.initialized() {
             Some(self.area)
@@ -75,13 +107,17 @@ impl<C: WorldContext> Block<C> {
         }
     }
 
+    #[deprecated]
     pub(crate) fn area_index(self) -> SlabAreaIndex {
         // TODO this should return an Option if area is uninitialized
         self.area
     }
+    #[deprecated]
     pub(crate) fn area_mut(&mut self) -> &mut SlabAreaIndex {
         &mut self.area
     }
+
+    #[deprecated]
     pub(crate) fn chunk_area(self, slice: GlobalSliceIndex) -> Option<ChunkArea> {
         if self.area.initialized() {
             Some(ChunkArea {

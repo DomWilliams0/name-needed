@@ -39,6 +39,7 @@ impl SliceIndexScale for Slab {
 
 /// A slice of blocks in a chunk, z coordinate
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Into, From)]
+// TODO local slice index needs u8 only
 pub struct SliceIndex<S: SliceIndexScale>(i32, PhantomData<S>);
 
 /// Slice index in range 0..MAX, so a single z+1 operation is infallible
@@ -61,11 +62,11 @@ impl<S: SliceIndexScale> SliceIndex<S> {
     }
 
     /// Last valid slice index
-    pub fn top() -> Self {
-        Self::new_srsly_unchecked(S::MAX)
+    pub const fn top() -> Self {
+        Self(S::MAX, PhantomData)
     }
-    pub fn bottom() -> Self {
-        Self::new_srsly_unchecked(S::MIN)
+    pub const fn bottom() -> Self {
+        Self(S::MIN, PhantomData)
     }
 
     pub fn range() -> impl Iterator<Item = Self> {
@@ -112,8 +113,8 @@ impl SliceIndex<Slab> {
     }
 
     /// All slices 0..=SLAB_SIZE-1
-    pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator {
-        (Slab::MIN..=Slab::MAX).map(|i| Self(i, PhantomData))
+    pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator + ExactSizeIterator {
+        (Slab::MIN..Slab::MAX + 1).map(|i| Self(i, PhantomData))
     }
     /// All slices except the last, 0..=SLAB_SIZE-2
     pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> + ExactSizeIterator

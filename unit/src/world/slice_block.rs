@@ -24,6 +24,13 @@ impl SliceBlock {
         Self::new(x, y).unwrap_or_else(|| panic!("coords out of range: {:?}", (x, y)))
     }
 
+    pub fn new_srsly_unchecked(x: BlockCoord, y: BlockCoord) -> Self {
+        if cfg!(debug_assertions) {
+            let _ = Self::new_unchecked(x, y);
+        };
+        Self(x, y)
+    }
+
     pub fn to_block_position(self, slice: GlobalSliceIndex) -> BlockPosition {
         BlockPosition::new_unchecked(self.0, self.1, slice)
     }

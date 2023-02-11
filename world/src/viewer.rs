@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
 use unit::world::{
-    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
+    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition,
 };
 
 #[derive(Clone)]
@@ -82,6 +82,12 @@ impl SliceRange {
     #[inline]
     pub fn as_range(self) -> RangeInclusive<i32> {
         self.0.slice()..=self.1.slice()
+    }
+
+    pub fn slabs(self) -> impl Iterator<Item = SlabIndex> {
+        self.as_range()
+            .map(|slice| GlobalSliceIndex::new(slice).slab_index())
+            .dedup()
     }
 
     pub fn size(self) -> u32 {
@@ -163,7 +169,7 @@ impl<C: WorldContext> WorldViewer<C> {
         {
             // TODO do mesh generation on a worker thread? or just do this bit in a parallel iter
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
-            info!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
+            debug!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
             f(dirty_chunk.pos(), mesh);
         }
 

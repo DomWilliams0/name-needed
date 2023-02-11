@@ -1,17 +1,25 @@
+use std::cell::Cell;
 use std::iter::once;
-use std::ops::Deref;
+use std::mem::MaybeUninit;
+use std::ops::{Deref, Index};
 
 use misc::*;
-use unit::world::{LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, WorldRange, SLAB_SIZE};
+use unit::world::{
+    BlockCoord, LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, SliceBlock, SliceIndex,
+    WorldRange, SLAB_SIZE,
+};
 use unit::world::{LocalSliceIndexBelowTop, CHUNK_SIZE};
 
 use crate::block::{Block, BlockOpacity};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
-use crate::loader::{GenericTerrainUpdate, SlabTerrainUpdate};
+use crate::chunk::slice_navmesh::{
+    make_mesh, SlabVerticalSpace, SliceAreaIndex, SliceConfig, ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
+};
+use crate::loader::{FreeVerticalSpace, GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity, OcclusionFace};
-use crate::{BlockType, WorldChangeEvent, WorldContext};
+use crate::{flatten_coords, BlockType, WorldChangeEvent, WorldContext, SLICE_SIZE};
 use grid::{Grid, GridImpl, GridImplExt};
 use std::sync::Arc;
 
@@ -43,7 +51,7 @@ impl<C: WorldContext> ::grid::GridImpl for SlabGridImpl<C> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SlabType {
     Normal,
 
@@ -58,6 +66,10 @@ pub struct Slab<C: WorldContext>(Arc<SlabGridImpl<C>>, SlabType);
 
 #[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
+
+pub(crate) struct SlabInternal {
+    pub areas: Vec<SliceNavArea>,
+}
 
 pub trait DeepClone {
     fn deep_clone(&self) -> Self;
@@ -147,6 +159,13 @@ impl<C: WorldContext> Slab<C> {
         LocalSliceIndex::slices().map(move |idx| (idx, self.slice(idx)))
     }
 
+    /// (slice index *relative to this slab*, slice)
+    pub fn slices_from_top(&self) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice<C>)> {
+        LocalSliceIndex::slices()
+            .rev()
+            .map(move |idx| (idx, self.slice(idx)))
+    }
+
     // (below sliceN, this slice0, this slice1), (this slice0, this slice1, this slice2) ...
     // (this sliceN-1, this sliceN, above0)
     pub fn ascending_slice_triplets<'a>(
@@ -197,62 +216,143 @@ impl IntoIterator for SlabInternalNavigability {
     }
 }
 
-/// Initialization functions
-impl<C: WorldContext> Slab<C> {
-    /// Discover navigability and occlusion
-    pub(crate) fn process_terrain<'s>(
-        &mut self,
-        index: SlabIndex,
-        above: Option<impl Into<Slice<'s, C>>>,
-        below: Option<impl Into<Slice<'s, C>>>,
-    ) -> SlabInternalNavigability {
-        let above = above.map(Into::into);
-        let below = below.map(Into::into);
+#[derive(Debug, Copy, Clone)]
+pub struct SliceNavArea {
+    pub slice: u8,
+    pub from: (BlockCoord, BlockCoord),
+    /// Inclusive
+    pub to: (BlockCoord, BlockCoord),
+    pub area: SliceAreaIndex,
+    pub height: FreeVerticalSpace,
+}
 
-        log_scope!(o!(index));
-        // TODO detect when slab is all air and avoid expensive processing
-        // but remember an all air slab above a solid slab DOES have an area on the first slice..
+struct NavmeshCfg<'a> {
+    vec: &'a mut Vec<SliceNavArea>,
+    cur_slice: u8,
+}
 
-        // flood fill to discover navigability
-        let navigation = self.discover_areas(index, below);
+impl SliceConfig for NavmeshCfg<'_> {
+    const SZ: usize = CHUNK_SIZE.as_usize();
+    const FILL_OUTPUT: bool = false; // unused
+    type InputElem = u8;
 
-        if navigation.0.is_empty() && matches!(self.1, SlabType::Placeholder) {
-            // skip mutable references
-        } else {
-            // occlusion
-            self.init_occlusion(above, below);
-        }
-
-        navigation
+    fn available_height(elem: Self::InputElem) -> u8 {
+        elem
     }
 
-    fn discover_areas(
-        &mut self,
-        this_slab: SlabIndex,
-        slice_below: Option<Slice<C>>,
-    ) -> SlabInternalNavigability {
-        // TODO if exclusive we're in deep water with CoW
-        assert!(self.is_exclusive(), "not exclusive?");
+    fn emit(&mut self, range: [usize; 2], height: u8, area: u8) {
+        self.vec.push(SliceNavArea {
+            slice: self.cur_slice,
+            from: unflatten_index(range[0]).xy(),
+            to: unflatten_index(range[1]).xy(),
+            area: SliceAreaIndex(area),
+            height,
+        })
+    }
+}
 
-        // collect slab into local grid
-        let mut discovery = AreaDiscovery::from_slab(&self.0, this_slab, slice_below);
+/// Initialization functions
+impl<C: WorldContext> Slab<C> {
+    pub(crate) fn discover_navmesh(
+        &self,
+        vertical_space: &SlabVerticalSpace,
+        above: Option<&SlabVerticalSpace>,
+    ) -> Vec<SliceNavArea> {
+        let maximum: u8 = 4; // TODO pass through
+        let mut rects = vec![];
+        let mut cfg = NavmeshCfg {
+            vec: &mut rects,
+            cur_slice: 1, // first slice is skipped
+        };
 
-        // flood fill and assign areas
-        let area_count = discovery.flood_fill_areas();
-        debug!("discovered {count} areas", count = area_count);
+        #[allow(clippy::uninit_assumed_init, invalid_value)]
+        // uninit values will not be ready anyway
+        let mut output: [SliceAreaIndex; SLICE_SIZE] =
+            unsafe { MaybeUninit::uninit().assume_init() };
+        for (slice_idx, blocks) in &vertical_space
+            .iter_blocks()
+            .skip_while(|(pos, _)| pos.z() == LocalSliceIndex::bottom()) // skip bottom slice
+            .group_by(|(pos, _)| pos.z())
+        {
+            log_scope!(o!("slice" => slice_idx.slice()));
+            // setup input (uncapped)
+            let mut input = [0u8; SLICE_SIZE];
+            for (pos, h) in blocks {
+                let idx = flatten_coords(SliceBlock::new_srsly_unchecked(pos.x(), pos.y()));
+                unsafe {
+                    *input.get_unchecked_mut(idx) = h;
+                }
+            }
 
-        // collect areas and graphs
-        let slab_areas = discovery.areas_with_graph().collect_vec();
+            if above.is_some() {
+                // check if this goes to the top of the slab, so if we need above
+                let remaining_until_top = LocalSliceIndex::top().slice() - slice_idx.slice();
+                let remaining_until_top = remaining_until_top as u8;
+                if remaining_until_top < maximum {
+                    let above = unsafe { above.unwrap_unchecked() }; // checked already
+                                                                     // in the top few slices, check each block if it extends into slab above
+                    for (i, this) in input
+                        .iter_mut()
+                        .enumerate()
+                        .filter(|(_, h)| **h > remaining_until_top)
+                    {
+                        // increase with air above
+                        *this += above.below_at(unflatten_index(i).xy());
+                        // TODO should post incremental updates to the slab above
+                    }
+                }
+            }
 
-        // skip expensive mutable reference cloning if no areas (empty slab)
-        if area_count > 0 {
-            // TODO discover internal area links
+            // clamp to max
+            input.iter_mut().for_each(|h| *h = (*h).min(maximum));
 
-            // apply areas to blocks
-            discovery.apply(self.expect_mut());
+            let mut initialised = [false; SLICE_SIZE];
+            cfg.cur_slice = slice_idx.slice_unsigned() as u8;
+            make_mesh(&mut cfg, &input, &mut output, &mut initialised);
         }
 
-        SlabInternalNavigability(slab_areas)
+        rects
+    }
+
+    pub(crate) fn discover_bottom_slice_areas(
+        &self,
+        this: &SlabVerticalSpace,
+        below: &SlabVerticalSpace,
+        out: &mut Vec<SliceNavArea>,
+    ) {
+        let maximum = 4; // TODO pass through
+
+        // setup input (uncapped)
+        let mut input = [0u8; SLICE_SIZE];
+
+        // only use blocks from this slab bottom slice if it is not solid
+        let mut this_heights = [0; SLICE_SIZE];
+        for (empty_pos, h) in this
+            .iter_blocks()
+            .take_while(|(pos, _)| pos.z() == LocalSliceIndex::bottom())
+        {
+            this_heights[flatten_coords(empty_pos.to_slice_block())] = h;
+        }
+
+        for (input, this_h, below) in
+            izip!(input.iter_mut(), this_heights.iter(), below.above().iter(),)
+        {
+            if *this_h != 0 && *below == 0 {
+                *input = (*this_h).min(maximum);
+            }
+        }
+
+        let mut cfg = NavmeshCfg {
+            vec: out,
+            cur_slice: 0,
+        };
+        let mut initialised = [false; SLICE_SIZE];
+
+        #[allow(clippy::uninit_assumed_init, invalid_value)]
+        // uninit values will not be ready anyway
+        let mut output: [SliceAreaIndex; SLICE_SIZE] =
+            unsafe { MaybeUninit::uninit().assume_init() };
+        make_mesh(&mut cfg, &input, &mut output, &mut initialised);
     }
 
     fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
@@ -430,6 +530,34 @@ impl<C: WorldContext> Slab<C> {
         }
 
         count
+    }
+
+    pub(crate) fn apply_navigation_updates(&mut self, updates: &[SliceNavArea], replace_all: bool) {
+        if updates.is_empty() {
+            return;
+        }
+        debug!("applying nav updates to slab"; "n" => updates.len(), "replace_all" => replace_all);
+
+        for (slice_idx, group) in &updates.iter().group_by(|u| u.slice) {
+            let mut slice = self.slice_mut(LocalSliceIndex::new_unchecked(slice_idx as i32));
+
+            if replace_all {
+                slice.iter_mut().for_each(|b| b.clear_nav_area());
+            }
+            for u in group {
+                for x in u.from.0..=u.to.0 {
+                    for y in u.from.1..=u.to.1 {
+                        let b = &mut slice[SliceBlock::new_srsly_unchecked(x, y)];
+                        debug_assert!(
+                            b.block_type().is_air(),
+                            "{x},{y},{slice_idx} should be air but is {:?}",
+                            b.block_type()
+                        );
+                        b.set_nav_area(u.area);
+                    }
+                }
+            }
+        }
     }
 }
 

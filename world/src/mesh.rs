@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::hint::unreachable_unchecked;
 
 use crate::chunk::slab::Slab;
-use crate::chunk::slice::unflatten_index;
+use crate::chunk::slice::{unflatten_index, Slice};
 use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip, VertexOcclusion};
 use crate::viewer::SliceRange;

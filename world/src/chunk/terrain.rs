@@ -183,7 +183,7 @@ impl<C: WorldContext> RawChunkTerrain<C> {
         self.slabs.add(Slab::empty_placeholder(), slab.into());
     }
 
-    pub(crate) fn slab(&self, index: SlabIndex) -> Option<&Slab<C>> {
+    pub fn slab(&self, index: SlabIndex) -> Option<&Slab<C>> {
         self.slabs.get(index)
     }
 
