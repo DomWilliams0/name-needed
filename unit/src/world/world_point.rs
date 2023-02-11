@@ -5,7 +5,7 @@ use std::ops::{Add, AddAssign, Sub};
 use misc::{NotNan, Point3, Vector2, Vector3};
 
 use crate::space::view::ViewPoint;
-use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
+use crate::world::{GlobalSliceIndex, SliceIndex, WorldPosition, BLOCKS_PER_METRE};
 
 /// A point anywhere in the world. All possible non-NaN and finite values are valid
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]

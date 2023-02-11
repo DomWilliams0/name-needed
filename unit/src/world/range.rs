@@ -7,7 +7,7 @@ use misc::*;
 
 use crate::world::{
     BlockCoord, BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SlabPosition,
-    WorldPoint, WorldPosition, CHUNK_SIZE,
+    SliceIndex, WorldPoint, WorldPosition,
 };
 
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -237,7 +237,7 @@ impl RangePosition for WorldPosition {
 
 impl RangePosition for SlabPosition {
     type XY = BlockCoord;
-    type Z = i32;
+    type Z = u8;
     type Count = usize;
 
     fn xyz(&self) -> (Self::XY, Self::XY, Self::Z) {

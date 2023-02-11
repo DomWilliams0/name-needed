@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use misc::*;
-use unit::world::{BlockCoord, SlabIndex, SlabPositionAsCoord, SLAB_SIZE};
+use unit::world::{BlockCoord, SlabIndex, SlabPositionAsCoord, SliceIndex, SLAB_SIZE};
 use unit::world::{LocalSliceIndex, RangePosition, SlabPosition, CHUNK_SIZE};
 
 use crate::block::Block;
@@ -168,7 +168,7 @@ impl<'a, C: WorldContext> AreaDiscovery<'a, C> {
             // check vertical neighbours for jump access
 
             // don't queue the slab above's neighbours if we're at the top of the slab
-            if current.z().slice() < SLAB_SIZE.as_i32() - 1 {
+            if current.z().slice() < SLAB_SIZE.as_u8() - 1 {
                 // only check for jump ups if the block directly above is not solid
                 if self
                     .get_vertical_offset(current, VerticalOffset::Above)
@@ -249,7 +249,7 @@ impl<'a, C: WorldContext> AreaDiscovery<'a, C> {
         offset: VerticalOffset,
     ) -> AreaDiscoveryGridBlock {
         let (x, y, z) = block.xyz();
-        const TOP: i32 = SLAB_SIZE.as_i32() - 1;
+        const TOP: u8 = SLAB_SIZE.as_u8() - 1;
 
         match z {
             // top of the slab: never check the slab above

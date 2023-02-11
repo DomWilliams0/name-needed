@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use misc::*;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, WorldPosition,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SliceIndex, WorldPosition,
     WorldPositionRange,
 };
 

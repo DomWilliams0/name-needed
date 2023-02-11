@@ -5,7 +5,7 @@ use misc::derive_more::*;
 use misc::*;
 
 use crate::space::view::ViewPoint;
-use crate::world::{GlobalSliceIndex, WorldPoint, BLOCKS_SCALE};
+use crate::world::{GlobalSliceIndex, SliceIndex, WorldPoint, BLOCKS_SCALE};
 
 /// A block anywhere in the world. All possible values are valid
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]

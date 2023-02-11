@@ -5,7 +5,7 @@ use misc::derive_more::*;
 use misc::*;
 
 use crate::world::{
-    BlockCoord, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
 };
 
 /// A block in a chunk. Only valid coords are represented by this type

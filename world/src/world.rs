@@ -1364,7 +1364,7 @@ mod tests {
     use std::time::Duration;
 
     use misc::{logging, thread_rng, Itertools, Rng, SeedableRng, StdRng};
-    use unit::world::{all_slabs_in_range, CHUNK_SIZE};
+    use unit::world::{all_slabs_in_range, SliceIndex, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
         WorldPositionRange, SLAB_SIZE,

@@ -7,7 +7,7 @@ use misc::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SLAB_SIZE,
+    SliceIndex, SLAB_SIZE,
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
 

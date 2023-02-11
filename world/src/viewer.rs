@@ -6,7 +6,8 @@ use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
 use unit::world::{
-    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition,
+    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceIndex,
+    WorldPosition,
 };
 
 #[derive(Clone)]

@@ -82,7 +82,7 @@ slog_kv_debug!(SlabIndex, "slab");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::world::SLAB_SIZE;
+    use crate::world::{SliceIndex, SLAB_SIZE};
 
     fn check(slab: i32, slice: i32) {
         let slab = SlabIndex(slab);

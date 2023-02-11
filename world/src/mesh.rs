@@ -11,8 +11,8 @@ use crate::viewer::SliceRange;
 use crate::{BaseTerrain, BlockType, WorldContext};
 use grid::GridImpl;
 use std::mem::MaybeUninit;
-use unit::world::CHUNK_SIZE;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
+use unit::world::{SliceIndex, CHUNK_SIZE};
 
 const VERTICES_PER_BLOCK: usize = 6;
 

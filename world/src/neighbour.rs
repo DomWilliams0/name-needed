@@ -328,7 +328,7 @@ impl NeighbourOffset {
 #[cfg(test)]
 mod tests {
     use misc::Itertools;
-    use unit::world::GlobalSliceIndex;
+    use unit::world::{GlobalSliceIndex, SliceIndex};
 
     use super::*;
 

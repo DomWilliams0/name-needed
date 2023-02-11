@@ -2,8 +2,8 @@ use misc::derive_more::*;
 use std::cmp::Ordering;
 
 use crate::world::{
-    BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, WorldPosition,
-    CHUNK_SIZE,
+    BlockCoord, BlockPosition, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, SliceIndex,
+    WorldPosition, CHUNK_SIZE,
 };
 use misc::*;
 use std::convert::TryFrom;
@@ -93,7 +93,7 @@ impl TryFrom<[i32; 3]> for SlabPosition {
 impl From<SlabPosition> for [i32; 3] {
     fn from(p: SlabPosition) -> Self {
         let SlabPosition(x, y, z) = p;
-        [i32::from(x), i32::from(y), z.slice()]
+        [i32::from(x), i32::from(y), z.slice() as i32]
     }
 }
 

@@ -3,7 +3,7 @@ use arbitrary_int::{u3, u4, u5};
 use misc::{trace, Itertools, SlogDrain};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::Arc;
-use unit::world::{BlockCoord, LocalSliceIndex, SlabPosition, SliceBlock, SLAB_SIZE};
+use unit::world::{BlockCoord, LocalSliceIndex, SlabPosition, SliceBlock, SliceIndex, SLAB_SIZE};
 
 /// Area index in a slice, all values are possible to allow for every block in a slice of 256 to
 /// have a separate area

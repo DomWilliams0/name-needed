@@ -532,6 +532,7 @@ impl<C: WorldContext> Slab<C> {
         count
     }
 
+    /// Applies nav areas to blocks. Probably stored in the chunk in future instead
     pub(crate) fn apply_navigation_updates(&mut self, updates: &[SliceNavArea], replace_all: bool) {
         if updates.is_empty() {
             return;
