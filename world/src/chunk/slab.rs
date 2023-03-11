@@ -13,11 +13,13 @@ use unit::world::{LocalSliceIndexBelowTop, CHUNK_SIZE};
 use crate::block::{Block, BlockOpacity};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
 use crate::chunk::slice_navmesh::{
-    make_mesh, SlabVerticalSpace, SliceAreaIndex, SliceConfig, ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
+    make_mesh, SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator, SliceConfig,
+    ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
 };
 use crate::loader::{FreeVerticalSpace, GenericTerrainUpdate, SlabTerrainUpdate};
 use crate::navigation::discovery::AreaDiscovery;
 use crate::navigation::{BlockGraph, ChunkArea};
+use crate::navigationv2::SlabNavGraph;
 use crate::occlusion::{BlockOcclusion, NeighbourOpacity, OcclusionFace};
 use crate::{flatten_coords, BlockType, WorldChangeEvent, WorldContext, SLICE_SIZE};
 use grid::{Grid, GridImpl, GridImplExt};
@@ -217,18 +219,20 @@ impl IntoIterator for SlabInternalNavigability {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(debug_assertions, derive(Eq, PartialEq))]
 pub struct SliceNavArea {
-    pub slice: u8,
+    pub slice: LocalSliceIndex,
     pub from: (BlockCoord, BlockCoord),
     /// Inclusive
     pub to: (BlockCoord, BlockCoord),
-    pub area: SliceAreaIndex,
+    // derive this from order in group of areas in the same slice
+    // pub area: SliceAreaIndex,
     pub height: FreeVerticalSpace,
 }
 
 struct NavmeshCfg<'a> {
     vec: &'a mut Vec<SliceNavArea>,
-    cur_slice: u8,
+    cur_slice: LocalSliceIndex,
 }
 
 impl SliceConfig for NavmeshCfg<'_> {
@@ -245,7 +249,7 @@ impl SliceConfig for NavmeshCfg<'_> {
             slice: self.cur_slice,
             from: unflatten_index(range[0]).xy(),
             to: unflatten_index(range[1]).xy(),
-            area: SliceAreaIndex(area),
+            // area: SliceAreaIndex(area),
             height,
         })
     }
@@ -262,7 +266,7 @@ impl<C: WorldContext> Slab<C> {
         let mut rects = vec![];
         let mut cfg = NavmeshCfg {
             vec: &mut rects,
-            cur_slice: 1, // first slice is skipped
+            cur_slice: LocalSliceIndex::second_from_bottom(), // first slice is skipped
         };
 
         #[allow(clippy::uninit_assumed_init, invalid_value)]
@@ -307,7 +311,7 @@ impl<C: WorldContext> Slab<C> {
             input.iter_mut().for_each(|h| *h = (*h).min(maximum));
 
             let mut initialised = [false; SLICE_SIZE];
-            cfg.cur_slice = slice_idx.slice_unsigned() as u8;
+            cfg.cur_slice = slice_idx;
             make_mesh(&mut cfg, &input, &mut output, &mut initialised);
         }
 
@@ -344,7 +348,7 @@ impl<C: WorldContext> Slab<C> {
 
         let mut cfg = NavmeshCfg {
             vec: out,
-            cur_slice: 0,
+            cur_slice: LocalSliceIndex::bottom(),
         };
         let mut initialised = [false; SLICE_SIZE];
 
@@ -539,8 +543,9 @@ impl<C: WorldContext> Slab<C> {
         }
         debug!("applying nav updates to slab"; "n" => updates.len(), "replace_all" => replace_all);
 
+        let mut area_alloc = SliceAreaIndexAllocator::default();
         for (slice_idx, group) in &updates.iter().group_by(|u| u.slice) {
-            let mut slice = self.slice_mut(LocalSliceIndex::new_unchecked(slice_idx as i32));
+            let mut slice = self.slice_mut(slice_idx);
 
             if replace_all {
                 slice.iter_mut().for_each(|b| b.clear_nav_area());
@@ -554,7 +559,7 @@ impl<C: WorldContext> Slab<C> {
                             "{x},{y},{slice_idx} should be air but is {:?}",
                             b.block_type()
                         );
-                        b.set_nav_area(u.area);
+                        b.set_nav_area(area_alloc.allocate(slice_idx.slice())); // TODO known eq special case
                     }
                 }
             }

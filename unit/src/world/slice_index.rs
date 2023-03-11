@@ -119,6 +119,16 @@ impl LocalSliceIndex {
     pub fn range() -> impl Iterator<Item = Self> {
         (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX).map(Self)
     }
+
+    pub fn second_from_bottom() -> Self {
+        Self(1)
+    }
+}
+
+impl Display for LocalSliceIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 /// Slice index in range 0..MAX, so a single z+1 operation is infallible

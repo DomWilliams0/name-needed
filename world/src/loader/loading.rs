@@ -15,10 +15,13 @@ use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::{get_or_wait_for_slab, ContiguousChunkIterator, WorldChangeEvent};
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
 
-use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, VerticalSpacePlease};
+use crate::chunk::slice_navmesh::{
+    FreeVerticalSpace, SlabVerticalSpace, SliceAreaIndex, VerticalSpacePlease,
+};
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
+use crate::navigationv2::SlabNavGraph;
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::{FutureExt, SinkExt};
 use std::collections::HashSet;
@@ -63,8 +66,9 @@ pub enum BlockForAllError {
 
 pub struct SlabNavigationUpdate {
     pub slab: SlabLocation,
+    /// Internal links only
+    pub graph: SlabNavGraph,
     pub new_areas: Vec<SliceNavArea>,
-    pub replace_all: bool,
 }
 
 struct InitialNavLoaded {
@@ -278,15 +282,13 @@ impl<C: WorldContext> WorldLoader<C> {
                 nav_tx
                     .send(SlabNavigationUpdate {
                         slab,
+                        graph: SlabNavGraph::discover(&areas),
                         new_areas: areas,
-                        replace_all: true,
                     })
                     .await
                     .expect("failed to send nav update");
 
                 // ----- slab is now DoneInIsolation
-
-                // TODO link up slice areas in this slab
             });
 
             real_count += 1;
@@ -355,17 +357,14 @@ impl<C: WorldContext> WorldLoader<C> {
             let mut do_it = || {
                 let chunk = w.find_chunk_with_pos_mut(update.slab.chunk)?;
 
-                if update.replace_all {
-                    // clear old slice areas
-                    chunk.replace_all_slice_areas(
-                        update.slab.slab,
-                        update.new_areas.iter().copied(),
-                    );
-                }
+                // clear old slice areas
+                chunk.replace_all_slice_areas(update.slab.slab, update.new_areas.iter().copied());
+
+                chunk.replace_slab_nav_graph(update.slab.slab, update.graph);
 
                 let slab = w.get_slab_mut(update.slab)?;
                 // TODO clear previous if indicated - but remember update to bottom slice is additive
-                slab.apply_navigation_updates(&update.new_areas, update.replace_all);
+                slab.apply_navigation_updates(&update.new_areas, true);
 
                 Some(())
             };

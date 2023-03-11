@@ -8,10 +8,43 @@ use unit::world::{BlockCoord, LocalSliceIndex, SlabPosition, SliceBlock, SliceIn
 /// Area index in a slice, all values are possible to allow for every block in a slice of 256 to
 /// have a separate area
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
-pub struct SliceAreaIndex(pub(in crate::chunk) u8);
+pub struct SliceAreaIndex(pub(crate) u8);
 
 impl SliceAreaIndex {
     pub const DEFAULT: Self = Self(0);
+}
+
+#[derive(Default)]
+pub struct SliceAreaIndexAllocator {
+    slice: Option<u8>,
+    current: u8,
+}
+
+impl SliceAreaIndexAllocator {
+    pub fn allocate(&mut self, slice: u8) -> SliceAreaIndex {
+        if self.slice == Some(slice) {
+            self.current += 1;
+        } else {
+            self.slice = Some(slice);
+            self.current = 0;
+        };
+
+        SliceAreaIndex(self.current)
+    }
+}
+
+#[test]
+fn slice_area_allocator() {
+    let mut a = SliceAreaIndexAllocator::default();
+
+    assert_eq!(a.allocate(2), SliceAreaIndex(0));
+    assert_eq!(a.allocate(2), SliceAreaIndex(1));
+    assert_eq!(a.allocate(2), SliceAreaIndex(2));
+    assert_eq!(a.allocate(3), SliceAreaIndex(0));
+    assert_eq!(a.allocate(3), SliceAreaIndex(1));
+    assert_eq!(a.allocate(3), SliceAreaIndex(2));
+    assert_eq!(a.allocate(5), SliceAreaIndex(0));
+    assert_eq!(a.allocate(5), SliceAreaIndex(1));
 }
 
 pub trait SliceConfig {

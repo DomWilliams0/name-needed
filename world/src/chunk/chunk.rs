@@ -1,18 +1,19 @@
 use misc::*;
 
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
+    SlabLocation, SliceIndex,
 };
 
 use crate::chunk::chunk::VerticalSpaceOrWait::Failure;
 use crate::chunk::slab::{Slab, SliceNavArea};
 use crate::chunk::slice::{Slice, SliceOwned};
-use crate::chunk::slice_navmesh::SlabVerticalSpace;
 use crate::chunk::slice_navmesh::{FreeVerticalSpace, VerticalSpacePlease};
+use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
 use crate::chunk::terrain::RawChunkTerrain;
 use crate::chunk::BaseTerrain;
 use crate::navigation::{BlockGraph, WorldArea};
-use crate::navigationv2::{ChunkArea, SlabArea};
+use crate::navigationv2::{ChunkArea, SlabArea, SlabNavGraph};
 use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldContext};
 use parking_lot::RwLock;
@@ -24,9 +25,11 @@ use std::sync::{Arc, Weak};
 
 pub type ChunkId = u64;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct AreaInfo {
     pub height: u8,
+    /// Inclusive
+    pub range: ((BlockCoord, BlockCoord), (BlockCoord, BlockCoord)),
 }
 
 pub struct Chunk<C: WorldContext> {
@@ -38,7 +41,11 @@ pub struct Chunk<C: WorldContext> {
     /// Sparse associated data with each block. Unused atm?
     block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
 
+    /// Big info about each area not needed for nav graph
     areas: HashMap<ChunkArea, AreaInfo>,
+
+    // TODO instead of multiple bad hashmaps 1:1 for each slabindex, store inline alongside slabs in RawChunkTerrain. smae with vertical_space
+    slab_navs: HashMap<SlabIndex, SlabNavGraph>,
 
     vertical_space: HashMap<SlabIndex, SlabVerticalSpace>,
 
@@ -80,6 +87,7 @@ impl<C: WorldContext> Chunk<C> {
             terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
             areas: HashMap::new(),
+            slab_navs: HashMap::new(),
             vertical_space: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: world.load_notifications(),
@@ -93,6 +101,7 @@ impl<C: WorldContext> Chunk<C> {
             pos: pos.into(),
             terrain: RawChunkTerrain::default(),
             block_data: HashMap::new(),
+            slab_navs: HashMap::new(),
             vertical_space: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
@@ -120,6 +129,15 @@ impl<C: WorldContext> Chunk<C> {
                     slice_idx: block.z().to_local(),
                     slice_area: area,
                 },
+            })
+            .copied()
+    }
+
+    pub fn area_info(&self, slab: SlabIndex, slab_area: SlabArea) -> Option<AreaInfo> {
+        self.areas
+            .get(&ChunkArea {
+                slab_idx: slab,
+                slab_area,
             })
             .copied()
     }
@@ -159,18 +177,25 @@ impl<C: WorldContext> Chunk<C> {
         // remove all for this slab
         self.areas.retain(|a, _| a.slab_idx != slab);
 
-        self.areas.extend(new_areas.map(|a| {
-            (
-                ChunkArea {
-                    slab_idx: slab,
-                    slab_area: SlabArea {
-                        slice_idx: LocalSliceIndex::new_unchecked(a.slice as i32), // gross
-                        slice_area: a.area,
+        let mut area_alloc = SliceAreaIndexAllocator::default();
+        let tmp_add = new_areas
+            .map(|a| {
+                (
+                    dbg!(ChunkArea {
+                        slab_idx: slab,
+                        slab_area: SlabArea {
+                            slice_idx: a.slice,
+                            slice_area: area_alloc.allocate(a.slice.slice()),
+                        },
+                    }),
+                    AreaInfo {
+                        height: a.height,
+                        range: (a.from, a.to),
                     },
-                },
-                AreaInfo { height: a.height },
-            )
-        }));
+                )
+            })
+            .collect_vec();
+        self.areas.extend(tmp_add.into_iter());
     }
 
     pub(crate) fn update_block_graphs(
@@ -307,6 +332,14 @@ impl<C: WorldContext> Chunk<C> {
 
     pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<&SlabVerticalSpace> {
         self.vertical_space.get(&slab)
+    }
+
+    pub(crate) fn replace_slab_nav_graph(&mut self, slab: SlabIndex, graph: SlabNavGraph) {
+        self.slab_navs.insert(slab, graph);
+    }
+
+    pub fn slab_nav_graph(&self, slab: SlabIndex) -> Option<&SlabNavGraph> {
+        self.slab_navs.get(&slab)
     }
 }
 
