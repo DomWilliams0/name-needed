@@ -254,6 +254,17 @@ impl TryFrom<&[f32]> for WorldPoint {
     }
 }
 
+impl TryFrom<&[f32; 3]> for WorldPoint {
+    type Error = ();
+
+    fn try_from(slice: &[f32; 3]) -> Result<Self, Self::Error> {
+        let x = slice[0];
+        let y = slice[1];
+        let z = slice[2];
+        WorldPoint::new(x, y, z).ok_or(())
+    }
+}
+
 impl Add<GlobalSliceIndex> for WorldPoint {
     type Output = Self;
 

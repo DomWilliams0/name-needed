@@ -171,7 +171,7 @@ pub fn bottleneck<C: WorldContext>(rng: &mut dyn RngCore) -> MemoryTerrainSource
             .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| {
                 C::BlockType::AIR
             })
-            // .fill_slice(-5, C::PRESET_TYPES[0])
+            .fill_slice(-5, C::PRESET_TYPES[0])
             .build((0, i))
     });
 

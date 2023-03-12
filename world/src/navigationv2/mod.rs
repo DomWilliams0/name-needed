@@ -98,11 +98,15 @@ impl SlabNavGraph {
 
             // slice 1, slice 1, slice 1, slice 2, slice 3
             for (i, a) in working.iter().enumerate() {
-                // skip all considered so far and this one itself
-                for b in working.iter().skip(i + 1) {
+                // skip all considered so far and this one itself, and any out of reach
+                let max_slice = a.area.slice_idx.slice() + a.height_left;
+                for b in working
+                    .iter()
+                    .skip(i + 1)
+                    .take_while(|x| x.area.slice_idx.slice() <= max_slice)
+                {
                     debug_assert_ne!(a.area, b.area);
 
-                    // TODO full slice directly above in onechunkwonder is still linked up but it shouldn't be
                     if areas_touch(a.range, b.range) && !graph.contains_edge(a.area, b.area) {
                         debug_assert!(
                             a.area.slice_idx <= b.area.slice_idx,
@@ -156,8 +160,8 @@ mod tests {
 
     #[test]
     fn touching() {
-        assert!(areas_touch(((1, 1), (2, 2)), ((3, 1), (4, 2)),));
-        assert!(!areas_touch(((1, 1), (2, 2)), ((4, 1), (4, 2)),));
+        assert!(areas_touch(((1, 1), (2, 2)), ((3, 1), (4, 2)),)); // adjacent
+        assert!(!areas_touch(((1, 1), (2, 2)), ((4, 1), (4, 2)),)); // 1 gap inbetween
     }
 
     struct TestArea {
@@ -223,7 +227,6 @@ mod tests {
 
     #[test]
     fn simple_step_up_same_roof() {
-        misc::logging::for_tests();
         let x = do_it(vec![
             TestArea {
                 slice: 1,
@@ -260,7 +263,6 @@ mod tests {
 
     #[test]
     fn simple_flat_walk_same_roof() {
-        misc::logging::for_tests();
         let x = do_it(vec![
             TestArea {
                 slice: 1,
@@ -292,5 +294,24 @@ mod tests {
                 },
             }]
         );
+    }
+
+    #[test]
+    fn dont_link_with_inaccessible_roof() {
+        misc::logging::for_tests();
+        let x = do_it(vec![
+            TestArea {
+                slice: 1,
+                height: 3,
+                bounds: ((1, 1), (2, 2)),
+            },
+            TestArea {
+                slice: 5,
+                height: 3,
+                bounds: ((1, 1), (2, 2)),
+            },
+        ]);
+
+        assert_eq!(edges(&x), vec![]);
     }
 }

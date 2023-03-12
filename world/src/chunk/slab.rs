@@ -218,8 +218,7 @@ impl IntoIterator for SlabInternalNavigability {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(debug_assertions, derive(Eq, PartialEq))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct SliceNavArea {
     pub slice: LocalSliceIndex,
     pub from: (BlockCoord, BlockCoord),

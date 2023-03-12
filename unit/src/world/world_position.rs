@@ -28,6 +28,10 @@ impl WorldPosition {
         )
     }
 
+    pub fn floored(self) -> WorldPoint {
+        WorldPoint::new_unchecked(self.0 as f32, self.1 as f32, self.2.slice() as f32)
+    }
+
     pub fn below(self) -> WorldPosition {
         Self(self.0, self.1, self.2 - 1)
     }
