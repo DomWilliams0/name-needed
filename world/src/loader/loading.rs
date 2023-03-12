@@ -74,12 +74,11 @@ pub struct SlabNavigationUpdate {
 struct InitialNavLoaded {
     pub slab: SlabLocation,
     pub new_areas: Vec<SliceNavArea>,
-    pub vs: SlabVerticalSpace,
+    pub vs: Arc<SlabVerticalSpace>,
 }
 
 lazy_static! {
-    static ref EMPTY_SLAB_VERTICAL_SPACE: Arc<SlabVerticalSpace> =
-        Arc::new(SlabVerticalSpace::empty());
+    static ref EMPTY_SLAB_VERTICAL_SPACE: Arc<SlabVerticalSpace> = SlabVerticalSpace::empty();
 }
 
 impl<C: WorldContext> WorldLoader<C> {
@@ -310,7 +309,8 @@ impl<C: WorldContext> WorldLoader<C> {
         slab: SlabLocation,
         slab_type: SlabType,
         source: &TerrainSource<C>,
-    ) -> Result<(Slab<C>, SlabVerticalSpace, Vec<C::GeneratedEntityDesc>), TerrainSourceError> {
+    ) -> Result<(Slab<C>, Arc<SlabVerticalSpace>, Vec<C::GeneratedEntityDesc>), TerrainSourceError>
+    {
         let mut entities = Vec::new();
         let result = if let SlabType::Placeholder = slab_type {
             // empty placeholder

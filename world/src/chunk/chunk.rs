@@ -313,7 +313,7 @@ impl<C: WorldContext> Chunk<C> {
         match progress {
             SlabLoadingStatus::Unloaded => Failure,
             SlabLoadingStatus::Requested => Wait,
-            _ => Loaded(self.slab_vertical_space(slab).unwrap().clone()),
+            _ => Loaded(self.slab_vertical_space(slab).unwrap()),
         }
     }
 
@@ -321,8 +321,8 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab(slab).is_some()
     }
 
-    pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<&SlabVerticalSpace> {
-        self.slabs.slab_data(slab).map(|s| &s.vertical_space)
+    pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<Arc<SlabVerticalSpace>> {
+        self.slabs.slab_data(slab).map(|s| s.vertical_space.clone())
     }
 
     pub(crate) fn replace_slab_nav_graph(&mut self, slab: SlabIndex, graph: SlabNavGraph) {
@@ -331,7 +331,7 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: SlabVerticalSpace) {
+    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: Arc<SlabVerticalSpace>) {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.vertical_space = vs;
         }
@@ -345,7 +345,7 @@ impl<C: WorldContext> Chunk<C> {
 pub enum VerticalSpaceOrWait {
     Wait,
     Failure,
-    Loaded(SlabVerticalSpace),
+    Loaded(Arc<SlabVerticalSpace>),
 }
 
 #[cfg(test)]

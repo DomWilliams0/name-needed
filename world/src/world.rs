@@ -557,7 +557,7 @@ impl<C: WorldContext> World<C> {
         &mut self,
         slab: SlabLocation,
         slab_terrain: Option<Slab<C>>,
-        vertical_space: SlabVerticalSpace,
+        vertical_space: Arc<SlabVerticalSpace>,
     ) {
         let chunk = self
             .find_chunk_with_pos_mut(slab.chunk)
@@ -1081,7 +1081,7 @@ pub async fn get_or_wait_for_slab<C: WorldContext>(
     notifier: &mut LoadNotifier,
     world: &WorldRef<C>,
     slab: SlabLocation,
-) -> Option<SlabVerticalSpace> {
+) -> Option<Arc<SlabVerticalSpace>> {
     loop {
         {
             let w = world.borrow();

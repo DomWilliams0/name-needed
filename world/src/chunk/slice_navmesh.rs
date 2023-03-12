@@ -467,8 +467,6 @@ impl PackedSlabBlockVerticalSpace {
     }
 }
 
-// TODO use Arc
-#[derive(Clone)]
 pub struct SlabVerticalSpace {
     /// Sorted by slice ascending.
     /// pos: 16x16x32 = 4+4+5 bits = 13 bits per pos alone.
@@ -479,14 +477,14 @@ pub struct SlabVerticalSpace {
 }
 
 impl SlabVerticalSpace {
-    pub fn empty() -> Self {
-        Self {
+    pub fn empty() -> Arc<Self> {
+        Arc::new(Self {
             blocks: Box::new([]),
             top_down: [SLAB_SIZE.as_u8(); SLICE_SIZE],
-        }
+        })
     }
 
-    pub fn discover<C: WorldContext>(terrain: &Slab<C>) -> Self {
+    pub fn discover<C: WorldContext>(terrain: &Slab<C>) -> Arc<Self> {
         let mut out = vec![];
 
         #[derive(Copy, Clone, Default)]
@@ -543,10 +541,10 @@ impl SlabVerticalSpace {
         }
 
         out.sort_unstable_by_key(|b| b.pos());
-        Self {
+        Arc::new(Self {
             blocks: out.into_boxed_slice(),
             top_down,
-        }
+        })
     }
 
     /// Sorted asc by slice

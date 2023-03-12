@@ -257,7 +257,7 @@ impl<C: WorldContext> Slab<C> {
     pub(crate) fn discover_navmesh(
         &self,
         vertical_space: &SlabVerticalSpace,
-        above: Option<&SlabVerticalSpace>,
+        above: Option<&Arc<SlabVerticalSpace>>,
     ) -> Vec<SliceNavArea> {
         let maximum: u8 = 4; // TODO pass through
         let mut rects = vec![];

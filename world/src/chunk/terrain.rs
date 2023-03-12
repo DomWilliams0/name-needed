@@ -1,6 +1,7 @@
 use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
+use std::sync::Arc;
 
 use crate::block::BlockDurability;
 use misc::*;
@@ -27,7 +28,7 @@ use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 pub struct SlabData<C: WorldContext> {
     pub(in crate::chunk) terrain: Slab<C>,
     pub(in crate::chunk) nav: SlabNavGraph,
-    pub(in crate::chunk) vertical_space: SlabVerticalSpace,
+    pub(in crate::chunk) vertical_space: Arc<SlabVerticalSpace>,
 }
 
 pub struct OcclusionChunkUpdate(
