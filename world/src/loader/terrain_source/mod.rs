@@ -159,7 +159,7 @@ impl<C: WorldContext> GeneratedSlab<C> {
 mod tests {
     use std::iter::once;
 
-    use crate::chunk::RawChunkTerrain;
+    use crate::chunk::SlabStorage;
     use crate::helpers::DummyWorldContext;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
 
@@ -173,7 +173,7 @@ mod tests {
 
         let random = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
             (5, 5),
-            RawChunkTerrain::default(),
+            SlabStorage::default(),
         )));
         assert!(matches!(
             random.err().unwrap(),
@@ -185,7 +185,7 @@ mod tests {
     fn bounds() {
         let just_one = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
             (0, 0),
-            RawChunkTerrain::default(),
+            SlabStorage::default(),
         )))
         .unwrap();
         assert_eq!(
@@ -205,11 +205,11 @@ mod tests {
         ));
         let sparse = MemoryTerrainSource::<DummyWorldContext>::from_chunks(
             vec![
-                ((0, 0), RawChunkTerrain::default()),
-                ((2, 5), RawChunkTerrain::default()),
-                ((1, 6), RawChunkTerrain::default()),
-                ((-5, -4), RawChunkTerrain::default()),
-                ((-8, -2), RawChunkTerrain::default()),
+                ((0, 0), SlabStorage::default()),
+                ((2, 5), SlabStorage::default()),
+                ((1, 6), SlabStorage::default()),
+                ((-5, -4), SlabStorage::default()),
+                ((-8, -2), SlabStorage::default()),
             ]
             .into_iter(),
         )

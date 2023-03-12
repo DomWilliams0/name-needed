@@ -9,33 +9,33 @@ use unit::world::{
 
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slice::SliceMut;
-use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
+use crate::chunk::terrain::{SlabCreationPolicy, SlabStorage};
 use crate::loader::split_range_across_slabs;
 use crate::WorldContext;
 use std::convert::TryFrom;
 
-pub struct ChunkBuilder<C: WorldContext>(Option<RawChunkTerrain<C>>);
+pub struct ChunkBuilder<C: WorldContext>(Option<SlabStorage<C>>);
 
 pub struct WorldBuilder<C: WorldContext>(HashMap<ChunkLocation, ChunkBuilder<C>>);
 
-pub struct ChunkBuilderApply<C: WorldContext>(RawChunkTerrain<C>);
+pub struct ChunkBuilderApply<C: WorldContext>(SlabStorage<C>);
 
 impl<C: WorldContext> ChunkBuilder<C> {
     pub fn new() -> Self {
-        Self::with_terrain(RawChunkTerrain::default())
+        Self::with_terrain(SlabStorage::default())
     }
 
-    fn with_terrain(terrain: RawChunkTerrain<C>) -> Self {
+    fn with_terrain(terrain: SlabStorage<C>) -> Self {
         Self(Some(terrain))
     }
 
-    fn terrain(&mut self) -> &mut RawChunkTerrain<C> {
+    fn terrain(&mut self) -> &mut SlabStorage<C> {
         self.0
             .as_mut()
             .expect("builder is in an uninitialized state")
     }
 
-    fn take_terrain(&mut self) -> RawChunkTerrain<C> {
+    fn take_terrain(&mut self) -> SlabStorage<C> {
         self.0.take().expect("builder is in an uninitialized state")
     }
 
@@ -107,7 +107,7 @@ impl<C: WorldContext> ChunkBuilder<C> {
         }
     }
 
-    pub fn into_inner(mut self) -> RawChunkTerrain<C> {
+    pub fn into_inner(mut self) -> SlabStorage<C> {
         self.take_terrain()
     }
 }
@@ -133,11 +133,11 @@ impl<C: WorldContext> Default for ChunkBuilder<C> {
 }
 
 pub struct ChunkDescriptor<C: WorldContext> {
-    pub terrain: RawChunkTerrain<C>,
+    pub terrain: SlabStorage<C>,
     pub chunk_pos: ChunkLocation,
 }
 
-impl<C: WorldContext> From<ChunkDescriptor<C>> for (ChunkLocation, RawChunkTerrain<C>) {
+impl<C: WorldContext> From<ChunkDescriptor<C>> for (ChunkLocation, SlabStorage<C>) {
     fn from(desc: ChunkDescriptor<C>) -> Self {
         (desc.chunk_pos, desc.terrain)
     }

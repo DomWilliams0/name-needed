@@ -15,7 +15,7 @@ use unit::world::{
 };
 
 use crate::block::{Block, BlockDurability};
-use crate::chunk::{BlockDamageResult, Chunk, VerticalSpaceOrWait};
+use crate::chunk::{BlockDamageResult, Chunk, SlabData, VerticalSpaceOrWait};
 use crate::context::WorldContext;
 use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
@@ -573,7 +573,9 @@ impl<C: WorldContext> World<C> {
 
         // update slab terrain if necessary
         if let Some(terrain) = slab_terrain {
-            chunk.terrain_mut().replace_slab(slab.slab, terrain);
+            chunk
+                .terrain_mut()
+                .replace_slab(slab.slab, SlabData::new(terrain));
         }
 
         chunk.set_slab_nav_progress(slab.slab, vertical_space);
@@ -610,7 +612,7 @@ impl<C: WorldContext> World<C> {
             if let Some(terrain) = slab.terrain.take() {
                 chunk
                     .terrain_mut()
-                    .replace_slab(slab.slab.slab /* lmao */, terrain);
+                    .replace_slab(slab.slab.slab /* lmao */, todo!("SlabData?"));
             }
 
             // update chunk area navigation

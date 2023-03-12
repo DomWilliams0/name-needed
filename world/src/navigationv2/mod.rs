@@ -25,6 +25,7 @@ pub struct ChunkArea {
 }
 
 /// Graph of areas within a single slab
+#[derive(Clone)]
 pub struct SlabNavGraph {
     graph: SlabNavGraphType,
 }
@@ -45,11 +46,15 @@ pub struct SlabNavEdge {
 type SlabNavGraphType = UnGraphMap<SlabArea, SlabNavEdge>;
 
 impl SlabNavGraph {
+    pub fn empty() -> Self {
+        Self {
+            graph: Default::default(),
+        }
+    }
+
     pub fn discover(areas: &[SliceNavArea]) -> Self {
         if areas.is_empty() {
-            return Self {
-                graph: Default::default(),
-            };
+            return Self::empty();
         }
 
         #[derive(Debug)]

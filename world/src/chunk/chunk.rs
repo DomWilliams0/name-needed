@@ -8,7 +8,7 @@ use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice::{Slice, SliceOwned};
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
-use crate::chunk::terrain::RawChunkTerrain;
+use crate::chunk::terrain::SlabStorage;
 use crate::navigation::{BlockGraph, WorldArea};
 use crate::navigationv2::{ChunkArea, SlabArea, SlabNavGraph};
 use crate::world::LoadNotifier;
@@ -33,18 +33,13 @@ pub struct Chunk<C: WorldContext> {
     /// Unique for each chunk
     pos: ChunkLocation,
 
-    terrain: RawChunkTerrain<C>,
+    slabs: SlabStorage<C>,
 
     /// Sparse associated data with each block. Unused atm?
     block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
 
     /// Big info about each area not needed for nav graph
     areas: HashMap<ChunkArea, AreaInfo>,
-
-    // TODO instead of multiple bad hashmaps 1:1 for each slabindex, store inline alongside slabs in RawChunkTerrain. smae with vertical_space
-    slab_navs: HashMap<SlabIndex, SlabNavGraph>,
-
-    vertical_space: HashMap<SlabIndex, SlabVerticalSpace>,
 
     slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
     slab_notify: LoadNotifier,
@@ -81,11 +76,9 @@ impl<C: WorldContext> Chunk<C> {
     pub fn empty_with_world(world: &World<C>, pos: impl Into<ChunkLocation>) -> Self {
         Self {
             pos: pos.into(),
-            terrain: RawChunkTerrain::default(),
+            slabs: SlabStorage::default(),
             block_data: HashMap::new(),
             areas: HashMap::new(),
-            slab_navs: HashMap::new(),
-            vertical_space: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: world.load_notifications(),
         }
@@ -96,21 +89,19 @@ impl<C: WorldContext> Chunk<C> {
     pub fn empty(pos: impl Into<ChunkLocation>) -> Self {
         Self {
             pos: pos.into(),
-            terrain: RawChunkTerrain::default(),
+            slabs: SlabStorage::default(),
             block_data: HashMap::new(),
-            slab_navs: HashMap::new(),
-            vertical_space: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: LoadNotifier::default(),
         }
     }
 
-    pub fn terrain(&self) -> &RawChunkTerrain<C> {
-        &self.terrain
+    pub fn terrain(&self) -> &SlabStorage<C> {
+        &self.slabs
     }
-    pub fn terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
-        &mut self.terrain
+    pub fn terrain_mut(&mut self) -> &mut SlabStorage<C> {
+        &mut self.slabs
     }
 
     #[inline]
@@ -124,7 +115,7 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub fn area_info_for_block(&self, block: BlockPosition) -> Option<AreaInfo> {
-        let b = self.terrain.get_block(block)?;
+        let b = self.slabs.get_block(block)?;
         let area = b.nav_area()?;
         self.areas
             .get(&ChunkArea {
@@ -147,7 +138,7 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub(crate) fn area_for_block(&self, block_pos: BlockPosition) -> Option<WorldArea> {
-        self.terrain.get_block(block_pos).map(|b| {
+        self.slabs.get_block(block_pos).map(|b| {
             let area_index = b.area_index();
             WorldArea {
                 chunk: self.pos,
@@ -220,14 +211,14 @@ impl<C: WorldContext> Chunk<C> {
     ) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>)> {
         range
             .as_range()
-            .map(move |i| self.terrain.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
+            .map(move |i| self.slabs.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
             .skip_while(|s| s.is_none())
             .while_some()
     }
 
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice<C> {
         #[allow(clippy::redundant_closure)]
-        self.terrain.slice(slice).unwrap_or_else(|| Slice::dummy())
+        self.slabs.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 
     pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {
@@ -247,10 +238,6 @@ impl<C: WorldContext> Chunk<C> {
         pos: BlockPosition,
     ) -> Option<C::AssociatedBlockData> {
         self.block_data.remove(&pos)
-    }
-
-    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: SlabVerticalSpace) {
-        self.vertical_space.insert(slab, vs);
     }
 
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
@@ -303,7 +290,7 @@ impl<C: WorldContext> Chunk<C> {
             }
             SlabLoadingStatus::Done => {
                 // is already loaded, only load again if it is a placeholder
-                let slab = self.terrain.slab(slab).unwrap();
+                let slab = self.slabs.slab(slab).unwrap();
                 slab.is_placeholder()
             }
             _ => {
@@ -331,19 +318,27 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub fn has_slab(&self, slab: SlabIndex) -> bool {
-        self.terrain.slab(slab).is_some()
+        self.slabs.slab(slab).is_some()
     }
 
     pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<&SlabVerticalSpace> {
-        self.vertical_space.get(&slab)
+        self.slabs.slab_data(slab).map(|s| &s.vertical_space)
     }
 
     pub(crate) fn replace_slab_nav_graph(&mut self, slab: SlabIndex, graph: SlabNavGraph) {
-        self.slab_navs.insert(slab, graph);
+        if let Some(s) = self.slabs.slab_data_mut(slab) {
+            s.nav = graph;
+        }
+    }
+
+    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: SlabVerticalSpace) {
+        if let Some(s) = self.slabs.slab_data_mut(slab) {
+            s.vertical_space = vs;
+        }
     }
 
     pub fn slab_nav_graph(&self, slab: SlabIndex) -> Option<&SlabNavGraph> {
-        self.slab_navs.get(&slab)
+        self.slabs.slab_data(slab).map(|s| &s.nav)
     }
 }
 
@@ -423,7 +418,7 @@ mod tests {
         // check individual block collection is ordered as intended
         let c = Chunk::<DummyWorldContext>::empty((0, 0));
         let mut blocks = Vec::new();
-        c.terrain.blocks(&mut blocks);
+        c.slabs.blocks(&mut blocks);
         let mut b = blocks.into_iter();
         assert_eq!(
             b.next().map(|(p, b)| (p.xyz(), b.block_type())),

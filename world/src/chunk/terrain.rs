@@ -17,14 +17,17 @@ use crate::chunk::slab::DeepClone;
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::{Slice, SliceMut};
 
+use crate::loader::SlabVerticalSpace;
 use crate::navigation::ChunkArea;
+use crate::navigationv2::SlabNavGraph;
 use crate::neighbour::NeighbourOffset;
 use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
 use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
-/// Terrain only. Clone with `deep_clone`
-pub struct RawChunkTerrain<C: WorldContext> {
-    slabs: DoubleSidedVec<Slab<C>>,
+pub struct SlabData<C: WorldContext> {
+    pub(in crate::chunk) terrain: Slab<C>,
+    pub(in crate::chunk) nav: SlabNavGraph,
+    pub(in crate::chunk) vertical_space: SlabVerticalSpace,
 }
 
 pub struct OcclusionChunkUpdate(
@@ -46,13 +49,13 @@ pub enum BlockDamageResult {
     Unbroken,
 }
 
-impl<C: WorldContext> RawChunkTerrain<C> {
+impl<C: WorldContext> SlabStorage<C> {
     pub fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
         self.slabs
             .get(slab_idx)
-            .map(|ptr| ptr.slice(chunk_slice_idx.to_local()))
+            .map(|data| data.terrain.slice(chunk_slice_idx.to_local()))
     }
 
     pub fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice<C> {
@@ -64,9 +67,11 @@ impl<C: WorldContext> RawChunkTerrain<C> {
     pub fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.slabs
-            .get_mut(slab_idx)
-            .map(|ptr| ptr.expect_mut_self().slice_mut(chunk_slice_idx.to_local()))
+        self.slabs.get_mut(slab_idx).map(|data| {
+            data.terrain
+                .expect_mut_self()
+                .slice_mut(chunk_slice_idx.to_local())
+        })
     }
 
     /// Calls `Slab::cow_clone`, triggering a slab copy if necessary
@@ -76,9 +81,11 @@ impl<C: WorldContext> RawChunkTerrain<C> {
     ) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.slabs
-            .get_mut(slab_idx)
-            .map(|ptr| ptr.cow_clone().slice_mut(chunk_slice_idx.to_local()))
+        self.slabs.get_mut(slab_idx).map(|data| {
+            data.terrain
+                .cow_clone()
+                .slice_mut(chunk_slice_idx.to_local())
+        })
     }
 
     /// Will clone CoW slab if necessary
@@ -133,18 +140,18 @@ impl<C: WorldContext> RawChunkTerrain<C> {
         self.slabs
             .iter_decreasing()
             .zip(self.slabs.indices_decreasing())
-            .map(|(ptr, idx)| (ptr, SlabIndex(idx)))
+            .map(|(data, idx)| (&data.terrain, SlabIndex(idx)))
     }
 
     pub(crate) fn slabs_from_bottom(&self) -> impl Iterator<Item = (&Slab<C>, SlabIndex)> {
         self.slabs
             .iter_increasing()
             .zip(self.slabs.indices_increasing())
-            .map(|(ptr, idx)| (ptr, SlabIndex(idx)))
+            .map(|(data, idx)| (&data.terrain, SlabIndex(idx)))
     }
 
     /// Adds slab, returning old if it exists
-    pub fn replace_slab(&mut self, index: SlabIndex, new_slab: Slab<C>) -> Option<Slab<C>> {
+    pub fn replace_slab(&mut self, index: SlabIndex, new_slab: SlabData<C>) -> Option<SlabData<C>> {
         if let Some(old) = self.slabs.get_mut(index) {
             Some(std::mem::replace(old, new_slab))
         } else {
@@ -155,26 +162,36 @@ impl<C: WorldContext> RawChunkTerrain<C> {
 
     #[cfg(test)]
     pub fn add_empty_placeholder_slab(&mut self, slab: impl Into<SlabIndex>) {
-        self.slabs.add(Slab::empty_placeholder(), slab.into());
+        self.slabs
+            .add(SlabData::new(Slab::empty_placeholder()), slab.into());
+    }
+
+    pub fn slab_data(&self, index: SlabIndex) -> Option<&SlabData<C>> {
+        self.slabs.get(index)
+    }
+
+    pub fn slab_data_mut(&mut self, index: SlabIndex) -> Option<&mut SlabData<C>> {
+        self.slabs.get_mut(index)
     }
 
     pub fn slab(&self, index: SlabIndex) -> Option<&Slab<C>> {
-        self.slabs.get(index)
+        self.slabs.get(index).map(|s| &s.terrain)
     }
 
     /// Cow-copies the slab if not already the exclusive holder
     pub(crate) fn slab_mut(&mut self, index: SlabIndex) -> Option<&mut Slab<C>> {
-        self.slabs.get_mut(index).map(|s| s.cow_clone())
+        self.slabs.get_mut(index).map(|s| s.terrain.cow_clone())
     }
 
     pub(crate) fn copy_slab(&self, index: SlabIndex) -> Option<Slab<C>> {
-        self.slabs.get(index).map(|s| s.deep_clone())
+        self.slabs.get(index).map(|s| s.terrain.deep_clone())
     }
 
     /// Fills in gaps in slabs up to the inclusive target with empty placeholder slabs. Nop if zero
     pub(crate) fn create_slabs_until(&mut self, target: SlabIndex) {
         if target != SlabIndex(0) {
-            self.slabs.fill_until(target, |_| Slab::empty_placeholder())
+            self.slabs
+                .fill_until(target, |_| SlabData::new(Slab::empty_placeholder()))
         }
     }
 
@@ -220,8 +237,8 @@ impl<C: WorldContext> RawChunkTerrain<C> {
             .tuple_windows()
             .map(|((lower_idx, lower), (_, upper))| {
                 let lower_idx = LocalSliceIndex::top().to_global(SlabIndex(lower_idx));
-                let lower_hi = lower.slice(LocalSliceIndex::top());
-                let upper_lo = upper.slice(LocalSliceIndex::bottom());
+                let lower_hi = lower.terrain.slice(LocalSliceIndex::top());
+                let upper_lo = upper.terrain.slice(LocalSliceIndex::bottom());
 
                 (lower_idx, lower_hi, upper_lo)
             })
@@ -490,19 +507,19 @@ impl<C: WorldContext> RawChunkTerrain<C> {
     ) {
         let (SlabIndex(start), SlabIndex(end)) = self.limited_slab_indices(slab_range);
         for slab_idx in start..=end {
-            let my_slab = self.slabs.get(slab_idx).unwrap();
+            let my_slab = &self.slabs.get(slab_idx).unwrap().terrain;
 
             // get loaded adjacent neighbour slab
             let ur_slab_adjacent = match other.slabs.get(slab_idx) {
-                Some(s) => s,
+                Some(s) => &s.terrain,
                 None => {
                     // skip this whole slab, no links to be made
                     continue;
                 }
             };
 
-            let ur_slab_below = other.slabs.get(slab_idx - 1);
-            let ur_slab_above = other.slabs.get(slab_idx + 1);
+            let ur_slab_below = other.slabs.get(slab_idx - 1).map(|s| &s.terrain);
+            let ur_slab_above = other.slabs.get(slab_idx + 1).map(|s| &s.terrain);
 
             let mut coord_range = [(0, 0); CHUNK_SIZE.as_usize()];
             pair_walking::calculate_boundary_slice_block_offsets(offset, &mut coord_range);
@@ -648,6 +665,31 @@ impl<C: WorldContext> RawChunkTerrain<C> {
     }
 
     // TODO set_block trait to reuse in ChunkBuilder (#46)
+}
+
+impl<C: WorldContext> SlabData<C> {
+    pub(crate) fn new(terrain: Slab<C>) -> Self {
+        Self {
+            terrain,
+            nav: SlabNavGraph::empty(),
+            vertical_space: SlabVerticalSpace::empty(),
+        }
+    }
+}
+
+impl<C: WorldContext> DeepClone for SlabData<C> {
+    fn deep_clone(&self) -> Self {
+        Self {
+            terrain: self.terrain.deep_clone(),
+            nav: self.nav.clone(),
+            vertical_space: self.vertical_space.clone(),
+        }
+    }
+}
+
+/// Clone with `deep_clone`
+pub struct SlabStorage<C: WorldContext> {
+    slabs: DoubleSidedVec<SlabData<C>>,
 }
 
 mod pair_walking {
@@ -815,14 +857,16 @@ mod pair_walking {
     }
 }
 
-impl<C: WorldContext> Default for RawChunkTerrain<C> {
+impl<C: WorldContext> Default for SlabStorage<C> {
     /// Has a single empty placeholder slab at index 0
     fn default() -> Self {
         let mut terrain = Self {
             slabs: DoubleSidedVec::with_capacity(8),
         };
 
-        terrain.slabs.add(Slab::empty_placeholder(), 0);
+        terrain
+            .slabs
+            .add(SlabData::new(Slab::empty_placeholder()), 0);
 
         terrain
     }
@@ -849,20 +893,20 @@ mod tests {
 
     #[test]
     fn empty() {
-        let terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let terrain = SlabStorage::<DummyWorldContext>::default();
         assert_eq!(terrain.slab_count(), 1);
     }
 
     #[test]
     #[should_panic]
     fn no_dupes() {
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
         terrain.add_empty_placeholder_slab(0);
     }
 
     #[test]
     fn slabs() {
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
 
         terrain.add_empty_placeholder_slab(1);
         terrain.add_empty_placeholder_slab(2);
@@ -894,7 +938,7 @@ mod tests {
 
     #[test]
     fn block_views() {
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
 
         *terrain.slice_mut(0).unwrap()[(0, 0)].block_type_mut() = DummyBlockType::Stone;
         assert_eq!(
@@ -920,7 +964,7 @@ mod tests {
             DummyBlockType::Grass
         );
 
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
         assert_eq!(
             terrain.set_block(
                 (2, 0, 0).try_into().unwrap(),
@@ -1028,7 +1072,7 @@ mod tests {
         // setting blocks in non-existent places should create a slab to fill it
 
         const SLAB_SIZE_I32: i32 = SLAB_SIZE.as_i32();
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
 
         // 1 slab below should not yet exist
         assert!(!terrain.set_block(
@@ -1469,8 +1513,8 @@ mod tests {
 
     #[test]
     fn cloned_slab_cow_is_updated() {
-        let mut terrain = RawChunkTerrain::<DummyWorldContext>::default();
-        let old = terrain.slabs.get(0).unwrap().clone(); // reference to force a cow clone
+        let mut terrain = SlabStorage::<DummyWorldContext>::default();
+        let old = terrain.slabs.get(0).unwrap().terrain.clone(); // reference to force a cow clone
 
         let slab = terrain.slab_mut(SlabIndex(0)).unwrap();
         let slice_0 = LocalSliceIndex::new_unchecked(0);

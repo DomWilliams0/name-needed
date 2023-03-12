@@ -4,18 +4,18 @@ use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::Slab;
-use crate::chunk::RawChunkTerrain;
+use crate::chunk::SlabStorage;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::{BlockType, WorldContext};
 
 /// Used for testing
 pub struct MemoryTerrainSource<C: WorldContext> {
-    chunk_map: HashMap<ChunkLocation, RawChunkTerrain<C>>,
+    chunk_map: HashMap<ChunkLocation, SlabStorage<C>>,
     bounds: (ChunkLocation, ChunkLocation),
 }
 
 impl<C: WorldContext> MemoryTerrainSource<C> {
-    pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, RawChunkTerrain<C>)>>(
+    pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, SlabStorage<C>)>>(
         chunks: impl Iterator<Item = T>,
     ) -> Result<Self, TerrainSourceError> {
         let size = chunks.size_hint().1.unwrap_or(8);
