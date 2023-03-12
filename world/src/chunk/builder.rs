@@ -7,13 +7,11 @@ use unit::world::{
     WorldPositionRange,
 };
 
-use crate::block::Block;
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{RawChunkTerrain, SlabCreationPolicy};
-use crate::chunk::BaseTerrain;
 use crate::loader::split_range_across_slabs;
-use crate::{BlockType, WorldContext};
+use crate::WorldContext;
 use std::convert::TryFrom;
 
 pub struct ChunkBuilder<C: WorldContext>(Option<RawChunkTerrain<C>>);
@@ -211,7 +209,7 @@ impl<C: WorldContext> WorldBuilder<C> {
 mod tests {
     use unit::world::GlobalSliceIndex;
 
-    use crate::chunk::{BaseTerrain, ChunkBuilder};
+    use crate::chunk::ChunkBuilder;
     use crate::helpers::{DummyBlockType, DummyWorldContext};
 
     #[test]

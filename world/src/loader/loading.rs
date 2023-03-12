@@ -278,7 +278,7 @@ impl<C: WorldContext> WorldLoader<C> {
                     }
                 }
 
-                // post update for blocks to be updated with their new areas
+                // post update for areas to be initialised
                 nav_tx
                     .send(SlabNavigationUpdate {
                         slab,
@@ -666,7 +666,6 @@ mod tests {
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
     use crate::world::helpers::DummyWorldContext;
-    use crate::BaseTerrain;
     use misc::{Itertools, Rng, SeedableRng, SliceRandom, SmallRng};
     use std::collections::{HashMap, HashSet};
     use unit::world::SlabLocation;
@@ -817,7 +816,7 @@ mod tests {
             let mut actual_blocks = vec![];
             let mut chunk_blocks = vec![];
             for chunk in world.all_chunks() {
-                let blocks = chunk.blocks(&mut chunk_blocks);
+                let blocks = chunk.terrain().blocks(&mut chunk_blocks);
                 for (block_pos, block) in blocks.drain(..) {
                     let block_type = block.block_type();
 

@@ -4,7 +4,7 @@
 pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{
-    flatten_coords, slice_navmesh::ABSOLUTE_MAX_FREE_VERTICAL_SPACE, unflatten_index, BaseTerrain,
+    flatten_coords, slice_navmesh::ABSOLUTE_MAX_FREE_VERTICAL_SPACE, unflatten_index,
     BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone, OcclusionChunkUpdate, Slab,
     SlabType,
 };

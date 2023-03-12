@@ -1,17 +1,14 @@
 use misc::*;
 
 use unit::world::{
-    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SlabLocation, SliceIndex,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceIndex,
 };
 
-use crate::chunk::chunk::VerticalSpaceOrWait::Failure;
-use crate::chunk::slab::{Slab, SliceNavArea};
+use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice::{Slice, SliceOwned};
-use crate::chunk::slice_navmesh::{FreeVerticalSpace, VerticalSpacePlease};
+
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
 use crate::chunk::terrain::RawChunkTerrain;
-use crate::chunk::BaseTerrain;
 use crate::navigation::{BlockGraph, WorldArea};
 use crate::navigationv2::{ChunkArea, SlabArea, SlabNavGraph};
 use crate::world::LoadNotifier;
@@ -109,6 +106,13 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
+    pub fn terrain(&self) -> &RawChunkTerrain<C> {
+        &self.terrain
+    }
+    pub fn terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
+        &mut self.terrain
+    }
+
     #[inline]
     pub fn pos(&self) -> ChunkLocation {
         self.pos
@@ -120,7 +124,7 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub fn area_info_for_block(&self, block: BlockPosition) -> Option<AreaInfo> {
-        let b = self.get_block(block)?;
+        let b = self.terrain.get_block(block)?;
         let area = b.nav_area()?;
         self.areas
             .get(&ChunkArea {
@@ -143,7 +147,7 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub(crate) fn area_for_block(&self, block_pos: BlockPosition) -> Option<WorldArea> {
-        self.get_block(block_pos).map(|b| {
+        self.terrain.get_block(block_pos).map(|b| {
             let area_index = b.area_index();
             WorldArea {
                 chunk: self.pos,
@@ -216,14 +220,14 @@ impl<C: WorldContext> Chunk<C> {
     ) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>)> {
         range
             .as_range()
-            .map(move |i| self.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
+            .map(move |i| self.terrain.slice(i).map(|s| (GlobalSliceIndex::new(i), s)))
             .skip_while(|s| s.is_none())
             .while_some()
     }
 
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice<C> {
         #[allow(clippy::redundant_closure)]
-        self.slice(slice).unwrap_or_else(|| Slice::dummy())
+        self.terrain.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 
     pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {
@@ -349,21 +353,10 @@ pub enum VerticalSpaceOrWait {
     Loaded(SlabVerticalSpace),
 }
 
-impl<C: WorldContext> BaseTerrain<C> for Chunk<C> {
-    fn raw_terrain(&self) -> &RawChunkTerrain<C> {
-        &self.terrain
-    }
-
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
-        &mut self.terrain
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use unit::world::GlobalSliceIndex;
 
-    use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::{Chunk, ChunkBuilder};
     use crate::helpers::{DummyBlockType, DummyWorldContext};
     use unit::world::CHUNK_SIZE;
@@ -430,7 +423,7 @@ mod tests {
         // check individual block collection is ordered as intended
         let c = Chunk::<DummyWorldContext>::empty((0, 0));
         let mut blocks = Vec::new();
-        c.blocks(&mut blocks);
+        c.terrain.blocks(&mut blocks);
         let mut b = blocks.into_iter();
         assert_eq!(
             b.next().map(|(p, b)| (p.xyz(), b.block_type())),

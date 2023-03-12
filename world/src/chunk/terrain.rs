@@ -27,40 +27,56 @@ pub struct RawChunkTerrain<C: WorldContext> {
     slabs: DoubleSidedVec<Slab<C>>,
 }
 
-pub trait BaseTerrain<C: WorldContext> {
-    fn raw_terrain(&self) -> &RawChunkTerrain<C>;
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C>;
+pub struct OcclusionChunkUpdate(
+    pub ChunkLocation,
+    pub Vec<(BlockPosition, BlockOcclusionUpdate)>,
+);
 
-    fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice<C>> {
+#[derive(Copy, Clone)]
+pub enum SlabCreationPolicy {
+    /// Don't add missing slabs
+    PleaseDont,
+
+    /// Create the missing slab and all intermediate slabs
+    CreateAll,
+}
+
+pub enum BlockDamageResult {
+    Broken,
+    Unbroken,
+}
+
+impl<C: WorldContext> RawChunkTerrain<C> {
+    pub fn slice<S: Into<GlobalSliceIndex>>(&self, index: S) -> Option<Slice<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.raw_terrain()
-            .slabs
+        self.slabs
             .get(slab_idx)
             .map(|ptr| ptr.slice(chunk_slice_idx.to_local()))
     }
 
-    fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice<C> {
+    pub fn slice_unchecked<S: Into<GlobalSliceIndex>>(&self, index: S) -> Slice<C> {
         // TODO actually add get_{mut_}unchecked to slabs for performance
         self.slice(index).unwrap()
     }
 
     /// Calls `Slab::expect_mut`, panics if not the exclusive reference
-    fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
+    pub fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.raw_terrain_mut()
-            .slabs
+        self.slabs
             .get_mut(slab_idx)
             .map(|ptr| ptr.expect_mut_self().slice_mut(chunk_slice_idx.to_local()))
     }
 
     /// Calls `Slab::cow_clone`, triggering a slab copy if necessary
-    fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
+    pub fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(
+        &mut self,
+        index: S,
+    ) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.raw_terrain_mut()
-            .slabs
+        self.slabs
             .get_mut(slab_idx)
             .map(|ptr| ptr.cow_clone().slice_mut(chunk_slice_idx.to_local()))
     }
@@ -70,37 +86,27 @@ pub trait BaseTerrain<C: WorldContext> {
         self.slice_mut_with_cow(index).unwrap()
     }
 
-    fn get_block(&self, pos: BlockPosition) -> Option<Block<C>> {
+    pub fn get_block(&self, pos: BlockPosition) -> Option<Block<C>> {
         self.slice(pos.z()).map(|slice| slice[pos])
     }
 
     /// Panics if invalid position
     #[cfg(test)]
-    fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block<C>> {
+    pub fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block<C>> {
         let pos = BlockPosition::try_from(pos).expect("bad position");
         self.slice(pos.z()).map(|slice| slice[pos])
     }
 
-    /// Returns the range of slices in this terrain rounded to the nearest slab
-    fn slice_bounds_as_slabs(&self) -> SliceRange {
-        let mut slabs = self.raw_terrain().slabs.indices_increasing();
-        let bottom = slabs.next().unwrap_or(0);
-        let top = slabs.last().unwrap_or(0) + 1;
-
-        SliceRange::from_bounds_unchecked(bottom * SLAB_SIZE.as_i32(), top * SLAB_SIZE.as_i32())
-    }
-
     /// Only for tests
     #[cfg(test)]
-    fn blocks<'a>(
+    pub fn blocks<'a>(
         &self,
         out: &'a mut Vec<(BlockPosition, Block<C>)>,
     ) -> &'a mut Vec<(BlockPosition, Block<C>)> {
-        let (_bottom_slab, bottom_slab_index) =
-            self.raw_terrain().slabs_from_bottom().next().unwrap();
+        let (_bottom_slab, bottom_slab_index) = self.slabs_from_bottom().next().unwrap();
 
         let SlabIndex(low_z) = bottom_slab_index * SLAB_SIZE;
-        let high_z = low_z + (self.raw_terrain().slab_count() * SLAB_SIZE.as_usize()) as i32;
+        let high_z = low_z + (self.slab_count() * SLAB_SIZE.as_usize()) as i32;
 
         let total_size =
             (high_z - low_z) as usize * (CHUNK_SIZE.as_usize() * CHUNK_SIZE.as_usize());
@@ -122,38 +128,7 @@ pub trait BaseTerrain<C: WorldContext> {
 
         out
     }
-}
 
-pub struct OcclusionChunkUpdate(
-    pub ChunkLocation,
-    pub Vec<(BlockPosition, BlockOcclusionUpdate)>,
-);
-
-#[derive(Copy, Clone)]
-pub enum SlabCreationPolicy {
-    /// Don't add missing slabs
-    PleaseDont,
-
-    /// Create the missing slab and all intermediate slabs
-    CreateAll,
-}
-
-pub enum BlockDamageResult {
-    Broken,
-    Unbroken,
-}
-
-impl<C: WorldContext> BaseTerrain<C> for RawChunkTerrain<C> {
-    fn raw_terrain(&self) -> &RawChunkTerrain<C> {
-        self
-    }
-
-    fn raw_terrain_mut(&mut self) -> &mut RawChunkTerrain<C> {
-        self
-    }
-}
-
-impl<C: WorldContext> RawChunkTerrain<C> {
     pub(crate) fn slabs_from_top(&self) -> impl Iterator<Item = (&Slab<C>, SlabIndex)> {
         self.slabs
             .iter_decreasing()
@@ -596,16 +571,14 @@ impl<C: WorldContext> RawChunkTerrain<C> {
         updates
             .iter()
             .filter_map(move |&(block_pos, new_opacities)| {
-                let raw_terrain = self.raw_terrain_mut();
-
                 // obtain immutable slice for checking, to avoid unnecessary CoW slab copying
-                let slice = raw_terrain.slice_unchecked(block_pos.z());
+                let slice = self.slice_unchecked(block_pos.z());
 
                 if *slice[block_pos].occlusion() != new_opacities {
                     // opacities have changed, promote slice to mutable, possibly triggering a slab copy
                     // TODO this is sometimes a false positive, triggering unnecessary copies
                     let block_mut =
-                        &mut raw_terrain.slice_mut_unchecked_with_cow(block_pos.z())[block_pos];
+                        &mut self.slice_mut_unchecked_with_cow(block_pos.z())[block_pos];
 
                     // for trace logging only
                     let _old_occlusion = *block_mut.occlusion();
@@ -861,7 +834,6 @@ mod tests {
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
 
     use crate::chunk::slab::Slab;
-    use crate::chunk::terrain::BaseTerrain;
     use crate::chunk::ChunkBuilder;
     use crate::occlusion::{OcclusionFace, VertexOcclusion};
     use crate::world::helpers::{
@@ -1226,6 +1198,7 @@ mod tests {
         let chunk = load_single_chunk(terrain.deep_clone());
 
         let (occlusion, _) = chunk
+            .terrain()
             .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
@@ -1246,6 +1219,7 @@ mod tests {
         let chunk = load_single_chunk(terrain);
 
         let (occlusion, _) = chunk
+            .terrain()
             .get_block_tup((2, 2, 2))
             .unwrap()
             .occlusion()
@@ -1275,11 +1249,13 @@ mod tests {
         let terrain = load_single_chunk(terrain);
 
         let below_block_occlusion = *terrain
+            .terrain()
             .get_block_tup((2, 2, SLAB_SIZE.as_i32() - 1))
             .unwrap()
             .occlusion();
 
         let above_block_occlusion = *terrain
+            .terrain()
             .get_block_tup((2, 2, SLAB_SIZE.as_i32()))
             .unwrap()
             .occlusion();
@@ -1342,7 +1318,10 @@ mod tests {
         face: OcclusionFace,
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
-        let block = chunk.get_block(block.try_into().unwrap()).unwrap();
+        let block = chunk
+            .terrain()
+            .get_block(block.try_into().unwrap())
+            .unwrap();
         let (occlusion, _) = block.occlusion().resolve_vertices(face);
         occlusion
     }

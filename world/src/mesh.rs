@@ -8,7 +8,7 @@ use crate::chunk::slice::{unflatten_index, Slice};
 use crate::chunk::Chunk;
 use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip, VertexOcclusion};
 use crate::viewer::SliceRange;
-use crate::{BaseTerrain, BlockType, WorldContext};
+use crate::{BlockType, WorldContext};
 use grid::GridImpl;
 use std::mem::MaybeUninit;
 use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};

@@ -1,5 +1,5 @@
 use crate::world::ContiguousChunkIterator;
-use crate::{BaseTerrain, BlockType, InnerWorldRef, SliceRange, WorldContext};
+use crate::{BlockType, InnerWorldRef, SliceRange, WorldContext};
 use misc::cgmath::Array;
 use misc::cgmath::Vector3;
 use misc::num_traits::signum;
@@ -81,7 +81,7 @@ impl VoxelRay {
                 if Some(block_pos) != last_block {
                     let block = chunk_iter
                         .next(ChunkLocation::from(block_pos))
-                        .and_then(|chunk| chunk.get_block(block_pos.into()));
+                        .and_then(|chunk| chunk.terrain().get_block(block_pos.into()));
 
                     if let Some(b) = block {
                         has_seen_a_block = true;

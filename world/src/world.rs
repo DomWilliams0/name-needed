@@ -15,7 +15,7 @@ use unit::world::{
 };
 
 use crate::block::{Block, BlockDurability};
-use crate::chunk::{BaseTerrain, BlockDamageResult, Chunk, VerticalSpaceOrWait};
+use crate::chunk::{BlockDamageResult, Chunk, VerticalSpaceOrWait};
 use crate::context::WorldContext;
 use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
@@ -120,7 +120,7 @@ impl<C: WorldContext> World<C> {
     }
 
     pub fn slice_bounds(&self) -> Option<SliceRange> {
-        let slab_ranges = self.chunks.iter().map(|c| c.raw_terrain().slab_range());
+        let slab_ranges = self.chunks.iter().map(|c| c.terrain().slab_range());
 
         let min = slab_ranges.clone().map(|(bottom, _)| bottom).min();
         let max = slab_ranges.map(|(_, top)| top).max();
@@ -138,13 +138,13 @@ impl<C: WorldContext> World<C> {
 
     pub fn has_slab(&self, slab_pos: SlabLocation) -> bool {
         self.find_chunk_with_pos(slab_pos.chunk)
-            .map(|chunk| chunk.raw_terrain().slab(slab_pos.slab).is_some())
+            .map(|chunk| chunk.terrain().slab(slab_pos.slab).is_some())
             .unwrap_or_default()
     }
 
     pub fn get_slab_mut(&mut self, slab_pos: SlabLocation) -> Option<&mut Slab<C>> {
         self.find_chunk_with_pos_mut(slab_pos.chunk)
-            .and_then(|chunk| chunk.raw_terrain_mut().slab_mut(slab_pos.slab))
+            .and_then(|chunk| chunk.terrain_mut().slab_mut(slab_pos.slab))
     }
 
     // TODO lru cache for chunk lookups
@@ -418,7 +418,7 @@ impl<C: WorldContext> World<C> {
         let slice_block = SliceBlock::from(BlockPosition::from(pos));
         self.find_chunk_with_pos(chunk_pos)
             .and_then(|c| {
-                c.raw_terrain()
+                c.terrain()
                     .find_accessible_block(slice_block, Some(pos.2), z_min)
             })
             .map(|pos| pos.to_world_position(chunk_pos))
@@ -438,7 +438,7 @@ impl<C: WorldContext> World<C> {
             let res = chunks
                 .next(chunk_pos)
                 .and_then(|c| {
-                    c.raw_terrain().find_accessible_block(
+                    c.terrain().find_accessible_block(
                         slice_block,
                         Some(pos.2),
                         Some(GlobalSliceIndex::new(min_z)),
@@ -499,7 +499,7 @@ impl<C: WorldContext> World<C> {
 
         if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
             let mut applied_count = 0usize;
-            for affected_slab in chunk.raw_terrain_mut().apply_occlusion_updates(&updates) {
+            for affected_slab in chunk.terrain_mut().apply_occlusion_updates(&updates) {
                 applied_count += 1;
 
                 let slab_loc = SlabLocation::new(affected_slab, chunk_pos);
@@ -536,7 +536,7 @@ impl<C: WorldContext> World<C> {
                 }
             };
 
-            let slab = match chunk.raw_terrain_mut().slab_mut(slab_loc.slab) {
+            let slab = match chunk.terrain_mut().slab_mut(slab_loc.slab) {
                 Some(slab) => slab,
                 None => {
                     let count = slab_updates.count();
@@ -564,7 +564,7 @@ impl<C: WorldContext> World<C> {
             .expect("no such chunk");
 
         // create missing chunks
-        let terrain = chunk.raw_terrain_mut();
+        let terrain = chunk.terrain_mut();
         terrain.create_slabs_until(slab.slab);
 
         // TODO unlink all nav from this slab
@@ -573,7 +573,7 @@ impl<C: WorldContext> World<C> {
 
         // update slab terrain if necessary
         if let Some(terrain) = slab_terrain {
-            chunk.raw_terrain_mut().replace_slab(slab.slab, terrain);
+            chunk.terrain_mut().replace_slab(slab.slab, terrain);
         }
 
         chunk.set_slab_nav_progress(slab.slab, vertical_space);
@@ -595,7 +595,7 @@ impl<C: WorldContext> World<C> {
             .expect("no such chunk");
 
         // create missing chunks
-        let terrain = chunk.raw_terrain_mut();
+        let terrain = chunk.terrain_mut();
         terrain.create_slabs_until(slab_range.0);
         terrain.create_slabs_until(slab_range.1);
 
@@ -609,7 +609,7 @@ impl<C: WorldContext> World<C> {
             // update slab terrain if necessary
             if let Some(terrain) = slab.terrain.take() {
                 chunk
-                    .raw_terrain_mut()
+                    .terrain_mut()
                     .replace_slab(slab.slab.slab /* lmao */, terrain);
             }
 
@@ -638,7 +638,7 @@ impl<C: WorldContext> World<C> {
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block<C>> {
         let pos = pos.into();
         self.find_chunk_with_pos(ChunkLocation::from(pos))
-            .and_then(|chunk| chunk.get_block(pos.into()))
+            .and_then(|chunk| chunk.terrain().get_block(pos.into()))
     }
 
     /// Mutates terrain silently to the loader, ensure the loader knows about this
@@ -648,11 +648,7 @@ impl<C: WorldContext> World<C> {
         damage: BlockDurability,
     ) -> Option<BlockDamageResult> {
         self.find_chunk_with_pos_mut(ChunkLocation::from(pos))
-            .and_then(|chunk| {
-                chunk
-                    .raw_terrain_mut()
-                    .apply_block_damage(pos.into(), damage)
-            })
+            .and_then(|chunk| chunk.terrain_mut().apply_block_damage(pos.into(), damage))
     }
 
     #[cfg(test)]
@@ -676,7 +672,7 @@ impl<C: WorldContext> World<C> {
                     let x = random.gen_range(0, CHUNK_SIZE.as_block_coord());
                     let y = random.gen_range(0, CHUNK_SIZE.as_block_coord());
                     chunk
-                        .raw_terrain()
+                        .terrain()
                         .find_accessible_block(SliceBlock::new_unchecked(x, y), None, None)
                         .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                 }
@@ -691,7 +687,7 @@ impl<C: WorldContext> World<C> {
                         .and_then(|chunk| {
                             let block_pos = BlockPosition::from(candidate);
                             chunk
-                                .raw_terrain()
+                                .terrain()
                                 .find_accessible_block(block_pos.into(), None, None)
                                 .map(|block_pos| block_pos.to_world_position(chunk.pos()))
                         })
@@ -745,7 +741,7 @@ impl<C: WorldContext> World<C> {
         let chunk_pos = ChunkLocation::from(block_pos);
         let block = self
             .find_chunk_with_pos(chunk_pos)
-            .and_then(|chunk| chunk.get_block(block_pos.into()));
+            .and_then(|chunk| chunk.terrain().get_block(block_pos.into()));
 
         let area = match block {
             None => return AreaLookup::BadPosition,
@@ -906,7 +902,7 @@ pub mod slab_loading {
     use crate::chunk::slab::{Slab, SlabInternalNavigability};
     use crate::chunk::slice_navmesh::SlabVerticalSpace;
     use crate::world::WaitResult;
-    use crate::{BaseTerrain, WorldContext, WorldRef};
+    use crate::{WorldContext, WorldRef};
 
     pub(crate) struct SlabProcessingFuture<'a, C: WorldContext> {
         phantom: PhantomData<&'a C>,
@@ -957,7 +953,7 @@ pub mod slab_loading {
             let result = {
                 match chunk {
                     Some(chunk) if chunk.has_slab(slab.slab) => {
-                        let terrain = chunk.raw_terrain_mut().slab_mut(slab.slab).unwrap();
+                        let terrain = chunk.terrain_mut().slab_mut(slab.slab).unwrap();
 
                         // safety: terrain belongs to chunk but we need access to the slab
                         // progress too, and they dont overlap. but make sure not to
@@ -996,7 +992,7 @@ pub mod slab_loading {
                                                                         // get out terrain from the slab again because we
                                                                         // don't own it
                                                                         terrain = chunk
-                                                                            .raw_terrain_mut()
+                                                                            .terrain_mut()
                                                                             .slab_mut(slab.slab)
                                                                             .unwrap(); // definitely exists
 
@@ -1380,7 +1376,7 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{presets, BaseTerrain, BlockType, OcclusionChunkUpdate, SearchGoal, WorldContext};
+    use crate::{presets, BlockType, OcclusionChunkUpdate, SearchGoal, WorldContext};
 
     #[test]
     fn world_context() {
@@ -1718,7 +1714,7 @@ mod tests {
 
         // hold a reference to slab to trigger CoW
         let slab = w.chunks[0]
-            .raw_terrain()
+            .terrain()
             .slab(GlobalSliceIndex::new(pos.2).slab_index())
             .unwrap()
             .clone();
@@ -1746,7 +1742,7 @@ mod tests {
 
         // make sure CoW was triggered
         let new_slab = w.chunks[0]
-            .raw_terrain()
+            .terrain()
             .slab(GlobalSliceIndex::new(pos.2).slab_index())
             .unwrap();
 
@@ -1765,6 +1761,7 @@ mod tests {
 
         *w.find_chunk_with_pos_mut(ChunkLocation(0, 0))
             .unwrap()
+            .terrain_mut()
             .slice_mut(0)
             .unwrap()[(0, 0)]
             .block_type_mut() = DummyBlockType::Stone;

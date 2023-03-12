@@ -1,27 +1,25 @@
-use std::cell::Cell;
 use std::iter::once;
 use std::mem::MaybeUninit;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
 use misc::*;
+use unit::world::CHUNK_SIZE;
 use unit::world::{
     BlockCoord, LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition, SliceBlock, SliceIndex,
     WorldRange, SLAB_SIZE,
 };
-use unit::world::{LocalSliceIndexBelowTop, CHUNK_SIZE};
 
 use crate::block::{Block, BlockOpacity};
 use crate::chunk::slice::{unflatten_index, Slice, SliceMut, SliceOwned};
 use crate::chunk::slice_navmesh::{
     make_mesh, SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator, SliceConfig,
-    ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
 };
 use crate::loader::{FreeVerticalSpace, GenericTerrainUpdate, SlabTerrainUpdate};
-use crate::navigation::discovery::AreaDiscovery;
+
 use crate::navigation::{BlockGraph, ChunkArea};
-use crate::navigationv2::SlabNavGraph;
-use crate::occlusion::{BlockOcclusion, NeighbourOpacity, OcclusionFace};
-use crate::{flatten_coords, BlockType, WorldChangeEvent, WorldContext, SLICE_SIZE};
+
+use crate::occlusion::{NeighbourOpacity, OcclusionFace};
+use crate::{flatten_coords, BlockType, WorldContext, SLICE_SIZE};
 use grid::{Grid, GridImpl, GridImplExt};
 use std::sync::Arc;
 
