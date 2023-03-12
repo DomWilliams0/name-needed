@@ -84,19 +84,25 @@ impl SlabNavGraph {
             });
 
             // apply new areas
-            working.extend(areas.enumerate().map(|(i, a)| AreaInProgress {
-                height_left: a.height,
-                area: SlabArea {
+            working.extend(areas.enumerate().map(|(i, a)| {
+                let area = SlabArea {
                     slice_idx: a.slice,
                     slice_area: SliceAreaIndex(i as u8),
-                },
-                range: (a.from, a.to),
+                };
+
+                // also create node at the same time
+                graph.add_node(area);
+
+                AreaInProgress {
+                    height_left: a.height,
+                    area,
+                    range: (a.from, a.to),
+                }
             }));
 
             // link up
             debug_assert!(working.iter().all(|a| a.height_left > 0));
 
-            // slice 1, slice 1, slice 1, slice 2, slice 3
             for (i, a) in working.iter().enumerate() {
                 // skip all considered so far and this one itself, and any out of reach
                 let max_slice = a.area.slice_idx.slice() + a.height_left;
@@ -298,7 +304,6 @@ mod tests {
 
     #[test]
     fn dont_link_with_inaccessible_roof() {
-        misc::logging::for_tests();
         let x = do_it(vec![
             TestArea {
                 slice: 1,
@@ -313,5 +318,16 @@ mod tests {
         ]);
 
         assert_eq!(edges(&x), vec![]);
+    }
+
+    #[test]
+    fn single_area() {
+        let x = do_it(vec![TestArea {
+            slice: 1,
+            height: 3,
+            bounds: ((1, 1), (2, 2)),
+        }]);
+
+        assert_eq!(x.graph.node_count(), 1); // should still have a node
     }
 }
