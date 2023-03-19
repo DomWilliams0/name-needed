@@ -10,7 +10,8 @@ use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
 use crate::chunk::terrain::SlabStorage;
 use crate::navigation::{BlockGraph, WorldArea};
-use crate::navigationv2::{ChunkArea, SlabArea, SlabNavGraph};
+use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
+use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldContext};
 use parking_lot::RwLock;
@@ -59,7 +60,7 @@ pub(crate) enum SlabLoadingStatus {
     TerrainInWorld,
 
     /// Bottom slice of and nav has been provided by slab below, so now full nav areas
-    /// are available. Internal area links are known
+    /// are available. Internal area links are known, and SlabNavGraph is stored in the chunk
     DoneInIsolation,
 
     /// All neighbouring slabs are present and inter-slab links are known
@@ -176,13 +177,13 @@ impl<C: WorldContext> Chunk<C> {
         let tmp_add = new_areas
             .map(|a| {
                 (
-                    dbg!(ChunkArea {
+                    ChunkArea {
                         slab_idx: slab,
                         slab_area: SlabArea {
                             slice_idx: a.slice,
                             slice_area: area_alloc.allocate(a.slice.slice()),
                         },
-                    }),
+                    },
                     AreaInfo {
                         height: a.height,
                         range: (a.from, a.to),
@@ -250,7 +251,7 @@ impl<C: WorldContext> Chunk<C> {
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
-    pub(crate) fn mark_slab_as_done_in_isolation(&self, slab: SlabIndex) {
+    fn mark_slab_as_done_in_isolation(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::DoneInIsolation);
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
@@ -305,15 +306,45 @@ impl<C: WorldContext> Chunk<C> {
         matches!(progress, SlabLoadingStatus::Done)
     }
 
-    /// If true it has not been requested and is not loading
-    pub fn slab_vertical_space_or_wait(&self, slab: SlabIndex) -> VerticalSpaceOrWait {
-        use VerticalSpaceOrWait::*;
+    pub fn slab_vertical_space_or_wait(
+        &self,
+        slab: SlabIndex,
+    ) -> SlabThingOrWait<Arc<SlabVerticalSpace>> {
+        use SlabThingOrWait::*;
         let progress = self.slab_progress(slab);
 
         match progress {
             SlabLoadingStatus::Unloaded => Failure,
             SlabLoadingStatus::Requested => Wait,
-            _ => Loaded(self.slab_vertical_space(slab).unwrap()),
+            _ => Ready(self.slab_vertical_space(slab).unwrap()),
+        }
+    }
+
+    pub fn slab_areas_or_wait(
+        &self,
+        slab: SlabIndex,
+        neighbour_direction: NeighbourOffset,
+        out: &mut Vec<SliceNavArea>,
+    ) -> SlabThingOrWait<()> {
+        use SlabLoadingStatus::*;
+        use SlabThingOrWait::*;
+
+        let progress = self.slab_progress(slab);
+
+        match progress {
+            Unloaded => Failure,
+            Requested | TerrainInWorld => Wait,
+            DoneInIsolation | Done => Ready(out.extend(filter_border_areas(
+                self.areas.iter().filter_map(|(area, info)| {
+                    (area.slab_idx == slab).then(|| SliceNavArea {
+                        slice: area.slab_area.slice_idx,
+                        from: info.range.0,
+                        to: info.range.1,
+                        height: info.height,
+                    })
+                }),
+                neighbour_direction,
+            ))),
         }
     }
 
@@ -325,9 +356,11 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab_data(slab).map(|s| s.vertical_space.clone())
     }
 
+    /// Sets state to DoneInIsolation
     pub(crate) fn replace_slab_nav_graph(&mut self, slab: SlabIndex, graph: SlabNavGraph) {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.nav = graph;
+            self.mark_slab_as_done_in_isolation(slab);
         }
     }
 
@@ -342,10 +375,10 @@ impl<C: WorldContext> Chunk<C> {
     }
 }
 
-pub enum VerticalSpaceOrWait {
+pub enum SlabThingOrWait<T> {
     Wait,
     Failure,
-    Loaded(Arc<SlabVerticalSpace>),
+    Ready(T),
 }
 
 #[cfg(test)]

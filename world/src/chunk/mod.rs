@@ -1,7 +1,7 @@
 pub use slab::DeepClone;
 
 pub use self::builder::{ChunkBuilder, ChunkDescriptor, WorldBuilder};
-pub use self::chunk::{Chunk, ChunkId, VerticalSpaceOrWait};
+pub use self::chunk::{Chunk, ChunkId, SlabThingOrWait};
 pub use self::slab::{Slab, SlabType};
 pub use self::slice::{flatten_coords, unflatten_index};
 pub use self::terrain::{BlockDamageResult, OcclusionChunkUpdate};

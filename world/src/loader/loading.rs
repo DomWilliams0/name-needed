@@ -12,8 +12,11 @@ use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType, SliceNavArea}
 
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::worker_pool::LoadTerrainResult;
-use crate::world::{get_or_wait_for_slab, ContiguousChunkIterator, WorldChangeEvent};
-use crate::{OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
+use crate::world::{
+    get_or_wait_for_slab_border_areas, get_or_wait_for_slab_vertical_space,
+    ContiguousChunkIterator, WorldChangeEvent,
+};
+use crate::{navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
 
 use crate::chunk::slice_navmesh::{
     FreeVerticalSpace, SlabVerticalSpace, SliceAreaIndex, VerticalSpacePlease,
@@ -22,6 +25,7 @@ use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
 use crate::navigationv2::SlabNavGraph;
+use crate::neighbour::NeighbourOffset;
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::{FutureExt, SinkExt};
 use std::collections::HashSet;
@@ -258,36 +262,113 @@ impl<C: WorldContext> WorldLoader<C> {
                 // wait for slab above to be loaded if needed
                 // TODO use this slab vertical space to see if above slab will even influence
                 //  this one, if not then dont wait
-                let above = get_or_wait_for_slab(&mut notifications, &world, slab.above()).await;
+                let above =
+                    get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.above())
+                        .await;
 
                 // generate nav areas skipping the bottom slice
                 let mut areas = terrain.discover_navmesh(&vs, above.as_ref());
 
                 // bottom slice nav requires below slab vertical space, now wait for that
-                let below = get_or_wait_for_slab(&mut notifications, &world, slab.below()).await;
+                let below =
+                    get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.below())
+                        .await;
                 if let Some(below) = below.as_ref() {
                     terrain.discover_bottom_slice_areas(&vs, below, &mut areas);
                 }
 
-                // mark slab as done in isolation
+                // discover internal areas and edges
+                let graph = SlabNavGraph::discover(&areas);
+
                 {
-                    let mut world = world.borrow_mut();
-                    if let Some(c) = world.find_chunk_with_pos_mut(slab.chunk) {
-                        c.mark_slab_as_done_in_isolation(slab.slab);
+                    // put this into world and mark as DoneInIsolation
+                    let mut do_it = || {
+                        let mut w = world.borrow_mut();
+                        let chunk = w.find_chunk_with_pos_mut(slab.chunk)?;
+
+                        // clear old slice areas
+                        chunk.replace_all_slice_areas(slab.slab, areas.iter().copied());
+
+                        chunk.replace_slab_nav_graph(slab.slab, graph);
+
+                        // let slab = w.get_slab_mut(slab)?;
+                        // TODO clear previous if indicated - but remember update to bottom slice is additive
+                        // slab.apply_navigation_updates(&update.new_areas, true);
+
+                        Some(())
+                    };
+                    let _ = do_it();
+                }
+
+                // ----- slab is now DoneInIsolation
+
+                // wait for neighbouring slabs to link up navigation
+                let mut this_border_areas = vec![];
+                let mut neighbour_border_areas = vec![];
+                let mut new_world_edges = vec![];
+                for (direction, offset) in NeighbourOffset::aligned() {
+                    let n_slab_loc = SlabLocation {
+                        chunk: slab.chunk + offset,
+                        slab: slab.slab,
+                    };
+
+                    // only add edges one way
+                    if slab.chunk < n_slab_loc.chunk {
+                        continue;
+                    }
+
+                    // check if there are any areas at the border that could link
+                    this_border_areas.extend(navigationv2::filter_border_areas(
+                        areas.iter().copied(),
+                        direction,
+                    ));
+                    if !this_border_areas.is_empty() {
+                        // wait for neighbour to be DoneInIsolation too
+                        get_or_wait_for_slab_border_areas(
+                            &mut notifications,
+                            &world,
+                            direction.opposite(),
+                            n_slab_loc,
+                            &mut neighbour_border_areas,
+                        )
+                        .await;
+
+                        if !neighbour_border_areas.is_empty() {
+                            navigationv2::discover_border_edges(
+                                &this_border_areas,
+                                &neighbour_border_areas,
+                                direction,
+                                |src, dst, edge| {
+                                    let e = (src, dst, edge);
+                                    debug_assert!(
+                                        !new_world_edges.contains(&e),
+                                        "duplicate edge {:?}",
+                                        e
+                                    );
+                                    new_world_edges.push(e);
+                                },
+                            );
+
+                            // add to world
+                            {
+                                let mut w = world.borrow_mut();
+                                w.nav_graph_mut().add_inter_slab_edges(
+                                    slab,
+                                    n_slab_loc,
+                                    new_world_edges.drain(..),
+                                );
+                            }
+
+                            // clear for next iteration
+                            neighbour_border_areas.clear();
+                        }
+
+                        // clear for next iteration
+                        this_border_areas.clear();
                     }
                 }
 
-                // post update for areas to be initialised
-                nav_tx
-                    .send(SlabNavigationUpdate {
-                        slab,
-                        graph: SlabNavGraph::discover(&areas),
-                        new_areas: areas,
-                    })
-                    .await
-                    .expect("failed to send nav update");
-
-                // ----- slab is now DoneInIsolation
+                // TODO above and below neighbours: special case
             });
 
             real_count += 1;
@@ -342,35 +423,6 @@ impl<C: WorldContext> WorldLoader<C> {
             Err(err) => return Err(err),
         };
         Ok((terrain, vs, entities))
-    }
-
-    pub fn apply_navigation_updates(&mut self) {
-        let mut w = self.world.borrow_mut();
-
-        // TODO limit number done per tick
-        while let Ok(update) = self.nav_updates.1.try_next() {
-            let update = match update {
-                Some(u) => u,
-                None => return, // channel closed
-            };
-
-            let mut do_it = || {
-                let chunk = w.find_chunk_with_pos_mut(update.slab.chunk)?;
-
-                // clear old slice areas
-                chunk.replace_all_slice_areas(update.slab.slab, update.new_areas.iter().copied());
-
-                chunk.replace_slab_nav_graph(update.slab.slab, update.graph);
-
-                let slab = w.get_slab_mut(update.slab)?;
-                // TODO clear previous if indicated - but remember update to bottom slice is additive
-                slab.apply_navigation_updates(&update.new_areas, true);
-
-                Some(())
-            };
-
-            let _ = do_it();
-        }
     }
 
     /// Note changes are made immediately to the terrain but are delayed for navigation.

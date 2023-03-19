@@ -15,20 +15,24 @@ use unit::world::{
 };
 
 use crate::block::{Block, BlockDurability};
-use crate::chunk::{BlockDamageResult, Chunk, SlabData, VerticalSpaceOrWait};
+use crate::chunk::slab::SliceNavArea;
+use crate::chunk::{BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
 use crate::context::WorldContext;
 use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
     AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
+use crate::navigationv2::world_graph::WorldGraph;
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::{BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
     chunks: Vec<Chunk<C>>,
+    #[deprecated]
     area_graph: AreaGraph,
+    nav_graph: WorldGraph,
     dirty_slabs: HashSet<SlabLocation>,
     entities_to_spawn: Vec<C::GeneratedEntityDesc>,
     load_notifier: LoadNotifier,
@@ -107,6 +111,7 @@ impl<C: WorldContext> World<C> {
         Self {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
+            nav_graph: WorldGraph::default(),
             dirty_slabs: HashSet::with_capacity(32),
             entities_to_spawn: Vec::default(),
             load_notifier: LoadNotifier::default(),
@@ -653,6 +658,14 @@ impl<C: WorldContext> World<C> {
             .and_then(|chunk| chunk.terrain_mut().apply_block_damage(pos.into(), damage))
     }
 
+    pub fn nav_graph(&self) -> &WorldGraph {
+        &self.nav_graph
+    }
+
+    pub fn nav_graph_mut(&mut self) -> &mut WorldGraph {
+        &mut self.nav_graph
+    }
+
     #[cfg(test)]
     pub(crate) fn area_graph(&self) -> &AreaGraph {
         &self.area_graph
@@ -1077,7 +1090,38 @@ pub mod slab_loading {
     }
 }
 
-pub async fn get_or_wait_for_slab<C: WorldContext>(
+/// Check if out is populated
+pub async fn get_or_wait_for_slab_border_areas<C: WorldContext>(
+    notifier: &mut LoadNotifier,
+    world: &WorldRef<C>,
+    neighbour_direction: NeighbourOffset,
+    slab: SlabLocation,
+    out: &mut Vec<SliceNavArea>,
+) {
+    loop {
+        {
+            let w = world.borrow();
+            let chunk = match w.find_chunk_with_pos(slab.chunk) {
+                Some(c) => c,
+                None => {
+                    trace!("chunk not found: {:?}", slab);
+                    break;
+                }
+            };
+            match chunk.slab_areas_or_wait(slab.slab, neighbour_direction, out) {
+                SlabThingOrWait::Wait => {}
+                SlabThingOrWait::Failure | SlabThingOrWait::Ready(_) => break,
+            }
+        }
+
+        if let WaitResult::Disconnected = notifier.wait_for_slab(slab).await {
+            // failure, guess we're shutting down
+            break;
+        }
+    }
+}
+
+pub async fn get_or_wait_for_slab_vertical_space<C: WorldContext>(
     notifier: &mut LoadNotifier,
     world: &WorldRef<C>,
     slab: SlabLocation,
@@ -1087,9 +1131,9 @@ pub async fn get_or_wait_for_slab<C: WorldContext>(
             let w = world.borrow();
             let chunk = w.find_chunk_with_pos(slab.chunk)?;
             match chunk.slab_vertical_space_or_wait(slab.slab) {
-                VerticalSpaceOrWait::Wait => {}
-                VerticalSpaceOrWait::Failure => return None,
-                VerticalSpaceOrWait::Loaded(x) => return Some(x),
+                SlabThingOrWait::Wait => {}
+                SlabThingOrWait::Failure => return None,
+                SlabThingOrWait::Ready(x) => return Some(x),
             }
         }
 
@@ -1312,7 +1356,6 @@ pub mod helpers {
         let mut _updates = Vec::new();
         let mut updates = updates.iter().cloned().collect();
         loader.apply_terrain_updates(&mut updates, &mut _updates);
-        loader.apply_navigation_updates();
 
         loader.block_for_last_batch(test_world_timeout()).unwrap();
 
@@ -1349,7 +1392,6 @@ pub mod helpers {
                 world.apply_occlusion_update(update);
             });
         }
-        loader.apply_navigation_updates();
 
         loader
     }
