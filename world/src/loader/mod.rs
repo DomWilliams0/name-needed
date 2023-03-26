@@ -9,7 +9,7 @@ pub use update::{
 };
 pub use worker_pool::AsyncWorkerPool;
 
-pub use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, VerticalSpacePlease};
+pub use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace};
 
 mod batch;
 mod loading;

@@ -24,6 +24,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
+use crate::navigationv2::ChunkArea;
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::{BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
 
@@ -405,6 +406,24 @@ impl<C: WorldContext> World<C> {
     pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
         self.area_graph
             .path_exists(from, to, &self.area_search_context)
+    }
+
+    pub fn find_area_for_block(
+        &self,
+        block: WorldPosition,
+    ) -> Option<crate::navigationv2::world_graph::WorldArea> {
+        let chunk_loc = ChunkLocation::from(block);
+        let chunk = self.find_chunk_with_pos(chunk_loc)?;
+
+        chunk.find_area_for_block(block).map(|slab_area| {
+            crate::navigationv2::world_graph::WorldArea {
+                chunk_idx: chunk_loc,
+                chunk_area: ChunkArea {
+                    slab_idx: block.slice().into(),
+                    slab_area,
+                },
+            }
+        })
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {

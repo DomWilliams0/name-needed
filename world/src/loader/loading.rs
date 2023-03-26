@@ -18,9 +18,7 @@ use crate::world::{
 };
 use crate::{navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
 
-use crate::chunk::slice_navmesh::{
-    FreeVerticalSpace, SlabVerticalSpace, SliceAreaIndex, VerticalSpacePlease,
-};
+use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, SliceAreaIndex};
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
@@ -349,7 +347,7 @@ impl<C: WorldContext> WorldLoader<C> {
                                 },
                             );
 
-                            // add to world
+                            // add edge to world nav graph
                             {
                                 let mut w = world.borrow_mut();
                                 w.nav_graph_mut().add_inter_slab_edges(

@@ -440,11 +440,11 @@ struct PackedSlabBlockVerticalSpace {
 
 impl PackedSlabBlockVerticalSpace {
     fn pos(&self) -> SlabPosition {
-        SlabPosition::new_unchecked(
-            self.x().value(),
-            self.y().value(),
-            LocalSliceIndex::new_unchecked(self.z().value() as i32),
-        )
+        SlabPosition::new_unchecked(self.x().value(), self.y().value(), self.pos_z())
+    }
+
+    fn pos_z(&self) -> LocalSliceIndex {
+        LocalSliceIndex::new_unchecked(self.z().value() as i32)
     }
 
     fn height(&self) -> FreeVerticalSpace {
@@ -468,7 +468,7 @@ impl PackedSlabBlockVerticalSpace {
 }
 
 pub struct SlabVerticalSpace {
-    /// Sorted by slice ascending.
+    /// Sorted by pos ascending.
     /// pos: 16x16x32 = 4+4+5 bits = 13 bits per pos alone.
     /// height must fit into 3 bits, so up to 8m supported.
     blocks: Box<[PackedSlabBlockVerticalSpace]>,
@@ -575,18 +575,35 @@ impl SlabVerticalSpace {
         }
     }
 
-    fn find_block(&self, pos: SlabPosition) -> Option<FreeVerticalSpace> {
+    /// Only returns exact matches for the bottom of the vertical space
+    fn find_block_exact(&self, pos: SlabPosition) -> Option<FreeVerticalSpace> {
         self.blocks
             .binary_search_by_key(&pos, |x| x.pos())
             .ok()
             .map(|i| self.blocks[i].height())
     }
-}
 
-pub enum VerticalSpacePlease {
-    JustTopDown,
-    JustBottomUp,
-    Both,
+    /// Searches downward for matching area
+    pub fn find_slice(&self, pos: SlabPosition) -> Option<LocalSliceIndex> {
+        let tgt_slice = pos.z().slice();
+        let min = tgt_slice.saturating_sub(ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        for z in (min..=tgt_slice).rev() {
+            let b =
+                SlabPosition::new_unchecked(pos.x(), pos.y(), LocalSliceIndex::new_unchecked(z));
+            match self.blocks.binary_search_by_key(&b, |x| x.pos()) {
+                Err(_) => continue,
+                Ok(idx) => {
+                    let h = &self.blocks[idx];
+                    let candidate_z = h.pos_z();
+
+                    let candidate_max = candidate_z.slice() + h.height();
+                    return (tgt_slice < candidate_max).then_some(candidate_z);
+                }
+            }
+        }
+
+        None
+    }
 }
 
 impl Debug for SlabVerticalSpace {
@@ -646,7 +663,7 @@ mod tests_vertical_space {
 
         // bottom of slab up to block
         assert_eq!(
-            x.find_block(SlabPosition::new_unchecked(3, 3, LocalSliceIndex::bottom())),
+            x.find_block_exact(SlabPosition::new_unchecked(3, 3, LocalSliceIndex::bottom())),
             Some(3)
         );
 
@@ -655,7 +672,7 @@ mod tests_vertical_space {
 
         // between the 2 blocks
         assert_eq!(
-            x.find_block(SlabPosition::new_unchecked(
+            x.find_block_exact(SlabPosition::new_unchecked(
                 3,
                 3,
                 LocalSliceIndex::new_unchecked(4)
@@ -665,7 +682,7 @@ mod tests_vertical_space {
 
         // above the top block
         assert_eq!(
-            x.find_block(SlabPosition::new_unchecked(
+            x.find_block_exact(SlabPosition::new_unchecked(
                 3,
                 3,
                 LocalSliceIndex::new_unchecked(8)
@@ -774,5 +791,45 @@ mod tests_vertical_space {
         // bottom slice set from slab below
         let a = get_area(SLAB_SIZE.as_i32() * 2);
         assert_eq!(a.height, 3);
+    }
+
+    #[test]
+    fn find_block_downwards() {
+        let c = ChunkBuilder::<DummyWorldContext>::new()
+            .set_block((2, 2, 0), DummyBlockType::Dirt)
+            .set_block((2, 2, 4), DummyBlockType::Dirt)
+            .set_block((2, 2, 5), DummyBlockType::Dirt)
+            .build((0, 0));
+        let slab = c.terrain.slab(0.into()).unwrap();
+
+        let x = SlabVerticalSpace::discover(slab);
+
+        let get_slice = |z| {
+            println!("looking up z={z}");
+            x.find_slice(SlabPosition::new_unchecked(
+                2,
+                2,
+                LocalSliceIndex::new_unchecked(z),
+            ))
+            .map(|s| s.slice())
+        };
+        assert_eq!(get_slice(0), None); // solid
+
+        for z in 1..=3 {
+            assert_eq!(get_slice(z), Some(1));
+        }
+
+        assert_eq!(get_slice(4), None);
+        assert_eq!(get_slice(5), None);
+
+        // the space above goes up to the max
+        for z in 6..6 + ABSOLUTE_MAX_FREE_VERTICAL_SPACE {
+            assert_eq!(get_slice(z), Some(6));
+        }
+
+        // should not search further than the max
+        for z in 6 + ABSOLUTE_MAX_FREE_VERTICAL_SPACE..SLAB_SIZE.as_u8() {
+            assert_eq!(get_slice(z), None);
+        }
     }
 }

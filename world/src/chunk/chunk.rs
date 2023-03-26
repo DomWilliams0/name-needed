@@ -1,7 +1,8 @@
 use misc::*;
 
 use unit::world::{
-    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceIndex,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, SliceIndex, WorldPosition,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -9,7 +10,8 @@ use crate::chunk::slice::{Slice, SliceOwned};
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
 use crate::chunk::terrain::SlabStorage;
-use crate::navigation::{BlockGraph, WorldArea};
+use crate::chunk::SlabData;
+use crate::navigation::{BlockGraph, SlabAreaIndex, WorldArea};
 use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
@@ -372,6 +374,39 @@ impl<C: WorldContext> Chunk<C> {
 
     pub fn slab_nav_graph(&self, slab: SlabIndex) -> Option<&SlabNavGraph> {
         self.slabs.slab_data(slab).map(|s| &s.nav)
+    }
+
+    pub fn find_area_for_block(&self, block: WorldPosition) -> Option<SlabArea> {
+        debug_assert_eq!(ChunkLocation::from(block), self.pos);
+
+        // search downwards in vertical space for area z
+        let slab_idx = SlabIndex::from(block.slice());
+        let slab = self.slabs.slab_data(slab_idx)?;
+        let area_slice_idx = slab.vertical_space.find_slice(block.into())?;
+
+        // find matching area in graph (bounds checks all areas in that slice... might be fine)
+        let slice_block = SliceBlock::from(BlockPosition::from(block));
+        slab.nav.iter_nodes().find_map(|a| {
+            if a.slice_idx == area_slice_idx {
+                // bounds check
+                let bounds = self
+                    .area_info(slab_idx, a)
+                    .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
+                if bounds.contains(slice_block) {
+                    return Some(a);
+                }
+            }
+
+            None
+        })
+    }
+}
+
+impl AreaInfo {
+    fn contains(&self, block: SliceBlock) -> bool {
+        let (x, y) = block.xy();
+        let ((x1, y1), (x2, y2)) = self.range;
+        x >= x1 && x <= x2 && y >= y1 && y <= y2
     }
 }
 

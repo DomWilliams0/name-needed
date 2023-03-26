@@ -8,7 +8,7 @@ use misc::*;
 pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SliceIndex, SLAB_SIZE,
+    SlabPosition, SliceIndex, SLAB_SIZE,
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
 
@@ -17,10 +17,12 @@ use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::DeepClone;
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::{Slice, SliceMut};
+use crate::chunk::Chunk;
 
+use crate::helpers::DummyWorldContext;
 use crate::loader::SlabVerticalSpace;
-use crate::navigation::ChunkArea;
-use crate::navigationv2::SlabNavGraph;
+use crate::navigation::{ChunkArea, SlabAreaIndex};
+use crate::navigationv2::{SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
 use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
@@ -875,8 +877,8 @@ impl<C: WorldContext> Default for SlabStorage<C> {
 
 #[cfg(test)]
 mod tests {
-    use unit::world::CHUNK_SIZE;
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
+    use unit::world::{WorldPosition, CHUNK_SIZE};
 
     use crate::chunk::slab::Slab;
     use crate::chunk::ChunkBuilder;
@@ -1624,5 +1626,33 @@ mod tests {
 
         // now the chunk is empty
         assert_eq!(get_areas().len(), 0);
+    }
+
+    #[test]
+    fn lookup_pos_to_area() {
+        let mut loader =
+            loader_from_chunks_blocking(vec![ChunkBuilder::<DummyWorldContext>::new()
+                .set_block((2, 2, 0), DummyBlockType::Dirt)
+                .set_block((2, 2, 4), DummyBlockType::Dirt)
+                .set_block((2, 2, 5), DummyBlockType::Dirt)
+                .build((0, 0))]);
+
+        let world_ref = loader.world();
+        let w = world_ref.borrow();
+        let chunk = w.find_chunk_with_pos((0, 0).into()).unwrap();
+
+        let get_block = |slice| {
+            chunk.find_area_for_block(WorldPosition::new(2, 2, GlobalSliceIndex::new(slice)))
+        };
+        assert_eq!(get_block(0), None); // solid
+        let the_area = get_block(1).expect("should have area");
+        assert_eq!(get_block(2), Some(the_area));
+        assert_eq!(get_block(3), Some(the_area));
+        assert_eq!(get_block(4), None); // solid
+        assert_eq!(get_block(5), None); // solid
+
+        let above_area = get_block(6);
+        assert!(above_area.is_some());
+        assert_ne!(above_area, Some(the_area));
     }
 }
