@@ -11,17 +11,18 @@ use crate::chunk::slice::{Slice, SliceOwned};
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
 use crate::chunk::terrain::SlabStorage;
 use crate::chunk::SlabData;
-use crate::navigation::{BlockGraph, SlabAreaIndex, WorldArea};
+use crate::navigation::{BlockGraph, SlabAreaIndex};
 use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{SliceRange, World, WorldContext};
+use crate::{SliceRange, World, WorldArea, WorldContext};
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
 use std::collections::HashMap;
 use std::iter::once;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 pub type ChunkId = u64;
 
@@ -48,8 +49,7 @@ pub struct Chunk<C: WorldContext> {
     slab_notify: LoadNotifier,
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
+#[derive(Clone, Debug)]
 pub(crate) enum SlabLoadingStatus {
     /// Not available
     Unloaded,
@@ -69,10 +69,11 @@ pub(crate) enum SlabLoadingStatus {
     Done,
 }
 
-enum SlabAvailability<C: WorldContext> {
-    Never,
-    OnItsWay,
-    TadaItsAvailable(SliceOwned<C>),
+pub enum SlabAvailability {
+    NotRequested,
+    InProgress,
+    /// Last change time
+    Present(Instant),
 }
 
 impl<C: WorldContext> Chunk<C> {
@@ -176,24 +177,21 @@ impl<C: WorldContext> Chunk<C> {
         self.areas.retain(|a, _| a.slab_idx != slab);
 
         let mut area_alloc = SliceAreaIndexAllocator::default();
-        let tmp_add = new_areas
-            .map(|a| {
-                (
-                    ChunkArea {
-                        slab_idx: slab,
-                        slab_area: SlabArea {
-                            slice_idx: a.slice,
-                            slice_area: area_alloc.allocate(a.slice.slice()),
-                        },
+        self.areas.extend(new_areas.map(|a| {
+            (
+                ChunkArea {
+                    slab_idx: slab,
+                    slab_area: SlabArea {
+                        slice_idx: a.slice,
+                        slice_area: area_alloc.allocate(a.slice.slice()),
                     },
-                    AreaInfo {
-                        height: a.height,
-                        range: (a.from, a.to),
-                    },
-                )
-            })
-            .collect_vec();
-        self.areas.extend(tmp_add.into_iter());
+                },
+                AreaInfo {
+                    height: a.height,
+                    range: (a.from, a.to),
+                },
+            )
+        }));
     }
 
     pub(crate) fn update_block_graphs(
@@ -255,6 +253,11 @@ impl<C: WorldContext> Chunk<C> {
 
     fn mark_slab_as_done_in_isolation(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::DoneInIsolation);
+        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+    }
+
+    pub(crate) fn mark_slab_as_done(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::Done);
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
@@ -354,6 +357,26 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab(slab).is_some()
     }
 
+    pub fn slab_load_status(&self, slab: SlabIndex) -> impl Debug {
+        self.slab_progress(slab)
+    }
+
+    pub fn slab_availability(&self, slab: SlabIndex) -> SlabAvailability {
+        match self.slab_progress(slab) {
+            SlabLoadingStatus::Unloaded => SlabAvailability::NotRequested,
+            SlabLoadingStatus::Requested
+            | SlabLoadingStatus::TerrainInWorld
+            | SlabLoadingStatus::DoneInIsolation => SlabAvailability::InProgress,
+            SlabLoadingStatus::Done => {
+                let data = self
+                    .terrain()
+                    .slab_data(slab)
+                    .expect("slab data should be present for Done slab");
+                SlabAvailability::Present(data.load_time)
+            }
+        }
+    }
+
     pub fn slab_vertical_space(&self, slab: SlabIndex) -> Option<Arc<SlabVerticalSpace>> {
         self.slabs.slab_data(slab).map(|s| s.vertical_space.clone())
     }
@@ -366,9 +389,11 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    pub(crate) fn set_slab_nav_progress(&mut self, slab: SlabIndex, vs: Arc<SlabVerticalSpace>) {
+    /// Sets modified time to now
+    pub(crate) fn set_slab_vertical_space(&mut self, slab: SlabIndex, vs: Arc<SlabVerticalSpace>) {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.vertical_space = vs;
+            s.load_time = Instant::now();
         }
     }
 
@@ -376,11 +401,13 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab_data(slab).map(|s| &s.nav)
     }
 
-    pub fn find_area_for_block(&self, block: WorldPosition) -> Option<SlabArea> {
-        debug_assert_eq!(ChunkLocation::from(block), self.pos);
-
+    pub fn find_area_for_block(
+        &self,
+        block: BlockPosition,
+        required_height: u8,
+    ) -> Option<SlabArea> {
         // search downwards in vertical space for area z
-        let slab_idx = SlabIndex::from(block.slice());
+        let slab_idx = SlabIndex::from(block.z());
         let slab = self.slabs.slab_data(slab_idx)?;
         let area_slice_idx = slab.vertical_space.find_slice(block.into())?;
 
@@ -389,10 +416,10 @@ impl<C: WorldContext> Chunk<C> {
         slab.nav.iter_nodes().find_map(|a| {
             if a.slice_idx == area_slice_idx {
                 // bounds check
-                let bounds = self
+                let info = self
                     .area_info(slab_idx, a)
                     .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
-                if bounds.contains(slice_block) {
+                if info.height >= required_height && info.contains(slice_block) {
                     return Some(a);
                 }
             }
@@ -407,6 +434,36 @@ impl AreaInfo {
         let (x, y) = block.xy();
         let ((x1, y1), (x2, y2)) = self.range;
         x >= x1 && x <= x2 && y >= y1 && y <= y2
+    }
+
+    pub fn centre_pos(&self, area: crate::navigationv2::world_graph::WorldArea) -> WorldPosition {
+        let (range_min, range_max) = self.range;
+        let centre_x = (range_min.0 + range_max.0) / 2;
+        let centre_y = (range_min.1 + range_max.1) / 2;
+        Self::pos_to_world(area, (centre_x, centre_y))
+    }
+
+    pub fn min_pos(&self, area: crate::navigationv2::world_graph::WorldArea) -> WorldPosition {
+        Self::pos_to_world(area, self.range.0)
+    }
+
+    pub fn max_pos(&self, area: crate::navigationv2::world_graph::WorldArea) -> WorldPosition {
+        Self::pos_to_world(area, self.range.1)
+    }
+
+    fn pos_to_world(
+        area: crate::navigationv2::world_graph::WorldArea,
+        (x, y): (BlockCoord, BlockCoord),
+    ) -> WorldPosition {
+        BlockPosition::new_unchecked(
+            x,
+            y,
+            area.chunk_area
+                .slab_area
+                .slice_idx
+                .to_global(area.chunk_area.slab_idx),
+        )
+        .to_world_position(area.chunk_idx)
     }
 }
 

@@ -16,7 +16,7 @@ use unit::world::{
 
 use crate::block::{Block, BlockDurability};
 use crate::chunk::slab::SliceNavArea;
-use crate::chunk::{BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
+use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
 use crate::context::WorldContext;
 use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
@@ -46,6 +46,13 @@ pub struct LoadNotifier {
     recv: broadcast::Receiver<SlabLocation>,
     /// Dont bother sending anything if there are no receivers
     waiters: Arc<AtomicUsize>,
+}
+
+/// Will receive all broadcasted events while this is alive
+pub struct ListeningLoadNotifier {
+    /// Decrement on drop
+    waiters: Arc<AtomicUsize>,
+    recv: broadcast::Receiver<SlabLocation>,
 }
 
 pub enum WaitResult {
@@ -411,19 +418,28 @@ impl<C: WorldContext> World<C> {
     pub fn find_area_for_block(
         &self,
         block: WorldPosition,
+        required_height: u8,
     ) -> Option<crate::navigationv2::world_graph::WorldArea> {
         let chunk_loc = ChunkLocation::from(block);
         let chunk = self.find_chunk_with_pos(chunk_loc)?;
 
-        chunk.find_area_for_block(block).map(|slab_area| {
-            crate::navigationv2::world_graph::WorldArea {
+        chunk
+            .find_area_for_block(block.into(), required_height)
+            .map(|slab_area| crate::navigationv2::world_graph::WorldArea {
                 chunk_idx: chunk_loc,
                 chunk_area: ChunkArea {
                     slab_idx: block.slice().into(),
                     slab_area,
                 },
-            }
-        })
+            })
+    }
+
+    pub fn lookup_area_info(
+        &self,
+        area: crate::navigationv2::world_graph::WorldArea,
+    ) -> Option<AreaInfo> {
+        self.find_chunk_with_pos(area.chunk_idx)
+            .and_then(|c| c.area_info(area.chunk_area.slab_idx, area.chunk_area.slab_area))
     }
 
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
@@ -570,6 +586,10 @@ impl<C: WorldContext> World<C> {
             };
 
             let count = slab.apply_terrain_updates(slab_loc, slab_updates);
+
+            let slab_data = chunk.terrain_mut().slab_data_mut(slab_loc.slab).unwrap(); // just accessed to get terrain
+            slab_data.update_last_modify_time();
+
             debug!("applied {count} terrain block updates to slab", count = count; slab_loc);
 
             per_slab(slab_loc);
@@ -602,7 +622,7 @@ impl<C: WorldContext> World<C> {
                 .replace_slab(slab.slab, SlabData::new(terrain));
         }
 
-        chunk.set_slab_nav_progress(slab.slab, vertical_space);
+        chunk.set_slab_vertical_space(slab.slab, vertical_space);
 
         // notify anyone waiting
         chunk.mark_slab_as_in_world(slab.slab);
@@ -616,6 +636,7 @@ impl<C: WorldContext> World<C> {
         slab_range: (SlabIndex, SlabIndex),
         slabs: impl Iterator<Item = LoadedSlab<C>>,
     ) {
+        unimplemented!("old");
         let chunk = self
             .find_chunk_with_pos_mut(chunk_loc)
             .expect("no such chunk");
@@ -888,14 +909,95 @@ impl Default for LoadNotifier {
     }
 }
 
+impl Drop for ListeningLoadNotifier {
+    fn drop(&mut self) {
+        // unsubscribe
+        self.waiters.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl ListeningLoadNotifier {
+    /// Ignores messages for other slabs
+    pub async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
+        loop {
+            match self.recv.recv().await {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
+                    break WaitResult::Retry;
+                }
+                Err(e) => {
+                    error!("error waiting for slab notification: {}", e);
+                    break WaitResult::Disconnected;
+                }
+                Ok(recvd) if recvd == slab => break WaitResult::Success,
+                Ok(_) => { /* keep waiting */ }
+            }
+        }
+    }
+
+    /// Waits for load notifications for all slabs. Ensure no dupes
+    pub async fn wait_for_slabs(&mut self, slabs: &[SlabLocation]) -> WaitResult {
+        debug_assert_eq!(
+            slabs.iter().sorted_unstable().copied().collect_vec(),
+            slabs
+                .iter()
+                .sorted_unstable()
+                .copied()
+                .dedup()
+                .collect_vec(),
+            "duplicates detected"
+        );
+
+        trace!("waiting for slabs to load: {:?}", slabs);
+
+        let mut success: SmallVec<[bool; 16]> = smallvec![false; 16];
+        let mut remaining = slabs.len();
+
+        loop {
+            match self.recv.recv().await {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
+                    break WaitResult::Retry;
+                }
+                Err(e) => {
+                    error!("error waiting for slab notification: {}", e);
+                    break WaitResult::Disconnected;
+                }
+                Ok(recvd) => {
+                    if let Some(idx) = slabs.iter().position(|s| *s == recvd) {
+                        debug_assert!(!success[idx]);
+                        success[idx] = true; // TODO what is the point of this then?
+                        remaining -= 1;
+                        if remaining == 0 {
+                            return WaitResult::Success;
+                        }
+                    }
+
+                    // keep waiting
+                    trace!("continue waiting for {remaining}: {:?}", slabs);
+                }
+            }
+        }
+    }
+}
+
 impl LoadNotifier {
+    pub fn start_listening(&self) -> ListeningLoadNotifier {
+        self.waiters.fetch_add(1, Ordering::SeqCst);
+        ListeningLoadNotifier {
+            waiters: self.waiters.clone(),
+            recv: self.send.subscribe(),
+        }
+    }
+
     pub fn notify(&self, slab: SlabLocation) {
         if self.waiters.load(Ordering::Relaxed) > 0 {
             self.send.send(slab).expect("send channel is full");
         }
     }
 
-    async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
+    #[deprecated]
+    pub async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
         // increment waiter count
         self.waiters.fetch_add(1, Ordering::SeqCst);
 
@@ -1423,7 +1525,7 @@ mod tests {
     use std::time::Duration;
 
     use misc::{logging, thread_rng, Itertools, Rng, SeedableRng, StdRng};
-    use unit::world::{all_slabs_in_range, SliceIndex, CHUNK_SIZE};
+    use unit::world::{all_slabs_in_range, SliceBlock, SliceIndex, WorldPoint, CHUNK_SIZE};
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
         WorldPositionRange, SLAB_SIZE,
@@ -1439,7 +1541,9 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{presets, BlockType, OcclusionChunkUpdate, SearchGoal, WorldContext};
+    use crate::{
+        presets, BlockType, OcclusionChunkUpdate, SearchGoal, World, WorldContext, WorldRef,
+    };
 
     #[test]
     fn world_context() {
@@ -1625,15 +1729,52 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        // logging::for_tests();
-        let world = world_from_chunks_blocking(presets::ring()).into_inner();
+        logging::for_tests();
+        let world = world_from_chunks_blocking(presets::ring());
 
-        let src =
-            BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::top()).to_world_position((0, 1));
-        let dst =
-            BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::top()).to_world_position((-1, 1));
+        let src = WorldPoint::new_unchecked(8.5, 25.5, 302.0);
+        let dst = WorldPoint::new_unchecked(-6.5, 24.5, 301.0);
 
-        let _ = world.find_path(src, dst).expect("path should succeed");
+        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        println!("path {:?}", path);
+    }
+
+    #[test]
+    fn same_area() {
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_range((2, 2, 2), (6, 6, 2), |_| DummyBlockType::Stone)
+            .build((0, 0))]);
+
+        let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
+        let dst = WorldPoint::new_unchecked(4.0, 4.0, 3.0);
+
+        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        println!("path {:?}", path);
+        assert_eq!(path.iter_areas().count(), 0);
+    }
+
+    #[test]
+    fn adjacent_area() {
+        logging::for_tests();
+        /*
+           X X
+               X X
+
+           0 0 1 1
+           X X X X
+        */
+        let world = world_from_chunks_blocking(vec![ChunkBuilder::new()
+            .fill_range((2, 2, 2), (5, 2, 2), |_| DummyBlockType::Stone)
+            .fill_range((2, 2, 6), (3, 2, 6), |_| DummyBlockType::Stone)
+            .fill_range((4, 2, 5), (5, 2, 5), |_| DummyBlockType::Stone)
+            .build((0, 0))]);
+
+        let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
+        let dst = WorldPoint::new_unchecked(5.0, 2.0, 3.0);
+
+        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        println!("path {:?}", path);
+        assert_ne!(path.iter_areas().count(), 0);
     }
 
     #[test]

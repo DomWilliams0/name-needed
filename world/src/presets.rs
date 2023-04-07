@@ -5,7 +5,6 @@ use unit::world::{CHUNK_SIZE, SLAB_SIZE};
 
 use crate::chunk::{ChunkBuilder, WorldBuilder};
 use crate::loader::MemoryTerrainSource;
-#[cfg(test)]
 use crate::ChunkDescriptor;
 use crate::{BlockType, WorldContext};
 
@@ -19,6 +18,7 @@ pub fn from_preset<C: WorldContext>(preset: &str, rng: &mut dyn RngCore) -> Memo
         "bottleneck" => bottleneck(rng),
         "stairs" => stairs(),
         "fatstairs" => fat_stairs(),
+        "ring" => ring_preset(),
         _ => unreachable!("unknown preset"),
     }
 }
@@ -229,7 +229,11 @@ pub fn fat_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
     MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
 }
 
-#[cfg(test)]
+pub fn ring_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    MemoryTerrainSource::from_chunks(ring().into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
+}
+
 pub fn ring<C: WorldContext>() -> Vec<ChunkDescriptor<C>> {
     let fill_except_outline = |z| {
         ChunkBuilder::new().fill_range(
@@ -252,6 +256,7 @@ pub fn ring<C: WorldContext>() -> Vec<ChunkDescriptor<C>> {
         fill_except_outline(300)
             .set_block((3, CHUNK_SIZE.as_i32() - 1, 300), C::PRESET_TYPES[2]) /* north bridge */
             .set_block((0, 3, 300), C::PRESET_TYPES[2]) /* west bridge */
+            .set_block((0, 0, 300), C::PRESET_TYPES[1]) /* ground for camera to centre on... */
             .build((0, 0)),
         // bottom left
         fill_except_outline(301)

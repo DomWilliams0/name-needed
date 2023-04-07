@@ -2,6 +2,7 @@ use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::block::BlockDurability;
 use misc::*;
@@ -29,8 +30,9 @@ use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
 pub struct SlabData<C: WorldContext> {
     pub(in crate::chunk) terrain: Slab<C>,
-    pub(in crate::chunk) nav: SlabNavGraph,
+    pub(in crate::chunk) nav: SlabNavGraph, // currently unused
     pub(in crate::chunk) vertical_space: Arc<SlabVerticalSpace>,
+    pub(in crate::chunk) load_time: Instant,
 }
 
 pub struct OcclusionChunkUpdate(
@@ -676,6 +678,7 @@ impl<C: WorldContext> SlabData<C> {
             terrain,
             nav: SlabNavGraph::empty(),
             vertical_space: SlabVerticalSpace::empty(),
+            load_time: Instant::now(),
         }
     }
 }
@@ -686,7 +689,14 @@ impl<C: WorldContext> DeepClone for SlabData<C> {
             terrain: self.terrain.deep_clone(),
             nav: self.nav.clone(),
             vertical_space: self.vertical_space.clone(),
+            load_time: Instant::now(),
         }
+    }
+}
+
+impl<C: WorldContext> SlabData<C> {
+    pub fn update_last_modify_time(&mut self) {
+        self.load_time = Instant::now();
     }
 }
 
@@ -1642,7 +1652,10 @@ mod tests {
         let chunk = w.find_chunk_with_pos((0, 0).into()).unwrap();
 
         let get_block = |slice| {
-            chunk.find_area_for_block(WorldPosition::new(2, 2, GlobalSliceIndex::new(slice)))
+            chunk.find_area_for_block(
+                BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
+                3,
+            )
         };
         assert_eq!(get_block(0), None); // solid
         let the_area = get_block(1).expect("should have area");
@@ -1654,5 +1667,13 @@ mod tests {
         let above_area = get_block(6);
         assert!(above_area.is_some());
         assert_ne!(above_area, Some(the_area));
+
+        assert_eq!(
+            chunk.find_area_for_block(
+                BlockPosition::new(2, 2, GlobalSliceIndex::new(3)).unwrap(),
+                4
+            ),
+            None
+        ); // too tall
     }
 }

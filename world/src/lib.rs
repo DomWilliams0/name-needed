@@ -13,6 +13,7 @@ pub use self::context::{
 };
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};
+pub use self::navigationv2::world_graph::{Path, SearchError, SearchResultFuture};
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};

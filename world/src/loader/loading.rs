@@ -282,6 +282,10 @@ impl<C: WorldContext> WorldLoader<C> {
                     // put this into world and mark as DoneInIsolation
                     let mut do_it = || {
                         let mut w = world.borrow_mut();
+
+                        // temporary: just put all nodes and edges into world graph directly (TODO)
+                        w.nav_graph_mut().absorb(slab, &graph);
+
                         let chunk = w.find_chunk_with_pos_mut(slab.chunk)?;
 
                         // clear old slice areas
@@ -367,6 +371,15 @@ impl<C: WorldContext> WorldLoader<C> {
                 }
 
                 // TODO above and below neighbours: special case
+
+                // slab is now done
+                {
+                    let mut w = world.borrow_mut();
+
+                    if let Some(chunk) = w.find_chunk_with_pos_mut(slab.chunk) {
+                        chunk.mark_slab_as_done(slab.slab);
+                    }
+                }
             });
 
             real_count += 1;
