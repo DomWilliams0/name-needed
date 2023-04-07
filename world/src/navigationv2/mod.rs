@@ -1,22 +1,26 @@
+use std::collections::HashSet;
+use std::fmt::{Debug, Display, Formatter};
 use std::hint::unreachable_unchecked;
 use std::num::NonZeroU8;
 
-use misc::{debug, Itertools};
+use misc::{debug, trace, Either, Itertools};
 use petgraph::graphmap::UnGraphMap;
 use petgraph::prelude::DiGraphMap;
 use unit::world::{
-    BlockCoord, ChunkLocation, LocalSliceIndex, SlabIndex, SliceBlock, SliceIndex, CHUNK_SIZE,
+    BlockCoord, ChunkLocation, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, SliceIndex,
+    CHUNK_SIZE,
 };
 
 use crate::chunk::slab::SliceNavArea;
-use crate::chunk::slice_navmesh::SliceAreaIndex;
+use crate::chunk::slice_navmesh::{SliceAreaIndex, SliceAreaIndexAllocator};
+use crate::chunk::AreaInfo;
 use crate::neighbour::NeighbourOffset;
 use crate::{flatten_coords, SLICE_SIZE};
 
 pub mod world_graph;
 
 /// Area within a slab
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SlabArea {
     pub slice_idx: LocalSliceIndex,
     pub slice_area: SliceAreaIndex,
@@ -74,21 +78,13 @@ impl SlabNavGraph {
         let areas_by_slice_iter = areas.iter().group_by(|a| a.slice);
         let areas_by_slice = areas_by_slice_iter.into_iter();
 
-        debug_assert_eq!(
-            areas,
-            areas
-                .iter()
-                .copied()
-                .sorted_by_key(|a| a.slice)
-                .collect_vec()
-                .as_slice()
-        );
+        debug_assert!(is_sorted_by(areas, |a| a.slice));
 
         let mut graph = SlabNavGraphType::with_capacity(32, 16);
 
         let mut last_slice_idx = 0;
         for (slice, areas) in areas_by_slice {
-            // decay prev slice
+            // decay prev slice (nonsense on first iter but working is empty)
             let decay = slice.slice() - last_slice_idx;
             last_slice_idx = slice.slice();
             working.retain_mut(|a| {
@@ -198,39 +194,79 @@ fn border_areas_touch(
     }
 }
 
+fn is_border(
+    direction: NeighbourOffset,
+    range: ((BlockCoord, BlockCoord), (BlockCoord, BlockCoord)),
+) -> bool {
+    use NeighbourOffset::*;
+    let is_min = |coord| coord == 0;
+    let is_max = |coord| coord == CHUNK_SIZE.as_block_coord() - 1;
+
+    let (from, to) = range;
+    match direction {
+        South => is_min(from.1),
+        East => is_max(to.0),
+        North => is_max(to.1),
+        West => is_min(from.0),
+        _ => false, // cannot link with diagonals
+    }
+}
+
+pub fn filter_border_areas_with_info(
+    areas: impl Iterator<Item = (ChunkArea, AreaInfo)>,
+    direction: NeighbourOffset,
+) -> impl Iterator<Item = (SliceNavArea, SliceAreaIndex)> {
+    areas.filter_map(move |(a, i)| {
+        is_border(direction, i.range).then(|| {
+            (
+                SliceNavArea {
+                    slice: a.slab_area.slice_idx,
+                    from: i.range.0,
+                    to: i.range.1,
+                    height: i.height,
+                },
+                a.slab_area.slice_area,
+            )
+        })
+    })
+}
+
+/// Input must be in order and unfiltered
 pub fn filter_border_areas(
     areas: impl Iterator<Item = SliceNavArea>,
     direction: NeighbourOffset,
-) -> impl Iterator<Item = SliceNavArea> {
-    use NeighbourOffset::*;
-
-    areas.filter(move |a| {
-        let is_min = |coord| coord == 0;
-        let is_max = |coord| coord == CHUNK_SIZE.as_block_coord() - 1;
-
-        let res = match direction {
-            South => is_min(a.from.1),
-            East => is_max(a.to.0),
-            North => is_max(a.to.1),
-            West => is_min(a.from.0),
-            _ => false, // cannot like with diagonals
-        };
-
-        debug!("{:?} {:?} -> {}", a, direction, res);
-
-        res
+) -> impl Iterator<Item = (SliceNavArea, SliceAreaIndex)> {
+    let mut alloc = SliceAreaIndexAllocator::default();
+    areas.filter_map(move |a| {
+        let idx = alloc.allocate(a.slice.slice());
+        is_border(direction, (a.from, a.to)).then_some((a, idx))
     })
+}
+
+fn is_sorted_by<T, P: PartialOrd>(slice: &[T], key: impl Fn(&T) -> P) -> bool {
+    slice.iter().tuple_windows().all(|(a, b)| key(a) <= key(b))
+}
+
+fn no_dupes(input: &[(SliceNavArea, SliceAreaIndex)]) -> bool {
+    let orig = input.iter().collect_vec();
+    let dedup = orig
+        .iter()
+        .map(|(a, i)| (a.slice, i.0))
+        .collect::<HashSet<_>>();
+    orig.len() == dedup.len()
 }
 
 /// Edge direction is from this to the other slab
 pub fn discover_border_edges(
-    this_areas: &[SliceNavArea],
-    neighbour_areas: &[SliceNavArea],
+    this_areas: &[(SliceNavArea, SliceAreaIndex)],
+    neighbour_areas: &[(SliceNavArea, SliceAreaIndex)],
     neighbour_dir: NeighbourOffset,
     mut on_edge: impl FnMut(SlabArea, SlabArea, SlabNavEdge),
 ) {
     // all areas are touching the border, but not necessarily each other
     debug_assert!(neighbour_dir.is_aligned());
+    debug_assert!(no_dupes(this_areas));
+    debug_assert!(no_dupes(neighbour_areas));
 
     #[derive(Debug)]
     struct AreaInProgress {
@@ -244,14 +280,14 @@ pub fn discover_border_edges(
     }
 
     impl AreaInProgress {
-        fn new(i: usize, a: &SliceNavArea, this_slab: bool) -> Self {
+        fn new(slice_area: SliceAreaIndex, area: &SliceNavArea, this_slab: bool) -> Self {
             Self {
                 this_slab,
-                height_left: a.height,
-                range: (a.from, a.to),
+                height_left: area.height,
+                range: (area.from, area.to),
                 area: SlabArea {
-                    slice_idx: a.slice,
-                    slice_area: SliceAreaIndex(i as u8),
+                    slice_idx: area.slice,
+                    slice_area,
                 },
             }
         }
@@ -261,13 +297,11 @@ pub fn discover_border_edges(
     let areas_by_slice = {
         let this = this_areas
             .iter()
-            .enumerate()
-            .map(|(i, a)| AreaInProgress::new(i, a, true));
+            .map(|(a, i)| AreaInProgress::new(*i, a, true));
 
         let neighbours = neighbour_areas
             .iter()
-            .enumerate()
-            .map(|(i, a)| AreaInProgress::new(i, a, false));
+            .map(|(a, i)| AreaInProgress::new(*i, a, false));
 
         this.interleave(neighbours) // should keep it mostly sorted
             .sorted_unstable_by_key(|a| a.area.slice_idx)
@@ -276,7 +310,7 @@ pub fn discover_border_edges(
 
     let mut last_slice_idx = 0;
     for (slice, areas) in &areas_by_slice {
-        // decay prev slice
+        // decay prev slice (nonsense on first iter but working is empty)
         let decay = slice.slice() - last_slice_idx;
         last_slice_idx = slice.slice();
         working.retain_mut(|a| {
@@ -298,8 +332,6 @@ pub fn discover_border_edges(
                 .take_while(|x| x.area.slice_idx == slice)
                 .filter(|next| !next.this_slab)
             {
-                debug_assert_ne!(a.area, b.area);
-
                 if border_areas_touch(a.range, b.range, neighbour_dir) {
                     debug_assert!(
                         a.area.slice_idx <= b.area.slice_idx,
@@ -322,6 +354,18 @@ pub fn discover_border_edges(
                 }
             }
         }
+    }
+}
+
+impl Display for SlabArea {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SlabArea({}:{})", self.slice_idx, self.slice_area.0)
+    }
+}
+
+impl Debug for SlabArea {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -380,22 +424,37 @@ mod tests {
         other: Vec<TestArea>,
         dir: NeighbourOffset,
     ) -> Vec<(SlabArea, SlabArea, SlabNavEdge)> {
+        let mut alloc = SliceAreaIndexAllocator::default();
         let this = this
             .into_iter()
-            .map(|a| SliceNavArea {
-                slice: LocalSliceIndex::new_unchecked(a.slice),
-                from: a.bounds.0,
-                to: a.bounds.1,
-                height: a.height,
+            .sorted_by_key(|x| x.slice)
+            .map(|a| {
+                (
+                    SliceNavArea {
+                        slice: LocalSliceIndex::new_unchecked(a.slice),
+                        from: a.bounds.0,
+                        to: a.bounds.1,
+                        height: a.height,
+                    },
+                    alloc.allocate(a.slice),
+                )
             })
             .collect_vec();
+
+        alloc = SliceAreaIndexAllocator::default();
         let other = other
             .into_iter()
-            .map(|a| SliceNavArea {
-                slice: LocalSliceIndex::new_unchecked(a.slice),
-                from: a.bounds.0,
-                to: a.bounds.1,
-                height: a.height,
+            .sorted_by_key(|x| x.slice)
+            .map(|a| {
+                (
+                    SliceNavArea {
+                        slice: LocalSliceIndex::new_unchecked(a.slice),
+                        from: a.bounds.0,
+                        to: a.bounds.1,
+                        height: a.height,
+                    },
+                    alloc.allocate(a.slice),
+                )
             })
             .collect_vec();
 

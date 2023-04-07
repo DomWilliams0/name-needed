@@ -29,7 +29,7 @@ use crate::world::WaitResult;
 use crate::{World, WorldContext, WorldRef};
 
 /// Area within the world
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct WorldArea {
     pub chunk_idx: ChunkLocation,
     pub chunk_area: ChunkArea,
@@ -128,6 +128,12 @@ impl Display for WorldArea {
     }
 }
 
+impl Debug for WorldArea {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
 impl WorldArea {
     pub fn slab(&self) -> SlabLocation {
         SlabLocation {
@@ -193,7 +199,7 @@ type PathNodes = Vec<(WorldArea, SlabNavEdge)>;
 pub struct Path {
     areas: PathNodes,
     source: WorldPoint,
-    target: WorldPoint,
+    target: (WorldPoint, WorldArea),
 }
 
 impl Path {
@@ -202,11 +208,18 @@ impl Path {
     }
 
     pub fn target(&self) -> WorldPoint {
-        self.target
+        self.target.0
     }
 
-    pub fn iter_areas(&self) -> impl Iterator<Item = WorldArea> + ExactSizeIterator + '_ {
-        self.areas.iter().map(|(a, _)| *a)
+    pub fn iter_areas(&self) -> impl Iterator<Item = WorldArea> + '_ {
+        self.areas
+            .iter()
+            .map(|(a, _)| *a)
+            .chain(once(self.target.1))
+    }
+
+    pub fn route(&self) -> impl Iterator<Item = (WorldArea, SlabNavEdge)> + '_ {
+        self.areas.iter().copied()
     }
 }
 
@@ -278,10 +291,10 @@ impl<C: WorldContext> World<C> {
                     listener = world.load_notifications().start_listening();
 
                     slabs_to_wait_for = match world.find_abortable_path(from_pos, to_pos, required_height) {
-                        Ok(Either::Left(path)) => return SearchResult::Success(Path {
+                        Ok(Either::Left((path, dst))) => return SearchResult::Success(Path {
                             areas: path,
                             source: from,
-                            target: to,
+                            target: (to, dst),
                         }),
                         Ok(Either::Right(loading_slabs)) => {
                             loading_slabs
@@ -305,12 +318,13 @@ impl<C: WorldContext> World<C> {
         SearchResultFuture(task)
     }
 
+    /// On success (Left=(path, target area), Right=[slabs to wait for])
     fn find_abortable_path(
         &self,
         from: WorldPosition,
         to: WorldPosition,
         required_height: u8,
-    ) -> Result<Either<PathNodes, SmallVec<[SlabLocation; 2]>>, SearchError> {
+    ) -> Result<Either<(PathNodes, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError> {
         let world_graph = self.nav_graph();
 
         // resolve positions to areas
@@ -325,7 +339,7 @@ impl<C: WorldContext> World<C> {
 
         if src == dst {
             // empty path
-            return Ok(Either::Left(PathNodes::new()));
+            return Ok(Either::Left((PathNodes::new(), dst)));
         }
 
         let mut ctx =
@@ -385,7 +399,7 @@ impl<C: WorldContext> World<C> {
                 return Ok(if !changed_slabs.is_empty() {
                     Either::Right(changed_slabs)
                 } else {
-                    Either::Left(path)
+                    Either::Left((path, dst))
                 });
             }
 
@@ -540,7 +554,7 @@ where
         self.came_from.insert(node, (previous, edge));
     }
 
-    /// Returns (node, edge leaving it), missing the goal node
+    /// Path is (node, edge leaving it). Missing goal node
     fn reconstruct_path_to<RealNode, RealEdge, Resolve: Fn(N, E) -> (RealNode, RealEdge)>(
         &self,
         last: N,
@@ -551,8 +565,8 @@ where
 
         let mut current = last;
         while let Some(&(previous, edge)) = self.came_from.get(&current) {
-            path_out.push((resolve(current, edge)));
             current = previous;
+            path_out.push((resolve(previous, edge)));
         }
 
         path_out.reverse();

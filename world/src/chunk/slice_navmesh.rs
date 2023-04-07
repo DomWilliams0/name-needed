@@ -25,6 +25,9 @@ impl SliceAreaIndexAllocator {
         if self.slice == Some(slice) {
             self.current += 1;
         } else {
+            if let Some(prev) = self.slice {
+                debug_assert!(slice > prev);
+            }
             self.slice = Some(slice);
             self.current = 0;
         };

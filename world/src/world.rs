@@ -16,6 +16,7 @@ use unit::world::{
 
 use crate::block::{Block, BlockDurability};
 use crate::chunk::slab::SliceNavArea;
+use crate::chunk::slice_navmesh::SliceAreaIndex;
 use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
 use crate::context::WorldContext;
 use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
@@ -24,7 +25,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
-use crate::navigationv2::ChunkArea;
+use crate::navigationv2::{ChunkArea, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::{BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
 
@@ -1217,7 +1218,7 @@ pub async fn get_or_wait_for_slab_border_areas<C: WorldContext>(
     world: &WorldRef<C>,
     neighbour_direction: NeighbourOffset,
     slab: SlabLocation,
-    out: &mut Vec<SliceNavArea>,
+    out: &mut Vec<(SliceNavArea, SliceAreaIndex)>,
 ) {
     loop {
         {
@@ -1775,6 +1776,7 @@ mod tests {
         let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
         println!("path {:?}", path);
         assert_ne!(path.iter_areas().count(), 0);
+        assert_eq!(path.route().count(), 1);
     }
 
     #[test]

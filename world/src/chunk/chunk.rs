@@ -8,11 +8,13 @@ use unit::world::{
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice::{Slice, SliceOwned};
 
-use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
+use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator};
 use crate::chunk::terrain::SlabStorage;
 use crate::chunk::SlabData;
 use crate::navigation::{BlockGraph, SlabAreaIndex};
-use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
+use crate::navigationv2::{
+    filter_border_areas, filter_border_areas_with_info, ChunkArea, SlabArea, SlabNavGraph,
+};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldArea, WorldContext};
@@ -329,7 +331,7 @@ impl<C: WorldContext> Chunk<C> {
         &self,
         slab: SlabIndex,
         neighbour_direction: NeighbourOffset,
-        out: &mut Vec<SliceNavArea>,
+        out: &mut Vec<(SliceNavArea, SliceAreaIndex)>,
     ) -> SlabThingOrWait<()> {
         use SlabLoadingStatus::*;
         use SlabThingOrWait::*;
@@ -339,17 +341,15 @@ impl<C: WorldContext> Chunk<C> {
         match progress {
             Unloaded => Failure,
             Requested | TerrainInWorld => Wait,
-            DoneInIsolation | Done => Ready(out.extend(filter_border_areas(
-                self.areas.iter().filter_map(|(area, info)| {
-                    (area.slab_idx == slab).then(|| SliceNavArea {
-                        slice: area.slab_area.slice_idx,
-                        from: info.range.0,
-                        to: info.range.1,
-                        height: info.height,
-                    })
-                }),
-                neighbour_direction,
-            ))),
+            DoneInIsolation | Done => Ready(
+                out.extend(filter_border_areas_with_info(
+                    self.areas
+                        .iter()
+                        .filter(|(area, info)| area.slab_idx == slab)
+                        .map(|(a, i)| (*a, *i)),
+                    neighbour_direction,
+                )),
+            ),
         }
     }
 
