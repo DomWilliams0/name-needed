@@ -342,7 +342,8 @@ impl<C: WorldContext> WorldLoader<C> {
                                 direction,
                                 |src, dst, edge| {
                                     let e = (src, dst, edge);
-                                    debug_assert!(
+                                    #[cfg(debug_assertions)]
+                                    assert!(
                                         !new_world_edges.contains(&e),
                                         "duplicate edge {:?}",
                                         e

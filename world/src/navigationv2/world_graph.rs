@@ -195,7 +195,6 @@ struct SearchState {
 /// [(area, edge to leave this area)]. Missing goal. Empty if already in goal area
 type PathNodes = Vec<(WorldArea, SlabNavEdge)>;
 
-#[derive(Debug)]
 pub struct Path {
     areas: PathNodes,
     source: WorldPoint,
@@ -223,7 +222,6 @@ impl Path {
     }
 }
 
-#[derive(Debug)]
 pub enum SearchResult {
     Success(Path),
     Failed(SearchError),
@@ -231,7 +229,6 @@ pub enum SearchResult {
     WorldChanged(ArrayVec<SlabLocation, 4>),
 }
 
-#[derive(Debug)]
 pub struct SearchResultFuture(tokio::task::JoinHandle<SearchResult>);
 
 impl SearchResult {

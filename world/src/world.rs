@@ -1736,8 +1736,7 @@ mod tests {
         let src = WorldPoint::new_unchecked(8.5, 25.5, 302.0);
         let dst = WorldPoint::new_unchecked(-6.5, 24.5, 301.0);
 
-        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
-        println!("path {:?}", path);
+        let _path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
     }
 
     #[test]
@@ -1750,7 +1749,6 @@ mod tests {
         let dst = WorldPoint::new_unchecked(4.0, 4.0, 3.0);
 
         let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
-        println!("path {:?}", path);
         assert_eq!(path.iter_areas().count(), 0);
     }
 
@@ -1774,7 +1772,6 @@ mod tests {
         let dst = WorldPoint::new_unchecked(5.0, 2.0, 3.0);
 
         let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
-        println!("path {:?}", path);
         assert_ne!(path.iter_areas().count(), 0);
         assert_eq!(path.route().count(), 1);
     }
