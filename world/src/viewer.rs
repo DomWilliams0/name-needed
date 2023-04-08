@@ -73,6 +73,10 @@ impl SliceRange {
         self.as_range().contains(&slice.slice())
     }
 
+    pub fn intersects(self, (from, to): (GlobalSliceIndex, GlobalSliceIndex)) -> bool {
+        self.1 >= from && to >= self.0
+    }
+
     pub const fn bottom(self) -> GlobalSliceIndex {
         self.0
     }
