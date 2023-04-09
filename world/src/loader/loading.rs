@@ -276,6 +276,7 @@ impl<C: WorldContext> WorldLoader<C> {
                 }
 
                 // discover internal areas and edges
+                areas.sort_unstable_by_key(|a| a.slice);
                 let graph = SlabNavGraph::discover(&areas);
 
                 {
@@ -352,7 +353,7 @@ impl<C: WorldContext> WorldLoader<C> {
                                 },
                             );
 
-                            // add edge to world nav graph
+                            // add edges to world nav graph
                             {
                                 let mut w = world.borrow_mut();
                                 w.nav_graph_mut().add_inter_slab_edges(

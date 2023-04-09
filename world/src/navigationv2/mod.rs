@@ -19,6 +19,8 @@ use crate::{flatten_coords, SLICE_SIZE};
 
 pub mod world_graph;
 
+pub use world_graph::WorldArea;
+
 /// Area within a slab
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SlabArea {
@@ -117,7 +119,7 @@ impl SlabNavGraph {
                 for b in working
                     .iter()
                     .skip(i + 1)
-                    .take_while(|x| x.area.slice_idx == slice)
+                    .filter(|x| x.area.slice_idx == slice)
                 {
                     debug_assert_ne!(a.area, b.area);
 
@@ -329,8 +331,7 @@ pub fn discover_border_edges(
             for b in working
                 .iter()
                 .skip(i + 1)
-                .take_while(|x| x.area.slice_idx == slice)
-                .filter(|next| !next.this_slab)
+                .filter(|x| !x.this_slab && x.area.slice_idx == slice)
             {
                 if border_areas_touch(a.range, b.range, neighbour_dir) {
                     debug_assert!(
@@ -750,5 +751,51 @@ mod tests {
         );
 
         assert_eq!(edges, vec![])
+    }
+
+    #[test]
+    fn all_edges() {
+        // old bug: slice 2 area should link to all 5 of the slice 1 ones
+        let areas = vec![
+            TestArea {
+                slice: 1,
+                bounds: ((0, 0), (6, 2)),
+                height: 4,
+            },
+            TestArea {
+                slice: 1,
+                bounds: ((7, 0), (15, 1)),
+                height: 4,
+            },
+            TestArea {
+                slice: 1,
+                bounds: ((8, 2), (15, 15)),
+                height: 4,
+            },
+            TestArea {
+                slice: 1,
+                bounds: ((0, 3), (6, 15)),
+                height: 4,
+            },
+            TestArea {
+                slice: 1,
+                bounds: ((7, 6), (7, 15)),
+                height: 4,
+            },
+            TestArea {
+                slice: 2,
+                bounds: ((7, 2), (7, 5)),
+                height: 4,
+            },
+        ];
+        let graph = do_it(areas);
+        let edges = graph
+            .graph
+            .edges(SlabArea {
+                slice_idx: LocalSliceIndex::new_unchecked(2),
+                slice_area: SliceAreaIndex(0),
+            })
+            .collect_vec();
+        assert_eq!(edges.len(), 5, "edges: {:?}", edges);
     }
 }
