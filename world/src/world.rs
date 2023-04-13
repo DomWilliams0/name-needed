@@ -25,7 +25,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
-use crate::navigationv2::{ChunkArea, SlabArea};
+use crate::navigationv2::{as_border_area, ChunkArea, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::{BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
 
@@ -425,7 +425,7 @@ impl<C: WorldContext> World<C> {
         let chunk = self.find_chunk_with_pos(chunk_loc)?;
 
         chunk
-            .find_area_for_block(block.into(), required_height)
+            .find_area_for_block_with_height(block.into(), required_height)
             .map(|slab_area| crate::navigationv2::world_graph::WorldArea {
                 chunk_idx: chunk_loc,
                 chunk_area: ChunkArea {
@@ -1212,13 +1212,11 @@ pub mod slab_loading {
     }
 }
 
-/// Check if out is populated
-pub async fn get_or_wait_for_slab_border_areas<C: WorldContext>(
-    notifier: &mut LoadNotifier,
+pub async fn get_or_wait_for_slab_areas<C: WorldContext>(
+    notifier: &mut ListeningLoadNotifier,
     world: &WorldRef<C>,
-    neighbour_direction: NeighbourOffset,
     slab: SlabLocation,
-    out: &mut Vec<(SliceNavArea, SliceAreaIndex)>,
+    mut func: impl FnMut(&ChunkArea, &AreaInfo),
 ) {
     loop {
         {
@@ -1230,7 +1228,7 @@ pub async fn get_or_wait_for_slab_border_areas<C: WorldContext>(
                     break;
                 }
             };
-            match chunk.slab_areas_or_wait(slab.slab, neighbour_direction, out) {
+            match chunk.get_slab_areas_or_wait(slab.slab, |a, ai| func(a, ai)) {
                 SlabThingOrWait::Wait => {}
                 SlabThingOrWait::Failure | SlabThingOrWait::Ready(_) => break,
             }
@@ -1243,8 +1241,24 @@ pub async fn get_or_wait_for_slab_border_areas<C: WorldContext>(
     }
 }
 
+/// Check if out is populated
+pub async fn get_or_collect_slab_areas<C: WorldContext>(
+    notifier: &mut ListeningLoadNotifier,
+    world: &WorldRef<C>,
+    slab: SlabLocation,
+    func: impl Fn(&ChunkArea, &AreaInfo) -> Option<(SliceNavArea, SliceAreaIndex)>,
+    out: &mut Vec<(SliceNavArea, SliceAreaIndex)>,
+) {
+    get_or_wait_for_slab_areas(notifier, world, slab, |a, ai| {
+        if let Some(nav_area) = func(a, ai) {
+            out.push(nav_area);
+        }
+    })
+    .await
+}
+
 pub async fn get_or_wait_for_slab_vertical_space<C: WorldContext>(
-    notifier: &mut LoadNotifier,
+    notifier: &mut ListeningLoadNotifier,
     world: &WorldRef<C>,
     slab: SlabLocation,
 ) -> Option<Arc<SlabVerticalSpace>> {
@@ -1372,7 +1386,7 @@ pub mod helpers {
     use std::time::Duration;
 
     use misc::Itertools;
-    use unit::world::ChunkLocation;
+    use unit::world::{ChunkLocation, SlabLocation};
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
     use crate::chunk::slice::SLICE_SIZE;
@@ -1460,6 +1474,17 @@ pub mod helpers {
         load_world(source, AsyncWorkerPool::new_blocking().unwrap())
     }
 
+    pub fn loader_from_chunks_blocking_with_load_blacklist(
+        chunks: Vec<ChunkDescriptor<DummyWorldContext>>,
+        blacklist: Vec<SlabLocation>,
+    ) -> WorldLoader<DummyWorldContext> {
+        let mut source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
+        for slab in blacklist {
+            source.blacklist_slab_on_initial_load(slab)
+        }
+        load_world(source, AsyncWorkerPool::new_blocking().unwrap())
+    }
+
     pub fn test_world_timeout() -> Duration {
         let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
             .ok()
@@ -1498,7 +1523,7 @@ pub mod helpers {
         // let area_graph = AreaGraph::from_chunks(&[]);
 
         let slabs_to_load = source
-            .all_slabs()
+            .all_slabs(true)
             .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)))
             .collect_vec();
 

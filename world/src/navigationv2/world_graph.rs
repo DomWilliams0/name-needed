@@ -102,6 +102,20 @@ impl WorldGraph {
             self.graph.add_node(area)
         })
     }
+
+    pub fn iter_inter_slab_edges(
+        &self,
+    ) -> impl Iterator<Item = (WorldArea, WorldArea, SlabNavEdge)> + '_ {
+        self.graph.edge_indices().filter_map(|e| {
+            let (src, dst) = self.graph.edge_endpoints(e).unwrap();
+            let src = self.graph.node_weight(src).unwrap();
+            let dst = self.graph.node_weight(dst).unwrap();
+            (src.slab() != dst.slab()).then(|| {
+                let edge = self.graph.edge_weight(e).unwrap();
+                (*src, *dst, *edge)
+            })
+        })
+    }
 }
 
 impl From<(SlabLocation, SlabArea)> for WorldArea {

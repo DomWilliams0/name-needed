@@ -8,14 +8,14 @@ use petgraph::graphmap::UnGraphMap;
 use petgraph::prelude::DiGraphMap;
 use unit::world::{
     BlockCoord, ChunkLocation, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, SliceIndex,
-    CHUNK_SIZE,
+    CHUNK_SIZE, SLAB_SIZE,
 };
 
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::{SliceAreaIndex, SliceAreaIndexAllocator};
 use crate::chunk::AreaInfo;
 use crate::neighbour::NeighbourOffset;
-use crate::{flatten_coords, SLICE_SIZE};
+use crate::{flatten_coords, WorldAreaV2, ABSOLUTE_MAX_FREE_VERTICAL_SPACE, SLICE_SIZE};
 
 pub mod world_graph;
 
@@ -80,7 +80,7 @@ impl SlabNavGraph {
         let areas_by_slice_iter = areas.iter().group_by(|a| a.slice);
         let areas_by_slice = areas_by_slice_iter.into_iter();
 
-        debug_assert!(is_sorted_by(areas, |a| a.slice));
+        debug_assert!(is_sorted_by(areas.iter(), |a| a.slice));
 
         let mut graph = SlabNavGraphType::with_capacity(32, 16);
 
@@ -214,22 +214,21 @@ fn is_border(
     }
 }
 
-pub fn filter_border_areas_with_info(
-    areas: impl Iterator<Item = (ChunkArea, AreaInfo)>,
+pub fn as_border_area(
+    area: ChunkArea,
+    info: &AreaInfo,
     direction: NeighbourOffset,
-) -> impl Iterator<Item = (SliceNavArea, SliceAreaIndex)> {
-    areas.filter_map(move |(a, i)| {
-        is_border(direction, i.range).then(|| {
-            (
-                SliceNavArea {
-                    slice: a.slab_area.slice_idx,
-                    from: i.range.0,
-                    to: i.range.1,
-                    height: i.height,
-                },
-                a.slab_area.slice_area,
-            )
-        })
+) -> Option<(SliceNavArea, SliceAreaIndex)> {
+    is_border(direction, info.range).then(|| {
+        (
+            SliceNavArea {
+                slice: area.slab_area.slice_idx,
+                from: info.range.0,
+                to: info.range.1,
+                height: info.height,
+            },
+            area.slab_area.slice_area,
+        )
     })
 }
 
@@ -245,8 +244,45 @@ pub fn filter_border_areas(
     })
 }
 
-fn is_sorted_by<T, P: PartialOrd>(slice: &[T], key: impl Fn(&T) -> P) -> bool {
-    slice.iter().tuple_windows().all(|(a, b)| key(a) <= key(b))
+fn is_top_area(a: &SliceNavArea) -> bool {
+    a.slice.slice() + a.height > SLAB_SIZE.as_u8()
+}
+
+/// Filters areas that protrude into slab above.
+/// Input must be in order and unfiltered
+pub fn filter_top_areas(
+    areas: impl Iterator<Item = SliceNavArea>,
+) -> impl Iterator<Item = (SliceNavArea, SliceAreaIndex)> {
+    const MIN_SLICE: u8 = SLAB_SIZE.as_u8() - 1 - ABSOLUTE_MAX_FREE_VERTICAL_SPACE;
+    let mut alloc = SliceAreaIndexAllocator::default();
+    areas
+        .skip_while(|a| a.slice.slice() < MIN_SLICE)
+        .filter_map(move |a| {
+            let idx = alloc.allocate(a.slice.slice());
+            is_top_area(&a).then_some((a, idx))
+        })
+}
+
+/// Filters areas that
+/// Input must be in order and unfiltered
+pub fn filter_bottom_areas(
+    areas: impl Iterator<Item = SliceNavArea>,
+) -> impl Iterator<Item = (SliceNavArea, SliceAreaIndex)> {
+    const MIN_SLICE: u8 = SLAB_SIZE.as_u8() - 1 - ABSOLUTE_MAX_FREE_VERTICAL_SPACE;
+    let mut alloc = SliceAreaIndexAllocator::default();
+    areas
+        .skip_while(|a| a.slice.slice() < MIN_SLICE)
+        .filter_map(move |a| {
+            let idx = alloc.allocate(a.slice.slice());
+            (a.slice.slice() + a.height >= SLAB_SIZE.as_u8()).then_some((a, idx))
+        })
+}
+
+fn is_sorted_by<'a, T: 'a, P: PartialOrd>(
+    iter: impl Iterator<Item = &'a T>,
+    key: impl Fn(&T) -> P,
+) -> bool {
+    iter.tuple_windows().all(|(a, b)| key(a) <= key(b))
 }
 
 fn no_dupes(input: &[(SliceNavArea, SliceAreaIndex)]) -> bool {
@@ -258,15 +294,15 @@ fn no_dupes(input: &[(SliceNavArea, SliceAreaIndex)]) -> bool {
     orig.len() == dedup.len()
 }
 
-/// Edge direction is from this to the other slab
+/// Edge direction is from this to the other slab, or None if directly above
 pub fn discover_border_edges(
     this_areas: &[(SliceNavArea, SliceAreaIndex)],
     neighbour_areas: &[(SliceNavArea, SliceAreaIndex)],
-    neighbour_dir: NeighbourOffset,
+    neighbour_dir: Option<NeighbourOffset>,
     mut on_edge: impl FnMut(SlabArea, SlabArea, SlabNavEdge),
 ) {
     // all areas are touching the border, but not necessarily each other
-    debug_assert!(neighbour_dir.is_aligned());
+    debug_assert!(neighbour_dir.map(|d| d.is_aligned()).unwrap_or(true));
     debug_assert!(no_dupes(this_areas));
     debug_assert!(no_dupes(neighbour_areas));
 
@@ -279,42 +315,72 @@ pub fn discover_border_edges(
         area: SlabArea,
         /// (from x, from y, to x, to y) inclusive within its own slab
         range: ((BlockCoord, BlockCoord), (BlockCoord, BlockCoord)),
+
+        /// Effective start slice in neighbour slab reference
+        start_slice: u8,
+    }
+
+    // all this_slab should protrude if vertical
+    if neighbour_dir.is_none() {
+        for (a, _) in this_areas {
+            debug_assert!(
+                a.slice.slice() + a.height >= SLAB_SIZE.as_u8(),
+                "this area {a:?} does not protrude into slab above"
+            );
+        }
     }
 
     impl AreaInProgress {
-        fn new(slice_area: SliceAreaIndex, area: &SliceNavArea, this_slab: bool) -> Self {
+        fn new(
+            slice_area: SliceAreaIndex,
+            area: &SliceNavArea,
+            this_slab: bool,
+            vertical: bool,
+        ) -> Self {
+            let (start_slice, height_left) = if this_slab && vertical {
+                (0, (area.slice.slice() + area.height) % SLAB_SIZE.as_u8())
+            } else {
+                (area.slice.slice(), area.height)
+            };
+
+            debug_assert_ne!(
+                height_left, 0,
+                "bad area (start={start_slice}, height={height_left}) {area:?}"
+            );
             Self {
                 this_slab,
-                height_left: area.height,
+                height_left,
                 range: (area.from, area.to),
                 area: SlabArea {
                     slice_idx: area.slice,
                     slice_area,
                 },
+                start_slice,
             }
         }
     }
 
     let mut working = Vec::<AreaInProgress>::with_capacity(32);
     let areas_by_slice = {
+        let vertical = neighbour_dir.is_none();
         let this = this_areas
             .iter()
-            .map(|(a, i)| AreaInProgress::new(*i, a, true));
+            .map(|(a, i)| AreaInProgress::new(*i, a, true, vertical));
 
         let neighbours = neighbour_areas
             .iter()
-            .map(|(a, i)| AreaInProgress::new(*i, a, false));
+            .map(|(a, i)| AreaInProgress::new(*i, a, false, vertical));
 
-        this.interleave(neighbours) // should keep it mostly sorted
-            .sorted_unstable_by_key(|a| a.area.slice_idx)
-            .group_by(|a| a.area.slice_idx)
+        this.chain(neighbours) // should keep it mostly sorted
+            .sorted_unstable_by_key(|a| a.start_slice)
+            .group_by(|a| a.start_slice)
     };
 
     let mut last_slice_idx = 0;
     for (slice, areas) in &areas_by_slice {
         // decay prev slice (nonsense on first iter but working is empty)
-        let decay = slice.slice() - last_slice_idx;
-        last_slice_idx = slice.slice();
+        let decay = slice - last_slice_idx;
+        last_slice_idx = slice;
         working.retain_mut(|a| {
             a.height_left = a.height_left.saturating_sub(decay);
             a.height_left > 0
@@ -331,27 +397,46 @@ pub fn discover_border_edges(
             for b in working
                 .iter()
                 .skip(i + 1)
-                .filter(|x| !x.this_slab && x.area.slice_idx == slice)
+                .filter(|x| !x.this_slab && x.start_slice == slice)
             {
-                if border_areas_touch(a.range, b.range, neighbour_dir) {
+                let touching = match neighbour_dir {
+                    Some(dir) => border_areas_touch(a.range, b.range, dir),
+                    None => areas_touch(a.range, b.range),
+                };
+                if touching {
                     debug_assert!(
-                        a.area.slice_idx <= b.area.slice_idx,
+                        a.start_slice <= b.start_slice,
                         "edge should be upwards only"
                     );
                     let clearance = a.height_left.min(b.height_left);
 
-                    // TODO ensure no dups
-                    on_edge(a.area, b.area, unsafe {
-                        SlabNavEdge {
-                            clearance: NonZeroU8::new_unchecked(clearance), // all zeroes purged already
-                            height_diff: b
-                                .area
+                    unsafe {
+                        let diff = if neighbour_dir.is_none() {
+                            // vertical
+                            (b.start_slice + SLAB_SIZE.as_u8()) - a.area.slice_idx.slice() + 1
+                        } else {
+                            // horizontal
+                            debug_assert!(
+                                a.area.slice_idx.slice() <= b.area.slice_idx.slice(),
+                                "{a:?} < {b:?}"
+                            );
+
+                            b.area
                                 .slice_idx
                                 .slice()
                                 .checked_sub(a.area.slice_idx.slice())
-                                .unwrap_or_else(|| unreachable_unchecked()), // a <= b
-                        }
-                    });
+                                .unwrap_or_else(|| unreachable_unchecked()) // a <= b
+                        };
+
+                        on_edge(
+                            a.area,
+                            b.area,
+                            SlabNavEdge {
+                                clearance: NonZeroU8::new_unchecked(clearance), // all zeroes purged already
+                                height_diff: diff,
+                            },
+                        );
+                    }
                 }
             }
         }
@@ -367,6 +452,24 @@ impl Display for SlabArea {
 impl Debug for SlabArea {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
+    }
+}
+
+impl SlabArea {
+    pub fn to_chunk_area(self, slab: SlabIndex) -> ChunkArea {
+        ChunkArea {
+            slab_idx: slab,
+            slab_area: self,
+        }
+    }
+}
+
+impl ChunkArea {
+    pub fn to_world_area(self, chunk: ChunkLocation) -> WorldAreaV2 {
+        WorldAreaV2 {
+            chunk_idx: chunk,
+            chunk_area: self,
+        }
     }
 }
 
@@ -423,7 +526,7 @@ mod tests {
     fn do_it_neighbours(
         this: Vec<TestArea>,
         other: Vec<TestArea>,
-        dir: NeighbourOffset,
+        dir: Option<NeighbourOffset>,
     ) -> Vec<(SlabArea, SlabArea, SlabNavEdge)> {
         let mut alloc = SliceAreaIndexAllocator::default();
         let this = this
@@ -712,7 +815,7 @@ mod tests {
                 height: 8,
                 bounds: ((0, 3), (2, 8)),
             }],
-            NeighbourOffset::East,
+            Some(NeighbourOffset::East),
         );
 
         assert_eq!(
@@ -747,10 +850,67 @@ mod tests {
                 height: 8,
                 bounds: ((0, 0), (2, 3)),
             }],
-            NeighbourOffset::East,
+            Some(NeighbourOffset::East),
         );
 
         assert_eq!(edges, vec![])
+    }
+
+    #[test]
+    fn neighbours_vertical_protrude() {
+        let edges = do_it_neighbours(
+            // below slab protrudes a few blocks into above
+            vec![TestArea {
+                slice: SLAB_SIZE.as_u8() - 3,
+                height: 5,
+                bounds: ((5, 5), (5, 5)),
+            }],
+            vec![TestArea {
+                slice: 0,
+                height: 4,
+                bounds: ((6, 5), (6, 5)),
+            }],
+            None, // above
+        );
+
+        assert_eq!(
+            edges,
+            vec![(
+                SlabArea {
+                    // below slab
+                    slice_idx: LocalSliceIndex::new_unchecked(SLAB_SIZE.as_u8() - 3),
+                    slice_area: SliceAreaIndex(0),
+                },
+                SlabArea {
+                    // above slab
+                    slice_idx: LocalSliceIndex::new_unchecked(0),
+                    slice_area: SliceAreaIndex(0),
+                },
+                SlabNavEdge {
+                    clearance: NonZeroU8::new(2).unwrap(),
+                    // 29,30,31|32,33
+                    // X        X
+                    height_diff: 4, // 29 -> 32
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn top_area_check() {
+        let area = |slice: u8, height| SliceNavArea {
+            slice: LocalSliceIndex::new(slice).unwrap(),
+            from: (0, 0),
+            to: (1, 1),
+            height,
+        };
+
+        let base = SLAB_SIZE.as_u8() - 3;
+        assert!(is_top_area(&area(base, 5)));
+        assert!(is_top_area(&area(base, 4)));
+        assert!(!is_top_area(&area(base, 3))); // touches top only but no protrusion
+        assert!(!is_top_area(&area(base, 2)));
+        assert!(!is_top_area(&area(base, 1)));
     }
 
     #[test]

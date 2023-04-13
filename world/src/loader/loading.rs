@@ -13,8 +13,8 @@ use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType, SliceNavArea}
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::{
-    get_or_wait_for_slab_border_areas, get_or_wait_for_slab_vertical_space,
-    ContiguousChunkIterator, WorldChangeEvent,
+    get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
+    WorldChangeEvent,
 };
 use crate::{navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
 
@@ -22,7 +22,7 @@ use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, SliceAre
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
-use crate::navigationv2::SlabNavGraph;
+use crate::navigationv2::{as_border_area, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::slab_loading::SlabProcessingFuture;
 use futures::{FutureExt, SinkExt};
@@ -212,7 +212,7 @@ impl<C: WorldContext> WorldLoader<C> {
 
             self.pool.submit_any_async_with_handle(async move {
                 // generate terrain
-                let (terrain, vs, entities) =
+                let (mut terrain, vs, entities) =
                     match Self::step1_generate_terrain(slab, slab_type, &source).await {
                         Ok(tup) => tup,
                         Err(err) => {
@@ -228,10 +228,10 @@ impl<C: WorldContext> WorldLoader<C> {
                 // neighbours without blocking
 
                 // put into world immediately
-                let mut notifications;
+                let mut notifier;
                 {
                     let mut world = world.borrow_mut();
-                    notifications = world.load_notifications(); // might be pointless sometimes
+                    notifier = world.load_notifications(); // might be pointless sometimes
 
                     // spawn entities
                     if !entities.is_empty() {
@@ -257,12 +257,20 @@ impl<C: WorldContext> WorldLoader<C> {
                     return;
                 }
 
+                let mut notifications = notifier.start_listening();
+
                 // wait for slab above to be loaded if needed
                 // TODO use this slab vertical space to see if above slab will even influence
                 //  this one, if not then dont wait
                 let above =
                     get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.above())
                         .await;
+                trace!(
+                    "{} waited for above {}: {}",
+                    slab,
+                    slab.above(),
+                    if above.is_some() { "present" } else { "absent" }
+                );
 
                 // generate nav areas skipping the bottom slice
                 let mut areas = terrain.discover_navmesh(&vs, above.as_ref());
@@ -271,12 +279,19 @@ impl<C: WorldContext> WorldLoader<C> {
                 let below =
                     get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.below())
                         .await;
+                trace!(
+                    "{} waited for below {}: {}",
+                    slab,
+                    slab.below(),
+                    if below.is_some() { "present" } else { "absent" }
+                );
                 if let Some(below) = below.as_ref() {
                     terrain.discover_bottom_slice_areas(&vs, below, &mut areas);
                 }
 
                 // discover internal areas and edges
                 areas.sort_unstable_by_key(|a| a.slice);
+                trace!("{} has {} areas: {:?}", slab, areas.len(), areas);
                 let graph = SlabNavGraph::discover(&areas);
 
                 {
@@ -327,11 +342,12 @@ impl<C: WorldContext> WorldLoader<C> {
                     ));
                     if !this_border_areas.is_empty() {
                         // wait for neighbour to be DoneInIsolation too
-                        get_or_wait_for_slab_border_areas(
+                        let neighbour_dir = direction.opposite();
+                        get_or_collect_slab_areas(
                             &mut notifications,
                             &world,
-                            direction.opposite(),
                             n_slab_loc,
+                            |a, ai| as_border_area(*a, ai, neighbour_dir),
                             &mut neighbour_border_areas,
                         )
                         .await;
@@ -340,7 +356,7 @@ impl<C: WorldContext> WorldLoader<C> {
                             navigationv2::discover_border_edges(
                                 &this_border_areas,
                                 &neighbour_border_areas,
-                                direction,
+                                Some(direction),
                                 |src, dst, edge| {
                                     let e = (src, dst, edge);
                                     #[cfg(debug_assertions)]
@@ -369,6 +385,60 @@ impl<C: WorldContext> WorldLoader<C> {
 
                         // clear for next iteration
                         this_border_areas.clear();
+                    }
+                }
+
+                // above neighbour
+                debug_assert!(this_border_areas.is_empty());
+                debug_assert!(neighbour_border_areas.is_empty());
+                this_border_areas.extend(navigationv2::filter_top_areas(areas.iter().copied()));
+                if !this_border_areas.is_empty() {
+                    // wait for slab above, fetch all areas
+                    let n_slab_loc = slab.above();
+                    get_or_collect_slab_areas(
+                        &mut notifications,
+                        &world,
+                        n_slab_loc,
+                        |area, info| {
+                            Some((
+                                SliceNavArea {
+                                    slice: area.slab_area.slice_idx,
+                                    from: info.range.0,
+                                    to: info.range.1,
+                                    height: info.height,
+                                },
+                                area.slab_area.slice_area,
+                            ))
+                        },
+                        &mut neighbour_border_areas,
+                    )
+                    .await;
+
+                    if !neighbour_border_areas.is_empty() {
+                        navigationv2::discover_border_edges(
+                            &this_border_areas,
+                            &neighbour_border_areas,
+                            None,
+                            |src, dst, edge| {
+                                let e = (src, dst, edge);
+                                #[cfg(debug_assertions)]
+                                assert!(!new_world_edges.contains(&e), "duplicate edge {:?}", e);
+                                new_world_edges.push(e);
+                            },
+                        );
+
+                        // add edges to world nav graph
+                        {
+                            let mut w = world.borrow_mut();
+                            w.nav_graph_mut().add_inter_slab_edges(
+                                slab,
+                                n_slab_loc,
+                                new_world_edges.drain(..),
+                            );
+                        }
+
+                        // clear for next iteration
+                        neighbour_border_areas.clear();
                     }
                 }
 

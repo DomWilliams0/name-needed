@@ -12,9 +12,7 @@ use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIn
 use crate::chunk::terrain::SlabStorage;
 use crate::chunk::SlabData;
 use crate::navigation::{BlockGraph, SlabAreaIndex};
-use crate::navigationv2::{
-    filter_border_areas, filter_border_areas_with_info, ChunkArea, SlabArea, SlabNavGraph,
-};
+use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{SliceRange, World, WorldArea, WorldContext};
@@ -120,18 +118,18 @@ impl<C: WorldContext> Chunk<C> {
         (x as u64) << 32 | (y as u64)
     }
 
-    pub fn area_info_for_block(&self, block: BlockPosition) -> Option<AreaInfo> {
+    #[deprecated]
+    pub fn area_info_for_block(&self, block: BlockPosition) -> Option<(ChunkArea, AreaInfo)> {
         let b = self.slabs.get_block(block)?;
         let area = b.nav_area()?;
-        self.areas
-            .get(&ChunkArea {
-                slab_idx: block.z().slab_index(),
-                slab_area: SlabArea {
-                    slice_idx: block.z().to_local(),
-                    slice_area: area,
-                },
-            })
-            .copied()
+        let chunk_area = ChunkArea {
+            slab_idx: block.z().slab_index(),
+            slab_area: SlabArea {
+                slice_idx: block.z().to_local(),
+                slice_area: area,
+            },
+        };
+        self.areas.get(&chunk_area).map(|ai| (chunk_area, *ai))
     }
 
     pub fn area_info(&self, slab: SlabIndex, slab_area: SlabArea) -> Option<AreaInfo> {
@@ -327,11 +325,10 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    pub fn slab_areas_or_wait(
+    pub fn get_slab_areas_or_wait(
         &self,
         slab: SlabIndex,
-        neighbour_direction: NeighbourOffset,
-        out: &mut Vec<(SliceNavArea, SliceAreaIndex)>,
+        mut func: impl FnMut(&ChunkArea, &AreaInfo),
     ) -> SlabThingOrWait<()> {
         use SlabLoadingStatus::*;
         use SlabThingOrWait::*;
@@ -341,15 +338,13 @@ impl<C: WorldContext> Chunk<C> {
         match progress {
             Unloaded => Failure,
             Requested | TerrainInWorld => Wait,
-            DoneInIsolation | Done => Ready(
-                out.extend(filter_border_areas_with_info(
-                    self.areas
-                        .iter()
-                        .filter(|(area, info)| area.slab_idx == slab)
-                        .map(|(a, i)| (*a, *i)),
-                    neighbour_direction,
-                )),
-            ),
+            DoneInIsolation | Done => {
+                self.areas
+                    .iter()
+                    .filter(|(area, info)| area.slab_idx == slab)
+                    .for_each(|(a, i)| func(a, i));
+                Ready(())
+            }
         }
     }
 
@@ -401,11 +396,16 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab_data(slab).map(|s| &s.nav)
     }
 
-    pub fn find_area_for_block(
+    pub fn find_area_for_block_with_height(
         &self,
         block: BlockPosition,
         required_height: u8,
     ) -> Option<SlabArea> {
+        self.find_area_for_block(block)
+            .and_then(|(a, ai)| (ai.height >= required_height).then_some(a))
+    }
+
+    pub fn find_area_for_block(&self, block: BlockPosition) -> Option<(SlabArea, AreaInfo)> {
         // search downwards in vertical space for area z
         let slab_idx = SlabIndex::from(block.z());
         let slab = self.slabs.slab_data(slab_idx)?;
@@ -413,14 +413,14 @@ impl<C: WorldContext> Chunk<C> {
 
         // find matching area in graph (bounds checks all areas in that slice... might be fine)
         let slice_block = SliceBlock::from(BlockPosition::from(block));
-        slab.nav.iter_nodes().find_map(|a| {
+        slab.nav.iter_nodes().find_map(move |a| {
             if a.slice_idx == area_slice_idx {
                 // bounds check
                 let info = self
                     .area_info(slab_idx, a)
                     .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
-                if info.height >= required_height && info.contains(slice_block) {
-                    return Some(a);
+                if info.contains(slice_block) {
+                    return Some((a, info));
                 }
             }
 
@@ -449,6 +449,13 @@ impl AreaInfo {
 
     pub fn max_pos(&self, area: crate::navigationv2::world_graph::WorldArea) -> WorldPosition {
         Self::pos_to_world(area, self.range.1)
+    }
+
+    pub fn size(&self) -> (u8, u8) {
+        (
+            self.range.1 .0 - self.range.0 .0,
+            self.range.1 .1 - self.range.0 .1,
+        )
     }
 
     fn pos_to_world(

@@ -1652,7 +1652,7 @@ mod tests {
         let chunk = w.find_chunk_with_pos((0, 0).into()).unwrap();
 
         let get_block = |slice| {
-            chunk.find_area_for_block(
+            chunk.find_area_for_block_with_height(
                 BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
                 3,
             )
@@ -1669,7 +1669,7 @@ mod tests {
         assert_ne!(above_area, Some(the_area));
 
         assert_eq!(
-            chunk.find_area_for_block(
+            chunk.find_area_for_block_with_height(
                 BlockPosition::new(2, 2, GlobalSliceIndex::new(3)).unwrap(),
                 4
             ),

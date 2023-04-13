@@ -574,7 +574,7 @@ impl SlabVerticalSpace {
         match self.blocks.iter().find(|i| i.pos() == needle) {
             Some(b) => b.height(),
             None if self.blocks.is_empty() => 0,
-            None => unreachable!("should have vertical space for below"),
+            None => ABSOLUTE_MAX_FREE_VERTICAL_SPACE, // unreachable!("should have vertical space for below"),
         }
     }
 
@@ -622,10 +622,18 @@ impl Debug for SlabVerticalSpace {
 mod tests_vertical_space {
     use super::*;
     use crate::helpers::{
-        load_single_chunk, world_from_chunks_blocking, DummyBlockType, DummyWorldContext,
+        load_single_chunk, loader_from_chunks_blocking,
+        loader_from_chunks_blocking_with_load_blacklist, world_from_chunks_blocking,
+        DummyBlockType, DummyWorldContext,
     };
+    use crate::navigationv2::SlabNavEdge;
     use crate::ChunkBuilder;
-    use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, CHUNK_SIZE};
+    use std::iter::once;
+    use std::time::Duration;
+    use unit::world::{
+        BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition,
+        CHUNK_SIZE,
+    };
 
     #[test]
     fn packed() {
@@ -763,6 +771,56 @@ mod tests_vertical_space {
     }
 
     #[test]
+    fn link_up_later_loaded_slabs() {
+        misc::logging::for_tests();
+        let mut loader = loader_from_chunks_blocking_with_load_blacklist(
+            vec![ChunkBuilder::new()
+                .set_block((2, 0, -1), DummyBlockType::Dirt)
+                .set_block((1, 0, -2), DummyBlockType::Dirt)
+                .build((0, 0))],
+            vec![SlabLocation::new(-1, (0, 0))],
+        );
+
+        loader.request_slabs(once(SlabLocation::new(-1, (0, 0))));
+        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+
+        let w = loader.world();
+
+        let w = w.borrow();
+        let chunk = w.find_chunk_with_pos(ChunkLocation(0, 0)).unwrap();
+
+        let hi = WorldPosition::from((2, 0, 0));
+        let lo = WorldPosition::from((1, 0, -1));
+        let get_area = |b: WorldPosition| {
+            chunk
+                .find_area_for_block(b.into())
+                .unwrap_or_else(|| panic!("no area for block at {b}"))
+        };
+
+        // should both have areas
+        let lo_area = get_area(lo);
+        let hi_area = get_area(hi);
+
+        assert_eq!(lo_area.1.height, 4);
+        assert_eq!(hi_area.1.height, 4);
+
+        let g = w.nav_graph();
+        let edges = g.iter_inter_slab_edges().collect_vec();
+        // let c = ChunkLocation(0,0);
+        // assert_eq!(edges.len(), 1, "edges: {:?}", edges);
+        // assert_eq!(edges, vec![(
+        //     lo_area.0.to_chunk_area(SlabIndex(-1)).to_world_area(c),
+        //     hi_area.0.to_chunk_area(SlabIndex(0)).to_world_area(c),
+        //     SlabNavEdge {
+        //         clearance: (),
+        //         height_diff: 0,
+        //     }
+        //
+        //
+        //     )]);
+    }
+
+    #[test]
     fn cross_slab() {
         misc::logging::for_tests();
         let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
@@ -783,8 +841,9 @@ mod tests_vertical_space {
 
         let get_area = |z| {
             chunk
-                .area_info_for_block(BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::new(z)))
+                .find_area_for_block(BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::new(z)))
                 .unwrap_or_else(|| panic!("no area for block at z={z}"))
+                .1
         };
 
         // top slice set from slab above

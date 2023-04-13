@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
@@ -12,6 +12,7 @@ use crate::{BlockType, WorldContext};
 pub struct MemoryTerrainSource<C: WorldContext> {
     chunk_map: HashMap<ChunkLocation, SlabStorage<C>>,
     bounds: (ChunkLocation, ChunkLocation),
+    initial_load_blacklist: HashSet<SlabLocation>,
 }
 
 impl<C: WorldContext> MemoryTerrainSource<C> {
@@ -65,14 +66,25 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
             _ => (ChunkLocation(0, 0), ChunkLocation(0, 0)),
         };
 
-        Ok(Self { chunk_map, bounds })
+        Ok(Self {
+            chunk_map,
+            bounds,
+            initial_load_blacklist: Default::default(),
+        })
     }
 
-    pub fn all_slabs(&self) -> impl Iterator<Item = SlabLocation> + '_ {
-        self.chunk_map.iter().flat_map(|(chunk, terrain)| {
-            let (min, max) = terrain.slab_range();
-            (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
-        })
+    pub fn blacklist_slab_on_initial_load(&mut self, slab: SlabLocation) {
+        self.initial_load_blacklist.insert(slab);
+    }
+
+    pub fn all_slabs(&self, apply_blacklist: bool) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.chunk_map
+            .iter()
+            .flat_map(|(chunk, terrain)| {
+                let (min, max) = terrain.slab_range();
+                (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
+            })
+            .filter(move |s| !apply_blacklist || !self.initial_load_blacklist.contains(s))
     }
 
     pub fn get_slab_copy(&self, slab: SlabLocation) -> Result<Slab<C>, TerrainSourceError> {
