@@ -25,6 +25,7 @@ use crate::loader::{
 use crate::navigationv2::{as_border_area, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::slab_loading::SlabProcessingFuture;
+use ahash::AHashSet;
 use futures::{FutureExt, SinkExt};
 use std::collections::HashSet;
 use std::iter::repeat;
@@ -323,23 +324,26 @@ impl<C: WorldContext> WorldLoader<C> {
                 // wait for neighbouring slabs to link up navigation
                 let mut this_border_areas = vec![];
                 let mut neighbour_border_areas = vec![];
-                let mut new_world_edges = vec![];
+                let mut new_world_edges =
+                    HashSet::with_hasher(ahash::RandomState::with_seed(515175));
                 for (direction, offset) in NeighbourOffset::aligned() {
                     let n_slab_loc = SlabLocation {
                         chunk: slab.chunk + offset,
                         slab: slab.slab,
                     };
 
+                    // TODO only if both loading at the same time?
                     // only add edges one way
-                    if slab.chunk < n_slab_loc.chunk {
-                        continue;
-                    }
+                    // if slab.chunk < n_slab_loc.chunk {
+                    //     continue;
+                    // }
 
                     // check if there are any areas at the border that could link
                     this_border_areas.extend(navigationv2::filter_border_areas(
                         areas.iter().copied(),
                         direction,
                     ));
+                    trace!("this {slab} border edges: {:?}", this_border_areas);
                     if !this_border_areas.is_empty() {
                         // wait for neighbour to be DoneInIsolation too
                         let neighbour_dir = direction.opposite();
@@ -352,6 +356,10 @@ impl<C: WorldContext> WorldLoader<C> {
                         )
                         .await;
 
+                        trace!(
+                            "neighbour {slab} -> {n_slab_loc} border edges: {:?}",
+                            neighbour_border_areas
+                        );
                         if !neighbour_border_areas.is_empty() {
                             navigationv2::discover_border_edges(
                                 &this_border_areas,
@@ -359,13 +367,10 @@ impl<C: WorldContext> WorldLoader<C> {
                                 Some(direction),
                                 |src, dst, edge| {
                                     let e = (src, dst, edge);
-                                    #[cfg(debug_assertions)]
-                                    assert!(
-                                        !new_world_edges.contains(&e),
-                                        "duplicate edge {:?}",
-                                        e
-                                    );
-                                    new_world_edges.push(e);
+                                    // allow duplicates here for now
+                                    if !new_world_edges.insert(e) {
+                                        warn!("duplicate graph edge: {src} -> {dst} : {edge:?}")
+                                    }
                                 },
                             );
 
@@ -375,7 +380,7 @@ impl<C: WorldContext> WorldLoader<C> {
                                 w.nav_graph_mut().add_inter_slab_edges(
                                     slab,
                                     n_slab_loc,
-                                    new_world_edges.drain(..),
+                                    new_world_edges.drain(),
                                 );
                             }
 
@@ -421,9 +426,10 @@ impl<C: WorldContext> WorldLoader<C> {
                             None,
                             |src, dst, edge| {
                                 let e = (src, dst, edge);
-                                #[cfg(debug_assertions)]
-                                assert!(!new_world_edges.contains(&e), "duplicate edge {:?}", e);
-                                new_world_edges.push(e);
+                                // allow duplicates here for now
+                                if !new_world_edges.insert(e) {
+                                    warn!("duplicate graph edge: {src} -> {dst} : {edge:?}")
+                                }
                             },
                         );
 
@@ -433,7 +439,7 @@ impl<C: WorldContext> WorldLoader<C> {
                             w.nav_graph_mut().add_inter_slab_edges(
                                 slab,
                                 n_slab_loc,
-                                new_world_edges.drain(..),
+                                new_world_edges.drain(),
                             );
                         }
 

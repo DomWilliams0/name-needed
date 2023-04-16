@@ -771,12 +771,64 @@ mod tests_vertical_space {
     }
 
     #[test]
+    fn link_up_later_loaded_slabs_sideways_step() {
+        misc::logging::for_tests();
+        let mut loader = loader_from_chunks_blocking_with_load_blacklist(
+            vec![
+                ChunkBuilder::new()
+                    .fill_slice(3, DummyBlockType::Dirt)
+                    .build((0, 0)),
+                ChunkBuilder::new()
+                    .fill_slice(4, DummyBlockType::Dirt)
+                    .build((1, 0)),
+            ],
+            vec![SlabLocation::new(0, (1, 0))],
+        );
+
+        loader.request_slabs(once(SlabLocation::new(0, (1, 0))));
+        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+
+        let w = loader.world();
+
+        let w = w.borrow();
+        let edges = w.nav_graph().iter_inter_slab_edges().collect_vec();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].0.chunk_idx, ChunkLocation(1, 0)); // from second slab to be loaded
+    }
+
+    #[test]
+    fn link_up_later_loaded_slabs_sideways_flat() {
+        misc::logging::for_tests();
+        let mut loader = loader_from_chunks_blocking_with_load_blacklist(
+            vec![
+                ChunkBuilder::new()
+                    .fill_slice(3, DummyBlockType::Dirt)
+                    .build((0, 0)),
+                ChunkBuilder::new()
+                    .fill_slice(3, DummyBlockType::Dirt)
+                    .build((1, 0)),
+            ],
+            vec![SlabLocation::new(0, (1, 0))],
+        );
+
+        loader.request_slabs(once(SlabLocation::new(0, (1, 0))));
+        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+
+        let w = loader.world();
+
+        let w = w.borrow();
+        let edges = w.nav_graph().iter_inter_slab_edges().collect_vec();
+        assert_eq!(edges.len(), 1);
+    }
+
+    #[test]
     fn link_up_later_loaded_slabs() {
         misc::logging::for_tests();
         let mut loader = loader_from_chunks_blocking_with_load_blacklist(
             vec![ChunkBuilder::new()
                 .set_block((2, 0, -1), DummyBlockType::Dirt)
                 .set_block((1, 0, -2), DummyBlockType::Dirt)
+                .set_block((0, 0, -2), DummyBlockType::Dirt)
                 .build((0, 0))],
             vec![SlabLocation::new(-1, (0, 0))],
         );
@@ -796,6 +848,17 @@ mod tests_vertical_space {
                 .find_area_for_block(b.into())
                 .unwrap_or_else(|| panic!("no area for block at {b}"))
         };
+
+        let get_vs = |b: WorldPosition| {
+            let pos = BlockPosition::from(b);
+            chunk
+                .slab_vertical_space(b.slice().slab_index())
+                .unwrap_or_else(|| panic!("no slab vs for {b}"))
+                .above_at(pos.x(), pos.y())
+        };
+
+        // should protrude into slab above
+        assert_eq!(get_vs((0, 0, -1).into()), 4);
 
         // should both have areas
         let lo_area = get_area(lo);

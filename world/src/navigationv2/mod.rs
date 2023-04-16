@@ -392,12 +392,12 @@ pub fn discover_border_edges(
         // link up
         debug_assert!(working.iter().all(|a| a.height_left > 0));
 
-        for (i, a) in working.iter().enumerate().filter(|(_, a)| a.this_slab) {
+        for (i, a) in working.iter().enumerate() {
             // skip all considered so far and this one itself, and any out of reach
             for b in working
                 .iter()
                 .skip(i + 1)
-                .filter(|x| !x.this_slab && x.start_slice == slice)
+                .filter(|x| x.this_slab != a.this_slab && x.start_slice == slice)
             {
                 let touching = match neighbour_dir {
                     Some(dir) => border_areas_touch(a.range, b.range, dir),
@@ -428,9 +428,17 @@ pub fn discover_border_edges(
                                 .unwrap_or_else(|| unreachable_unchecked()) // a <= b
                         };
 
+                        // src must be from this slab to neighbour
+                        // TODO also reverse edge height diff?
+                        let (src, dst) = if a.this_slab {
+                            (a.area, b.area)
+                        } else {
+                            (b.area, a.area)
+                        };
+
                         on_edge(
-                            a.area,
-                            b.area,
+                            src,
+                            dst,
                             SlabNavEdge {
                                 clearance: NonZeroU8::new_unchecked(clearance), // all zeroes purged already
                                 height_diff: diff,

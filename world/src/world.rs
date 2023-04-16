@@ -996,31 +996,6 @@ impl LoadNotifier {
             self.send.send(slab).expect("send channel is full");
         }
     }
-
-    #[deprecated]
-    pub async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
-        // increment waiter count
-        self.waiters.fetch_add(1, Ordering::SeqCst);
-
-        let ret = loop {
-            match self.recv.recv().await {
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
-                    break WaitResult::Retry;
-                }
-                Err(e) => {
-                    error!("error waiting for slab notification: {}", e);
-                    break WaitResult::Disconnected;
-                }
-                Ok(recvd) if recvd == slab => break WaitResult::Success,
-                Ok(_) => { /* keep waiting */ }
-            }
-        };
-
-        // // decrement before returning
-        self.waiters.fetch_sub(1, Ordering::SeqCst);
-        ret
-    }
 }
 
 pub mod slab_loading {

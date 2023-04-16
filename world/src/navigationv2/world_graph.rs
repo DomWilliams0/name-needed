@@ -36,6 +36,7 @@ pub struct WorldArea {
 }
 
 // TODO hierarchical, nodes should be slabs only
+// TODO ensure undirected edges go a consistent direction e.g. src<dst, so edges can be reverserd consistently
 type WorldNavGraphType = StableUnGraph<WorldArea, SlabNavEdge, u32>;
 
 pub struct WorldGraph {
@@ -74,11 +75,15 @@ impl WorldGraph {
         edges: impl Iterator<Item = (SlabArea, SlabArea, SlabNavEdge)>,
     ) {
         for (a, b, e) in edges {
-            let src = self.add_node(WorldArea::from((from, a)));
-            let dst = self.add_node(WorldArea::from((to, b)));
+            let a = WorldArea::from((from, a));
+            let b = WorldArea::from((to, b));
+
+            trace!(" interslab edge {a} -> {b} : {e:?}");
+            let src = self.add_node(a);
+            let dst = self.add_node(b);
 
             // old edges should have been cleared already
-            debug_assert!(!self.graph.contains_edge(src, dst));
+            // debug_assert!(!self.graph.contains_edge(src, dst));
 
             self.graph.add_edge(src, dst, e);
         }
