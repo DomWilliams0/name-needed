@@ -426,6 +426,7 @@ pub type FreeVerticalSpace = u8;
 pub const ABSOLUTE_MAX_FREE_VERTICAL_SPACE: FreeVerticalSpace = 8;
 
 #[bitbybit::bitfield(u16, default: 0)]
+#[cfg_attr(test, derive(PartialEq))]
 struct PackedSlabBlockVerticalSpace {
     #[bits(12..=15, rw)]
     x: u4,
@@ -470,6 +471,16 @@ impl PackedSlabBlockVerticalSpace {
     }
 }
 
+impl Debug for PackedSlabBlockVerticalSpace {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("PackedSlabBlockVerticalSpace")
+            .field("pos", &self.pos())
+            .field("height", &self.height())
+            .finish()
+    }
+}
+
+#[cfg_attr(test, derive(PartialEq))]
 pub struct SlabVerticalSpace {
     /// Sorted by pos ascending.
     /// pos: 16x16x32 = 4+4+5 bits = 13 bits per pos alone.
@@ -479,11 +490,26 @@ pub struct SlabVerticalSpace {
     top_down: [FreeVerticalSpace; SLICE_SIZE],
 }
 
+lazy_static! {
+    static ref EMPTY_SLAB_VERTICAL_SPACE: Arc<SlabVerticalSpace> = SlabVerticalSpace::calc_empty();
+}
+
 impl SlabVerticalSpace {
     pub fn empty() -> Arc<Self> {
+        EMPTY_SLAB_VERTICAL_SPACE.clone()
+    }
+
+    fn calc_empty() -> Arc<Self> {
+        let blocks = (0..CHUNK_SIZE.as_block_coord())
+            .cartesian_product(0..CHUNK_SIZE.as_block_coord())
+            .map(|(y, x)| {
+                PackedSlabBlockVerticalSpace::new_(x, y, 0, ABSOLUTE_MAX_FREE_VERTICAL_SPACE)
+            })
+            .collect();
+
         Arc::new(Self {
-            blocks: Box::new([]),
-            top_down: [SLAB_SIZE.as_u8(); SLICE_SIZE],
+            blocks,
+            top_down: [ABSOLUTE_MAX_FREE_VERTICAL_SPACE; SLICE_SIZE],
         })
     }
 
@@ -713,7 +739,7 @@ mod tests_vertical_space {
     }
 
     #[test]
-    fn empty_slab() {
+    fn entire_empty_slab() {
         let c = ChunkBuilder::<DummyWorldContext>::new().build((0, 0));
         let slab = c.terrain.slab(0.into()).unwrap();
 
@@ -721,10 +747,16 @@ mod tests_vertical_space {
         assert!(x
             .iter_blocks()
             .all(|(_, h)| h == ABSOLUTE_MAX_FREE_VERTICAL_SPACE));
+
+        assert_eq!(x.below_at((0, 0)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        assert_eq!(x.below_at((5, 5)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+
+        let shared_empty = SlabVerticalSpace::empty();
+        assert_eq!(shared_empty, x);
     }
 
     #[test]
-    fn full_slab() {
+    fn entire_full_slab() {
         let c = ChunkBuilder::<DummyWorldContext>::new()
             .fill_range(
                 (0, 0, 0),
