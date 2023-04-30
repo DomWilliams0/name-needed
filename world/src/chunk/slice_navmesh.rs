@@ -858,7 +858,6 @@ mod tests_vertical_space {
 
     #[test]
     fn link_up_later_loaded_slabs() {
-        misc::logging::for_tests();
         let mut loader = loader_from_chunks_blocking_with_load_blacklist(
             vec![ChunkBuilder::new()
                 .set_block((2, 0, -1), DummyBlockType::Dirt)
@@ -921,7 +920,6 @@ mod tests_vertical_space {
 
     #[test]
     fn cross_slab() {
-        misc::logging::for_tests();
         let w = world_from_chunks_blocking(vec![ChunkBuilder::new()
             // block at 30, 1 space at 31
             // block at 34, space should be 31 32 33

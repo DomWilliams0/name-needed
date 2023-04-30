@@ -529,37 +529,6 @@ impl<C: WorldContext> Slab<C> {
 
         count
     }
-
-    /// Applies nav areas to blocks. Probably stored in the chunk in future instead
-    #[deprecated]
-    pub(crate) fn apply_navigation_updates(&mut self, updates: &[SliceNavArea], replace_all: bool) {
-        if updates.is_empty() {
-            return;
-        }
-        debug!("applying nav updates to slab"; "n" => updates.len(), "replace_all" => replace_all);
-
-        let mut area_alloc = SliceAreaIndexAllocator::default();
-        for (slice_idx, group) in &updates.iter().group_by(|u| u.slice) {
-            let mut slice = self.slice_mut(slice_idx);
-
-            if replace_all {
-                slice.iter_mut().for_each(|b| b.clear_nav_area());
-            }
-            for u in group {
-                for x in u.from.0..=u.to.0 {
-                    for y in u.from.1..=u.to.1 {
-                        let b = &mut slice[SliceBlock::new_srsly_unchecked(x, y)];
-                        debug_assert!(
-                            b.block_type().is_air(),
-                            "{x},{y},{slice_idx} should be air but is {:?}",
-                            b.block_type()
-                        );
-                        b.set_nav_area(area_alloc.allocate(slice_idx.slice())); // TODO known eq special case
-                    }
-                }
-            }
-        }
-    }
 }
 
 // ---------

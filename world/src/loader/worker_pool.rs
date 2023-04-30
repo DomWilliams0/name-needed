@@ -6,7 +6,6 @@ use unit::world::SlabLocation;
 use crate::loader::terrain_source::TerrainSourceError;
 use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
 
-use crate::loader::loading::LoadedSlab;
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
 
@@ -16,10 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-pub type LoadTerrainResult = Result<SlabLocation, TerrainSourceError>;
-
 pub struct AsyncWorkerPool {
-    pool: tokio::runtime::Runtime,
+    pool: Runtime,
     success_rx: async_channel::UnboundedReceiver<Result<SlabLocation, TerrainSourceError>>,
     success_tx: LoadSuccessTx,
 }
@@ -93,14 +90,6 @@ impl AsyncWorkerPool {
     ) -> JoinHandle<R> {
         self.pool.spawn(async move { task.await })
     }
-
-    // async fn send_result<R>(
-    //     mut done_channel: async_channel::Sender<R>,
-    //     result: R,
-    // ) {
-    //     // terrain has been processed in isolation on worker thread, now post to
-    //     // finalization thread
-    // }
 
     pub fn runtime(&self) -> &Runtime {
         &self.pool

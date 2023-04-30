@@ -13,7 +13,6 @@ use unit::world::{ChunkLocation, SlabIndex};
 mod area_navigation;
 mod block_navigation;
 mod cost;
-pub(crate) mod discovery;
 mod path;
 mod search;
 

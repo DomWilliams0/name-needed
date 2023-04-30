@@ -19,7 +19,7 @@ use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndex;
 use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
 use crate::context::WorldContext;
-use crate::loader::{LoadedSlab, SlabTerrainUpdate, SlabVerticalSpace};
+use crate::loader::{SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
     AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
@@ -632,43 +632,6 @@ impl<C: WorldContext> World<C> {
         chunk.mark_slab_as_in_world(slab.slab);
     }
 
-    /// Panics if chunk doesn't exist.
-    /// Does not update slab progress in chunk
-    pub(crate) fn populate_chunk_with_slabs(
-        &mut self,
-        chunk_loc: ChunkLocation,
-        slab_range: (SlabIndex, SlabIndex),
-        slabs: impl Iterator<Item = LoadedSlab<C>>,
-    ) {
-        unimplemented!("old");
-        let chunk = self
-            .find_chunk_with_pos_mut(chunk_loc)
-            .expect("no such chunk");
-
-        // create missing chunks
-        let terrain = chunk.terrain_mut();
-        terrain.create_slabs_until(slab_range.0);
-        terrain.create_slabs_until(slab_range.1);
-
-        // remove all areas in the slab range, because we're about to add the new ones
-        chunk.remove_block_graphs(slab_range);
-
-        for mut slab in slabs {
-            debug_assert_eq!(slab.slab.chunk, chunk_loc);
-            trace!("populating slab"; slab.slab);
-
-            // update slab terrain if necessary
-            if let Some(terrain) = slab.terrain.take() {
-                chunk
-                    .terrain_mut()
-                    .replace_slab(slab.slab.slab /* lmao */, todo!("SlabData?"));
-            }
-
-            // update chunk area navigation
-            // chunk.update_block_graphs(slab.navigation.into_iter());
-        }
-    }
-
     /// Drains all dirty slabs
     pub fn dirty_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
         self.dirty_slabs.drain()
@@ -795,6 +758,7 @@ impl<C: WorldContext> World<C> {
         )
     }
 
+    #[deprecated]
     pub fn area<P: Into<WorldPosition>>(&self, pos: P) -> AreaLookup {
         let block_pos = pos.into();
         let chunk_pos = ChunkLocation::from(block_pos);
@@ -996,195 +960,6 @@ impl LoadNotifier {
     pub fn notify(&self, slab: SlabLocation) {
         if self.waiters.load(Ordering::Relaxed) > 0 {
             self.send.send(slab).expect("send channel is full");
-        }
-    }
-}
-
-pub mod slab_loading {
-    use std::hint::unreachable_unchecked;
-    use std::marker::PhantomData;
-    use std::rc::Rc;
-    use std::sync::Arc;
-
-    use futures::task::{Context, Poll};
-    use futures::Future;
-    use tokio::macros::support::Pin;
-
-    use misc::*;
-    use unit::world::SlabLocation;
-
-    use crate::chunk::slab::{Slab, SlabInternalNavigability};
-    use crate::chunk::slice_navmesh::SlabVerticalSpace;
-    use crate::world::WaitResult;
-    use crate::{WorldContext, WorldRef};
-
-    pub(crate) struct SlabProcessingFuture<'a, C: WorldContext> {
-        phantom: PhantomData<&'a C>,
-        result: Outcome<C>,
-    }
-
-    type Output<C> = (Option<Slab<C>>, Arc<SlabVerticalSpace>);
-
-    enum Outcome<C: WorldContext> {
-        NoneYet(tokio::task::JoinHandle<Option<Output<C>>>),
-        Failed,
-        Succeeded(Output<C>),
-    }
-
-    impl<'a, C: WorldContext> SlabProcessingFuture<'a, C> {
-        pub fn with_provided_terrain(
-            world: WorldRef<C>,
-            slab: SlabLocation,
-            (mut terrain, vertical_space): (Slab<C>, Arc<SlabVerticalSpace>),
-        ) -> Self {
-            log_scope!(o!(slab.chunk));
-
-            let w = world.borrow();
-            let chunk = w.find_chunk_with_pos(slab.chunk);
-
-            let result = match chunk {
-                Some(chunk) => {
-                    unreachable!()
-                }
-
-                None => Outcome::Failed,
-            };
-
-            SlabProcessingFuture {
-                result,
-                phantom: PhantomData,
-            }
-        }
-
-        pub fn with_inline_terrain(world: WorldRef<C>, slab: SlabLocation) -> Self {
-            log_scope!(o!(slab.chunk));
-
-            // need mutable world ref here to access the slab terrain mutably as we don't
-            // have it in scope here
-            let mut w = world.borrow_mut();
-            let chunk = w.find_chunk_with_pos_mut(slab.chunk);
-
-            let result = {
-                match chunk {
-                    Some(chunk) if chunk.has_slab(slab.slab) => {
-                        let terrain = chunk.terrain_mut().slab_mut(slab.slab).unwrap();
-
-                        // safety: terrain belongs to chunk but we need access to the slab
-                        // progress too, and they dont overlap. but make sure not to
-                        // access this in a newly spawned task!!!
-                        let terrain: &mut Slab<C> = unsafe { std::mem::transmute(terrain) };
-
-                        // copy the top and bottom slices into chunk so neighbouring slabs can access it
-                        todo!("inline terrain");
-                        /*                        chunk.mark_slab_in_progress(slab.slab, ver);
-
-                                                match chunk.get_neighbouring_slabs(slab.slab) {
-                                                    None => {
-                                                        // dependent slabs are in progress and should be waited for
-                                                        let mut notifier = w.load_notifications();
-                                                        let world = world.clone();
-                                                        let rt = tokio::runtime::Handle::current();
-
-                                                        let task = rt.spawn(async move {
-                                                            // we must clobber the unsafely screwed up lifetime of terrain
-                                                            // in the scope of this task
-                                                            let terrain;
-
-                                                            loop {
-                                                                // attempt to get slabs again. do this before waiting to avoid
-                                                                // TOCTOU where the dependent slab becomes available just before
-                                                                // the wait and misses the notification it's expecting.
-                                                                {
-                                                                    let mut w = world.borrow_mut();
-                                                                    // the chunk exists for sure if it's sending notifications
-                                                                    let chunk =
-                                                                        w.find_chunk_with_pos_mut(slab.chunk).unwrap();
-                                                                    if let Some((above, below)) =
-                                                                        chunk.get_neighbouring_slabs(slab.slab)
-                                                                    {
-                                                                        // congrats we made it, do final processing - need to
-                                                                        // get out terrain from the slab again because we
-                                                                        // don't own it
-                                                                        terrain = chunk
-                                                                            .terrain_mut()
-                                                                            .slab_mut(slab.slab)
-                                                                            .unwrap(); // definitely exists
-
-                                                                        let result = terrain.process_terrain(
-                                                                            slab.slab,
-                                                                            above.as_ref(),
-                                                                            below.as_ref(),
-                                                                        );
-                                                                        break Some((None, result));
-                                                                    }
-                                                                }
-
-                                                                // still not available, wait for mandatory slab below to load
-                                                                if let WaitResult::Disconnected =
-                                                                    notifier.wait_for_slab(slab.below()).await
-                                                                {
-                                                                    // failure, guess we're shutting down
-                                                                    break None;
-                                                                }
-                                                            }
-                                                        });
-                                                        Outcome::NoneYet(task)
-                                                    }
-                                                    Some((above, below)) => {
-                                                        // dependent slabs are available already, do processing now
-                                                        let result = terrain.process_terrain(
-                                                            slab.slab,
-                                                            above.as_ref(),
-                                                            below.as_ref(),
-                                                        );
-
-                                                        Outcome::Succeeded((None, result))
-                                                    }
-                                                }
-                        */
-                    }
-                    _ => Outcome::Failed,
-                }
-            };
-
-            SlabProcessingFuture {
-                result,
-                phantom: PhantomData,
-            }
-        }
-    }
-
-    impl<'a, C: WorldContext> Future for SlabProcessingFuture<'a, C> {
-        type Output = Option<Output<C>>;
-
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let self_ = Pin::into_inner(self);
-
-            match &mut self_.result {
-                Outcome::NoneYet(task) => {
-                    // delegate to running task
-                    Future::poll(Pin::new(task), cx).map(|res| res.ok().flatten())
-                }
-                Outcome::Failed => Poll::Ready(None),
-                Outcome::Succeeded(_) => {
-                    let self_ = std::mem::replace(
-                        self_,
-                        SlabProcessingFuture {
-                            phantom: PhantomData,
-                            result: Outcome::Failed, // will be failed if this is called again
-                        },
-                    );
-
-                    let result = match self_.result {
-                        Outcome::Succeeded(result) => result,
-                        _ => unsafe {
-                            // safety: we're in the branch for this variant
-                            unreachable_unchecked()
-                        },
-                    };
-                    Poll::Ready(Some(result))
-                }
-            }
         }
     }
 }
@@ -1732,7 +1507,6 @@ mod tests {
 
     #[test]
     fn ring_path() {
-        logging::for_tests();
         let world = world_from_chunks_blocking(presets::ring());
 
         let src = WorldPoint::new_unchecked(8.5, 25.5, 302.0);
@@ -1756,7 +1530,6 @@ mod tests {
 
     #[test]
     fn adjacent_area() {
-        logging::for_tests();
         /*
            X X
                X X

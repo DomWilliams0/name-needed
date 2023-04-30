@@ -198,18 +198,6 @@ impl<C: WorldContext> Chunk<C> {
         }));
     }
 
-    pub(crate) fn update_block_graphs(
-        &mut self,
-        slab_nav: impl Iterator<Item = (ChunkArea, BlockGraph)>,
-    ) {
-        // for (area, graph) in slab_nav {
-        //     let (new_edges, new_nodes) = graph.len();
-        //     self.areas.insert(area, graph);
-        //     debug!("added {edges} edges and {nodes} nodes", edges = new_edges, nodes = new_nodes; "area" => ?area)
-        // }
-        unreachable!()
-    }
-
     pub fn slice_range(
         &self,
         range: SliceRange,

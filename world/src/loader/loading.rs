@@ -9,8 +9,6 @@ use unit::world::{
 
 use crate::chunk::slab::{Slab, SlabType, SliceNavArea};
 
-use crate::loader::batch::UpdateBatchUniqueId;
-use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::{
     get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
     ListeningLoadNotifier, WorldChangeEvent,
@@ -21,9 +19,7 @@ use crate::{
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex};
 use crate::chunk::{NeighbourAreaHash, SlabNeighbour};
-use crate::loader::{
-    AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
-};
+use crate::loader::{AsyncWorkerPool, TerrainSource, TerrainSourceError, WorldTerrainUpdate};
 use crate::navigationv2::{as_border_area, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 
@@ -38,24 +34,8 @@ use std::sync::Arc;
 pub struct WorldLoader<C: WorldContext> {
     source: TerrainSource<C>,
     pool: AsyncWorkerPool,
-    finalization_channel: async_channel::Sender<LoadTerrainResult>,
-    chunk_updates_rx: async_channel::UnboundedReceiver<OcclusionChunkUpdate>,
-    nav_updates: (
-        async_channel::Sender<SlabNavigationUpdate>,
-        async_channel::Receiver<SlabNavigationUpdate>,
-    ),
     world: WorldRef<C>,
     last_batch_size: usize,
-    batch_ids: UpdateBatchUniqueId,
-}
-
-pub struct LoadedSlab<C: WorldContext> {
-    pub(crate) slab: SlabLocation,
-    /// If None the terrain has already been updated
-    pub(crate) terrain: Option<Slab<C>>,
-    // pub(crate) vertical_space: Arc<SlabVerticalSpace>,
-    // pub(crate) batch: UpdateBatch,
-    pub(crate) entities: Vec<C::GeneratedEntityDesc>,
 }
 
 #[derive(Debug, Error)]
@@ -68,13 +48,6 @@ pub enum BlockForAllError {
 
     #[error("Failed to load terrain: {0}")]
     Error(#[from] TerrainSourceError),
-}
-
-pub struct SlabNavigationUpdate {
-    pub slab: SlabLocation,
-    /// Internal links only
-    pub graph: SlabNavGraph,
-    pub new_areas: Vec<SliceNavArea>,
 }
 
 mod load_task {
@@ -372,7 +345,7 @@ mod load_task {
         };
 
         // TODO redo to use vertical space efficiently
-        terrain.init_occlusion(None, None);
+        // terrain.init_occlusion(None, None);
 
         the_ultimate_load_task(LoadContext {
             world,
@@ -512,33 +485,6 @@ mod load_task {
     }
 
     impl UpdateNeighbour {
-        async fn apply_all<C: WorldContext>(
-            this_slab: SlabLocation,
-            this_areas: &[SliceNavArea],
-            notifications: ListeningLoadNotifier,
-            world: &WorldRef<C>,
-            current_hashes: [NeighbourAreaHash; 6],
-        ) {
-            use UpdateNeighbour::*;
-            let mut ctx = UpdateNeighbourContext {
-                this_slab,
-                this_areas,
-                current_hashes,
-                this_border_areas: vec![],
-                neighbour_border_areas: vec![],
-                new_world_edges: Default::default(),
-                notifications,
-            };
-
-            // TODO could do these in parallel, but would need own allocations then
-            for n in [North, East, South, West, Above] {
-                n.apply(&mut ctx, world).await;
-
-                ctx.this_border_areas.clear();
-                ctx.neighbour_border_areas.clear();
-            }
-        }
-
         fn to_hash_index(self) -> SlabNeighbour {
             // TODO rearrange both enums for quick 1:1 mapping
             use SlabNeighbour as N;
@@ -674,22 +620,13 @@ mod load_task {
 
 impl<C: WorldContext> WorldLoader<C> {
     pub fn new<S: Into<TerrainSource<C>>>(source: S, mut pool: AsyncWorkerPool) -> Self {
-        let (finalize_tx, finalize_rx) = async_channel::channel(16);
-        let (chunk_updates_tx, chunk_updates_rx) = async_channel::unbounded();
-        let nav_updates = async_channel::channel(64);
-
         let world = WorldRef::default();
-        // pool.start_finalizer(world.clone(), finalize_rx, chunk_updates_tx);
 
         Self {
             source: source.into(),
             pool,
-            finalization_channel: finalize_tx,
-            chunk_updates_rx,
-            nav_updates,
             world,
             last_batch_size: 0,
-            batch_ids: UpdateBatchUniqueId::default(),
         }
     }
 
@@ -768,7 +705,6 @@ impl<C: WorldContext> WorldLoader<C> {
         }
 
         let count = count + extra_slabs.len();
-        let mut batches = UpdateBatch::builder(&mut self.batch_ids, count);
         let mut real_count = 0;
 
         let all_slabs = {
@@ -789,11 +725,10 @@ impl<C: WorldContext> WorldLoader<C> {
             log_scope!(o!(slab));
 
             let source = self.source.clone();
-            let batch = batches.next_batch();
 
             debug!(
-                "submitting slab to pool as part of batch";
-                slab, batch
+                "requesting slab";
+                slab,
             );
 
             // load raw terrain and do as much processing in isolation as possible on a worker thread
@@ -819,7 +754,6 @@ impl<C: WorldContext> WorldLoader<C> {
             count, real_count
         );
 
-        // TODO remove batches
         self.last_batch_size = count;
     }
 
@@ -959,13 +893,6 @@ impl<C: WorldContext> WorldLoader<C> {
             ));
         }
 
-        // if let Err((n, m)) = batches.is_complete() {
-        //     panic!(
-        //         "incorrect batch size, only produced {}/{} updates in batch",
-        //         n, m
-        //     );
-        // }
-        //
         self.last_batch_size = real_slab_count;
     }
 
@@ -1029,9 +956,10 @@ impl<C: WorldContext> WorldLoader<C> {
     }
 
     pub fn iter_occlusion_updates(&mut self, mut f: impl FnMut(OcclusionChunkUpdate)) {
-        while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
-            f(update)
-        }
+        // TODO occlusion updates
+        // while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
+        //     f(update)
+        // }
     }
 
     pub fn get_ground_level(

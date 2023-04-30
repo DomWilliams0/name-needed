@@ -8,7 +8,6 @@ use std::time::Instant;
 
 use crate::block::BlockDurability;
 use misc::*;
-pub(crate) use pair_walking::WhichChunk;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
     SlabPosition, SliceIndex, SLAB_SIZE,
@@ -425,249 +424,6 @@ impl<C: WorldContext> SlabStorage<C> {
         (SlabIndex(min), SlabIndex(max))
     }
 
-    /// offset: self->other
-    pub(crate) fn cross_chunk_pairs_foreach<
-        F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity),
-    >(
-        &'_ self,
-        other: &'_ Self,
-        offset: NeighbourOffset,
-        slab_range: (SlabIndex, SlabIndex),
-        mut f: F,
-    ) {
-        let offset_opposite = offset.opposite();
-
-        let yield_ = if offset.is_aligned() {
-            pair_walking::yield_side
-        } else {
-            pair_walking::yield_corner
-        };
-
-        // find slab range
-        let (my_min, my_max) = self.limited_slab_indices(slab_range);
-        let (ur_min, ur_max) = other.limited_slab_indices(slab_range);
-
-        // one chunk starts lower than the other
-        if my_min != ur_min {
-            let (lower, which_lower, higher, higher_min, dir) = if my_min < ur_min {
-                (self, WhichChunk::ThisChunk, other, ur_min, offset)
-            } else {
-                (other, WhichChunk::OtherChunk, self, my_min, offset_opposite)
-            };
-
-            // skip lower slabs up until its the last one before the next
-            let lower_slab_index = higher_min - 1;
-
-            // compare top slice of this vs bottom slice of other
-            let lower_slice_above = lower
-                .slab(lower_slab_index + 1)
-                .map(|slab| slab.slice(LocalSliceIndex::bottom()));
-
-            let (_, bottom_slice) = higher.slices_from_bottom().next().unwrap();
-            yield_(
-                which_lower,
-                lower_slice_above,
-                lower_slab_index,
-                LocalSliceIndex::top(),
-                bottom_slice,
-                dir,
-                &mut f,
-            )
-        }
-
-        // continue from the common min = max of the mins
-        let first_misc_slab = my_min.max(ur_min);
-
-        // yield slices up until first max
-        let first_max = my_max.min(ur_max);
-
-        for (slab_index, next_slab_index) in (first_misc_slab.as_i32()..=first_max.as_i32())
-            .map(Some)
-            .chain(once(None))
-            .tuple_windows()
-        {
-            let slab_index = SlabIndex(slab_index.unwrap()); // always Some
-            let this_slab = self.slab(slab_index).unwrap();
-            let other_slab = other.slab(slab_index).unwrap();
-
-            for z in LocalSliceIndex::slices_except_last() {
-                let z_above = z.above();
-                let z_current = z.current();
-
-                let this_slice_above = this_slab.slice(z_above);
-                let upper_slice = other_slab.slice(z_above);
-                yield_(
-                    WhichChunk::ThisChunk,
-                    Some(this_slice_above),
-                    slab_index,
-                    z_current,
-                    upper_slice,
-                    offset,
-                    &mut f,
-                );
-
-                let upper_slice = this_slab.slice(z_above);
-                let other_slice_above = other_slab.slice(z_above);
-                yield_(
-                    WhichChunk::OtherChunk,
-                    Some(other_slice_above),
-                    slab_index,
-                    z_current,
-                    upper_slice,
-                    offset_opposite,
-                    &mut f,
-                );
-            }
-
-            // special case of top slice of one and bottom slice of next
-            if let Some(next_slab_index) = next_slab_index {
-                let next_slab_index = SlabIndex(next_slab_index);
-                let this_slice_above = self
-                    .slab(next_slab_index)
-                    .map(|slab| slab.slice(LocalSliceIndex::bottom()));
-                let next_slice = other
-                    .slab(next_slab_index)
-                    .unwrap()
-                    .slice(LocalSliceIndex::bottom());
-                yield_(
-                    WhichChunk::ThisChunk,
-                    this_slice_above,
-                    slab_index,
-                    LocalSliceIndex::top(),
-                    next_slice,
-                    offset,
-                    &mut f,
-                );
-
-                // let top_slice = other_slab.slice(SLAB_SIZE.as_i32() - 1);
-                let other_slice_above = other
-                    .slab(next_slab_index)
-                    .map(|slab| slab.slice(LocalSliceIndex::bottom()));
-                let next_slice = self
-                    .slab(next_slab_index)
-                    .unwrap()
-                    .slice(LocalSliceIndex::bottom());
-                yield_(
-                    WhichChunk::OtherChunk,
-                    other_slice_above,
-                    slab_index,
-                    LocalSliceIndex::top(),
-                    next_slice,
-                    offset_opposite,
-                    &mut f,
-                );
-            }
-        }
-
-        // one chunk ends higher than the other
-        if my_max != ur_max {
-            let (higher, lower, which_lower, lower_max, dir) = if my_max > ur_max {
-                (self, other, WhichChunk::OtherChunk, ur_max, offset)
-            } else {
-                (other, self, WhichChunk::ThisChunk, my_max, offset_opposite)
-            };
-
-            // top slice of lower and the bottom slice of next higher
-            // let top_slice = lower.slab(lower_max).unwrap().slice(SLAB_SIZE.as_i32() - 1);
-            let lower_slice_above = lower
-                .slab(lower_max + 1)
-                .map(|slab| slab.slice(LocalSliceIndex::bottom()));
-            let bottom_slice = higher
-                .slab(lower_max + 1)
-                .unwrap()
-                .slice(LocalSliceIndex::bottom());
-            yield_(
-                which_lower,
-                lower_slice_above,
-                lower_max,
-                LocalSliceIndex::top(),
-                bottom_slice,
-                dir,
-                &mut f,
-            );
-
-            // no need to bother with rest of higher slabs
-        }
-    }
-
-    pub(crate) fn cross_chunk_pairs_nav_foreach<
-        F: FnMut(ChunkArea, ChunkArea, EdgeCost, BlockCoord, GlobalSliceIndex),
-    >(
-        &'_ self,
-        other: &'_ Self,
-        offset: NeighbourOffset,
-        slab_range: (SlabIndex, SlabIndex),
-        mut f: F,
-    ) {
-        let (SlabIndex(start), SlabIndex(end)) = self.limited_slab_indices(slab_range);
-        for slab_idx in start..=end {
-            let my_slab = &self.slabs.get(slab_idx).unwrap().terrain;
-
-            // get loaded adjacent neighbour slab
-            let ur_slab_adjacent = match other.slabs.get(slab_idx) {
-                Some(s) => &s.terrain,
-                None => {
-                    // skip this whole slab, no links to be made
-                    continue;
-                }
-            };
-
-            let ur_slab_below = other.slabs.get(slab_idx - 1).map(|s| &s.terrain);
-            let ur_slab_above = other.slabs.get(slab_idx + 1).map(|s| &s.terrain);
-
-            let mut coord_range = [(0, 0); CHUNK_SIZE.as_usize()];
-            pair_walking::calculate_boundary_slice_block_offsets(offset, &mut coord_range);
-            let x_coord_changes = offset.is_vertical();
-
-            // iterate the boundary slices of this slab
-            for ((slice_idx, slice), (ur_slice_below, ur_slice, ur_slice_above)) in my_slab
-                .slices_from_bottom()
-                .zip(ur_slab_adjacent.ascending_slice_triplets(ur_slab_below, ur_slab_above))
-            {
-                // only iterate blocks that are walkable on this side
-                let slice_offsets = [
-                    (ur_slice_below, EdgeCost::JumpDown),
-                    (ur_slice, EdgeCost::Walk),
-                    (ur_slice_above, EdgeCost::JumpUp),
-                ];
-                for (wx, wy, this_area) in coord_range
-                    .iter()
-                    .copied()
-                    .filter_map(|(x, y)| slice[(x, y)].area_index().ok().map(|a| (x, y, a)))
-                {
-                    let ur_sliceblock = pair_walking::extend_boundary_slice_block(offset, (wx, wy));
-
-                    // check below, adjacent and above in the other slab as applicable
-                    for (ur_slice, &cost) in slice_offsets
-                        .iter()
-                        .filter_map(|(s, e)| s.clone().map(|s| (s, e)))
-                    {
-                        if let Some(other_area) = ur_slice[ur_sliceblock].area_index().ok() {
-                            let slab_idx = SlabIndex(slab_idx);
-
-                            // link found
-                            let src = ChunkArea {
-                                slab: slab_idx,
-                                area: this_area,
-                            };
-                            let dst = ChunkArea {
-                                slab: ur_slice.relative_slab_index(slab_idx),
-                                area: other_area,
-                            };
-
-                            let coord = if x_coord_changes { wx } else { wy };
-                            f(src, dst, cost, coord, slice_idx.to_global(slab_idx));
-
-                            // done with this slice
-                            // TODO could skip next slice because it cant be walkable if this one was?
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub fn deep_clone(&self) -> Self {
         Self {
             slabs: self.slabs.deep_clone(),
@@ -818,171 +574,6 @@ pub struct SlabStorage<C: WorldContext> {
     slabs: DoubleSidedVec<SlabData<C>>,
 }
 
-mod pair_walking {
-    //! Helpers for cross_chunk_pairs_*
-
-    use crate::occlusion::OcclusionOpacity;
-    use unit::world::SlabIndex;
-
-    use super::*;
-
-    #[derive(Copy, Clone)]
-    pub enum WhichChunk {
-        ThisChunk,
-        OtherChunk,
-    }
-
-    pub fn yield_corner<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity), C: WorldContext>(
-        which_chunk: WhichChunk,
-        lower_slice_above: Option<Slice<C>>,
-        lower_slab: SlabIndex,
-        lower_slice: LocalSliceIndex,
-        upper: Slice<C>,
-        direction: NeighbourOffset,
-        f: &mut F,
-    ) {
-        debug_assert!(!direction.is_aligned());
-
-        let corner_pos = |direction| -> (BlockCoord, BlockCoord) {
-            match direction {
-                NeighbourOffset::SouthEast => (CHUNK_SIZE.as_block_coord() - 1, 0),
-                NeighbourOffset::NorthEast => (
-                    CHUNK_SIZE.as_block_coord() - 1,
-                    CHUNK_SIZE.as_block_coord() - 1,
-                ),
-                NeighbourOffset::NorthWest => (0, CHUNK_SIZE.as_block_coord() - 1),
-                NeighbourOffset::SouthWest => (0, 0),
-                _ => unsafe { unreachable_unchecked() },
-            }
-        };
-
-        let this_pos = corner_pos(direction);
-        if let Some(lower_slice_above) = lower_slice_above {
-            // dont bother if block directly above is solid
-            if lower_slice_above[this_pos].opacity().solid() {
-                return;
-            }
-        }
-
-        // just check single block
-        let other_pos = corner_pos(direction.opposite());
-        let opacity = upper[other_pos].opacity();
-
-        if opacity.solid() {
-            let mut opacities = NeighbourOpacity::default();
-            opacities[direction as usize] = OcclusionOpacity::Known(opacity);
-
-            // get block pos in this chunk
-            let block_pos = {
-                let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition::new_unchecked(this_pos.0, this_pos.1, slice_idx)
-            };
-
-            f(which_chunk, block_pos, opacities);
-        }
-    }
-
-    pub fn calculate_boundary_slice_block_offsets(
-        direction: NeighbourOffset,
-        coords: &mut [(BlockCoord, BlockCoord); CHUNK_SIZE.as_usize()],
-    ) {
-        match direction {
-            NeighbourOffset::North => {
-                let xs = (0..CHUNK_SIZE.as_block_coord()).rev(); // reverse to iterate anti clockwise
-                let ys = repeat(CHUNK_SIZE.as_block_coord() - 1);
-                xs.zip(ys).enumerate().for_each(|(i, c)| coords[i] = c);
-            }
-            NeighbourOffset::South => {
-                let xs = 0..CHUNK_SIZE.as_block_coord();
-                let ys = repeat(0);
-                xs.zip(ys).enumerate().for_each(|(i, c)| coords[i] = c);
-            }
-            NeighbourOffset::West => {
-                let xs = repeat(0);
-                let ys = (0..CHUNK_SIZE.as_block_coord()).rev(); // reverse to iterate anti clockwise
-                xs.zip(ys).enumerate().for_each(|(i, c)| coords[i] = c);
-            }
-            NeighbourOffset::East => {
-                let xs = repeat(CHUNK_SIZE.as_block_coord() - 1);
-                let ys = 0..CHUNK_SIZE.as_block_coord();
-                xs.zip(ys).enumerate().for_each(|(i, c)| coords[i] = c);
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn extend_boundary_slice_block(
-        direction: NeighbourOffset,
-        (x, y): (BlockCoord, BlockCoord),
-    ) -> (BlockCoord, BlockCoord) {
-        match direction {
-            NeighbourOffset::North => (x, 0),
-            NeighbourOffset::South => (x, CHUNK_SIZE.as_block_coord() - 1),
-            NeighbourOffset::West => (CHUNK_SIZE.as_block_coord() - 1, y),
-            NeighbourOffset::East => (0, y),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn yield_side<F: FnMut(WhichChunk, BlockPosition, NeighbourOpacity), C: WorldContext>(
-        which_chunk: WhichChunk,
-        lower_slice_above: Option<Slice<C>>,
-        lower_slab: SlabIndex,
-        lower_slice: LocalSliceIndex,
-        upper: Slice<C>,
-        direction: NeighbourOffset,
-        f: &mut F,
-    ) {
-        debug_assert!(direction.is_aligned());
-
-        let mut coord_range = [(0, 0); CHUNK_SIZE.as_usize()];
-        calculate_boundary_slice_block_offsets(direction, &mut coord_range);
-
-        // None, Some(0,0), Some(1,0), ... None
-        let adjacent_coords = coord_range.iter().copied();
-        for (coord, (left, centre, right)) in adjacent_coords.clone().zip(
-            once(None)
-                .chain(
-                    adjacent_coords
-                        .map(|(x, y)| Some(extend_boundary_slice_block(direction, (x, y)))),
-                )
-                .chain(once(None))
-                .tuple_windows(),
-        ) {
-            if let Some(lower_slice_above) = &lower_slice_above {
-                // dont bother if block directly above is solid
-                if lower_slice_above[coord].opacity().solid() {
-                    continue;
-                }
-            }
-
-            let mut opacities = NeighbourOpacity::default();
-
-            // directly across is certainly present
-            opacities[direction as usize] =
-                OcclusionOpacity::Known(upper[centre.unwrap()].opacity());
-
-            if let Some(left) = left {
-                opacities[direction.next() as usize] =
-                    OcclusionOpacity::Known(upper[left].opacity());
-            }
-
-            if let Some(right) = right {
-                opacities[direction.prev() as usize] =
-                    OcclusionOpacity::Known(upper[right].opacity());
-            }
-
-            // get block pos in this chunk
-            let block_pos = {
-                let slice_idx = lower_slice.to_global(lower_slab);
-                BlockPosition::new_unchecked(coord.0, coord.1, slice_idx)
-            };
-
-            f(which_chunk, block_pos, opacities)
-        }
-    }
-}
-
 impl<C: WorldContext> Default for SlabStorage<C> {
     /// Has a single empty placeholder slab at index 0
     fn default() -> Self {
@@ -1014,7 +605,6 @@ mod tests {
     use super::*;
     use crate::helpers::{loader_from_chunks_blocking, DummyBlockType};
     use crate::loader::WorldTerrainUpdate;
-    use crate::navigation::discovery::AreaDiscovery;
     use std::convert::TryInto;
 
     #[test]
@@ -1122,64 +712,6 @@ mod tests {
     }
 
     #[test]
-    fn slab_areas() {
-        // slab with flat slice 0 should have 1 area
-        let mut slab = Slab::<DummyWorldContext>::empty();
-        slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-            .fill(DummyBlockType::Stone);
-
-        let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
-        assert_eq!(area_count, 1);
-
-        // slab with 2 unconnected floors should have 2
-        let mut slab = Slab::<DummyWorldContext>::empty();
-        slab.slice_mut(LocalSliceIndex::new_unchecked(0))
-            .fill(DummyBlockType::Stone);
-        slab.slice_mut(LocalSliceIndex::new_unchecked(5))
-            .fill(DummyBlockType::Stone);
-
-        let area_count = AreaDiscovery::from_slab(&slab, SlabIndex(0), None).flood_fill_areas();
-        assert_eq!(area_count, 2);
-    }
-
-    //noinspection DuplicatedCode
-    #[test]
-    fn slab_areas_jump() {
-        // terrain with accessible jumps should still be 1 area
-
-        let mut terrain = ChunkBuilder::default().set_block((2, 2, 2), DummyBlockType::Stone); // solid walkable
-
-        // full jump staircase next to it
-        terrain = terrain
-            .set_block((3, 2, 3), DummyBlockType::Stone)
-            .set_block((4, 2, 4), DummyBlockType::Stone)
-            .set_block((5, 2, 4), DummyBlockType::Stone);
-
-        // 1 area still
-        let chunk = load_single_chunk(terrain);
-        assert_eq!(chunk.areas().count(), 1);
-
-        // too big jump out of reach is still unreachable
-        let terrain = ChunkBuilder::default()
-            .set_block((2, 2, 2), DummyBlockType::Stone)
-            .set_block((3, 2, 3), DummyBlockType::Stone)
-            .set_block((4, 2, 7), DummyBlockType::Stone);
-
-        let chunk = load_single_chunk(terrain);
-        assert_eq!(chunk.areas().count(), 2);
-
-        // if above is blocked, can't jump
-        let terrain = ChunkBuilder::default()
-            .set_block((2, 2, 2), DummyBlockType::Stone)
-            .set_block((3, 2, 3), DummyBlockType::Stone)
-            .set_block((2, 2, 4), DummyBlockType::Stone); // blocks jump!
-
-        // so 2 areas expected
-        let chunk = load_single_chunk(terrain);
-        assert_eq!(chunk.areas().count(), 2);
-    }
-
-    #[test]
     fn cross_slab_walkability() {
         // a slab whose top layer is solid should mean the slab above's z=0 is walkable
 
@@ -1273,53 +805,6 @@ mod tests {
         assert_eq!(chunk.areas().count(), 2); // 2 disconnected areas
     }
 
-    //noinspection DuplicatedCode
-    #[test]
-    fn discovery_block_graph() {
-        let terrain = ChunkBuilder::new()
-            .fill_slice(51, DummyBlockType::Stone)
-            .set_block((2, 2, 52), DummyBlockType::Grass);
-
-        let chunk = load_single_chunk(terrain);
-
-        let graph = chunk
-            .block_graph_for_area(WorldArea::new_with_slab((0, 0), SlabIndex(1)))
-            .unwrap();
-
-        // 4 flat connections
-        assert_eq!(
-            graph.edges((5, 5, 52).try_into().unwrap()),
-            vec![
-                ((4, 5, 52).try_into().unwrap(), EdgeCost::Walk),
-                ((5, 4, 52).try_into().unwrap(), EdgeCost::Walk),
-                ((5, 6, 52).try_into().unwrap(), EdgeCost::Walk),
-                ((6, 5, 52).try_into().unwrap(), EdgeCost::Walk),
-            ]
-        );
-
-        // step up on 1 side
-        assert_eq!(
-            graph.edges((2, 3, 52).try_into().unwrap()),
-            vec![
-                ((1, 3, 52).try_into().unwrap(), EdgeCost::Walk),
-                ((2, 2, 53).try_into().unwrap(), EdgeCost::JumpUp),
-                ((2, 4, 52).try_into().unwrap(), EdgeCost::Walk),
-                ((3, 3, 52).try_into().unwrap(), EdgeCost::Walk),
-            ]
-        );
-
-        // step down on all sides
-        assert_eq!(
-            graph.edges((2, 2, 53).try_into().unwrap()),
-            vec![
-                ((1, 2, 52).try_into().unwrap(), EdgeCost::JumpDown),
-                ((2, 1, 52).try_into().unwrap(), EdgeCost::JumpDown),
-                ((2, 3, 52).try_into().unwrap(), EdgeCost::JumpDown),
-                ((3, 2, 52).try_into().unwrap(), EdgeCost::JumpDown),
-            ]
-        );
-    }
-
     #[test]
     fn slice_index_in_slab() {
         // positives are simple modulus
@@ -1408,7 +893,6 @@ mod tests {
 
     #[test]
     fn occlusion_across_slab() {
-        logging::for_tests();
         let terrain = ChunkBuilder::default()
             .set_block((2, 2, SLAB_SIZE.as_i32() - 1), DummyBlockType::Dirt)
             .set_block(
@@ -1657,49 +1141,6 @@ mod tests {
     }
 
     #[test]
-    fn area_discovery_after_modification() {
-        // regression test for bug where area discovery was only looking for jump ups and not down
-
-        let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
-            .fill_range((0, 0, 0), (2, 2, 1), |_| DummyBlockType::Stone)
-            .build((0, 0))]);
-
-        let world_ref = loader.world();
-        let assert_single_area = || {
-            let w = world_ref.borrow();
-
-            // just the one area
-            assert_eq!(
-                w.find_chunk_with_pos(ChunkLocation(0, 0))
-                    .unwrap()
-                    .areas()
-                    .count(),
-                1
-            );
-        };
-
-        assert_single_area();
-
-        // dig out a block
-        let updates = [WorldTerrainUpdate::new(
-            WorldPositionRange::with_single((0, 0, 1)),
-            DummyBlockType::Air,
-        )];
-        apply_updates(&mut loader, &updates).expect("updates failed");
-
-        assert_single_area();
-
-        // dig out another block
-        let updates = [WorldTerrainUpdate::new(
-            WorldPositionRange::with_single((1, 1, 1)),
-            DummyBlockType::Air,
-        )];
-        apply_updates(&mut loader, &updates).expect("updates failed");
-
-        assert_single_area();
-    }
-
-    #[test]
     fn stale_areas_removed_after_modification() {
         let mut loader = loader_from_chunks_blocking(vec![ChunkBuilder::new()
             .fill_range((0, 0, 0), (5, 0, 0), |_| DummyBlockType::Stone) // 5x1x1 ground
@@ -1720,15 +1161,14 @@ mod tests {
         // 3 areas initially, 1 on either side of the wall and 1 atop
         assert_eq!(get_areas().len(), 3);
 
-        // remove some of the wall to combine the 2 areas
+        // remove some of the wall
         let updates = [WorldTerrainUpdate::new(
             WorldPositionRange::with_inclusive_range((3, 0, 1), (3, 0, 2)),
             DummyBlockType::Air,
         )];
         apply_updates(&mut loader, &updates).expect("updates failed");
 
-        // now only 2 areas, the ground and atop the wall
-        assert_eq!(get_areas().len(), 2);
+        assert_eq!(get_areas().len(), 4);
 
         // remove the wall completely
         let updates = [WorldTerrainUpdate::new(
