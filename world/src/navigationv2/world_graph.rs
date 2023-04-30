@@ -75,9 +75,15 @@ impl WorldGraph {
         edges: impl Iterator<Item = (SlabArea, SlabArea, SlabNavEdge)>,
     ) {
         // remove old edges between these slabs
+        let sorted = |a, b| if a < b { (a, b) } else { (b, a) };
+        let (rm_a, rm_b) = sorted(from, to);
         self.graph.retain_edges(|g, e| {
             let (a, b) = g.edge_endpoints(e).unwrap();
-            !(g.node_weight(a).unwrap().slab() == from && g.node_weight(b).unwrap().slab() == to)
+            let a = g.node_weight(a).unwrap().slab();
+            let b = g.node_weight(b).unwrap().slab();
+
+            let (a, b) = sorted(a, b);
+            !(a == rm_a && b == rm_b)
         });
 
         for (a, b, e) in edges {
