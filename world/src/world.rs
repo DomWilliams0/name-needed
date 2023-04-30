@@ -44,7 +44,6 @@ pub struct World<C: WorldContext> {
 
 pub struct LoadNotifier {
     send: broadcast::Sender<SlabLocation>,
-    recv: broadcast::Receiver<SlabLocation>,
     /// Dont bother sending anything if there are no receivers
     waiters: Arc<AtomicUsize>,
 }
@@ -512,9 +511,7 @@ impl<C: WorldContext> World<C> {
 
     pub(crate) fn load_notifications(&self) -> LoadNotifier {
         let send = self.load_notifier.send.clone();
-        let recv = send.subscribe();
         LoadNotifier {
-            recv,
             send,
             waiters: self.load_notifier.waiters.clone(),
         }
@@ -910,7 +907,6 @@ impl Default for LoadNotifier {
         let (send, recv) = broadcast::channel(4096);
         Self {
             send,
-            recv,
             waiters: Arc::new(AtomicUsize::new(0)),
         }
     }
