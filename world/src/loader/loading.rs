@@ -428,6 +428,7 @@ mod load_task {
         }
 
         // ensure consistent order
+        areas.sort_unstable();
         debug_assert!(areas
             .iter()
             .tuple_windows()
