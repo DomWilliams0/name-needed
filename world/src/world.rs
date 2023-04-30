@@ -907,7 +907,7 @@ impl<C: WorldContext> World<C> {
 
 impl Default for LoadNotifier {
     fn default() -> Self {
-        let (send, recv) = broadcast::channel(1024);
+        let (send, recv) = broadcast::channel(4096);
         Self {
             send,
             recv,
