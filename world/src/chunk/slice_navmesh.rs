@@ -1,9 +1,11 @@
 use crate::{flatten_coords, unflatten_index, BlockType, Slab, WorldContext, SLICE_SIZE};
 use arbitrary_int::{u3, u4, u5};
-use misc::{trace, Itertools, SlogDrain};
+use misc::{lazy_static, trace, Itertools, SlogDrain};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::Arc;
-use unit::world::{BlockCoord, LocalSliceIndex, SlabPosition, SliceBlock, SliceIndex, SLAB_SIZE};
+use unit::world::{
+    BlockCoord, LocalSliceIndex, SlabPosition, SliceBlock, SliceIndex, CHUNK_SIZE, SLAB_SIZE,
+};
 
 /// Area index in a slice, all values are possible to allow for every block in a slice of 256 to
 /// have a separate area
@@ -495,6 +497,7 @@ lazy_static! {
 }
 
 impl SlabVerticalSpace {
+    /// Returns shared reference
     pub fn empty() -> Arc<Self> {
         EMPTY_SLAB_VERTICAL_SPACE.clone()
     }
@@ -652,13 +655,15 @@ mod tests_vertical_space {
         loader_from_chunks_blocking_with_load_blacklist, world_from_chunks_blocking,
         DummyBlockType, DummyWorldContext,
     };
+    use crate::loader::WorldTerrainUpdate;
     use crate::navigationv2::SlabNavEdge;
     use crate::ChunkBuilder;
     use std::iter::once;
+    use std::thread::sleep;
     use std::time::Duration;
     use unit::world::{
         BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, WorldPosition,
-        CHUNK_SIZE,
+        WorldPositionRange, CHUNK_SIZE,
     };
 
     #[test]
@@ -804,7 +809,6 @@ mod tests_vertical_space {
 
     #[test]
     fn link_up_later_loaded_slabs_sideways_step() {
-        misc::logging::for_tests();
         let mut loader = loader_from_chunks_blocking_with_load_blacklist(
             vec![
                 ChunkBuilder::new()
@@ -830,7 +834,6 @@ mod tests_vertical_space {
 
     #[test]
     fn link_up_later_loaded_slabs_sideways_flat() {
-        misc::logging::for_tests();
         let mut loader = loader_from_chunks_blocking_with_load_blacklist(
             vec![
                 ChunkBuilder::new()
@@ -890,7 +893,8 @@ mod tests_vertical_space {
         };
 
         // should protrude into slab above
-        assert_eq!(get_vs((0, 0, -1).into()), 4);
+        assert_eq!(get_area((0, 0, -1).into()).1.height, 4);
+        assert_eq!(get_vs((0, 0, -1).into()), 1); // but vs is not updated from above
 
         // should both have areas
         let lo_area = get_area(lo);

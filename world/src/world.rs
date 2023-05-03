@@ -520,15 +520,19 @@ impl<C: WorldContext> World<C> {
         }
     }
 
+    /// Inclusive range
     pub(crate) fn mark_slabs_dirty(
         &mut self,
         chunk_loc: ChunkLocation,
         slab_range: (SlabIndex, SlabIndex),
     ) {
-        // mark slabs dirty
         let slabs = slab_range.0.as_i32()..=slab_range.1.as_i32();
         self.dirty_slabs
             .extend(slabs.map(|s| SlabLocation::new(s, chunk_loc)));
+    }
+
+    pub(crate) fn mark_slab_dirty(&mut self, slab: SlabLocation) {
+        self.dirty_slabs.insert(slab);
     }
 
     pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
@@ -577,6 +581,8 @@ impl<C: WorldContext> World<C> {
                 }
             };
 
+            chunk.mark_slab_requested(slab_loc.slab);
+
             let slab = match chunk.terrain_mut().slab_mut(slab_loc.slab) {
                 Some(slab) => slab,
                 None => {
@@ -589,9 +595,9 @@ impl<C: WorldContext> World<C> {
             let count = slab.apply_terrain_updates(slab_loc, slab_updates);
 
             let slab_data = chunk.terrain_mut().slab_data_mut(slab_loc.slab).unwrap(); // just accessed to get terrain
-            slab_data.update_last_modify_time();
+            let new_version = slab_data.mark_modified();
 
-            debug!("applied {count} terrain block updates to slab", count = count; slab_loc);
+            debug!("applied {count} terrain block updates to slab", count = count; slab_loc, "new_version" => ?new_version);
 
             per_slab(slab_loc);
         }

@@ -74,6 +74,12 @@ impl WorldGraph {
         to: SlabLocation,
         edges: impl Iterator<Item = (SlabArea, SlabArea, SlabNavEdge)>,
     ) {
+        // remove old edges between these slabs
+        self.graph.retain_edges(|g, e| {
+            let (a, b) = g.edge_endpoints(e).unwrap();
+            !(g.node_weight(a).unwrap().slab() == from && g.node_weight(b).unwrap().slab() == to)
+        });
+
         for (a, b, e) in edges {
             let a = WorldArea::from((from, a));
             let b = WorldArea::from((to, b));
@@ -82,14 +88,11 @@ impl WorldGraph {
             let src = self.add_node(a);
             let dst = self.add_node(b);
 
-            // old edges should have been cleared already
-            // debug_assert!(!self.graph.contains_edge(src, dst));
-
             self.graph.add_edge(src, dst, e);
         }
     }
 
-    #[deprecated(note = "actually use SlabNavGraph for hierarchical search")]
+    // TODO actually use SlabNavGraph for hierarchical search
     pub fn absorb(&mut self, slab: SlabLocation, graph: &SlabNavGraph) {
         for slab_area in graph.iter_nodes() {
             let _ = self.add_node(WorldArea::from((slab, slab_area)));
@@ -450,6 +453,8 @@ impl<C: WorldContext> World<C> {
             });
 
             let changed_slabs = slabs
+                .collect::<HashSet<_>>() // dedupe because parallel edges exist
+                .into_iter()
                 .filter(|slab| {
                     let chunk = match self.find_chunk_with_pos(slab.chunk) {
                         None => {

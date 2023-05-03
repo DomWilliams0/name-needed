@@ -1,6 +1,8 @@
+use md5::digest::FixedOutput;
 use std::f32::EPSILON;
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
+use std::num::NonZeroU16;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -15,25 +17,112 @@ use unit::world::{SliceBlock, CHUNK_SIZE};
 
 use crate::block::Block;
 use crate::chunk::double_sided_vec::DoubleSidedVec;
-use crate::chunk::slab::DeepClone;
 use crate::chunk::slab::Slab;
+use crate::chunk::slab::{DeepClone, SliceNavArea};
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::chunk::Chunk;
 
 use crate::helpers::DummyWorldContext;
 use crate::loader::SlabVerticalSpace;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
-use crate::navigationv2::{SlabArea, SlabNavGraph};
+use crate::navigationv2::{is_border, is_bottom_area, is_top_area, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
 use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
-pub struct SlabData<C: WorldContext> {
-    pub(in crate::chunk) terrain: Slab<C>,
-    pub(in crate::chunk) nav: SlabNavGraph, // currently unused
-    pub(in crate::chunk) vertical_space: Arc<SlabVerticalSpace>,
-    pub(in crate::chunk) load_time: Instant,
+#[derive(Debug, Copy, Clone)]
+#[repr(usize)]
+pub enum SlabNeighbour {
+    Top = 0,
+    Bottom,
+    North,
+    East,
+    South,
+    West,
 }
+
+impl SlabNeighbour {
+    const N: usize = 6;
+    pub const VALUES: [SlabNeighbour; SlabNeighbour::N] = [
+        Self::Top,
+        Self::Bottom,
+        Self::North,
+        Self::East,
+        Self::South,
+        Self::West,
+    ];
+
+    pub fn is_border(&self, area: &SliceNavArea) -> bool {
+        use SlabNeighbour::*;
+        let dir = match self {
+            Top => return is_top_area(area),
+            Bottom => return is_bottom_area(area),
+            North => NeighbourOffset::North,
+            East => NeighbourOffset::East,
+            South => NeighbourOffset::South,
+            West => NeighbourOffset::West,
+        };
+
+        is_border(dir, (area.from, area.to))
+    }
+}
+
+#[derive(Default, Copy, Clone, Eq, PartialEq)]
+pub struct NeighbourAreaHash([u8; 16]);
+
+impl NeighbourAreaHash {
+    pub fn for_areas_with_edge(
+        edge: SlabNeighbour,
+        areas: impl Iterator<Item = SliceNavArea>,
+    ) -> Self {
+        Self::for_areas(areas.filter(|a| edge.is_border(a)))
+    }
+
+    pub fn for_areas(areas: impl Iterator<Item = SliceNavArea>) -> Self {
+        use md5::Digest;
+        let mut h = md5::Md5::new();
+        for a in areas {
+            let arr: [u8; 6] = [
+                a.slice.slice(),
+                a.height,
+                a.from.0,
+                a.from.1,
+                a.to.0,
+                a.to.1,
+            ];
+            h.update(&arr);
+        }
+        let res = h.finalize_fixed();
+        Self(res.into())
+    }
+}
+
+impl Debug for NeighbourAreaHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "NeighbourAreaHash(")?;
+        for b in self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        write!(f, ")")
+    }
+}
+
+pub struct SlabData<C: WorldContext> {
+    pub(crate) terrain: Slab<C>,
+    pub(crate) nav: SlabNavGraph, // currently unused
+    pub(in crate::chunk) vertical_space: Arc<SlabVerticalSpace>,
+    pub(in crate::chunk) last_modify_time: Instant,
+    /// Current version of this slab
+    pub(in crate::chunk) version: SlabVersion,
+    /// Version of each neighbour (indexed by SlabNeighbour) at load time, None if it was not loaded
+    pub(in crate::chunk) neighbour_versions: [Option<SlabVersion>; SlabNeighbour::N],
+
+    pub(crate) neighbour_edge_hashes: [NeighbourAreaHash; SlabNeighbour::N],
+}
+
+/// Wrapping version for a slab to detect changes. Incremented each time it is modified
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct SlabVersion(NonZeroU16);
 
 pub struct OcclusionChunkUpdate(
     pub ChunkLocation,
@@ -672,13 +761,31 @@ impl<C: WorldContext> SlabStorage<C> {
     // TODO set_block trait to reuse in ChunkBuilder (#46)
 }
 
+impl SlabVersion {
+    const DEFAULT: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
+    // pub fn get(self) -> NonZeroU16{self.0}
+
+    pub fn inc(&mut self) {
+        self.0 = self.0.checked_add(1).unwrap_or(Self::DEFAULT);
+    }
+}
+
+impl Default for SlabVersion {
+    fn default() -> Self {
+        Self(Self::DEFAULT)
+    }
+}
+
 impl<C: WorldContext> SlabData<C> {
     pub(crate) fn new(terrain: Slab<C>) -> Self {
         Self {
             terrain,
             nav: SlabNavGraph::empty(),
             vertical_space: SlabVerticalSpace::empty(),
-            load_time: Instant::now(),
+            last_modify_time: Instant::now(),
+            version: Default::default(),
+            neighbour_versions: [None; SlabNeighbour::N],
+            neighbour_edge_hashes: [NeighbourAreaHash::default(); SlabNeighbour::N],
         }
     }
 }
@@ -689,14 +796,20 @@ impl<C: WorldContext> DeepClone for SlabData<C> {
             terrain: self.terrain.deep_clone(),
             nav: self.nav.clone(),
             vertical_space: self.vertical_space.clone(),
-            load_time: Instant::now(),
+            last_modify_time: self.last_modify_time,
+            version: self.version,
+            neighbour_versions: self.neighbour_versions,
+            neighbour_edge_hashes: [NeighbourAreaHash::default(); SlabNeighbour::N],
         }
     }
 }
 
 impl<C: WorldContext> SlabData<C> {
-    pub fn update_last_modify_time(&mut self) {
-        self.load_time = Instant::now();
+    /// Bumps slab version and sets last modified time to now. Returns new version
+    pub fn mark_modified(&mut self) -> SlabVersion {
+        self.last_modify_time = Instant::now();
+        self.version.inc();
+        self.version
     }
 }
 

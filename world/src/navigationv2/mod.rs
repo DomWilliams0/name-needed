@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::hint::unreachable_unchecked;
@@ -42,8 +43,7 @@ pub struct SlabNavGraph {
 }
 
 // TODO make these 2xu4 instead
-#[derive(Copy, Clone)]
-#[cfg_attr(any(test, debug_assertions), derive(Debug, Eq, PartialEq, Hash))]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct SlabNavEdge {
     /// Max height in blocks for someone to pass this edge
     clearance: NonZeroU8,
@@ -196,7 +196,7 @@ fn border_areas_touch(
     }
 }
 
-fn is_border(
+pub fn is_border(
     direction: NeighbourOffset,
     range: ((BlockCoord, BlockCoord), (BlockCoord, BlockCoord)),
 ) -> bool {
@@ -244,8 +244,12 @@ pub fn filter_border_areas(
     })
 }
 
-fn is_top_area(a: &SliceNavArea) -> bool {
+pub fn is_top_area(a: &SliceNavArea) -> bool {
     a.slice.slice() + a.height > SLAB_SIZE.as_u8()
+}
+
+pub fn is_bottom_area(a: &SliceNavArea) -> bool {
+    a.slice == LocalSliceIndex::bottom()
 }
 
 /// Filters areas that protrude into slab above.
@@ -450,6 +454,8 @@ pub fn discover_border_edges(
         }
     }
 }
+
+// pub fn discover_new_bottom_slice_areas_from_below()
 
 impl Display for SlabArea {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

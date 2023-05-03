@@ -1,35 +1,38 @@
 use std::time::{Duration, Instant};
 
-use crate::context::BlockType;
 use futures::channel::mpsc as async_channel;
 use misc::*;
 use unit::world::{
     ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation, SlabPosition,
-    WorldPosition, CHUNK_SIZE, SLAB_SIZE,
+    SliceIndex, WorldPosition, CHUNK_SIZE, SLAB_SIZE,
 };
 
-use crate::chunk::slab::{Slab, SlabInternalNavigability, SlabType, SliceNavArea};
+use crate::chunk::slab::{Slab, SlabType, SliceNavArea};
 
 use crate::loader::batch::UpdateBatchUniqueId;
 use crate::loader::worker_pool::LoadTerrainResult;
 use crate::world::{
     get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
-    WorldChangeEvent,
+    ListeningLoadNotifier, WorldChangeEvent,
 };
-use crate::{navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, SLICE_SIZE};
+use crate::{
+    navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
+};
 
-use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace, SliceAreaIndex};
+use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex};
+use crate::chunk::{NeighbourAreaHash, SlabNeighbour};
 use crate::loader::{
     AsyncWorkerPool, TerrainSource, TerrainSourceError, UpdateBatch, WorldTerrainUpdate,
 };
-use crate::navigationv2::{as_border_area, SlabNavGraph};
+use crate::navigationv2::{as_border_area, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
-use crate::world::slab_loading::SlabProcessingFuture;
-use ahash::AHashSet;
+
+use ahash::RandomState;
+
 use futures::{FutureExt, SinkExt};
 use std::collections::HashSet;
 use std::iter::repeat;
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 pub struct WorldLoader<C: WorldContext> {
@@ -74,14 +77,599 @@ pub struct SlabNavigationUpdate {
     pub new_areas: Vec<SliceNavArea>,
 }
 
-struct InitialNavLoaded {
-    pub slab: SlabLocation,
-    pub new_areas: Vec<SliceNavArea>,
-    pub vs: Arc<SlabVerticalSpace>,
-}
+mod load_task {
+    use super::*;
+    use crate::loader::worker_pool::LoadSuccessTx;
 
-lazy_static! {
-    static ref EMPTY_SLAB_VERTICAL_SPACE: Arc<SlabVerticalSpace> = SlabVerticalSpace::empty();
+    enum ExtraInfo<C: WorldContext> {
+        Generated {
+            entities: Vec<C::GeneratedEntityDesc>,
+            terrain: Slab<C>,
+            vs: Arc<SlabVerticalSpace>,
+        },
+        Updated,
+    }
+
+    struct LoadContext<C: WorldContext> {
+        world: WorldRef<C>,
+        this_slab: SlabLocation,
+        extra: ExtraInfo<C>,
+        success_tx: LoadSuccessTx,
+    }
+
+    async fn the_ultimate_load_task<C: WorldContext>(mut ctx: LoadContext<C>) {
+        let slab = ctx.this_slab;
+        // ----- slab is currently Requested
+
+        // get terrain and vertical space
+        let is_update = matches!(ctx.extra, ExtraInfo::Updated);
+        let (terrain, new_terrain, vs, entities) = match ctx.extra {
+            ExtraInfo::Generated {
+                entities,
+                terrain,
+                vs,
+            } => (
+                terrain.clone(),
+                Some(terrain),
+                vs,
+                (!entities.is_empty()).then_some(entities),
+            ),
+            ExtraInfo::Updated => {
+                let w = ctx.world.borrow();
+
+                let terrain = if let Some(t) = w
+                    .find_chunk_with_pos(slab.chunk)
+                    .and_then(|c| c.terrain().slab(slab.slab))
+                {
+                    t.clone()
+                } else {
+                    debug!("changed {} doesn't exist anymore", ctx.this_slab);
+                    return;
+                };
+
+                // recalculate vertical space for this slab. it is capped to the top of
+                // this slab, but its only use is for area discovery while we also have the above one
+                // available, so no matter for loading
+                let vs = SlabVerticalSpace::discover(&terrain);
+
+                (terrain, None, vs, None)
+            }
+        };
+
+        // put terrain into world
+        let mut notifications;
+        {
+            let mut w = ctx.world.borrow_mut();
+            notifications = w.load_notifications().start_listening(); // might be pointless sometimes
+
+            // spawn entities if necessary
+            if let Some(entities) = entities {
+                debug_assert!(!entities.is_empty());
+                trace!(
+                    "passing {n} entity descriptions from slab to world to spawn next tick",
+                    n = entities.len()
+                );
+
+                // TODO maybe delay until nav is done?
+                w.queue_entities_to_spawn(entities.into_iter());
+            }
+
+            // put terrain into chunk
+            w.populate_chunk_with_slab(slab, new_terrain, vs.clone());
+            w.mark_slab_dirty(slab);
+        }
+
+        // ----- slab is now TerrainInWorld
+
+        // notify loader
+        if let Err(e) = ctx.success_tx.send(Ok(slab)).await {
+            error!("failed to send terrain result"; "error" => %e);
+            return;
+        }
+
+        // generate nav areas, skipping the bottom slice initially.
+        // needs vs from slab above. doesnt matter that it is capped locally, the max vs is
+        // much less than a slab height, so no impact on this currently updating slab.
+        debug_assert!(ABSOLUTE_MAX_FREE_VERTICAL_SPACE < SLAB_SIZE.as_u8());
+        let (mut areas, above_vs) = discover_areas_with_vertical_neighbours(
+            slab,
+            &vs,
+            &mut notifications,
+            &terrain,
+            &ctx.world,
+            None,
+        )
+        .await;
+
+        // discover links between internal areas
+        trace!("{} has {} areas: {:?}", slab, areas.len(), areas);
+        let graph = SlabNavGraph::discover(&areas);
+
+        // spawn a task to add any new areas to the slab above
+        if let Some(above_vs) = above_vs {
+            let above_slab = slab.above();
+            {
+                // mark above slab as updating
+                let w = ctx.world.borrow();
+                if let Some(c) = w.find_chunk_with_pos(above_slab.chunk) {
+                    c.mark_slab_as_updating(above_slab.slab);
+                }
+            }
+
+            tokio::spawn(update_slab_above(
+                ctx.world.clone(),
+                above_slab,
+                above_vs,
+                vs.clone(),
+            ));
+        }
+
+        // put this into world and mark as DoneInIsolation
+        let current_hashes = match replace_slab_nav_graph(&ctx.world, slab, graph, &areas) {
+            None => return,
+            Some(h) if is_update => h,
+            _ => Default::default(), // all zeroes for newly generated slab
+        };
+
+        // ------ slab is now DoneInIsolation
+
+        link_up_with_neighbours(slab, &areas, notifications, &ctx.world, current_hashes).await;
+
+        // that's all
+        {
+            let mut w = ctx.world.borrow_mut();
+
+            if let Some(chunk) = w.find_chunk_with_pos_mut(slab.chunk) {
+                chunk.mark_slab_as_done(slab.slab);
+            }
+        }
+    }
+
+    async fn link_up_with_neighbours<C: WorldContext>(
+        this_slab: SlabLocation,
+        this_areas: &[SliceNavArea],
+        notifications: ListeningLoadNotifier,
+        world: &WorldRef<C>,
+        current_hashes: [NeighbourAreaHash; 6],
+    ) {
+        use UpdateNeighbour::*;
+        let mut ctx = UpdateNeighbourContext {
+            this_slab,
+            this_areas,
+            current_hashes,
+            this_border_areas: vec![],
+            neighbour_border_areas: vec![],
+            new_world_edges: Default::default(),
+            notifications,
+        };
+
+        // TODO could do these in parallel, but would need own allocations then
+        for n in [North, East, South, West, Above] {
+            n.apply(&mut ctx, world).await;
+
+            ctx.this_border_areas.clear();
+            ctx.neighbour_border_areas.clear();
+        }
+    }
+
+    async fn update_slab_above<C: WorldContext>(
+        world: WorldRef<C>,
+        slab: SlabLocation,
+        this_vs: Arc<SlabVerticalSpace>,
+        below_vs: Arc<SlabVerticalSpace>,
+    ) {
+        trace!("running update_slab_above for {slab}");
+        let mut notifications;
+        let current_hashes;
+        let terrain;
+        {
+            let w = world.borrow();
+            notifications = w.load_notifications().start_listening();
+
+            if let Some((chunk, data)) = w
+                .find_chunk_with_pos(slab.chunk)
+                .and_then(|c| c.terrain().slab_data(slab.slab).map(|d| (c, d)))
+            {
+                terrain = data.terrain.clone();
+                current_hashes = data.neighbour_edge_hashes;
+            } else {
+                warn!("missing slab {} in update task", slab);
+                return;
+            }
+        }
+
+        // discover new bottom slice areas using vs and below vs
+        let mut bottom_areas = vec![];
+        terrain.discover_bottom_slice_areas(&this_vs, &below_vs, &mut bottom_areas); // order should be same as previous discovery, because they are discovered the same way
+        let new_hash = NeighbourAreaHash::for_areas(bottom_areas.iter().copied());
+
+        trace!(
+            "{} has {} bottom areas: {:?}. hash is {:?}, prev was {:?}",
+            slab,
+            bottom_areas.len(),
+            bottom_areas,
+            new_hash,
+            current_hashes[SlabNeighbour::Bottom as usize],
+        );
+
+        // check previous bottom areas
+        if new_hash == current_hashes[SlabNeighbour::Bottom as usize] {
+            trace!("bottom areas did not change, skipping all changes");
+            if let Some(c) = world.borrow().find_chunk_with_pos(slab.chunk) {
+                c.mark_slab_as_done(slab.slab);
+            }
+
+            return;
+        }
+
+        // need to redo graph
+        // TODO can probably skip some work here as only the bottom areas changed
+
+        let (areas, above_vs) = discover_areas_with_vertical_neighbours(
+            slab,
+            &this_vs,
+            &mut notifications,
+            &terrain,
+            &world,
+            Some(bottom_areas),
+        )
+        .await;
+
+        let graph = SlabNavGraph::discover(&areas);
+        replace_slab_nav_graph(&world, slab, graph, &areas);
+
+        // now DoneInIsolation
+
+        link_up_with_neighbours(slab, &areas, notifications, &world, current_hashes).await;
+
+        // slab is Done
+        if let Some(c) = world.borrow().find_chunk_with_pos(slab.chunk) {
+            c.mark_slab_as_done(slab.slab);
+        }
+    }
+
+    pub async fn generate<C: WorldContext>(
+        world: WorldRef<C>,
+        this_slab: SlabLocation,
+        slab_type: SlabType,
+        source: TerrainSource<C>,
+        mut success_tx: LoadSuccessTx,
+    ) {
+        let mut entities = vec![];
+        let result = if let SlabType::Placeholder = slab_type {
+            // empty placeholder
+            Ok(None)
+        } else {
+            source.load_slab(this_slab).await.map(|generated| {
+                entities = generated.entities;
+                Some(generated.terrain)
+            })
+        };
+
+        let (mut terrain, vs) = match result {
+            Ok(Some(terrain)) => {
+                let vs = SlabVerticalSpace::discover(&terrain);
+                (terrain, vs)
+            }
+            Ok(None) => {
+                debug!("adding placeholder slab to the top of the chunk"; this_slab);
+                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
+            }
+            Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
+                // soft error, we're at the world edge. treat as all air instead of
+                // crashing and burning
+                debug!("slab is out of bounds, swapping in an empty one"; this_slab);
+
+                // TODO shared instance of CoW for empty slab
+                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
+            }
+            Err(err) => {
+                if let Err(e) = success_tx.send(Err(err)).await {
+                    error!("failed to send failed terrain result"; "error" => %e);
+                }
+                return;
+            }
+        };
+
+        // TODO redo to use vertical space efficiently
+        terrain.init_occlusion(None, None);
+
+        the_ultimate_load_task(LoadContext {
+            world,
+            this_slab,
+            success_tx,
+            extra: ExtraInfo::Generated {
+                entities,
+                terrain,
+                vs,
+            },
+        })
+        .await
+    }
+
+    pub async fn update<C: WorldContext>(
+        world: WorldRef<C>,
+        this_slab: SlabLocation,
+        success_tx: LoadSuccessTx,
+    ) {
+        the_ultimate_load_task(LoadContext {
+            world,
+            this_slab,
+
+            success_tx,
+            extra: ExtraInfo::Updated,
+        })
+        .await
+    }
+
+    /// Waits on above and below slabs if necessary. Returns new areas for this slab and the slab above's vs
+    async fn discover_areas_with_vertical_neighbours<C: WorldContext>(
+        slab: SlabLocation,
+        vs: &SlabVerticalSpace,
+        notifications: &mut ListeningLoadNotifier,
+        terrain: &Slab<C>,
+        world: &WorldRef<C>,
+        bottom_areas: Option<Vec<SliceNavArea>>,
+    ) -> (Vec<SliceNavArea>, Option<Arc<SlabVerticalSpace>>) {
+        let needs_bottom = bottom_areas.is_none();
+        let mut areas = bottom_areas.unwrap_or_default();
+
+        // wait for slab above to be loaded if needed
+        let needs_above = vs
+            .above()
+            .iter()
+            .any(|h| *h != ABSOLUTE_MAX_FREE_VERTICAL_SPACE); // TODO calc once and cache
+
+        let above = if needs_above {
+            get_or_wait_for_slab_vertical_space(notifications, world, slab.above()).await
+        } else {
+            None
+        };
+
+        if needs_above {
+            trace!(
+                "{} waited for above {}: {}",
+                slab,
+                slab.above(),
+                if above.is_some() { "present" } else { "absent" }
+            );
+        }
+
+        // generate nav areas skipping the bottom slice
+        terrain.discover_navmesh(&vs, above.as_ref(), &mut areas);
+
+        if needs_bottom {
+            // bottom slice nav requires below slab vertical space, now wait for that
+            let below =
+                get_or_wait_for_slab_vertical_space(notifications, &world, slab.below()).await;
+            trace!(
+                "{} waited for below {}: {}",
+                slab,
+                slab.below(),
+                if below.is_some() { "present" } else { "absent" }
+            );
+
+            if let Some(below) = below.as_ref() {
+                terrain.discover_bottom_slice_areas(&vs, below, &mut areas);
+            }
+        }
+
+        // ensure consistent order
+        debug_assert!(areas
+            .iter()
+            .tuple_windows()
+            .all(|(a, b)| a.slice <= b.slice));
+
+        (areas, above)
+    }
+
+    /// Puts graph into the slab and marks slab as DoneInIsolation. Returns prev neighbour hashes
+    fn replace_slab_nav_graph<C: WorldContext>(
+        world: &WorldRef<C>,
+        slab: SlabLocation,
+        graph: SlabNavGraph,
+        areas: &[SliceNavArea],
+    ) -> Option<[NeighbourAreaHash; 6]> {
+        let mut w = world.borrow_mut();
+
+        // temporary: just put all nodes and edges into world graph directly (TODO)
+        w.nav_graph_mut().absorb(slab, &graph);
+
+        if let Some(chunk) = w.find_chunk_with_pos_mut(slab.chunk) {
+            // clear old slice areas
+            chunk.replace_all_slice_areas(slab.slab, areas);
+
+            let hashes = chunk.replace_slab_nav_graph(slab.slab, graph, areas);
+
+            // let slab = w.get_slab_mut(slab)?;
+            // TODO clear previous if indicated - but remember update to bottom slice is additive
+            // slab.apply_navigation_updates(&update.new_areas, true);
+            return hashes;
+        }
+
+        None
+    }
+
+    #[derive(Copy, Clone)]
+    enum UpdateNeighbour {
+        North,
+        East,
+        South,
+        West,
+        Above,
+    }
+
+    struct UpdateNeighbourContext<'a> {
+        this_slab: SlabLocation,
+        this_areas: &'a [SliceNavArea],
+        this_border_areas: Vec<(SliceNavArea, SliceAreaIndex)>,
+        current_hashes: [NeighbourAreaHash; 6],
+
+        neighbour_border_areas: Vec<(SliceNavArea, SliceAreaIndex)>,
+        new_world_edges: HashSet<(SlabArea, SlabArea, SlabNavEdge), RandomState>,
+
+        notifications: ListeningLoadNotifier,
+    }
+
+    impl UpdateNeighbour {
+        async fn apply_all<C: WorldContext>(
+            this_slab: SlabLocation,
+            this_areas: &[SliceNavArea],
+            notifications: ListeningLoadNotifier,
+            world: &WorldRef<C>,
+            current_hashes: [NeighbourAreaHash; 6],
+        ) {
+            use UpdateNeighbour::*;
+            let mut ctx = UpdateNeighbourContext {
+                this_slab,
+                this_areas,
+                current_hashes,
+                this_border_areas: vec![],
+                neighbour_border_areas: vec![],
+                new_world_edges: Default::default(),
+                notifications,
+            };
+
+            // TODO could do these in parallel, but would need own allocations then
+            for n in [North, East, South, West, Above] {
+                n.apply(&mut ctx, world).await;
+
+                ctx.this_border_areas.clear();
+                ctx.neighbour_border_areas.clear();
+            }
+        }
+
+        fn to_hash_index(self) -> SlabNeighbour {
+            // TODO rearrange both enums for quick 1:1 mapping
+            use SlabNeighbour as N;
+            use UpdateNeighbour::*;
+            match self {
+                Above => N::Top,
+                North => N::North,
+                East => N::East,
+                South => N::South,
+                West => N::West,
+            }
+        }
+
+        async fn apply<C: WorldContext>(
+            self,
+            ctx: &mut UpdateNeighbourContext<'_>,
+            world: &WorldRef<C>,
+        ) {
+            let n_slab_loc = self.neighbour_slab(ctx);
+
+            // collect border edges
+            debug_assert!(ctx.this_border_areas.is_empty());
+            let direction = self.direction();
+            if let Some(dir) = direction {
+                ctx.this_border_areas
+                    .extend(navigationv2::filter_border_areas(
+                        ctx.this_areas.iter().copied(),
+                        dir,
+                    ));
+            } else {
+                ctx.this_border_areas.extend(navigationv2::filter_top_areas(
+                    ctx.this_areas.iter().copied(),
+                ));
+            }
+
+            // hash and compare to previous
+            let new_hash =
+                NeighbourAreaHash::for_areas(ctx.this_border_areas.iter().map(|tup| tup.0));
+            let cur_hash = ctx.current_hashes[self.to_hash_index() as usize];
+            if new_hash == cur_hash {
+                trace!(
+                    "no change in {} areas between {} and {:?} neighbour (cur={:?}, new={:?})",
+                    ctx.this_border_areas.len(),
+                    ctx.this_slab,
+                    self.to_hash_index(),
+                    cur_hash,
+                    new_hash
+                );
+                return;
+            }
+
+            if !ctx.this_border_areas.is_empty() {
+                // wait for neighbour and collect from them too
+                if let Some(dir) = direction {
+                    let neighbour_dir = dir.opposite();
+                    get_or_collect_slab_areas(
+                        &mut ctx.notifications,
+                        world,
+                        n_slab_loc,
+                        |a, ai| as_border_area(*a, ai, neighbour_dir),
+                        &mut ctx.neighbour_border_areas,
+                    )
+                    .await;
+                } else {
+                    get_or_collect_slab_areas(
+                        &mut ctx.notifications,
+                        world,
+                        n_slab_loc,
+                        |area, info| {
+                            (area.slab_area.slice_idx.slice() <= ABSOLUTE_MAX_FREE_VERTICAL_SPACE)
+                                .then_some((
+                                    SliceNavArea {
+                                        slice: area.slab_area.slice_idx,
+                                        from: info.range.0,
+                                        to: info.range.1,
+                                        height: info.height,
+                                    },
+                                    area.slab_area.slice_area,
+                                ))
+                        },
+                        &mut ctx.neighbour_border_areas,
+                    )
+                    .await;
+                }
+
+                if !ctx.neighbour_border_areas.is_empty() {
+                    navigationv2::discover_border_edges(
+                        &ctx.this_border_areas,
+                        &ctx.neighbour_border_areas,
+                        direction,
+                        |src, dst, edge| {
+                            let e = (src, dst, edge);
+                            // allow duplicates here for now
+                            if !ctx.new_world_edges.insert(e) {
+                                warn!("duplicate graph edge: {src} -> {dst} : {edge:?}")
+                            }
+                        },
+                    );
+                }
+            }
+
+            // add edges to world nav graph, replacing old ones
+            {
+                let mut w = world.borrow_mut();
+                w.nav_graph_mut().add_inter_slab_edges(
+                    ctx.this_slab,
+                    n_slab_loc,
+                    ctx.new_world_edges.drain(),
+                );
+            }
+        }
+
+        fn neighbour_slab(self, ctx: &UpdateNeighbourContext) -> SlabLocation {
+            use UpdateNeighbour::*;
+            ctx.this_slab.with_chunk_offset(match self.direction() {
+                Some(dir) => dir.offset(),
+                None => return ctx.this_slab.above(),
+            })
+        }
+
+        fn direction(self) -> Option<NeighbourOffset> {
+            use UpdateNeighbour::*;
+            Some(match self {
+                Above => return None,
+                North => NeighbourOffset::North,
+                East => NeighbourOffset::East,
+                South => NeighbourOffset::South,
+                West => NeighbourOffset::West,
+            })
+        }
+    }
 }
 
 impl<C: WorldContext> WorldLoader<C> {
@@ -114,6 +702,8 @@ impl<C: WorldContext> WorldLoader<C> {
         let count = slabs.len();
         self.request_slabs_with_count(slabs, count)
     }
+
+    // TODO debug renderer to flicker chunks that are updated (nav,terrain,occlusion) on block change, to ensure not too much is changed
 
     // TODO add more efficient version that takes chunk+multiple slabs
     /// Must be sorted by chunk then by ascending slab (debug asserted). All slabs are loaded from
@@ -208,257 +798,15 @@ impl<C: WorldContext> WorldLoader<C> {
 
             // load raw terrain and do as much processing in isolation as possible on a worker thread
             let world = self.world();
-            let mut nav_tx = self.nav_updates.0.clone();
             let mut terrain_tx = self.pool.success_tx();
 
-            self.pool.submit_any_async_with_handle(async move {
-                // generate terrain
-                let (mut terrain, vs, entities) =
-                    match Self::step1_generate_terrain(slab, slab_type, &source).await {
-                        Ok(tup) => tup,
-                        Err(err) => {
-                            // give up
-                            if let Err(e) = terrain_tx.send(Err(err)).await {
-                                error!("failed to send failed terrain result"; "error" => %e);
-                            }
-                            return;
-                        }
-                    };
-
-                // slab terrain is now fixed, TODO try to update occlusion from any loaded/available
-                // neighbours without blocking
-
-                // put into world immediately
-                let mut notifier;
-                {
-                    let mut world = world.borrow_mut();
-                    notifier = world.load_notifications(); // might be pointless sometimes
-
-                    // spawn entities
-                    if !entities.is_empty() {
-                        trace!(
-                            "passing {n} entity descriptions from slab to world to spawn next tick",
-                            n = entities.len()
-                        );
-
-                        // TODO maybe delay until nav is done?
-                        world.queue_entities_to_spawn(entities.into_iter());
-                    }
-
-                    // put terrain into chunk
-                    world.populate_chunk_with_slab(slab, Some(terrain.clone()), vs.clone());
-                    world.mark_slabs_dirty(slab.chunk, (slab.slab, slab.slab));
-                }
-
-                // ----- slab is now TerrainInWorld
-
-                // notify loader
-                if let Err(e) = terrain_tx.send(Ok(slab)).await {
-                    error!("failed to send terrain result"; "error" => %e);
-                    return;
-                }
-
-                let mut notifications = notifier.start_listening();
-
-                // wait for slab above to be loaded if needed
-                // TODO use this slab vertical space to see if above slab will even influence
-                //  this one, if not then dont wait
-                let above =
-                    get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.above())
-                        .await;
-                trace!(
-                    "{} waited for above {}: {}",
-                    slab,
-                    slab.above(),
-                    if above.is_some() { "present" } else { "absent" }
-                );
-
-                // generate nav areas skipping the bottom slice
-                let mut areas = terrain.discover_navmesh(&vs, above.as_ref());
-
-                // bottom slice nav requires below slab vertical space, now wait for that
-                let below =
-                    get_or_wait_for_slab_vertical_space(&mut notifications, &world, slab.below())
-                        .await;
-                trace!(
-                    "{} waited for below {}: {}",
-                    slab,
-                    slab.below(),
-                    if below.is_some() { "present" } else { "absent" }
-                );
-                if let Some(below) = below.as_ref() {
-                    terrain.discover_bottom_slice_areas(&vs, below, &mut areas);
-                }
-
-                // discover internal areas and edges
-                areas.sort_unstable_by_key(|a| a.slice);
-                trace!("{} has {} areas: {:?}", slab, areas.len(), areas);
-                let graph = SlabNavGraph::discover(&areas);
-
-                {
-                    // put this into world and mark as DoneInIsolation
-                    let mut do_it = || {
-                        let mut w = world.borrow_mut();
-
-                        // temporary: just put all nodes and edges into world graph directly (TODO)
-                        w.nav_graph_mut().absorb(slab, &graph);
-
-                        let chunk = w.find_chunk_with_pos_mut(slab.chunk)?;
-
-                        // clear old slice areas
-                        chunk.replace_all_slice_areas(slab.slab, areas.iter().copied());
-
-                        chunk.replace_slab_nav_graph(slab.slab, graph);
-
-                        // let slab = w.get_slab_mut(slab)?;
-                        // TODO clear previous if indicated - but remember update to bottom slice is additive
-                        // slab.apply_navigation_updates(&update.new_areas, true);
-
-                        Some(())
-                    };
-                    let _ = do_it();
-                }
-
-                // ----- slab is now DoneInIsolation
-
-                // wait for neighbouring slabs to link up navigation
-                let mut this_border_areas = vec![];
-                let mut neighbour_border_areas = vec![];
-                let mut new_world_edges =
-                    HashSet::with_hasher(ahash::RandomState::with_seed(515175));
-                for (direction, offset) in NeighbourOffset::aligned() {
-                    let n_slab_loc = SlabLocation {
-                        chunk: slab.chunk + offset,
-                        slab: slab.slab,
-                    };
-
-                    // TODO only if both loading at the same time?
-                    // only add edges one way
-                    // if slab.chunk < n_slab_loc.chunk {
-                    //     continue;
-                    // }
-
-                    // check if there are any areas at the border that could link
-                    this_border_areas.extend(navigationv2::filter_border_areas(
-                        areas.iter().copied(),
-                        direction,
-                    ));
-                    trace!("this {slab} border edges: {:?}", this_border_areas);
-                    if !this_border_areas.is_empty() {
-                        // wait for neighbour to be DoneInIsolation too
-                        let neighbour_dir = direction.opposite();
-                        get_or_collect_slab_areas(
-                            &mut notifications,
-                            &world,
-                            n_slab_loc,
-                            |a, ai| as_border_area(*a, ai, neighbour_dir),
-                            &mut neighbour_border_areas,
-                        )
-                        .await;
-
-                        trace!(
-                            "neighbour {slab} -> {n_slab_loc} border edges: {:?}",
-                            neighbour_border_areas
-                        );
-                        if !neighbour_border_areas.is_empty() {
-                            navigationv2::discover_border_edges(
-                                &this_border_areas,
-                                &neighbour_border_areas,
-                                Some(direction),
-                                |src, dst, edge| {
-                                    let e = (src, dst, edge);
-                                    // allow duplicates here for now
-                                    if !new_world_edges.insert(e) {
-                                        warn!("duplicate graph edge: {src} -> {dst} : {edge:?}")
-                                    }
-                                },
-                            );
-
-                            // add edges to world nav graph
-                            {
-                                let mut w = world.borrow_mut();
-                                w.nav_graph_mut().add_inter_slab_edges(
-                                    slab,
-                                    n_slab_loc,
-                                    new_world_edges.drain(),
-                                );
-                            }
-
-                            // clear for next iteration
-                            neighbour_border_areas.clear();
-                        }
-
-                        // clear for next iteration
-                        this_border_areas.clear();
-                    }
-                }
-
-                // above neighbour
-                debug_assert!(this_border_areas.is_empty());
-                debug_assert!(neighbour_border_areas.is_empty());
-                this_border_areas.extend(navigationv2::filter_top_areas(areas.iter().copied()));
-                if !this_border_areas.is_empty() {
-                    // wait for slab above, fetch all areas
-                    let n_slab_loc = slab.above();
-                    get_or_collect_slab_areas(
-                        &mut notifications,
-                        &world,
-                        n_slab_loc,
-                        |area, info| {
-                            Some((
-                                SliceNavArea {
-                                    slice: area.slab_area.slice_idx,
-                                    from: info.range.0,
-                                    to: info.range.1,
-                                    height: info.height,
-                                },
-                                area.slab_area.slice_area,
-                            ))
-                        },
-                        &mut neighbour_border_areas,
-                    )
-                    .await;
-
-                    if !neighbour_border_areas.is_empty() {
-                        navigationv2::discover_border_edges(
-                            &this_border_areas,
-                            &neighbour_border_areas,
-                            None,
-                            |src, dst, edge| {
-                                let e = (src, dst, edge);
-                                // allow duplicates here for now
-                                if !new_world_edges.insert(e) {
-                                    warn!("duplicate graph edge: {src} -> {dst} : {edge:?}")
-                                }
-                            },
-                        );
-
-                        // add edges to world nav graph
-                        {
-                            let mut w = world.borrow_mut();
-                            w.nav_graph_mut().add_inter_slab_edges(
-                                slab,
-                                n_slab_loc,
-                                new_world_edges.drain(),
-                            );
-                        }
-
-                        // clear for next iteration
-                        neighbour_border_areas.clear();
-                    }
-                }
-
-                // TODO above and below neighbours: special case
-
-                // slab is now done
-                {
-                    let mut w = world.borrow_mut();
-
-                    if let Some(chunk) = w.find_chunk_with_pos_mut(slab.chunk) {
-                        chunk.mark_slab_as_done(slab.slab);
-                    }
-                }
-            });
+            self.pool.submit_any_async_with_handle(load_task::generate(
+                world,
+                slab,
+                slab_type,
+                source.clone(),
+                terrain_tx.clone(),
+            ));
 
             real_count += 1;
         }
@@ -473,45 +821,6 @@ impl<C: WorldContext> WorldLoader<C> {
 
         // TODO remove batches
         self.last_batch_size = count;
-    }
-
-    async fn step1_generate_terrain(
-        slab: SlabLocation,
-        slab_type: SlabType,
-        source: &TerrainSource<C>,
-    ) -> Result<(Slab<C>, Arc<SlabVerticalSpace>, Vec<C::GeneratedEntityDesc>), TerrainSourceError>
-    {
-        let mut entities = Vec::new();
-        let result = if let SlabType::Placeholder = slab_type {
-            // empty placeholder
-            Ok(None)
-        } else {
-            source.load_slab(slab).await.map(|generated| {
-                entities = generated.entities;
-                Some(generated.terrain)
-            })
-        };
-
-        let (terrain, vs) = match result {
-            Ok(Some(terrain)) => {
-                let vs = SlabVerticalSpace::discover(&terrain);
-                (terrain, vs)
-            }
-            Ok(None) => {
-                debug!("adding placeholder slab to the top of the chunk"; slab);
-                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
-            }
-            Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
-                // soft error, we're at the world edge. treat as all air instead of
-                // crashing and burning
-                debug!("slab is out of bounds, swapping in an empty one"; slab);
-
-                // TODO shared instance of CoW for empty slab
-                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
-            }
-            Err(err) => return Err(err),
-        };
-        Ok((terrain, vs, entities))
     }
 
     /// Note changes are made immediately to the terrain but are delayed for navigation.
@@ -624,13 +933,15 @@ impl<C: WorldContext> WorldLoader<C> {
 
         // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
         // navigation or rendering), world queries in the next game tick will be current with the
-        // changes applied now.
+        // changes applied now. the slabs loading state is returned to Requested
         // TODO reuse buf
         let mut slab_locs = Vec::with_capacity(upper_slab_limit);
-        let mut world = world_ref.borrow_mut();
-        world.apply_terrain_updates_in_place(grouped_updates.into_iter(), |slab_loc| {
-            slab_locs.push(slab_loc)
-        });
+        {
+            let mut w = world_ref.borrow_mut();
+            w.apply_terrain_updates_in_place(grouped_updates.into_iter(), |slab_loc| {
+                slab_locs.push(slab_loc)
+            });
+        }
 
         let real_slab_count = slab_locs.len();
         debug!(
@@ -638,44 +949,24 @@ impl<C: WorldContext> WorldLoader<C> {
             count = real_slab_count
         );
         debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
-        // submit slabs for finalization
-        // let mut batches = UpdateBatch::builder(&mut self.batch_ids, real_slab_count);
-        // unreachable!()
 
-        /*   for slab_loc in slab_locs.into_iter() {
-            debug!("submitting slab for finalization"; slab_loc);
-
-            let batch = batches.next_batch();
-            let world_ref = world_ref.clone();
-
-            self.pool.submit_async(
-                async move {
-                    let (_, navigation) =
-                        SlabProcessingFuture::with_inline_terrain(world_ref, slab_loc)
-                            .await
-                            .expect("chunk and slab should be present");
-
-                    // submit for finalization
-                    Ok(LoadedSlab {
-                        slab: slab_loc,
-                        terrain: None, // owned by the world
-                        vertical_space: todo!(),
-                        batch,
-                        entities: vec![], // no new entities to spawn for an update
-                    })
-                },
-                self.finalization_channel.clone(),
-            );
+        for slab in slab_locs.into_iter() {
+            let mut terrain_tx = self.pool.success_tx();
+            self.pool.submit_any_async_with_handle(load_task::update(
+                world_ref.clone(),
+                slab,
+                terrain_tx.clone(),
+            ));
         }
 
-        if let Err((n, m)) = batches.is_complete() {
-            panic!(
-                "incorrect batch size, only produced {}/{} updates in batch",
-                n, m
-            );
-        }
-
-        self.last_batch_size = real_slab_count*/
+        // if let Err((n, m)) = batches.is_complete() {
+        //     panic!(
+        //         "incorrect batch size, only produced {}/{} updates in batch",
+        //         n, m
+        //     );
+        // }
+        //
+        self.last_batch_size = real_slab_count;
     }
 
     pub fn block_on_next_finalization(

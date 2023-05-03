@@ -4,7 +4,9 @@ pub use self::builder::{ChunkBuilder, ChunkDescriptor, WorldBuilder};
 pub use self::chunk::{AreaInfo, Chunk, ChunkId, SlabAvailability, SlabThingOrWait};
 pub use self::slab::{Slab, SlabType};
 pub use self::slice::{flatten_coords, unflatten_index};
-pub use self::terrain::{BlockDamageResult, OcclusionChunkUpdate};
+pub use self::terrain::{
+    BlockDamageResult, NeighbourAreaHash, OcclusionChunkUpdate, SlabNeighbour,
+};
 pub(crate) use self::terrain::{SlabData, SlabStorage};
 
 mod builder;

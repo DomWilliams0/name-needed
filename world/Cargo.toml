@@ -21,6 +21,7 @@ array-init = "2.1"
 bitbybit = "1.1"
 arbitrary-int = "1.2"
 ahash = "0.8"
+md-5 = "0.10"
 
 [features]
 worldprocgen = []

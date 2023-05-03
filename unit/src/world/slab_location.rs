@@ -27,6 +27,13 @@ impl SlabLocation {
         self.slab.0 += 1;
         self
     }
+
+    pub fn with_chunk_offset(self, offset: (i16, i16)) -> Self {
+        Self {
+            chunk: self.chunk + offset,
+            ..self
+        }
+    }
 }
 
 impl Debug for SlabLocation {

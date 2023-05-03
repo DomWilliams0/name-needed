@@ -21,8 +21,10 @@ pub type LoadTerrainResult = Result<SlabLocation, TerrainSourceError>;
 pub struct AsyncWorkerPool {
     pool: tokio::runtime::Runtime,
     success_rx: async_channel::UnboundedReceiver<Result<SlabLocation, TerrainSourceError>>,
-    success_tx: async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>>,
+    success_tx: LoadSuccessTx,
 }
+
+pub type LoadSuccessTx = async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>>;
 
 impl AsyncWorkerPool {
     /// Spawns no threads, only runs on current thread

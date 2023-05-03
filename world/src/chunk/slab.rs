@@ -216,7 +216,7 @@ impl IntoIterator for SlabInternalNavigability {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SliceNavArea {
     pub slice: LocalSliceIndex,
     pub from: (BlockCoord, BlockCoord),
@@ -258,11 +258,11 @@ impl<C: WorldContext> Slab<C> {
         &self,
         vertical_space: &SlabVerticalSpace,
         above: Option<&Arc<SlabVerticalSpace>>,
-    ) -> Vec<SliceNavArea> {
+        out: &mut Vec<SliceNavArea>,
+    ) {
         let maximum: u8 = 4; // TODO pass through
-        let mut rects = vec![];
         let mut cfg = NavmeshCfg {
-            vec: &mut rects,
+            vec: out,
             cur_slice: LocalSliceIndex::second_from_bottom(), // first slice is skipped
         };
 
@@ -285,13 +285,12 @@ impl<C: WorldContext> Slab<C> {
                 }
             }
 
-            if above.is_some() {
+            if let Some(above) = above {
                 // check if this goes to the top of the slab, so if we need above
-                let remaining_until_top = LocalSliceIndex::top().slice() - slice_idx.slice();
-                let remaining_until_top = remaining_until_top as u8;
+                let remaining_until_top =
+                    (LocalSliceIndex::top().slice() - slice_idx.slice()) as u8;
                 if remaining_until_top < maximum {
-                    let above = unsafe { above.unwrap_unchecked() }; // checked already
-                                                                     // in the top few slices, check each block if it extends into slab above
+                    // in the top few slices, check each block if it extends into slab above
                     for (i, this) in input
                         .iter_mut()
                         .enumerate()
@@ -311,8 +310,6 @@ impl<C: WorldContext> Slab<C> {
             cfg.cur_slice = slice_idx;
             make_mesh(&mut cfg, &input, &mut output, &mut initialised);
         }
-
-        rects
     }
 
     pub(crate) fn discover_bottom_slice_areas(
@@ -356,7 +353,7 @@ impl<C: WorldContext> Slab<C> {
         make_mesh(&mut cfg, &input, &mut output, &mut initialised);
     }
 
-    fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
+    pub fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
         // TODO sucks to do this because we cant mutate the block directly while iterating
         let mut occlusion_updates = vec![];
         self.ascending_slice_window(

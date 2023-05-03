@@ -1,15 +1,15 @@
 use misc::*;
 
 use unit::world::{
-    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation,
-    SliceBlock, SliceIndex, WorldPosition,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
+    SlabLocation, SliceBlock, SliceIndex, WorldPosition,
 };
 
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice::{Slice, SliceOwned};
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator};
-use crate::chunk::terrain::SlabStorage;
+use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage, SlabVersion};
 use crate::chunk::SlabData;
 use crate::navigation::{BlockGraph, SlabAreaIndex};
 use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
@@ -50,7 +50,7 @@ pub struct Chunk<C: WorldContext> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum SlabLoadingStatus {
+pub enum SlabLoadingStatus {
     /// Not available
     Unloaded,
 
@@ -60,6 +60,9 @@ pub(crate) enum SlabLoadingStatus {
     /// Terrain is in chunk with isolated occlusion and vertical space and nav areas (both are *missing bottom slice*).
     /// Depends on slab above
     TerrainInWorld,
+
+    /// Was in Done but bottom slab changed, currently processing the update
+    Updating,
 
     /// Bottom slice of and nav has been provided by slab below, so now full nav areas
     /// are available. Internal area links are known, and SlabNavGraph is stored in the chunk
@@ -72,7 +75,7 @@ pub(crate) enum SlabLoadingStatus {
 pub enum SlabAvailability {
     NotRequested,
     InProgress,
-    /// Last change time
+    /// Last modify time
     Present(Instant),
 }
 
@@ -129,7 +132,8 @@ impl<C: WorldContext> Chunk<C> {
                 slice_area: area,
             },
         };
-        self.areas.get(&chunk_area).map(|ai| (chunk_area, *ai))
+        // self.areas.get(&chunk_area).map(|ai| (chunk_area, *ai))
+        unreachable!()
     }
 
     pub fn area_info(&self, slab: SlabIndex, slab_area: SlabArea) -> Option<AreaInfo> {
@@ -152,6 +156,10 @@ impl<C: WorldContext> Chunk<C> {
         })
     }
 
+    pub fn iter_areas_with_info(&self) -> impl Iterator<Item = (ChunkArea, AreaInfo)> + '_ {
+        self.areas.iter().map(|(k, v)| (*k, *v))
+    }
+
     pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> {
         self.areas.keys()
     }
@@ -168,16 +176,12 @@ impl<C: WorldContext> Chunk<C> {
         unreachable!()
     }
 
-    pub fn replace_all_slice_areas(
-        &mut self,
-        slab: SlabIndex,
-        new_areas: impl Iterator<Item = SliceNavArea>,
-    ) {
+    pub fn replace_all_slice_areas(&mut self, slab: SlabIndex, new_areas: &[SliceNavArea]) {
         // remove all for this slab
         self.areas.retain(|a, _| a.slab_idx != slab);
 
         let mut area_alloc = SliceAreaIndexAllocator::default();
-        self.areas.extend(new_areas.map(|a| {
+        self.areas.extend(new_areas.iter().map(|a| {
             (
                 ChunkArea {
                     slab_idx: slab,
@@ -256,6 +260,11 @@ impl<C: WorldContext> Chunk<C> {
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
     }
 
+    pub(crate) fn mark_slab_as_updating(&self, slab: SlabIndex) {
+        self.update_slab_status(slab, SlabLoadingStatus::Updating);
+        // self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+    }
+
     pub(crate) fn mark_slab_as_done(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Done);
         self.slab_notify.notify(SlabLocation::new(slab, self.pos));
@@ -306,6 +315,15 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
+    pub fn iter_loading_slabs(&self, mut per_slab: impl FnMut(SlabIndex, SlabLoadingStatus)) {
+        let guard = self.slab_progress.read();
+        for (slab, state) in guard.iter() {
+            if !matches!(state, SlabLoadingStatus::Done) {
+                per_slab(*slab, state.clone())
+            }
+        }
+    }
+
     pub fn is_slab_loaded(&self, slab: SlabIndex) -> bool {
         let progress = self.slab_progress(slab);
         matches!(progress, SlabLoadingStatus::Done)
@@ -337,7 +355,7 @@ impl<C: WorldContext> Chunk<C> {
 
         match progress {
             Unloaded => Failure,
-            Requested | TerrainInWorld => Wait,
+            Requested | TerrainInWorld | Updating => Wait,
             DoneInIsolation | Done => {
                 self.areas
                     .iter()
@@ -357,17 +375,16 @@ impl<C: WorldContext> Chunk<C> {
     }
 
     pub fn slab_availability(&self, slab: SlabIndex) -> SlabAvailability {
+        use SlabLoadingStatus::*;
         match self.slab_progress(slab) {
-            SlabLoadingStatus::Unloaded => SlabAvailability::NotRequested,
-            SlabLoadingStatus::Requested
-            | SlabLoadingStatus::TerrainInWorld
-            | SlabLoadingStatus::DoneInIsolation => SlabAvailability::InProgress,
-            SlabLoadingStatus::Done => {
+            Unloaded => SlabAvailability::NotRequested,
+            Requested | TerrainInWorld | DoneInIsolation | Updating => SlabAvailability::InProgress,
+            Done => {
                 let data = self
                     .terrain()
                     .slab_data(slab)
                     .expect("slab data should be present for Done slab");
-                SlabAvailability::Present(data.load_time)
+                SlabAvailability::Present(data.last_modify_time)
             }
         }
     }
@@ -376,19 +393,42 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab_data(slab).map(|s| s.vertical_space.clone())
     }
 
-    /// Sets state to DoneInIsolation
-    pub(crate) fn replace_slab_nav_graph(&mut self, slab: SlabIndex, graph: SlabNavGraph) {
+    /// Sets state to DoneInIsolation. Returns prev neighbour hashes
+    pub(crate) fn replace_slab_nav_graph(
+        &mut self,
+        slab: SlabIndex,
+        graph: SlabNavGraph,
+        areas: &[SliceNavArea],
+    ) -> Option<[NeighbourAreaHash; 6]> {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.nav = graph;
+
+            let old_hashes = s.neighbour_edge_hashes;
+
+            // calculate hashes for border areas
+            for (n_dir, out) in SlabNeighbour::VALUES
+                .iter()
+                .zip(s.neighbour_edge_hashes.iter_mut())
+            {
+                *out = NeighbourAreaHash::for_areas_with_edge(*n_dir, areas.iter().copied());
+                trace!(
+                    "new neighbour hash for {:?}: {:?} ({} neighbours)",
+                    n_dir,
+                    *out,
+                    areas.iter().filter(|a| n_dir.is_border(*a)).count()
+                )
+            }
+
             self.mark_slab_as_done_in_isolation(slab);
+            return Some(old_hashes);
         }
+
+        None
     }
 
-    /// Sets modified time to now
     pub(crate) fn set_slab_vertical_space(&mut self, slab: SlabIndex, vs: Arc<SlabVerticalSpace>) {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.vertical_space = vs;
-            s.load_time = Instant::now();
         }
     }
 
@@ -471,6 +511,15 @@ impl AreaInfo {
                 .to_global(area.chunk_area.slab_idx),
         )
         .to_world_position(area.chunk_idx)
+    }
+
+    pub(crate) fn as_slice_nav_area(&self, slice: LocalSliceIndex) -> SliceNavArea {
+        SliceNavArea {
+            slice,
+            from: self.range.0,
+            to: self.range.1,
+            height: self.height,
+        }
     }
 }
 

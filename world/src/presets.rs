@@ -182,7 +182,7 @@ pub fn bottleneck<C: WorldContext>(rng: &mut dyn RngCore) -> MemoryTerrainSource
 pub fn stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
     let mut chunk = ChunkBuilder::new();
 
-    const HEIGHT: i32 = 500;
+    const HEIGHT: i32 = 35;
 
     // 3x3 spiral
     const COORDS: [(i32, i32); 8] = [
