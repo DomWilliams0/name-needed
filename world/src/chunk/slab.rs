@@ -84,8 +84,12 @@ impl<C: WorldContext> Slab<C> {
         Self::new_empty(SlabType::Placeholder)
     }
 
+    pub fn all_stone() -> Self {
+        Self(C::all_stone(), SlabType::Normal)
+    }
+
     fn new_empty(ty: SlabType) -> Self {
-        Self::from_grid(SlabGrid::default(), ty)
+        Self(C::all_air(), ty)
     }
 
     pub fn from_grid(grid: SlabGrid<C>, ty: SlabType) -> Self {
@@ -94,7 +98,7 @@ impl<C: WorldContext> Slab<C> {
         Self(arc, ty)
     }
 
-    pub fn from_other_grid<G, T>(other: Grid<G>, ty: SlabType, conv: T) -> Self
+    pub fn from_other_grid<G, T>(other: &Grid<G>, ty: SlabType, conv: T) -> Self
     where
         G: GridImpl,
         T: Fn(&G::Item) -> <SlabGridImpl<C> as GridImpl>::Item,
@@ -130,6 +134,10 @@ impl<C: WorldContext> Slab<C> {
         Arc::strong_count(&self.0) == 1
     }
 
+    pub fn ref_count(&self) -> usize {
+        Arc::strong_count(&self.0)
+    }
+
     pub fn is_placeholder(&self) -> bool {
         matches!(self.1, SlabType::Placeholder)
     }
@@ -142,13 +150,13 @@ impl<C: WorldContext> Slab<C> {
 
     pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice<C> {
         let index = index.into();
-        let (from, to) = self.slice_range(index.slice_unsigned());
+        let (from, to) = SlabGridImpl::<C>::slice_range(index.slice_unsigned());
         Slice::new(&self.array()[from..to])
     }
 
     pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut<C> {
         let index = index.into();
-        let (from, to) = self.slice_range(index.slice_unsigned());
+        let (from, to) = SlabGridImpl::<C>::slice_range(index.slice_unsigned());
         SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 

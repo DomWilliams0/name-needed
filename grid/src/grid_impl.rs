@@ -84,12 +84,12 @@ pub trait GridImpl {
     }
 
     /// Vertical slice in z direction
-    fn slice_range(&self, index: u32) -> (usize, usize) {
-        self.slice_range_multiple(index, index + 1)
+    fn slice_range(index: u32) -> (usize, usize) {
+        Self::slice_range_multiple(index, index + 1)
     }
 
     /// Vertical slices in z direction, [from..to)
-    fn slice_range_multiple(&self, from: u32, to: u32) -> (usize, usize) {
+    fn slice_range_multiple(from: u32, to: u32) -> (usize, usize) {
         debug_assert!(from < to);
 
         let [xs, ys, _] = Self::DIMS;
@@ -199,12 +199,11 @@ impl<G: GridImpl> GridImplExt for G {
     }
 
     fn from_iter<T: IntoIterator<Item = G::Item>>(iter: T) -> Box<Self> {
-        let vec: Vec<G::Item> = iter.into_iter().collect();
-        assert_eq!(vec.len(), G::FULL_SIZE, "grid iterator is wrong length");
+        let slice: Box<[G::Item]> = iter.into_iter().take(G::FULL_SIZE).collect();
+        assert_eq!(slice.len(), G::FULL_SIZE, "grid iterator is wrong length");
 
         // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
         unsafe {
-            let slice = vec.into_boxed_slice();
             let raw_slice = Box::into_raw(slice);
             Box::from_raw(raw_slice as *mut Self)
         }

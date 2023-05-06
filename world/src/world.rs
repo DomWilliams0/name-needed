@@ -1135,12 +1135,14 @@ impl AreaLookup {
 /// Helpers to create a world synchronously for tests and benchmarks
 pub mod helpers {
     use color::Color;
+    use std::sync::Arc;
     use std::time::Duration;
 
     use misc::Itertools;
     use unit::world::{ChunkLocation, SlabLocation};
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
+    use crate::chunk::slab::SlabGridImpl;
     use crate::chunk::slice::SLICE_SIZE;
     use crate::context::NopGeneratedTerrainSource;
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
@@ -1167,6 +1169,13 @@ pub mod helpers {
 
         fn air_slice() -> &'static [Block<Self>; SLICE_SIZE] {
             todo!()
+        }
+
+        fn all_air() -> Arc<SlabGridImpl<Self>> {
+            WorldContext::slab_grid_of_all(DummyBlockType::Air)
+        }
+        fn all_stone() -> Arc<SlabGridImpl<Self>> {
+            WorldContext::slab_grid_of_all(DummyBlockType::Stone)
         }
 
         const PRESET_TYPES: [Self::BlockType; 3] = [

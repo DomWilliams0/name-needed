@@ -321,6 +321,7 @@ mod load_task {
 
         let (mut terrain, vs) = match result {
             Ok(Some(terrain)) => {
+                // TODO use shared reference of all air/all X terrain. then use a shared verticalspace reference for all air/all solid
                 let vs = SlabVerticalSpace::discover(&terrain);
                 (terrain, vs)
             }
