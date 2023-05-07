@@ -160,6 +160,41 @@ impl<C: WorldContext> Slab<C> {
         SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
     }
 
+    pub fn slice_below(&self, slice: Slice<C>) -> Option<Slice<C>> {
+        let src = slice.slice();
+        if src.as_ptr() == self.array().as_ptr() {
+            None
+        } else {
+            let slice_size = SlabGridImpl::<C>::SLICE_SIZE;
+            unsafe {
+                Some(Slice::new(std::slice::from_raw_parts(
+                    src.as_ptr().offset(-(slice_size as isize)),
+                    slice_size,
+                )))
+            }
+        }
+    }
+
+    pub fn slice_above(&self, slice: Slice<C>) -> Option<Slice<C>> {
+        let src = slice.slice();
+        let slice_size = SlabGridImpl::<C>::SLICE_SIZE;
+        let last_slice_ptr = unsafe {
+            self.array()
+                .as_ptr()
+                .offset((slice_size * (SlabGridImpl::<C>::DIMS[2] - 1)) as isize)
+        };
+        if src.as_ptr() == last_slice_ptr {
+            None
+        } else {
+            unsafe {
+                Some(Slice::new(std::slice::from_raw_parts(
+                    src.as_ptr().offset(slice_size as isize),
+                    slice_size,
+                )))
+            }
+        }
+    }
+
     /// (slice index *relative to this slab*, slice)
     pub fn slices_from_bottom(
         &self,
@@ -575,8 +610,10 @@ impl<C: WorldContext> SliceSource<'_, C> {
 #[cfg(test)]
 mod tests {
     use crate::chunk::slab::Slab;
+    use crate::chunk::slice::Slice;
     use crate::helpers::DummyWorldContext;
     use crate::DeepClone;
+    use unit::world::{LocalSliceIndex, SliceIndex};
 
     #[test]
     fn deep_clone() {
@@ -586,5 +623,42 @@ mod tests {
 
         assert!(std::ptr::eq(a.raw(), b.raw()));
         assert!(!std::ptr::eq(a.raw(), c.raw()));
+    }
+
+    #[test]
+    fn relative_slabs() {
+        let a = Slab::<DummyWorldContext>::empty();
+        for (idx, slice) in a.slices_from_bottom() {
+            let above = a.slice_above(slice);
+            let below = a.slice_below(slice);
+
+            if idx == LocalSliceIndex::bottom() {
+                assert!(below.is_none());
+                assert!(above.is_some());
+            } else if idx == LocalSliceIndex::top() {
+                assert!(below.is_some());
+                assert!(above.is_none())
+            } else {
+                assert!(below.is_some());
+                assert!(above.is_some());
+            }
+
+            let cmp_slab = |slice: Slice<DummyWorldContext>, idx| {
+                let cmp = a.slice(idx);
+                assert_eq!(cmp.as_ptr_range(), slice.slice().as_ptr_range());
+            };
+
+            if let Some(above) = above {
+                cmp_slab(above, LocalSliceIndex::new_unchecked(idx.slice() + 1));
+            } else {
+                assert_eq!(idx, LocalSliceIndex::top());
+            }
+
+            if let Some(below) = below {
+                cmp_slab(below, LocalSliceIndex::new_unchecked(idx.slice() - 1));
+            } else {
+                assert_eq!(idx, LocalSliceIndex::bottom());
+            }
+        }
     }
 }
