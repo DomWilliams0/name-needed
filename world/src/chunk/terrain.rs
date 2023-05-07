@@ -156,15 +156,9 @@ impl<C: WorldContext> SlabStorage<C> {
         self.slice(index).unwrap()
     }
 
-    /// Calls `Slab::expect_mut`, panics if not the exclusive reference
+    /// Same as `cow_clone`. TODO is this one needed ever?
     pub fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
-        let chunk_slice_idx = index.into();
-        let slab_idx = chunk_slice_idx.slab_index();
-        self.slabs.get_mut(slab_idx).map(|data| {
-            data.terrain
-                .expect_mut_self()
-                .slice_mut(chunk_slice_idx.to_local())
-        })
+        self.slice_mut_with_cow(index)
     }
 
     /// Calls `Slab::cow_clone`, triggering a slab copy if necessary
