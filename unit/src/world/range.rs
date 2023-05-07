@@ -20,6 +20,7 @@ pub struct WorldRange<P: RangePosition> {
 
 pub trait RangeNum: Num + Zero + Copy + PartialOrd + PartialEq + SubAssign + Mul {
     fn range_step() -> Self;
+    fn checked_sub(self, rhs: Self) -> Option<Self>;
 }
 
 pub trait RangePosition: Copy + Sized + PartialEq {
@@ -37,7 +38,8 @@ pub trait RangePosition: Copy + Sized + PartialEq {
 
     fn below(&self) -> Option<Self> {
         let (x, y, z) = self.xyz();
-        Self::new((x, y, z - Self::Z::one()))
+        let z = z.checked_sub(Self::Z::one())?;
+        Self::new((x, y, z))
     }
 
     fn above(&self) -> Option<Self> {
@@ -303,11 +305,19 @@ impl RangeNum for i32 {
     fn range_step() -> Self {
         1
     }
+
+    fn checked_sub(self, rhs: Self) -> Option<Self> {
+        i32::checked_sub(self, rhs)
+    }
 }
 
 impl RangeNum for BlockCoord {
     fn range_step() -> Self {
         1
+    }
+
+    fn checked_sub(self, rhs: Self) -> Option<Self> {
+        BlockCoord::checked_sub(self, rhs)
     }
 }
 
@@ -315,6 +325,10 @@ impl RangeNum for f32 {
     fn range_step() -> Self {
         // no difference between inclusive and exclusive ranges
         0.0
+    }
+
+    fn checked_sub(self, rhs: Self) -> Option<Self> {
+        Some(self - rhs)
     }
 }
 
