@@ -15,6 +15,8 @@ pub trait GridImpl {
     const DIMS: [usize; 3];
     const FULL_SIZE: usize;
 
+    const SLICE_SIZE: usize = Self::DIMS[0] * Self::DIMS[1];
+
     fn array(&self) -> &[Self::Item];
     fn array_mut(&mut self) -> &mut [Self::Item];
 
@@ -92,8 +94,7 @@ pub trait GridImpl {
     fn slice_range_multiple(from: u32, to: u32) -> (usize, usize) {
         debug_assert!(from < to);
 
-        let [xs, ys, _] = Self::DIMS;
-        let slice_count = (xs * ys) as u32;
+        let slice_count = Self::SLICE_SIZE as u32;
         let offset = from * slice_count;
         let n = to - from; // asserted to>from above
         (

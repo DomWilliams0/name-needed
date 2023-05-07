@@ -84,6 +84,10 @@ impl NeighbourOpacity {
         Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
     }
 
+    pub fn all_transparent() -> Self {
+        Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
+    }
+
     /// Top face only
     pub fn with_slice_above<C: WorldContext>(
         this_block: SliceBlock,

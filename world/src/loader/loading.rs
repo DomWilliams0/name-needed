@@ -52,7 +52,12 @@ pub enum BlockForAllError {
 
 mod load_task {
     use super::*;
+    use crate::block::BlockOpacity;
     use crate::loader::worker_pool::LoadSuccessTx;
+    use crate::occlusion::NeighbourOpacity;
+    use crate::{flatten_coords, BlockOcclusion, OcclusionFace};
+    use grid::GridImpl;
+    use unit::world::{RangePosition, SlabPositionAsCoord};
 
     enum ExtraInfo<C: WorldContext> {
         Generated {
@@ -345,8 +350,8 @@ mod load_task {
             }
         };
 
-        // TODO redo to use vertical space efficiently
-        // terrain.init_occlusion(None, None);
+        // discover occlusion internal to this slab
+        init_internal_occlusion(&mut terrain, &vs);
 
         the_ultimate_load_task(LoadContext {
             world,
@@ -616,6 +621,68 @@ mod load_task {
                 South => NeighbourOffset::South,
                 West => NeighbourOffset::West,
             })
+        }
+    }
+
+    fn init_internal_occlusion<C: WorldContext>(slab: &mut Slab<C>, vs: &SlabVerticalSpace) {
+        for (air_pos, height) in vs.iter_blocks() {
+            // TODO need to use height?
+
+            // block is air, so, do occlusion for block below
+            let pos = match air_pos.below() {
+                Some(pos) => pos,
+                None => {
+                    // TODO bottom slice?
+                    continue;
+                }
+            };
+            let mut occlusion = BlockOcclusion::default();
+
+            let slice_this = slab.slice(pos.z());
+            let slice_above = slab.slice_above(slice_this).unwrap(); // known to be available TODO unless top of slab?
+
+            occlusion.set_face(
+                OcclusionFace::Top,
+                NeighbourOpacity::with_slice_above(pos.to_slice_block(), slice_above),
+            );
+
+            for face in OcclusionFace::SIDE_FACES {
+                use OcclusionFace::*;
+
+                // extend in direction of face
+                let neighbour_opacity = match face.extend_sideways(pos.to_slice_block()) {
+                    None => {
+                        // missing chunk
+                        NeighbourOpacity::unknown()
+                    }
+                    Some(sideways_neighbour_pos) => {
+                        // check if totally occluded
+                        let neighbour_opacity = slice_this[sideways_neighbour_pos].opacity();
+
+                        if let BlockOpacity::Solid = neighbour_opacity {
+                            // totally occluded
+                            NeighbourOpacity::all_solid()
+                        } else {
+                            NeighbourOpacity::with_neighbouring_slices(
+                                sideways_neighbour_pos,
+                                slice_this,
+                                slab.slice_below(slice_this),
+                                Some(slice_above), // TODO always Some?
+                                face,
+                            )
+                        }
+                    }
+                };
+
+                occlusion.set_face(face, neighbour_opacity);
+            }
+
+            unsafe {
+                *slab
+                    .slice_mut(pos.z())
+                    .get_unchecked_mut(flatten_coords(pos.to_slice_block()))
+                    .occlusion_mut() = occlusion;
+            }
         }
     }
 }
