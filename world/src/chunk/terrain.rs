@@ -1,12 +1,15 @@
-use md5::digest::FixedOutput;
+use std::cmp::Ordering;
 use std::f32::EPSILON;
+use std::fmt::{Debug, Formatter};
 use std::hint::unreachable_unchecked;
 use std::iter::{once, repeat};
 use std::num::NonZeroU16;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::block::BlockDurability;
+use arbitrary_int::{u4, u5};
+use md5::digest::FixedOutput;
+use misc::FmtResult;
 use misc::*;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
@@ -14,20 +17,20 @@ use unit::world::{
 };
 use unit::world::{SliceBlock, CHUNK_SIZE};
 
-use crate::block::Block;
+use crate::block::BlockDurability;
+use crate::block::{Block, BlockEnriched};
 use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::Slab;
 use crate::chunk::slab::{DeepClone, SliceNavArea};
 use crate::chunk::slice::{Slice, SliceMut};
 use crate::chunk::Chunk;
-
 use crate::helpers::DummyWorldContext;
 use crate::loader::SlabVerticalSpace;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::navigationv2::{is_border, is_bottom_area, is_top_area, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
-use crate::{BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
+use crate::{BlockOcclusion, BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(usize)]
@@ -106,6 +109,147 @@ impl Debug for NeighbourAreaHash {
     }
 }
 
+/// Maps T to a block in a slab
+#[derive(Derivative, Clone)]
+#[derivative(Default(bound = ""))]
+pub struct SparseGrid<T>(Vec<(PackedSlabPosition, T)>);
+
+pub struct SparseGridExtension<'a, T> {
+    grid: &'a mut SparseGrid<T>,
+    needs_sort: bool,
+}
+
+impl<T> SparseGrid<T> {
+    pub fn new_unsorted(mut positions: Vec<(PackedSlabPosition, T)>) -> Self {
+        positions.sort_unstable_by_key(|(k, _)| *k);
+        Self(positions)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (SlabPosition, &T)> + '_ {
+        self.0.iter().map(|(pos, t)| ((*pos).into(), t))
+    }
+
+    fn find(&self, pos: SlabPosition) -> Option<usize> {
+        self.0
+            .binary_search_by_key(&PackedSlabPosition::from(pos), |(k, _)| *k)
+            .ok()
+    }
+
+    pub fn contains(&self, pos: SlabPosition) -> bool {
+        self.find(pos).is_some()
+    }
+
+    pub fn get(&self, pos: SlabPosition) -> Option<&T> {
+        self.find(pos)
+            .map(|i| unsafe { &self.0.get_unchecked(i).1 })
+    }
+
+    pub fn get_mut(&mut self, pos: SlabPosition) -> Option<&mut T> {
+        self.find(pos)
+            .map(|i| unsafe { &mut self.0.get_unchecked_mut(i).1 })
+    }
+
+    pub fn extend(&mut self) -> SparseGridExtension<T> {
+        SparseGridExtension {
+            grid: self,
+            needs_sort: false,
+        }
+    }
+}
+
+impl<T: Default> SparseGridExtension<'_, T> {
+    /// Must not exist already
+    pub fn add_new(&mut self, pos: SlabPosition, val: T) {
+        debug_assert!(!self.grid.contains(pos));
+
+        self.grid.0.push((pos.into(), val));
+        self.needs_sort = true;
+    }
+
+    pub fn get_or_insert(&mut self, pos: SlabPosition) -> &mut T {
+        let idx = match self.grid.find(pos) {
+            None => {
+                self.add_new(pos, T::default());
+                self.grid.0.len() - 1
+            }
+            Some(i) => i,
+        };
+        unsafe { &mut self.grid.0.get_unchecked_mut(idx).1 }
+    }
+
+    pub fn remove(&mut self, pos: SlabPosition) {
+        if let Some(idx) = self.grid.find(pos) {
+            self.grid.0.swap_remove(idx);
+            self.needs_sort = true;
+        }
+    }
+}
+
+impl<T> Drop for SparseGridExtension<'_, T> {
+    fn drop(&mut self) {
+        if self.needs_sort {
+            self.grid.0.sort_unstable_by_key(|(k, _)| *k);
+        }
+    }
+}
+
+#[bitbybit::bitfield(u16, default: 0)]
+#[derive(Eq, PartialEq)]
+pub struct PackedSlabPosition {
+    #[bits(12..=15, rw)]
+    x: u4,
+
+    #[bits(8..=11, rw)]
+    y: u4,
+
+    #[bits(3..=7, rw)]
+    z: u5,
+}
+
+impl From<PackedSlabPosition> for SlabPosition {
+    fn from(packed: PackedSlabPosition) -> Self {
+        SlabPosition::new_unchecked(
+            packed.x().value(),
+            packed.y().value(),
+            LocalSliceIndex::new_srsly_unchecked(packed.z().value()),
+        )
+    }
+}
+
+impl From<SlabPosition> for PackedSlabPosition {
+    fn from(pos: SlabPosition) -> Self {
+        unsafe {
+            PackedSlabPosition::new()
+                .with_x(u4::new_unchecked(pos.x()))
+                .with_y(u4::new_unchecked(pos.y()))
+                .with_z(u5::new_unchecked(pos.z().slice()))
+        }
+    }
+}
+
+impl PartialOrd for PackedSlabPosition {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PackedSlabPosition {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.z()
+            .cmp(&other.z())
+            .then(self.y().cmp(&other.y()))
+            .then(self.x().cmp(&other.x()))
+    }
+}
+
+impl Debug for PackedSlabPosition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("PackedSlabPosition")
+            .field(&SlabPosition::from(*self))
+            .finish()
+    }
+}
+
 pub struct SlabData<C: WorldContext> {
     pub(crate) terrain: Slab<C>,
     pub(crate) nav: SlabNavGraph, // currently unused
@@ -117,6 +261,8 @@ pub struct SlabData<C: WorldContext> {
     pub(in crate::chunk) neighbour_versions: [Option<SlabVersion>; SlabNeighbour::N],
 
     pub(crate) neighbour_edge_hashes: [NeighbourAreaHash; SlabNeighbour::N],
+
+    pub(crate) occlusion: SparseGrid<BlockOcclusion>,
 }
 
 /// Wrapping version for a slab to detect changes. Incremented each time it is modified
@@ -186,9 +332,20 @@ impl<C: WorldContext> SlabStorage<C> {
 
     /// Panics if invalid position
     #[cfg(test)]
-    pub fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<Block<C>> {
+    pub fn get_block_tup(&self, pos: (i32, i32, i32)) -> Option<BlockEnriched<C>> {
         let pos = BlockPosition::try_from(pos).expect("bad position");
-        self.slice(pos.z()).map(|slice| slice[pos])
+        let block = self.slice(pos.z()).map(|slice| slice[pos])?;
+
+        let data = self.slab_data(pos.z().slab_index()).expect("bad slab");
+        let occlusion = data
+            .occlusion
+            .get(SlabPosition::from(pos))
+            .copied()
+            .unwrap_or_default();
+        Some(BlockEnriched {
+            block_type: block.block_type(),
+            occlusion,
+        })
     }
 
     /// Only for tests
@@ -235,6 +392,13 @@ impl<C: WorldContext> SlabStorage<C> {
             .iter_increasing()
             .zip(self.slabs.indices_increasing())
             .map(|(data, idx)| (&data.terrain, SlabIndex(idx)))
+    }
+
+    pub(crate) fn slab_data_from_bottom(&self) -> impl Iterator<Item = (&SlabData<C>, SlabIndex)> {
+        self.slabs
+            .iter_increasing()
+            .zip(self.slabs.indices_increasing())
+            .map(|(data, idx)| (data, SlabIndex(idx)))
     }
 
     /// Adds slab, returning old if it exists
@@ -309,8 +473,7 @@ impl<C: WorldContext> SlabStorage<C> {
     /// (global slice index, slice)
     pub fn slices_from_top_offset(&self) -> impl Iterator<Item = (GlobalSliceIndex, Slice<C>)> {
         self.slabs_from_top().flat_map(|(slab, idx)| {
-            slab.slices_from_bottom()
-                .rev()
+            slab.slices_from_top()
                 .map(move |(z, slice)| (z.to_global(idx), slice))
         })
     }
@@ -425,43 +588,14 @@ impl<C: WorldContext> SlabStorage<C> {
     }
 
     /// Returns iter of slabs affected, probably duplicated but in order
+    #[deprecated]
     pub fn apply_occlusion_updates<'a>(
         &'a mut self,
         updates: &'a [(BlockPosition, BlockOcclusionUpdate)],
     ) -> impl Iterator<Item = SlabIndex> + 'a {
         updates
             .iter()
-            .filter_map(move |&(block_pos, new_opacities)| {
-                // obtain immutable slice for checking, to avoid unnecessary CoW slab copying
-                let slice = self.slice_unchecked(block_pos.z());
-
-                if *slice[block_pos].occlusion() != new_opacities {
-                    // opacities have changed, promote slice to mutable, possibly triggering a slab copy
-                    // TODO this is sometimes a false positive, triggering unnecessary copies
-                    let block_mut =
-                        &mut self.slice_mut_unchecked_with_cow(block_pos.z())[block_pos];
-
-                    // for trace logging only
-                    let _old_occlusion = *block_mut.occlusion();
-
-                    block_mut
-                        .occlusion_mut()
-                        .update_from_neighbour_opacities(&new_opacities);
-
-                    trace!(
-                        "new AO for block";
-                        "block" => ?block_pos,
-                        "old" => ?_old_occlusion,
-                        "new" => ?new_opacities,
-                        "updated" => ?block_mut.occlusion()
-                    );
-
-                    let slab = block_pos.z().slab_index();
-                    Some(slab)
-                } else {
-                    None
-                }
-            })
+            .filter_map(move |&(block_pos, new_opacities)| unreachable!())
     }
 
     // TODO use an enum for the slice range rather than Options
@@ -536,6 +670,7 @@ impl<C: WorldContext> SlabData<C> {
             version: Default::default(),
             neighbour_versions: [None; SlabNeighbour::N],
             neighbour_edge_hashes: [NeighbourAreaHash::default(); SlabNeighbour::N],
+            occlusion: SparseGrid::default(),
         }
     }
 }
@@ -549,7 +684,8 @@ impl<C: WorldContext> DeepClone for SlabData<C> {
             last_modify_time: self.last_modify_time,
             version: self.version,
             neighbour_versions: self.neighbour_versions,
-            neighbour_edge_hashes: [NeighbourAreaHash::default(); SlabNeighbour::N],
+            neighbour_edge_hashes: self.neighbour_edge_hashes,
+            occlusion: self.occlusion.clone(),
         }
     }
 }
@@ -585,11 +721,15 @@ impl<C: WorldContext> Default for SlabStorage<C> {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
+
     use unit::world::{GlobalSliceIndex, WorldPositionRange, SLAB_SIZE};
     use unit::world::{WorldPosition, CHUNK_SIZE};
 
     use crate::chunk::slab::Slab;
     use crate::chunk::ChunkBuilder;
+    use crate::helpers::{loader_from_chunks_blocking, DummyBlockType};
+    use crate::loader::WorldTerrainUpdate;
     use crate::occlusion::{OcclusionFace, VertexOcclusion};
     use crate::world::helpers::{
         apply_updates, load_single_chunk, world_from_chunks_blocking, DummyWorldContext,
@@ -597,9 +737,6 @@ mod tests {
     use crate::{World, WorldArea, WorldRef};
 
     use super::*;
-    use crate::helpers::{loader_from_chunks_blocking, DummyBlockType};
-    use crate::loader::WorldTerrainUpdate;
-    use std::convert::TryInto;
 
     #[test]
     fn empty() {
@@ -966,12 +1103,14 @@ mod tests {
         face: OcclusionFace,
     ) -> [VertexOcclusion; 4] {
         let chunk = world.find_chunk_with_pos(chunk).unwrap();
-        let block = chunk
+        let occlusion = chunk
             .terrain()
-            .get_block(block.try_into().unwrap())
-            .unwrap();
-        let (occlusion, _) = block.occlusion().resolve_vertices(face);
-        occlusion
+            .slab_data(GlobalSliceIndex::new(block.2).slab_index())
+            .expect("bad slab")
+            .occlusion
+            .get(WorldPosition::from(block).into())
+            .expect("no occlusion for block");
+        occlusion.resolve_vertices(face).0
     }
 
     #[test]
@@ -1222,5 +1361,45 @@ mod tests {
             ),
             None
         ); // too tall
+    }
+
+    #[test]
+    fn sparse_grid() {
+        let blocks = [
+            SlabPosition::new_unchecked(5, 5, LocalSliceIndex::new_srsly_unchecked(2)),
+            SlabPosition::new_unchecked(1, 5, LocalSliceIndex::new_srsly_unchecked(6)),
+            SlabPosition::new_unchecked(5, 2, LocalSliceIndex::new_srsly_unchecked(1)),
+            SlabPosition::new_unchecked(3, 3, LocalSliceIndex::new_srsly_unchecked(0)),
+        ];
+
+        let vals = [1, 2, 3, 4];
+
+        let mut grid = SparseGrid::new_unsorted(
+            blocks
+                .into_iter()
+                .map(|p| PackedSlabPosition::from(p))
+                .zip(vals)
+                .collect_vec(),
+        );
+
+        for (b, v) in blocks.iter().zip(vals) {
+            assert_eq!(grid.get(*b).copied(), Some(v));
+        }
+
+        assert!(!grid.contains(SlabPosition::new_unchecked(
+            3,
+            3,
+            LocalSliceIndex::new_srsly_unchecked(2)
+        )));
+
+        let new_block = SlabPosition::new_unchecked(8, 3, LocalSliceIndex::new_srsly_unchecked(0));
+        let mut ext = grid.extend();
+        ext.remove(blocks[0]);
+        *ext.get_or_insert(new_block) = 10;
+        drop(ext);
+
+        assert_eq!(grid.iter().count(), blocks.len());
+        assert!(!grid.contains(blocks[0]));
+        assert_eq!(grid.get(new_block).copied(), Some(10));
     }
 }

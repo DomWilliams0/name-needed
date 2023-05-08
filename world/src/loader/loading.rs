@@ -53,6 +53,7 @@ pub enum BlockForAllError {
 mod load_task {
     use super::*;
     use crate::block::BlockOpacity;
+    use crate::chunk::SparseGrid;
     use crate::loader::worker_pool::LoadSuccessTx;
     use crate::occlusion::NeighbourOpacity;
     use crate::{flatten_coords, BlockOcclusion, OcclusionFace};
@@ -64,6 +65,7 @@ mod load_task {
             entities: Vec<C::GeneratedEntityDesc>,
             terrain: Slab<C>,
             vs: Arc<SlabVerticalSpace>,
+            occlusion: SparseGrid<BlockOcclusion>,
         },
         Updated,
     }
@@ -81,17 +83,13 @@ mod load_task {
 
         // get terrain and vertical space
         let is_update = matches!(ctx.extra, ExtraInfo::Updated);
-        let (terrain, new_terrain, vs, entities) = match ctx.extra {
+        let (terrain, new_terrain, vs, entities, occlusion) = match ctx.extra {
             ExtraInfo::Generated {
                 entities,
                 terrain,
                 vs,
-            } => (
-                terrain.clone(),
-                Some(terrain),
-                vs,
-                (!entities.is_empty()).then_some(entities),
-            ),
+                occlusion,
+            } => (terrain.clone(), Some(terrain), vs, entities, occlusion),
             ExtraInfo::Updated => {
                 let w = ctx.world.borrow();
 
@@ -109,8 +107,9 @@ mod load_task {
                 // this slab, but its only use is for area discovery while we also have the above one
                 // available, so no matter for loading
                 let vs = SlabVerticalSpace::discover(&terrain);
+                let occlusion = init_internal_occlusion(&terrain, &vs);
 
-                (terrain, None, vs, None)
+                (terrain, None, vs, vec![], occlusion)
             }
         };
 
@@ -121,8 +120,7 @@ mod load_task {
             notifications = w.load_notifications().start_listening(); // might be pointless sometimes
 
             // spawn entities if necessary
-            if let Some(entities) = entities {
-                debug_assert!(!entities.is_empty());
+            if !entities.is_empty() {
                 trace!(
                     "passing {n} entity descriptions from slab to world to spawn next tick",
                     n = entities.len()
@@ -133,7 +131,7 @@ mod load_task {
             }
 
             // put terrain into chunk
-            w.populate_chunk_with_slab(slab, new_terrain, vs.clone());
+            w.populate_chunk_with_slab(slab, new_terrain, vs.clone(), occlusion);
             w.mark_slab_dirty(slab);
         }
 
@@ -324,7 +322,7 @@ mod load_task {
             })
         };
 
-        let (mut terrain, vs) = match result {
+        let (terrain, vs) = match result {
             Ok(Some(terrain)) => {
                 // TODO use shared reference of all air/all X terrain. then use a shared verticalspace reference for all air/all solid
                 let vs = SlabVerticalSpace::discover(&terrain);
@@ -351,7 +349,7 @@ mod load_task {
         };
 
         // discover occlusion internal to this slab
-        init_internal_occlusion(&mut terrain, &vs);
+        let occlusion = init_internal_occlusion(&terrain, &vs);
 
         the_ultimate_load_task(LoadContext {
             world,
@@ -361,6 +359,7 @@ mod load_task {
                 entities,
                 terrain,
                 vs,
+                occlusion,
             },
         })
         .await
@@ -624,10 +623,13 @@ mod load_task {
         }
     }
 
-    fn init_internal_occlusion<C: WorldContext>(slab: &mut Slab<C>, vs: &SlabVerticalSpace) {
-        for (air_pos, height) in vs.iter_blocks() {
-            // TODO need to use height?
-
+    fn init_internal_occlusion<C: WorldContext>(
+        slab: &Slab<C>,
+        vs: &SlabVerticalSpace,
+    ) -> SparseGrid<BlockOcclusion> {
+        let mut grid = SparseGrid::default();
+        let mut grid_ext = grid.extend();
+        for (air_pos, _) in vs.iter_blocks() {
             // block is air, so, do occlusion for block below
             let pos = match air_pos.below() {
                 Some(pos) => pos,
@@ -677,13 +679,11 @@ mod load_task {
                 occlusion.set_face(face, neighbour_opacity);
             }
 
-            unsafe {
-                *slab
-                    .slice_mut(pos.z())
-                    .get_unchecked_mut(flatten_coords(pos.to_slice_block()))
-                    .occlusion_mut() = occlusion;
-            }
+            grid_ext.add_new(pos, occlusion);
         }
+
+        drop(grid_ext);
+        grid
     }
 }
 

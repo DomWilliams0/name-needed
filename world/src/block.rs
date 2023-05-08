@@ -14,19 +14,26 @@ pub struct Block<C: WorldContext> {
     block_type: C::BlockType,
 
     /// How damaged the block is
+    // TODO put into slab data too
     durability: Proportion<BlockDurability>,
 
     /// Navigability
+    #[deprecated]
     area: SlabAreaIndex,
 
     /// Only for navigation if [is_accessible] is set
+    #[deprecated]
     nav_area: SliceAreaIndex,
 
     // TODO pack into a bit
+    #[deprecated]
     is_accessible: bool,
+}
 
-    /// Lighting
-    occlusion: BlockOcclusion,
+/// Enriched with info from slab data that isnt stored inline in blocks
+pub struct BlockEnriched<C: WorldContext> {
+    pub block_type: C::BlockType,
+    pub occlusion: BlockOcclusion,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -46,7 +53,6 @@ impl<C: WorldContext> Block<C> {
                 Proportion::with_value(max, max)
             },
             area: SlabAreaIndex::UNINITIALIZED,
-            occlusion: BlockOcclusion::default(),
             nav_area: SliceAreaIndex::DEFAULT, // irrelevant because not accessible
             is_accessible: false,
         }
@@ -57,7 +63,6 @@ impl<C: WorldContext> Block<C> {
             block_type: C::BlockType::AIR,
             durability: Proportion::default_empty(),
             area: SlabAreaIndex::UNINITIALIZED,
-            occlusion: BlockOcclusion::default_const(),
             nav_area: SliceAreaIndex::DEFAULT, // irrelevant because not accessible
             is_accessible: false,
         }
@@ -129,13 +134,6 @@ impl<C: WorldContext> Block<C> {
         }
     }
 
-    pub fn occlusion_mut(&mut self) -> &mut BlockOcclusion {
-        &mut self.occlusion
-    }
-    pub fn occlusion(&self) -> &BlockOcclusion {
-        &self.occlusion
-    }
-
     pub(crate) fn durability_mut(&mut self) -> &mut Proportion<BlockDurability> {
         &mut self.durability
     }
@@ -147,6 +145,16 @@ impl<C: WorldContext> Block<C> {
     /// True if air or durability == 0
     pub fn is_destroyed(&self) -> bool {
         self.durability.value() == 0 || self.block_type.is_air()
+    }
+}
+
+impl<C: WorldContext> BlockEnriched<C> {
+    pub fn block_type(&self) -> C::BlockType {
+        self.block_type
+    }
+
+    pub fn occlusion(&self) -> &BlockOcclusion {
+        &self.occlusion
     }
 }
 

@@ -196,10 +196,14 @@ impl<C: WorldContext> Slab<C> {
     }
 
     /// (slice index *relative to this slab*, slice)
-    pub fn slices_from_bottom(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = (LocalSliceIndex, Slice<C>)> {
-        LocalSliceIndex::slices().map(move |idx| (idx, self.slice(idx)))
+    #[inline]
+    pub fn slices_from_bottom(&self) -> impl Iterator<Item = (LocalSliceIndex, Slice<C>)> {
+        let mut slice = Some(self.slice(LocalSliceIndex::bottom()));
+        LocalSliceIndex::slices().zip(std::iter::from_fn(move || {
+            let ret = slice;
+            slice = slice.and_then(|slice| self.slice_above(slice));
+            ret
+        }))
     }
 
     /// (slice index *relative to this slab*, slice)
@@ -397,79 +401,7 @@ impl<C: WorldContext> Slab<C> {
     }
 
     pub fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
-        // TODO sucks to do this because we cant mutate the block directly while iterating
-        let mut occlusion_updates = vec![];
-        self.ascending_slice_window(
-            slice_above,
-            slice_below,
-            |slice_below, mut slice_this, slice_above| {
-                for (i, b) in slice_this.iter().enumerate() {
-                    let this_block = b.opacity();
-                    if this_block.transparent() {
-                        // TODO if leaving alone, ensure default is correct
-                        continue;
-                    }
-
-                    let pos = unflatten_index(i);
-
-                    let mut block_occlusion = *b.occlusion();
-
-                    for face in OcclusionFace::FACES {
-                        use OcclusionFace::*;
-
-                        // extend in direction of face
-                        let sideways_neighbour_pos = face.extend_sideways(pos);
-
-                        // check if totally occluded
-                        let neighbour_opacity = match face {
-                            Top => slice_above.map(|s| (*s)[i].opacity()),
-                            North => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
-                            East => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
-                            South => sideways_neighbour_pos.map(|pos| slice_this[pos].opacity()),
-                            West => sideways_neighbour_pos.map(|pos| (&slice_this)[pos].opacity()),
-                        };
-
-                        let neighbour_opacity = if let Some(BlockOpacity::Solid) = neighbour_opacity
-                        {
-                            // totally occluded
-                            NeighbourOpacity::all_solid()
-                        } else if let Top = face {
-                            // special case, top face only needs the slice above
-                            if let Some(slice_above) = slice_above {
-                                NeighbourOpacity::with_slice_above(pos, slice_above)
-                            } else {
-                                // no chunk above
-                                NeighbourOpacity::unknown()
-                            }
-                        } else if let Some(relative_pos) = sideways_neighbour_pos {
-                            NeighbourOpacity::with_neighbouring_slices(
-                                relative_pos,
-                                &slice_this,
-                                slice_below,
-                                slice_above,
-                                face,
-                            )
-                        } else {
-                            // missing chunk
-                            NeighbourOpacity::unknown()
-                        };
-
-                        block_occlusion.set_face(face, neighbour_opacity);
-                    }
-
-                    occlusion_updates.push((i, block_occlusion));
-                }
-
-                for &(i, occ) in &occlusion_updates {
-                    // safety: indices were just calculated above
-                    unsafe {
-                        *slice_this.get_unchecked_mut(i).occlusion_mut() = occ;
-                    }
-                }
-
-                occlusion_updates.clear();
-            },
-        );
+        unreachable!()
     }
 
     /// f(maybe slice below, this slice, slice above)

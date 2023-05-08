@@ -1,20 +1,17 @@
 use color::Color;
 use misc::*;
 use std::fmt::Debug;
-use std::hint::unreachable_unchecked;
 
 use crate::chunk::slab::Slab;
-use crate::chunk::slice::{unflatten_index, Slice};
-use crate::chunk::Chunk;
-use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip, VertexOcclusion};
+use crate::chunk::slice::Slice;
+use crate::chunk::{Chunk, SlabData};
+use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip};
 use crate::viewer::SliceRange;
 use crate::{BlockType, WorldContext};
 use grid::GridImpl;
 use std::mem::MaybeUninit;
-use unit::world::{GlobalSliceIndex, SliceBlock, SLAB_SIZE};
+use unit::world::{GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceBlock, SLAB_SIZE};
 use unit::world::{SliceIndex, CHUNK_SIZE};
-
-const VERTICES_PER_BLOCK: usize = 6;
 
 // for ease of declaration. /2 for radius as this is based around the center of the block
 const X: f32 = unit::world::BLOCKS_SCALE / 2.0;
@@ -35,11 +32,29 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
         (slice_index - slice_range.bottom()).slice() as f32
     };
 
-    for (slice_index, slice) in chunk.slice_range(slice_range) {
-        // TODO skip if slice knows it is empty
+    let range = |(a, b)| a..b;
+    for (a, b) in chunk
+        .terrain()
+        .slab_data_from_bottom()
+        .skip_while(|(_, s)| !range(s.slice_range()).contains(&slice_range.bottom()))
+        .take_while(|(_, s)| {
+            let (from, to) = s.slice_range();
+            to <= slice_range.top() || (from..to).contains(&slice_range.top())
+        })
+        .flat_map(|(slab, slab_idx)| {
+            slab.terrain
+                .slices_from_bottom()
+                .map(move |(slice_idx, slice)| (slice_idx, slab_idx, slice, slab))
+        })
+        .tuple_windows()
+    {
+        // too complex for ide apparently
+        let ((local_slice_index, slab_index, slice, slab), (_, _, slice_above, _)): (
+            (LocalSliceIndex, SlabIndex, Slice<C>, &SlabData<C>),
+            (_, _, Slice<C>, _),
+        ) = (a, b);
 
-        let slice_above = chunk.slice_or_dummy(slice_index + 1);
-        let slice_index = shifted_slice_index(slice_index);
+        let slice_index = shifted_slice_index(local_slice_index.to_global(slab_index));
 
         for (i, block_pos, block) in slice.non_air_blocks() {
             let above = unsafe { slice_above.get_unchecked(i) };
@@ -50,10 +65,17 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
                     slice_index,
                 ));
             }
+
+            let occlusion = slab
+                .occlusion
+                .get(block_pos.to_slab_position(local_slice_index))
+                .copied()
+                .unwrap_or_default();
+
             vertices.extend_from_slice(&make_corners_with_ao(
                 block_pos,
                 block.block_type().render_color(),
-                block.occlusion(),
+                occlusion,
                 slice_index,
             ));
         }
@@ -74,7 +96,7 @@ fn block_centre(block: SliceBlock) -> (f32, f32) {
 fn make_corners_with_ao<V: BaseVertex>(
     block_pos: SliceBlock,
     color: Color,
-    occlusion: &BlockOcclusion,
+    occlusion: BlockOcclusion,
     slice_index: f32,
 ) -> ArrayVec<V, { 6 * OcclusionFace::COUNT }> {
     let (bx, by) = block_centre(block_pos);
@@ -82,7 +104,6 @@ fn make_corners_with_ao<V: BaseVertex>(
     let mut corners = ArrayVec::<V, { 4 * OcclusionFace::COUNT }>::new();
 
     for face in OcclusionFace::FACES {
-        // TODO ignore occluded face, return maybeuninit array and len of how much is initialised
         if occlusion.get_face(face).is_all_solid() {
             continue;
         }
@@ -117,7 +138,7 @@ fn make_corners_with_ao<V: BaseVertex>(
         if let OcclusionFlip::Flip = ao_flip {
             // TODO also rotate texture
             let n = corners.len();
-            let mut quad = &mut corners[n - 4..];
+            let quad = &mut corners[n - 4..];
             let last = quad[3];
             quad.copy_within(0..3, 1);
             quad[0] = last;
@@ -188,19 +209,6 @@ fn make_corners<V: BaseVertex>(block_pos: SliceBlock, color: Color, slice_index:
             *c.get_unchecked(0),
         ]
     }
-}
-
-unsafe fn corners_to_vertices<V: BaseVertex>(block_corners: [MaybeUninit<V>; 4]) -> [V; 6] {
-    [
-        // tri 1
-        block_corners[0].assume_init(),
-        block_corners[1].assume_init(),
-        block_corners[2].assume_init(),
-        // tri 2
-        block_corners[2].assume_init(),
-        block_corners[3].assume_init(),
-        block_corners[0].assume_init(),
-    ]
 }
 
 /// Compile time `min`...

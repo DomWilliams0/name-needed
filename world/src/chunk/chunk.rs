@@ -10,12 +10,12 @@ use crate::chunk::slice::{Slice, SliceOwned};
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator};
 use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage, SlabVersion};
-use crate::chunk::SlabData;
+use crate::chunk::{SlabData, SparseGrid};
 use crate::navigation::{BlockGraph, SlabAreaIndex};
 use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{SliceRange, World, WorldArea, WorldContext};
+use crate::{BlockOcclusion, SliceRange, World, WorldArea, WorldContext};
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
 use std::collections::HashMap;
@@ -414,9 +414,15 @@ impl<C: WorldContext> Chunk<C> {
         None
     }
 
-    pub(crate) fn set_slab_vertical_space(&mut self, slab: SlabIndex, vs: Arc<SlabVerticalSpace>) {
+    pub(crate) fn update_slab_terrain_derived_data(
+        &mut self,
+        slab: SlabIndex,
+        vs: Arc<SlabVerticalSpace>,
+        occlusion: SparseGrid<BlockOcclusion>,
+    ) {
         if let Some(s) = self.slabs.slab_data_mut(slab) {
             s.vertical_space = vs;
+            s.occlusion = occlusion;
         }
     }
 

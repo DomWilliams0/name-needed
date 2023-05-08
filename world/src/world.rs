@@ -17,7 +17,7 @@ use unit::world::{
 use crate::block::{Block, BlockDurability};
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndex;
-use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait};
+use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait, SparseGrid};
 use crate::context::WorldContext;
 use crate::loader::{SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
@@ -27,7 +27,7 @@ use crate::navigation::{
 use crate::navigationv2::world_graph::WorldGraph;
 use crate::navigationv2::{as_border_area, ChunkArea, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
-use crate::{BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
+use crate::{BlockOcclusion, BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
@@ -606,6 +606,7 @@ impl<C: WorldContext> World<C> {
         slab: SlabLocation,
         slab_terrain: Option<Slab<C>>,
         vertical_space: Arc<SlabVerticalSpace>,
+        occlusion: SparseGrid<BlockOcclusion>,
     ) {
         let chunk = self
             .find_chunk_with_pos_mut(slab.chunk)
@@ -626,7 +627,7 @@ impl<C: WorldContext> World<C> {
                 .replace_slab(slab.slab, SlabData::new(terrain));
         }
 
-        chunk.set_slab_vertical_space(slab.slab, vertical_space);
+        chunk.update_slab_terrain_derived_data(slab.slab, vertical_space, occlusion);
 
         // notify anyone waiting
         chunk.mark_slab_as_in_world(slab.slab);
@@ -653,6 +654,14 @@ impl<C: WorldContext> World<C> {
         let pos = pos.into();
         self.find_chunk_with_pos(ChunkLocation::from(pos))
             .and_then(|chunk| chunk.terrain().get_block(pos.into()))
+    }
+
+    pub fn block_occlusion<P: Into<WorldPosition>>(&self, pos: P) -> BlockOcclusion {
+        let pos = pos.into();
+        self.find_chunk_with_pos(ChunkLocation::from(pos))
+            .and_then(|chunk| chunk.terrain().slab_data(pos.2.slab_index()))
+            .and_then(|slab| slab.occlusion.get(pos.into()).copied())
+            .unwrap_or_default()
     }
 
     /// Mutates terrain silently to the loader, ensure the loader knows about this
@@ -1643,10 +1652,7 @@ mod tests {
                 DummyBlockType::Air
             );
             assert_eq!(
-                w.block((CHUNK_SIZE.as_i32(), 5, 4))
-                    .unwrap()
-                    .occlusion()
-                    .top_corner(3), // occluded by other chunk
+                w.block_occlusion((CHUNK_SIZE.as_i32(), 5, 4)).top_corner(3), // occluded by other chunk
                 VertexOcclusion::Mildly
             );
         }
@@ -1674,10 +1680,7 @@ mod tests {
                 DummyBlockType::Stone
             );
             assert_eq!(
-                w.block((CHUNK_SIZE.as_i32(), 5, 4))
-                    .unwrap()
-                    .occlusion()
-                    .top_corner(3), // no longer occluded by other chunk
+                w.block_occlusion((CHUNK_SIZE.as_i32(), 5, 4)).top_corner(3), // no longer occluded by other chunk
                 VertexOcclusion::NotAtAll
             );
         }
@@ -1695,7 +1698,7 @@ mod tests {
 
         let mut w = world.borrow_mut();
         assert_eq!(
-            w.block(pos).unwrap().occlusion().top_corner(0),
+            w.block_occlusion(pos).top_corner(0),
             VertexOcclusion::NotAtAll
         );
 
@@ -1715,25 +1718,27 @@ mod tests {
             )],
         ));
 
-        // use old slab reference to keep it alive until here
-        assert_eq!(
-            w.block(pos).unwrap().occlusion().top_corner(0),
-            VertexOcclusion::Full
-        );
+        todo!(); // TODO fix
+                 /*        // use old slab reference to keep it alive until here
+                         assert_eq!(
+                             w.block(pos).unwrap().occlusion().top_corner(0),
+                             VertexOcclusion::Full
+                         );
 
-        // check world uses new CoW slab
-        assert_eq!(
-            w.block(pos).unwrap().occlusion().top_corner(0),
-            VertexOcclusion::Full
-        );
+                         // check world uses new CoW slab
+                         assert_eq!(
+                             w.block(pos).unwrap().occlusion().top_corner(0),
+                             VertexOcclusion::Full
+                         );
 
-        // make sure CoW was triggered
-        let new_slab = w.chunks[0]
-            .terrain()
-            .slab(GlobalSliceIndex::new(pos.2).slab_index())
-            .unwrap();
+                         // make sure CoW was triggered
+                         let new_slab = w.chunks[0]
+                             .terrain()
+                             .slab(GlobalSliceIndex::new(pos.2).slab_index())
+                             .unwrap();
 
-        assert!(!std::ptr::eq(slab.raw(), new_slab.raw()));
+                         assert!(!std::ptr::eq(slab.raw(), new_slab.raw()));
+                 */
     }
 
     #[test]
