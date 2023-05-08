@@ -195,7 +195,7 @@ impl Debug for NeighbourOpacity {
 impl Debug for BlockOcclusion {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let solid_only = !f.alternate();
-        let entries = OcclusionFace::FACES
+        let entries = OcclusionFace::ORDINALS
             .iter()
             .zip(self.neighbours.iter())
             .filter(|(f, n)| !(n.is_all_transparent() && solid_only));
