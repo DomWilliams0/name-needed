@@ -717,10 +717,13 @@ mod load_task {
             // cannot be the top slice and so doesnt need the slab above
             debug_assert_ne!(pos.z(), LocalSliceIndex::top());
 
-            let mut side_faces = [false; OcclusionFace::SIDE_FACES.len()];
+            // skip Top (idx 0)
+            let mut side_faces = [false; OcclusionFace::ORDINALS.len() - 1];
+            debug_assert_eq!(Top as usize, 0);
+
             use OcclusionFace::*;
             let mut mark_needed = |face: OcclusionFace| {
-                let idx = face as usize;
+                let idx = face as usize - 1; // skipping Top
                 for i in [
                     (idx + OcclusionFace::SIDE_FACES.len() - 1) % OcclusionFace::SIDE_FACES.len(),
                     idx,

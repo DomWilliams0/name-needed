@@ -406,6 +406,7 @@ pub enum OcclusionFlip {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(usize)]
 pub enum OcclusionFace {
+    Top = 0,
     /// +Y
     North,
     /// +X
@@ -414,7 +415,6 @@ pub enum OcclusionFace {
     South,
     /// -X
     West,
-    Top,
     // dont ever see bottom
 }
 
@@ -439,11 +439,11 @@ impl OcclusionFace {
 
     /// In same order as ordinal
     pub const ORDINALS: [OcclusionFace; Self::COUNT] = [
+        OcclusionFace::Top,
         OcclusionFace::North,
         OcclusionFace::East,
         OcclusionFace::South,
         OcclusionFace::West,
-        OcclusionFace::Top,
     ];
 
     pub fn xy_delta(self) -> (i16, i16) {
