@@ -15,7 +15,7 @@ use crate::navigation::{BlockGraph, SlabAreaIndex};
 use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{BlockOcclusion, SliceRange, World, WorldArea, WorldContext};
+use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldContext};
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
 use std::collections::HashMap;
@@ -57,8 +57,7 @@ pub enum SlabLoadingStatus {
     /// Has been requested
     Requested,
 
-    /// Terrain is in chunk with isolated occlusion and vertical space and nav areas (both are *missing bottom slice*).
-    /// Depends on slab above
+    /// Terrain is in chunk with isolated occlusion and vertical space (*missing bottom slice*).
     TerrainInWorld,
 
     /// Was in Done but bottom slab changed, currently processing the update
@@ -321,13 +320,26 @@ impl<C: WorldContext> Chunk<C> {
         &self,
         slab: SlabIndex,
     ) -> SlabThingOrWait<Arc<SlabVerticalSpace>> {
+        use SlabLoadingStatus::*;
         use SlabThingOrWait::*;
         let progress = self.slab_progress(slab);
 
         match progress {
-            SlabLoadingStatus::Unloaded => Failure,
-            SlabLoadingStatus::Requested => Wait,
+            Unloaded => Failure,
+            Requested | Updating => Wait,
             _ => Ready(self.slab_vertical_space(slab).unwrap()),
+        }
+    }
+
+    pub fn get_slab_or_wait(&self, slab: SlabIndex) -> SlabThingOrWait<&Slab<C>> {
+        use SlabLoadingStatus::*;
+        use SlabThingOrWait::*;
+        let progress = self.slab_progress(slab);
+
+        match progress {
+            Unloaded => Failure,
+            Requested | Updating => Wait,
+            TerrainInWorld | DoneInIsolation | Done => Ready(self.slabs.slab(slab).unwrap()),
         }
     }
 

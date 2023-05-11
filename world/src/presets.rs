@@ -1,4 +1,4 @@
-use std::iter::once;
+use std::iter::{once, repeat};
 
 use misc::*;
 use unit::world::{CHUNK_SIZE, SLAB_SIZE};
@@ -18,6 +18,7 @@ pub fn from_preset<C: WorldContext>(preset: &str, rng: &mut dyn RngCore) -> Memo
         "bottleneck" => bottleneck(rng),
         "stairs" => stairs(),
         "fatstairs" => fat_stairs(),
+        "fuckystairs" => fucky_stairs(),
         "ring" => ring_preset(),
         _ => unreachable!("unknown preset"),
     }
@@ -223,6 +224,25 @@ pub fn fat_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
             ((x + 1) * sz, 20, z),
             C::PRESET_TYPES[(x % 3) as usize],
         );
+    }
+
+    MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
+}
+
+pub fn fucky_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let mut b = WorldBuilder::<C>::new();
+
+    let z_range = -6..SLAB_SIZE.as_i32() * 3;
+
+    let mut bt = C::PRESET_TYPES.into_iter().cycle();
+    for y in z_range.clone() {
+        let block = bt.next().unwrap();
+        for xz in z_range.clone() {
+            b = b
+                .set((xz, y, xz + y), block)
+                .set((xz, y + 1, xz + y), block)
+                .set((xz + 1, y, xz + y), block)
+        }
     }
 
     MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")

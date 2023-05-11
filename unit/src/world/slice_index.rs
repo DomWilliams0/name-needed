@@ -4,6 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
+use misc::num_traits::{CheckedAdd, CheckedSub, One};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A slice in the world
@@ -15,7 +16,7 @@ pub struct GlobalSliceIndex(i32);
 pub struct LocalSliceIndex(u8);
 
 pub trait SliceIndex: Sized {
-    type Inner: Copy;
+    type Inner: Copy + CheckedAdd + CheckedSub + One + Ord;
     const MIN: Self::Inner;
     const MAX: Self::Inner;
 
@@ -29,6 +30,18 @@ pub trait SliceIndex: Sized {
 
     fn slice(self) -> Self::Inner;
     fn new_srsly_unchecked(slice: Self::Inner) -> Self;
+
+    fn above(self) -> Option<Self> {
+        self.slice()
+            .checked_add(&Self::Inner::one())
+            .and_then(|s| (s <= Self::top().slice()).then(|| Self::new_srsly_unchecked(s)))
+    }
+
+    fn below(self) -> Option<Self> {
+        self.slice()
+            .checked_sub(&Self::Inner::one())
+            .and_then(|s| (s >= Self::bottom().slice()).then(|| Self::new_srsly_unchecked(s)))
+    }
 }
 
 impl SliceIndex for GlobalSliceIndex {

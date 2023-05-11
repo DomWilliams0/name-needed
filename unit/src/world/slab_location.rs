@@ -2,6 +2,7 @@ use crate::world::{ChunkLocation, SlabIndex};
 use misc::derive_more::{From, Into};
 use misc::*;
 use std::fmt::{Debug, Display, Formatter};
+use std::ops::Add;
 
 /// A slab in the world
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Into, From)]
@@ -32,6 +33,16 @@ impl SlabLocation {
         Self {
             chunk: self.chunk + offset,
             ..self
+        }
+    }
+}
+
+impl Add<[i8; 3]> for SlabLocation {
+    type Output = Self;
+    fn add(self, [dx, dy, dz]: [i8; 3]) -> Self::Output {
+        Self {
+            chunk: self.chunk + (dx as i16, dy as i16),
+            slab: self.slab + dz as i32,
         }
     }
 }

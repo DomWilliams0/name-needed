@@ -55,9 +55,15 @@ mod load_task {
     use crate::block::BlockOpacity;
     use crate::chunk::SparseGrid;
     use crate::loader::worker_pool::LoadSuccessTx;
-    use crate::occlusion::NeighbourOpacity;
+    use crate::occlusion::{
+        NeighbourOpacity, OcclusionOpacity, OcclusionUpdateType, RelativeSlabs,
+    };
+    use crate::world::get_or_wait_for_slab;
     use crate::{flatten_coords, BlockOcclusion, OcclusionFace};
+    use futures::pin_mut;
     use grid::GridImpl;
+    use std::cell::{RefCell, UnsafeCell};
+    use std::sync::Weak;
     use unit::world::{RangePosition, SlabPositionAsCoord};
 
     enum ExtraInfo<C: WorldContext> {
@@ -113,7 +119,7 @@ mod load_task {
             }
         };
 
-        // put terrain into world
+        // put terrain into world so other slabs can access it asap
         let mut notifications;
         {
             let mut w = ctx.world.borrow_mut();
@@ -132,7 +138,6 @@ mod load_task {
 
             // put terrain into chunk
             w.populate_chunk_with_slab(slab, new_terrain, vs.clone(), occlusion);
-            w.mark_slab_dirty(slab);
         }
 
         // ----- slab is now TerrainInWorld
@@ -141,6 +146,15 @@ mod load_task {
         if let Err(e) = ctx.success_tx.send(Ok(slab)).await {
             error!("failed to send terrain result"; "error" => %e);
             return;
+        }
+
+        // init occlusion using neighbouring slabs
+        update_neighbour_occlusion(&vs, slab, &mut notifications, &ctx.world).await;
+
+        // new slab can now be made visible
+        {
+            let mut w = ctx.world.borrow_mut();
+            w.mark_slab_dirty(slab);
         }
 
         // generate nav areas, skipping the bottom slice initially.
@@ -643,40 +657,36 @@ mod load_task {
             let slice_this = slab.slice(pos.z());
             let slice_above = slab.slice_above(slice_this).unwrap(); // known to be available TODO unless top of slab?
 
-            occlusion.set_face(
-                OcclusionFace::Top,
-                NeighbourOpacity::with_slice_above(pos.to_slice_block(), slice_above),
-            );
+            let mut update_info = OcclusionUpdateType::InitThisSlab {
+                this_slice: slice_this,
+                slice_above,
+                slice_below: slab.slice_below(slice_this),
+            };
 
+            // top face
+            let mut top_occlusion = NeighbourOpacity::default();
+            NeighbourOpacity::with_slice_above_other_slabs_possible(
+                pos,
+                &mut update_info,
+                |i, op| top_occlusion[i] = OcclusionOpacity::Known(op),
+            )
+            .now_or_never()
+            .expect("future should not await for internal occlusion");
+            occlusion.set_face(OcclusionFace::Top, top_occlusion);
+
+            // side faces
             for face in OcclusionFace::SIDE_FACES {
-                use OcclusionFace::*;
+                let mut neighbour_opacity = NeighbourOpacity::default();
+                NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
+                    pos,
+                    &mut update_info,
+                    face,
+                    |i, op| neighbour_opacity[i] = OcclusionOpacity::Known(op),
+                )
+                .now_or_never()
+                .expect("future should not await for internal occlusion");
 
-                // extend in direction of face
-                let neighbour_opacity = match face.extend_sideways(pos.to_slice_block()) {
-                    None => {
-                        // missing chunk
-                        NeighbourOpacity::unknown()
-                    }
-                    Some(sideways_neighbour_pos) => {
-                        // check if totally occluded
-                        let neighbour_opacity = slice_this[sideways_neighbour_pos].opacity();
-
-                        if let BlockOpacity::Solid = neighbour_opacity {
-                            // totally occluded
-                            NeighbourOpacity::all_solid()
-                        } else {
-                            NeighbourOpacity::with_neighbouring_slices(
-                                sideways_neighbour_pos,
-                                slice_this,
-                                slab.slice_below(slice_this),
-                                Some(slice_above), // TODO always Some?
-                                face,
-                            )
-                        }
-                    }
-                };
-
-                occlusion.set_face(face, neighbour_opacity);
+                occlusion.set_face(face, neighbour_opacity)
             }
 
             grid_ext.add_new(pos, occlusion);
@@ -684,6 +694,99 @@ mod load_task {
 
         drop(grid_ext);
         grid
+    }
+
+    async fn update_neighbour_occlusion<C: WorldContext>(
+        vs: &SlabVerticalSpace,
+        this_slab: SlabLocation,
+        notifications: &mut ListeningLoadNotifier,
+        world: &WorldRef<C>,
+    ) {
+        let mut changes = vec![];
+        let mut update_neighbour_info = OcclusionUpdateType::UpdateFromNeighbours {
+            relative_slabs: RelativeSlabs::new(this_slab, notifications, world),
+        };
+
+        for (air_block, _) in vs.iter_blocks() {
+            let pos = match air_block.below() {
+                None => continue, // ignore bottom slice, the slab below will look upwards to this one instead
+                Some(pos) => pos,
+            };
+
+            // because this block comes below an accessible air block in this slab, we know it
+            // cannot be the top slice and so doesnt need the slab above
+            debug_assert_ne!(pos.z(), LocalSliceIndex::top());
+
+            let mut side_faces = [false; OcclusionFace::SIDE_FACES.len()];
+            use OcclusionFace::*;
+            let mut mark_needed = |face: OcclusionFace| {
+                let idx = face as usize;
+                for i in [
+                    (idx + OcclusionFace::SIDE_FACES.len() - 1) % OcclusionFace::SIDE_FACES.len(),
+                    idx,
+                    (idx + 1) % OcclusionFace::SIDE_FACES.len(),
+                ] {
+                    unsafe {
+                        *side_faces.get_unchecked_mut(i) = true;
+                    }
+                }
+            };
+
+            if pos.y() == 0 {
+                mark_needed(South)
+            } else if pos.y() == CHUNK_SIZE.as_block_coord() - 1 {
+                mark_needed(North)
+            }
+            if pos.x() == 0 {
+                mark_needed(West);
+            } else if pos.x() == CHUNK_SIZE.as_block_coord() - 1 {
+                mark_needed(East);
+            }
+
+            let faces = side_faces
+                .into_iter()
+                .zip(OcclusionFace::SIDE_FACES.into_iter())
+                .filter_map(|(b, f)| b.then_some(f));
+
+            for face in faces {
+                NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
+                    pos,
+                    &mut update_neighbour_info,
+                    face,
+                    |i, opacity| changes.push((pos, face, i as u8, opacity)),
+                )
+                .await;
+            }
+
+            NeighbourOpacity::with_slice_above_other_slabs_possible(
+                pos,
+                &mut update_neighbour_info,
+                |i, opacity| changes.push((pos, OcclusionFace::Top, i as u8, opacity)),
+            )
+            .await;
+        }
+
+        if !changes.is_empty() {
+            let mut w = world.borrow_mut();
+            let slab_data = w
+                .find_chunk_with_pos_mut(this_slab.chunk)
+                .and_then(|c| c.terrain_mut().slab_data_mut(this_slab.slab));
+
+            if let Some(slab_data) = slab_data {
+                let mut ext = slab_data.occlusion.extend();
+
+                for (slab_pos, opacities) in &changes.into_iter().group_by(|tup| tup.0) {
+                    let mut occlusion = ext.get_or_insert(slab_pos);
+
+                    for (face, changes) in &opacities.group_by(|tup| tup.1) {
+                        let mut face_occlusion = occlusion.get_face_mut(face);
+                        for (_, _, i, op) in changes {
+                            face_occlusion[i as usize] = OcclusionOpacity::Known(op);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -51,6 +51,42 @@ impl SliceBlock {
         }
     }
 
+    /// Intrudes into other slabs. dx and dy must be 1 or -1.
+    /// Returns ((slab dx, slab dy), pos in that slab)
+    pub fn try_add_intrusive(self, (dx, dy): (i16, i16)) -> ([i8; 2], SliceBlock) {
+        if (dx, dy) == (0, 0) {
+            // nothing to do
+            return ([0, 0], self);
+        }
+
+        debug_assert!((-1..=1).contains(&dx));
+        debug_assert!((-1..=1).contains(&dy));
+
+        let x = (self.0 as i16) + dx;
+        let y = (self.1 as i16) + dy;
+
+        let mut slab_dx = 0;
+        let mut slab_dy = 0;
+        if x < 0 {
+            slab_dx = -1;
+        } else if x >= CHUNK_SIZE.as_i16() {
+            slab_dx = 1;
+        }
+        if y < 0 {
+            slab_dy = -1;
+        } else if y >= CHUNK_SIZE.as_i16() {
+            slab_dy = 1;
+        }
+
+        (
+            [slab_dx, slab_dy],
+            SliceBlock(
+                x.rem_euclid(CHUNK_SIZE.as_i16()) as BlockCoord,
+                y.rem_euclid(CHUNK_SIZE.as_i16()) as BlockCoord,
+            ),
+        )
+    }
+
     pub fn xy(self) -> (BlockCoord, BlockCoord) {
         (self.0, self.1)
     }

@@ -157,6 +157,7 @@ impl<C: WorldContext> WorldViewer<C> {
         &mut self,
         mut f: F,
     ) {
+        // TODO time this function, is it the cause of stuttering when scrolling camera fast
         let range = self.terrain_range();
         let world = self.world.borrow();
 

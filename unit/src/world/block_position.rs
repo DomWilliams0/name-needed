@@ -6,6 +6,7 @@ use misc::*;
 
 use crate::world::{
     BlockCoord, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition, CHUNK_SIZE,
+    SLAB_SIZE,
 };
 
 /// A block in a chunk. Only valid coords are represented by this type
@@ -138,4 +139,13 @@ impl From<WorldPosition> for BlockPosition {
             z,
         )
     }
+}
+
+#[test]
+fn world_pos_to_block_pos_negative() {
+    let wp = WorldPosition::from((-1, -(CHUNK_SIZE.as_i32() - 1), -6));
+    let bp = BlockPosition::from(wp);
+    assert_eq!(bp.x(), CHUNK_SIZE.as_block_coord() - 1);
+    assert_eq!(bp.y(), 1);
+    assert_eq!(bp.z().slice(), -6);
 }

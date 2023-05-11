@@ -1041,6 +1041,35 @@ pub async fn get_or_wait_for_slab_vertical_space<C: WorldContext>(
     }
 }
 
+pub async fn get_or_wait_for_slab<C: WorldContext>(
+    notifier: &mut ListeningLoadNotifier,
+    world: &WorldRef<C>,
+    slab: SlabLocation,
+) -> Option<Slab<C>> {
+    loop {
+        {
+            let w = world.borrow();
+            let chunk = match w.find_chunk_with_pos(slab.chunk) {
+                Some(c) => c,
+                None => {
+                    trace!("chunk not found: {:?}", slab);
+                    break None;
+                }
+            };
+            match chunk.get_slab_or_wait(slab.slab) {
+                SlabThingOrWait::Wait => {}
+                SlabThingOrWait::Failure => break None,
+                SlabThingOrWait::Ready(slab) => break Some(slab.clone()),
+            }
+        }
+
+        if let WaitResult::Disconnected = notifier.wait_for_slab(slab).await {
+            // failure, guess we're shutting down
+            break None;
+        }
+    }
+}
+
 impl<'a, C: WorldContext> ContiguousChunkIteratorMut<'a, C> {
     pub fn new(world: &'a mut World<C>) -> Self {
         ContiguousChunkIteratorMut {

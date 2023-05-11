@@ -302,28 +302,13 @@ impl<C: WorldContext> SlabStorage<C> {
         self.slice(index).unwrap()
     }
 
-    /// Same as `cow_clone`. TODO is this one needed ever?
+    /// Panics if not exclusive reference
     pub fn slice_mut<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> Option<SliceMut<C>> {
-        self.slice_mut_with_cow(index)
-    }
-
-    /// Calls `Slab::cow_clone`, triggering a slab copy if necessary
-    pub fn slice_mut_with_cow<S: Into<GlobalSliceIndex>>(
-        &mut self,
-        index: S,
-    ) -> Option<SliceMut<C>> {
         let chunk_slice_idx = index.into();
         let slab_idx = chunk_slice_idx.slab_index();
-        self.slabs.get_mut(slab_idx).map(|data| {
-            data.terrain
-                .cow_clone()
-                .slice_mut(chunk_slice_idx.to_local())
-        })
-    }
-
-    /// Will clone CoW slab if necessary
-    fn slice_mut_unchecked_with_cow<S: Into<GlobalSliceIndex>>(&mut self, index: S) -> SliceMut<C> {
-        self.slice_mut_with_cow(index).unwrap()
+        self.slabs
+            .get_mut(slab_idx)
+            .map(|data| data.terrain.slice_mut(chunk_slice_idx.to_local()))
     }
 
     pub fn get_block(&self, pos: BlockPosition) -> Option<Block<C>> {

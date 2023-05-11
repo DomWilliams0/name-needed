@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::chunk::slab::Slab;
 use crate::chunk::slice::Slice;
 use crate::chunk::{Chunk, SlabData};
-use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip};
+use crate::occlusion::{BlockOcclusion, OcclusionFace, OcclusionFlip, VertexOcclusion};
 use crate::viewer::SliceRange;
 use crate::{BlockType, WorldContext};
 use grid::GridImpl;
@@ -54,7 +54,12 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
             (_, _, Slice<C>, _),
         ) = (a, b);
 
-        let slice_index = shifted_slice_index(local_slice_index.to_global(slab_index));
+        let global_slice = local_slice_index.to_global(slab_index);
+        if !slice_range.contains(global_slice) {
+            continue;
+        }
+
+        let slice_index = shifted_slice_index(global_slice);
 
         for (i, block_pos, block) in slice.non_air_blocks() {
             let above = unsafe { slice_above.get_unchecked(i) };

@@ -21,7 +21,7 @@ use crate::navigation::{BlockGraph, ChunkArea};
 use crate::occlusion::{NeighbourOpacity, OcclusionFace};
 use crate::{flatten_coords, BlockType, WorldContext, SLICE_SIZE};
 use grid::{Grid, GridImpl, GridImplExt};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 const GRID_DIM_X: usize = CHUNK_SIZE.as_usize();
 const GRID_DIM_Y: usize = CHUNK_SIZE.as_usize();
@@ -63,6 +63,8 @@ pub enum SlabType {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct Slab<C: WorldContext>(Arc<SlabGridImpl<C>>, SlabType);
+
+pub struct WeakSlabRef<C: WorldContext>(Weak<SlabGridImpl<C>>, SlabType);
 
 #[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
@@ -151,13 +153,17 @@ impl<C: WorldContext> Slab<C> {
     pub fn slice<S: Into<LocalSliceIndex>>(&self, index: S) -> Slice<C> {
         let index = index.into();
         let (from, to) = SlabGridImpl::<C>::slice_range(index.slice_unsigned());
-        Slice::new(&self.array()[from..to])
+        debug_assert!(self.array.get(from..to).is_some());
+        let slice = unsafe { self.array.get_unchecked(from..to) };
+        Slice::new(slice)
     }
 
     pub fn slice_mut<S: Into<LocalSliceIndex>>(&mut self, index: S) -> SliceMut<C> {
         let index = index.into();
         let (from, to) = SlabGridImpl::<C>::slice_range(index.slice_unsigned());
-        SliceMut::new(&mut self.expect_mut().array_mut()[from..to])
+        debug_assert!(self.array.get(from..to).is_some());
+        let slice = unsafe { self.expect_mut().array.get_unchecked_mut(from..to) };
+        SliceMut::new(slice)
     }
 
     pub fn slice_below(&self, slice: Slice<C>) -> Option<Slice<C>> {
@@ -233,6 +239,15 @@ impl<C: WorldContext> Slab<C> {
         let last = above.map(|slab| SliceSource::AboveSlab(slab.slice(LocalSliceIndex::bottom())));
 
         once(first).chain(middle).chain(once(last)).tuple_windows()
+    }
+
+    pub fn downgrade(&self) -> WeakSlabRef<C> {
+        WeakSlabRef(Arc::downgrade(&self.0), self.1)
+    }
+}
+impl<C: WorldContext> WeakSlabRef<C> {
+    pub fn upgrade(&self) -> Option<Slab<C>> {
+        self.0.upgrade().map(|s| Slab(s, self.1))
     }
 }
 
@@ -398,10 +413,6 @@ impl<C: WorldContext> Slab<C> {
         let mut output: [SliceAreaIndex; SLICE_SIZE] =
             unsafe { MaybeUninit::uninit().assume_init() };
         make_mesh(&mut cfg, &input, &mut output, &mut initialised);
-    }
-
-    pub fn init_occlusion(&mut self, slice_above: Option<Slice<C>>, slice_below: Option<Slice<C>>) {
-        unreachable!()
     }
 
     /// f(maybe slice below, this slice, slice above)
