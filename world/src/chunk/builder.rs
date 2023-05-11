@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 use misc::*;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SliceIndex, WorldPosition,
-    WorldPositionRange,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
+    WorldPosition, WorldPositionRange,
 };
 
 use crate::chunk::slab::DeepClone;
@@ -14,7 +14,10 @@ use crate::loader::split_range_across_slabs;
 use crate::WorldContext;
 use std::convert::TryFrom;
 
-pub struct ChunkBuilder<C: WorldContext>(Option<SlabStorage<C>>);
+pub struct ChunkBuilder<C: WorldContext> {
+    inner: Option<SlabStorage<C>>,
+    cowed_range: (SlabIndex, SlabIndex),
+}
 
 pub struct WorldBuilder<C: WorldContext>(HashMap<ChunkLocation, ChunkBuilder<C>>);
 
@@ -25,18 +28,45 @@ impl<C: WorldContext> ChunkBuilder<C> {
         Self::with_terrain(SlabStorage::default())
     }
 
+    pub fn empty() -> Self {
+        Self {
+            inner: None,
+            cowed_range: (SlabIndex::MAX, SlabIndex::MIN),
+        }
+    }
+
     fn with_terrain(terrain: SlabStorage<C>) -> Self {
-        Self(Some(terrain))
+        Self {
+            inner: Some(terrain),
+            cowed_range: (SlabIndex::MAX, SlabIndex::MIN),
+        }
     }
 
     fn terrain(&mut self) -> &mut SlabStorage<C> {
-        self.0
+        let storage = self
+            .inner
             .as_mut()
-            .expect("builder is in an uninitialized state")
+            .expect("builder is in an uninitialized state");
+
+        let range = storage.slab_range();
+        if range != self.cowed_range {
+            for idx in range.0 .0..=range.1 .0 {
+                storage
+                    .slab_data_mut(SlabIndex(idx))
+                    .unwrap()
+                    .terrain
+                    .cow_clone();
+            }
+            self.cowed_range = range;
+        }
+
+        storage
     }
 
     fn take_terrain(&mut self) -> SlabStorage<C> {
-        self.0.take().expect("builder is in an uninitialized state")
+        self.inner
+            .take()
+            .expect("builder is in an uninitialized state")
     }
 
     /// Panics if block position is invalid for the chunk. Will create slabs as necessary
@@ -45,7 +75,9 @@ impl<C: WorldContext> ChunkBuilder<C> {
             BlockPosition::try_from(pos)
                 .unwrap_or_else(|_| panic!("bad chunk coordinate {:?}", pos)),
             block,
-            SlabCreationPolicy::CreateAll,
+            SlabCreationPolicy::CreateAll {
+                placeholders: false,
+            },
         );
         self
     }
@@ -53,10 +85,13 @@ impl<C: WorldContext> ChunkBuilder<C> {
     pub fn fill_slice(mut self, slice: impl Into<GlobalSliceIndex>, block: C::BlockType) -> Self {
         let do_fill = |mut slice: SliceMut<C>| slice.fill(block);
         let slice = slice.into();
-        if !self
-            .terrain()
-            .slice_mut_with_policy(slice, SlabCreationPolicy::CreateAll, do_fill)
-        {
+        if !self.terrain().slice_mut_with_policy(
+            slice,
+            SlabCreationPolicy::CreateAll {
+                placeholders: false,
+            },
+            do_fill,
+        ) {
             warn!("failed to create slice to fill"; "slice" => ?slice);
         }
 
@@ -120,7 +155,9 @@ impl<C: WorldContext> ChunkBuilderApply<C> {
             BlockPosition::try_from(pos)
                 .unwrap_or_else(|_| panic!("bad chunk coordinate {:?}", pos)),
             block,
-            SlabCreationPolicy::CreateAll,
+            SlabCreationPolicy::CreateAll {
+                placeholders: false,
+            },
         );
         self
     }
@@ -154,7 +191,10 @@ impl<C: WorldContext> DeepClone for ChunkDescriptor<C> {
 
 impl<C: WorldContext> DeepClone for ChunkBuilder<C> {
     fn deep_clone(&self) -> Self {
-        ChunkBuilder(self.0.as_ref().map(|t| t.deep_clone()))
+        ChunkBuilder {
+            inner: self.inner.as_ref().map(|t| t.deep_clone()),
+            cowed_range: self.cowed_range,
+        }
     }
 }
 
@@ -163,11 +203,20 @@ impl<C: WorldContext> WorldBuilder<C> {
         Self(Default::default())
     }
     pub fn set(mut self, pos: (i32, i32, i32), b: C::BlockType) -> Self {
-        let chunk = ChunkLocation::from(WorldPosition::from(pos));
+        let world_pos = WorldPosition::from(pos);
+        let chunk = ChunkLocation::from(world_pos);
         let c = self.0.entry(chunk).or_insert_with(|| ChunkBuilder::new());
 
-        let tmp = std::mem::replace(c, ChunkBuilder(None));
-        *c = tmp.set_block(pos, b); // wtf
+        let tmp = std::mem::replace(c, ChunkBuilder::empty());
+        let actual_pos = BlockPosition::from(world_pos);
+        *c = tmp.set_block(
+            (
+                actual_pos.x() as i32,
+                actual_pos.y() as i32,
+                actual_pos.z().slice(),
+            ),
+            b,
+        ); // wtf
         self
     }
 
@@ -182,7 +231,7 @@ impl<C: WorldContext> WorldBuilder<C> {
             let chunk = slab.chunk;
             let c = self.0.entry(chunk).or_insert_with(|| ChunkBuilder::new());
 
-            let tmp = std::mem::replace(c, ChunkBuilder(None));
+            let tmp = std::mem::replace(c, ChunkBuilder::empty());
             let (xs, ys, zs) = update.0.ranges();
 
             let zs = (

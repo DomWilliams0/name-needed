@@ -280,7 +280,7 @@ pub enum SlabCreationPolicy {
     PleaseDont,
 
     /// Create the missing slab and all intermediate slabs
-    CreateAll,
+    CreateAll { placeholders: bool },
 }
 
 pub enum BlockDamageResult {
@@ -529,9 +529,17 @@ impl<C: WorldContext> SlabStorage<C> {
             // slice doesn't exist
 
             match policy {
-                SlabCreationPolicy::CreateAll if try_again => {
+                SlabCreationPolicy::CreateAll { placeholders } if try_again => {
                     // create slabs
                     self.create_slabs_until(slice.slab_index());
+
+                    if !placeholders {
+                        // make all slabs unique, could be more efficient but not used in actual game
+                        let (from, to) = self.slab_range();
+                        for idx in from.0..=to.0 {
+                            let _ = self.slab_mut(SlabIndex(idx));
+                        }
+                    }
 
                     // try again once more
                     try_again = false;
@@ -880,7 +888,7 @@ mod tests {
         assert!(terrain.set_block(
             (0, 0, -5).try_into().unwrap(),
             DummyBlockType::Stone,
-            SlabCreationPolicy::CreateAll,
+            SlabCreationPolicy::CreateAll { placeholders: true },
         ));
         assert_eq!(
             terrain
@@ -899,7 +907,7 @@ mod tests {
         assert!(terrain.set_block(
             (0, 0, 100).try_into().unwrap(),
             DummyBlockType::Grass,
-            SlabCreationPolicy::CreateAll,
+            SlabCreationPolicy::CreateAll { placeholders: true },
         ));
         assert_eq!(
             terrain
