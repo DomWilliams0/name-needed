@@ -954,6 +954,7 @@ impl<C: WorldContext> WorldLoader<C> {
     /// scratch, it's the caller's responsibility to ensure slabs that are already loaded are not
     /// passed in here
     pub fn request_slabs(&mut self, slabs: impl Iterator<Item = SlabLocation> + Clone) {
+        let _span = tracy_client::span!();
         let mut world_mut = self.world.borrow_mut();
 
         // check order of slabs is as expected
@@ -1025,6 +1026,7 @@ impl<C: WorldContext> WorldLoader<C> {
 
         // let the terrain source know what's coming so it can kick off region generation
         {
+            let _span = tracy_client::span!("prepare terrain source");
             let source = self.source.clone();
             self.pool.submit_any_async_with_handle(async move {
                 source.prepare_for_chunks((chunk_min, chunk_max)).await;
@@ -1068,6 +1070,7 @@ impl<C: WorldContext> WorldLoader<C> {
         terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>,
         changes_out: &mut Vec<WorldChangeEvent>,
     ) {
+        let _span = tracy_client::span!();
         let world_ref = self.world.clone();
 
         let (slab_updates, upper_slab_limit) = {

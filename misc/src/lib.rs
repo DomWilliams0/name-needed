@@ -1,5 +1,6 @@
 pub use arrayvec::*;
 pub use bumpalo;
+pub use tracy_client;
 
 pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
 pub type BumpString<'a> = bumpalo::collections::String<'a>;

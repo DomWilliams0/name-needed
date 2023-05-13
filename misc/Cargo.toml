@@ -9,6 +9,8 @@ edition = "2021"
 [dependencies]
 logging = { path = "../logging" }
 
+tracy-client = { version = "0.15", default-features = false }
+
 lazy_static = "1.4"
 cgmath = "0.18"
 num-traits = "0.2"
@@ -19,7 +21,7 @@ derive_more = "0.99"
 ordered-float = "2.0"
 thiserror = "1.0"
 bumpalo = { version = "3.9", features = ["collections", "boxed"] }
-smallvec = {version = "1.6", features = ["union"]}
+smallvec = { version = "1.6", features = ["union"] }
 arrayvec = "0.7"
 parking_lot = "0.12"
 derivative = "2.2"
@@ -30,3 +32,4 @@ default = ["library"]
 binary = ["logging/binary"]
 library = []
 log-to-file = ["logging/to-file"]
+profiling = ["tracy-client/enable", "tracy-client/sampling", "tracy-client/code-transfer", "tracy-client/system-tracing", "tracy-client/fibers"]
