@@ -39,8 +39,6 @@ pub struct World<C: WorldContext> {
     dirty_slabs: HashSet<SlabLocation>,
     entities_to_spawn: Vec<C::GeneratedEntityDesc>,
     load_notifier: LoadNotifier,
-    block_search_context: BlockGraphSearchContext,
-    area_search_context: AreaGraphSearchContext,
 }
 
 #[derive(Clone)]
@@ -125,8 +123,6 @@ impl<C: WorldContext> World<C> {
             dirty_slabs: HashSet::with_capacity(32),
             entities_to_spawn: Vec::default(),
             load_notifier: LoadNotifier::default(),
-            block_search_context: BlockGraph::search_context(),
-            area_search_context: AreaGraph::search_context(),
         }
     }
 
@@ -196,7 +192,7 @@ impl<C: WorldContext> World<C> {
 
         Ok(self
             .area_graph
-            .find_area_path(from_area, to_area, &self.area_search_context)?)
+            .find_area_path(from_area, to_area, unimplemented!())?)
     }
 
     fn find_block_path(
@@ -212,7 +208,7 @@ impl<C: WorldContext> World<C> {
             .ok_or(NavigationError::NoSuchArea(area))?;
 
         block_graph
-            .find_block_path(from, to, target, &self.block_search_context)
+            .find_block_path(from, to, target, unreachable!())
             .map_err(|e| NavigationError::BlockError(area, e))
     }
 
@@ -346,7 +342,7 @@ impl<C: WorldContext> World<C> {
             let (explore_result, target_block) = block_graph.explore(
                 current_pos.into(),
                 &mut fuel,
-                &self.block_search_context,
+                unreachable!(),
                 &mut random,
                 filter.as_ref().map(|func| (func, current_chunk)),
             );
@@ -413,8 +409,7 @@ impl<C: WorldContext> World<C> {
 
     /// Cheap check if an path exists between the 2 areas
     pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
-        self.area_graph
-            .path_exists(from, to, &self.area_search_context)
+        self.area_graph.path_exists(from, to, unreachable!())
     }
 
     pub fn find_area_for_block(

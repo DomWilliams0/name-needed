@@ -8,10 +8,6 @@ use std::sync::Arc;
 #[repr(transparent)]
 pub struct WorldRef<C: WorldContext>(Arc<RwLock<World<C>>>);
 
-// safety: thin wrapper around an Arc and Mutex
-unsafe impl<C: WorldContext> Send for WorldRef<C> {}
-unsafe impl<C: WorldContext> Sync for WorldRef<C> {}
-
 pub type InnerWorldRef<'a, C> = RwLockReadGuard<'a, World<C>>;
 pub type InnerWorldRefMut<'a, C> = RwLockWriteGuard<'a, World<C>>;
 
