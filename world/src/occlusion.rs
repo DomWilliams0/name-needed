@@ -111,8 +111,6 @@ impl NeighbourOpacity {
         ty: &mut OcclusionUpdateType<'_, C>,
         mut set_occlusion_idx: impl FnMut(usize, BlockOpacity),
     ) {
-        // TODO check if solid shortcut
-
         // move source block in direction of face first
         let (slab_dz, rel_block_z) = {
             match orig_block.z().above() {
@@ -131,14 +129,12 @@ impl NeighbourOpacity {
                 .solid(),
             OcclusionUpdateType::UpdateFromNeighbours { relative_slabs } if slab_dz == 1 => {
                 relative_slabs
-                    .get([0, 0, 1])
+                    .get_opacity(
+                        [0, 0, 1],
+                        orig_block.to_slice_block().to_slab_position(rel_block_z),
+                    )
                     .await
-                    .and_then(|slab| {
-                        slab.get(SlabPositionAsCoord(
-                            orig_block.to_slice_block().to_slab_position(rel_block_z),
-                        ))
-                    })
-                    .map(|b| b.opacity().solid())
+                    .map(|op| op.solid())
                     .unwrap_or(false)
             }
             _ => false,
@@ -166,12 +162,8 @@ impl NeighbourOpacity {
                     if slab_offset != [0; 3] =>
                 {
                     let neighbour_opacity = relative_slabs
-                        .get(slab_offset)
-                        .await
-                        .and_then(|slab| {
-                            slab.get(SlabPositionAsCoord(slab_pos.to_slab_position(rel_block_z)))
-                        })
-                        .map(|b| b.opacity());
+                        .get_opacity(slab_offset, slab_pos.to_slab_position(rel_block_z))
+                        .await;
 
                     if let Some(op) = neighbour_opacity {
                         set_occlusion_idx(i, op);
@@ -236,14 +228,12 @@ impl NeighbourOpacity {
                 .solid(),
             OcclusionUpdateType::UpdateFromNeighbours { relative_slabs } if slab_dxy != [0; 2] => {
                 relative_slabs
-                    .get([slab_dxy[0], slab_dxy[1], 0])
+                    .get_opacity(
+                        [slab_dxy[0], slab_dxy[1], 0],
+                        rel_block.to_slab_position(orig_block.z()),
+                    )
                     .await
-                    .and_then(|slab| {
-                        slab.get(SlabPositionAsCoord(
-                            rel_block.to_slab_position(orig_block.z()),
-                        ))
-                    })
-                    .map(|b| b.opacity().solid())
+                    .map(|b| b.solid())
                     .unwrap_or(false)
             }
             _ => false,
@@ -270,7 +260,7 @@ impl NeighbourOpacity {
             let mut slab_offset = [
                 slab_offset_xy[0] + slab_dxy[0],
                 slab_offset_xy[1] + slab_dxy[1],
-                0,
+                0, // set just after
             ];
             let slab_z = match relative {
                 Relative::SliceAbove => match orig_block.z().above() {
@@ -311,12 +301,8 @@ impl NeighbourOpacity {
                     if slab_offset != [0; 3] =>
                 {
                     let neighbour_opacity = relative_slabs
-                        .get(slab_offset)
-                        .await
-                        .and_then(|slab| {
-                            slab.get(SlabPositionAsCoord(slab_pos.to_slab_position(slab_z)))
-                        })
-                        .map(|b| b.opacity());
+                        .get_opacity(slab_offset, slab_pos.to_slab_position(slab_z))
+                        .await;
 
                     if let Some(op) = neighbour_opacity {
                         set_occlusion_idx(i, op);
@@ -689,5 +675,16 @@ impl<'a, C: WorldContext> RelativeSlabs<'a, C> {
         self.refs.push((relative, slab));
 
         Some(unsafe { &self.refs.get_unchecked(self.refs.len() - 1).1 })
+    }
+
+    pub async fn get_opacity(
+        &mut self,
+        relative: [i8; 3],
+        relative_block: SlabPosition,
+    ) -> Option<BlockOpacity> {
+        self.get(relative)
+            .await
+            .and_then(|slab| slab.get(SlabPositionAsCoord(relative_block)))
+            .map(|b| b.opacity())
     }
 }

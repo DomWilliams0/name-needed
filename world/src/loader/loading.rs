@@ -737,12 +737,8 @@ mod load_task {
             relative_slabs: RelativeSlabs::new(this_slab, notifications, world),
         };
 
-        for (air_block, _) in vs.iter_blocks() {
-            let pos = match air_block.below() {
-                None => continue, // ignore bottom slice, the slab below will look upwards to this one instead
-                Some(pos) => pos,
-            };
-
+        use OcclusionFace::*;
+        for pos in vs.iter_blocks().filter_map(|(air, _)| air.below()) {
             // because this block comes below an accessible air block in this slab, we know it
             // cannot be the top slice and so doesnt need the slab above
             debug_assert_ne!(pos.z(), LocalSliceIndex::top());
@@ -751,7 +747,6 @@ mod load_task {
             let mut side_faces = [false; OcclusionFace::ORDINALS.len() - 1];
             debug_assert_eq!(Top as usize, 0);
 
-            use OcclusionFace::*;
             let mut mark_needed = |face: OcclusionFace| {
                 let idx = face as usize - 1; // skipping Top
                 for i in [
@@ -794,7 +789,7 @@ mod load_task {
             NeighbourOpacity::with_slice_above_other_slabs_possible(
                 pos,
                 &mut update_neighbour_info,
-                |i, opacity| changes.push((pos, OcclusionFace::Top, i as u8, opacity)),
+                |i, opacity| changes.push((pos, Top, i as u8, opacity)),
             )
             .await;
         }
