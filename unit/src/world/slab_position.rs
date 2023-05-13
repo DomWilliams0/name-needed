@@ -17,6 +17,7 @@ pub struct SlabPosition(BlockCoord, BlockCoord, LocalSliceIndex);
 
 impl SlabPosition {
     /// None if x/y are out of range
+    #[inline]
     pub fn new(x: BlockCoord, y: BlockCoord, z: LocalSliceIndex) -> Option<Self> {
         if x < CHUNK_SIZE.as_block_coord() && y < CHUNK_SIZE.as_block_coord() {
             Some(Self(x, y, z))
@@ -26,8 +27,17 @@ impl SlabPosition {
     }
 
     /// Panics if x/y are out of range
+    #[inline]
     pub fn new_unchecked(x: BlockCoord, y: BlockCoord, z: LocalSliceIndex) -> Self {
         Self::new(x, y, z).unwrap_or_else(|| panic!("coords out of range: {:?}", (x, y, z)))
+    }
+
+    #[inline]
+    pub fn new_srsly_unchecked(x: BlockCoord, y: BlockCoord, z: LocalSliceIndex) -> Self {
+        if cfg!(debug_assertions) {
+            let _ = Self::new_unchecked(x, y, z);
+        };
+        Self(x, y, z)
     }
 
     pub fn to_world_position(self, slab: SlabLocation) -> WorldPosition {

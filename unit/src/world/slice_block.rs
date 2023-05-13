@@ -20,10 +20,12 @@ impl SliceBlock {
     }
 
     /// Panics if x/y are out of range
+    #[inline]
     pub fn new_unchecked(x: BlockCoord, y: BlockCoord) -> Self {
         Self::new(x, y).unwrap_or_else(|| panic!("coords out of range: {:?}", (x, y)))
     }
 
+    #[inline]
     pub fn new_srsly_unchecked(x: BlockCoord, y: BlockCoord) -> Self {
         if cfg!(debug_assertions) {
             let _ = Self::new_unchecked(x, y);

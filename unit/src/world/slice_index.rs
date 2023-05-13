@@ -29,6 +29,7 @@ pub trait SliceIndex: Sized {
     }
 
     fn slice(self) -> Self::Inner;
+
     fn new_srsly_unchecked(slice: Self::Inner) -> Self;
 
     fn above(self) -> Option<Self> {
@@ -52,6 +53,8 @@ impl SliceIndex for GlobalSliceIndex {
     fn slice(self) -> Self::Inner {
         self.0
     }
+
+    #[inline]
     fn new_srsly_unchecked(slice: Self::Inner) -> Self {
         Self(slice)
     }
@@ -65,6 +68,7 @@ impl SliceIndex for LocalSliceIndex {
     fn slice(self) -> Self::Inner {
         self.0
     }
+    #[inline]
     fn new_srsly_unchecked(slice: Self::Inner) -> Self {
         Self(slice)
     }
