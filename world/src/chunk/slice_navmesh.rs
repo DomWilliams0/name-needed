@@ -489,7 +489,11 @@ pub struct SlabVerticalSpace {
     /// height must fit into 3 bits, so up to 8m supported.
     blocks: Box<[PackedSlabBlockVerticalSpace]>,
 
+    // TODO can be packed more e.g. RLE
     top_down: [FreeVerticalSpace; SLICE_SIZE],
+
+    // TODO just used to check if solid, should be packed into a bit array or box<[packed xy]>
+    bottom_solids: Box<[SliceBlock]>,
 }
 
 lazy_static! {
@@ -513,11 +517,13 @@ impl SlabVerticalSpace {
         Arc::new(Self {
             blocks,
             top_down: [ABSOLUTE_MAX_FREE_VERTICAL_SPACE; SLICE_SIZE],
+            bottom_solids: Box::new([]),
         })
     }
 
     pub fn discover<C: WorldContext>(terrain: &Slab<C>) -> Arc<Self> {
         let mut out = vec![];
+        let mut bottom_solids = vec![];
 
         #[derive(Copy, Clone, Default)]
         struct BlockState {
@@ -547,6 +553,11 @@ impl SlabVerticalSpace {
                     }
 
                     *state = BlockState::default();
+
+                    // gather bottom slice solid blocks
+                    if slice_idx == LocalSliceIndex::bottom() {
+                        bottom_solids.push(unflatten_index(i));
+                    }
                 }
             }
         }
@@ -576,6 +587,7 @@ impl SlabVerticalSpace {
         Arc::new(Self {
             blocks: out.into_boxed_slice(),
             top_down,
+            bottom_solids: bottom_solids.into_boxed_slice(),
         })
     }
 
@@ -603,14 +615,21 @@ impl SlabVerticalSpace {
             .map(|((y, x), h)| (SliceBlock::new_srsly_unchecked(x, y), h))
     }
 
-    // pub fn maximum(&self) -> FreeVerticalSpace{self.maximum}
-
     pub fn below_at(&self, (x, y): (BlockCoord, BlockCoord)) -> FreeVerticalSpace {
-        let needle = SlabPosition::new_unchecked(x, y, LocalSliceIndex::bottom());
-        match self.blocks.iter().find(|i| i.pos() == needle) {
+        match self
+            .blocks
+            .iter()
+            .take_while(|p| p.pos_z() == LocalSliceIndex::bottom())
+            .find(|i| i.x().value() == x && i.y().value() == y)
+        {
             Some(b) => b.height(),
-            None if self.blocks.is_empty() => 0,
-            None => ABSOLUTE_MAX_FREE_VERTICAL_SPACE, // unreachable!("should have vertical space for below"),
+            None if self
+                .bottom_solids
+                .contains(&SliceBlock::new_srsly_unchecked(x, y)) =>
+            {
+                0 // solid
+            }
+            None => ABSOLUTE_MAX_FREE_VERTICAL_SPACE, // air
         }
     }
 
@@ -807,11 +826,13 @@ mod tests_vertical_space {
     fn just_slice_0() {
         let c = ChunkBuilder::<DummyWorldContext>::new()
             .fill_slice(0, DummyBlockType::Dirt)
+            .set_block((5, 5, 0), DummyBlockType::Air) // hole
             .build((0, 0));
         let slab = c.terrain.slab(0.into()).unwrap();
 
         let x = SlabVerticalSpace::discover(slab);
-        eprintln!("{:#?}", x.iter_blocks().collect_vec());
+        assert_eq!(x.below_at((5, 4)), 0); // solid
+        assert_eq!(x.below_at((5, 5)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE); // air
     }
 
     #[test]
