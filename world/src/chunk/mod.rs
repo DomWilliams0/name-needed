@@ -6,6 +6,7 @@ pub use self::slab::{Slab, SlabGrid, SlabGridImpl, SlabType};
 pub use self::slice::{flatten_coords, unflatten_index};
 pub use self::terrain::{
     BlockDamageResult, NeighbourAreaHash, OcclusionChunkUpdate, SlabNeighbour, SparseGrid,
+    SparseGridExtension,
 };
 pub(crate) use self::terrain::{SlabData, SlabStorage};
 

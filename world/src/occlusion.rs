@@ -45,8 +45,8 @@ impl From<VertexOcclusion> for f32 {
 
 pub enum OcclusionUpdateType<'a, C: WorldContext> {
     InitThisSlab {
-        this_slice: Slice<'a, C>,
-        slice_above: Slice<'a, C>,
+        slice_this: Slice<'a, C>,
+        slice_above: Option<Slice<'a, C>>,
         slice_below: Option<Slice<'a, C>>,
     },
     UpdateFromNeighbours {
@@ -123,11 +123,12 @@ impl NeighbourOpacity {
 
         // check if block above is solid
         if match ty {
-            OcclusionUpdateType::InitThisSlab { slice_above, .. } if slab_dz == 0 => {
-                IndexableSlice::index(slice_above, orig_block.to_slice_block())
-                    .opacity()
-                    .solid()
-            }
+            OcclusionUpdateType::InitThisSlab {
+                slice_above: Some(slice_above),
+                ..
+            } if slab_dz == 0 => IndexableSlice::index(slice_above, orig_block.to_slice_block())
+                .opacity()
+                .solid(),
             OcclusionUpdateType::UpdateFromNeighbours { relative_slabs } if slab_dz == 1 => {
                 relative_slabs
                     .get([0, 0, 1])
@@ -154,7 +155,10 @@ impl NeighbourOpacity {
 
             let slab_offset = [slab_offset_xy[0], slab_offset_xy[1], slab_dz];
             match ty {
-                OcclusionUpdateType::InitThisSlab { slice_above, .. } if slab_offset == [0; 3] => {
+                OcclusionUpdateType::InitThisSlab {
+                    slice_above: Some(slice_above),
+                    ..
+                } if slab_offset == [0; 3] => {
                     let opacity = IndexableSlice::index(slice_above, slab_pos).opacity();
                     set_occlusion_idx(i, opacity);
                 }
@@ -224,11 +228,12 @@ impl NeighbourOpacity {
 
         // check if block is solid, then we can skip everything else
         if match ty {
-            OcclusionUpdateType::InitThisSlab { this_slice, .. } if slab_dxy == [0; 2] => {
-                IndexableSlice::index(this_slice, rel_block)
-                    .opacity()
-                    .solid()
-            }
+            OcclusionUpdateType::InitThisSlab {
+                slice_this: this_slice,
+                ..
+            } if slab_dxy == [0; 2] => IndexableSlice::index(this_slice, rel_block)
+                .opacity()
+                .solid(),
             OcclusionUpdateType::UpdateFromNeighbours { relative_slabs } if slab_dxy != [0; 2] => {
                 relative_slabs
                     .get([slab_dxy[0], slab_dxy[1], 0])
@@ -287,14 +292,14 @@ impl NeighbourOpacity {
 
             match ty {
                 OcclusionUpdateType::InitThisSlab {
-                    this_slice,
+                    slice_this: this_slice,
                     slice_above,
                     slice_below,
                 } if slab_offset == [0; 3] => {
-                    let neighbour_opacity = match (relative, slice_below) {
-                        (Relative::SliceBelow, Some(slice)) => slice[slab_pos].opacity(),
-                        (Relative::SliceAbove, _) => slice_above[slab_pos].opacity(),
-                        (Relative::ThisSlice, _) => {
+                    let neighbour_opacity = match (relative, slice_below, slice_above) {
+                        (Relative::SliceBelow, Some(slice), _) => slice[slab_pos].opacity(),
+                        (Relative::SliceAbove, _, Some(slice)) => slice[slab_pos].opacity(),
+                        (Relative::ThisSlice, _, _) => {
                             IndexableSlice::index(this_slice, slab_pos).opacity()
                         }
                         _ => continue,

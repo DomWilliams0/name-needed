@@ -53,7 +53,8 @@ pub enum BlockForAllError {
 mod load_task {
     use super::*;
     use crate::block::BlockOpacity;
-    use crate::chunk::SparseGrid;
+    use crate::chunk::slice::Slice;
+    use crate::chunk::{SparseGrid, SparseGridExtension};
     use crate::loader::worker_pool::LoadSuccessTx;
     use crate::occlusion::{
         NeighbourOpacity, OcclusionOpacity, OcclusionUpdateType, RelativeSlabs,
@@ -64,7 +65,7 @@ mod load_task {
     use grid::GridImpl;
     use std::cell::{RefCell, UnsafeCell};
     use std::sync::Weak;
-    use unit::world::{RangePosition, SlabPositionAsCoord};
+    use unit::world::{RangePosition, SlabPositionAsCoord, SliceBlock};
 
     enum ExtraInfo<C: WorldContext> {
         Generated {
@@ -643,54 +644,83 @@ mod load_task {
     ) -> SparseGrid<BlockOcclusion> {
         let mut grid = SparseGrid::default();
         let mut grid_ext = grid.extend();
-        for (air_pos, _) in vs.iter_blocks() {
-            // block is air, so, do occlusion for block below
-            let pos = match air_pos.below() {
-                Some(pos) => pos,
-                None => {
-                    // TODO bottom slice?
-                    continue;
+
+        #[inline]
+        fn dew_it<'a, C: WorldContext>(
+            grid_ext: &mut SparseGridExtension<BlockOcclusion>,
+            blocks: impl Iterator<Item = SlabPosition>,
+            do_top: bool,
+            slices: impl Fn(
+                LocalSliceIndex,
+            ) -> (Option<Slice<'a, C>>, Slice<'a, C>, Option<Slice<'a, C>>),
+        ) {
+            for pos in blocks {
+                let mut occlusion = BlockOcclusion::default();
+
+                let (slice_below, slice_this, slice_above) = slices(pos.z());
+
+                let mut update_info = OcclusionUpdateType::InitThisSlab {
+                    slice_this,
+                    slice_above,
+                    slice_below,
+                };
+
+                if do_top {
+                    let mut top_occlusion = NeighbourOpacity::default();
+                    NeighbourOpacity::with_slice_above_other_slabs_possible(
+                        pos,
+                        &mut update_info,
+                        |i, op| top_occlusion[i] = OcclusionOpacity::Known(op),
+                    )
+                    .now_or_never()
+                    .expect("future should not await for internal occlusion");
+                    occlusion.set_face(OcclusionFace::Top, top_occlusion);
                 }
-            };
-            let mut occlusion = BlockOcclusion::default();
 
-            let slice_this = slab.slice(pos.z());
-            let slice_above = slab.slice_above(slice_this).unwrap(); // known to be available TODO unless top of slab?
+                // side faces
+                for face in OcclusionFace::SIDE_FACES {
+                    let mut neighbour_opacity = NeighbourOpacity::default();
+                    NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
+                        pos,
+                        &mut update_info,
+                        face,
+                        |i, op| neighbour_opacity[i] = OcclusionOpacity::Known(op),
+                    )
+                    .now_or_never()
+                    .expect("future should not await for internal occlusion");
 
-            let mut update_info = OcclusionUpdateType::InitThisSlab {
-                this_slice: slice_this,
-                slice_above,
-                slice_below: slab.slice_below(slice_this),
-            };
+                    occlusion.set_face(face, neighbour_opacity)
+                }
 
-            // top face
-            let mut top_occlusion = NeighbourOpacity::default();
-            NeighbourOpacity::with_slice_above_other_slabs_possible(
-                pos,
-                &mut update_info,
-                |i, op| top_occlusion[i] = OcclusionOpacity::Known(op),
-            )
-            .now_or_never()
-            .expect("future should not await for internal occlusion");
-            occlusion.set_face(OcclusionFace::Top, top_occlusion);
-
-            // side faces
-            for face in OcclusionFace::SIDE_FACES {
-                let mut neighbour_opacity = NeighbourOpacity::default();
-                NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
-                    pos,
-                    &mut update_info,
-                    face,
-                    |i, op| neighbour_opacity[i] = OcclusionOpacity::Known(op),
-                )
-                .now_or_never()
-                .expect("future should not await for internal occlusion");
-
-                occlusion.set_face(face, neighbour_opacity)
+                grid_ext.add_new(pos, occlusion);
             }
-
-            grid_ext.add_new(pos, occlusion);
         }
+
+        // use vertical space to skip all known air blocks
+        dew_it(
+            &mut grid_ext,
+            vs.iter_blocks().filter_map(|(air, _)| air.below()),
+            true,
+            |idx| {
+                let this = slab.slice(idx);
+                (slab.slice_below(this), this, slab.slice_above(this))
+            },
+        );
+
+        // top slice is special case that needs to be done separately, there is no vertical space above it
+        let top_slice = slab.slice(LocalSliceIndex::top());
+        let slice_below_top = slab.slice_below(top_slice);
+        dew_it(
+            &mut grid_ext,
+            vs.iter_above()
+                .filter_map(|(pos, h)| (h == 0).then_some(pos))
+                .map(|slice_block| slice_block.to_slab_position(LocalSliceIndex::top())),
+            false, // cant look above
+            |s| {
+                debug_assert_eq!(s, LocalSliceIndex::top());
+                (slice_below_top, top_slice, None)
+            },
+        );
 
         drop(grid_ext);
         grid

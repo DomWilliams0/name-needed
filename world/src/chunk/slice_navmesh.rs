@@ -596,6 +596,13 @@ impl SlabVerticalSpace {
         &self.top_down
     }
 
+    pub fn iter_above(&self) -> impl Iterator<Item = (SliceBlock, FreeVerticalSpace)> + '_ {
+        (0..CHUNK_SIZE.as_block_coord())
+            .cartesian_product(0..CHUNK_SIZE.as_block_coord())
+            .zip(self.top_down.into_iter())
+            .map(|((y, x), h)| (SliceBlock::new_srsly_unchecked(x, y), h))
+    }
+
     // pub fn maximum(&self) -> FreeVerticalSpace{self.maximum}
 
     pub fn below_at(&self, (x, y): (BlockCoord, BlockCoord)) -> FreeVerticalSpace {
