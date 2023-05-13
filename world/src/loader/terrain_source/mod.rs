@@ -194,7 +194,7 @@ mod tests {
         );
 
         // cheap check to tests bounds
-        assert!(!just_one.is_in_bounds(ChunkLocation(1, 1).get_slab(0)));
+        assert!(!just_one.is_in_bounds(ChunkLocation(1, 1)));
 
         // make sure impl fails too
         assert!(just_one.get_slab_copy(SlabLocation::new(0, (0, 0))).is_ok());

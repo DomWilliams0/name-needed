@@ -116,9 +116,8 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
         self.bounds
     }
 
-    /// Checks chunk bounds only, assume infinite depth
-    pub fn is_in_bounds(&self, slab: SlabLocation) -> bool {
+    pub fn is_in_bounds(&self, chunk: ChunkLocation) -> bool {
         let (min, max) = self.bounds;
-        (min.0..=max.0).contains(&slab.chunk.0) && (min.1..=max.1).contains(&slab.chunk.1)
+        (min.0..=max.0).contains(&chunk.0) && (min.1..=max.1).contains(&chunk.1)
     }
 }

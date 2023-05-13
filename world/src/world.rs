@@ -986,10 +986,7 @@ pub async fn get_or_wait_for_slab_areas<C: WorldContext>(
             let w = world.borrow();
             let chunk = match w.find_chunk_with_pos(slab.chunk) {
                 Some(c) => c,
-                None => {
-                    trace!("chunk not found: {:?}", slab);
-                    break;
-                }
+                None => break, // non existent chunk
             };
             match chunk.get_slab_areas_or_wait(slab.slab, |a, ai| func(a, ai)) {
                 SlabThingOrWait::Wait => {}
@@ -1053,10 +1050,7 @@ pub async fn get_or_wait_for_slab<C: WorldContext>(
             let w = world.borrow();
             let chunk = match w.find_chunk_with_pos(slab.chunk) {
                 Some(c) => c,
-                None => {
-                    trace!("chunk not found: {:?}", slab);
-                    break None;
-                }
+                None => break None, // non existent chunk
             };
             match chunk.get_slab_or_wait(slab.slab) {
                 SlabThingOrWait::Wait => {}
@@ -1817,7 +1811,7 @@ mod tests {
             SlabLocation::new(-max_slab, min),
             SlabLocation::new(max_slab, max),
         );
-        loader.request_slabs_with_count(all_slabs, count);
+        loader.request_slabs(all_slabs);
 
         assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
 

@@ -940,28 +940,20 @@ impl<C: WorldContext> WorldLoader<C> {
         self.world.clone()
     }
 
-    /// Requests slabs as a single batch. Must be sorted as per [self.request_slabs_with_count]
-    pub fn request_slabs(&mut self, slabs: impl ExactSizeIterator<Item = SlabLocation> + Clone) {
-        let count = slabs.len();
-        self.request_slabs_with_count(slabs, count)
+    fn world_boundary(&self) -> (ChunkLocation, ChunkLocation) {
+        match &self.source {
+            TerrainSource::Memory(src) => src.read().world_bounds(),
+            #[cfg(feature = "worldprocgen")]
+            TerrainSource::Generated(_) => (ChunkLocation(0, 0), ChunkLocation::MAX), // planet chunks dont go negative
+        }
     }
 
     // TODO debug renderer to flicker chunks that are updated (nav,terrain,occlusion) on block change, to ensure not too much is changed
 
-    // TODO add more efficient version that takes chunk+multiple slabs
     /// Must be sorted by chunk then by ascending slab (debug asserted). All slabs are loaded from
     /// scratch, it's the caller's responsibility to ensure slabs that are already loaded are not
     /// passed in here
-    pub fn request_slabs_with_count(
-        &mut self,
-        slabs: impl Iterator<Item = SlabLocation> + Clone,
-        count: usize,
-    ) {
-        // bomb out early if nothing to do
-        if count == 0 {
-            return;
-        }
-
+    pub fn request_slabs(&mut self, slabs: impl Iterator<Item = SlabLocation> + Clone) {
         let mut world_mut = self.world.borrow_mut();
 
         // check order of slabs is as expected
@@ -977,10 +969,21 @@ impl<C: WorldContext> WorldLoader<C> {
 
         // calculate chunk range
         let (mut chunk_min, mut chunk_max) = (ChunkLocation::MAX, ChunkLocation::MIN);
+        let world_boundary = self.world_boundary();
+        let is_chunk_valid = |chunk_loc: ChunkLocation| {
+            let (world_chunk_min, world_chunk_max) = world_boundary;
+            (world_chunk_min.0..=world_chunk_max.0).contains(&chunk_loc.0)
+                && (world_chunk_min.1..=world_chunk_max.1).contains(&chunk_loc.1)
+        };
 
         // first iterate slabs to register them all with their chunk, so they know if their
         // neighbours have been requested/are being loaded too
         for (chunk_loc, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
+            if !is_chunk_valid(chunk_loc) {
+                // skip chunk and all its slabs
+                continue;
+            }
+
             log_scope!(o!(chunk_loc));
 
             let chunk = world_mut.ensure_chunk(chunk_loc);
@@ -1010,11 +1013,12 @@ impl<C: WorldContext> WorldLoader<C> {
             chunk_max = chunk_max.max(chunk_loc);
         }
 
-        let count = count + extra_slabs.len();
-        let mut real_count = 0;
+        let mut count = 0;
 
         let all_slabs = {
-            let real_slabs = slabs.zip(repeat(SlabType::Normal));
+            let real_slabs = slabs
+                .filter(|s| is_chunk_valid(s.chunk))
+                .zip(repeat(SlabType::Normal));
             let air_slabs = extra_slabs.into_iter().zip(repeat(SlabType::Placeholder));
             real_slabs.chain(air_slabs)
         };
@@ -1049,18 +1053,13 @@ impl<C: WorldContext> WorldLoader<C> {
                 terrain_tx.clone(),
             ));
 
-            real_count += 1;
+            count += 1;
         }
 
-        debug!("slab batch of size {size} submitted", size = count);
-
-        assert_eq!(
-            real_count, count,
-            "expected batch of {} but actually got {}",
-            count, real_count
-        );
-
-        self.last_batch_size = count;
+        if count > 0 {
+            debug!("slab batch of size {size} submitted", size = count);
+            self.last_batch_size = count;
+        }
     }
 
     /// Note changes are made immediately to the terrain but are delayed for navigation.
@@ -1290,14 +1289,6 @@ impl<C: WorldContext> WorldLoader<C> {
 
         #[cfg(not(feature = "worldprocgen"))]
         false
-    }
-
-    pub fn is_in_bounds(&self, slab: SlabLocation) -> bool {
-        if let TerrainSource::Memory(src) = &self.source {
-            src.read().is_in_bounds(slab)
-        } else {
-            true
-        }
     }
 
     /// Nop if any mutexes cannot be taken immediately
