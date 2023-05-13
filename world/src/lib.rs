@@ -37,3 +37,12 @@ mod ray;
 mod viewer;
 mod world;
 mod world_ref;
+
+pub fn iter_slice_xy() -> impl Iterator<Item = unit::world::SliceBlock> {
+    use misc::Itertools;
+    use unit::world::{SliceBlock, CHUNK_SIZE};
+
+    (0..CHUNK_SIZE.as_block_coord())
+        .cartesian_product(0..CHUNK_SIZE.as_block_coord())
+        .map(|(y, x)| SliceBlock::new_srsly_unchecked(x, y))
+}

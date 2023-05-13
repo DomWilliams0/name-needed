@@ -76,7 +76,9 @@ impl BlockPosition {
     pub const fn z(self) -> GlobalSliceIndex {
         self.2
     }
-
+    pub const fn xy(self) -> (BlockCoord, BlockCoord) {
+        (self.0, self.1)
+    }
     pub fn xyz(self) -> (BlockCoord, BlockCoord, GlobalSliceIndex) {
         (self.0, self.1, self.2)
     }

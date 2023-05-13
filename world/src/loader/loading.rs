@@ -60,7 +60,7 @@ mod load_task {
         NeighbourOpacity, OcclusionOpacity, OcclusionUpdateType, RelativeSlabs,
     };
     use crate::world::get_or_wait_for_slab;
-    use crate::{flatten_coords, BlockOcclusion, OcclusionFace};
+    use crate::{flatten_coords, iter_slice_xy, BlockOcclusion, OcclusionFace};
     use futures::pin_mut;
     use grid::GridImpl;
     use std::cell::{RefCell, UnsafeCell};
@@ -114,7 +114,7 @@ mod load_task {
                 // this slab, but its only use is for area discovery while we also have the above one
                 // available, so no matter for loading
                 let vs = SlabVerticalSpace::discover(&terrain);
-                let occlusion = init_internal_occlusion(&terrain, &vs);
+                let occlusion = init_internal_occlusion(slab, &terrain, &vs);
 
                 (terrain, None, vs, vec![], occlusion)
             }
@@ -364,7 +364,7 @@ mod load_task {
         };
 
         // discover occlusion internal to this slab
-        let occlusion = init_internal_occlusion(&terrain, &vs);
+        let occlusion = init_internal_occlusion(this_slab, &terrain, &vs);
 
         the_ultimate_load_task(LoadContext {
             world,
@@ -639,6 +639,7 @@ mod load_task {
     }
 
     fn init_internal_occlusion<C: WorldContext>(
+        this_slab: SlabLocation,
         slab: &Slab<C>,
         vs: &SlabVerticalSpace,
     ) -> SparseGrid<BlockOcclusion> {
@@ -647,6 +648,7 @@ mod load_task {
 
         #[inline]
         fn dew_it<'a, C: WorldContext>(
+            this_slab: SlabLocation,
             grid_ext: &mut SparseGridExtension<BlockOcclusion>,
             blocks: impl Iterator<Item = SlabPosition>,
             do_top: bool,
@@ -698,6 +700,7 @@ mod load_task {
 
         // use vertical space to skip all known air blocks
         dew_it(
+            this_slab,
             &mut grid_ext,
             vs.iter_blocks().filter_map(|(air, _)| air.below()),
             true,
@@ -711,6 +714,7 @@ mod load_task {
         let top_slice = slab.slice(LocalSliceIndex::top());
         let slice_below_top = slab.slice_below(top_slice);
         dew_it(
+            this_slab,
             &mut grid_ext,
             vs.iter_above()
                 .filter_map(|(pos, h)| (h == 0).then_some(pos))
@@ -792,6 +796,47 @@ mod load_task {
                 |i, opacity| changes.push((pos, Top, i as u8, opacity)),
             )
             .await;
+        }
+
+        // do top slice separately
+        for pos in vs
+            .iter_above()
+            .filter_map(|(pos, h)| (h == 0).then_some(pos))
+            .map(|slice_block| slice_block.to_slab_position(LocalSliceIndex::top()))
+        {
+            // needs all faces
+            for face in OcclusionFace::SIDE_FACES {
+                NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
+                    pos,
+                    &mut update_neighbour_info,
+                    face,
+                    |i, opacity| changes.push((pos, face, i as u8, opacity)),
+                )
+                .await;
+            }
+
+            NeighbourOpacity::with_slice_above_other_slabs_possible(
+                pos,
+                &mut update_neighbour_info,
+                |i, opacity| changes.push((pos, Top, i as u8, opacity)),
+            )
+            .await;
+        }
+
+        // redo bottom slice too to now use slab below
+        for pos in iter_slice_xy()
+            .filter(|pos| vs.below_at(pos.xy()) == 0)
+            .map(|b| b.to_slab_position(LocalSliceIndex::bottom()))
+        {
+            for face in OcclusionFace::SIDE_FACES {
+                NeighbourOpacity::with_neighbouring_slices_other_slabs_possible(
+                    pos,
+                    &mut update_neighbour_info,
+                    face,
+                    |i, opacity| changes.push((pos, face, i as u8, opacity)),
+                )
+                .await;
+            }
         }
 
         if !changes.is_empty() {

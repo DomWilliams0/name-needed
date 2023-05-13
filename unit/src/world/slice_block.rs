@@ -87,7 +87,13 @@ impl SliceBlock {
         )
     }
 
-    pub fn xy(self) -> (BlockCoord, BlockCoord) {
+    pub const fn x(self) -> BlockCoord {
+        self.0
+    }
+    pub const fn y(self) -> BlockCoord {
+        self.1
+    }
+    pub const fn xy(self) -> (BlockCoord, BlockCoord) {
         (self.0, self.1)
     }
 }

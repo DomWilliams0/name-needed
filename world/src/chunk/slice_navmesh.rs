@@ -1,4 +1,6 @@
-use crate::{flatten_coords, unflatten_index, BlockType, Slab, WorldContext, SLICE_SIZE};
+use crate::{
+    flatten_coords, iter_slice_xy, unflatten_index, BlockType, Slab, WorldContext, SLICE_SIZE,
+};
 use arbitrary_int::{u3, u4, u5};
 use misc::{lazy_static, trace, Itertools, SlogDrain};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -507,10 +509,14 @@ impl SlabVerticalSpace {
     }
 
     fn calc_empty() -> Arc<Self> {
-        let blocks = (0..CHUNK_SIZE.as_block_coord())
-            .cartesian_product(0..CHUNK_SIZE.as_block_coord())
-            .map(|(y, x)| {
-                PackedSlabBlockVerticalSpace::new_(x, y, 0, ABSOLUTE_MAX_FREE_VERTICAL_SPACE)
+        let blocks = iter_slice_xy()
+            .map(|b| {
+                PackedSlabBlockVerticalSpace::new_(
+                    b.x(),
+                    b.y(),
+                    0,
+                    ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
+                )
             })
             .collect();
 
@@ -600,7 +606,7 @@ impl SlabVerticalSpace {
         self.blocks.is_empty()
     }
 
-    pub fn above_at(&self, x: BlockCoord, y: BlockCoord) -> FreeVerticalSpace {
+    pub fn above_at(&self, (x, y): (BlockCoord, BlockCoord)) -> FreeVerticalSpace {
         self.top_down[flatten_coords(SliceBlock::new_unchecked(x, y))]
     }
 
@@ -759,14 +765,14 @@ mod tests_vertical_space {
         );
 
         // really high block
-        assert_eq!(x.above_at(3, 3), 2);
+        assert_eq!(x.above_at((3, 3)), 2);
 
         // ceiling block
-        assert_eq!(x.above_at(4, 4), 0);
+        assert_eq!(x.above_at((4, 4)), 0);
 
         // open space
         assert_eq!(x.below_at((6, 7)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
-        assert_eq!(x.above_at(6, 7), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        assert_eq!(x.above_at((6, 7)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
     }
 
     #[test]
@@ -803,7 +809,7 @@ mod tests_vertical_space {
 
         let x = SlabVerticalSpace::discover(slab);
         assert_eq!(x.iter_blocks().count(), 0);
-        assert_eq!(x.above_at(5, 5), 0);
+        assert_eq!(x.above_at((5, 5)), 0);
         assert_eq!(x.below_at((5, 5)), 0);
     }
 
@@ -817,9 +823,9 @@ mod tests_vertical_space {
 
         let x = SlabVerticalSpace::discover(slab);
 
-        assert_eq!(x.above_at(3, 5), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
-        assert_eq!(x.above_at(4, 5), 1);
-        assert_eq!(x.above_at(5, 5), 0);
+        assert_eq!(x.above_at((3, 5)), ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        assert_eq!(x.above_at((4, 5)), 1);
+        assert_eq!(x.above_at((5, 5)), 0);
     }
 
     #[test]
@@ -916,7 +922,7 @@ mod tests_vertical_space {
             chunk
                 .slab_vertical_space(b.slice().slab_index())
                 .unwrap_or_else(|| panic!("no slab vs for {b}"))
-                .above_at(pos.x(), pos.y())
+                .above_at(pos.xy())
         };
 
         // should protrude into slab above
