@@ -18,6 +18,7 @@ use crate::loader::{FreeVerticalSpace, GenericTerrainUpdate, SlabTerrainUpdate};
 
 use crate::navigation::{BlockGraph, ChunkArea};
 
+use crate::chunk::affected_neighbours::OcclusionAffectedNeighbourSlabs;
 use crate::occlusion::{NeighbourOpacity, OcclusionFace};
 use crate::{flatten_coords, BlockType, WorldContext, SLICE_SIZE};
 use grid::{Grid, GridImpl, GridImplExt};
@@ -489,8 +490,10 @@ impl<C: WorldContext> Slab<C> {
         &mut self,
         this_slab: SlabLocation,
         updates: impl Iterator<Item = SlabTerrainUpdate<C>>,
-    ) -> usize {
+    ) -> (OcclusionAffectedNeighbourSlabs, usize) {
         let mut count = 0;
+        let mut affected_neighbours = OcclusionAffectedNeighbourSlabs::default();
+
         for update in updates {
             let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate<C> = update;
             trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
@@ -511,9 +514,10 @@ impl<C: WorldContext> Slab<C> {
                     }
                 }
             }
+            affected_neighbours.update(range);
         }
 
-        count
+        (affected_neighbours, count)
     }
 }
 

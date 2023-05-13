@@ -15,6 +15,7 @@ mod builder;
 #[allow(clippy::module_inception)]
 mod chunk;
 
+pub(crate) mod affected_neighbours;
 mod double_sided_vec;
 pub(crate) mod slab;
 pub(crate) mod slice;

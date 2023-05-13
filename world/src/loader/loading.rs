@@ -53,6 +53,9 @@ pub enum BlockForAllError {
 mod load_task {
     use super::*;
     use crate::block::BlockOpacity;
+    use crate::chunk::affected_neighbours::{
+        OcclusionAffectedNeighbourSlab, OcclusionAffectedNeighbourSlabs,
+    };
     use crate::chunk::slice::Slice;
     use crate::chunk::{SparseGrid, SparseGridExtension};
     use crate::loader::worker_pool::LoadSuccessTx;
@@ -65,6 +68,8 @@ mod load_task {
     use grid::GridImpl;
     use std::cell::{RefCell, UnsafeCell};
     use std::sync::Weak;
+    use strum::{EnumCount, IntoEnumIterator};
+    use tokio::runtime::Handle;
     use unit::world::{RangePosition, SlabPositionAsCoord, SliceBlock};
 
     enum ExtraInfo<C: WorldContext> {
@@ -74,7 +79,9 @@ mod load_task {
             vs: Arc<SlabVerticalSpace>,
             occlusion: SparseGrid<BlockOcclusion>,
         },
-        Updated,
+        Updated {
+            affected_slabs: OcclusionAffectedNeighbourSlabs,
+        },
     }
 
     struct LoadContext<C: WorldContext> {
@@ -89,15 +96,22 @@ mod load_task {
         // ----- slab is currently Requested
 
         // get terrain and vertical space
-        let is_update = matches!(ctx.extra, ExtraInfo::Updated);
-        let (terrain, new_terrain, vs, entities, occlusion) = match ctx.extra {
+        let is_update = matches!(ctx.extra, ExtraInfo::Updated { .. });
+        let (terrain, new_terrain, vs, entities, occlusion, ref affected_slabs) = match ctx.extra {
             ExtraInfo::Generated {
                 entities,
                 terrain,
                 vs,
                 occlusion,
-            } => (terrain.clone(), Some(terrain), vs, entities, occlusion),
-            ExtraInfo::Updated => {
+            } => (
+                terrain.clone(),
+                Some(terrain),
+                vs,
+                entities,
+                occlusion,
+                None,
+            ),
+            ExtraInfo::Updated { ref affected_slabs } => {
                 let w = ctx.world.borrow();
 
                 let terrain = if let Some(t) = w
@@ -116,15 +130,17 @@ mod load_task {
                 let vs = SlabVerticalSpace::discover(&terrain);
                 let occlusion = init_internal_occlusion(slab, &terrain, &vs);
 
-                (terrain, None, vs, vec![], occlusion)
+                (terrain, None, vs, vec![], occlusion, Some(affected_slabs))
             }
         };
 
         // put terrain into world so other slabs can access it asap
+        let notifier;
         let mut notifications;
         {
             let mut w = ctx.world.borrow_mut();
-            notifications = w.load_notifications().start_listening(); // might be pointless sometimes
+            notifier = w.load_notifications();
+            notifications = notifier.start_listening(); // might be pointless sometimes
 
             // spawn entities if necessary
             if !entities.is_empty() {
@@ -147,6 +163,45 @@ mod load_task {
         if let Err(e) = ctx.success_tx.send(Ok(slab)).await {
             error!("failed to send terrain result"; "error" => %e);
             return;
+        }
+
+        // trigger neighbouring slabs to update occlusion based on this one
+        let affected_slabs: ArrayVec<
+            OcclusionAffectedNeighbourSlab,
+            { OcclusionAffectedNeighbourSlab::COUNT },
+        > = match affected_slabs {
+            Some(slabs) => slabs.finish().collect(),
+            None => OcclusionAffectedNeighbourSlab::iter().collect(),
+        };
+        if !affected_slabs.is_empty() {
+            let handle = Handle::current();
+            for affected_neighbour in affected_slabs {
+                let world = ctx.world.clone();
+                let notifier = notifier.clone(); // avoid needing a world ref
+                handle.spawn(async move {
+                    let mut notifications = notifier.start_listening();
+                    let neighbour_slab = slab + affected_neighbour.offset();
+                    let neighbour_vs = get_or_wait_for_slab_vertical_space(
+                        &mut notifications,
+                        &world,
+                        neighbour_slab,
+                    )
+                    .await;
+                    if let Some(vs) = neighbour_vs {
+                        if update_neighbour_occlusion(
+                            &vs,
+                            neighbour_slab,
+                            &mut notifications,
+                            &world,
+                        )
+                        .await
+                        {
+                            let mut w = world.borrow_mut();
+                            w.mark_slab_dirty(neighbour_slab);
+                        }
+                    }
+                });
+            }
         }
 
         // init occlusion using neighbouring slabs
@@ -383,6 +438,7 @@ mod load_task {
     pub async fn update<C: WorldContext>(
         world: WorldRef<C>,
         this_slab: SlabLocation,
+        affected_slabs: OcclusionAffectedNeighbourSlabs,
         success_tx: LoadSuccessTx,
     ) {
         the_ultimate_load_task(LoadContext {
@@ -390,7 +446,7 @@ mod load_task {
             this_slab,
 
             success_tx,
-            extra: ExtraInfo::Updated,
+            extra: ExtraInfo::Updated { affected_slabs },
         })
         .await
     }
@@ -730,12 +786,13 @@ mod load_task {
         grid
     }
 
+    /// Returns if any changes were applied
     async fn update_neighbour_occlusion<C: WorldContext>(
         vs: &SlabVerticalSpace,
         this_slab: SlabLocation,
         notifications: &mut ListeningLoadNotifier,
         world: &WorldRef<C>,
-    ) {
+    ) -> bool {
         let mut changes = vec![];
         let mut update_neighbour_info = OcclusionUpdateType::UpdateFromNeighbours {
             relative_slabs: RelativeSlabs::new(this_slab, notifications, world),
@@ -839,7 +896,9 @@ mod load_task {
             }
         }
 
-        if !changes.is_empty() {
+        let any_changes = !changes.is_empty();
+
+        if any_changes {
             let mut w = world.borrow_mut();
             let slab_data = w
                 .find_chunk_with_pos_mut(this_slab.chunk)
@@ -860,6 +919,8 @@ mod load_task {
                 }
             }
         }
+
+        any_changes
     }
 }
 
@@ -1117,9 +1178,10 @@ impl<C: WorldContext> WorldLoader<C> {
         let mut slab_locs = Vec::with_capacity(upper_slab_limit);
         {
             let mut w = world_ref.borrow_mut();
-            w.apply_terrain_updates_in_place(grouped_updates.into_iter(), |slab_loc| {
-                slab_locs.push(slab_loc)
-            });
+            w.apply_terrain_updates_in_place(
+                grouped_updates.into_iter(),
+                |slab_loc, affected_slabs| slab_locs.push((slab_loc, affected_slabs)),
+            );
         }
 
         let real_slab_count = slab_locs.len();
@@ -1129,11 +1191,12 @@ impl<C: WorldContext> WorldLoader<C> {
         );
         debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
 
-        for slab in slab_locs.into_iter() {
+        for (slab, affected_slabs) in slab_locs.into_iter() {
             let mut terrain_tx = self.pool.success_tx();
             self.pool.submit_any_async_with_handle(load_task::update(
                 world_ref.clone(),
                 slab,
+                affected_slabs,
                 terrain_tx.clone(),
             ));
         }

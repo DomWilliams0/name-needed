@@ -22,6 +22,7 @@ bitbybit = "1.1"
 arbitrary-int = "1.2"
 ahash = "0.8"
 md-5 = "0.10"
+strum = { version = "0.19", features = ["derive"] }
 
 [features]
 worldprocgen = []
@@ -29,6 +30,7 @@ worldprocgen = []
 [dev-dependencies]
 criterion = "0.3"
 num_cpus = "1.13"
+rstest = "0.17"
 
 
 [[bench]]

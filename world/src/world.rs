@@ -15,6 +15,7 @@ use unit::world::{
 };
 
 use crate::block::{Block, BlockDurability};
+use crate::chunk::affected_neighbours::OcclusionAffectedNeighbourSlabs;
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndex;
 use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait, SparseGrid};
@@ -42,6 +43,7 @@ pub struct World<C: WorldContext> {
     area_search_context: AreaGraphSearchContext,
 }
 
+#[derive(Clone)]
 pub struct LoadNotifier {
     send: broadcast::Sender<SlabLocation>,
     /// Dont bother sending anything if there are no receivers
@@ -563,7 +565,7 @@ impl<C: WorldContext> World<C> {
     pub(crate) fn apply_terrain_updates_in_place(
         &mut self,
         updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate<C>>)>,
-        mut per_slab: impl FnMut(SlabLocation),
+        mut per_slab: impl FnMut(SlabLocation, OcclusionAffectedNeighbourSlabs),
     ) {
         let mut contiguous_chunks = ContiguousChunkIteratorMut::new(self);
 
@@ -589,14 +591,14 @@ impl<C: WorldContext> World<C> {
                 }
             };
 
-            let count = slab.apply_terrain_updates(slab_loc, slab_updates);
+            let (affected_neighbours, count) = slab.apply_terrain_updates(slab_loc, slab_updates);
 
             let slab_data = chunk.terrain_mut().slab_data_mut(slab_loc.slab).unwrap(); // just accessed to get terrain
             let new_version = slab_data.mark_modified();
 
             debug!("applied {count} terrain block updates to slab", count = count; slab_loc, "new_version" => ?new_version);
 
-            per_slab(slab_loc);
+            per_slab(slab_loc, affected_neighbours);
         }
     }
 
