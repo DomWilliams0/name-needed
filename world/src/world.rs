@@ -838,28 +838,6 @@ impl<C: WorldContext> World<C> {
         .map(|(_, pos)| pos)
     }
 
-    pub fn associated_block_data(&self, pos: WorldPosition) -> Option<&C::AssociatedBlockData> {
-        self.find_chunk_with_pos(pos.into())
-            .and_then(|chunk| chunk.associated_block_data(pos.into()))
-    }
-
-    pub fn set_associated_block_data(
-        &mut self,
-        pos: WorldPosition,
-        data: C::AssociatedBlockData,
-    ) -> Option<C::AssociatedBlockData> {
-        self.find_chunk_with_pos_mut(pos.into())
-            .and_then(|chunk| chunk.set_associated_block_data(pos.into(), data))
-    }
-
-    pub fn remove_associated_block_data(
-        &mut self,
-        pos: WorldPosition,
-    ) -> Option<C::AssociatedBlockData> {
-        self.find_chunk_with_pos_mut(pos.into())
-            .and_then(|chunk| chunk.remove_associated_block_data(pos.into()))
-    }
-
     /// Removes slabs that are already loaded and not placeholders.
     /// More efficient when sorted by slab
     pub fn retain_slabs_to_load(&self, slabs: &mut Vec<SlabLocation>) {
@@ -1195,7 +1173,6 @@ pub mod helpers {
     }
 
     impl WorldContext for DummyWorldContext {
-        type AssociatedBlockData = ();
         type BlockType = DummyBlockType;
         type GeneratedTerrainSource = NopGeneratedTerrainSource<Self>;
         type GeneratedBlockDetails = ();

@@ -12,7 +12,6 @@ use std::sync::Arc;
 use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 pub trait WorldContext: 'static + Send + Sync + Sized {
-    type AssociatedBlockData;
     type BlockType: BlockType;
 
     type GeneratedTerrainSource: GeneratedTerrainSource<Self> + Send + Sync;

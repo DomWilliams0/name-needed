@@ -39,9 +39,6 @@ pub struct Chunk<C: WorldContext> {
 
     slabs: SlabStorage<C>,
 
-    /// Sparse associated data with each block. Unused atm?
-    block_data: HashMap<BlockPosition, C::AssociatedBlockData>,
-
     /// Big info about each area not needed for nav graph
     areas: HashMap<ChunkArea, AreaInfo>,
 
@@ -83,7 +80,6 @@ impl<C: WorldContext> Chunk<C> {
         Self {
             pos: pos.into(),
             slabs: SlabStorage::default(),
-            block_data: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: world.load_notifications(),
@@ -96,7 +92,6 @@ impl<C: WorldContext> Chunk<C> {
         Self {
             pos: pos.into(),
             slabs: SlabStorage::default(),
-            block_data: HashMap::new(),
             areas: HashMap::new(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: LoadNotifier::default(),
@@ -211,25 +206,6 @@ impl<C: WorldContext> Chunk<C> {
     pub fn slice_or_dummy(&self, slice: GlobalSliceIndex) -> Slice<C> {
         #[allow(clippy::redundant_closure)]
         self.slabs.slice(slice).unwrap_or_else(|| Slice::dummy())
-    }
-
-    pub fn associated_block_data(&self, pos: BlockPosition) -> Option<&C::AssociatedBlockData> {
-        self.block_data.get(&pos)
-    }
-
-    pub fn set_associated_block_data(
-        &mut self,
-        pos: BlockPosition,
-        data: C::AssociatedBlockData,
-    ) -> Option<C::AssociatedBlockData> {
-        self.block_data.insert(pos, data)
-    }
-
-    pub fn remove_associated_block_data(
-        &mut self,
-        pos: BlockPosition,
-    ) -> Option<C::AssociatedBlockData> {
-        self.block_data.remove(&pos)
     }
 
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
