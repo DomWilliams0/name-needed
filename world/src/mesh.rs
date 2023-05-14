@@ -25,7 +25,7 @@ pub fn make_simple_render_mesh<V: BaseVertex, C: WorldContext>(
     slice_range: SliceRange,
 ) -> Vec<V> {
     // TODO use indices and dont duplicate vertices?
-    let mut vertices = Vec::<V>::new(); // TODO reuse/calculate needed capacity first
+    let mut vertices = Vec::<V>::with_capacity(40_000); // TODO calculate better
 
     let shifted_slice_index = |slice_index: GlobalSliceIndex| {
         // shift slice range down to 0..size, to keep render z position low and near 0
