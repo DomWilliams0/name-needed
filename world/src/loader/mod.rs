@@ -1,4 +1,4 @@
-pub use loading::{BlockForAllError, WorldLoader};
+pub use loading::{BlockForAllError, WorldLoader, WorldLoaderEvent};
 // #[cfg(feature = "worldprocgen")]
 // pub use {procgen::PlanetParams, terrain_source::GeneratedTerrainSource};
 

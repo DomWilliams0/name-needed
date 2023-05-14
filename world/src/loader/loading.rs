@@ -43,6 +43,16 @@ pub struct WorldLoader<C: WorldContext> {
     pool: AsyncWorkerPool,
     world: WorldRef<C>,
     slab_request_tx: [Sender<SlabRequest>; LOAD_WORKERS],
+    event_channel: (
+        crossbeam::channel::Sender<WorldLoaderEvent<C>>,
+        crossbeam::channel::Receiver<WorldLoaderEvent<C>>,
+    ),
+}
+
+pub enum WorldLoaderEvent<C: WorldContext> {
+    /// Terrain and occlusion are ready to render
+    DirtySlab(SlabLocation),
+    SpawnEntities(Vec<C::GeneratedEntityDesc>),
 }
 
 #[derive(Debug, Error)]
@@ -97,6 +107,16 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         extra: ExtraInfo<C>,
+        event_tx: crossbeam::channel::Sender<WorldLoaderEvent<C>>,
+    }
+
+    fn send_event<C: WorldContext>(
+        event_tx: &crossbeam::channel::Sender<WorldLoaderEvent<C>>,
+        evt: WorldLoaderEvent<C>,
+    ) {
+        if let Err(e) = event_tx.try_send(evt) {
+            error!("failed to send world loader event"; "err" => %e);
+        }
     }
 
     async fn the_ultimate_load_task<C: WorldContext>(mut ctx: LoadContext<C>) {
@@ -150,19 +170,19 @@ mod load_task {
             notifier = w.load_notifications();
             notifications = notifier.start_listening(); // might be pointless sometimes
 
-            // spawn entities if necessary
-            if !entities.is_empty() {
-                trace!(
-                    "passing {n} entity descriptions from slab to world to spawn next tick",
-                    n = entities.len()
-                );
-
-                // TODO maybe delay until nav is done?
-                w.queue_entities_to_spawn(entities.into_iter());
-            }
-
             // put terrain into chunk
             w.populate_chunk_with_slab(slab, new_terrain, vs.clone(), occlusion);
+        }
+
+        // spawn entities if necessary
+        if !entities.is_empty() {
+            trace!(
+                "passing {n} entity descriptions from slab to world to spawn next tick",
+                n = entities.len()
+            );
+
+            // TODO maybe delay until nav is done?
+            send_event(&ctx.event_tx, WorldLoaderEvent::SpawnEntities(entities));
         }
 
         // ----- slab is now TerrainInWorld
@@ -180,6 +200,7 @@ mod load_task {
             for affected_neighbour in affected_slabs {
                 let world = ctx.world.clone();
                 let notifier = notifier.clone(); // avoid needing a world ref
+                let event_tx = ctx.event_tx.clone();
                 handle.spawn(async move {
                     let mut notifications = notifier.start_listening();
                     let neighbour_slab = slab + affected_neighbour.offset();
@@ -198,8 +219,7 @@ mod load_task {
                         )
                         .await
                         {
-                            let mut w = world.borrow_mut();
-                            w.mark_slab_dirty(neighbour_slab);
+                            send_event(&event_tx, WorldLoaderEvent::DirtySlab(neighbour_slab));
                         }
                     }
                 });
@@ -210,10 +230,7 @@ mod load_task {
         update_neighbour_occlusion(&vs, slab, &mut notifications, &ctx.world).await;
 
         // new slab can now be made visible
-        {
-            let mut w = ctx.world.borrow_mut();
-            w.mark_slab_dirty(slab);
-        }
+        send_event(&ctx.event_tx, WorldLoaderEvent::DirtySlab(slab));
 
         // generate nav areas, skipping the bottom slice initially.
         // needs vs from slab above. doesnt matter that it is capped locally, the max vs is
@@ -380,6 +397,7 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         source: TerrainSource<C>,
+        event_tx: crossbeam::channel::Sender<WorldLoaderEvent<C>>,
     ) {
         let mut entities = vec![];
         let result = source.load_slab(this_slab).await.map(|generated| {
@@ -417,6 +435,7 @@ mod load_task {
                 vs,
                 occlusion,
             },
+            event_tx,
         })
         .await
     }
@@ -425,11 +444,13 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         affected_slabs: OcclusionAffectedNeighbourSlabs,
+        event_tx: crossbeam::channel::Sender<WorldLoaderEvent<C>>,
     ) {
         the_ultimate_load_task(LoadContext {
             world,
             this_slab,
             extra: ExtraInfo::Updated { affected_slabs },
+            event_tx,
         })
         .await
     }
@@ -925,6 +946,7 @@ impl<C: WorldContext> WorldLoader<C> {
         let source = source.into();
 
         let handle = pool.runtime().handle().clone();
+        let event_channel = crossbeam::channel::unbounded();
         let mk_worker = || {
             let (req_tx, req_rx) = futures::channel::mpsc::channel(1024);
             handle.spawn(Self::slab_request_task(
@@ -932,6 +954,7 @@ impl<C: WorldContext> WorldLoader<C> {
                 source.clone(),
                 world.clone(),
                 handle.clone(),
+                event_channel.0.clone(),
             ));
             req_tx
         };
@@ -942,6 +965,7 @@ impl<C: WorldContext> WorldLoader<C> {
             pool,
             world,
             slab_request_tx: workers,
+            event_channel,
         }
     }
 
@@ -956,6 +980,7 @@ impl<C: WorldContext> WorldLoader<C> {
         source: TerrainSource<C>,
         world: WorldRef<C>,
         pool: Handle,
+        event_tx: crossbeam::channel::Sender<WorldLoaderEvent<C>>,
     ) {
         let (world_chunk_min, world_chunk_max) = source.world_boundary();
 
@@ -1004,6 +1029,7 @@ impl<C: WorldContext> WorldLoader<C> {
                     world.clone(),
                     SlabLocation::new(*slab, chunk),
                     source.clone(),
+                    event_tx.clone(),
                 ));
             }
         }
@@ -1188,6 +1214,7 @@ impl<C: WorldContext> WorldLoader<C> {
         }
 
         let handle = self.pool.runtime().handle().clone();
+        let event_tx = self.event_tx();
         self.pool.runtime().spawn(async move {
             // group per slab so each slab is fetched and modified only once
             let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
@@ -1216,7 +1243,12 @@ impl<C: WorldContext> WorldLoader<C> {
             debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
 
             for (slab, affected_slabs) in slab_locs.into_iter() {
-                handle.spawn(load_task::update(world_ref.clone(), slab, affected_slabs));
+                handle.spawn(load_task::update(
+                    world_ref.clone(),
+                    slab,
+                    affected_slabs,
+                    event_tx.clone(),
+                ));
             }
         });
     }
@@ -1308,6 +1340,15 @@ impl<C: WorldContext> WorldLoader<C> {
         let _span = span!();
         let fut = self.source.steal_queued_block_updates(out);
         let _ = fut.now_or_never();
+    }
+
+    pub fn event_tx(&self) -> crossbeam::channel::Sender<WorldLoaderEvent<C>> {
+        self.event_channel.0.clone()
+    }
+
+    /// Non blocking
+    pub fn iter_events(&self) -> impl Iterator<Item = WorldLoaderEvent<C>> + '_ {
+        self.event_channel.1.try_iter()
     }
 }
 

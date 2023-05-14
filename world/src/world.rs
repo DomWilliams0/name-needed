@@ -36,8 +36,6 @@ pub struct World<C: WorldContext> {
     #[deprecated]
     area_graph: AreaGraph,
     nav_graph: WorldGraph,
-    dirty_slabs: HashSet<SlabLocation>,
-    entities_to_spawn: Vec<C::GeneratedEntityDesc>,
     load_notifier: LoadNotifier,
 }
 
@@ -120,8 +118,6 @@ impl<C: WorldContext> World<C> {
             chunks: Vec::new(),
             area_graph: AreaGraph::default(),
             nav_graph: WorldGraph::default(),
-            dirty_slabs: HashSet::with_capacity(32),
-            entities_to_spawn: Vec::default(),
             load_notifier: LoadNotifier::default(),
         }
     }
@@ -514,10 +510,6 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    pub(crate) fn mark_slab_dirty(&mut self, slab: SlabLocation) {
-        self.dirty_slabs.insert(slab);
-    }
-
     pub(crate) fn apply_terrain_updates_in_place(
         &mut self,
         updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate<C>>)>,
@@ -589,23 +581,6 @@ impl<C: WorldContext> World<C> {
 
         // notify anyone waiting
         chunk.mark_slab_as_in_world(slab.slab);
-    }
-
-    /// Drains all dirty slabs
-    pub fn dirty_slabs(&mut self) -> impl Iterator<Item = SlabLocation> + '_ {
-        self.dirty_slabs.drain()
-    }
-
-    pub fn queue_entities_to_spawn(
-        &mut self,
-        entities: impl Iterator<Item = C::GeneratedEntityDesc>,
-    ) {
-        self.entities_to_spawn.extend(entities);
-    }
-
-    /// Drains all entities to spawn from world generation
-    pub fn entities_to_spawn(&mut self) -> impl Iterator<Item = C::GeneratedEntityDesc> + '_ {
-        self.entities_to_spawn.drain(..)
     }
 
     pub fn block<P: Into<WorldPosition>>(&self, pos: P) -> Option<Block<C>> {

@@ -23,6 +23,8 @@ arbitrary-int = "1.2"
 ahash = "0.8"
 md-5 = "0.10"
 strum = { version = "0.19", features = ["derive"] }
+crossbeam = "0.8"
+spiral = "0.2"
 
 backtrace = { version = "0.3", optional = true }
 

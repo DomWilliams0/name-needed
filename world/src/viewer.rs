@@ -6,6 +6,7 @@ use futures::FutureExt;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
+use std::time::{Duration, Instant};
 use unit::world::{
     all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceIndex,
     WorldPosition,
@@ -16,7 +17,7 @@ pub struct WorldViewer<C: WorldContext> {
     world: WorldRef<C>,
     view_range: SliceRange,
     chunk_range: (ChunkLocation, ChunkLocation),
-    clean_slabs: HashSet<SlabLocation>,
+    clean_chunks: HashSet<ChunkLocation>,
     requested_slabs: Vec<SlabLocation>,
 
     /// Any slabs in this set will not be requested again
@@ -152,7 +153,7 @@ impl<C: WorldContext> WorldViewer<C> {
             world,
             view_range,
             chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?
-            clean_slabs: HashSet::with_capacity(128),
+            clean_chunks: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
             all_requested_slabs: HashSet::with_capacity(512),
         })
@@ -165,28 +166,43 @@ impl<C: WorldContext> WorldViewer<C> {
         let _span = misc::tracy_client::span!();
 
         let range = self.terrain_range();
-        let world = self.world.borrow(); // TODO wait up to a time before giving up
+        let world = self.world.borrow();
 
+        let mut start_time = Instant::now();
+        const MAX_TIME: Duration = Duration::from_millis(85);
+
+        let mut done = 0usize;
+        let mut done_chunks = vec![];
+        // TODO generate these concurrently instead of blocking main thread?
         for dirty_chunk in self
-            .visible_slabs(range)
-            .filter_map(|slab| self.is_slab_dirty(&slab).then_some(slab.chunk))
-            .dedup()
+            .visible_chunks_spiral()
+            .filter(|chunk| self.is_chunk_dirty(*chunk))
             .filter_map(|chunk| world.find_chunk_with_pos(chunk))
         {
-            // TODO do mesh generation on a worker thread? or just do this bit in a parallel iter
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
             debug!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
             f(dirty_chunk.pos(), mesh);
-        }
 
+            done_chunks.push(dirty_chunk.pos());
+            if start_time.elapsed() >= MAX_TIME {
+                break;
+            }
+        }
         drop(world);
 
-        self.clean_slabs.extend(self.visible_slabs(range));
+        if !done_chunks.is_empty() {
+            debug!(
+                "regenerated {} chunk meshes in {}ms",
+                done_chunks.len(),
+                start_time.elapsed().as_millis()
+            );
+            self.clean_chunks.extend(done_chunks.into_iter());
+        }
     }
 
     fn invalidate_meshes(&mut self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        self.clean_slabs.clear();
+        self.clean_chunks.clear();
     }
 
     fn update_range(&mut self, new_range: SliceRange, wat: &str) {
@@ -241,6 +257,15 @@ impl<C: WorldContext> WorldViewer<C> {
             .map(|(x, y)| ChunkLocation(x, y))
     }
 
+    pub fn visible_chunks_spiral(&self) -> impl Iterator<Item = ChunkLocation> {
+        let (min, max) = self.chunk_range;
+        let (centre_x, centre_y) = ((min.0 + max.0) / 2, (min.1 + max.1) / 2);
+        let (w, h) = (max.0 - min.0, max.1 - min.1);
+
+        spiral::ChebyshevIterator::new(centre_x, centre_y, w.max(h))
+            .map(|(x, y)| ChunkLocation(x, y))
+    }
+
     pub fn visible_slabs(&self, range: SliceRange) -> impl Iterator<Item = SlabLocation> {
         let (bottom_slab, top_slab) = (range.bottom().slab_index(), range.top().slab_index());
         let (bottom_chunk, top_chunk) = self.chunk_range;
@@ -287,12 +312,12 @@ impl<C: WorldContext> WorldViewer<C> {
         self.chunk_range
     }
 
-    fn is_slab_dirty(&self, slab: &SlabLocation) -> bool {
-        !self.clean_slabs.contains(slab)
+    fn is_chunk_dirty(&self, chunk: ChunkLocation) -> bool {
+        !self.clean_chunks.contains(&chunk)
     }
 
-    pub fn mark_dirty(&mut self, slab: SlabLocation) {
-        self.clean_slabs.remove(&slab);
+    pub fn mark_dirty(&mut self, chunk: ChunkLocation) {
+        self.clean_chunks.remove(&chunk);
     }
 
     /// Returns deduped and unrequested, sorted by chunk+slab. Call `consume` when requested to clear out the
