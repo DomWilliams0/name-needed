@@ -1294,7 +1294,7 @@ pub mod helpers {
             .collect_vec();
 
         let mut loader = WorldLoader::new(source, pool);
-        loader.request_slabs(slabs_to_load.into_iter());
+        loader.request_slabs_all(slabs_to_load.into_iter());
         loader.block_for_last_batch(test_world_timeout()).unwrap();
 
         // apply occlusion updates
