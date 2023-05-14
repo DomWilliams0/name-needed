@@ -205,7 +205,7 @@ mod introspect {
                     TimeReason::Waiting => "took to long to take lock",
                     TimeReason::Held => "held lock for too long",
                 };
-                misc::trace!(
+                misc::warn!(
                     "{msg} for {} on thread {} ({}ms)",
                     self.scope,
                     thread_name.unwrap_or("<unnamed>"),
