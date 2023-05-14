@@ -269,11 +269,6 @@ pub struct SlabData<C: WorldContext> {
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct SlabVersion(NonZeroU16);
 
-pub struct OcclusionChunkUpdate(
-    pub ChunkLocation,
-    pub Vec<(BlockPosition, BlockOcclusionUpdate)>,
-);
-
 #[derive(Copy, Clone)]
 pub enum SlabCreationPolicy {
     /// Don't add missing slabs

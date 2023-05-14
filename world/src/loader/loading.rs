@@ -13,9 +13,7 @@ use crate::world::{
     get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
     ListeningLoadNotifier, WorldChangeEvent,
 };
-use crate::{
-    navigationv2, OcclusionChunkUpdate, WorldContext, WorldRef, ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
-};
+use crate::{navigationv2, WorldContext, WorldRef, ABSOLUTE_MAX_FREE_VERTICAL_SPACE};
 
 use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex};
 use crate::chunk::{NeighbourAreaHash, SlabNeighbour};
@@ -1301,13 +1299,6 @@ impl<C: WorldContext> WorldLoader<C> {
         }
     }
 
-    pub fn iter_occlusion_updates(&mut self, mut f: impl FnMut(OcclusionChunkUpdate)) {
-        // TODO occlusion updates
-        // while let Ok(Some(update)) = self.chunk_updates_rx.try_next() {
-        //     f(update)
-        // }
-    }
-
     pub fn get_ground_level(
         &self,
         block: WorldPosition,
@@ -1571,9 +1562,6 @@ mod tests {
                 // timed out
                 break;
             }
-
-            // consume updates to keep memory down
-            loader.iter_occlusion_updates(|_| {});
         }
 
         let world = loader.world();

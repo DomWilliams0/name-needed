@@ -5,8 +5,7 @@ pub use self::chunk::{AreaInfo, Chunk, ChunkId, SlabAvailability, SlabThingOrWai
 pub use self::slab::{Slab, SlabGrid, SlabGridImpl};
 pub use self::slice::{flatten_coords, unflatten_index};
 pub use self::terrain::{
-    BlockDamageResult, NeighbourAreaHash, OcclusionChunkUpdate, SlabNeighbour, SparseGrid,
-    SparseGridExtension,
+    BlockDamageResult, NeighbourAreaHash, SlabNeighbour, SparseGrid, SparseGridExtension,
 };
 pub(crate) use self::terrain::{SlabData, SlabStorage};
 

@@ -28,7 +28,7 @@ use crate::navigation::{
 use crate::navigationv2::world_graph::WorldGraph;
 use crate::navigationv2::{as_border_area, ChunkArea, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
-use crate::{BlockOcclusion, BlockType, OcclusionChunkUpdate, Slab, SliceRange, WorldRef};
+use crate::{BlockOcclusion, BlockType, Slab, SliceRange, WorldRef};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
@@ -514,47 +514,8 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    /// Inclusive range
-    pub(crate) fn mark_slabs_dirty(
-        &mut self,
-        chunk_loc: ChunkLocation,
-        slab_range: (SlabIndex, SlabIndex),
-    ) {
-        let slabs = slab_range.0.as_i32()..=slab_range.1.as_i32();
-        self.dirty_slabs
-            .extend(slabs.map(|s| SlabLocation::new(s, chunk_loc)));
-    }
-
     pub(crate) fn mark_slab_dirty(&mut self, slab: SlabLocation) {
         self.dirty_slabs.insert(slab);
-    }
-
-    pub fn apply_occlusion_update(&mut self, update: OcclusionChunkUpdate) {
-        let OcclusionChunkUpdate(chunk_pos, updates) = update;
-        let len_before = self.dirty_slabs.len();
-
-        // safety: dirty_slabs is not referenced anywhere else through &mut self
-        let dirty_slabs: &mut HashSet<_> = unsafe { std::mem::transmute(&mut self.dirty_slabs) };
-
-        if let Some(chunk) = self.find_chunk_with_pos_mut(chunk_pos) {
-            let mut applied_count = 0usize;
-            for affected_slab in chunk.terrain_mut().apply_occlusion_updates(&updates) {
-                applied_count += 1;
-
-                let slab_loc = SlabLocation::new(affected_slab, chunk_pos);
-                dirty_slabs.insert(slab_loc);
-            }
-
-            if applied_count > 0 {
-                debug!(
-                    "applied {applied}/{total} queued occlusion updates across {slabs} slabs",
-                    applied = applied_count,
-                    total = updates.len(),
-                    slabs = self.dirty_slabs.len() - len_before;
-                    chunk_pos
-                );
-            }
-        }
     }
 
     pub(crate) fn apply_terrain_updates_in_place(
@@ -1265,18 +1226,9 @@ pub mod helpers {
         loader: &mut WorldLoader<DummyWorldContext>,
         updates: &[WorldTerrainUpdate<DummyWorldContext>],
     ) -> Result<(), String> {
-        let world = loader.world();
-
         let mut updates = updates.iter().cloned().collect();
         loader.apply_terrain_updates(&mut updates);
-
-        loader.block_for_last_batch(test_world_timeout()).unwrap();
-
-        // apply occlusion updates
-        let mut world = world.borrow_mut();
-        loader.iter_occlusion_updates(|update| {
-            world.apply_occlusion_update(update);
-        });
+        loader.block_for_last_batch(test_world_timeout()).unwrap(); // TODO cannot wait here, just wait for all slabs to be done
 
         Ok(())
     }
@@ -1296,15 +1248,6 @@ pub mod helpers {
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs_all(slabs_to_load.into_iter());
         loader.block_for_last_batch(test_world_timeout()).unwrap();
-
-        // apply occlusion updates
-        {
-            let world = loader.world();
-            let mut world = world.borrow_mut();
-            loader.iter_occlusion_updates(|update| {
-                world.apply_occlusion_update(update);
-            });
-        }
 
         loader
     }
@@ -1333,9 +1276,7 @@ mod tests {
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{
-        presets, BlockType, OcclusionChunkUpdate, SearchGoal, World, WorldContext, WorldRef,
-    };
+    use crate::{presets, BlockType, SearchGoal, World, WorldContext, WorldRef};
 
     #[test]
     fn world_context() {
@@ -1680,61 +1621,6 @@ mod tests {
                 VertexOcclusion::NotAtAll
             );
         }
-    }
-
-    #[test]
-    fn occlusion_updates_applied() {
-        let pos = (0, 0, 50);
-        let chunks = vec![ChunkBuilder::new()
-            .set_block(pos, DummyBlockType::Stone)
-            .build((0, 0))];
-
-        let loader = loader_from_chunks_blocking(chunks);
-        let world = loader.world();
-
-        let mut w = world.borrow_mut();
-        assert_eq!(
-            w.block_occlusion(pos).top_corner(0),
-            VertexOcclusion::NotAtAll
-        );
-
-        // hold a reference to slab to trigger CoW
-        let slab = w.chunks[0]
-            .terrain()
-            .slab(GlobalSliceIndex::new(pos.2).slab_index())
-            .unwrap()
-            .clone();
-
-        w.apply_occlusion_update(OcclusionChunkUpdate(
-            ChunkLocation(0, 0),
-            vec![(
-                BlockPosition::try_from(pos).unwrap(),
-                // NeighbourOpacity::all_solid(),
-                todo!(),
-            )],
-        ));
-
-        todo!(); // TODO fix
-                 /*        // use old slab reference to keep it alive until here
-                         assert_eq!(
-                             w.block(pos).unwrap().occlusion().top_corner(0),
-                             VertexOcclusion::Full
-                         );
-
-                         // check world uses new CoW slab
-                         assert_eq!(
-                             w.block(pos).unwrap().occlusion().top_corner(0),
-                             VertexOcclusion::Full
-                         );
-
-                         // make sure CoW was triggered
-                         let new_slab = w.chunks[0]
-                             .terrain()
-                             .slab(GlobalSliceIndex::new(pos.2).slab_index())
-                             .unwrap();
-
-                         assert!(!std::ptr::eq(slab.raw(), new_slab.raw()));
-                 */
     }
 
     #[test]

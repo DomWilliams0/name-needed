@@ -5,8 +5,8 @@ pub use petgraph::prelude::NodeIndex;
 
 pub use self::chunk::{
     flatten_coords, slice_navmesh::ABSOLUTE_MAX_FREE_VERTICAL_SPACE, unflatten_index,
-    BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone, OcclusionChunkUpdate, Slab,
-    SlabGrid, SlabGridImpl,
+    BlockDamageResult, Chunk, ChunkBuilder, ChunkDescriptor, DeepClone, Slab, SlabGrid,
+    SlabGridImpl,
 };
 pub use self::context::{
     BlockType, GeneratedTerrainSource, NopGeneratedTerrainSource, WorldContext, SLICE_SIZE,
