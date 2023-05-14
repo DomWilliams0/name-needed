@@ -18,11 +18,7 @@ use tokio::task::JoinHandle;
 
 pub struct AsyncWorkerPool {
     pool: Runtime,
-    success_rx: async_channel::UnboundedReceiver<Result<SlabLocation, TerrainSourceError>>,
-    success_tx: LoadSuccessTx,
 }
-
-pub type LoadSuccessTx = async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>>;
 
 impl AsyncWorkerPool {
     /// Runs tasks on a thread pool
@@ -37,34 +33,8 @@ impl AsyncWorkerPool {
     }
 
     fn with_rt_builder(mut builder: tokio::runtime::Builder) -> Result<Self, futures::io::Error> {
-        let (success_tx, success_rx) = async_channel::unbounded();
         let pool = builder.enable_time().build()?;
-        Ok(Self {
-            pool,
-            success_rx,
-            success_tx,
-        })
-    }
-
-    pub(in crate::loader) fn success_tx(
-        &self,
-    ) -> async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>> {
-        // TODO should this even live here?
-        self.success_tx.clone()
-    }
-
-    pub fn block_on_next_load(
-        &mut self,
-        timeout: Duration,
-    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
-        let pool = &self.pool;
-        let rx = &mut self.success_rx;
-        pool.block_on(async {
-            let future = rx.next();
-            tokio::time::timeout(timeout, future)
-                .await
-                .unwrap_or_default()
-        })
+        Ok(Self { pool })
     }
 
     pub fn runtime(&self) -> &Runtime {

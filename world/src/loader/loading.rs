@@ -68,7 +68,6 @@ mod load_task {
     };
     use crate::chunk::slice::Slice;
     use crate::chunk::{SparseGrid, SparseGridExtension};
-    use crate::loader::worker_pool::LoadSuccessTx;
     use crate::occlusion::{
         NeighbourOpacity, OcclusionOpacity, OcclusionUpdateType, RelativeSlabs,
     };
@@ -98,7 +97,6 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         extra: ExtraInfo<C>,
-        success_tx: LoadSuccessTx,
     }
 
     async fn the_ultimate_load_task<C: WorldContext>(mut ctx: LoadContext<C>) {
@@ -168,12 +166,6 @@ mod load_task {
         }
 
         // ----- slab is now TerrainInWorld
-
-        // notify loader
-        if let Err(e) = ctx.success_tx.send(Ok(slab)).await {
-            error!("failed to send terrain result"; "error" => %e);
-            return;
-        }
 
         // trigger neighbouring slabs to update occlusion based on this one
         let affected_slabs: ArrayVec<
@@ -388,7 +380,6 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         source: TerrainSource<C>,
-        mut success_tx: LoadSuccessTx,
     ) {
         let mut entities = vec![];
         let result = source.load_slab(this_slab).await.map(|generated| {
@@ -409,9 +400,7 @@ mod load_task {
                 (Slab::empty(), SlabVerticalSpace::empty())
             }
             Err(err) => {
-                if let Err(e) = success_tx.send(Err(err)).await {
-                    error!("failed to send failed terrain result"; "error" => %e);
-                }
+                error!("failed to generate terrain for {this_slab}: {err}");
                 return;
             }
         };
@@ -422,7 +411,6 @@ mod load_task {
         the_ultimate_load_task(LoadContext {
             world,
             this_slab,
-            success_tx,
             extra: ExtraInfo::Generated {
                 entities,
                 terrain,
@@ -437,13 +425,10 @@ mod load_task {
         world: WorldRef<C>,
         this_slab: SlabLocation,
         affected_slabs: OcclusionAffectedNeighbourSlabs,
-        success_tx: LoadSuccessTx,
     ) {
         the_ultimate_load_task(LoadContext {
             world,
             this_slab,
-
-            success_tx,
             extra: ExtraInfo::Updated { affected_slabs },
         })
         .await
@@ -946,7 +931,6 @@ impl<C: WorldContext> WorldLoader<C> {
                 req_rx,
                 source.clone(),
                 world.clone(),
-                pool.success_tx(),
                 handle.clone(),
             ));
             req_tx
@@ -971,7 +955,6 @@ impl<C: WorldContext> WorldLoader<C> {
         mut request_rx: futures::channel::mpsc::Receiver<SlabRequest>,
         source: TerrainSource<C>,
         world: WorldRef<C>,
-        success_tx: UnboundedSender<Result<SlabLocation, TerrainSourceError>>,
         pool: Handle,
     ) {
         let (world_chunk_min, world_chunk_max) = source.world_boundary();
@@ -1021,7 +1004,6 @@ impl<C: WorldContext> WorldLoader<C> {
                     world.clone(),
                     SlabLocation::new(*slab, chunk),
                     source.clone(),
-                    success_tx.clone(),
                 ));
             }
         }
@@ -1206,7 +1188,6 @@ impl<C: WorldContext> WorldLoader<C> {
         }
 
         let handle = self.pool.runtime().handle().clone();
-        let success_tx = self.pool.success_tx();
         self.pool.runtime().spawn(async move {
             // group per slab so each slab is fetched and modified only once
             let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
@@ -1235,12 +1216,7 @@ impl<C: WorldContext> WorldLoader<C> {
             debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
 
             for (slab, affected_slabs) in slab_locs.into_iter() {
-                handle.spawn(load_task::update(
-                    world_ref.clone(),
-                    slab,
-                    affected_slabs,
-                    success_tx.clone(),
-                ));
+                handle.spawn(load_task::update(world_ref.clone(), slab, affected_slabs));
             }
         });
     }
@@ -1254,35 +1230,6 @@ impl<C: WorldContext> WorldLoader<C> {
                 n
             })
             .sum()
-    }
-
-    pub fn block_on_next_load(
-        &mut self,
-        timeout: Duration,
-        bail: &impl Fn() -> bool,
-    ) -> BlockOnLoadResult {
-        let end_time = Instant::now() + timeout;
-        loop {
-            if bail() {
-                break BlockOnLoadResult::Bailed;
-            }
-
-            let this_timeout = {
-                let now = Instant::now();
-                if now >= end_time {
-                    break BlockOnLoadResult::Timeout;
-                }
-                let left = end_time - now;
-                left.min(Duration::from_secs(1))
-            };
-
-            if let ret @ Some(_) = self.pool.block_on_next_load(this_timeout) {
-                break match ret {
-                    Some(result) => BlockOnLoadResult::Loaded(result),
-                    None => BlockOnLoadResult::Timeout,
-                };
-            }
-        }
     }
 
     pub fn block_until_all_done_with_bail(
@@ -1470,8 +1417,8 @@ mod tests {
             WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new(1).unwrap());
         loader.request_slabs(vec![SlabLocation::new(1, (0, 0))].into_iter());
 
-        match loader.block_on_next_load(Duration::from_secs(15), &|| false) {
-            BlockOnLoadResult::Loaded(Ok(slab)) if slab == SlabLocation::new(1, (0, 0)) => {}
+        match loader.block_until_all_done(Duration::from_secs(15)) {
+            Ok(()) => {}
             res => panic!("failed: {res:?}"),
         }
 
