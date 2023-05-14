@@ -14,7 +14,7 @@ use petgraph::algo::Measure;
 use petgraph::stable_graph::*;
 use petgraph::visit::{EdgeRef, IntoEdges, VisitMap};
 use petgraph::visit::{NodeRef, Visitable};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 use tokio::time::timeout;
 use unit::world::{
     BlockPosition, ChunkLocation, SlabLocation, SliceIndex, WorldPoint, WorldPosition,
@@ -96,6 +96,10 @@ impl WorldGraph {
 
             self.graph.add_edge(src, dst, e);
         }
+    }
+
+    pub fn pathfinding_runtime(&self) -> Handle {
+        self.pathfinding_runtime.handle().clone()
     }
 
     // TODO actually use SlabNavGraph for hierarchical search
@@ -296,13 +300,7 @@ impl<C: WorldContext> World<C> {
         let from_pos = from.floor();
         let to_pos = to.floor();
 
-        let runtime = self_
-            .borrow()
-            .nav_graph()
-            .pathfinding_runtime
-            .handle()
-            .clone();
-        let task = runtime.spawn(async move {
+        let task = self_.nav_runtime().spawn(async move {
             let world_ref = self_.clone();
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
@@ -523,12 +521,7 @@ impl<C: WorldContext> World<C> {
         to: WorldPoint,
         required_height: u8,
     ) -> Result<Path, SearchError> {
-        let h = self_
-            .borrow()
-            .nav_graph()
-            .pathfinding_runtime
-            .handle()
-            .clone();
+        let h = self_.nav_runtime();
         let fut = Self::find_path_async(self_, from, to, required_height);
 
         h.block_on(async { timeout(Duration::from_secs_f32(0.5), fut.0).await })

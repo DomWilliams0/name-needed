@@ -24,8 +24,12 @@ ahash = "0.8"
 md-5 = "0.10"
 strum = { version = "0.19", features = ["derive"] }
 
+backtrace = { version = "0.3", optional = true }
+
 [features]
+default = []
 worldprocgen = []
+log-lock-delay = ["backtrace"]
 
 [dev-dependencies]
 criterion = "0.3"
