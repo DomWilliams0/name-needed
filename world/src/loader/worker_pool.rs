@@ -9,6 +9,7 @@ use crate::{WorldContext, WorldRef};
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
 
+use futures::executor::block_on;
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -24,11 +25,6 @@ pub struct AsyncWorkerPool {
 pub type LoadSuccessTx = async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>>;
 
 impl AsyncWorkerPool {
-    /// Spawns no threads, only runs on current thread
-    pub fn new_blocking() -> Result<Self, futures::io::Error> {
-        Self::with_rt_builder(tokio::runtime::Builder::new_current_thread())
-    }
-
     /// Runs tasks on a thread pool
     pub fn new(threads: usize) -> Result<Self, futures::io::Error> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
@@ -57,7 +53,7 @@ impl AsyncWorkerPool {
         self.success_tx.clone()
     }
 
-    pub fn block_on_next_finalize(
+    pub fn block_on_next_load(
         &mut self,
         timeout: Duration,
     ) -> Option<Result<SlabLocation, TerrainSourceError>> {
@@ -69,26 +65,6 @@ impl AsyncWorkerPool {
                 .await
                 .unwrap_or_default()
         })
-    }
-
-    pub fn submit_async<R: Send + 'static>(
-        &mut self,
-        task: impl Future<Output = R> + Send + 'static,
-        mut done_channel: async_channel::UnboundedSender<R>,
-    ) {
-        self.pool.spawn(async move {
-            let result = task.await;
-            if let Err(e) = done_channel.send(result).await {
-                error!("failed to send terrain result"; "error" => %e);
-            }
-        });
-    }
-
-    pub fn submit_any_async_with_handle<R: Send + 'static>(
-        &self,
-        task: impl Future<Output = R> + Send + 'static,
-    ) -> JoinHandle<R> {
-        self.pool.spawn(async move { task.await })
     }
 
     pub fn runtime(&self) -> &Runtime {

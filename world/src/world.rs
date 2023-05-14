@@ -829,6 +829,21 @@ impl Drop for ListeningLoadNotifier {
 }
 
 impl ListeningLoadNotifier {
+    pub async fn wait_for_any(&mut self) -> WaitResult {
+        loop {
+            match self.recv.recv().await {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
+                    break WaitResult::Retry;
+                }
+                Err(e) => {
+                    error!("error waiting for slab notification: {}", e);
+                    break WaitResult::Disconnected;
+                }
+                Ok(_) => break WaitResult::Success,
+            }
+        }
+    }
     /// Ignores messages for other slabs
     pub async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
         loop {
@@ -1199,7 +1214,7 @@ pub mod helpers {
         chunks: Vec<ChunkDescriptor<DummyWorldContext>>,
     ) -> WorldLoader<DummyWorldContext> {
         let source = MemoryTerrainSource::from_chunks(chunks.into_iter()).expect("bad chunks");
-        load_world(source, AsyncWorkerPool::new_blocking().unwrap())
+        load_world(source, AsyncWorkerPool::new(1).unwrap())
     }
 
     pub fn loader_from_chunks_blocking_with_load_blacklist(
@@ -1210,14 +1225,14 @@ pub mod helpers {
         for slab in blacklist {
             source.blacklist_slab_on_initial_load(slab)
         }
-        load_world(source, AsyncWorkerPool::new_blocking().unwrap())
+        load_world(source, AsyncWorkerPool::new(1).unwrap())
     }
 
     pub fn test_world_timeout() -> Duration {
         let seconds = std::env::var("NN_TEST_WORLD_TIMEOUT")
             .ok()
             .and_then(|val| val.parse().ok())
-            .unwrap_or(5);
+            .unwrap_or(2);
 
         Duration::from_secs(seconds)
     }
@@ -1228,7 +1243,7 @@ pub mod helpers {
     ) -> Result<(), String> {
         let mut updates = updates.iter().cloned().collect();
         loader.apply_terrain_updates(&mut updates);
-        loader.block_for_last_batch(test_world_timeout()).unwrap(); // TODO cannot wait here, just wait for all slabs to be done
+        loader.block_until_all_done(test_world_timeout()).unwrap();
 
         Ok(())
     }
@@ -1247,7 +1262,7 @@ pub mod helpers {
 
         let mut loader = WorldLoader::new(source, pool);
         loader.request_slabs_all(slabs_to_load.into_iter());
-        loader.block_for_last_batch(test_world_timeout()).unwrap();
+        loader.block_until_all_done(test_world_timeout()).unwrap();
 
         loader
     }
@@ -1267,7 +1282,7 @@ mod tests {
     };
 
     use crate::chunk::ChunkBuilder;
-    use crate::helpers::DummyBlockType;
+    use crate::helpers::{DummyBlockType, DummyWorldContext};
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::navigation::EdgeCost;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
@@ -1659,7 +1674,7 @@ mod tests {
         // TODO make stresser use generated terrain again
         // let source =
         //     GeneratedTerrainSource::new(None, CHUNK_RADIUS as u32, TERRAIN_HEIGHT).unwrap();
-        let source = from_preset("multichunkwonder", &mut thread_rng());
+        let source = from_preset::<DummyWorldContext>("multichunkwonder", &mut thread_rng());
         let (min, max) = source.world_bounds();
         let mut loader = WorldLoader::new(source, pool);
 
@@ -1670,7 +1685,7 @@ mod tests {
         );
         loader.request_slabs(all_slabs);
 
-        assert!(loader.block_for_last_batch(Duration::from_secs(60)).is_ok());
+        assert!(loader.block_until_all_done(Duration::from_secs(60)).is_ok());
 
         let world = loader.world();
 

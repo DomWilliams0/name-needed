@@ -856,7 +856,7 @@ mod tests_vertical_space {
         );
 
         loader.request_slabs(once(SlabLocation::new(0, (1, 0))));
-        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+        loader.block_until_all_done(Duration::from_secs(2)).unwrap();
 
         let w = loader.world();
 
@@ -881,7 +881,7 @@ mod tests_vertical_space {
         );
 
         loader.request_slabs(once(SlabLocation::new(0, (1, 0))));
-        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+        loader.block_until_all_done(Duration::from_secs(2)).unwrap();
 
         let w = loader.world();
 
@@ -902,7 +902,7 @@ mod tests_vertical_space {
         );
 
         loader.request_slabs(once(SlabLocation::new(-1, (0, 0))));
-        loader.block_for_last_batch(Duration::from_secs(2)).unwrap();
+        loader.block_until_all_done(Duration::from_secs(2)).unwrap();
 
         let w = loader.world();
 

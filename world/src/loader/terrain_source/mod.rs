@@ -31,9 +31,6 @@ pub enum TerrainSourceError {
     #[error("Requested block {0} is out of bounds")]
     BlockOutOfBounds(WorldPosition),
 
-    #[error("Received signal to bail")]
-    Bailed,
-
     #[error("Async task failed to complete: {0}")]
     Async(#[from] tokio::task::JoinError),
 }

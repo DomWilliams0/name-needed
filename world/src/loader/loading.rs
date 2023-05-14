@@ -11,7 +11,7 @@ use crate::chunk::slab::{Slab, SliceNavArea};
 
 use crate::world::{
     get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
-    ListeningLoadNotifier, WorldChangeEvent,
+    ListeningLoadNotifier, WaitResult, WorldChangeEvent,
 };
 use crate::{navigationv2, WorldContext, WorldRef, ABSOLUTE_MAX_FREE_VERTICAL_SPACE};
 
@@ -34,6 +34,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::runtime::Handle;
 use tokio::sync::Notify;
+use tokio::time::error::Elapsed;
 
 const LOAD_WORKERS: usize = 8;
 
@@ -41,14 +42,16 @@ pub struct WorldLoader<C: WorldContext> {
     source: TerrainSource<C>,
     pool: AsyncWorkerPool,
     world: WorldRef<C>,
-    last_batch_size: usize,
-    slab_request_tx: [futures::channel::mpsc::Sender<SlabRequest>; LOAD_WORKERS],
+    slab_request_tx: [Sender<SlabRequest>; LOAD_WORKERS],
 }
 
 #[derive(Debug, Error)]
 pub enum BlockForAllError {
-    #[error("A batch of chunks must be requested first")]
-    NoBatch,
+    #[error("Received bail signal")]
+    Bailed,
+
+    #[error("Load notifier disconnected, something went wrong")]
+    Disconnected,
 
     #[error("Timed out")]
     TimedOut,
@@ -924,6 +927,13 @@ enum SlabRequest {
     FlushBatch,
 }
 
+#[derive(Debug)]
+pub enum BlockOnLoadResult {
+    Bailed,
+    Timeout,
+    Loaded(Result<SlabLocation, TerrainSourceError>),
+}
+
 impl<C: WorldContext> WorldLoader<C> {
     pub fn new<S: Into<TerrainSource<C>>>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let world = WorldRef::default();
@@ -947,7 +957,6 @@ impl<C: WorldContext> WorldLoader<C> {
             source,
             pool,
             world,
-            last_batch_size: 0,
             slab_request_tx: workers,
         }
     }
@@ -1093,7 +1102,6 @@ impl<C: WorldContext> WorldLoader<C> {
                     debug!("could not flush slab requests, channel is probably full ({e})");
                 }
             });
-            self.last_batch_size = n;
         }
     }
 
@@ -1240,63 +1248,81 @@ impl<C: WorldContext> WorldLoader<C> {
         // self.last_batch_size = real_slab_count;
     }
 
-    pub fn block_on_next_finalization(
+    pub fn count_loading_slabs(&self) -> usize {
+        let w = self.world.borrow();
+        w.all_chunks()
+            .map(|c| {
+                let mut n = 0usize;
+                c.iter_loading_slabs(|_, _| n += 1);
+                n
+            })
+            .sum()
+    }
+
+    pub fn block_on_next_load(
         &mut self,
         timeout: Duration,
         bail: &impl Fn() -> bool,
-    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
+    ) -> BlockOnLoadResult {
         let end_time = Instant::now() + timeout;
         loop {
             if bail() {
-                break Some(Err(TerrainSourceError::Bailed));
+                break BlockOnLoadResult::Bailed;
             }
 
             let this_timeout = {
                 let now = Instant::now();
                 if now >= end_time {
-                    break None; // finished
+                    break BlockOnLoadResult::Timeout;
                 }
                 let left = end_time - now;
                 left.min(Duration::from_secs(1))
             };
 
-            if let ret @ Some(_) = self.pool.block_on_next_finalize(this_timeout) {
-                break ret;
+            if let ret @ Some(_) = self.pool.block_on_next_load(this_timeout) {
+                break match ret {
+                    Some(result) => BlockOnLoadResult::Loaded(result),
+                    None => BlockOnLoadResult::Timeout,
+                };
             }
         }
     }
 
-    pub fn block_for_last_batch(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
-        self.block_for_last_batch_with_bail(timeout, || false)
-    }
-
-    pub fn block_for_last_batch_with_bail(
+    pub fn block_until_all_done_with_bail(
         &mut self,
         timeout: Duration,
         bail: impl Fn() -> bool,
     ) -> Result<(), BlockForAllError> {
-        match std::mem::take(&mut self.last_batch_size) {
-            0 => Err(BlockForAllError::NoBatch),
-            count => {
-                let start_time = Instant::now();
-                for i in 0..count {
-                    let elapsed = start_time.elapsed();
-                    let timeout = match timeout.checked_sub(elapsed) {
-                        None => return Err(BlockForAllError::TimedOut),
-                        Some(t) => t,
-                    };
+        let start_time = Instant::now();
+        let notify = self.world.borrow().load_notifications();
+        let mut seen_non_zero = false;
+        let mut notifications = notify.start_listening();
+        self.pool.runtime().block_on(async {
+            loop {
+                let elapsed = start_time.elapsed();
+                let timeout = match timeout.checked_sub(elapsed) {
+                    None => return Err(BlockForAllError::TimedOut),
+                    Some(t) => t,
+                };
 
-                    trace!("waiting for slab {index}/{total}", index = i + 1, total = count; "timeout" => ?timeout);
-                    match self.block_on_next_finalization(timeout, &bail) {
-                        None => return Err(BlockForAllError::TimedOut),
-                        Some(Err(e)) => return Err(BlockForAllError::Error(e)),
-                        Some(Ok(_)) => continue,
-                    }
+                match block_on(tokio::time::timeout(timeout, notifications.wait_for_any())) {
+                    Ok(WaitResult::Disconnected) => return Err(BlockForAllError::Disconnected),
+                    _ => {}
+                };
+
+                let remaining = self.count_loading_slabs();
+                match (remaining, seen_non_zero) {
+                    (0, true) => return Ok(()),
+                    (n, false) if n != 0 => seen_non_zero = true,
+                    _ => {}
                 }
-
-                Ok(())
+                trace!("waiting for slabs to finish loading, {remaining} left"; "timeout" => ?timeout);
             }
-        }
+        })
+    }
+
+    pub fn block_until_all_done(&mut self, timeout: Duration) -> Result<(), BlockForAllError> {
+        self.block_until_all_done_with_bail(timeout, || false)
     }
 
     pub fn get_ground_level(
@@ -1422,7 +1448,7 @@ mod tests {
 
     use crate::chunk::ChunkBuilder;
     use crate::helpers::{test_world_timeout, DummyBlockType};
-    use crate::loader::loading::{ChunkBatcher, WorldLoader};
+    use crate::loader::loading::{BlockOnLoadResult, ChunkBatcher, WorldLoader};
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
     use crate::world::helpers::DummyWorldContext;
@@ -1444,11 +1470,13 @@ mod tests {
             MemoryTerrainSource::from_chunks(vec![((0, 0), a), ((-1, 0), b)].into_iter()).unwrap();
 
         let mut loader =
-            WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new_blocking().unwrap());
+            WorldLoader::<DummyWorldContext>::new(source, AsyncWorkerPool::new(1).unwrap());
         loader.request_slabs(vec![SlabLocation::new(1, (0, 0))].into_iter());
 
-        let finalized = loader.block_on_next_finalization(Duration::from_secs(15), &|| false);
-        assert_eq!(finalized.unwrap().unwrap(), SlabLocation::new(1, (0, 0)));
+        match loader.block_on_next_load(Duration::from_secs(15), &|| false) {
+            BlockOnLoadResult::Loaded(Ok(slab)) if slab == SlabLocation::new(1, (0, 0)) => {}
+            res => panic!("failed: {res:?}"),
+        }
 
         assert_eq!(loader.world.borrow().all_chunks().count(), 1);
     }
@@ -1527,7 +1555,7 @@ mod tests {
         // load all slabs and wait for them to be present, otherwise the terrain updates are dropped
         loader.request_slabs(slabs_to_load.into_iter());
         assert!(
-            loader.block_for_last_batch(test_world_timeout()).is_ok(),
+            loader.block_until_all_done(test_world_timeout()).is_ok(),
             "timed out waiting for initial world finalization"
         );
 
@@ -1554,12 +1582,7 @@ mod tests {
                 "test: waiting {:?} for world to settle down",
                 timeout.min(Duration::from_secs(10))
             );
-            let _ = loader.block_for_last_batch(timeout); // idk block longer
-            if loader
-                .block_on_next_finalization(timeout, &|| false)
-                .is_none()
-            {
-                // timed out
+            if loader.block_until_all_done(timeout).is_ok() {
                 break;
             }
         }
