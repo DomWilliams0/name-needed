@@ -42,6 +42,7 @@ pub struct Chunk<C: WorldContext> {
     /// Big info about each area not needed for nav graph
     areas: HashMap<ChunkArea, AreaInfo>,
 
+    // TODO use lockfree DashMap?
     slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
     slab_notify: LoadNotifier,
 }
@@ -210,6 +211,11 @@ impl<C: WorldContext> Chunk<C> {
 
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
+        // no notification necessary, nothing waits for a slab to be requested
+    }
+
+    pub(crate) fn mark_slabs_requested(&self, slabs: impl Iterator<Item = SlabIndex>) {
+        self.update_slabs_status(slabs, SlabLoadingStatus::Requested);
         // no notification necessary, nothing waits for a slab to be requested
     }
 

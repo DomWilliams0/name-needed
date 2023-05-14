@@ -304,7 +304,8 @@ where
     }
 
     pub fn result(&self) -> impl Deref<Target = [(N, E)]> + '_ {
-        Ref::map(self.0.borrow(), |inner| &inner.result[..])
+        unimplemented!();
+        vec![]
     }
 }
 

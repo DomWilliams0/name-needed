@@ -2,6 +2,7 @@ use misc::*;
 
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
+use futures::FutureExt;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
@@ -17,6 +18,9 @@ pub struct WorldViewer<C: WorldContext> {
     chunk_range: (ChunkLocation, ChunkLocation),
     clean_slabs: HashSet<SlabLocation>,
     requested_slabs: Vec<SlabLocation>,
+
+    /// Any slabs in this set will not be requested again
+    all_requested_slabs: HashSet<SlabLocation>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -150,6 +154,7 @@ impl<C: WorldContext> WorldViewer<C> {
             chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?
             clean_slabs: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
+            all_requested_slabs: HashSet::with_capacity(512),
         })
     }
 
@@ -159,9 +164,8 @@ impl<C: WorldContext> WorldViewer<C> {
     ) {
         let _span = misc::tracy_client::span!();
 
-        // TODO time this function, is it the cause of stuttering when scrolling camera fast
         let range = self.terrain_range();
-        let world = self.world.borrow();
+        let world = self.world.borrow(); // TODO wait up to a time before giving up
 
         for dirty_chunk in self
             .visible_slabs(range)
@@ -253,10 +257,6 @@ impl<C: WorldContext> WorldViewer<C> {
         slabs
     }
 
-    pub fn world(&self) -> InnerWorldRef<C> {
-        self.world.borrow()
-    }
-
     /// Slice range for terrain rendering
     pub fn terrain_range(&self) -> SliceRange {
         self.view_range
@@ -301,7 +301,8 @@ impl<C: WorldContext> WorldViewer<C> {
         self.clean_slabs.remove(&slab);
     }
 
-    /// Returns deduped and sorted by chunk+slab, inner vec is cleared on ret value drop
+    /// Returns deduped and unrequested, sorted by chunk+slab. Call `consume` when requested to clear out the
+    /// requested ones.
     pub fn requested_slabs(
         &mut self,
         extras: impl Iterator<Item = SlabLocation>,
@@ -315,11 +316,8 @@ impl<C: WorldContext> WorldViewer<C> {
         self.requested_slabs
             .sort_unstable_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
         self.requested_slabs.dedup();
-
-        // filter down any already loaded slabs
-        let world = self.world.borrow();
-        world.retain_slabs_to_load(&mut self.requested_slabs);
-        drop(world);
+        self.requested_slabs
+            .retain(|s| !self.all_requested_slabs.contains(s));
 
         if len_before > 0 {
             debug!(
@@ -327,17 +325,22 @@ impl<C: WorldContext> WorldViewer<C> {
                 unfiltered = len_before,
                 filtered = self.requested_slabs.len()
             );
+        }
 
+        if !self.requested_slabs.is_empty() {
             trace!("slab requests"; "slabs" => ?self.requested_slabs);
+
+            self.all_requested_slabs
+                .extend(self.requested_slabs.iter().copied());
         }
 
         RequestedSlabs(&mut self.requested_slabs)
     }
 }
 
-impl Drop for RequestedSlabs<'_> {
-    fn drop(&mut self) {
-        self.0.clear();
+impl RequestedSlabs<'_> {
+    pub fn consume(self, n: usize) {
+        let _ = self.0.drain(0..n);
     }
 }
 

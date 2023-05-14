@@ -144,6 +144,14 @@ impl<C: WorldContext> TerrainSource<C> {
             }
         }
     }
+
+    pub fn world_boundary(&self) -> (ChunkLocation, ChunkLocation) {
+        match self {
+            TerrainSource::Memory(src) => src.world_bounds(),
+            #[cfg(feature = "worldprocgen")]
+            TerrainSource::Generated(_) => (ChunkLocation(0, 0), ChunkLocation::MAX), // planet chunks dont go negative
+        }
+    }
 }
 
 impl<C: WorldContext> GeneratedSlab<C> {

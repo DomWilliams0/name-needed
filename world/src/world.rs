@@ -607,7 +607,7 @@ impl<C: WorldContext> World<C> {
     ) {
         let chunk = self
             .find_chunk_with_pos_mut(slab.chunk)
-            .expect("no such chunk");
+            .unwrap_or_else(|| panic!("no such chunk {:?}", slab.chunk));
 
         // create missing chunks
         let terrain = chunk.terrain_mut();
@@ -1267,9 +1267,8 @@ pub mod helpers {
     ) -> Result<(), String> {
         let world = loader.world();
 
-        let mut _updates = Vec::new();
         let mut updates = updates.iter().cloned().collect();
-        loader.apply_terrain_updates(&mut updates, &mut _updates);
+        loader.apply_terrain_updates(&mut updates);
 
         loader.block_for_last_batch(test_world_timeout()).unwrap();
 

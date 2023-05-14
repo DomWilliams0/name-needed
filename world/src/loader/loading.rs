@@ -25,17 +25,26 @@ use crate::neighbour::NeighbourOffset;
 
 use ahash::RandomState;
 
-use futures::{FutureExt, SinkExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use std::collections::HashSet;
 use std::iter::repeat;
 
+use futures::channel::mpsc::{Sender, TrySendError, UnboundedSender};
+use futures::executor::block_on;
+use misc::tracy_client::span;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use tokio::runtime::Handle;
+use tokio::sync::Notify;
+
+const LOAD_WORKERS: usize = 8;
 
 pub struct WorldLoader<C: WorldContext> {
     source: TerrainSource<C>,
     pool: AsyncWorkerPool,
     world: WorldRef<C>,
     last_batch_size: usize,
+    slab_request_tx: [futures::channel::mpsc::Sender<SlabRequest>; LOAD_WORKERS],
 }
 
 #[derive(Debug, Error)]
@@ -377,12 +386,12 @@ mod load_task {
     pub async fn generate<C: WorldContext>(
         world: WorldRef<C>,
         this_slab: SlabLocation,
-        slab_type: SlabType,
         source: TerrainSource<C>,
         mut success_tx: LoadSuccessTx,
     ) {
         let mut entities = vec![];
-        let result = if let SlabType::Placeholder = slab_type {
+        let result = if false {
+            // TODO remove placeholders
             // empty placeholder
             Ok(None)
         } else {
@@ -924,15 +933,36 @@ mod load_task {
     }
 }
 
+enum SlabRequest {
+    Slab(SlabLocation),
+    FlushBatch,
+}
+
 impl<C: WorldContext> WorldLoader<C> {
     pub fn new<S: Into<TerrainSource<C>>>(source: S, mut pool: AsyncWorkerPool) -> Self {
         let world = WorldRef::default();
+        let source = source.into();
+
+        let handle = pool.runtime().handle().clone();
+        let mk_worker = || {
+            let (req_tx, req_rx) = futures::channel::mpsc::channel(1024);
+            handle.spawn(Self::slab_request_task(
+                req_rx,
+                source.clone(),
+                world.clone(),
+                pool.success_tx(),
+                handle.clone(),
+            ));
+            req_tx
+        };
+        let workers = core::array::from_fn(|_| mk_worker());
 
         Self {
-            source: source.into(),
+            source,
             pool,
             world,
             last_batch_size: 0,
+            slab_request_tx: workers,
         }
     }
 
@@ -940,136 +970,150 @@ impl<C: WorldContext> WorldLoader<C> {
         self.world.clone()
     }
 
-    fn world_boundary(&self) -> (ChunkLocation, ChunkLocation) {
-        match &self.source {
-            TerrainSource::Memory(src) => src.read().world_bounds(),
-            #[cfg(feature = "worldprocgen")]
-            TerrainSource::Generated(_) => (ChunkLocation(0, 0), ChunkLocation::MAX), // planet chunks dont go negative
-        }
-    }
-
     // TODO debug renderer to flicker chunks that are updated (nav,terrain,occlusion) on block change, to ensure not too much is changed
 
-    /// Must be sorted by chunk then by ascending slab (debug asserted). All slabs are loaded from
-    /// scratch, it's the caller's responsibility to ensure slabs that are already loaded are not
-    /// passed in here
-    pub fn request_slabs(&mut self, slabs: impl Iterator<Item = SlabLocation> + Clone) {
-        let _span = tracy_client::span!();
-        let mut world_mut = self.world.borrow_mut();
+    async fn slab_request_task(
+        mut request_rx: futures::channel::mpsc::Receiver<SlabRequest>,
+        source: TerrainSource<C>,
+        world: WorldRef<C>,
+        success_tx: UnboundedSender<Result<SlabLocation, TerrainSourceError>>,
+        pool: Handle,
+    ) {
+        let (world_chunk_min, world_chunk_max) = source.world_boundary();
 
-        // check order of slabs is as expected
-        if cfg!(debug_assertions) {
-            let sorted = slabs
-                .clone()
-                .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
+        let mut batcher = ChunkBatcher::default();
+        loop {
+            let req = request_rx.next().await;
+            let force_flush = match req {
+                None => {
+                    warn!("channel closed, shutting down?");
+                    break;
+                }
+                Some(SlabRequest::FlushBatch) => {
+                    trace!("received slab request flush signal");
+                    true
+                }
+                Some(SlabRequest::Slab(latest_slab)) => {
+                    trace!("requested individual slab"; "latest_slab" => %latest_slab);
 
-            assert_equal(slabs.clone(), sorted);
-        }
+                    // batch up requests for the same chunk
+                    batcher.submit_slab(latest_slab);
+                    false
+                }
+            };
 
-        let mut extra_slabs = SmallVec::<[SlabLocation; 16]>::new();
+            let (chunk, slabs) = some_or_continue!(batcher.flush(force_flush));
+            trace!("processing requested slab batch"; chunk, "slabs" => ?slabs);
 
-        // calculate chunk range
-        let (mut chunk_min, mut chunk_max) = (ChunkLocation::MAX, ChunkLocation::MIN);
-        let world_boundary = self.world_boundary();
-        let is_chunk_valid = |chunk_loc: ChunkLocation| {
-            let (world_chunk_min, world_chunk_max) = world_boundary;
-            (world_chunk_min.0..=world_chunk_max.0).contains(&chunk_loc.0)
-                && (world_chunk_min.1..=world_chunk_max.1).contains(&chunk_loc.1)
-        };
-
-        // first iterate slabs to register them all with their chunk, so they know if their
-        // neighbours have been requested/are being loaded too
-        for (chunk_loc, slabs) in slabs.clone().group_by(|slab| slab.chunk).into_iter() {
-            if !is_chunk_valid(chunk_loc) {
-                // skip chunk and all its slabs
+            // chunk validity check
+            if !((world_chunk_min.0..=world_chunk_max.0).contains(&chunk.0)
+                && (world_chunk_min.1..=world_chunk_max.1).contains(&chunk.1))
+            {
                 continue;
             }
 
-            log_scope!(o!(chunk_loc));
+            // should have already filtered out chunks that are loaded already
 
-            let chunk = world_mut.ensure_chunk(chunk_loc);
-
-            // track the highest slab
-            let mut highest = SlabIndex::MIN;
+            {
+                // TODO shard chunk locks so we dont need to lock the whole world
+                let mut w = world.borrow_mut();
+                let chunk = w.ensure_chunk(chunk);
+                chunk.mark_slabs_requested(slabs.iter().copied());
+            }
 
             for slab in slabs {
-                chunk.mark_slab_requested(slab.slab);
-
-                debug_assert!(slab.slab > highest, "slabs should be in ascending order");
-                highest = slab.slab;
+                pool.spawn(load_task::generate(
+                    world.clone(),
+                    SlabLocation::new(*slab, chunk),
+                    source.clone(),
+                    success_tx.clone(),
+                ));
             }
+        }
+    }
 
-            // should have seen some slabs
-            assert_ne!(highest, SlabIndex::MIN);
+    /// AWFUL, only use in debug
+    fn are_slabs_sorted(slabs: impl Iterator<Item = SlabLocation> + Clone) -> bool {
+        let sorted = slabs
+            .clone()
+            .sorted_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
 
-            // request the slab above the highest as all-air if it's missing
-            let empty = highest + 1;
-            if !chunk.has_slab(empty) {
-                extra_slabs.push(SlabLocation::new(empty, chunk.pos()));
-                chunk.mark_slab_requested(empty);
+        equal(slabs, sorted)
+    }
+
+    /// Blocks until all requested.
+    pub fn request_slabs_all(&mut self, slabs: impl Iterator<Item = SlabLocation> + Clone) {
+        debug_assert!(Self::are_slabs_sorted(slabs.clone()));
+
+        let mut n = 0;
+        block_on(async {
+            for s in slabs {
+                let _ = self.determine_slab_tx(s).send(SlabRequest::Slab(s)).await;
+                n += 1;
             }
+        });
 
-            // track chunk range
-            chunk_min = chunk_min.min(chunk_loc);
-            chunk_max = chunk_max.max(chunk_loc);
+        self.post_request(n);
+    }
+
+    /// Must be sorted by chunk then by ascending slab (debug asserted). All slabs are loaded from
+    /// scratch, it's the caller's responsibility to ensure slabs that are already loaded are not
+    /// passed in here.
+    /// Returns how many were requested.
+    pub fn request_slabs(&mut self, slabs: impl Iterator<Item = SlabLocation> + Clone) -> usize {
+        // check order of slabs is as expected
+        debug_assert!(Self::are_slabs_sorted(slabs.clone()));
+
+        // TODO placeholder slabs?
+        // TODO prepare terrain source for a chunk first?
+
+        let mut n = 0;
+        for slab in slabs {
+            match self
+                .determine_slab_tx(slab)
+                .try_send(SlabRequest::Slab(slab))
+            {
+                Ok(_) => n += 1,
+                Err(err) => {
+                    debug!("could not request any more slabs this tick after {n} ({err})",);
+                    break;
+                }
+            }
         }
 
-        let mut count = 0;
+        self.post_request(n);
 
-        let all_slabs = {
-            let real_slabs = slabs
-                .filter(|s| is_chunk_valid(s.chunk))
-                .zip(repeat(SlabType::Normal));
-            let air_slabs = extra_slabs.into_iter().zip(repeat(SlabType::Placeholder));
-            real_slabs.chain(air_slabs)
+        n
+    }
+
+    #[inline]
+    fn determine_slab_tx(&mut self, slab: SlabLocation) -> &mut Sender<SlabRequest> {
+        // send all slabs in the same chunk to the same worker
+        let hash = {
+            let (x, y) = slab.chunk.xy();
+            let mut hash = x.wrapping_mul(0x1_0000_01) as u64;
+            hash ^= y.wrapping_mul(0x1_0000_01) as u64;
+            hash = hash.wrapping_mul(0x423b_1c47) & 0xffff_ffff;
+            ((hash >> 16) % LOAD_WORKERS as u64) as usize
         };
 
-        // let the terrain source know what's coming so it can kick off region generation
-        {
-            let _span = tracy_client::span!("prepare terrain source");
-            let source = self.source.clone();
-            self.pool.submit_any_async_with_handle(async move {
-                source.prepare_for_chunks((chunk_min, chunk_max)).await;
+        &mut self.slab_request_tx[hash]
+    }
+
+    fn post_request(&mut self, n: usize) {
+        if n > 0 {
+            self.slab_request_tx.iter_mut().for_each(|s| {
+                if let Err(e) = s.try_send(SlabRequest::FlushBatch) {
+                    debug!("could not flush slab requests, channel is probably full ({e})");
+                }
             });
-        }
-
-        for (slab, slab_type) in all_slabs {
-            log_scope!(o!(slab));
-
-            let source = self.source.clone();
-
-            debug!(
-                "requesting slab";
-                slab,
-            );
-
-            // load raw terrain and do as much processing in isolation as possible on a worker thread
-            let world = self.world();
-            let mut terrain_tx = self.pool.success_tx();
-
-            self.pool.submit_any_async_with_handle(load_task::generate(
-                world,
-                slab,
-                slab_type,
-                source.clone(),
-                terrain_tx.clone(),
-            ));
-
-            count += 1;
-        }
-
-        if count > 0 {
-            debug!("slab batch of size {size} submitted", size = count);
-            self.last_batch_size = count;
+            self.last_batch_size = n;
         }
     }
 
     /// Note changes are made immediately to the terrain but are delayed for navigation.
-    pub fn apply_terrain_updates(
-        &mut self,
-        terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>,
-        changes_out: &mut Vec<WorldChangeEvent>,
-    ) {
+    /// Updates applied this tick are removed from the hashset
+    pub fn apply_terrain_updates(&mut self, terrain_updates: &mut HashSet<WorldTerrainUpdate<C>>) {
         let _span = tracy_client::span!();
         let world_ref = self.world.clone();
 
@@ -1167,43 +1211,47 @@ impl<C: WorldContext> WorldLoader<C> {
             return;
         }
 
-        // group per slab so each slab is fetched and modified only once
-        let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
-        let grouped_updates = grouped_updates
-            .into_iter()
-            .map(|(slab, updates)| (slab, updates.map(|(_, update)| update)));
+        let handle = self.pool.runtime().handle().clone();
+        let success_tx = self.pool.success_tx();
+        self.pool.runtime().spawn(async move {
+            // group per slab so each slab is fetched and modified only once
+            let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
+            let grouped_updates = grouped_updates
+                .into_iter()
+                .map(|(slab, updates)| (slab, updates.map(|(_, update)| update)));
 
-        // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
-        // navigation or rendering), world queries in the next game tick will be current with the
-        // changes applied now. the slabs loading state is returned to Requested
-        // TODO reuse buf
-        let mut slab_locs = Vec::with_capacity(upper_slab_limit);
-        {
-            let mut w = world_ref.borrow_mut();
-            w.apply_terrain_updates_in_place(
-                grouped_updates.into_iter(),
-                |slab_loc, affected_slabs| slab_locs.push((slab_loc, affected_slabs)),
+            // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
+            // navigation or rendering), world queries in the next game tick will be current with the
+            // changes applied now. the slabs loading state is returned to Requested
+            let mut slab_locs = Vec::with_capacity(upper_slab_limit);
+
+            {
+                let mut w = world_ref.borrow_mut();
+                w.apply_terrain_updates_in_place(
+                    grouped_updates.into_iter(),
+                    |slab_loc, affected_slabs| slab_locs.push((slab_loc, affected_slabs)),
+                );
+            }
+
+            let real_slab_count = slab_locs.len();
+            debug!(
+                "applied terrain updates to {count} slabs",
+                count = real_slab_count
             );
-        }
+            debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
 
-        let real_slab_count = slab_locs.len();
-        debug!(
-            "applied terrain updates to {count} slabs",
-            count = real_slab_count
-        );
-        debug_assert_eq!(upper_slab_limit, slab_locs.capacity());
+            for (slab, affected_slabs) in slab_locs.into_iter() {
+                handle.spawn(load_task::update(
+                    world_ref.clone(),
+                    slab,
+                    affected_slabs,
+                    success_tx.clone(),
+                ));
+            }
+        });
 
-        for (slab, affected_slabs) in slab_locs.into_iter() {
-            let mut terrain_tx = self.pool.success_tx();
-            self.pool.submit_any_async_with_handle(load_task::update(
-                world_ref.clone(),
-                slab,
-                affected_slabs,
-                terrain_tx.clone(),
-            ));
-        }
-
-        self.last_batch_size = real_slab_count;
+        // TODO cant know this now
+        // self.last_batch_size = real_slab_count;
     }
 
     pub fn block_on_next_finalization(
@@ -1308,8 +1356,79 @@ impl<C: WorldContext> WorldLoader<C> {
     }
 
     pub fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate<C>>) {
+        let _span = span!();
         let fut = self.source.steal_queued_block_updates(out);
-        self.pool.runtime().block_on(fut)
+        let _ = fut.now_or_never();
+    }
+}
+
+#[derive(Default)]
+struct ChunkBatcher {
+    chunk: Option<ChunkLocation>,
+    batch: ArrayVec<SlabIndex, 8>,
+    next: (Option<ChunkLocation>, [SlabIndex; 1]),
+    ready: bool,
+    clear: bool,
+}
+
+impl ChunkBatcher {
+    fn submit_slab(&mut self, slab: SlabLocation) {
+        if self.clear {
+            self.clear = false;
+            self.chunk.take();
+            self.batch.clear();
+
+            if let next @ Some(_) = self.next.0.take() {
+                self.chunk = next;
+                self.batch.push(self.next.1[0]);
+            }
+        }
+
+        if Some(slab.chunk) == self.chunk {
+            match self.batch.try_push(slab.slab) {
+                Ok(()) => return, // keep going
+                Err(CapacityError { .. }) => {
+                    // batch is full, do this one next
+                    self.ready = true;
+                    debug_assert!(self.next.0.is_none(), "overflow");
+                    self.next = (Some(slab.chunk), [slab.slab]);
+                }
+            }
+        } else {
+            if self.chunk.is_some() {
+                self.ready = true;
+                debug_assert!(self.next.0.is_none(), "overflow");
+                self.next = (Some(slab.chunk), [slab.slab]);
+            } else {
+                // start a batch
+                self.chunk = Some(slab.chunk);
+                self.batch.push(slab.slab);
+                debug_assert!(!self.ready);
+            }
+        }
+    }
+
+    fn flush(&mut self, force: bool) -> Option<(ChunkLocation, &[SlabIndex])> {
+        if self.ready || force {
+            self.clear = true;
+            self.ready = false;
+            self.force_flush()
+        } else {
+            None
+        }
+    }
+
+    fn force_flush(&mut self) -> Option<(ChunkLocation, &[SlabIndex])> {
+        self.chunk
+            .take()
+            .map(|c| {
+                debug_assert!(!self.batch.is_empty());
+                (c, self.batch.as_slice())
+            })
+            .or_else(|| {
+                let (c, arr) = &mut self.next;
+                c.take().map(|c| (c, arr.as_slice()))
+            })
     }
 }
 
@@ -1318,13 +1437,13 @@ mod tests {
     use std::time::Duration;
 
     use unit::world::{
-        all_slabs_in_range, ChunkLocation, SlabPosition, WorldPosition, WorldPositionRange,
-        CHUNK_SIZE,
+        all_slabs_in_range, ChunkLocation, SlabIndex, SlabPosition, WorldPosition,
+        WorldPositionRange, CHUNK_SIZE,
     };
 
     use crate::chunk::ChunkBuilder;
     use crate::helpers::{test_world_timeout, DummyBlockType};
-    use crate::loader::loading::WorldLoader;
+    use crate::loader::loading::{ChunkBatcher, WorldLoader};
     use crate::loader::terrain_source::MemoryTerrainSource;
     use crate::loader::{AsyncWorkerPool, WorldTerrainUpdate};
     use crate::world::helpers::DummyWorldContext;
@@ -1425,7 +1544,6 @@ mod tests {
 
             batches
         };
-        let mut _changes = Vec::with_capacity(blocks_to_set.len());
 
         // load all slabs and wait for them to be present, otherwise the terrain updates are dropped
         loader.request_slabs(slabs_to_load.into_iter());
@@ -1443,7 +1561,7 @@ mod tests {
                 batch.len(),
                 log_str
             );
-            loader.apply_terrain_updates(&mut batch, &mut _changes);
+            loader.apply_terrain_updates(&mut batch);
             if !batch.is_empty() {
                 // push to back of "queue"
                 update_batches.insert(0, batch);
@@ -1538,5 +1656,57 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn chunk_batching() {
+        let mut batcher = ChunkBatcher::default();
+
+        let chunks = [
+            ChunkLocation(0, 0),
+            ChunkLocation(1, 0),
+            ChunkLocation(2, 0),
+        ];
+        batcher.submit_slab(SlabLocation::new(0, chunks[0]));
+
+        let res = batcher.flush(true).unwrap();
+        assert_eq!(res.0, chunks[0]);
+        assert_eq!(res.1.len(), 1);
+
+        // now empty
+        assert!(batcher.flush(true).is_none());
+
+        batcher.submit_slab(SlabLocation::new(0, chunks[0]));
+        assert!(batcher.flush(false).is_none());
+        batcher.submit_slab(SlabLocation::new(1, chunks[0]));
+        assert!(batcher.flush(false).is_none());
+        batcher.submit_slab(SlabLocation::new(1, chunks[1]));
+        let res = batcher.flush(false).unwrap();
+        assert_eq!(res.0, chunks[0]);
+        assert_eq!(res.1.len(), 2);
+
+        assert!(batcher.flush(false).is_none());
+        let res = batcher.flush(true).unwrap();
+        assert_eq!(res.0, chunks[1]);
+        assert_eq!(res.1.len(), 1);
+
+        // fill it up
+        let mut batches = vec![];
+        for i in 0..18 {
+            batcher.submit_slab(SlabLocation::new(i, chunks[2]));
+            if let Some((c, slabs)) = batcher.flush(false) {
+                batches.push((i, slabs.iter().copied().collect_vec()))
+            }
+        }
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0].0, 8); // first overflow
+        assert_eq!(batches[0].1, (0..8).map(SlabIndex).collect_vec());
+
+        assert_eq!(batches[1].0, 16); // second overflow
+        assert_eq!(batches[1].1, (8..16).map(SlabIndex).collect_vec());
+
+        let res = batcher.flush(true).unwrap();
+        assert_eq!(res.1, (16..18).map(SlabIndex).collect_vec());
     }
 }
