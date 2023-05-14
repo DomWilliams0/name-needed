@@ -25,22 +25,6 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
         for it in chunks {
             let (chunk, terrain) = it.into();
             let chunk = chunk.into();
-
-            // assert placeholder slabs are really placeholders
-            if cfg!(debug_assertions) {
-                for (slab, idx) in terrain.slabs_from_bottom() {
-                    if slab.is_placeholder() {
-                        for (_, slice) in slab.slices_from_bottom() {
-                            assert!(
-                                slice.all_blocks_are(C::BlockType::AIR),
-                                "non air blocks in \"placeholder\" slab {:?}",
-                                SlabLocation::new(idx, chunk)
-                            );
-                        }
-                    }
-                }
-            }
-
             if chunk_map.insert(chunk, terrain).is_some() {
                 return Err(TerrainSourceError::Duplicate(chunk));
             }

@@ -7,7 +7,7 @@ use unit::world::{
     SliceIndex, WorldPosition, CHUNK_SIZE, SLAB_SIZE,
 };
 
-use crate::chunk::slab::{Slab, SlabType, SliceNavArea};
+use crate::chunk::slab::{Slab, SliceNavArea};
 
 use crate::world::{
     get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
@@ -390,34 +390,22 @@ mod load_task {
         mut success_tx: LoadSuccessTx,
     ) {
         let mut entities = vec![];
-        let result = if false {
-            // TODO remove placeholders
-            // empty placeholder
-            Ok(None)
-        } else {
-            source.load_slab(this_slab).await.map(|generated| {
-                entities = generated.entities;
-                Some(generated.terrain)
-            })
-        };
+        let result = source.load_slab(this_slab).await.map(|generated| {
+            entities = generated.entities;
+            generated.terrain
+        });
 
         let (terrain, vs) = match result {
-            Ok(Some(terrain)) => {
+            Ok(terrain) => {
                 // TODO use shared reference of all air/all X terrain. then use a shared verticalspace reference for all air/all solid
                 let vs = SlabVerticalSpace::discover(&terrain);
                 (terrain, vs)
-            }
-            Ok(None) => {
-                debug!("adding placeholder slab to the top of the chunk"; this_slab);
-                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
             }
             Err(TerrainSourceError::SlabOutOfBounds(slab)) => {
                 // soft error, we're at the world edge. treat as all air instead of
                 // crashing and burning
                 debug!("slab is out of bounds, swapping in an empty one"; this_slab);
-
-                // TODO shared instance of CoW for empty slab
-                (Slab::empty_placeholder(), SlabVerticalSpace::empty())
+                (Slab::empty(), SlabVerticalSpace::empty())
             }
             Err(err) => {
                 if let Err(e) = success_tx.send(Err(err)).await {

@@ -398,8 +398,7 @@ impl<C: WorldContext> SlabStorage<C> {
 
     #[cfg(test)]
     pub fn add_empty_placeholder_slab(&mut self, slab: impl Into<SlabIndex>) {
-        self.slabs
-            .add(SlabData::new(Slab::empty_placeholder()), slab.into());
+        self.slabs.add(SlabData::new(Slab::empty()), slab.into());
     }
 
     pub fn slab_data(&self, index: SlabIndex) -> Option<&SlabData<C>> {
@@ -427,7 +426,7 @@ impl<C: WorldContext> SlabStorage<C> {
     pub(crate) fn create_slabs_until(&mut self, target: SlabIndex) {
         if target != SlabIndex(0) {
             self.slabs
-                .fill_until(target, |_| SlabData::new(Slab::empty_placeholder()))
+                .fill_until(target, |_| SlabData::new(Slab::empty()))
         }
     }
 
@@ -698,15 +697,13 @@ pub struct SlabStorage<C: WorldContext> {
 }
 
 impl<C: WorldContext> Default for SlabStorage<C> {
-    /// Has a single empty placeholder slab at index 0
+    /// Has a single empty slab at index 0
     fn default() -> Self {
         let mut terrain = Self {
             slabs: DoubleSidedVec::with_capacity(8),
         };
 
-        terrain
-            .slabs
-            .add(SlabData::new(Slab::empty_placeholder()), 0);
+        terrain.slabs.add(SlabData::new(Slab::empty()), 0);
 
         terrain
     }

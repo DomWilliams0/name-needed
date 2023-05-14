@@ -52,20 +52,12 @@ impl<C: WorldContext> ::grid::GridImpl for SlabGridImpl<C> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum SlabType {
-    Normal,
-
-    /// All air placeholder that should be overwritten with actual terrain
-    Placeholder,
-}
-
 /// CoW slab terrain
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Slab<C: WorldContext>(Arc<SlabGridImpl<C>>, SlabType);
+pub struct Slab<C: WorldContext>(Arc<SlabGridImpl<C>>);
 
-pub struct WeakSlabRef<C: WorldContext>(Weak<SlabGridImpl<C>>, SlabType);
+pub struct WeakSlabRef<C: WorldContext>(Weak<SlabGridImpl<C>>);
 
 #[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
@@ -80,28 +72,20 @@ pub trait DeepClone {
 
 impl<C: WorldContext> Slab<C> {
     pub fn empty() -> Self {
-        Self::new_empty(SlabType::Normal)
-    }
-
-    pub fn empty_placeholder() -> Self {
-        Self::new_empty(SlabType::Placeholder)
+        Self(C::all_air())
     }
 
     pub fn all_stone() -> Self {
-        Self(C::all_stone(), SlabType::Normal)
+        Self(C::all_stone())
     }
 
-    fn new_empty(ty: SlabType) -> Self {
-        Self(C::all_air(), ty)
-    }
-
-    pub fn from_grid(grid: SlabGrid<C>, ty: SlabType) -> Self {
+    pub fn from_grid(grid: SlabGrid<C>) -> Self {
         let terrain = grid.into_boxed_impl();
         let arc = Arc::from(terrain);
-        Self(arc, ty)
+        Self(arc)
     }
 
-    pub fn from_other_grid<G, T>(other: &Grid<G>, ty: SlabType, conv: T) -> Self
+    pub fn from_other_grid<G, T>(other: &Grid<G>, conv: T) -> Self
     where
         G: GridImpl,
         T: Fn(&G::Item) -> <SlabGridImpl<C> as GridImpl>::Item,
@@ -109,7 +93,7 @@ impl<C: WorldContext> Slab<C> {
         let new_vals = other.array().iter().map(conv);
         let terrain = SlabGridImpl::from_iter(new_vals);
         let arc = Arc::from(terrain);
-        Self(arc, ty)
+        Self(arc)
     }
 
     pub fn cow_clone(&mut self) -> &mut Slab<C> {
@@ -118,14 +102,7 @@ impl<C: WorldContext> Slab<C> {
     }
 
     pub fn expect_mut(&mut self) -> &mut SlabGridImpl<C> {
-        let grid = Arc::get_mut(&mut self.0).expect("expected to be the only slab reference");
-
-        if let SlabType::Placeholder = self.1 {
-            self.1 = SlabType::Normal;
-            trace!("promoting placeholder slab to normal due to mutable reference");
-        }
-
-        grid
+        Arc::get_mut(&mut self.0).expect("expected to be the only slab reference")
     }
 
     pub fn expect_mut_self(&mut self) -> &mut Slab<C> {
@@ -139,10 +116,6 @@ impl<C: WorldContext> Slab<C> {
 
     pub fn ref_count(&self) -> usize {
         Arc::strong_count(&self.0)
-    }
-
-    pub fn is_placeholder(&self) -> bool {
-        matches!(self.1, SlabType::Placeholder)
     }
 
     /// Leaks
@@ -243,12 +216,12 @@ impl<C: WorldContext> Slab<C> {
     }
 
     pub fn downgrade(&self) -> WeakSlabRef<C> {
-        WeakSlabRef(Arc::downgrade(&self.0), self.1)
+        WeakSlabRef(Arc::downgrade(&self.0))
     }
 }
 impl<C: WorldContext> WeakSlabRef<C> {
     pub fn upgrade(&self) -> Option<Slab<C>> {
-        self.0.upgrade().map(|s| Slab(s, self.1))
+        self.0.upgrade().map(Slab)
     }
 }
 
@@ -258,7 +231,7 @@ impl<C: WorldContext> DeepClone for Slab<C> {
         let mut new_copy = SlabGridImpl::default_boxed();
         new_copy.array.copy_from_slice(&self.array);
 
-        Self(Arc::from(new_copy), self.1)
+        Self(Arc::from(new_copy))
     }
 }
 

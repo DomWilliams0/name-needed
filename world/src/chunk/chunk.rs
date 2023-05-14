@@ -272,15 +272,7 @@ impl<C: WorldContext> Chunk<C> {
                 // has not been requested, pls load
                 true
             }
-            SlabLoadingStatus::Done => {
-                // is already loaded, only load again if it is a placeholder
-                let slab = self.slabs.slab(slab).unwrap();
-                slab.is_placeholder()
-            }
-            _ => {
-                // is currently in progress, don't request again
-                false
-            }
+            _ => false, // is currently in progress or done, don't request again
         }
     }
 
