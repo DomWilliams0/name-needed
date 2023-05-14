@@ -1243,9 +1243,6 @@ impl<C: WorldContext> WorldLoader<C> {
                 ));
             }
         });
-
-        // TODO cant know this now
-        // self.last_batch_size = real_slab_count;
     }
 
     pub fn count_loading_slabs(&self) -> usize {
