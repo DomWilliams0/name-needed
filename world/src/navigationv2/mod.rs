@@ -182,14 +182,10 @@ fn border_areas_touch(
     match dir {
         East | West => {
             // check y axis only
-            let ay1 = ay1.saturating_sub(1);
-            let ay2 = ay2 + 1;
             ay1 <= by2 && ay2 >= by1
         }
         South | North => {
             // check x axis only
-            let ax1 = ax1.saturating_sub(1);
-            let ax2 = ax2 + 1;
             ax1 <= bx2 && ax2 >= bx1
         }
         _ => unreachable!(), // cant be unaligned
@@ -971,5 +967,16 @@ mod tests {
             })
             .collect_vec();
         assert_eq!(edges.len(), 5, "edges: {:?}", edges);
+    }
+
+    #[test]
+    fn no_diagonal_border_edges() {
+        // diagonal to each other
+        let a = ((0, 0), (0, 0));
+        let b = ((1, 15), (1, 15));
+        let a_to_b = NeighbourOffset::South;
+
+        assert!(!border_areas_touch(a, b, a_to_b));
+        assert!(!border_areas_touch(b, a, a_to_b.opposite()));
     }
 }
