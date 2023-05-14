@@ -144,6 +144,7 @@ mod introspect {
                         if seen_this_yet
                             && callers.len() < n
                             && !name.contains("world::world_ref")
+                            && !name.starts_with("core::")
                             && !name.contains("core::future") =>
                     {
                         // actual useful symbol, finally
