@@ -41,7 +41,7 @@ pub enum TerrainSourceError {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub enum TerrainSource<C: WorldContext> {
-    Memory(Arc<RwLock<MemoryTerrainSource<C>>>),
+    Memory(Arc<MemoryTerrainSource<C>>),
     #[cfg(feature = "worldprocgen")]
     Generated(C::GeneratedTerrainSource),
 }
@@ -56,7 +56,7 @@ pub struct GeneratedSlab<C: WorldContext> {
 
 impl<C: WorldContext> From<MemoryTerrainSource<C>> for TerrainSource<C> {
     fn from(src: MemoryTerrainSource<C>) -> Self {
-        Self::Memory(Arc::new(RwLock::new(src)))
+        Self::Memory(Arc::new(src))
     }
 }
 
@@ -74,10 +74,7 @@ impl<C: WorldContext> TerrainSource<C> {
         slab: SlabLocation,
     ) -> Result<GeneratedSlab<C>, TerrainSourceError> {
         match self {
-            TerrainSource::Memory(src) => src
-                .read()
-                .get_slab_copy(slab)
-                .map(GeneratedSlab::with_terrain),
+            TerrainSource::Memory(src) => src.get_slab_copy(slab).map(GeneratedSlab::with_terrain),
             #[cfg(feature = "worldprocgen")]
             TerrainSource::Generated(src) => {
                 // TODO handle wrapping of slabs around planet boundaries
@@ -94,7 +91,7 @@ impl<C: WorldContext> TerrainSource<C> {
         block: WorldPosition,
     ) -> Result<GlobalSliceIndex, TerrainSourceError> {
         match self {
-            TerrainSource::Memory(src) => src.read().get_ground_level(block),
+            TerrainSource::Memory(src) => src.get_ground_level(block),
             #[cfg(feature = "worldprocgen")]
             TerrainSource::Generated(src) => src
                 .find_ground_level(block)
