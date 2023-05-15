@@ -44,6 +44,11 @@ impl SlabIndex {
         (bottom, top)
     }
 
+    pub fn contains_slice(self, slice: GlobalSliceIndex) -> bool {
+        let (from, to) = self.slice_range();
+        (from..to).contains(&slice)
+    }
+
     pub fn try_add(self, dz: i32) -> Option<Self> {
         self.0.checked_add(dz).map(Self)
     }

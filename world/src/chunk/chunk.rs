@@ -27,6 +27,7 @@ use std::time::Instant;
 pub type ChunkId = u64;
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AreaInfo {
     pub height: u8,
     /// Inclusive
@@ -155,7 +156,7 @@ impl<C: WorldContext> Chunk<C> {
         self.areas.iter().map(|(k, v)| (*k, *v))
     }
 
-    pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> {
+    pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> + ExactSizeIterator {
         self.areas.keys()
     }
 
@@ -416,17 +417,12 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slab_data(slab).map(|s| &s.nav)
     }
 
+    /// Searches downwards in vertical space for area z
     pub fn find_area_for_block_with_height(
         &self,
         block: BlockPosition,
         required_height: u8,
-    ) -> Option<SlabArea> {
-        self.find_area_for_block(block)
-            .and_then(|(a, ai)| (ai.height >= required_height).then_some(a))
-    }
-
-    pub fn find_area_for_block(&self, block: BlockPosition) -> Option<(SlabArea, AreaInfo)> {
-        // search downwards in vertical space for area z
+    ) -> Option<(SlabArea, AreaInfo)> {
         let slab_idx = SlabIndex::from(block.z());
         let slab = self.slabs.slab_data(slab_idx)?;
         let area_slice_idx = slab.vertical_space.find_slice(block.into())?;
@@ -439,7 +435,7 @@ impl<C: WorldContext> Chunk<C> {
                 let info = self
                     .area_info(slab_idx, a)
                     .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
-                if info.contains(slice_block) {
+                if info.height >= required_height && info.contains(slice_block) {
                     return Some((a, info));
                 }
             }
@@ -450,7 +446,7 @@ impl<C: WorldContext> Chunk<C> {
 }
 
 impl AreaInfo {
-    fn contains(&self, block: SliceBlock) -> bool {
+    pub fn contains(&self, block: SliceBlock) -> bool {
         let (x, y) = block.xy();
         let ((x1, y1), (x2, y2)) = self.range;
         x >= x1 && x <= x2 && y >= y1 && y <= y2

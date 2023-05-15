@@ -23,7 +23,7 @@ use crate::chunk::double_sided_vec::DoubleSidedVec;
 use crate::chunk::slab::Slab;
 use crate::chunk::slab::{DeepClone, SliceNavArea};
 use crate::chunk::slice::{Slice, SliceMut};
-use crate::chunk::Chunk;
+use crate::chunk::{AreaInfo, Chunk};
 use crate::helpers::DummyWorldContext;
 use crate::loader::SlabVerticalSpace;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
@@ -253,7 +253,7 @@ impl Debug for PackedSlabPosition {
 pub struct SlabData<C: WorldContext> {
     pub(crate) terrain: Slab<C>,
     pub(crate) nav: SlabNavGraph, // currently unused
-    pub(in crate::chunk) vertical_space: Arc<SlabVerticalSpace>,
+    pub(crate) vertical_space: Arc<SlabVerticalSpace>,
     pub(in crate::chunk) last_modify_time: Instant,
     /// Current version of this slab
     pub(in crate::chunk) version: SlabVersion,
@@ -372,6 +372,13 @@ impl<C: WorldContext> SlabStorage<C> {
             .iter_increasing()
             .zip(self.slabs.indices_increasing())
             .map(|(data, idx)| (&data.terrain, SlabIndex(idx)))
+    }
+
+    pub(crate) fn slab_data_from_top(&self) -> impl Iterator<Item = (&SlabData<C>, SlabIndex)> {
+        self.slabs
+            .iter_decreasing()
+            .zip(self.slabs.indices_decreasing())
+            .map(|(data, idx)| (data, SlabIndex(idx)))
     }
 
     pub(crate) fn slab_data_from_bottom(&self) -> impl Iterator<Item = (&SlabData<C>, SlabIndex)> {
@@ -585,19 +592,22 @@ impl<C: WorldContext> SlabStorage<C> {
             .filter_map(move |&(block_pos, new_opacities)| unreachable!())
     }
 
-    // TODO use an enum for the slice range rather than Options
+    /// Searches downwards
+    #[deprecated]
     pub fn find_accessible_block(
         &self,
         pos: SliceBlock,
         start_from: Option<GlobalSliceIndex>,
         end_at: Option<GlobalSliceIndex>,
     ) -> Option<BlockPosition> {
+        unreachable!("unimpl");
         self.find_from_top(pos, start_from, end_at, |above, below| {
             above.walkable() && below.block_type().can_be_walked_on()
         })
     }
 
-    pub fn find_ground_level(
+    /// Just finds a block with air above it
+    pub fn find_guessed_ground_level(
         &self,
         pos: SliceBlock,
         start_from: Option<GlobalSliceIndex>,
@@ -1323,10 +1333,12 @@ mod tests {
         let chunk = w.find_chunk_with_pos((0, 0).into()).unwrap();
 
         let get_block = |slice| {
-            chunk.find_area_for_block_with_height(
-                BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
-                3,
-            )
+            chunk
+                .find_area_for_block_with_height(
+                    BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
+                    3,
+                )
+                .map(|tup| tup.0)
         };
         assert_eq!(get_block(0), None); // solid
         let the_area = get_block(1).expect("should have area");

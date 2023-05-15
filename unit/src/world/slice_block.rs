@@ -1,6 +1,8 @@
 use misc::derive_more::*;
 
-use crate::world::{BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, CHUNK_SIZE};
+use crate::world::{
+    BlockPosition, GlobalSliceIndex, LocalSliceIndex, SlabPosition, WorldPosition, CHUNK_SIZE,
+};
 
 /// A block in a chunk x/y coordinate. Must be < chunk size
 pub type BlockCoord = u8;
@@ -108,5 +110,10 @@ impl From<BlockPosition> for SliceBlock {
 impl From<SlabPosition> for SliceBlock {
     fn from(s: SlabPosition) -> Self {
         Self(s.x(), s.y())
+    }
+}
+impl From<WorldPosition> for SliceBlock {
+    fn from(p: WorldPosition) -> Self {
+        BlockPosition::from(p).into()
     }
 }

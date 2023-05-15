@@ -8,8 +8,8 @@ use misc::{debug, trace, Either, Itertools};
 use petgraph::graphmap::UnGraphMap;
 use petgraph::prelude::DiGraphMap;
 use unit::world::{
-    BlockCoord, ChunkLocation, LocalSliceIndex, SlabIndex, SlabLocation, SliceBlock, SliceIndex,
-    CHUNK_SIZE, SLAB_SIZE,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
+    SliceBlock, SliceIndex, CHUNK_SIZE, SLAB_SIZE,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -480,6 +480,10 @@ impl ChunkArea {
             chunk_idx: chunk,
             chunk_area: self,
         }
+    }
+
+    pub fn slice(self) -> GlobalSliceIndex {
+        self.slab_area.slice_idx.to_global(self.slab_idx)
     }
 }
 

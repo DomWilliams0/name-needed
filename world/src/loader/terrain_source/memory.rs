@@ -89,7 +89,7 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
             .get(&block.into())
             .and_then(|terrain| {
                 let block = BlockPosition::from(block);
-                terrain.find_ground_level(block.into(), None, None)
+                terrain.find_guessed_ground_level(block.into(), None, None)
             })
             .map(|block| block.z())
             .ok_or(TerrainSourceError::BlockOutOfBounds(block))

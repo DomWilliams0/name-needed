@@ -8,7 +8,7 @@ pub use path::{
     AreaPath, BlockPath, BlockPathNode, NavigationError, SearchGoal, WorldPath, WorldPathNode,
 };
 pub use search::ExploreResult;
-use unit::world::{ChunkLocation, SlabIndex};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabIndex};
 
 mod area_navigation;
 mod block_navigation;

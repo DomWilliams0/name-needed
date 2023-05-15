@@ -640,17 +640,17 @@ impl SlabVerticalSpace {
     }
 
     /// Only returns exact matches for the bottom of the vertical space
-    fn find_block_exact(&self, pos: SlabPosition) -> Option<FreeVerticalSpace> {
+    pub fn find_block_exact(&self, pos: SlabPosition) -> Option<FreeVerticalSpace> {
         self.blocks
             .binary_search_by_key(&pos, |x| x.pos())
             .ok()
             .map(|i| self.blocks[i].height())
     }
 
-    /// Searches downward for matching area
+    /// Searches downward for a block with vertical space above it
     pub fn find_slice(&self, pos: SlabPosition) -> Option<LocalSliceIndex> {
         let tgt_slice = pos.z().slice();
-        let min = tgt_slice.saturating_sub(ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        let min = LocalSliceIndex::bottom().slice_unsigned() as u8; // tgt_slice.saturating_sub(ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
         for z in (min..=tgt_slice).rev() {
             let b =
                 SlabPosition::new_unchecked(pos.x(), pos.y(), LocalSliceIndex::new_unchecked(z));
@@ -913,7 +913,7 @@ mod tests_vertical_space {
         let lo = WorldPosition::from((1, 0, -1));
         let get_area = |b: WorldPosition| {
             chunk
-                .find_area_for_block(b.into())
+                .find_area_for_block_with_height(b.into(), 0)
                 .unwrap_or_else(|| panic!("no area for block at {b}"))
         };
 
@@ -972,7 +972,10 @@ mod tests_vertical_space {
 
         let get_area = |z| {
             chunk
-                .find_area_for_block(BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::new(z)))
+                .find_area_for_block_with_height(
+                    BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::new(z)),
+                    0,
+                )
                 .unwrap_or_else(|| panic!("no area for block at z={z}"))
                 .1
         };
