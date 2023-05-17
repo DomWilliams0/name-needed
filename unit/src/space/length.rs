@@ -1,4 +1,5 @@
-use crate::world::BLOCKS_PER_METRE;
+use crate::space::view::ViewPoint;
+use crate::world::{WorldPoint, BLOCKS_PER_METRE, BLOCKS_SCALE};
 use misc::{derive_more::*, *};
 use std::fmt::{Display, Formatter};
 use std::ops::{Div, DivAssign};
@@ -29,8 +30,12 @@ impl Length3 {
         self.0[2]
     }
 
-    pub const fn xyz(self) -> [f32; 3] {
+    pub const fn xyz_meters(self) -> [f32; 3] {
         self.0
+    }
+
+    pub fn xyz_blocks(self) -> WorldPoint {
+        ViewPoint::new_unchecked(self.x(), self.y(), self.z()).into()
     }
 
     /// Does `other` fit into `self`

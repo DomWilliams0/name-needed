@@ -7,7 +7,7 @@ use misc::{NotNan, Point3, Vector2, Vector3};
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, SliceIndex, WorldPosition, BLOCKS_PER_METRE};
 
-/// A point anywhere in the world. All possible non-NaN and finite values are valid
+/// A point anywhere in the world, in block terms. All possible non-NaN and finite values are valid
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
 pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
 
