@@ -188,13 +188,13 @@ impl<G: GridImpl> std::ops::IndexMut<Range<usize>> for Grid<G> {
 impl<G: GridImpl> GridImplExt for G {
     /// The grid may be too big for the stack, build directly on the heap
     fn default_boxed() -> Box<Self> {
-        let vec = (0..G::FULL_SIZE)
+        let boxed = (0..G::FULL_SIZE)
             .map(|_| Default::default())
-            .collect::<Vec<G::Item>>();
+            .collect::<Box<[G::Item]>>();
 
         // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
         unsafe {
-            let raw_slice = Box::into_raw(vec.into_boxed_slice());
+            let raw_slice = Box::into_raw(boxed);
             Box::from_raw(raw_slice as *mut Self)
         }
     }

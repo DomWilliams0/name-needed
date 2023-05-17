@@ -1,3 +1,4 @@
+use std::iter::repeat_with;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use serde::{Deserialize, Serialize};
@@ -17,12 +18,7 @@ impl<T: Default> DynamicGrid<T> {
         let len = dims[0] * dims[1] * dims[2];
         assert_ne!(len, 0);
 
-        let data = {
-            let mut vec = Vec::with_capacity(len);
-            vec.resize_with(len, T::default);
-            vec.into_boxed_slice()
-        };
-
+        let data = repeat_with(T::default).take(len).collect();
         DynamicGrid { dims, data }
     }
 
