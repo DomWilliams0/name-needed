@@ -62,10 +62,6 @@ pub struct WeakSlabRef<C: WorldContext>(Weak<SlabGridImpl<C>>);
 #[derive(Default)]
 pub(crate) struct SlabInternalNavigability(Vec<(ChunkArea, BlockGraph)>);
 
-pub(crate) struct SlabInternal {
-    pub areas: Vec<SliceNavArea>,
-}
-
 pub trait DeepClone {
     fn deep_clone(&self) -> Self;
 }

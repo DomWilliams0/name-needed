@@ -20,7 +20,7 @@ pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 pub use occlusion::{BlockOcclusion, OcclusionFace};
-pub use ray::VoxelRay;
+pub use ray::{VoxelRay, VoxelRayOutput};
 
 pub mod block;
 mod chunk;

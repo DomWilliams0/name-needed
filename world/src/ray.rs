@@ -3,16 +3,48 @@ use crate::{BlockType, InnerWorldRef, SliceRange, WorldContext};
 use misc::cgmath::Array;
 use misc::cgmath::Vector3;
 use misc::num_traits::signum;
-use misc::{debug, InnerSpace, F};
+use misc::parking_lot::Mutex;
+use misc::{debug, lazy_static, InnerSpace, F};
+use std::cell::RefCell;
 use unit::space::view::ViewPoint;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, WorldPoint, WorldPosition, BLOCKS_PER_METRE,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition,
+    BLOCKS_PER_METRE,
 };
 
 #[derive(Debug, Clone)]
 pub struct VoxelRay {
     pos: ViewPoint,
     dir: Vector3<F>,
+}
+
+pub struct VoxelRayOutput {
+    pub ray: VoxelRay,
+    pub points: Vec<WorldPoint>,
+    pub blocks: Vec<(WorldPosition, bool)>,
+    pub result: Option<WorldPosition>,
+}
+
+impl VoxelRayOutput {
+    fn new(ray: &VoxelRay) -> Self {
+        Self {
+            ray: ray.clone(),
+            points: vec![],
+            blocks: vec![],
+            result: None,
+        }
+    }
+    fn on_point(&mut self, p: WorldPoint) {
+        self.points.push(p);
+    }
+
+    fn on_block(&mut self, p: WorldPosition, accepted: bool) {
+        self.blocks.push((p, accepted));
+    }
+
+    pub fn result(&self) -> Option<WorldPosition> {
+        self.result
+    }
 }
 
 impl VoxelRay {
@@ -36,15 +68,18 @@ impl VoxelRay {
         &self,
         world: &InnerWorldRef<C>,
         range: SliceRange,
-    ) -> Option<WorldPosition> {
-        self.find_first_with_callback(world, |_| {}, |pos| range.contains(pos.slice()))
+    ) -> VoxelRayOutput {
+        let mut output = VoxelRayOutput::new(self);
+        let res = self.dew_it(world, |pos| range.contains(pos.slice()), &mut output);
+        output.result = res;
+        output
     }
 
-    pub fn find_first_with_callback<C: WorldContext>(
+    fn dew_it<C: WorldContext>(
         &self,
         world: &InnerWorldRef<C>,
-        mut cb: impl FnMut(WorldPosition),
         mut filter: impl FnMut(WorldPosition) -> bool,
+        output: &mut VoxelRayOutput,
     ) -> Option<WorldPosition> {
         if self.dir.magnitude2() < 0.9 {
             misc::warn!("invalid raycast direction {:?}", self.dir);
@@ -70,15 +105,19 @@ impl VoxelRay {
 
         let t_delta = Vector3::new(step[0] / dir.x, step[1] / dir.y, step[2] / dir.z);
 
-        let mut last_block = None;
+        let mut last_block = WorldPosition::new(i32::MIN, i32::MIN, GlobalSliceIndex::bottom());
         let mut has_seen_a_block = false;
         let mut chunk_iter = ContiguousChunkIterator::new(world);
         loop {
-            let block_pos =
-                WorldPoint::new_unchecked(pos.x as f32, pos.y as f32, pos.z as f32).floor();
-            if filter(block_pos) {
+            let point = WorldPoint::new_unchecked(pos.x as f32, pos.y as f32, pos.z as f32);
+            output.on_point(point);
+
+            let block_pos = point.floor();
+            let filtered = filter(block_pos);
+            output.on_block(block_pos, filtered);
+            if filtered {
                 // TODO filter out invisible here
-                if Some(block_pos) != last_block {
+                if block_pos != last_block {
                     let block = chunk_iter
                         .next(ChunkLocation::from(block_pos))
                         .and_then(|chunk| chunk.terrain().get_block(block_pos.into()));
@@ -96,8 +135,7 @@ impl VoxelRay {
                         break;
                     }
 
-                    last_block = Some(block_pos);
-                    cb(block_pos);
+                    last_block = block_pos;
                 }
             }
 
