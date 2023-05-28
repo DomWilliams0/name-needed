@@ -165,10 +165,12 @@ impl<C: WorldContext> Default for Block<C> {
 }
 
 impl BlockOpacity {
+    #[inline]
     pub fn solid(self) -> bool {
         matches!(self, Self::Solid)
     }
 
+    #[inline]
     pub fn transparent(self) -> bool {
         matches!(self, Self::Transparent)
     }

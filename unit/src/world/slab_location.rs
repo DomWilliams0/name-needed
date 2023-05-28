@@ -1,4 +1,4 @@
-use crate::world::{ChunkLocation, SlabIndex};
+use crate::world::{ChunkLocation, SlabIndex, WorldPosition};
 use misc::derive_more::{From, Into};
 use misc::*;
 use std::fmt::{Debug, Display, Formatter};
@@ -101,6 +101,15 @@ pub fn all_slabs_in_range(
     }
 
     (all_slabs, full_count)
+}
+
+impl From<WorldPosition> for SlabLocation {
+    fn from(pos: WorldPosition) -> Self {
+        Self {
+            slab: pos.slice().slab_index(),
+            chunk: pos.into(),
+        }
+    }
 }
 
 slog_value_display!(SlabLocation);

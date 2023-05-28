@@ -56,53 +56,28 @@ pub enum OcclusionUpdateType<'a, C: WorldContext> {
 
 /// Holds opacity of 8 surrounding neighbours
 /// TODO bitset of Opacities will be much smaller, 2 bits each
-#[derive(Deref, DerefMut, Default, Copy, Clone)]
-pub struct NeighbourOpacity([OcclusionOpacity; NeighbourOffset::COUNT]);
+#[derive(Deref, DerefMut, Copy, Clone)]
+pub struct NeighbourOpacity([BlockOpacity; NeighbourOffset::COUNT]);
 
 impl NeighbourOpacity {
     pub const fn default_const() -> Self {
-        Self([OcclusionOpacity::Unknown; NeighbourOffset::COUNT])
-    }
-
-    pub const fn unknown() -> Self {
-        Self([OcclusionOpacity::Unknown; NeighbourOffset::COUNT])
+        Self::all_transparent()
     }
 
     pub fn is_all_transparent(&self) -> bool {
-        self.0.iter().all(|o| !o.solid())
+        self.0.iter().all(|o| o.transparent())
     }
 
     pub fn is_all_solid(&self) -> bool {
         self.0.iter().all(|o| o.solid())
     }
 
-    pub fn is_all_unknown(&self) -> bool {
-        self.0
-            .iter()
-            .all(|o| matches!(o, OcclusionOpacity::Unknown))
+    pub const fn all_solid() -> Self {
+        Self([BlockOpacity::Solid; NeighbourOffset::COUNT])
     }
 
-    /// Reduce to `[0 = transparent/unknown, 1 = solid]`
-    fn opacities(&self) -> [u8; NeighbourOffset::COUNT] {
-        // TODO return a transmuted u16 when bitset is used, much cheaper to create and compare
-        [
-            self.0[0].as_u8(),
-            self.0[1].as_u8(),
-            self.0[2].as_u8(),
-            self.0[3].as_u8(),
-            self.0[4].as_u8(),
-            self.0[5].as_u8(),
-            self.0[6].as_u8(),
-            self.0[7].as_u8(),
-        ]
-    }
-
-    pub fn all_solid() -> Self {
-        Self([OcclusionOpacity::Known(BlockOpacity::Solid); NeighbourOffset::COUNT])
-    }
-
-    pub fn all_transparent() -> Self {
-        Self([OcclusionOpacity::Known(BlockOpacity::Transparent); NeighbourOffset::COUNT])
+    pub const fn all_transparent() -> Self {
+        Self([BlockOpacity::Transparent; NeighbourOffset::COUNT])
     }
 
     /// Top face only
@@ -314,19 +289,21 @@ impl NeighbourOpacity {
     }
 }
 
+impl Default for NeighbourOpacity {
+    fn default() -> Self {
+        NeighbourOpacity::default_const()
+    }
+}
+
 impl Debug for NeighbourOpacity {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO only for debugging
-        let known = self.0.iter().enumerate().filter_map(|(i, o)| match o {
-            OcclusionOpacity::Unknown => None,
-            OcclusionOpacity::Known(o) => {
-                // safety: limited to NeighbourOffset::COUNT
-                let n = unsafe { std::mem::transmute::<_, NeighbourOffset>(i as u8) };
-                Some((n, *o))
-            }
+        let faces = self.0.iter().enumerate().map(|(i, o)| {
+            // safety: limited to NeighbourOffset::COUNT
+            let n = unsafe { std::mem::transmute::<_, NeighbourOffset>(i as u8) };
+            Some((n, *o))
         });
 
-        f.debug_list().entries(known).finish()
+        f.debug_list().entries(faces).finish()
     }
 }
 
@@ -339,44 +316,6 @@ impl Debug for BlockOcclusion {
             .filter(|(f, n)| !(n.is_all_transparent() && solid_only));
 
         f.debug_map().entries(entries).finish()
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum OcclusionOpacity {
-    /// Across a chunk boundary, treated as transparent
-    Unknown,
-    Known(BlockOpacity),
-}
-
-impl Default for OcclusionOpacity {
-    fn default() -> Self {
-        OcclusionOpacity::Unknown
-    }
-}
-
-impl OcclusionOpacity {
-    pub fn solid(self) -> bool {
-        matches!(self, OcclusionOpacity::Known(BlockOpacity::Solid))
-    }
-
-    pub fn transparent(self) -> bool {
-        !self.solid()
-    }
-
-    fn as_u8(self) -> u8 {
-        if self.solid() {
-            1
-        } else {
-            0
-        }
-    }
-
-    fn update(self, new: Self) -> Self {
-        match (self, new) {
-            (OcclusionOpacity::Unknown, known) | (known, OcclusionOpacity::Unknown) => known,
-            (_, new) => new,
-        }
     }
 }
 
@@ -466,9 +405,6 @@ pub struct BlockOcclusion {
     neighbours: [NeighbourOpacity; OcclusionFace::COUNT],
 }
 
-#[derive(Default, Deref, Debug, Copy, Clone)]
-pub struct BlockOcclusionUpdate([Option<NeighbourOpacity>; OcclusionFace::COUNT]);
-
 impl BlockOcclusion {
     // TODO pub(crate)
     pub fn resolve_vertices(&self, face: OcclusionFace) -> ([VertexOcclusion; 4], OcclusionFlip) {
@@ -481,7 +417,7 @@ impl BlockOcclusion {
                 0
             } else {
                 let corner = neighbours[corner_offset as usize];
-                3 - (s1.as_u8() + s2.as_u8() + corner.as_u8())
+                3 - (s1 as u8 + s2 as u8 + corner as u8)
             };
 
             // Safety: value is 0 - 3
@@ -505,26 +441,13 @@ impl BlockOcclusion {
 
     pub const fn all_transparent() -> Self {
         Self {
-            neighbours: [NeighbourOpacity::unknown(); OcclusionFace::COUNT],
+            neighbours: [NeighbourOpacity::all_transparent(); OcclusionFace::COUNT],
         }
     }
 
     pub const fn default_const() -> Self {
         Self {
             neighbours: [NeighbourOpacity::default_const(); OcclusionFace::COUNT],
-        }
-    }
-
-    pub fn update_from_neighbour_opacities(&mut self, neighbours: &BlockOcclusionUpdate) {
-        for (a, b) in self
-            .neighbours
-            .iter_mut()
-            .zip(neighbours.iter())
-            .filter_map(|(a, b)| b.map(|b| (a, b)))
-        {
-            for (a, b) in a.iter_mut().zip(b.iter()) {
-                *a = a.update(*b);
-            }
         }
     }
 
@@ -544,7 +467,14 @@ impl BlockOcclusion {
         self.neighbours
             .iter()
             .zip(OcclusionFace::ORDINALS.iter())
-            .filter_map(|(n, &face)| if !n.is_all_solid() { Some(face) } else { None })
+            .filter_map(|(n, &face)| (!n.is_all_solid()).then_some(face))
+    }
+
+    pub fn iter_faces(&self) -> impl Iterator<Item = (NeighbourOpacity, OcclusionFace)> + '_ {
+        self.neighbours
+            .iter()
+            .zip(OcclusionFace::ORDINALS.iter())
+            .map(|(n, f)| (*n, *f))
     }
 
     #[cfg(test)]
@@ -554,38 +484,11 @@ impl BlockOcclusion {
     }
 }
 
-impl BlockOcclusionUpdate {
-    pub fn with_single_face(face: OcclusionFace, opacities: NeighbourOpacity) -> Self {
-        let mut occ = [None; OcclusionFace::COUNT];
-        occ[face as usize] = Some(opacities);
-        Self(occ)
-    }
-
-    pub fn set_face(&mut self, face: OcclusionFace, opacity: NeighbourOpacity) {
-        self.0[face as usize] = Some(opacity);
-    }
-}
-
 impl Default for BlockOcclusion {
     fn default() -> Self {
         Self {
-            neighbours: [NeighbourOpacity::unknown(); OcclusionFace::COUNT],
+            neighbours: [NeighbourOpacity::all_transparent(); OcclusionFace::COUNT],
         }
-    }
-}
-
-impl PartialEq<BlockOcclusionUpdate> for BlockOcclusion {
-    /// Only compares Some faces against self's faces
-    fn eq(&self, opacities: &BlockOcclusionUpdate) -> bool {
-        for (i, ur_opacity) in opacities.iter().enumerate() {
-            if let Some(ur_opacity) = ur_opacity {
-                let my_opacity = self.neighbours[i];
-                if my_opacity.opacities() != ur_opacity.opacities() {
-                    return false;
-                }
-            }
-        }
-        true
     }
 }
 
@@ -614,30 +517,6 @@ mod tests {
             NeighbourOffset::between_aligned(ChunkLocation(-2, 5), ChunkLocation(33, 5)),
             NeighbourOffset::East
         ));
-    }
-
-    #[test]
-    fn after_block_removed() {
-        let neighbour_occluded = {
-            let mut o = NeighbourOpacity::default();
-            o.0[0] = OcclusionOpacity::Known(BlockOpacity::Solid);
-            o
-        };
-        let neighbour_not_occluded = {
-            let mut o = NeighbourOpacity::default();
-            o.0[0] = OcclusionOpacity::Known(BlockOpacity::Transparent);
-            o
-        };
-
-        let mut occlusion = BlockOcclusion::default();
-        occlusion.set_face(OcclusionFace::Top, neighbour_occluded);
-        assert_eq!(occlusion.top_corner(0), VertexOcclusion::Mildly);
-
-        occlusion.update_from_neighbour_opacities(&BlockOcclusionUpdate::with_single_face(
-            OcclusionFace::Top,
-            neighbour_not_occluded,
-        ));
-        assert_eq!(occlusion.top_corner(0), VertexOcclusion::NotAtAll);
     }
 }
 

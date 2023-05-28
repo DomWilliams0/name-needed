@@ -28,7 +28,8 @@ use crate::navigation::{
 use crate::navigationv2::world_graph::WorldGraph;
 use crate::navigationv2::{as_border_area, ChunkArea, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
-use crate::{BlockOcclusion, BlockType, Slab, SliceRange, WorldAreaV2, WorldRef};
+use crate::occlusion::NeighbourOpacity;
+use crate::{BlockOcclusion, BlockType, OcclusionFace, Slab, SliceRange, WorldAreaV2, WorldRef};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
@@ -587,12 +588,48 @@ impl<C: WorldContext> World<C> {
             .and_then(|chunk| chunk.terrain().get_block(pos.into()))
     }
 
-    pub fn block_occlusion<P: Into<WorldPosition>>(&self, pos: P) -> BlockOcclusion {
+    /// Probably incomplete, only useful for lighting
+    pub fn block_occlusion_lazy<P: Into<WorldPosition>>(&self, pos: P) -> BlockOcclusion {
         let pos = pos.into();
         self.find_chunk_with_pos(ChunkLocation::from(pos))
             .and_then(|chunk| chunk.terrain().slab_data(pos.2.slab_index()))
             .and_then(|slab| slab.occlusion.get(pos.into()).copied())
             .unwrap_or_default()
+    }
+
+    /// Checks against world to find visible faces
+    pub fn block_occlusion_complete(&self, pos: impl Into<WorldPosition>) -> BlockOcclusion {
+        let pos = pos.into();
+        let mut occ = self.block_occlusion_lazy(pos);
+
+        for (n, face) in occ.clone().iter_faces() {
+            if n.is_all_solid() {
+                continue; // already initialised
+            }
+
+            //     // should use RelativeSlabs from occlusion for efficiency
+            //     let (slab_dx, pos_in_slab) = slice_block.try_add_intrusive(face.xy_delta());
+            //     let new_slab = SlabLocation {
+            //         chunk: orig_slab.chunk + (slab_dx[0], slab_dx[1]),
+            //         ..orig_slab
+            //     };
+
+            let n_pos = if let OcclusionFace::Top = face {
+                pos.above()
+            } else {
+                let (dx, dy) = face.xy_delta();
+                pos + (dx as i32, dy as i32, 0)
+            };
+
+            // TODO this can definitely be more efficient
+            if let Some(b) = self.block(n_pos) {
+                if !b.block_type().is_air() {
+                    occ.set_face(face, NeighbourOpacity::all_solid());
+                }
+            }
+        }
+
+        occ
     }
 
     /// Mutates terrain silently to the loader, ensure the loader knows about this
@@ -1547,7 +1584,8 @@ mod tests {
                 DummyBlockType::Air
             );
             assert_eq!(
-                w.block_occlusion((CHUNK_SIZE.as_i32(), 5, 4)).top_corner(3), // occluded by other chunk
+                w.block_occlusion_lazy((CHUNK_SIZE.as_i32(), 5, 4))
+                    .top_corner(3), // occluded by other chunk
                 VertexOcclusion::Mildly
             );
         }
@@ -1575,7 +1613,8 @@ mod tests {
                 DummyBlockType::Stone
             );
             assert_eq!(
-                w.block_occlusion((CHUNK_SIZE.as_i32(), 5, 4)).top_corner(3), // no longer occluded by other chunk
+                w.block_occlusion_lazy((CHUNK_SIZE.as_i32(), 5, 4))
+                    .top_corner(3), // no longer occluded by other chunk
                 VertexOcclusion::NotAtAll
             );
         }

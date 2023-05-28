@@ -78,9 +78,7 @@ mod load_task {
     };
     use crate::chunk::slice::Slice;
     use crate::chunk::{SparseGrid, SparseGridExtension};
-    use crate::occlusion::{
-        NeighbourOpacity, OcclusionOpacity, OcclusionUpdateType, RelativeSlabs,
-    };
+    use crate::occlusion::{NeighbourOpacity, OcclusionUpdateType, RelativeSlabs};
     use crate::world::get_or_wait_for_slab;
     use crate::{flatten_coords, iter_slice_xy, BlockOcclusion, OcclusionFace};
     use futures::pin_mut;
@@ -732,7 +730,7 @@ mod load_task {
                     NeighbourOpacity::with_slice_above_other_slabs_possible(
                         pos,
                         &mut update_info,
-                        |i, op| top_occlusion[i] = OcclusionOpacity::Known(op),
+                        |i, op| top_occlusion[i] = op,
                     )
                     .now_or_never()
                     .expect("future should not await for internal occlusion");
@@ -746,7 +744,7 @@ mod load_task {
                         pos,
                         &mut update_info,
                         face,
-                        |i, op| neighbour_opacity[i] = OcclusionOpacity::Known(op),
+                        |i, op| neighbour_opacity[i] = op,
                     )
                     .now_or_never()
                     .expect("future should not await for internal occlusion");
@@ -917,7 +915,7 @@ mod load_task {
                     for (face, changes) in &opacities.group_by(|tup| tup.1) {
                         let mut face_occlusion = occlusion.get_face_mut(face);
                         for (_, _, i, op) in changes {
-                            face_occlusion[i as usize] = OcclusionOpacity::Known(op);
+                            face_occlusion[i as usize] = op;
                         }
                     }
                 }

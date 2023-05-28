@@ -29,7 +29,7 @@ use crate::loader::SlabVerticalSpace;
 use crate::navigation::{ChunkArea, SlabAreaIndex};
 use crate::navigationv2::{is_border, is_bottom_area, is_top_area, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
-use crate::occlusion::{BlockOcclusionUpdate, NeighbourOpacity};
+use crate::occlusion::NeighbourOpacity;
 use crate::{BlockOcclusion, BlockType, EdgeCost, OcclusionFace, SliceRange, WorldContext};
 
 #[derive(Debug, Copy, Clone)]
@@ -262,6 +262,7 @@ pub struct SlabData<C: WorldContext> {
 
     pub(crate) neighbour_edge_hashes: [NeighbourAreaHash; SlabNeighbour::N],
 
+    /// Lazily initialised from vertical space, so incomplete.
     pub(crate) occlusion: SparseGrid<BlockOcclusion>,
 }
 
@@ -579,17 +580,6 @@ impl<C: WorldContext> SlabStorage<C> {
         Self {
             slabs: self.slabs.deep_clone(),
         }
-    }
-
-    /// Returns iter of slabs affected, probably duplicated but in order
-    #[deprecated]
-    pub fn apply_occlusion_updates<'a>(
-        &'a mut self,
-        updates: &'a [(BlockPosition, BlockOcclusionUpdate)],
-    ) -> impl Iterator<Item = SlabIndex> + 'a {
-        updates
-            .iter()
-            .filter_map(move |&(block_pos, new_opacities)| unreachable!())
     }
 
     /// Searches downwards
