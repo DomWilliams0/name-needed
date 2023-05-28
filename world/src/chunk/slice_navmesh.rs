@@ -688,7 +688,7 @@ mod tests_vertical_space {
         DummyBlockType, DummyWorldContext,
     };
     use crate::loader::WorldTerrainUpdate;
-    use crate::navigationv2::SlabNavEdge;
+    use crate::navigationv2::{NavRequirement, SlabNavEdge};
     use crate::ChunkBuilder;
     use std::iter::once;
     use std::thread::sleep;
@@ -913,7 +913,7 @@ mod tests_vertical_space {
         let lo = WorldPosition::from((1, 0, -1));
         let get_area = |b: WorldPosition| {
             chunk
-                .find_area_for_block_with_height(b.into(), 0)
+                .find_area_for_block_with_height(b.into(), NavRequirement::ZERO)
                 .unwrap_or_else(|| panic!("no area for block at {b}"))
         };
 
@@ -926,15 +926,18 @@ mod tests_vertical_space {
         };
 
         // should protrude into slab above
-        assert_eq!(get_area((0, 0, -1).into()).1.height, 4);
+        assert_eq!(
+            get_area((0, 0, -1).into()).1.height,
+            ABSOLUTE_MAX_FREE_VERTICAL_SPACE
+        );
         assert_eq!(get_vs((0, 0, -1).into()), 1); // but vs is not updated from above
 
         // should both have areas
         let lo_area = get_area(lo);
         let hi_area = get_area(hi);
 
-        assert_eq!(lo_area.1.height, 4);
-        assert_eq!(hi_area.1.height, 4);
+        assert_eq!(lo_area.1.height, ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
+        assert_eq!(hi_area.1.height, ABSOLUTE_MAX_FREE_VERTICAL_SPACE);
 
         let g = w.nav_graph();
         let edges = g.iter_inter_slab_edges().collect_vec();
@@ -974,7 +977,7 @@ mod tests_vertical_space {
             chunk
                 .find_area_for_block_with_height(
                     BlockPosition::new_unchecked(5, 5, GlobalSliceIndex::new(z)),
-                    0,
+                    NavRequirement::ZERO,
                 )
                 .unwrap_or_else(|| panic!("no area for block at z={z}"))
                 .1

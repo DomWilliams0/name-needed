@@ -8,11 +8,11 @@ use tokio::sync::broadcast;
 
 use misc::derive_more::Constructor;
 use misc::*;
-use unit::world::CHUNK_SIZE;
 use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
-    SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
+    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
+    SlabLocation, SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
 };
+use unit::world::{WorldPoint, CHUNK_SIZE};
 
 use crate::block::{Block, BlockDurability};
 use crate::chunk::affected_neighbours::OcclusionAffectedNeighbourSlabs;
@@ -26,7 +26,7 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
-use crate::navigationv2::{as_border_area, ChunkArea, SlabArea};
+use crate::navigationv2::{as_border_area, ChunkArea, NavRequirement, SlabArea};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::occlusion::NeighbourOpacity;
 use crate::{BlockOcclusion, BlockType, OcclusionFace, Slab, SliceRange, WorldAreaV2, WorldRef};
@@ -407,13 +407,13 @@ impl<C: WorldContext> World<C> {
     pub fn find_area_for_block(
         &self,
         block: WorldPosition,
-        required_height: u8,
+        requirement: NavRequirement,
     ) -> Option<crate::navigationv2::world_graph::WorldArea> {
         let chunk_loc = ChunkLocation::from(block);
         let chunk = self.find_chunk_with_pos(chunk_loc)?;
 
         chunk
-            .find_area_for_block_with_height(block.into(), required_height)
+            .find_area_for_block_with_height(block.into(), requirement)
             .map(
                 |(slab_area, _)| crate::navigationv2::world_graph::WorldArea {
                     chunk_idx: chunk_loc,
@@ -655,12 +655,12 @@ impl<C: WorldContext> World<C> {
         &self.area_graph
     }
 
-    pub fn choose_random_accessible_block(
+    pub fn choose_random_accessible_point(
         &self,
         max_attempts: usize,
-        required_height: u8,
+        requirement: NavRequirement,
         random: &mut dyn RngCore,
-    ) -> Option<WorldPosition> {
+    ) -> Option<WorldPoint> {
         (0..max_attempts).find_map(|_| {
             // choose from all global chunks
             let chunk = self.all_chunks().choose(random).unwrap(); // never empty
@@ -668,18 +668,30 @@ impl<C: WorldContext> World<C> {
             // choose random area
             let (a, ai) = chunk
                 .iter_areas_with_info()
-                .filter(|(a, ai)| ai.height >= required_height)
+                .filter(|(a, ai)| ai.fits_requirement(requirement))
                 .choose(random)?;
 
-            // take random block in this area
-            let x = random.gen_range(ai.range.0 .0, ai.range.1 .0 + 1);
-            let y = random.gen_range(ai.range.0 .1, ai.range.1 .1 + 1);
-            Some(
-                SliceBlock::new_unchecked(x, y)
-                    .to_block_position(a.slice())
-                    .to_world_position(chunk.pos()),
-            )
+            // take random point in this area
+            let (x, y) = ai.random_point(requirement.max_xy, random);
+
+            // TODO new BlockPoint for BlockPosition but floats. this conversion is gross
+            let block_pos =
+                BlockPosition::new_unchecked(x as BlockCoord, y as BlockCoord, a.slice());
+            let world_pos = block_pos.to_world_position(chunk.pos()).floored();
+
+            let point = world_pos + (x.fract(), y.fract(), 0.0);
+            Some(point)
         })
+    }
+
+    pub fn choose_random_accessible_block(
+        &self,
+        max_attempts: usize,
+        requirement: NavRequirement,
+        random: &mut dyn RngCore,
+    ) -> Option<WorldPosition> {
+        self.choose_random_accessible_point(max_attempts, requirement, random)
+            .map(|p| p.floor())
     }
 
     /// Finds the area for the specific block (air)
@@ -1265,6 +1277,7 @@ mod tests {
     use crate::helpers::{DummyBlockType, DummyWorldContext};
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::navigation::EdgeCost;
+    use crate::navigationv2::NavRequirement;
     use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
     use crate::presets::from_preset;
     use crate::world::helpers::{
@@ -1462,7 +1475,16 @@ mod tests {
         let src = WorldPoint::new_unchecked(8.5, 25.5, 302.0);
         let dst = WorldPoint::new_unchecked(-6.5, 24.5, 301.0);
 
-        let _path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        let _path = World::find_path_now(
+            world.clone(),
+            src,
+            dst,
+            NavRequirement {
+                height: 2,
+                max_xy: 1,
+            },
+        )
+        .expect("path should succeed");
     }
 
     #[test]
@@ -1474,7 +1496,16 @@ mod tests {
         let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
         let dst = WorldPoint::new_unchecked(4.0, 4.0, 3.0);
 
-        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        let path = World::find_path_now(
+            world.clone(),
+            src,
+            dst,
+            NavRequirement {
+                height: 2,
+                max_xy: 1,
+            },
+        )
+        .expect("path should succeed");
         assert_eq!(path.iter_areas().count(), 0);
     }
 
@@ -1496,7 +1527,16 @@ mod tests {
         let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
         let dst = WorldPoint::new_unchecked(5.0, 2.0, 3.0);
 
-        let path = World::find_path_now(world.clone(), src, dst, 2).expect("path should succeed");
+        let path = World::find_path_now(
+            world.clone(),
+            src,
+            dst,
+            NavRequirement {
+                height: 2,
+                max_xy: 1,
+            },
+        )
+        .expect("path should succeed");
         assert_ne!(path.iter_areas().count(), 0);
         assert_eq!(path.route().count(), 1);
     }
@@ -1677,7 +1717,7 @@ mod tests {
                 .map(|_| {
                     let w = world.borrow();
                     let pos = w
-                        .choose_random_accessible_block(1000, 1, &mut randy)
+                        .choose_random_accessible_block(1000, NavRequirement::MIN, &mut randy)
                         .expect("ran out of walkable blocks");
                     let blocktype = if randy.gen_bool(0.5) {
                         DummyBlockType::Stone

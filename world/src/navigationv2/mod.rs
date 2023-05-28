@@ -487,6 +487,31 @@ impl ChunkArea {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct NavRequirement {
+    pub height: u8,
+    pub max_xy: u8,
+}
+
+impl NavRequirement {
+    pub const MIN: Self = Self {
+        height: 1,
+        max_xy: 1,
+    };
+    pub const ZERO: Self = Self {
+        height: 0,
+        max_xy: 0,
+    };
+
+    /// Input is in blocks!
+    pub fn with_dims(block_size: (f32, f32, f32)) -> Self {
+        Self {
+            height: (block_size.2.ceil() as u8).min(ABSOLUTE_MAX_FREE_VERTICAL_SPACE),
+            max_xy: block_size.0.max(block_size.1).ceil() as u8,
+        }
+    }
+}
+
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {

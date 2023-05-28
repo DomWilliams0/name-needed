@@ -20,7 +20,9 @@ use crate::navigation::{BlockGraph, ChunkArea};
 
 use crate::chunk::affected_neighbours::OcclusionAffectedNeighbourSlabs;
 use crate::occlusion::{NeighbourOpacity, OcclusionFace};
-use crate::{flatten_coords, BlockType, WorldContext, SLICE_SIZE};
+use crate::{
+    flatten_coords, BlockType, WorldContext, ABSOLUTE_MAX_FREE_VERTICAL_SPACE, SLICE_SIZE,
+};
 use grid::{Grid, GridImpl, GridImplExt};
 use std::sync::{Arc, Weak};
 
@@ -292,7 +294,7 @@ impl<C: WorldContext> Slab<C> {
         above: Option<&Arc<SlabVerticalSpace>>,
         out: &mut Vec<SliceNavArea>,
     ) {
-        let maximum: u8 = 4; // TODO pass through
+        let maximum = ABSOLUTE_MAX_FREE_VERTICAL_SPACE; // TODO pass through
         let mut cfg = NavmeshCfg {
             vec: out,
             cur_slice: LocalSliceIndex::second_from_bottom(), // first slice is skipped
@@ -350,7 +352,7 @@ impl<C: WorldContext> Slab<C> {
         below: &SlabVerticalSpace,
         out: &mut Vec<SliceNavArea>,
     ) {
-        let maximum = 4; // TODO pass through
+        let maximum = ABSOLUTE_MAX_FREE_VERTICAL_SPACE; // TODO pass through
 
         // setup input (uncapped)
         let mut input = [0u8; SLICE_SIZE];

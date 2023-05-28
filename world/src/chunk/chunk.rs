@@ -12,7 +12,7 @@ use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIn
 use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage, SlabVersion};
 use crate::chunk::{SlabData, SparseGrid};
 use crate::navigation::{BlockGraph, SlabAreaIndex};
-use crate::navigationv2::{filter_border_areas, ChunkArea, SlabArea, SlabNavGraph};
+use crate::navigationv2::{filter_border_areas, ChunkArea, NavRequirement, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldContext};
@@ -421,7 +421,7 @@ impl<C: WorldContext> Chunk<C> {
     pub fn find_area_for_block_with_height(
         &self,
         block: BlockPosition,
-        required_height: u8,
+        requirement: NavRequirement,
     ) -> Option<(SlabArea, AreaInfo)> {
         let slab_idx = SlabIndex::from(block.z());
         let slab = self.slabs.slab_data(slab_idx)?;
@@ -435,7 +435,7 @@ impl<C: WorldContext> Chunk<C> {
                 let info = self
                     .area_info(slab_idx, a)
                     .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
-                if info.height >= required_height && info.contains(slice_block) {
+                if info.fits_requirement(requirement) && info.contains(slice_block) {
                     return Some((a, info));
                 }
             }
@@ -472,6 +472,24 @@ impl AreaInfo {
             self.range.1 .0 - self.range.0 .0,
             self.range.1 .1 - self.range.0 .1,
         )
+    }
+
+    pub fn random_point(&self, max_xy: u8, random: &mut dyn RngCore) -> (f32, f32) {
+        debug_assert!(self.fits_xy(max_xy));
+        let ((xmin, ymin), (xmax, ymax)) = self.range;
+        let half_width = max_xy as f32 * 0.5;
+        (
+            random.gen_range(xmin as f32 + half_width, xmax as f32 - half_width + 1.0) - half_width,
+            random.gen_range(ymin as f32 + half_width, ymax as f32 - half_width + 1.0) - half_width,
+        )
+    }
+    pub fn fits_xy(&self, max_xy: u8) -> bool {
+        let (x, y) = self.size();
+        max_xy <= x.min(y)
+    }
+
+    pub fn fits_requirement(&self, req: NavRequirement) -> bool {
+        self.height >= req.height && self.fits_xy(req.max_xy)
     }
 
     fn pos_to_world(

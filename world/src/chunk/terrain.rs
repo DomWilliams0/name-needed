@@ -715,6 +715,7 @@ mod tests {
     use crate::chunk::ChunkBuilder;
     use crate::helpers::{loader_from_chunks_blocking, DummyBlockType};
     use crate::loader::WorldTerrainUpdate;
+    use crate::navigationv2::NavRequirement;
     use crate::occlusion::{OcclusionFace, VertexOcclusion};
     use crate::world::helpers::{
         apply_updates, load_single_chunk, world_from_chunks_blocking, DummyWorldContext,
@@ -1326,7 +1327,10 @@ mod tests {
             chunk
                 .find_area_for_block_with_height(
                     BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
-                    3,
+                    NavRequirement {
+                        height: 3,
+                        max_xy: 1,
+                    },
                 )
                 .map(|tup| tup.0)
         };
@@ -1344,7 +1348,10 @@ mod tests {
         assert_eq!(
             chunk.find_area_for_block_with_height(
                 BlockPosition::new(2, 2, GlobalSliceIndex::new(3)).unwrap(),
-                4
+                NavRequirement {
+                    height: 4,
+                    max_xy: 1,
+                }
             ),
             None
         ); // too tall

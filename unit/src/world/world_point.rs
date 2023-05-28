@@ -120,6 +120,11 @@ impl WorldPoint {
     }
 
     #[inline]
+    pub fn xy(&self) -> (f32, f32) {
+        (self.x(), self.y())
+    }
+
+    #[inline]
     pub fn x(&self) -> f32 {
         self.0.into_inner()
     }

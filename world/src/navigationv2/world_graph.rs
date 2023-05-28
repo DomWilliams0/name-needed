@@ -25,7 +25,7 @@ use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndexAllocator;
 use crate::chunk::SlabAvailability;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
-use crate::navigationv2::{ChunkArea, SlabArea, SlabNavEdge, SlabNavGraph};
+use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::world::WaitResult;
 use crate::{World, WorldContext, WorldRef};
 
@@ -178,11 +178,11 @@ impl WorldArea {
 
 #[derive(Debug, Clone, Error)]
 pub enum SearchError {
-    #[error("Source block {0} is not accessible for height {1}")]
-    SourceNotWalkable(WorldPosition, u8),
+    #[error("Source block {0} is not accessible for {1:?}")]
+    SourceNotWalkable(WorldPosition, NavRequirement),
 
-    #[error("Destination block {0} is not accessible for height {1}")]
-    DestinationNotWalkable(WorldPosition, u8),
+    #[error("Destination block {0} is not accessible for {1:?}")]
+    DestinationNotWalkable(WorldPosition, NavRequirement),
 
     #[error("{0} in world graph is not in the graph")]
     InvalidArea(WorldArea),
@@ -296,7 +296,7 @@ impl<C: WorldContext> World<C> {
         self_: WorldRef<C>,
         from: WorldPoint,
         to: WorldPoint,
-        required_height: u8,
+        requirement: NavRequirement,
     ) -> SearchResultFuture {
         let from_pos = from.floor();
         let to_pos = to.floor();
@@ -305,7 +305,7 @@ impl<C: WorldContext> World<C> {
             let world_ref = self_.clone();
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
-                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "height" => required_height);
+                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement);
                 let slabs_to_wait_for;
                 let mut listener;
                 {
@@ -314,7 +314,7 @@ impl<C: WorldContext> World<C> {
                     // start listening for load notifications now, so all loads during search are captured too
                     listener = world.load_notifications().start_listening();
 
-                    slabs_to_wait_for = match world.find_abortable_path(from_pos, to_pos, required_height) {
+                    slabs_to_wait_for = match world.find_abortable_path(from_pos, to_pos, requirement) {
                         Ok(Either::Left((path, dst))) => return SearchResult::Success(Path {
                             areas: path,
                             source: from,
@@ -347,17 +347,17 @@ impl<C: WorldContext> World<C> {
         &self,
         from: WorldPosition,
         to: WorldPosition,
-        required_height: u8,
+        requirement: NavRequirement,
     ) -> Result<Either<(PathNodes, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError> {
         let world_graph = self.nav_graph();
 
         // resolve positions to areas
         let src = self
-            .find_area_for_block(from, required_height)
-            .ok_or(SearchError::SourceNotWalkable(from, required_height))?;
+            .find_area_for_block(from, requirement)
+            .ok_or(SearchError::SourceNotWalkable(from, requirement))?;
         let dst = self
-            .find_area_for_block(to, required_height)
-            .ok_or(SearchError::DestinationNotWalkable(from, required_height))?;
+            .find_area_for_block(to, requirement)
+            .ok_or(SearchError::DestinationNotWalkable(from, requirement))?;
 
         trace!("path areas"; "src" => %src, "dst" => %dst);
 
@@ -520,10 +520,10 @@ impl<C: WorldContext> World<C> {
         self_: WorldRef<C>,
         from: WorldPoint,
         to: WorldPoint,
-        required_height: u8,
+        requirement: NavRequirement,
     ) -> Result<Path, SearchError> {
         let h = self_.nav_runtime();
-        let fut = Self::find_path_async(self_, from, to, required_height);
+        let fut = Self::find_path_async(self_, from, to, requirement);
 
         h.block_on(async { timeout(Duration::from_secs_f32(0.5), fut.0).await })
             .expect("path finding timed out")
