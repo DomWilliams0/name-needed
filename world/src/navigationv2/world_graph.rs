@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
@@ -280,10 +281,10 @@ impl<C: WorldContext> World<C> {
         fut: SearchResultFuture,
     ) -> Result<Result<Path, SearchError>, SearchResultFuture> {
         if fut.0.is_finished() {
-            Ok(self
-                .nav_graph()
-                .pathfinding_runtime
-                .block_on(fut.0)
+            Ok(fut
+                .0
+                .now_or_never()
+                .expect("future is apparently finished")
                 .expect("path finding panicked")
                 .into_result())
         } else {
