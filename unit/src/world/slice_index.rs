@@ -75,6 +75,7 @@ impl SliceIndex for LocalSliceIndex {
 }
 
 impl GlobalSliceIndex {
+    pub const MAX: Self = GlobalSliceIndex(i32::MAX);
     pub fn new(slice: i32) -> Self {
         Self(slice)
     }

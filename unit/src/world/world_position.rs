@@ -12,6 +12,8 @@ use crate::world::{GlobalSliceIndex, SliceIndex, WorldPoint, BLOCKS_SCALE};
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
+    pub const MAX: Self = Self(i32::MAX, i32::MAX, GlobalSliceIndex::MAX);
+
     pub fn new(x: i32, y: i32, z: GlobalSliceIndex) -> Self {
         Self(x, y, z)
     }

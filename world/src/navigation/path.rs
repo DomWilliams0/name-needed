@@ -2,6 +2,7 @@ use misc::*;
 use unit::world::{BlockPosition, WorldPosition};
 
 use crate::navigation::{AreaNavEdge, AreaPathError, BlockPathError, EdgeCost, WorldArea};
+use crate::SearchError;
 
 // TODO smallvecs
 
@@ -21,6 +22,10 @@ pub enum NavigationError {
 
     #[error("Block navigation error in area {0:?}: {1}")]
     BlockError(WorldArea, #[source] BlockPathError),
+
+    // TODO remove duplicate errors from NavigationError that already exist in SearchError
+    #[error("Search error: {0}")]
+    Search(#[from] SearchError),
 
     #[error("Navigation was aborted")]
     Aborted,

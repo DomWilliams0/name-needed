@@ -4,7 +4,9 @@ use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
+use std::future::Future;
 use std::hash::Hash;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
 use std::time::{Duration, Instant};
 
@@ -27,7 +29,7 @@ use crate::chunk::SlabAvailability;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::world::WaitResult;
-use crate::{World, WorldContext, WorldRef};
+use crate::{InnerWorldRef, World, WorldContext, WorldRef};
 
 /// Area within the world
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -231,7 +233,7 @@ type PathNodes = Vec<(WorldArea, SlabNavEdge)>;
 pub struct Path {
     areas: PathNodes,
     source: WorldPoint,
-    target: (WorldPoint, WorldArea),
+    target: (Option<WorldPoint>, WorldArea),
 }
 
 impl Path {
@@ -239,8 +241,16 @@ impl Path {
         self.source
     }
 
-    pub fn target(&self) -> WorldPoint {
+    pub fn target_point(&self) -> Option<WorldPoint> {
         self.target.0
+    }
+
+    pub fn target(&self) -> Either<WorldPoint, WorldArea> {
+        if let Some(p) = self.target.0 {
+            Either::Left(p)
+        } else {
+            Either::Right(self.target.1)
+        }
     }
 
     pub fn iter_areas(&self) -> impl Iterator<Item = WorldArea> + '_ {
@@ -248,6 +258,10 @@ impl Path {
             .iter()
             .map(|(a, _)| *a)
             .chain(once(self.target.1))
+    }
+
+    pub fn area_count(&self) -> usize {
+        self.areas.len()
     }
 
     pub fn route(&self) -> impl Iterator<Item = (WorldArea, SlabNavEdge)> + '_ {
@@ -262,7 +276,36 @@ pub enum SearchResult {
     WorldChanged(ArrayVec<SlabLocation, 4>),
 }
 
-pub struct SearchResultFuture(tokio::task::JoinHandle<SearchResult>);
+pub struct SearchResultFuture {
+    task: ManuallyDrop<tokio::task::JoinHandle<SearchResult>>,
+    present: bool,
+}
+
+impl Drop for SearchResultFuture {
+    fn drop(&mut self) {
+        if let SearchResultFuture {
+            task,
+            present: true,
+        } = self
+        {
+            unsafe {
+                ManuallyDrop::drop(task);
+            }
+        }
+    }
+}
+
+impl SearchResultFuture {
+    pub fn cancel(&self) {
+        assert!(self.present);
+        self.task.abort();
+    }
+
+    pub fn take_future(&mut self) -> tokio::task::JoinHandle<SearchResult> {
+        assert!(std::mem::replace(&mut self.present, false));
+        unsafe { ManuallyDrop::take(&mut self.task) }
+    }
+}
 
 impl SearchResult {
     fn into_result(self) -> Result<Path, SearchError> {
@@ -274,38 +317,94 @@ impl SearchResult {
     }
 }
 
+pub trait SearchEndpoint: Debug + Send + Copy {
+    fn into_area<C: WorldContext>(
+        self,
+        world: &World<C>,
+        req: NavRequirement,
+    ) -> Result<WorldArea, WorldPosition>;
+
+    fn as_point_opt(&self) -> Option<WorldPoint>;
+}
+
+pub trait SearchEndpointStart: SearchEndpoint {
+    fn as_point(&self) -> WorldPoint;
+}
+
+impl SearchEndpoint for (WorldPoint, Option<WorldArea>) {
+    fn into_area<C: WorldContext>(
+        self,
+        _: &World<C>,
+        _: NavRequirement,
+    ) -> Result<WorldArea, WorldPosition> {
+        self.1.ok_or_else(|| self.0.floor())
+    }
+
+    fn as_point_opt(&self) -> Option<WorldPoint> {
+        Some(self.0)
+    }
+}
+
+impl SearchEndpointStart for (WorldPoint, Option<WorldArea>) {
+    fn as_point(&self) -> WorldPoint {
+        self.0
+    }
+}
+
+impl SearchEndpoint for WorldPoint {
+    fn into_area<C: WorldContext>(
+        self,
+        world: &World<C>,
+        req: NavRequirement,
+    ) -> Result<WorldArea, WorldPosition> {
+        let pos = self.floor();
+        world.find_area_for_block(pos, req).ok_or(pos)
+    }
+
+    fn as_point_opt(&self) -> Option<WorldPoint> {
+        Some(*self)
+    }
+}
+
+impl SearchEndpointStart for WorldPoint {
+    fn as_point(&self) -> WorldPoint {
+        *self
+    }
+}
+
 impl<C: WorldContext> World<C> {
-    /// Returns future if still in progress
-    pub fn poll_path(
-        &self,
-        fut: SearchResultFuture,
-    ) -> Result<Result<Path, SearchError>, SearchResultFuture> {
-        if fut.0.is_finished() {
-            Ok(fut
-                .0
+    pub fn poll_path(&self, fut: &mut SearchResultFuture) -> Option<Result<Path, SearchError>> {
+        assert!(fut.present);
+
+        if !fut.task.is_finished() {
+            return None;
+        }
+
+        let owned_fut = fut.take_future();
+
+        Some(
+            owned_fut
                 .now_or_never()
                 .expect("future is apparently finished")
                 .expect("path finding panicked")
-                .into_result())
-        } else {
-            Err(fut)
-        }
+                .into_result(),
+        )
     }
 
     pub fn find_path_async(
         self_: WorldRef<C>,
-        from: WorldPoint,
-        to: WorldPoint,
+        from: impl SearchEndpointStart + 'static,
+        to: impl SearchEndpoint + 'static,
         requirement: NavRequirement,
     ) -> SearchResultFuture {
-        let from_pos = from.floor();
-        let to_pos = to.floor();
+        let from_point = from.as_point();
+        let to_point = to.as_point_opt();
 
         let task = self_.nav_runtime().spawn(async move {
             let world_ref = self_.clone();
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
-                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement);
+                trace!("path finding"; "attempt" => retry+1, "from" => ?from, "to" => ?to, "req" => ?requirement);
                 let slabs_to_wait_for;
                 let mut listener;
                 {
@@ -314,11 +413,11 @@ impl<C: WorldContext> World<C> {
                     // start listening for load notifications now, so all loads during search are captured too
                     listener = world.load_notifications().start_listening();
 
-                    slabs_to_wait_for = match world.find_abortable_path(from_pos, to_pos, requirement) {
+                    slabs_to_wait_for = match world.find_abortable_path(from, to, requirement) {
                         Ok(Either::Left((path, dst))) => return SearchResult::Success(Path {
                             areas: path,
-                            source: from,
-                            target: (to, dst),
+                            source: from_point,
+                            target: (to_point, dst),
                         }),
                         Ok(Either::Right(loading_slabs)) => {
                             loading_slabs
@@ -339,25 +438,33 @@ impl<C: WorldContext> World<C> {
             SearchResult::Failed(SearchError::WorldChanged)
         });
 
-        SearchResultFuture(task)
+        SearchResultFuture {
+            task: ManuallyDrop::new(task),
+            present: true,
+        }
     }
 
     /// On success (Left=(path, target area), Right=[slabs to wait for])
     fn find_abortable_path(
         &self,
-        from: WorldPosition,
-        to: WorldPosition,
+        from: impl SearchEndpointStart,
+        to: impl SearchEndpoint,
         requirement: NavRequirement,
     ) -> Result<Either<(PathNodes, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError> {
         let world_graph = self.nav_graph();
 
+        let to_pos = to
+            .as_point_opt()
+            .map(|p| p.floor())
+            .unwrap_or_else(|| todo!("find closest block in area to start pos"));
+
         // resolve positions to areas
-        let src = self
-            .find_area_for_block(from, requirement)
-            .ok_or(SearchError::SourceNotWalkable(from, requirement))?;
-        let dst = self
-            .find_area_for_block(to, requirement)
-            .ok_or(SearchError::DestinationNotWalkable(from, requirement))?;
+        let src = from
+            .into_area(self, requirement)
+            .map_err(|p| SearchError::SourceNotWalkable(p, requirement))?;
+        let dst = to
+            .into_area(self, requirement)
+            .map_err(|p| SearchError::DestinationNotWalkable(p, requirement))?;
 
         trace!("path areas"; "src" => %src, "dst" => %dst);
 
@@ -373,7 +480,7 @@ impl<C: WorldContext> World<C> {
         let src_node = *world_graph.nodes.get(&src).ok_or(InvalidArea(src))?;
         let dst_node = *world_graph.nodes.get(&dst).ok_or(InvalidArea(dst))?;
 
-        let estimate_cost = |n| heuristic(n, to, self);
+        let estimate_cost = |n| heuristic(n, to_pos, self);
         let is_goal = |n| n == dst_node;
         let node_weight = |n| {
             let opt = world_graph.graph.node_weight(n);
@@ -523,9 +630,8 @@ impl<C: WorldContext> World<C> {
         requirement: NavRequirement,
     ) -> Result<Path, SearchError> {
         let h = self_.nav_runtime();
-        let fut = Self::find_path_async(self_, from, to, requirement);
-
-        h.block_on(async { timeout(Duration::from_secs_f32(0.5), fut.0).await })
+        let mut fut = Self::find_path_async(self_, from, to, requirement);
+        h.block_on(async { timeout(Duration::from_secs_f32(0.5), fut.take_future()).await })
             .expect("path finding timed out")
             .expect("path finding panicked")
             .into_result()

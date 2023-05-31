@@ -507,6 +507,7 @@ impl NavRequirement {
     pub fn with_dims(block_size: (f32, f32, f32)) -> Self {
         Self {
             height: (block_size.2.ceil() as u8).min(ABSOLUTE_MAX_FREE_VERTICAL_SPACE),
+            // TODO or should this be the half diagonal?
             max_xy: block_size.0.max(block_size.1).ceil() as u8,
         }
     }

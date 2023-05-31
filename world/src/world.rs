@@ -404,6 +404,7 @@ impl<C: WorldContext> World<C> {
         self.area_graph.path_exists(from, to, unreachable!())
     }
 
+    /// Searches downward
     pub fn find_area_for_block(
         &self,
         block: WorldPosition,
@@ -433,6 +434,7 @@ impl<C: WorldContext> World<C> {
             .and_then(|c| c.area_info(area.chunk_area.slab_idx, area.chunk_area.slab_area))
     }
 
+    #[deprecated]
     pub fn find_accessible_block_in_column(&self, x: i32, y: i32) -> Option<WorldPosition> {
         self.find_accessible_block_in_column_with_range(
             WorldPosition(x, y, SliceIndex::top()),
@@ -440,6 +442,7 @@ impl<C: WorldContext> World<C> {
         )
     }
 
+    #[deprecated]
     pub fn find_accessible_block_in_column_with_range(
         &self,
         pos: WorldPosition,
@@ -456,6 +459,7 @@ impl<C: WorldContext> World<C> {
             .map(|pos| pos.to_world_position(chunk_pos))
     }
 
+    #[deprecated]
     pub fn find_accessible_block_in_range(
         &self,
         range: &WorldPositionRange,
