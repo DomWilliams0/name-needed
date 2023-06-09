@@ -13,9 +13,9 @@ pub use world_position::*;
 use crate::dim::SmallUnsignedConstant;
 
 /// 3x3x3 blocks per 1m^3
-pub const BLOCKS_PER_METRE: u32 = 3;
+pub const BLOCKS_PER_METRE: SmallUnsignedConstant = SmallUnsignedConstant::new(3);
 
-pub const BLOCKS_SCALE: f32 = 1.0 / BLOCKS_PER_METRE as f32;
+pub const BLOCKS_SCALE: f32 = 1.0 / BLOCKS_PER_METRE.as_f32();
 
 /// Chunk size X and Y dimension
 pub const CHUNK_SIZE: SmallUnsignedConstant = SmallUnsignedConstant::new(16);

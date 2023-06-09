@@ -315,7 +315,7 @@ impl From<ViewPoint> for WorldPoint {
 
         // safety: guaranteed valid coords from viewpoint
         unsafe {
-            const SCALE: f32 = BLOCKS_PER_METRE as f32;
+            const SCALE: f32 = BLOCKS_PER_METRE.as_f32();
             new_xyz(x * SCALE, y * SCALE, z * SCALE)
         }
     }
