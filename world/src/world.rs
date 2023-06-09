@@ -26,10 +26,12 @@ use crate::navigation::{
     BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
-use crate::navigationv2::{as_border_area, ChunkArea, NavRequirement, SlabArea};
+use crate::navigationv2::{as_border_area, ChunkArea, NavRequirement, SlabArea, SlabNavEdge};
 use crate::neighbour::{NeighbourOffset, WorldNeighbours};
 use crate::occlusion::NeighbourOpacity;
-use crate::{BlockOcclusion, BlockType, OcclusionFace, Slab, SliceRange, WorldAreaV2, WorldRef};
+use crate::{
+    BlockOcclusion, BlockType, OcclusionFace, SearchError, Slab, SliceRange, WorldAreaV2, WorldRef,
+};
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
 pub struct World<C: WorldContext> {
@@ -305,89 +307,53 @@ impl<C: WorldContext> World<C> {
         })
     }
 
-    /// Meanders randomly, using the given amount of fuel. Doesn't calculate a path
-    pub fn find_exploratory_destination(
+    /// TODO should be async and handle updating graph underneath
+    /// Meanders randomly, using the given amount of fuel. Can return the same area.
+    fn find_exploratory_destination(
         &self,
-        from: WorldPosition,
-        mut fuel: u32,
+        from: WorldAreaV2,
+        fuel: u32,
+        req: NavRequirement,
         filter: Option<ExplorationFilter>,
-    ) -> Result<WorldPosition, NavigationError> {
-        let (from, from_area) = self
-            .find_accessible_block_in_column_with_range(from, None)
-            .and_then(|pos| self.area(from).ok().map(|area| (pos, area)))
-            .ok_or(NavigationError::SourceNotWalkable(from))?;
-
+    ) -> Result<WorldAreaV2, NavigationError> {
+        let mut current = from;
+        let mut last = from;
+        let mut fuel = fuel as f32;
         let mut random = thread_rng();
 
-        // loop vars
-        let mut current_pos = from;
-        let mut current_area = from_area;
-        let mut current_final_target = from;
         loop {
-            let current_chunk = ChunkLocation::from(current_pos);
-            let block_graph = self
-                .find_chunk_with_pos(current_chunk)
-                .and_then(|c| c.block_graph_for_area(current_area))
-                .ok_or(NavigationError::NoSuchArea(current_area))?;
-
-            // explore within current chunk, possibly ending early at a border
-            let (explore_result, target_block) = block_graph.explore(
-                current_pos.into(),
-                &mut fuel,
-                unreachable!(),
-                &mut random,
-                filter.as_ref().map(|func| (func, current_chunk)),
-            );
-
-            current_final_target = match target_block {
-                Some(block) => block.to_world_position(current_pos),
-                None => break,
-            };
-
-            // fuel is exhausted or search is otherwise ended
-            if fuel == 0 || !matches!(explore_result, ExploreResult::AtBorder) {
-                break;
-            }
-
-            // determine if we should continue into the next area
-            let (next_block, next_area) = match self
-                .find_candidate_chunks_to_explore(current_final_target)
-                .collect::<ArrayVec<_, 3>>()
+            let (dst, ai) = match self
+                .nav_graph
+                .iter_edges(current)
+                .filter(|(a, _)| *a != last)
+                .filter_map(|(a, _)| {
+                    let ai = self
+                        .lookup_area_info(a)
+                        .unwrap_or_else(|| panic!("missing area info {:?}", a));
+                    (ai.fits_requirement(req)).then_some((a, ai))
+                })
                 .choose(&mut random)
             {
-                Some(next) => *next,
-                _ => break,
+                Some(e) => e,
+                // None if current == from => return Err(SearchError::NoPath.into()),
+                None => return Ok(current),
             };
 
-            current_pos = next_block;
-            current_area = next_area;
-        }
+            // TODO use line from entry point of current area to entry of next area for fuel estimation
+            fuel -= {
+                let (w, h) = ai.size();
+                (((w as u32).pow(2) + (h as u32).pow(2)) as f32).sqrt()
+            };
 
-        Ok(current_final_target)
-    }
-
-    fn find_candidate_chunks_to_explore(
-        &self,
-        exiting_block: WorldPosition,
-    ) -> impl Iterator<Item = (WorldPosition, WorldArea)> + '_ {
-        let exiting_block_pos = BlockPosition::from(exiting_block);
-        let src_area = self.area(exiting_block).ok().expect("bad src"); // TODO
-
-        NeighbourOffset::accessible_neighbours(exiting_block_pos).filter_map(move |offset| {
-            let (tgt_block, tgt_chunk) =
-                offset.extend_across_any_boundary(exiting_block_pos, exiting_block.into());
-            let tgt_area = self
-                .find_chunk_with_pos(tgt_chunk)
-                .and_then(|c| c.area_for_block(tgt_block))?;
-
-            let edge = self.area_graph.get_adjacent_area_edge(src_area, tgt_area)?;
-            if edge.contains(exiting_block_pos) {
-                let tgt_block = tgt_block.to_world_position(tgt_chunk);
-                Some((tgt_block, tgt_area))
-            } else {
-                None
+            if fuel <= 0.0 {
+                return Ok(dst);
             }
-        })
+
+            // TODO use exploration filter, which should check area only
+
+            last = current;
+            current = dst;
+        }
     }
 
     /// Cheap check if an area path exists between the areas of the 2 blocks
@@ -676,15 +642,7 @@ impl<C: WorldContext> World<C> {
                 .choose(random)?;
 
             // take random point in this area
-            let (x, y) = ai.random_point(requirement.max_xy, random);
-
-            // TODO new BlockPoint for BlockPosition but floats. this conversion is gross
-            let block_pos =
-                BlockPosition::new_unchecked(x as BlockCoord, y as BlockCoord, a.slice());
-            let world_pos = block_pos.to_world_position(chunk.pos()).floored();
-
-            let point = world_pos + (x.fract(), y.fract(), 0.0);
-            Some(point)
+            Some(ai.random_world_point(requirement.max_xy, a.slice(), chunk.pos(), random))
         })
     }
 

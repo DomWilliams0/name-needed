@@ -105,6 +105,33 @@ impl WorldGraph {
         self.pathfinding_runtime.handle().clone()
     }
 
+    pub fn iter_edges(
+        &self,
+        node: WorldArea,
+    ) -> impl Iterator<Item = (WorldArea, &SlabNavEdge)> + '_ {
+        let idx = self.node(&node);
+        self.graph.edges(idx).map(move |e| {
+            (
+                *self
+                    .graph
+                    .node_weight(if idx == e.source() {
+                        e.target()
+                    } else {
+                        e.source()
+                    })
+                    .unwrap(),
+                e.weight(),
+            )
+        })
+    }
+
+    fn node(&self, area: &WorldArea) -> NodeIndex {
+        *self
+            .nodes
+            .get(area)
+            .unwrap_or_else(|| panic!("no node for area {area}"))
+    }
+
     // TODO actually use SlabNavGraph for hierarchical search
     pub fn absorb(&mut self, slab: SlabLocation, graph: &SlabNavGraph) {
         for slab_area in graph.iter_nodes() {

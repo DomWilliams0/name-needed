@@ -2,7 +2,7 @@ use misc::*;
 
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SlabLocation, SliceBlock, SliceIndex, WorldPosition,
+    SlabLocation, SliceBlock, SliceIndex, WorldPoint, WorldPosition,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -474,6 +474,7 @@ impl AreaInfo {
         )
     }
 
+    /// Point is relative to this area
     pub fn random_point(&self, max_xy: u8, random: &mut dyn RngCore) -> (f32, f32) {
         debug_assert!(self.fits_xy(max_xy));
         let ((xmin, ymin), (xmax, ymax)) = self.range;
@@ -483,6 +484,23 @@ impl AreaInfo {
             random.gen_range(ymin as f32 + half_width, ymax as f32 - half_width + 1.0) - half_width,
         )
     }
+
+    pub fn random_world_point(
+        &self,
+        max_xy: u8,
+        slice: GlobalSliceIndex,
+        chunk: ChunkLocation,
+        random: &mut dyn RngCore,
+    ) -> WorldPoint {
+        let (x, y) = self.random_point(max_xy, random);
+
+        // TODO new BlockPoint for BlockPosition but floats. this conversion is gross
+        let block_pos = BlockPosition::new_unchecked(x as BlockCoord, y as BlockCoord, slice);
+        let world_pos = block_pos.to_world_position(chunk).floored();
+
+        world_pos + (x.fract(), y.fract(), 0.0)
+    }
+
     pub fn fits_xy(&self, max_xy: u8) -> bool {
         let (x, y) = self.size();
         max_xy <= x.min(y)
