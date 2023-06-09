@@ -76,6 +76,24 @@ impl<P: RangePosition> WorldRange<P> {
         )
     }
 
+    pub fn with_inclusive_range_unchecked<F: Into<P>, T: Into<P>>(from: F, to: T) -> Self {
+        let from = from.into();
+        let to = to.into();
+        if cfg!(debug_assertions) {
+            let (min, max) = Self::min_max(from, to);
+            assert!((min, max) == (from, to), "incorrect min and max");
+        }
+
+        Self { min: from, max: to }
+    }
+
+    pub fn min(&self) -> P {
+        self.min
+    }
+    pub fn max(&self) -> P {
+        self.max
+    }
+
     /// `[from, to]`
     pub fn with_inclusive_range<F: Into<P>, T: Into<P>>(from: F, to: T) -> Self {
         let (min, max) = Self::min_max(from.into(), to.into());
