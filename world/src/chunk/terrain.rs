@@ -1330,6 +1330,7 @@ mod tests {
                     NavRequirement {
                         height: 3,
                         max_xy: 1,
+                        step_size: 1,
                     },
                 )
                 .map(|tup| tup.0)
@@ -1351,6 +1352,7 @@ mod tests {
                 NavRequirement {
                     height: 4,
                     max_xy: 1,
+                    step_size: 1,
                 }
             ),
             None

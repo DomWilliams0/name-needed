@@ -1444,6 +1444,7 @@ mod tests {
             NavRequirement {
                 height: 2,
                 max_xy: 1,
+                step_size: 1,
             },
         )
         .expect("path should succeed");
@@ -1465,6 +1466,7 @@ mod tests {
             NavRequirement {
                 height: 2,
                 max_xy: 1,
+                step_size: 1,
             },
         )
         .expect("path should succeed");
@@ -1496,6 +1498,7 @@ mod tests {
             NavRequirement {
                 height: 2,
                 max_xy: 1,
+                step_size: 1,
             },
         )
         .expect("path should succeed");

@@ -399,6 +399,21 @@ impl SearchEndpointStart for WorldPoint {
     }
 }
 
+trait EdgeRefExt {
+    fn directional_height(&self, source: NodeIndex) -> i8;
+}
+
+impl<'a> EdgeRefExt for EdgeReference<'a, SlabNavEdge> {
+    fn directional_height(&self, source: NodeIndex) -> i8 {
+        if self.source() == source {
+            self.weight().height_diff as i8
+        } else {
+            debug_assert_eq!(source, self.target());
+            -(self.weight().height_diff as i8)
+        }
+    }
+}
+
 impl<C: WorldContext> World<C> {
     pub fn poll_path(&self, fut: &mut SearchResultFuture) -> Option<Result<Path, SearchError>> {
         assert!(fut.present);
@@ -576,9 +591,15 @@ impl<C: WorldContext> World<C> {
                if loading slab: await on it (but this adds new nodes to graph, so need to release reference somehow). then continue
             */
 
+            let step_size = requirement.step_size as i8;
+            let filtered_edges = world_graph
+                .graph
+                .edges(node)
+                .filter(|e| e.directional_height(node) <= step_size);
+
             // iter edges to find if neighbouring slabs are loading/being modified, and abort if so
             let this_slab = node_weight(node).slab();
-            let slabs = world_graph.graph.edges(node).filter_map(|e| {
+            let slabs = filtered_edges.clone().filter_map(|e| {
                 let src_slab = node_weight(e.source()).slab();
                 if src_slab != this_slab {
                     return Some(src_slab);
@@ -618,7 +639,7 @@ impl<C: WorldContext> World<C> {
                 return Ok(Either::Right(changed_slabs));
             }
 
-            for edge in world_graph.graph.edges(node) {
+            for edge in filtered_edges {
                 let next = edge.target();
                 if ctx.visited.is_visited(&next) {
                     continue;
