@@ -225,6 +225,7 @@ mod load_task {
         }
 
         // init occlusion using neighbouring slabs
+        // TODO if this waits on other slabs, do it in a new task?
         update_neighbour_occlusion(&vs, slab, &mut notifications, &ctx.world).await;
 
         // new slab can now be made visible
@@ -1253,13 +1254,7 @@ impl<C: WorldContext> WorldLoader<C> {
 
     pub fn count_loading_slabs(&self) -> usize {
         let w = self.world.borrow();
-        w.all_chunks()
-            .map(|c| {
-                let mut n = 0usize;
-                c.iter_loading_slabs(|_, _| n += 1);
-                n
-            })
-            .sum()
+        w.all_chunks().map(|c| c.iter_loading_slabs().count()).sum()
     }
 
     pub fn block_until_all_done_with_bail(

@@ -1,5 +1,6 @@
 use misc::*;
 
+use crate::loader::WorldLoader;
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
 use futures::FutureExt;
@@ -148,6 +149,13 @@ impl<C: WorldContext> WorldViewer<C> {
 
         info!("positioning world viewer at {:?}", view_range);
 
+        // track already loaded or requested slabs
+        let mut all_requested_slabs = HashSet::with_capacity(1024);
+        all_requested_slabs.extend(world.borrow().all_chunks().flat_map(|c| {
+            c.iter_slabs()
+                .map((|(slab, _)| SlabLocation::new(slab, c.pos())))
+        }));
+
         let initial_chunk = ChunkLocation::from(initial_block);
         Ok(Self {
             world,
@@ -155,7 +163,7 @@ impl<C: WorldContext> WorldViewer<C> {
             chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?
             clean_chunks: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
-            all_requested_slabs: HashSet::with_capacity(512),
+            all_requested_slabs,
         })
     }
 

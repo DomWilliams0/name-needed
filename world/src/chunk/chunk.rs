@@ -277,13 +277,28 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    pub fn iter_loading_slabs(&self, mut per_slab: impl FnMut(SlabIndex, SlabLoadingStatus)) {
+    pub fn iter_loading_slabs(&self) -> impl Iterator<Item = (SlabIndex, SlabLoadingStatus)> + '_ {
+        self.iter_slabs_filtered(|s| {
+            !matches!(s, SlabLoadingStatus::Unloaded | SlabLoadingStatus::Done)
+        })
+    }
+
+    /// All states except unloaded
+    pub fn iter_slabs(&self) -> impl Iterator<Item = (SlabIndex, SlabLoadingStatus)> + '_ {
+        self.iter_slabs_filtered(|s| !matches!(s, SlabLoadingStatus::Unloaded))
+    }
+
+    /// Allocates :(
+    fn iter_slabs_filtered(
+        &self,
+        filter: impl Fn(&SlabLoadingStatus) -> bool,
+    ) -> impl Iterator<Item = (SlabIndex, SlabLoadingStatus)> + '_ {
         let guard = self.slab_progress.read();
-        for (slab, state) in guard.iter() {
-            if !matches!(state, SlabLoadingStatus::Done) {
-                per_slab(*slab, state.clone())
-            }
-        }
+        let vec = guard
+            .iter()
+            .filter_map(|(slab, state)| filter(state).then(|| (*slab, state.clone())))
+            .collect_vec();
+        vec.into_iter()
     }
 
     pub fn is_slab_loaded(&self, slab: SlabIndex) -> bool {
