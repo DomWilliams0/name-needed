@@ -134,6 +134,19 @@ impl WorldGraph {
 
     // TODO actually use SlabNavGraph for hierarchical search
     pub fn absorb(&mut self, slab: SlabLocation, graph: &SlabNavGraph) {
+        // remove all old from this slab
+        let mut nodes_to_remove = HashSet::with_capacity(graph.graph.node_count());
+        self.nodes.retain(|a, ni| {
+            if a.slab() == slab {
+                nodes_to_remove.insert(*ni);
+                false
+            } else {
+                true
+            }
+        });
+        self.graph
+            .retain_nodes(|g, n| !nodes_to_remove.contains(&n));
+
         for slab_area in graph.iter_nodes() {
             let _ = self.add_node(WorldArea::from((slab, slab_area)));
         }
