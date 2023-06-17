@@ -12,7 +12,9 @@ use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIn
 use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage, SlabVersion};
 use crate::chunk::{SlabData, SparseGrid};
 use crate::navigation::{BlockGraph, SlabAreaIndex};
-use crate::navigationv2::{filter_border_areas, ChunkArea, NavRequirement, SlabArea, SlabNavGraph};
+use crate::navigationv2::{
+    filter_border_areas, is_border, ChunkArea, NavRequirement, SlabArea, SlabNavGraph,
+};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldContext};
@@ -488,6 +490,12 @@ impl AreaInfo {
             self.range.1 .0 - self.range.0 .0 + 1,
             self.range.1 .1 - self.range.0 .1 + 1,
         )
+    }
+
+    pub fn borders(&self) -> ArrayVec<NeighbourOffset, 4> {
+        NeighbourOffset::aligned()
+            .filter_map(|(d, _)| is_border(d, self.range).then_some(d))
+            .collect()
     }
 
     /// Point is relative to this area
