@@ -482,10 +482,11 @@ impl AreaInfo {
         Self::pos_to_world(area, self.range.1)
     }
 
+    /// Inclusive size
     pub fn size(&self) -> (u8, u8) {
         (
-            self.range.1 .0 - self.range.0 .0,
-            self.range.1 .1 - self.range.0 .1,
+            self.range.1 .0 - self.range.0 .0 + 1,
+            self.range.1 .1 - self.range.0 .1 + 1,
         )
     }
 
@@ -518,7 +519,7 @@ impl AreaInfo {
 
     pub fn fits_xy(&self, max_xy: u8) -> bool {
         let (x, y) = self.size();
-        max_xy <= x.min(y)
+        max_xy < x.min(y)
     }
 
     pub fn fits_requirement(&self, req: NavRequirement) -> bool {
