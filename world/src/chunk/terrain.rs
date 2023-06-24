@@ -1327,11 +1327,7 @@ mod tests {
             chunk
                 .find_area_for_block_with_height(
                     BlockPosition::new(2, 2, GlobalSliceIndex::new(slice)).unwrap(),
-                    NavRequirement {
-                        height: 3,
-                        max_xy: 1,
-                        step_size: 1,
-                    },
+                    NavRequirement::with_height(3),
                 )
                 .map(|tup| tup.0)
         };
@@ -1349,11 +1345,7 @@ mod tests {
         assert_eq!(
             chunk.find_area_for_block_with_height(
                 BlockPosition::new(2, 2, GlobalSliceIndex::new(3)).unwrap(),
-                NavRequirement {
-                    height: 4,
-                    max_xy: 1,
-                    step_size: 1,
-                }
+                NavRequirement::with_height(4),
             ),
             None
         ); // too tall

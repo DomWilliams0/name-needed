@@ -490,32 +490,45 @@ impl ChunkArea {
 #[derive(Debug, Copy, Clone)]
 pub struct NavRequirement {
     pub height: u8,
-    pub max_xy: u8,
     pub step_size: u8,
+    /// Blocks
+    pub dims: (f32, f32),
     // TODO drop tolerance
 }
 
 impl NavRequirement {
     pub const MIN: Self = Self {
         height: 1,
-        max_xy: 1,
+        dims: (1.0, 1.0),
         step_size: 1,
     };
     pub const ZERO: Self = Self {
         height: 0,
-        max_xy: 0,
+        dims: (1.0, 1.0),
         step_size: 1,
     };
+
+    pub fn with_height(height: u8) -> Self {
+        Self {
+            height,
+            dims: (1.0, 1.0),
+            step_size: 1,
+        }
+    }
 
     /// Input is in blocks!
     pub fn new(block_size: (f32, f32, f32), step_size_meters: f32) -> Self {
         debug_assert!(step_size_meters.is_sign_positive());
         Self {
             height: (block_size.2.ceil() as u8).min(ABSOLUTE_MAX_FREE_VERTICAL_SPACE),
-            // TODO or should this be the half diagonal?
-            max_xy: block_size.0.max(block_size.1).ceil() as u8,
+            dims: (block_size.0, block_size.1),
             step_size: (step_size_meters * BLOCKS_PER_METRE.as_f32()) as u8,
         }
+    }
+
+    /// In blocks
+    pub fn xy_diagonal_sqrd(&self) -> f32 {
+        (self.dims.0 * self.dims.0) + (self.dims.1 * self.dims.1)
     }
 }
 

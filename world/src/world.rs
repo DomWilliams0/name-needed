@@ -642,7 +642,7 @@ impl<C: WorldContext> World<C> {
                 .choose(random)?;
 
             // take random point in this area
-            Some(ai.random_world_point(requirement.max_xy, a.slice(), chunk.pos(), random))
+            Some(ai.random_world_point(requirement.dims, a.slice(), chunk.pos(), random))
         })
     }
 
@@ -1437,17 +1437,8 @@ mod tests {
         let src = WorldPoint::new_unchecked(8.5, 25.5, 302.0);
         let dst = WorldPoint::new_unchecked(-6.5, 24.5, 301.0);
 
-        let _path = World::find_path_now(
-            world.clone(),
-            src,
-            dst,
-            NavRequirement {
-                height: 2,
-                max_xy: 1,
-                step_size: 1,
-            },
-        )
-        .expect("path should succeed");
+        let _path = World::find_path_now(world.clone(), src, dst, NavRequirement::with_height(2))
+            .expect("path should succeed");
     }
 
     #[test]
@@ -1459,17 +1450,8 @@ mod tests {
         let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
         let dst = WorldPoint::new_unchecked(4.0, 4.0, 3.0);
 
-        let path = World::find_path_now(
-            world.clone(),
-            src,
-            dst,
-            NavRequirement {
-                height: 2,
-                max_xy: 1,
-                step_size: 1,
-            },
-        )
-        .expect("path should succeed");
+        let path = World::find_path_now(world.clone(), src, dst, NavRequirement::with_height(2))
+            .expect("path should succeed");
         assert_eq!(path.iter_areas().count(), 0);
     }
 
@@ -1491,17 +1473,8 @@ mod tests {
         let src = WorldPoint::new_unchecked(2.0, 2.0, 3.0);
         let dst = WorldPoint::new_unchecked(5.0, 2.0, 3.0);
 
-        let path = World::find_path_now(
-            world.clone(),
-            src,
-            dst,
-            NavRequirement {
-                height: 2,
-                max_xy: 1,
-                step_size: 1,
-            },
-        )
-        .expect("path should succeed");
+        let path = World::find_path_now(world.clone(), src, dst, NavRequirement::with_height(2))
+            .expect("path should succeed");
         assert_ne!(path.iter_areas().count(), 0);
         assert_eq!(path.route().count(), 1);
     }

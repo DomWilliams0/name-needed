@@ -499,10 +499,10 @@ impl AreaInfo {
     }
 
     /// Point is relative to this area
-    pub fn random_point(&self, max_xy: u8, random: &mut dyn RngCore) -> (f32, f32) {
-        debug_assert!(self.fits_xy(max_xy));
+    pub fn random_point(&self, xy_blocks: (f32, f32), random: &mut dyn RngCore) -> (f32, f32) {
+        debug_assert!(self.fits_xy(xy_blocks.0.powi(2) + xy_blocks.1.powi(2)));
         let ((xmin, ymin), (xmax, ymax)) = self.range;
-        let half_width = max_xy as f32 * 0.5;
+        let half_width = xy_blocks.0.min(xy_blocks.1) * 0.5;
         (
             random.gen_range(xmin as f32 + half_width, xmax as f32 - half_width + 1.0) - half_width,
             random.gen_range(ymin as f32 + half_width, ymax as f32 - half_width + 1.0) - half_width,
@@ -515,12 +515,12 @@ impl AreaInfo {
 
     pub fn random_world_point(
         &self,
-        max_xy: u8,
+        xy_blocks: (f32, f32),
         slice: GlobalSliceIndex,
         chunk: ChunkLocation,
         random: &mut dyn RngCore,
     ) -> WorldPoint {
-        let (x, y) = self.random_point(max_xy, random);
+        let (x, y) = self.random_point(xy_blocks, random);
 
         // TODO new BlockPoint for BlockPosition but floats. this conversion is gross
         let block_pos = BlockPosition::new_unchecked(x as BlockCoord, y as BlockCoord, slice);
@@ -529,13 +529,15 @@ impl AreaInfo {
         world_pos + (x.fract(), y.fract(), 0.0)
     }
 
-    pub fn fits_xy(&self, max_xy: u8) -> bool {
+    pub fn fits_xy(&self, xy_diagonal_sqrd: f32) -> bool {
         let (x, y) = self.size();
-        max_xy < x.min(y)
+        let x = (x as u32).pow(2);
+        let y = (y as u32).pow(2);
+        xy_diagonal_sqrd < (x + y) as f32
     }
 
     pub fn fits_requirement(&self, req: NavRequirement) -> bool {
-        self.height >= req.height && self.fits_xy(req.max_xy)
+        self.height >= req.height && self.fits_xy(req.xy_diagonal_sqrd())
     }
 
     fn pos_to_world(
