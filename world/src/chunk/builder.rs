@@ -202,6 +202,15 @@ impl<C: WorldContext> WorldBuilder<C> {
     pub fn new() -> Self {
         Self(Default::default())
     }
+
+    pub fn with_chunks(chunks: impl Iterator<Item = ChunkDescriptor<C>>) -> Self {
+        Self(
+            chunks
+                .map(|c| (c.chunk_pos, ChunkBuilder::with_terrain(c.terrain)))
+                .collect(),
+        )
+    }
+
     pub fn set(mut self, pos: (i32, i32, i32), b: C::BlockType) -> Self {
         let world_pos = WorldPosition::from(pos);
         let chunk = ChunkLocation::from(world_pos);

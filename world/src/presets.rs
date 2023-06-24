@@ -59,7 +59,21 @@ pub fn multi_chunk_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
             .build((2, 0)),
     ];
 
-    MemoryTerrainSource::from_chunks(chunks.into_iter())
+    let mut builder = WorldBuilder::with_chunks(chunks.into_iter());
+
+    // "trees"
+    /*    for _ in 0..40 {
+            let x = thread_rng().gen_range(-CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2);
+            let y = thread_rng().gen_range(-CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2);
+
+            builder = builder.fill_range(
+                (x, y, 0),
+                (x, y, 10),
+                *C::PRESET_TYPES.choose(&mut thread_rng()).unwrap(),
+            );
+        }
+    */
+    MemoryTerrainSource::from_chunks(builder.build())
         .expect("hardcoded world preset is wrong??!!1!")
 }
 

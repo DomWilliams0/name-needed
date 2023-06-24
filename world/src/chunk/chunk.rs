@@ -2,7 +2,7 @@ use misc::*;
 
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SlabLocation, SliceBlock, SliceIndex, WorldPoint, WorldPosition,
+    SlabLocation, SliceBlock, SliceIndex, WorldPoint, WorldPosition, WorldPositionRange,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -17,7 +17,7 @@ use crate::navigationv2::{
 };
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldContext};
+use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2, WorldContext};
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
 use std::collections::HashMap;
@@ -507,6 +507,10 @@ impl AreaInfo {
             random.gen_range(xmin as f32 + half_width, xmax as f32 - half_width + 1.0) - half_width,
             random.gen_range(ymin as f32 + half_width, ymax as f32 - half_width + 1.0) - half_width,
         )
+    }
+
+    pub fn as_range(&self, area: WorldAreaV2) -> WorldPositionRange {
+        WorldPositionRange::with_inclusive_range(self.min_pos(area), self.max_pos(area))
     }
 
     pub fn random_world_point(

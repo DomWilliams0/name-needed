@@ -286,6 +286,14 @@ impl Add<(f32, f32, f32)> for WorldPoint {
     }
 }
 
+impl Add<[f32; 3]> for WorldPoint {
+    type Output = Self;
+
+    fn add(self, [x, y, z]: [f32; 3]) -> Self::Output {
+        Self(self.0 + x, self.1 + y, self.2 + z)
+    }
+}
+
 impl Display for WorldPoint {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "({:.2}, {:.2}, {:.2})", self.0, self.1, self.2)

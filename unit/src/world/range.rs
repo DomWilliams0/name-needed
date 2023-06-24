@@ -212,6 +212,13 @@ impl<P: RangePosition> WorldRange<P> {
 
         ax <= x && x <= bx && ay <= y && y <= by && az <= z && z <= bz
     }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        let ((ax1, ax2), (ay1, ay2), (az1, az2)) = self.ranges();
+        let ((bx1, bx2), (by1, by2), (bz1, bz2)) = other.ranges();
+
+        ax1 <= bx2 && ax2 >= bx1 && ay1 <= by2 && ay2 >= by1 && az1 <= bz2 && az2 >= bz1
+    }
 }
 
 impl<XY: Copy, Z: Copy, P: RangePosition + Add<(XY, XY, Z), Output = P>> Add<(XY, XY, Z)>
@@ -415,6 +422,15 @@ impl WorldRange<WorldPosition> {
         // let max = BlockPosition::new_unchecked(CHUNK_SIZE.as_block_coord(), CHUNK_SIZE.as_block_coord(), top).to_world_position(slab.chunk);
 
         true // TODO FIXME
+    }
+}
+
+impl From<WorldPositionRange> for WorldPointRange {
+    fn from(range: WorldPositionRange) -> Self {
+        WorldPointRange {
+            min: range.min.floored(),
+            max: range.max.floored(),
+        }
     }
 }
 
