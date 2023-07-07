@@ -21,7 +21,7 @@ derive_more = "0.99"
 ordered-float = "2.0"
 thiserror = "1.0"
 bumpalo = { version = "3.9", features = ["collections", "boxed"] }
-smallvec = { version = "1.6", features = ["union"] }
+smallvec = { version = "1.10", features = ["union", "const_generics"] }
 arrayvec = "0.7"
 parking_lot = "0.12"
 derivative = "2.2"
