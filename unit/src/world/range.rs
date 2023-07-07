@@ -423,6 +423,14 @@ impl WorldRange<WorldPosition> {
 
         true // TODO FIXME
     }
+
+    pub fn expand(&self, by: u16) -> Self {
+        let by = by as i32;
+        Self {
+            min: self.min + (-by, -by, -by),
+            max: self.max + (by, by, by),
+        }
+    }
 }
 
 impl From<WorldPositionRange> for WorldPointRange {

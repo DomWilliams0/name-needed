@@ -20,7 +20,8 @@ use petgraph::visit::{NodeRef, Visitable};
 use tokio::runtime::{Handle, Runtime};
 use tokio::time::timeout;
 use unit::world::{
-    BlockPosition, ChunkLocation, SlabLocation, SliceIndex, WorldPoint, WorldPosition,
+    BlockPosition, ChunkLocation, LocalSliceIndex, SlabLocation, SliceIndex, WorldPoint,
+    WorldPosition,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -214,6 +215,20 @@ impl WorldArea {
         SlabLocation {
             chunk: self.chunk_idx,
             slab: self.chunk_area.slab_idx,
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn dummy_for_tests_only_srsly_dont_use_this() -> Self {
+        Self {
+            chunk_idx: ChunkLocation(0, 0),
+            chunk_area: ChunkArea {
+                slab_idx: Default::default(),
+                slab_area: SlabArea {
+                    slice_idx: LocalSliceIndex::bottom(),
+                    slice_area: Default::default(),
+                },
+            },
         }
     }
 }
