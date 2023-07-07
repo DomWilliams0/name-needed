@@ -1,10 +1,8 @@
 use crate::world::ContiguousChunkIterator;
 use crate::{BlockType, InnerWorldRef, SliceRange, WorldContext};
-use misc::cgmath::Array;
-use misc::cgmath::Vector3;
 use misc::num_traits::signum;
 use misc::parking_lot::Mutex;
-use misc::{debug, lazy_static, InnerSpace, F};
+use misc::*;
 use std::cell::RefCell;
 use unit::space::view::ViewPoint;
 use unit::world::{
@@ -15,7 +13,7 @@ use unit::world::{
 #[derive(Debug, Clone)]
 pub struct VoxelRay {
     pos: ViewPoint,
-    dir: Vector3<F>,
+    dir: Vec3,
 }
 
 pub struct VoxelRayOutput {
@@ -48,7 +46,7 @@ impl VoxelRayOutput {
 }
 
 impl VoxelRay {
-    pub fn new(pos: ViewPoint, dir: Vector3<F>) -> Self {
+    pub fn new(pos: ViewPoint, dir: Vec3) -> Self {
         Self {
             pos,
             dir: dir.normalize(),
@@ -59,7 +57,7 @@ impl VoxelRay {
         self.pos
     }
 
-    pub fn direction(&self) -> Vector3<F> {
+    pub fn direction(&self) -> Vec3 {
         self.dir
     }
 
@@ -81,29 +79,29 @@ impl VoxelRay {
         mut filter: impl FnMut(WorldPosition) -> bool,
         output: &mut VoxelRayOutput,
     ) -> Option<WorldPosition> {
-        if self.dir.magnitude2() < 0.9 {
+        if self.dir.length_squared() < 0.9 {
             misc::warn!("invalid raycast direction {:?}", self.dir);
             return None;
         }
 
         // TODO skip ahead over unloaded chunks
         let step: [f64; 3] = {
-            let vec = (self.dir / 10.0).cast::<f64>().unwrap(); // cant fail
+            let vec = (self.dir / 10.0).as_dvec3();
             *vec.as_ref()
         };
 
         // https://gamedev.stackexchange.com/a/49423j
         let range = 800.0;
         let cam_pos = WorldPoint::from(self.pos);
-        let mut pos = Vector3::new(cam_pos.x() as f64, cam_pos.y() as f64, cam_pos.z() as f64);
-        let dir = self.dir.cast::<f64>().unwrap(); // cant fail
-        let mut t_max = Vector3::new(
+        let mut pos = dvec3(cam_pos.x() as f64, cam_pos.y() as f64, cam_pos.z() as f64);
+        let dir = self.dir.as_dvec3();
+        let mut t_max = dvec3(
             intbound(pos.x, dir.x),
             intbound(pos.y, dir.y),
             intbound(pos.z, dir.z),
         );
 
-        let t_delta = Vector3::new(step[0] / dir.x, step[1] / dir.y, step[2] / dir.z);
+        let t_delta = dvec3(step[0] / dir.x, step[1] / dir.y, step[2] / dir.z);
 
         let mut last_block = WorldPosition::new(i32::MIN, i32::MIN, GlobalSliceIndex::bottom());
         let mut has_seen_a_block = false;

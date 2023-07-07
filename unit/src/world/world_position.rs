@@ -100,16 +100,6 @@ impl Add<(i32, i32, i32)> for WorldPosition {
     }
 }
 
-impl From<&WorldPosition> for Point3 {
-    fn from(pos: &WorldPosition) -> Self {
-        Self {
-            x: pos.0 as f32,
-            y: pos.1 as f32,
-            z: pos.2.slice() as f32,
-        }
-    }
-}
-
 impl From<WorldPosition> for [i32; 3] {
     fn from(pos: WorldPosition) -> Self {
         [pos.0, pos.1, pos.2.slice()]

@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Sub};
 
-use misc::{NotNan, Point3, Vector2, Vector3};
+use misc::{NotNan, Vec2, Vec3};
 
 use crate::space::view::ViewPoint;
 use crate::world::{GlobalSliceIndex, SliceIndex, WorldPosition, BLOCKS_PER_METRE};
@@ -161,9 +161,9 @@ impl WorldPoint {
     }
 }
 
-impl From<WorldPoint> for Vector3 {
+impl From<WorldPoint> for Vec3 {
     fn from(p: WorldPoint) -> Self {
-        Vector3 {
+        Vec3 {
             x: p.x(),
             y: p.y(),
             z: p.z(),
@@ -177,26 +177,16 @@ impl From<(NotNan<f32>, NotNan<f32>, NotNan<f32>)> for WorldPoint {
     }
 }
 
-impl From<WorldPoint> for Vector2 {
+impl From<WorldPoint> for Vec2 {
     fn from(p: WorldPoint) -> Self {
-        Vector2 { x: p.x(), y: p.y() }
+        Vec2 { x: p.x(), y: p.y() }
     }
 }
 
-impl From<WorldPoint> for Point3 {
-    fn from(p: WorldPoint) -> Self {
-        Point3 {
-            x: p.x(),
-            y: p.y(),
-            z: p.z(),
-        }
-    }
-}
-
-impl TryFrom<Vector3> for WorldPoint {
+impl TryFrom<Vec3> for WorldPoint {
     type Error = ();
 
-    fn try_from(vec: Vector3) -> Result<Self, Self::Error> {
+    fn try_from(vec: Vec3) -> Result<Self, Self::Error> {
         Self::new(vec.x, vec.y, vec.z).ok_or(())
     }
 }
@@ -207,8 +197,8 @@ impl From<WorldPosition> for WorldPoint {
     }
 }
 
-impl AddAssign<Vector2> for WorldPoint {
-    fn add_assign(&mut self, rhs: Vector2) {
+impl AddAssign<Vec2> for WorldPoint {
+    fn add_assign(&mut self, rhs: Vec2) {
         self.0 += rhs.x;
         self.1 += rhs.y;
     }
@@ -236,10 +226,10 @@ impl From<WorldPoint> for (f32, f32, f32) {
     }
 }
 
-impl Add<Vector2> for WorldPoint {
+impl Add<Vec2> for WorldPoint {
     type Output = Self;
 
-    fn add(self, rhs: Vector2) -> Self::Output {
+    fn add(self, rhs: Vec2) -> Self::Output {
         Self(self.0 + rhs.x, self.1 + rhs.y, self.2)
     }
 }

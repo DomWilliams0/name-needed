@@ -93,10 +93,10 @@ impl From<WorldArea> for ChunkArea {
     }
 }
 
-impl From<WorldArea> for Vector3 {
+impl From<WorldArea> for Vec3 {
     fn from(area: WorldArea) -> Self {
         // is this good for estimating node cost?
-        Vector3 {
+        Vec3 {
             x: area.chunk.0 as f32,
             y: area.chunk.1 as f32,
             z: area.slab.into(),

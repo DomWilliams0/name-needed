@@ -12,7 +12,7 @@ logging = { path = "../logging" }
 tracy-client = { version = "0.15", default-features = false }
 
 lazy_static = "1.4"
-cgmath = "0.18"
+glam = "0.21"
 num-traits = "0.2"
 itertools = "0.10"
 rand = { version = "0.7", features = ["small_rng"] } # updating to 0.8 changes terrain seeds

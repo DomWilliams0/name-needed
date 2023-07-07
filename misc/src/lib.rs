@@ -6,10 +6,6 @@ pub type BumpVec<'a, T> = bumpalo::collections::Vec<'a, T>;
 pub type BumpString<'a> = bumpalo::collections::String<'a>;
 pub type BumpBox<'a, T> = bumpalo::boxed::Box<'a, T>;
 
-pub use cgmath::{
-    self, Angle, EuclideanSpace, InnerSpace, Matrix, MetricSpace, Rotation2, Rotation3,
-    SquareMatrix, VectorSpace, Zero,
-};
 pub use derivative::Derivative;
 pub use derive_more;
 pub use float_cmp::ApproxEq;
@@ -41,16 +37,7 @@ pub use std::{
 
 pub type BoxedResult<T> = Result<T, Box<dyn Error>>;
 
-pub type F = f32;
-pub type Vector3 = cgmath::Vector3<F>;
-pub type Vector2 = cgmath::Vector2<F>;
-pub type Point3 = cgmath::Point3<F>;
-pub type Point2 = cgmath::Point2<F>;
-pub type Matrix4 = cgmath::Matrix4<F>;
-pub type Quaternion = cgmath::Quaternion<F>;
-pub type Basis2 = cgmath::Basis2<F>;
-pub type Rad = cgmath::Rad<F>;
-pub type Deg = cgmath::Deg<F>;
+pub use glam::{dvec2, dvec3, vec2, vec3, Mat2, Mat3, Quat, Vec2, Vec3};
 
 pub mod newtype;
 pub mod sized_iter;
