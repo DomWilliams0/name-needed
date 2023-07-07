@@ -57,7 +57,7 @@ impl WorldPoint {
     }
 
     pub fn slice(&self) -> GlobalSliceIndex {
-        GlobalSliceIndex::new(self.z() as i32)
+        GlobalSliceIndex::new(self.z().floor() as i32)
     }
 
     pub fn floored(&self) -> Self {
