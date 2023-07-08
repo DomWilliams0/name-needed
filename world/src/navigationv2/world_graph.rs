@@ -288,7 +288,7 @@ type PathNodes = Vec<(WorldArea, SlabNavEdge)>;
 pub struct Path {
     areas: PathNodes,
     source: WorldPoint,
-    target: (Option<WorldPoint>, WorldArea),
+    target: (WorldPoint, WorldArea),
 }
 
 impl Path {
@@ -296,16 +296,12 @@ impl Path {
         self.source
     }
 
-    pub fn target_point(&self) -> Option<WorldPoint> {
+    pub fn target_point(&self) -> WorldPoint {
         self.target.0
     }
 
-    pub fn target(&self) -> Either<WorldPoint, WorldArea> {
-        if let Some(p) = self.target.0 {
-            Either::Left(p)
-        } else {
-            Either::Right(self.target.1)
-        }
+    pub fn target(&self) -> WorldArea {
+        self.target.1
     }
 
     pub fn iter_areas(&self) -> impl Iterator<Item = WorldArea> + '_ {
@@ -379,28 +375,18 @@ pub trait SearchEndpoint: Debug + Send + Copy {
         req: NavRequirement,
     ) -> Result<WorldArea, WorldPosition>;
 
-    fn as_point_opt(&self) -> Option<WorldPoint>;
-}
-
-pub trait SearchEndpointStart: SearchEndpoint {
     fn as_point(&self) -> WorldPoint;
 }
 
-impl SearchEndpoint for (WorldPoint, Option<WorldArea>) {
+impl SearchEndpoint for (WorldPoint, WorldArea) {
     fn into_area<C: WorldContext>(
         self,
         _: &World<C>,
         _: NavRequirement,
     ) -> Result<WorldArea, WorldPosition> {
-        self.1.ok_or_else(|| self.0.floor())
+        Ok(self.1)
     }
 
-    fn as_point_opt(&self) -> Option<WorldPoint> {
-        Some(self.0)
-    }
-}
-
-impl SearchEndpointStart for (WorldPoint, Option<WorldArea>) {
     fn as_point(&self) -> WorldPoint {
         self.0
     }
@@ -416,12 +402,6 @@ impl SearchEndpoint for WorldPoint {
         world.find_area_for_block(pos, req).ok_or(pos)
     }
 
-    fn as_point_opt(&self) -> Option<WorldPoint> {
-        Some(*self)
-    }
-}
-
-impl SearchEndpointStart for WorldPoint {
     fn as_point(&self) -> WorldPoint {
         *self
     }
@@ -463,12 +443,12 @@ impl<C: WorldContext> World<C> {
 
     pub fn find_path_async(
         self_: WorldRef<C>,
-        from: impl SearchEndpointStart + 'static,
+        from: impl SearchEndpoint + 'static,
         to: impl SearchEndpoint + 'static,
         requirement: NavRequirement,
     ) -> SearchResultFuture {
         let from_point = from.as_point();
-        let to_point = to.as_point_opt();
+        let to_point = to.as_point();
 
         let task = self_.nav_runtime().spawn(async move {
             let world_ref = self_.clone();
@@ -517,16 +497,13 @@ impl<C: WorldContext> World<C> {
     /// On success (Left=(path, target area), Right=[slabs to wait for])
     fn find_abortable_path(
         &self,
-        from: impl SearchEndpointStart,
+        from: impl SearchEndpoint,
         to: impl SearchEndpoint,
         requirement: NavRequirement,
     ) -> Result<Either<(PathNodes, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError> {
         let world_graph = self.nav_graph();
 
-        let to_pos = to
-            .as_point_opt()
-            .map(|p| p.floor())
-            .unwrap_or_else(|| todo!("find closest block in area to start pos"));
+        let to_pos = to.as_point().floor();
 
         // resolve positions to areas
         let src = from
