@@ -106,6 +106,10 @@ impl WorldGraph {
         self.pathfinding_runtime.handle().clone()
     }
 
+    pub fn iter_nodes(&self) -> impl Iterator<Item = WorldArea> + '_ {
+        self.graph.node_weights().copied()
+    }
+
     pub fn iter_edges(
         &self,
         node: WorldArea,
