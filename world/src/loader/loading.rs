@@ -30,6 +30,7 @@ use std::iter::repeat;
 use futures::channel::mpsc::{Sender, TrySendError, UnboundedSender};
 use futures::executor::block_on;
 use misc::tracy_client::span;
+use slice_group_by::{GroupBy, GroupByMut};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tokio::runtime::Handle;
@@ -1118,29 +1119,34 @@ impl<C: WorldContext> WorldLoader<C> {
         let _span = tracy_client::span!();
         let world_ref = self.world.clone();
 
+        let mut grouped_slab_updates;
         let (slab_updates, upper_slab_limit) = {
             // translate world -> slab updates, preserving original mapping
             // TODO reuse vec allocs
-            let mut slab_updates = terrain_updates
+            grouped_slab_updates = terrain_updates
                 .iter()
-                .cloned()
                 .flat_map(|world_update| {
                     world_update
-                        .clone()
                         .into_slab_updates()
                         .map(move |update| (world_update.clone(), update))
                 })
                 .collect_vec();
-            let mut slab_updates_to_keep = Vec::with_capacity(slab_updates.len());
+            let mut slab_updates_to_keep = Vec::with_capacity(grouped_slab_updates.len());
 
             // sort then group by chunk and slab, so each slab is touched only once
-            slab_updates.sort_unstable_by(|(_, (a, _)), (_, (b, _))| {
+            grouped_slab_updates.sort_unstable_by(|(_, (a, _)), (_, (b, _))| {
                 a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab))
             });
 
             let world = world_ref.borrow();
             let mut chunks_iter = ContiguousChunkIterator::new(&*world);
-            for (slab, updates) in &slab_updates.into_iter().group_by(|(_, (slab, _))| *slab) {
+            for updates in grouped_slab_updates
+                .linear_group_by_key(|(_, (slab, _))| *slab)
+                .into_iter()
+            {
+                assert!(!updates.is_empty()); // never empty
+                let slab = updates[0].1 .0;
+
                 enum UpdateApplication {
                     /// Pop updates from set and apply now
                     Apply,
@@ -1167,17 +1173,17 @@ impl<C: WorldContext> WorldLoader<C> {
                         slab_updates_to_keep.extend(updates.into_iter().map(
                             |(original, update)| {
                                 // remove from update set
-                                terrain_updates.remove(&original);
+                                terrain_updates.remove(original);
 
                                 // remove now unnecessary original mapping from update
-                                update
+                                update.clone()
                             },
                         ));
                     }
 
                     UpdateApplication::Defer => {
                         if cfg!(debug_assertions) {
-                            let count = updates.count();
+                            let count = updates.len();
                             trace!("deferring {count} terrain updates for slab because it's currently loading", count = count; slab.chunk);
                         } else {
                             // avoid consuming expensive iterator when not logging
@@ -1186,9 +1192,9 @@ impl<C: WorldContext> WorldLoader<C> {
                     }
                     UpdateApplication::Drop => {
                         // remove from update set
-                        let mut count = 0;
-                        for (orig, _) in updates.dedup_by(|(a, _), (b, _)| *a == *b) {
-                            terrain_updates.remove(&orig);
+                        let mut count = 0usize;
+                        for (orig, _) in updates.iter().dedup_by(|(a, _), (b, _)| *a == *b) {
+                            terrain_updates.remove(orig);
                             count += 1;
                         }
 
@@ -1216,10 +1222,7 @@ impl<C: WorldContext> WorldLoader<C> {
         let event_tx = self.event_tx();
         self.pool.runtime().spawn(async move {
             // group per slab so each slab is fetched and modified only once
-            let grouped_updates = slab_updates.into_iter().group_by(|(slab, _)| *slab);
-            let grouped_updates = grouped_updates
-                .into_iter()
-                .map(|(slab, updates)| (slab, updates.map(|(_, update)| update)));
+            let grouped_updates = slab_updates.linear_group_by_key(|(slab, _)| *slab);
 
             // modify slabs in place - even though the changes won't be fully visible in the game yet (in terms of
             // navigation or rendering), world queries in the next game tick will be current with the
@@ -1228,10 +1231,7 @@ impl<C: WorldContext> WorldLoader<C> {
 
             {
                 let mut w = world_ref.borrow_mut();
-                w.apply_terrain_updates_in_place(
-                    grouped_updates.into_iter(),
-                    |slab_loc, affected_slabs| slab_locs.push((slab_loc, affected_slabs)),
-                );
+                w.apply_terrain_updates_in_place(grouped_updates, &mut slab_locs);
             }
 
             let real_slab_count = slab_locs.len();

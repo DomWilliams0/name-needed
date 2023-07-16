@@ -236,7 +236,7 @@ impl<C: WorldContext> WorldBuilder<C> {
         b: C::BlockType,
     ) -> Self {
         let range = WorldPositionRange::with_inclusive_range(from, to);
-        for (slab, update) in split_range_across_slabs::<C>(range, b) {
+        for (slab, update) in split_range_across_slabs::<C>(&range, b) {
             let chunk = slab.chunk;
             let c = self.0.entry(chunk).or_insert_with(|| ChunkBuilder::new());
 

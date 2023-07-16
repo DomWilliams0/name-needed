@@ -457,16 +457,16 @@ impl<C: WorldContext> Slab<C> {
         self.slice(index).to_owned()
     }
 
-    pub(crate) fn apply_terrain_updates(
+    pub(crate) fn apply_terrain_updates<'a>(
         &mut self,
         this_slab: SlabLocation,
-        updates: impl Iterator<Item = SlabTerrainUpdate<C>>,
+        updates: impl Iterator<Item = &'a SlabTerrainUpdate<C>>,
     ) -> (OcclusionAffectedNeighbourSlabs, usize) {
         let mut count = 0;
         let mut affected_neighbours = OcclusionAffectedNeighbourSlabs::default();
 
         for update in updates {
-            let GenericTerrainUpdate(range, block_type): SlabTerrainUpdate<C> = update;
+            let &GenericTerrainUpdate(range, block_type): &SlabTerrainUpdate<C> = update;
             trace!("setting blocks"; "range" => ?range, "type" => ?block_type);
 
             if let Some(pos) = range.as_single() {

@@ -161,7 +161,7 @@ impl<C: WorldContext> Chunk<C> {
         self.areas.iter().map(|(k, v)| (*k, *v))
     }
 
-    pub(crate) fn areas(&self) -> impl Iterator<Item = &ChunkArea> + ExactSizeIterator {
+    pub fn iter_areas(&self) -> impl Iterator<Item = &ChunkArea> + ExactSizeIterator + Clone {
         self.areas.keys()
     }
 
@@ -177,9 +177,15 @@ impl<C: WorldContext> Chunk<C> {
         unreachable!()
     }
 
-    pub fn replace_all_slice_areas(&mut self, slab: SlabIndex, new_areas: &[SliceNavArea]) {
-        // remove all for this slab
+    pub fn remove_all_areas_for_slab(&mut self, slab: SlabIndex) {
         self.areas.retain(|a, _| a.slab_idx != slab);
+        if let Some(slab_data) = self.slabs.slab_data_mut(slab) {
+            slab_data.nav = SlabNavGraph::empty();
+        }
+    }
+
+    pub fn replace_all_slice_areas(&mut self, slab: SlabIndex, new_areas: &[SliceNavArea]) {
+        self.remove_all_areas_for_slab(slab);
 
         let mut area_alloc = SliceAreaIndexAllocator::default();
         self.areas.extend(new_areas.iter().map(|a| {
@@ -215,14 +221,14 @@ impl<C: WorldContext> Chunk<C> {
         self.slabs.slice(slice).unwrap_or_else(|| Slice::dummy())
     }
 
+    /// Does not notify
     pub(crate) fn mark_slab_requested(&self, slab: SlabIndex) {
         self.update_slab_status(slab, SlabLoadingStatus::Requested);
-        // no notification necessary, nothing waits for a slab to be requested
     }
 
+    /// Does not notify
     pub(crate) fn mark_slabs_requested(&self, slabs: impl Iterator<Item = SlabIndex>) {
         self.update_slabs_status(slabs, SlabLoadingStatus::Requested);
-        // no notification necessary, nothing waits for a slab to be requested
     }
 
     fn set_status_and_notify(&self, slab: SlabIndex, status: SlabLoadingStatus) {
@@ -435,10 +441,6 @@ impl<C: WorldContext> Chunk<C> {
             s.vertical_space = vs;
             s.occlusion = occlusion;
         }
-    }
-
-    pub fn slab_nav_graph(&self, slab: SlabIndex) -> Option<&SlabNavGraph> {
-        self.slabs.slab_data(slab).map(|s| &s.nav)
     }
 
     /// Searches downwards in vertical space for area z

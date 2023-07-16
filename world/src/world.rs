@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::iter::once;
 
 use enumflags2::BitFlags;
@@ -53,7 +54,7 @@ pub struct LoadNotifier(broadcast::Sender<(SlabLocation, SlabLoadingStatus)>);
 pub struct ListeningLoadNotifier(broadcast::Receiver<(SlabLocation, SlabLoadingStatus)>);
 
 pub enum WaitResult {
-    Success,
+    Success(SlabLocation),
     /// Channel is disconnected
     Disconnected,
     /// Channel is lagging, check slab state again and wait again if necessary
@@ -472,30 +473,39 @@ impl<C: WorldContext> World<C> {
         LoadNotifier(send)
     }
 
-    pub(crate) fn apply_terrain_updates_in_place(
+    /// Each slice of updates must be the same slab and non empty
+    pub(crate) fn apply_terrain_updates_in_place<'a>(
         &mut self,
-        updates: impl Iterator<Item = (SlabLocation, impl Iterator<Item = SlabTerrainUpdate<C>>)>,
-        mut per_slab: impl FnMut(SlabLocation, OcclusionAffectedNeighbourSlabs),
+        updates: impl Iterator<Item = &'a [(SlabLocation, SlabTerrainUpdate<C>)]>,
+        slabs_out: &mut Vec<(SlabLocation, OcclusionAffectedNeighbourSlabs)>,
     ) {
         let mut contiguous_chunks = ContiguousChunkIteratorMut::new(self);
 
-        for (slab_loc, slab_updates) in updates {
+        for single_slab_updates in updates {
+            assert!(!single_slab_updates.is_empty());
+            let slab_loc = single_slab_updates[0].0;
+            let slab_updates = single_slab_updates.iter().map(|(_, u)| u);
+
             // fetch chunk, reusing the last one if it's the same, as it should be in this sorted iterator
             let chunk = match contiguous_chunks.next(slab_loc.chunk) {
                 Some(chunk) => chunk,
                 None => {
-                    let count = slab_updates.count();
+                    let count = single_slab_updates.len();
                     debug!("skipping {count} terrain updates for chunk because it's not loaded", count = count; slab_loc.chunk);
                     continue;
                 }
             };
 
+            // remove areas from chunk lookup. need a mut world reference to remove links from world graph
+            // so do all slabs together after. only then can the notification for Requested be sent so
+            // any waiting tasks don't wake up and see old graph links
+            chunk.remove_all_areas_for_slab(slab_loc.slab);
             chunk.mark_slab_requested(slab_loc.slab);
 
             let slab = match chunk.terrain_mut().slab_mut(slab_loc.slab) {
                 Some(slab) => slab,
                 None => {
-                    let count = slab_updates.count();
+                    let count = single_slab_updates.len();
                     debug!("skipping {count} terrain updates for slab because it's not loaded", count = count; slab_loc);
                     continue;
                 }
@@ -508,7 +518,14 @@ impl<C: WorldContext> World<C> {
 
             debug!("applied {count} terrain block updates to slab", count = count; slab_loc, "new_version" => ?new_version);
 
-            per_slab(slab_loc, affected_neighbours);
+            slabs_out.push((slab_loc, affected_neighbours));
+        }
+
+        // remove old areas and connections for this slab before waking up any tasks waiting for this slab
+        for (slab, _) in slabs_out.iter() {
+            self.nav_graph.disconnect_slab(*slab);
+            self.load_notifier
+                .notify(*slab, SlabLoadingStatus::Requested);
         }
     }
 
@@ -784,6 +801,18 @@ impl SlabNotificationFilter for AnyDone {
     }
 }
 
+pub struct AnyChanged;
+
+impl SlabNotificationFilter for AnyChanged {
+    fn accept_slab(&mut self, _: SlabLocation) -> bool {
+        true
+    }
+
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
+        SlabLoadingStatus::Requested | SlabLoadingStatus::Updating
+    }
+}
+
 impl<T> SlabNotificationFilter for (SlabLocation, T)
 where
     T: Into<BitFlags<SlabLoadingStatus>> + Copy,
@@ -797,34 +826,63 @@ where
     }
 }
 
-pub struct SlabSliceDone<'a> {
-    slabs: &'a [SlabLocation],
+pub struct AllSlabs<S: SlabContainer> {
+    slabs: S,
     states: BitFlags<SlabLoadingStatus>,
     remaining: usize,
 }
 
-impl<'a> SlabSliceDone<'a> {
-    pub fn new(slabs: &'a [SlabLocation], states: impl Into<BitFlags<SlabLoadingStatus>>) -> Self {
-        debug_assert_eq!(
-            slabs,
-            slabs
-                .iter()
-                .sorted_unstable()
-                .copied()
-                .dedup()
-                .collect_vec()
-                .as_slice(),
-            "duplicates detected"
-        );
+pub struct AnySlab<S: SlabContainer>(pub S, pub BitFlags<SlabLoadingStatus>);
+
+/// Must not contain duplicates
+pub trait SlabContainer: Debug {
+    fn len(&self) -> usize;
+    fn contains(&self, slab: &SlabLocation) -> bool;
+    fn contains_dupes(&self) -> bool;
+}
+
+impl SlabContainer for &[SlabLocation] {
+    fn len(&self) -> usize {
+        <[SlabLocation]>::len(self)
+    }
+
+    fn contains(&self, slab: &SlabLocation) -> bool {
+        <[SlabLocation]>::contains(self, slab)
+    }
+
+    fn contains_dupes(&self) -> bool {
+        let clone = self.iter().copied().sorted_unstable().dedup().collect_vec();
+        clone.len() != self.len()
+    }
+}
+
+impl SlabContainer for &HashSet<SlabLocation> {
+    fn len(&self) -> usize {
+        <HashSet<_>>::len(self)
+    }
+
+    fn contains(&self, slab: &SlabLocation) -> bool {
+        <HashSet<_>>::contains(self, slab)
+    }
+
+    fn contains_dupes(&self) -> bool {
+        false
+    }
+}
+
+impl<S: SlabContainer> AllSlabs<S> {
+    pub fn new(slabs: S, states: impl Into<BitFlags<SlabLoadingStatus>>) -> Self {
+        debug_assert!(!slabs.contains_dupes(), "dupes in {:?}", slabs);
+        let remaining = slabs.len();
         Self {
             slabs,
             states: states.into(),
-            remaining: slabs.len(),
+            remaining,
         }
     }
 }
 
-impl SlabNotificationFilter for SlabSliceDone<'_> {
+impl<S: SlabContainer> SlabNotificationFilter for AllSlabs<S> {
     fn accept_slab(&mut self, slab: SlabLocation) -> bool {
         if self.slabs.contains(&slab) {
             self.remaining -= 1;
@@ -836,6 +894,16 @@ impl SlabNotificationFilter for SlabSliceDone<'_> {
 
     fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
         self.states
+    }
+}
+
+impl<S: SlabContainer> SlabNotificationFilter for AnySlab<S> {
+    fn accept_slab(&mut self, slab: SlabLocation) -> bool {
+        self.0.contains(&slab)
+    }
+
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
+        self.1
     }
 }
 
@@ -851,11 +919,11 @@ impl ListeningLoadNotifier {
                     error!("error waiting for slab notification: {}", e);
                     break WaitResult::Disconnected;
                 }
-                Ok((recvd, state))
+                Ok((slab, state))
                     if !(filter.acceptable_states() & state).is_empty()
-                        && filter.accept_slab(recvd) =>
+                        && filter.accept_slab(slab) =>
                 {
-                    break WaitResult::Success
+                    break WaitResult::Success(slab)
                 }
                 Ok(_) => { /* keep waiting */ }
             }

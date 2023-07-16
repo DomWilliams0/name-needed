@@ -43,7 +43,7 @@ pub struct GenericTerrainUpdate<C: WorldContext, P: RangePosition>(
 );
 
 impl<C: WorldContext> WorldTerrainUpdate<C> {
-    pub fn into_slab_updates(self) -> impl Iterator<Item = (SlabLocation, SlabTerrainUpdate<C>)> {
+    pub fn into_slab_updates(&self) -> impl Iterator<Item = (SlabLocation, SlabTerrainUpdate<C>)> {
         let mut block_iter = None;
         let mut range_iter = None;
 
@@ -55,11 +55,11 @@ impl<C: WorldContext> WorldTerrainUpdate<C> {
             let slab = pos.slice().slab_index();
             let result = (
                 SlabLocation::new(slab, chunk),
-                GenericTerrainUpdate(WorldRange::with_single(block), block_type),
+                GenericTerrainUpdate(WorldRange::with_single(block), *block_type),
             );
             block_iter = Some(once(result));
         } else {
-            range_iter = Some(split_range_across_slabs(range, block_type));
+            range_iter = Some(split_range_across_slabs(range, *block_type));
         }
 
         block_iter
@@ -92,7 +92,7 @@ mod split {
     use crate::WorldContext;
 
     pub fn split_range_across_slabs<C: WorldContext>(
-        range: WorldPositionRange,
+        range: &WorldPositionRange,
         bt: C::BlockType,
     ) -> impl Iterator<Item = (SlabLocation, SlabTerrainUpdate<C>)> {
         let ((ax, bx), (ay, by), (az, bz)) = range.ranges();

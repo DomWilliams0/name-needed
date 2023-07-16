@@ -8,8 +8,12 @@ use std::future::Future;
 use std::hash::Hash;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::Deref;
+use std::ptr::null_mut;
+use std::sync::atomic::{AtomicPtr, Ordering as AtomicOrdering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use misc::parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use misc::SliceRandom;
 use misc::*;
 use misc::{Rng, SmallVec};
@@ -29,8 +33,8 @@ use crate::chunk::slice_navmesh::SliceAreaIndexAllocator;
 use crate::chunk::{SlabAvailability, SlabLoadingStatus};
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
-use crate::world::{SlabSliceDone, WaitResult};
-use crate::{InnerWorldRef, World, WorldContext, WorldRef};
+use crate::world::{AllSlabs, AnyChanged, AnySlab, ListeningLoadNotifier, WaitResult};
+use crate::{AreaInfo, InnerWorldRef, World, WorldAreaV2, WorldContext, WorldRef};
 
 /// Area within the world
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -72,6 +76,18 @@ impl Default for WorldGraph {
 }
 
 impl WorldGraph {
+    /// Slab has been modified
+    pub fn disconnect_slab(&mut self, slab: SlabLocation) {
+        self.nodes.retain(|area, idx| {
+            if area.slab() == slab {
+                self.graph.remove_node(*idx);
+                false
+            } else {
+                true
+            }
+        });
+    }
+
     pub fn add_inter_slab_edges(
         &mut self,
         from: SlabLocation,
@@ -256,6 +272,9 @@ pub enum SearchError {
 
     #[error("Channel disconnected waiting for slabs to load")]
     WaitingForSlabLoading,
+
+    #[error("Search future has ended but was polled again")]
+    FinishedAlready,
 }
 
 fn edge_cost(e: EdgeReference<SlabNavEdge>) -> f32 {
@@ -287,10 +306,11 @@ struct SearchState {
 }
 
 /// [(area, edge to leave this area)]. Missing goal. Empty if already in goal area
-type PathNodes = Vec<(WorldArea, SlabNavEdge)>;
+type PathNodesSlice = [(WorldArea, SlabNavEdge)];
 
+#[derive(Clone, Debug)]
 pub struct Path {
-    areas: PathNodes,
+    areas: Box<PathNodesSlice>,
     source: WorldPoint,
     target: (WorldPoint, WorldArea),
 }
@@ -315,6 +335,10 @@ impl Path {
             .chain(once(self.target.1))
     }
 
+    pub fn iter_slabs(&self) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.iter_areas().map(|a| a.slab()).dedup()
+    }
+
     pub fn area_count(&self) -> usize {
         self.areas.len()
     }
@@ -327,20 +351,109 @@ impl Path {
 pub enum SearchResult {
     Success(Path),
     Failed(SearchError),
-    /// Wait on these slabs to load then try again
-    WorldChanged(ArrayVec<SlabLocation, 4>),
 }
 
-pub struct SearchResultFuture {
-    task: ManuallyDrop<tokio::task::JoinHandle<SearchResult>>,
-    present: bool,
+enum OngoingPath {
+    InitialSearch,
+    InterruptedSearch,
+    Found { path: Path, first_time: bool },
+}
+pub struct OngoingPathSearchFuture {
+    task: ManuallyDrop<tokio::task::JoinHandle<SearchError>>,
+    task_present: bool,
+
+    /// Shared with consumer who will poll via this
+    path: Arc<Mutex<OngoingPath>>,
 }
 
-impl Drop for SearchResultFuture {
+struct AtomicPathNodes {
+    ptr: AtomicPtr<AtomicPathNodesInner>,
+}
+
+struct AtomicPathNodesInner {
+    len: usize,
+    elems: *mut (WorldArea, SlabNavEdge),
+}
+
+impl Default for AtomicPathNodes {
+    fn default() -> Self {
+        Self {
+            ptr: AtomicPtr::new(null_mut()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SearchStatus<'a> {
+    InitialSearch,
+    Interrupted,
+    /// After first poll like this, will return `Unchanged` until it changes (duh)
+    Found(MappedMutexGuard<'a, Path>),
+    Unchanged,
+    Failed(SearchError),
+}
+
+impl OngoingPathSearchFuture {
+    /// Do not cache the returned path, but rather query each tick
+    pub fn poll_path(&mut self) -> SearchStatus {
+        if !self.task_present {
+            // already removed and over
+            return SearchStatus::Failed(SearchError::FinishedAlready);
+        }
+
+        if self.task.is_finished() {
+            // future only ends on error
+            let owned_fut = self.take_future();
+
+            let res = owned_fut
+                .now_or_never()
+                .expect("future is apparently finished")
+                .expect("path finding panicked");
+
+            return SearchStatus::Failed(res);
+        }
+
+        let mut guard = self.path.lock();
+        match &mut *guard {
+            OngoingPath::InitialSearch => SearchStatus::InitialSearch,
+            OngoingPath::InterruptedSearch => SearchStatus::Interrupted,
+            OngoingPath::Found {
+                first_time: false, ..
+            } => SearchStatus::Unchanged,
+            OngoingPath::Found { first_time, .. } => {
+                debug_assert!(*first_time);
+                *first_time = false;
+                SearchStatus::Found(MutexGuard::map(guard, |p| match p {
+                    OngoingPath::Found { path, .. } => path,
+                    _ => unreachable!(),
+                }))
+            }
+        }
+    }
+
+    pub fn check_path(&self) -> Option<MappedMutexGuard<Path>> {
+        if !self.task_present || self.task.is_finished() {
+            return None;
+        }
+
+        let guard = self.path.lock();
+        if let OngoingPath::Found { .. } = &*guard {
+            Some(MutexGuard::map(guard, |p| match p {
+                OngoingPath::Found { path, .. } => path,
+                _ => unreachable!(),
+            }))
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for OngoingPathSearchFuture {
     fn drop(&mut self) {
-        if let SearchResultFuture {
+        if let OngoingPathSearchFuture {
             task,
-            present: true,
+            task_present: true,
+            ..
         } = self
         {
             unsafe {
@@ -350,14 +463,14 @@ impl Drop for SearchResultFuture {
     }
 }
 
-impl SearchResultFuture {
+impl OngoingPathSearchFuture {
     pub fn cancel(&self) {
-        assert!(self.present);
+        assert!(self.task_present);
         self.task.abort();
     }
 
-    pub fn take_future(&mut self) -> tokio::task::JoinHandle<SearchResult> {
-        assert!(std::mem::replace(&mut self.present, false));
+    fn take_future(&mut self) -> tokio::task::JoinHandle<SearchError> {
+        assert!(std::mem::replace(&mut self.task_present, false));
         unsafe { ManuallyDrop::take(&mut self.task) }
     }
 }
@@ -367,47 +480,7 @@ impl SearchResult {
         match self {
             SearchResult::Success(path) => Ok(path),
             SearchResult::Failed(err) => Err(err),
-            SearchResult::WorldChanged(_) => Err(SearchError::WorldChanged),
         }
-    }
-}
-
-pub trait SearchEndpoint: Debug + Send + Copy {
-    fn into_area<C: WorldContext>(
-        self,
-        world: &World<C>,
-        req: NavRequirement,
-    ) -> Result<WorldArea, WorldPosition>;
-
-    fn as_point(&self) -> WorldPoint;
-}
-
-impl SearchEndpoint for (WorldPoint, WorldArea) {
-    fn into_area<C: WorldContext>(
-        self,
-        _: &World<C>,
-        _: NavRequirement,
-    ) -> Result<WorldArea, WorldPosition> {
-        Ok(self.1)
-    }
-
-    fn as_point(&self) -> WorldPoint {
-        self.0
-    }
-}
-
-impl SearchEndpoint for WorldPoint {
-    fn into_area<C: WorldContext>(
-        self,
-        world: &World<C>,
-        req: NavRequirement,
-    ) -> Result<WorldArea, WorldPosition> {
-        let pos = self.floor();
-        world.find_area_for_block(pos, req).ok_or(pos)
-    }
-
-    fn as_point(&self) -> WorldPoint {
-        *self
     }
 }
 
@@ -427,62 +500,97 @@ impl<'a> EdgeRefExt for EdgeReference<'a, SlabNavEdge> {
 }
 
 impl<C: WorldContext> World<C> {
-    pub fn poll_path(&self, fut: &mut SearchResultFuture) -> Option<Result<Path, SearchError>> {
-        assert!(fut.present);
-
-        if !fut.task.is_finished() {
-            return None;
-        }
-
-        let owned_fut = fut.take_future();
-
-        Some(
-            owned_fut
-                .now_or_never()
-                .expect("future is apparently finished")
-                .expect("path finding panicked")
-                .into_result(),
-        )
-    }
-
     pub fn find_path_async(
         self_: WorldRef<C>,
-        from: impl SearchEndpoint + 'static,
-        to: impl SearchEndpoint + 'static,
+        from: WorldPoint,
+        to: WorldPoint,
         requirement: NavRequirement,
-    ) -> SearchResultFuture {
-        let from_point = from.as_point();
-        let to_point = to.as_point();
+    ) -> OngoingPathSearchFuture {
+        async fn resolve_area<C: WorldContext>(
+            world_ref: &WorldRef<C>,
+            pos: WorldPoint,
+            requirement: NavRequirement,
+            is_dst: bool,
+        ) -> Result<Result<WorldArea, SlabLocation>, SearchError> {
+            let pos = pos.floor();
+            let slab = SlabLocation::from(pos);
 
-        let task = self_.nav_runtime().spawn(async move {
-            let world_ref = self_.clone();
+            let w = world_ref.borrow();
+            if let Some(c) = w.find_chunk_with_pos(slab.chunk) {
+                // is there a race here? slab could be changed between the load check and fetching area
+                if c.is_slab_loaded(slab.slab) {
+                    trace!("wow slab is already loaded??"; slab);
+                    return match c.find_area_for_block_with_height(pos.into(), requirement) {
+                        Some((a, _)) => {
+                            Ok(Ok(a.to_chunk_area(slab.slab).to_world_area(slab.chunk)))
+                        }
+                        None => Err(if is_dst {
+                            SearchError::DestinationNotWalkable(pos, requirement)
+                        } else {
+                            SearchError::SourceNotWalkable(pos, requirement)
+                        }),
+                    };
+                }
+            }
+
+            // must wait
+            trace!("waiting for {} slab to become available", if is_dst {"dst"} else {"src"}; slab);
+            Ok(Err(slab))
+        }
+
+        async fn find_path<C: WorldContext>(
+            world_ref: WorldRef<C>,
+            notifier: &mut ListeningLoadNotifier,
+            from: WorldPoint,
+            to: WorldPoint,
+            requirement: NavRequirement,
+        ) -> SearchResult {
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
-                trace!("path finding"; "attempt" => retry+1, "from" => ?from, "to" => ?to, "req" => ?requirement);
-                let slabs_to_wait_for;
-                let mut listener;
+                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement);
+                let mut slabs_to_wait_for = SmallVec::new();
                 {
-                    let world = world_ref.borrow();
-
-                    // start listening for load notifications now, so all loads during search are captured too
-                    listener = world.load_notifications().start_listening();
-
-                    slabs_to_wait_for = match world.find_abortable_path(from, to, requirement) {
-                        Ok(Either::Left((path, dst))) => return SearchResult::Success(Path {
-                            areas: path,
-                            source: from_point,
-                            target: (to_point, dst),
-                        }),
-                        Ok(Either::Right(loading_slabs)) => {
-                            loading_slabs
-                        }
+                    // resolve to areas, waiting for slabs if needed
+                    // TODO needs current start point, not original
+                    let src = match resolve_area(&world_ref, from, requirement, false).await {
+                        Ok(res) => res,
                         Err(err) => return SearchResult::Failed(err),
                     };
+                    let dst = match resolve_area(&world_ref, to, requirement, true).await {
+                        Ok(res) => res,
+                        Err(err) => return SearchResult::Failed(err),
+                    };
+
+                    match (src, dst) {
+                        (Ok(src), Ok(dst)) => {
+                            let world = world_ref.borrow();
+                            slabs_to_wait_for =
+                                match world.find_abortable_path(src, (to, dst), requirement) {
+                                    Ok(Either::Left((path, dst))) => {
+                                        return SearchResult::Success(Path {
+                                            areas: path,
+                                            source: from,
+                                            target: (to, dst),
+                                        })
+                                    }
+                                    Ok(Either::Right(loading_slabs)) => loading_slabs,
+                                    Err(err) => return SearchResult::Failed(err),
+                                };
+                        }
+                        (Err(a), Err(b)) => slabs_to_wait_for = smallvec![a, b],
+                        (Err(s), _) | (_, Err(s)) => slabs_to_wait_for = smallvec![s],
+                    }
                 }
 
                 debug_assert!(!slabs_to_wait_for.is_empty());
-                match listener.wait_for_slabs(SlabSliceDone::new(&slabs_to_wait_for, SlabLoadingStatus::Done)).await {
-                    WaitResult::Success | WaitResult::Retry => continue, // try again
+                match notifier
+                    .wait_for_slabs(AllSlabs::new(
+                        slabs_to_wait_for.as_slice(),
+                        SlabLoadingStatus::Done,
+                    ))
+                    .await
+                {
+                    WaitResult::Success(_) | WaitResult::Retry => continue, // try again
                     WaitResult::Disconnected => {
                         return SearchResult::Failed(SearchError::WaitingForSlabLoading)
                     }
@@ -490,40 +598,86 @@ impl<C: WorldContext> World<C> {
             }
 
             SearchResult::Failed(SearchError::WorldChanged)
+        }
+
+        let path_arc = Arc::new(Mutex::new(OngoingPath::InitialSearch));
+        let path_tx = path_arc.clone();
+        let task = self_.nav_runtime().spawn(async move {
+            let world_ref = self_.clone();
+            let mut listener = world_ref.borrow().load_notifications().start_listening();
+            let mut watching_slabs = HashSet::new();
+            loop {
+                // find initial path
+                let path = match find_path(world_ref.clone(), &mut listener, from, to, requirement)
+                    .await
+                {
+                    SearchResult::Success(p) => p,
+                    SearchResult::Failed(e) => return e,
+                };
+
+                // collect the slabs crossed
+                debug_assert!(watching_slabs.is_empty());
+                watching_slabs.extend(path.iter_slabs());
+
+                // publish path
+                *path_tx.lock() = OngoingPath::Found {
+                    path,
+                    first_time: true,
+                };
+
+                // watch for any changes to path slabs
+                loop {
+                    match listener
+                        .wait_for_slabs(AnySlab(
+                            &watching_slabs,
+                            SlabLoadingStatus::Requested | SlabLoadingStatus::Updating,
+                        ))
+                        .await
+                    {
+                        WaitResult::Success(s) => {
+                            // invalidate path!
+                            // TODO could be more graceful than stopping immediately
+
+                            trace!("invalidating path because a slab changed"; s);
+                            *path_tx.lock() = OngoingPath::InterruptedSearch;
+
+                            // commence search again
+                            // TODO from current position
+                            break;
+                        }
+                        WaitResult::Disconnected => return SearchError::WaitingForSlabLoading,
+                        WaitResult::Retry => continue,
+                    }
+                }
+
+                // clean up for next search
+                watching_slabs.clear();
+            }
         });
 
-        SearchResultFuture {
+        OngoingPathSearchFuture {
             task: ManuallyDrop::new(task),
-            present: true,
+            task_present: true,
+            path: path_arc,
         }
     }
 
     /// On success (Left=(path, target area), Right=[slabs to wait for])
     fn find_abortable_path(
         &self,
-        from: impl SearchEndpoint,
-        to: impl SearchEndpoint,
+        src: WorldArea,
+        (to_pos, dst): (WorldPoint, WorldArea),
         requirement: NavRequirement,
-    ) -> Result<Either<(PathNodes, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError> {
+    ) -> Result<Either<(Box<PathNodesSlice>, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError>
+    {
         let world_graph = self.nav_graph();
-
-        let to_pos = to.as_point().floor();
-
-        // resolve positions to areas
-        let src = from
-            .into_area(self, requirement)
-            .map_err(|p| SearchError::SourceNotWalkable(p, requirement))?;
-        let dst = to
-            .into_area(self, requirement)
-            .map_err(|p| SearchError::DestinationNotWalkable(p, requirement))?;
-
-        trace!("path areas"; "src" => %src, "dst" => %dst);
 
         if src == dst {
             // empty path
-            return Ok(Either::Left((PathNodes::new(), dst)));
+            return Ok(Either::Left((Box::new([]), dst)));
         }
 
+        let to_pos = to_pos.floor();
         let mut ctx =
             SearchContextInner::<_, EdgeIndex, _, <WorldNavGraphType as Visitable>::Map>::new(
                 world_graph.graph.visit_map(),
@@ -581,7 +735,7 @@ impl<C: WorldContext> World<C> {
                 return Ok(if !changed_slabs.is_empty() {
                     Either::Right(changed_slabs)
                 } else {
-                    Either::Left((path, dst))
+                    Either::Left((path.into_boxed_slice(), dst))
                 });
             }
 
@@ -688,10 +842,15 @@ impl<C: WorldContext> World<C> {
     ) -> Result<Path, SearchError> {
         let h = self_.nav_runtime();
         let mut fut = Self::find_path_async(self_, from, to, requirement);
-        h.block_on(async { timeout(Duration::from_secs_f32(0.5), fut.take_future()).await })
-            .expect("path finding timed out")
-            .expect("path finding panicked")
-            .into_result()
+        loop {
+            match fut.poll_path() {
+                SearchStatus::InitialSearch => continue,
+                SearchStatus::Interrupted => unreachable!("path was interrupted"),
+                SearchStatus::Found(p) => return Ok(p.clone()),
+                SearchStatus::Unchanged => unreachable!(),
+                SearchStatus::Failed(e) => return Err(e),
+            }
+        }
     }
 }
 
@@ -857,3 +1016,4 @@ where
         self.path_tracker.came_from.clear();
     }
 }
+slog_kv_display!(WorldArea, "area");

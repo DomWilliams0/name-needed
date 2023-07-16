@@ -252,7 +252,7 @@ impl Debug for PackedSlabPosition {
 
 pub struct SlabData<C: WorldContext> {
     pub(crate) terrain: Slab<C>,
-    pub(crate) nav: SlabNavGraph, // currently unused
+    pub(crate) nav: SlabNavGraph, // not yet used for navigation, but is used for faster lookup of slab local nav areas
     pub(crate) vertical_space: Arc<SlabVerticalSpace>,
     pub(in crate::chunk) last_modify_time: Instant,
     /// Current version of this slab
@@ -839,7 +839,7 @@ mod tests {
         let terrain = load_single_chunk(terrain);
 
         // TODO 1 area at z=0
-        assert_eq!(terrain.areas().count(), 1);
+        assert_eq!(terrain.iter_areas().count(), 1);
     }
 
     #[test]
@@ -919,7 +919,7 @@ mod tests {
             .set_block((3, 2, 4), DummyBlockType::Stone);
 
         let chunk = load_single_chunk(terrain);
-        assert_eq!(chunk.areas().count(), 2); // 2 disconnected areas
+        assert_eq!(chunk.iter_areas().count(), 2); // 2 disconnected areas
     }
 
     #[test]
@@ -1272,7 +1272,7 @@ mod tests {
             let w = world_ref.borrow();
             w.find_chunk_with_pos(ChunkLocation(0, 0))
                 .unwrap()
-                .areas()
+                .iter_areas()
                 .copied()
                 .collect_vec()
         };
