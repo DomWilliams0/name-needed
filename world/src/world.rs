@@ -1,10 +1,11 @@
-use std::collections::HashSet;
 use std::iter::once;
 
+use enumflags2::BitFlags;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::SendError;
 
 use misc::derive_more::Constructor;
 use misc::*;
@@ -18,7 +19,10 @@ use crate::block::{Block, BlockDurability};
 use crate::chunk::affected_neighbours::OcclusionAffectedNeighbourSlabs;
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndex;
-use crate::chunk::{AreaInfo, BlockDamageResult, Chunk, SlabData, SlabThingOrWait, SparseGrid};
+use crate::chunk::SlabLoadingStatus::TerrainInWorld;
+use crate::chunk::{
+    AreaInfo, BlockDamageResult, Chunk, SlabData, SlabLoadingStatus, SlabThingOrWait, SparseGrid,
+};
 use crate::context::WorldContext;
 use crate::loader::{SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
@@ -43,18 +47,10 @@ pub struct World<C: WorldContext> {
 }
 
 #[derive(Clone)]
-pub struct LoadNotifier {
-    send: broadcast::Sender<SlabLocation>,
-    /// Dont bother sending anything if there are no receivers
-    waiters: Arc<AtomicUsize>,
-}
+pub struct LoadNotifier(broadcast::Sender<(SlabLocation, SlabLoadingStatus)>);
 
 /// Will receive all broadcasted events while this is alive
-pub struct ListeningLoadNotifier {
-    /// Decrement on drop
-    waiters: Arc<AtomicUsize>,
-    recv: broadcast::Receiver<SlabLocation>,
-}
+pub struct ListeningLoadNotifier(broadcast::Receiver<(SlabLocation, SlabLoadingStatus)>);
 
 pub enum WaitResult {
     Success,
@@ -472,11 +468,8 @@ impl<C: WorldContext> World<C> {
     }
 
     pub(crate) fn load_notifications(&self) -> LoadNotifier {
-        let send = self.load_notifier.send.clone();
-        LoadNotifier {
-            send,
-            waiters: self.load_notifier.waiters.clone(),
-        }
+        let send = self.load_notifier.0.clone();
+        LoadNotifier(send)
     }
 
     pub(crate) fn apply_terrain_updates_in_place(
@@ -767,75 +760,89 @@ impl<C: WorldContext> World<C> {
 
 impl Default for LoadNotifier {
     fn default() -> Self {
-        let (send, recv) = broadcast::channel(4096);
-        Self {
-            send,
-            waiters: Arc::new(AtomicUsize::new(0)),
-        }
+        let (send, _) = broadcast::channel(4096);
+        Self(send)
     }
 }
 
-impl Drop for ListeningLoadNotifier {
-    fn drop(&mut self) {
-        // unsubscribe
-        self.waiters.fetch_sub(1, Ordering::SeqCst);
+pub trait SlabNotificationFilter {
+    /// Only called when passed the state check already.
+    /// Return true when done
+    fn accept_slab(&mut self, slab: SlabLocation) -> bool;
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus>;
+}
+
+pub struct AnyDone;
+
+impl SlabNotificationFilter for AnyDone {
+    fn accept_slab(&mut self, _: SlabLocation) -> bool {
+        true
+    }
+
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
+        SlabLoadingStatus::Done.into()
     }
 }
 
-impl ListeningLoadNotifier {
-    pub async fn wait_for_any(&mut self) -> WaitResult {
-        loop {
-            match self.recv.recv().await {
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
-                    break WaitResult::Retry;
-                }
-                Err(e) => {
-                    error!("error waiting for slab notification: {}", e);
-                    break WaitResult::Disconnected;
-                }
-                Ok(_) => break WaitResult::Success,
-            }
-        }
-    }
-    /// Ignores messages for other slabs
-    pub async fn wait_for_slab(&mut self, slab: SlabLocation) -> WaitResult {
-        loop {
-            match self.recv.recv().await {
-                Err(broadcast::error::RecvError::Lagged(n)) => {
-                    warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
-                    break WaitResult::Retry;
-                }
-                Err(e) => {
-                    error!("error waiting for slab notification: {}", e);
-                    break WaitResult::Disconnected;
-                }
-                Ok(recvd) if recvd == slab => break WaitResult::Success,
-                Ok(_) => { /* keep waiting */ }
-            }
-        }
+impl<T> SlabNotificationFilter for (SlabLocation, T)
+where
+    T: Into<BitFlags<SlabLoadingStatus>> + Copy,
+{
+    fn accept_slab(&mut self, slab: SlabLocation) -> bool {
+        self.0 == slab
     }
 
-    /// Waits for load notifications for all slabs. Ensure no dupes
-    pub async fn wait_for_slabs(&mut self, slabs: &[SlabLocation]) -> WaitResult {
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
+        self.1.into()
+    }
+}
+
+pub struct SlabSliceDone<'a> {
+    slabs: &'a [SlabLocation],
+    states: BitFlags<SlabLoadingStatus>,
+    remaining: usize,
+}
+
+impl<'a> SlabSliceDone<'a> {
+    pub fn new(slabs: &'a [SlabLocation], states: impl Into<BitFlags<SlabLoadingStatus>>) -> Self {
         debug_assert_eq!(
-            slabs.iter().sorted_unstable().copied().collect_vec(),
+            slabs,
             slabs
                 .iter()
                 .sorted_unstable()
                 .copied()
                 .dedup()
-                .collect_vec(),
+                .collect_vec()
+                .as_slice(),
             "duplicates detected"
         );
+        Self {
+            slabs,
+            states: states.into(),
+            remaining: slabs.len(),
+        }
+    }
+}
 
-        trace!("waiting for slabs to load: {:?}", slabs);
+impl SlabNotificationFilter for SlabSliceDone<'_> {
+    fn accept_slab(&mut self, slab: SlabLocation) -> bool {
+        if self.slabs.contains(&slab) {
+            self.remaining -= 1;
+            self.remaining == 0
+        } else {
+            false
+        }
+    }
 
-        let mut success: SmallVec<[bool; 16]> = smallvec![false; 16];
-        let mut remaining = slabs.len();
+    fn acceptable_states(&self) -> BitFlags<SlabLoadingStatus> {
+        self.states
+    }
+}
 
+impl ListeningLoadNotifier {
+    pub async fn wait_for_slabs(&mut self, mut filter: impl SlabNotificationFilter) -> WaitResult {
         loop {
-            match self.recv.recv().await {
+            match self.0.recv().await {
                 Err(broadcast::error::RecvError::Lagged(n)) => {
                     warn!("slab notifications are lagging! probably deadlock incoming"; "skipped" => n);
                     break WaitResult::Retry;
@@ -844,19 +851,13 @@ impl ListeningLoadNotifier {
                     error!("error waiting for slab notification: {}", e);
                     break WaitResult::Disconnected;
                 }
-                Ok(recvd) => {
-                    if let Some(idx) = slabs.iter().position(|s| *s == recvd) {
-                        debug_assert!(!success[idx]);
-                        success[idx] = true; // TODO what is the point of this then?
-                        remaining -= 1;
-                        if remaining == 0 {
-                            return WaitResult::Success;
-                        }
-                    }
-
-                    // keep waiting
-                    trace!("continue waiting for {remaining}: {:?}", slabs);
+                Ok((recvd, state))
+                    if !(filter.acceptable_states() & state).is_empty()
+                        && filter.accept_slab(recvd) =>
+                {
+                    break WaitResult::Success
                 }
+                Ok(_) => { /* keep waiting */ }
             }
         }
     }
@@ -864,17 +865,11 @@ impl ListeningLoadNotifier {
 
 impl LoadNotifier {
     pub fn start_listening(&self) -> ListeningLoadNotifier {
-        self.waiters.fetch_add(1, Ordering::SeqCst);
-        ListeningLoadNotifier {
-            waiters: self.waiters.clone(),
-            recv: self.send.subscribe(),
-        }
+        ListeningLoadNotifier(self.0.subscribe())
     }
 
-    pub fn notify(&self, slab: SlabLocation) {
-        if self.waiters.load(Ordering::Relaxed) > 0 {
-            self.send.send(slab).expect("send channel is full");
-        }
+    pub fn notify(&self, slab: SlabLocation, status: SlabLoadingStatus) {
+        let _ = self.0.send((slab, status));
     }
 }
 
@@ -897,7 +892,11 @@ pub async fn get_or_wait_for_slab_areas<C: WorldContext>(
             }
         }
 
-        if let WaitResult::Disconnected = notifier.wait_for_slab(slab).await {
+        use SlabLoadingStatus::*;
+        if let WaitResult::Disconnected = notifier
+            .wait_for_slabs((slab, DoneInIsolation | Done))
+            .await
+        {
             // failure, guess we're shutting down
             break;
         }
@@ -936,7 +935,11 @@ pub async fn get_or_wait_for_slab_vertical_space<C: WorldContext>(
             }
         }
 
-        if let WaitResult::Disconnected = notifier.wait_for_slab(slab).await {
+        use SlabLoadingStatus::*;
+        if let WaitResult::Disconnected = notifier
+            .wait_for_slabs((slab, TerrainInWorld | DoneInIsolation | Done))
+            .await
+        {
             // failure, guess we're shutting down
             return None;
         }
@@ -962,7 +965,11 @@ pub async fn get_or_wait_for_slab<C: WorldContext>(
             }
         }
 
-        if let WaitResult::Disconnected = notifier.wait_for_slab(slab).await {
+        use SlabLoadingStatus::*;
+        if let WaitResult::Disconnected = notifier
+            .wait_for_slabs((slab, TerrainInWorld | DoneInIsolation | Done))
+            .await
+        {
             // failure, guess we're shutting down
             break None;
         }

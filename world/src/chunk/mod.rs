@@ -1,7 +1,9 @@
 pub use slab::DeepClone;
 
 pub use self::builder::{ChunkBuilder, ChunkDescriptor, WorldBuilder};
-pub use self::chunk::{AreaInfo, Chunk, ChunkId, SlabAvailability, SlabThingOrWait};
+pub use self::chunk::{
+    AreaInfo, Chunk, ChunkId, SlabAvailability, SlabLoadingStatus, SlabThingOrWait,
+};
 pub use self::slab::{Slab, SlabGrid, SlabGridImpl};
 pub use self::slice::{flatten_coords, unflatten_index};
 pub use self::terrain::{

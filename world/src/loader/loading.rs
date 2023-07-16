@@ -10,8 +10,8 @@ use unit::world::{
 use crate::chunk::slab::{Slab, SliceNavArea};
 
 use crate::world::{
-    get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, ContiguousChunkIterator,
-    ListeningLoadNotifier, WaitResult, WorldChangeEvent,
+    get_or_collect_slab_areas, get_or_wait_for_slab_vertical_space, AnyDone,
+    ContiguousChunkIterator, ListeningLoadNotifier, WaitResult, WorldChangeEvent,
 };
 use crate::{navigationv2, WorldContext, WorldRef, ABSOLUTE_MAX_FREE_VERTICAL_SPACE};
 
@@ -1274,7 +1274,7 @@ impl<C: WorldContext> WorldLoader<C> {
                     Some(t) => t,
                 };
 
-                match block_on(tokio::time::timeout(timeout, notifications.wait_for_any())) {
+                match block_on(tokio::time::timeout(timeout, notifications.wait_for_slabs(AnyDone))) {
                     Ok(WaitResult::Disconnected) => return Err(BlockForAllError::Disconnected),
                     _ => {}
                 };

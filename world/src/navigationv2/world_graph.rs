@@ -26,10 +26,10 @@ use unit::world::{
 
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndexAllocator;
-use crate::chunk::SlabAvailability;
+use crate::chunk::{SlabAvailability, SlabLoadingStatus};
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
-use crate::world::WaitResult;
+use crate::world::{SlabSliceDone, WaitResult};
 use crate::{InnerWorldRef, World, WorldContext, WorldRef};
 
 /// Area within the world
@@ -477,7 +477,7 @@ impl<C: WorldContext> World<C> {
                 }
 
                 debug_assert!(!slabs_to_wait_for.is_empty());
-                match listener.wait_for_slabs(&slabs_to_wait_for).await {
+                match listener.wait_for_slabs(SlabSliceDone::new(&slabs_to_wait_for, SlabLoadingStatus::Done)).await {
                     WaitResult::Success | WaitResult::Retry => continue, // try again
                     WaitResult::Disconnected => {
                         return SearchResult::Failed(SearchError::WaitingForSlabLoading)

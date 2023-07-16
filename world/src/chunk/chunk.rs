@@ -18,6 +18,7 @@ use crate::navigationv2::{
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
 use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2, WorldContext};
+use enumflags2::bitflags;
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
 use std::collections::HashMap;
@@ -50,7 +51,9 @@ pub struct Chunk<C: WorldContext> {
     slab_notify: LoadNotifier,
 }
 
-#[derive(Clone, Debug)]
+#[bitflags]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
 pub enum SlabLoadingStatus {
     /// Not available
     Unloaded,
@@ -222,24 +225,26 @@ impl<C: WorldContext> Chunk<C> {
         // no notification necessary, nothing waits for a slab to be requested
     }
 
+    fn set_status_and_notify(&self, slab: SlabIndex, status: SlabLoadingStatus) {
+        self.update_slab_status(slab, status);
+        self.slab_notify
+            .notify(SlabLocation::new(slab, self.pos), status);
+    }
+
     pub(crate) fn mark_slab_as_in_world(&self, slab: SlabIndex) {
-        self.update_slab_status(slab, SlabLoadingStatus::TerrainInWorld);
-        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        self.set_status_and_notify(slab, SlabLoadingStatus::TerrainInWorld);
     }
 
     fn mark_slab_as_done_in_isolation(&self, slab: SlabIndex) {
-        self.update_slab_status(slab, SlabLoadingStatus::DoneInIsolation);
-        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        self.set_status_and_notify(slab, SlabLoadingStatus::DoneInIsolation);
     }
 
     pub(crate) fn mark_slab_as_updating(&self, slab: SlabIndex) {
-        self.update_slab_status(slab, SlabLoadingStatus::Updating);
-        // self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        self.set_status_and_notify(slab, SlabLoadingStatus::Updating);
     }
 
     pub(crate) fn mark_slab_as_done(&self, slab: SlabIndex) {
-        self.update_slab_status(slab, SlabLoadingStatus::Done);
-        self.slab_notify.notify(SlabLocation::new(slab, self.pos));
+        self.set_status_and_notify(slab, SlabLoadingStatus::Done);
     }
 
     fn update_slab_status(&self, slab: SlabIndex, state: SlabLoadingStatus) {
@@ -319,7 +324,9 @@ impl<C: WorldContext> Chunk<C> {
         match progress {
             Unloaded => Failure,
             Requested | Updating => Wait,
-            _ => Ready(self.slab_vertical_space(slab).unwrap()),
+            TerrainInWorld | DoneInIsolation | Done => {
+                Ready(self.slab_vertical_space(slab).unwrap())
+            }
         }
     }
 
