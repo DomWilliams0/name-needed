@@ -31,6 +31,11 @@ impl SmallUnsignedConstant {
     }
 
     #[inline]
+    pub const fn as_i8(self) -> i8 {
+        self.0 as i8
+    }
+
+    #[inline]
     pub const fn as_u8(self) -> u8 {
         self.0 as u8
     }
