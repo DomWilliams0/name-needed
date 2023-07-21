@@ -9,7 +9,8 @@ pub use self::chunk::{
     SlabGridImpl,
 };
 pub use self::context::{
-    BlockType, GeneratedTerrainSource, NopGeneratedTerrainSource, WorldContext, SLICE_SIZE,
+    BlockType, GeneratedTerrainSource, NopGeneratedTerrainSource, SearchToken, UpdatedSearchSource,
+    WorldContext, SLICE_SIZE,
 };
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};

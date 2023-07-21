@@ -3,13 +3,14 @@ use crate::chunk::slab::SlabGridImpl;
 pub use crate::chunk::slice::SLICE_SIZE;
 use crate::loader::{GeneratedSlab, WorldTerrainUpdate};
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 use misc::Derivative;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPoint, WorldPosition};
 
 pub trait WorldContext: 'static + Send + Sync + Sized {
     type BlockType: BlockType;
@@ -31,6 +32,18 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
         let boxed = g.into_boxed_impl();
         Arc::from(boxed)
     }
+
+    type SearchToken: SearchToken;
+}
+
+pub trait SearchToken: Debug + Clone + Send + Sync {
+    fn get_updated_search_source(&self) -> BoxFuture<UpdatedSearchSource>;
+}
+
+pub enum UpdatedSearchSource {
+    Unchanged,
+    New(WorldPoint),
+    Abort,
 }
 
 /// Panics in all methods

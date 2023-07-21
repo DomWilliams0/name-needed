@@ -1147,16 +1147,18 @@ impl AreaLookup {
 /// Helpers to create a world synchronously for tests and benchmarks
 pub mod helpers {
     use color::Color;
+    use futures::future::BoxFuture;
+    use futures::FutureExt;
     use std::sync::Arc;
     use std::time::Duration;
 
     use misc::Itertools;
-    use unit::world::{ChunkLocation, SlabLocation};
+    use unit::world::{ChunkLocation, SlabLocation, WorldPoint};
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
     use crate::chunk::slab::SlabGridImpl;
     use crate::chunk::slice::SLICE_SIZE;
-    use crate::context::NopGeneratedTerrainSource;
+    use crate::context::{NopGeneratedTerrainSource, SearchToken, UpdatedSearchSource};
     use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
     use crate::{BlockType, Chunk, ChunkBuilder, ChunkDescriptor, WorldContext, WorldRef};
 
@@ -1194,6 +1196,14 @@ pub mod helpers {
             DummyBlockType::Dirt,
             DummyBlockType::Grass,
         ];
+
+        type SearchToken = ();
+    }
+
+    impl SearchToken for () {
+        fn get_updated_search_source(&self) -> BoxFuture<'static, UpdatedSearchSource> {
+            async { UpdatedSearchSource::Unchanged }.boxed()
+        }
     }
 
     impl BlockType for DummyBlockType {

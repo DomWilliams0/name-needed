@@ -31,10 +31,13 @@ use unit::world::{
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::SliceAreaIndexAllocator;
 use crate::chunk::{SlabAvailability, SlabLoadingStatus};
+use crate::context::SearchToken;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::world::{AllSlabs, AnyChanged, AnySlab, ListeningLoadNotifier, WaitResult};
-use crate::{AreaInfo, InnerWorldRef, World, WorldAreaV2, WorldContext, WorldRef};
+use crate::{
+    AreaInfo, InnerWorldRef, UpdatedSearchSource, World, WorldAreaV2, WorldContext, WorldRef,
+};
 
 /// Area within the world
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -275,6 +278,9 @@ pub enum SearchError {
 
     #[error("Search future has ended but was polled again")]
     FinishedAlready,
+
+    #[error("Search token expired")]
+    Aborted,
 }
 
 fn edge_cost(e: EdgeReference<SlabNavEdge>) -> f32 {
@@ -505,6 +511,7 @@ impl<C: WorldContext> World<C> {
         from: WorldPoint,
         to: WorldPoint,
         requirement: NavRequirement,
+        token: C::SearchToken,
     ) -> OngoingPathSearchFuture {
         async fn resolve_area<C: WorldContext>(
             world_ref: &WorldRef<C>,
@@ -519,7 +526,7 @@ impl<C: WorldContext> World<C> {
             if let Some(c) = w.find_chunk_with_pos(slab.chunk) {
                 // is there a race here? slab could be changed between the load check and fetching area
                 if c.is_slab_loaded(slab.slab) {
-                    trace!("wow slab is already loaded??"; slab);
+                    trace!("slab is already loaded"; slab);
                     return match c.find_area_for_block_with_height(pos.into(), requirement) {
                         Some((a, _)) => {
                             Ok(Ok(a.to_chunk_area(slab.slab).to_world_area(slab.chunk)))
@@ -548,38 +555,36 @@ impl<C: WorldContext> World<C> {
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
                 trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement);
-                let mut slabs_to_wait_for = SmallVec::new();
-                {
-                    // resolve to areas, waiting for slabs if needed
-                    // TODO needs current start point, not original
-                    let src = match resolve_area(&world_ref, from, requirement, false).await {
-                        Ok(res) => res,
-                        Err(err) => return SearchResult::Failed(err),
-                    };
-                    let dst = match resolve_area(&world_ref, to, requirement, true).await {
-                        Ok(res) => res,
-                        Err(err) => return SearchResult::Failed(err),
-                    };
+                let mut slabs_to_wait_for;
 
-                    match (src, dst) {
-                        (Ok(src), Ok(dst)) => {
-                            let world = world_ref.borrow();
-                            slabs_to_wait_for =
-                                match world.find_abortable_path(src, (to, dst), requirement) {
-                                    Ok(Either::Left((path, dst))) => {
-                                        return SearchResult::Success(Path {
-                                            areas: path,
-                                            source: from,
-                                            target: (to, dst),
-                                        })
-                                    }
-                                    Ok(Either::Right(loading_slabs)) => loading_slabs,
-                                    Err(err) => return SearchResult::Failed(err),
-                                };
-                        }
-                        (Err(a), Err(b)) => slabs_to_wait_for = smallvec![a, b],
-                        (Err(s), _) | (_, Err(s)) => slabs_to_wait_for = smallvec![s],
+                // resolve to areas, waiting for slabs if needed
+                let src = match resolve_area(&world_ref, from, requirement, false).await {
+                    Ok(res) => res,
+                    Err(err) => return SearchResult::Failed(err),
+                };
+                let dst = match resolve_area(&world_ref, to, requirement, true).await {
+                    Ok(res) => res,
+                    Err(err) => return SearchResult::Failed(err),
+                };
+
+                match (src, dst) {
+                    (Ok(src), Ok(dst)) => {
+                        let world = world_ref.borrow();
+                        slabs_to_wait_for =
+                            match world.find_abortable_path(src, (to, dst), requirement) {
+                                Ok(Either::Left((path, dst))) => {
+                                    return SearchResult::Success(Path {
+                                        areas: path,
+                                        source: from,
+                                        target: (to, dst),
+                                    })
+                                }
+                                Ok(Either::Right(loading_slabs)) => loading_slabs,
+                                Err(err) => return SearchResult::Failed(err),
+                            };
                     }
+                    (Err(a), Err(b)) => slabs_to_wait_for = smallvec![a, b],
+                    (Err(s), _) | (_, Err(s)) => slabs_to_wait_for = smallvec![s],
                 }
 
                 debug_assert!(!slabs_to_wait_for.is_empty());
@@ -606,7 +611,32 @@ impl<C: WorldContext> World<C> {
             let world_ref = self_.clone();
             let mut listener = world_ref.borrow().load_notifications().start_listening();
             let mut watching_slabs = HashSet::new();
+
+            // use initial start pos for first iteration only
+            let mut search_from = Some(from);
             loop {
+                // fetch current start pos
+                let from = match search_from.take() {
+                    Some(p) => p,
+                    None => {
+                        trace!("waiting for new search pos");
+                        match token.get_updated_search_source().await {
+                            UpdatedSearchSource::Unchanged => {
+                                debug!("continue search from same point"; "token" => ?token);
+                                from
+                            }
+                            UpdatedSearchSource::New(p) => {
+                                debug!("continue search from {p}"; "token" => ?token);
+                                p
+                            }
+                            UpdatedSearchSource::Abort => {
+                                debug!("search token has expired"; "token" => ?token);
+                                return SearchError::Aborted;
+                            }
+                        }
+                    }
+                };
+
                 // find initial path
                 let path = match find_path(world_ref.clone(), &mut listener, from, to, requirement)
                     .await
