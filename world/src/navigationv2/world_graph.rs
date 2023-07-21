@@ -584,6 +584,7 @@ impl<C: WorldContext> World<C> {
                                 Err(err) => return SearchResult::Failed(err),
                             };
                     }
+                    (Err(a), Err(b)) if a == b => slabs_to_wait_for = smallvec![a],
                     (Err(a), Err(b)) => slabs_to_wait_for = smallvec![a, b],
                     (Err(s), _) | (_, Err(s)) => slabs_to_wait_for = smallvec![s],
                 }
