@@ -551,10 +551,11 @@ impl<C: WorldContext> World<C> {
             from: WorldPoint,
             to: WorldPoint,
             requirement: NavRequirement,
+            token: &C::SearchToken,
         ) -> SearchResult {
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
-                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement);
+                trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement, token);
                 let mut slabs_to_wait_for;
 
                 // resolve to areas, waiting for slabs if needed
@@ -587,6 +588,7 @@ impl<C: WorldContext> World<C> {
                     (Err(s), _) | (_, Err(s)) => slabs_to_wait_for = smallvec![s],
                 }
 
+                trace!("waiting for slabs"; "slabs" => ?slabs_to_wait_for, token);
                 debug_assert!(!slabs_to_wait_for.is_empty());
                 match notifier
                     .wait_for_slabs(AllSlabs::new(
@@ -638,8 +640,15 @@ impl<C: WorldContext> World<C> {
                 };
 
                 // find initial path
-                let path = match find_path(world_ref.clone(), &mut listener, from, to, requirement)
-                    .await
+                let path = match find_path(
+                    world_ref.clone(),
+                    &mut listener,
+                    from,
+                    to,
+                    requirement,
+                    &token,
+                )
+                .await
                 {
                     SearchResult::Success(p) => p,
                     SearchResult::Failed(e) => return e,
@@ -691,6 +700,9 @@ impl<C: WorldContext> World<C> {
             path: path_arc,
         }
     }
+
+    // TODO should have a slight preference for similar direction, or rather avoid going
+    //  back towards where the previous path came from. to avoid ping ponging
 
     /// On success (Left=(path, target area), Right=[slabs to wait for])
     fn find_abortable_path(

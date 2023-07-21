@@ -36,7 +36,7 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
     type SearchToken: SearchToken;
 }
 
-pub trait SearchToken: Debug + Clone + Send + Sync {
+pub trait SearchToken: Debug + Clone + Send + Sync + misc::slog::KV {
     fn get_updated_search_source(&self) -> BoxFuture<UpdatedSearchSource>;
 }
 
