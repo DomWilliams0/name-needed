@@ -123,7 +123,8 @@ impl LoggerBuilder {
             terminal_drain
         };
         let chan_size = match self.level {
-            Level::Debug | Level::Trace => 0x20000,
+            Level::Trace => 0x100000,
+            Level::Debug => 0x20000,
             _ => 0x4000,
         };
 
