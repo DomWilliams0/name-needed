@@ -161,6 +161,18 @@ impl WorldPoint {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct ZOffset(pub f32);
+
+impl Add<ZOffset> for WorldPoint {
+    type Output = Self;
+
+    fn add(mut self, rhs: ZOffset) -> Self::Output {
+        self.2 += rhs.0;
+        self
+    }
+}
+
 impl From<WorldPoint> for Vec3 {
     fn from(p: WorldPoint) -> Self {
         Vec3 {
