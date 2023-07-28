@@ -219,7 +219,10 @@ pub fn make_mesh<C: SliceConfig>(
             }
         }
 
-        next_area += 1;
+        next_area = match next_area.checked_add(1) {
+            Some(next) => next,
+            None => break, // happens on last iteration only
+        };
 
         // if end_corner.is_none() {
         //     // finished
