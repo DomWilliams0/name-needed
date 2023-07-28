@@ -348,10 +348,11 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
+    /// Stops early if func returns false
     pub fn get_slab_areas_or_wait(
         &self,
         slab: SlabIndex,
-        mut func: impl FnMut(&ChunkArea, &AreaInfo),
+        mut func: impl FnMut(&ChunkArea, &AreaInfo) -> bool,
     ) -> SlabThingOrWait<()> {
         use SlabLoadingStatus::*;
         use SlabThingOrWait::*;
@@ -365,7 +366,8 @@ impl<C: WorldContext> Chunk<C> {
                 self.areas
                     .iter()
                     .filter(|(area, info)| area.slab_idx == slab)
-                    .for_each(|(a, i)| func(a, i));
+                    .take_while(|(a, i)| func(a, i))
+                    .for_each(|_| {});
                 Ready(())
             }
         }

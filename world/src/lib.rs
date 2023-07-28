@@ -21,7 +21,9 @@ pub use self::navigationv2::{
     NavRequirement,
 };
 pub use self::viewer::{SliceRange, WorldViewer};
-pub use self::world::{helpers, ExplorationFilter, ExplorationResult, World, WorldChangeEvent};
+pub use self::world::{
+    helpers, AreaLookupV2, ExplorationFilter, ExplorationResult, World, WorldChangeEvent,
+};
 pub use self::world_ref::{InnerWorldRef, InnerWorldRefMut, WorldRef};
 pub use occlusion::{BlockOcclusion, OcclusionFace};
 pub use ray::{VoxelRay, VoxelRayOutput};

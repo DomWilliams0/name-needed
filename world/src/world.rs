@@ -667,25 +667,34 @@ impl<C: WorldContext> World<C> {
     }
 
     /// Finds the area for the specific block (air)
-    pub fn areav2(&self, pos: WorldPosition) -> Option<WorldAreaV2> {
-        let chunk = self.find_chunk_with_pos(pos.into())?;
+    pub fn areav2(&self, pos: WorldPosition) -> AreaLookupV2 {
+        let chunk = match self.find_chunk_with_pos(pos.into()) {
+            Some(c) => c,
+            None => return AreaLookupV2::NoChunk,
+        };
         let slab_idx = pos.slice().slab_index();
-        let slab = chunk.terrain().slab_data(slab_idx)?;
-
         let slice = pos.slice().to_local();
-        slab.nav.iter_nodes().find_map(move |a| {
-            if a.slice_idx == slice {
+        let slice_block = SliceBlock::from(pos);
+        let mut ret = None;
+        let res = chunk.get_slab_areas_or_wait(slab_idx, |a, ai| {
+            if a.slab_area.slice_idx == slice {
                 // bounds check
-                let info = chunk
-                    .area_info(slab_idx, a)
-                    .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", chunk.pos()));
-                if info.contains(pos.into()) {
-                    return Some(a.to_chunk_area(slab_idx).to_world_area(chunk.pos()));
+                if ai.contains(slice_block) {
+                    ret = Some((a.to_world_area(chunk.pos()), *ai));
+                    return false;
                 }
             }
+            true
+        });
 
-            None
-        })
+        if let Some((a, ai)) = ret {
+            AreaLookupV2::Found(a, ai)
+        } else {
+            match res {
+                SlabThingOrWait::Wait => AreaLookupV2::Loading,
+                SlabThingOrWait::Failure | SlabThingOrWait::Ready(_) => AreaLookupV2::None,
+            }
+        }
     }
 
     #[deprecated]
@@ -772,6 +781,19 @@ impl<C: WorldContext> World<C> {
                 }
             }
         });
+    }
+}
+
+pub enum AreaLookupV2 {
+    Found(WorldAreaV2, AreaInfo),
+    Loading,
+    NoChunk,
+    None,
+}
+
+impl AreaLookupV2 {
+    pub fn is_found(&self) -> bool {
+        matches!(self, Self::Found(_, _))
     }
 }
 
@@ -945,7 +967,7 @@ pub async fn get_or_wait_for_slab_areas<C: WorldContext>(
     notifier: &mut ListeningLoadNotifier,
     world: &WorldRef<C>,
     slab: SlabLocation,
-    mut func: impl FnMut(&ChunkArea, &AreaInfo),
+    mut func: impl FnMut(&ChunkArea, &AreaInfo) -> bool,
 ) {
     loop {
         {
@@ -983,6 +1005,7 @@ pub async fn get_or_collect_slab_areas<C: WorldContext>(
         if let Some(nav_area) = func(a, ai) {
             out.push(nav_area);
         }
+        true
     })
     .await
 }

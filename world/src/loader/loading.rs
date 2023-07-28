@@ -1332,6 +1332,7 @@ impl<C: WorldContext> WorldLoader<C> {
     pub fn steal_queued_block_updates(&self, out: &mut HashSet<WorldTerrainUpdate<C>>) {
         let _span = span!();
         let fut = self.source.steal_queued_block_updates(out);
+        // TODO block with timeout
         let _ = fut.now_or_never();
     }
 
