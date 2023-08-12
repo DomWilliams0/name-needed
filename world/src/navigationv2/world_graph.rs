@@ -2,7 +2,7 @@ use futures::FutureExt;
 use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::future::Future;
 use std::hash::Hash;
@@ -147,6 +147,44 @@ impl WorldGraph {
                 e.weight(),
             )
         })
+    }
+
+    /// (src area, dst area) -> should continue recursing
+    pub fn iter_accessible_nodes(
+        &self,
+        start: WorldArea,
+        req: NavRequirement,
+        mut per_node: impl FnMut(&WorldArea, &WorldArea) -> bool,
+    ) {
+        let step_size = req.step_size as i8;
+        let mut visited = HashSet::with_capacity(64);
+        let mut stack = Vec::with_capacity(32);
+        let node = match self.nodes.get(&start) {
+            Some(n) => *n,
+            None => return,
+        };
+        stack.push(node);
+
+        while let Some(node) = stack.pop() {
+            if !visited.insert(node) {
+                continue;
+            }
+
+            let src_area = self.graph.node_weight(node).unwrap();
+
+            for edge in self.graph.edges(node) {
+                if req.height <= edge.weight().clearance.get()
+                    && edge.directional_height(node) <= step_size
+                {
+                    let other_node = edge.target();
+                    debug_assert_ne!(other_node, node);
+                    let area = self.graph.node_weight(other_node).unwrap();
+                    if per_node(src_area, area) {
+                        stack.push(other_node);
+                    }
+                }
+            }
+        }
     }
 
     fn node(&self, area: &WorldArea) -> NodeIndex {

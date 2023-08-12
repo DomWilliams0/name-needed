@@ -795,6 +795,14 @@ impl AreaLookupV2 {
     pub fn is_found(&self) -> bool {
         matches!(self, Self::Found(_, _))
     }
+
+    pub fn into_option(self) -> Option<(WorldAreaV2, AreaInfo)> {
+        if let AreaLookupV2::Found(a, ai) = self {
+            Some((a, ai))
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for LoadNotifier {
