@@ -30,7 +30,7 @@ pub struct SlabArea {
 }
 
 /// Area within a chunk
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ChunkArea {
     pub slab_idx: SlabIndex,
     pub slab_area: SlabArea,

@@ -40,7 +40,7 @@ use crate::{
 };
 
 /// Area within the world
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct WorldArea {
     pub chunk_idx: ChunkLocation,
     pub chunk_area: ChunkArea,
