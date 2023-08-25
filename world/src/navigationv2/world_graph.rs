@@ -1030,22 +1030,35 @@ impl<C: WorldContext> World<C> {
 
     pub fn path_exists(
         self_: &WorldRef<C>,
-        src: WorldPosition,
-        dst: WorldPosition,
+        src: PathExistsEndpoint,
+        dst: PathExistsEndpoint,
         requirement: NavRequirement,
         goal: SearchGoal,
     ) -> PathExistsResult {
-        let src = match World::resolve_area(self_, src, ResolveAreaType::Source, requirement) {
-            Ok(ResolvedArea::WaitForSlab(_)) => return PathExistsResult::Loading,
-            Ok(ResolvedArea::Found { area, .. }) => area,
-            Err(_) => return PathExistsResult::No,
+        let src = match src {
+            PathExistsEndpoint::Point(src) => {
+                match World::resolve_area(self_, src, ResolveAreaType::Source, requirement) {
+                    Ok(ResolvedArea::WaitForSlab(_)) => return PathExistsResult::Loading,
+                    Ok(ResolvedArea::Found { area, .. }) => area,
+                    Err(_) => return PathExistsResult::No,
+                }
+            }
+            PathExistsEndpoint::Area(a) => a,
         };
 
-        let dst = match World::resolve_area(self_, dst, ResolveAreaType::Target(goal), requirement)
-        {
-            Ok(ResolvedArea::WaitForSlab(_)) => return PathExistsResult::Loading,
-            Ok(ResolvedArea::Found { area, new_pos }) => (new_pos.centred(), area),
-            Err(_) => return PathExistsResult::No,
+        let dst = match dst {
+            PathExistsEndpoint::Point(dst) => {
+                match World::resolve_area(self_, dst, ResolveAreaType::Target(goal), requirement) {
+                    Ok(ResolvedArea::WaitForSlab(_)) => return PathExistsResult::Loading,
+                    Ok(ResolvedArea::Found { area, new_pos }) => (new_pos.centred(), area),
+                    Err(_) => return PathExistsResult::No,
+                }
+            }
+            PathExistsEndpoint::Area(a) => {
+                // just use any point within area
+                let pos = self_.borrow().lookup_area_info(a).unwrap(); // just resolved
+                (pos.min_pos(a).floored(), a)
+            }
         };
 
         let w = self_.borrow();
@@ -1076,6 +1089,23 @@ impl<C: WorldContext> World<C> {
                 SearchStatus::Failed(e) => return Err(e),
             }
         }
+    }
+}
+
+pub enum PathExistsEndpoint {
+    Point(WorldPosition),
+    Area(WorldAreaV2),
+}
+
+impl From<WorldPosition> for PathExistsEndpoint {
+    fn from(pos: WorldPosition) -> Self {
+        Self::Point(pos)
+    }
+}
+
+impl From<WorldAreaV2> for PathExistsEndpoint {
+    fn from(area: WorldAreaV2) -> Self {
+        Self::Area(area)
     }
 }
 
