@@ -20,7 +20,7 @@ use crate::{flatten_coords, WorldAreaV2, ABSOLUTE_MAX_FREE_VERTICAL_SPACE, SLICE
 
 pub mod world_graph;
 
-pub use world_graph::WorldArea;
+pub use world_graph::{PathExistsResult, WorldArea};
 
 /// Area within a slab
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -499,6 +499,11 @@ pub struct NavRequirement {
 impl NavRequirement {
     pub const MIN: Self = Self {
         height: 1,
+        dims: (1.0, 1.0),
+        step_size: 1,
+    };
+    pub const MAX_HEIGHT: Self = Self {
+        height: ABSOLUTE_MAX_FREE_VERTICAL_SPACE,
         dims: (1.0, 1.0),
         step_size: 1,
     };

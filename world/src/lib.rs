@@ -18,7 +18,7 @@ pub use self::navigationv2::{
     world_graph::{
         OngoingPathSearchFuture, Path, SearchError, SearchStatus, WorldArea as WorldAreaV2,
     },
-    NavRequirement,
+    NavRequirement, PathExistsResult,
 };
 pub use self::viewer::{SliceRange, WorldViewer};
 pub use self::world::{

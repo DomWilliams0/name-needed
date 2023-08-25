@@ -353,20 +353,6 @@ impl<C: WorldContext> World<C> {
         }
     }
 
-    /// Cheap check if an area path exists between the areas of the 2 blocks
-    pub fn path_exists(&self, from: WorldPosition, to: WorldPosition) -> bool {
-        self.area(from)
-            .ok()
-            .and_then(|from| self.area(to).ok().map(|to| (from, to)))
-            .map(|(from, to)| self.area_path_exists(from, to))
-            .unwrap_or(false)
-    }
-
-    /// Cheap check if an path exists between the 2 areas
-    pub fn area_path_exists(&self, from: WorldArea, to: WorldArea) -> bool {
-        self.area_graph.path_exists(from, to, unreachable!())
-    }
-
     /// Searches downward
     pub fn find_area_for_block(
         &self,
