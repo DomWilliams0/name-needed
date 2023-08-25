@@ -334,6 +334,7 @@ fn edge_cost(e: EdgeReference<SlabNavEdge>) -> f32 {
        shitty surface type: higher cost
        doors/gates etc: higher
     */
+    // TODO slightly better edge if point is more towards goal than sideways
     1.0
 }
 
@@ -342,8 +343,25 @@ fn heuristic<C: WorldContext>(n: NodeIndex, dst: WorldPosition, world: &World<C>
     world
         .find_chunk_with_pos(area.chunk_idx)
         .and_then(|c| c.area_info(area.chunk_area.slab_idx, area.chunk_area.slab_area))
-        .map(|ai| ai.centre_pos(*area))
-        .map(|pos| pos.distance2(dst) as f32 * 1.4)
+        .map(|ai| {
+            let min = ai.min_pos(*area);
+            let max = ai.max_pos(*area);
+            let corners = [
+                (min.0, min.1),
+                (min.0, max.1),
+                (max.0, min.1),
+                (max.0, max.1),
+            ];
+
+            let distance_score = corners
+                .into_iter()
+                .map(|(x, y)| {
+                    OrderedFloat(WorldPosition::new(x, y, min.slice()).distance2(dst) as f32)
+                })
+                .min()
+                .unwrap();
+            distance_score.0
+        })
         .unwrap_or(f32::INFINITY)
 }
 
@@ -895,6 +913,7 @@ impl<C: WorldContext> World<C> {
                 .graph
                 .edges(node)
                 .filter(|e| e.directional_height(node) <= step_size);
+            // TODO use edge clearance too
 
             // iter edges to find if neighbouring slabs are loading/being modified, and abort if so
             let this_slab = node_weight(node).slab();
@@ -977,7 +996,8 @@ impl<C: WorldContext> World<C> {
         requirement: NavRequirement,
     ) -> Result<Path, SearchError> {
         let h = self_.nav_runtime();
-        let mut fut = Self::find_path_async(self_, from, to, requirement, todo!(), SearchGoal::Arrive);
+        let mut fut =
+            Self::find_path_async(self_, from, to, requirement, todo!(), SearchGoal::Arrive);
         loop {
             match fut.poll_path() {
                 SearchStatus::InitialSearch => continue,

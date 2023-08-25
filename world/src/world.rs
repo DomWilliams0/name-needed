@@ -756,7 +756,10 @@ impl<C: WorldContext> World<C> {
             // TODO search below blocks, and include the reachable range of the entity (including height)
             let mut neighbours = WorldNeighbours::new(*pos).chain(once(pos.above()));
 
-            if neighbours.any(|pos| self.areav2(pos).is_found()) {
+            if neighbours.any(|pos| {
+                self.find_area_for_block(pos, NavRequirement::MAX_HEIGHT)
+                    .is_some()
+            }) {
                 // at least one neighbour is walkable
                 return true;
             }
