@@ -753,11 +753,10 @@ impl<C: WorldContext> World<C> {
 
             // check neighbours for reachability
             // TODO filter_blocks_in_range should pass chunk+slab reference to predicate
-            let mut neighbours = WorldNeighbours::new(*pos)
-                .chain(once(pos.above())) // above and below too
-                .chain(once(pos.below()));
+            // TODO search below blocks, and include the reachable range of the entity (including height)
+            let mut neighbours = WorldNeighbours::new(*pos).chain(once(pos.above()));
 
-            if neighbours.any(|pos| matches!(self.area(pos), AreaLookup::Area(_))) {
+            if neighbours.any(|pos| self.areav2(pos).is_found()) {
                 // at least one neighbour is walkable
                 return true;
             }

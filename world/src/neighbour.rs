@@ -95,6 +95,10 @@ impl<B: NeighboursBehaviour, P: Into<[i32; 3]> + TryFrom<[i32; 3]> + Clone> Iter
 
         None
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(Self::HORIZONTAL_OFFSETS.len()))
+    }
 }
 
 impl NeighbourOffset {

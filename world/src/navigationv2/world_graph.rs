@@ -24,8 +24,8 @@ use petgraph::visit::{NodeRef, Visitable};
 use tokio::runtime::{Handle, Runtime};
 use tokio::time::timeout;
 use unit::world::{
-    BlockPosition, ChunkLocation, LocalSliceIndex, SlabLocation, SliceIndex, WorldPoint,
-    WorldPosition,
+    BlockPosition, ChunkLocation, LocalSliceIndex, RangePosition, SlabLocation, SliceIndex,
+    WorldPoint, WorldPosition,
 };
 
 use crate::chunk::slab::SliceNavArea;
@@ -34,9 +34,11 @@ use crate::chunk::{SlabAvailability, SlabLoadingStatus};
 use crate::context::SearchToken;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
+use crate::neighbour::WorldNeighbours;
 use crate::world::{AllSlabs, AnyChanged, AnySlab, ListeningLoadNotifier, WaitResult};
 use crate::{
-    AreaInfo, InnerWorldRef, UpdatedSearchSource, World, WorldAreaV2, WorldContext, WorldRef,
+    AreaInfo, InnerWorldRef, SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext,
+    WorldRef,
 };
 
 /// Area within the world
@@ -319,6 +321,9 @@ pub enum SearchError {
 
     #[error("Search token expired")]
     Aborted,
+
+    #[error("No accessible adjacent target could be found")]
+    NoAdjacent,
 }
 
 fn edge_cost(e: EdgeReference<SlabNavEdge>) -> f32 {
@@ -550,46 +555,72 @@ impl<C: WorldContext> World<C> {
         to: WorldPoint,
         requirement: NavRequirement,
         token: C::SearchToken,
+        goal: SearchGoal,
     ) -> OngoingPathSearchFuture {
-        async fn resolve_area<C: WorldContext>(
+        // Ok(Err(slab)) -> must wait for slab to load
+        // Ok(Ok(_)) -> found
+        // Err(_) -> not found
+        fn resolve_area<C: WorldContext>(
             world_ref: &WorldRef<C>,
             pos: WorldPoint,
             requirement: NavRequirement,
             is_dst: bool,
         ) -> Result<Result<WorldArea, SlabLocation>, SearchError> {
-            let pos = pos.floor();
-            let slab = SlabLocation::from(pos);
-
-            let w = world_ref.borrow();
-            if let Some(c) = w.find_chunk_with_pos(slab.chunk) {
-                // is there a race here? slab could be changed between the load check and fetching area
-                if c.is_slab_loaded(slab.slab) {
-                    trace!("slab is already loaded"; slab);
-                    return match c.find_area_for_block_with_height(pos.into(), requirement) {
-                        Some((a, _)) => {
-                            Ok(Ok(a.to_chunk_area(slab.slab).to_world_area(slab.chunk)))
-                        }
-                        None => Err(if is_dst {
-                            SearchError::DestinationNotWalkable(pos, requirement)
-                        } else {
-                            SearchError::SourceNotWalkable(pos, requirement)
-                        }),
-                    };
+            // for source area, check neighbours around start point, as it might be rounded/floored
+            // in the wrong direction
+            let pos_floor = pos.floor();
+            let positions_to_check = {
+                let mut vec = ArrayVec::<_, 5>::new();
+                vec.push(pos_floor);
+                if !is_dst {
+                    vec.extend(WorldNeighbours::new(pos_floor));
                 }
+                vec
+            };
+            let w = world_ref.borrow();
+            let mut last_slab = None;
+            let mut any_unloaded = false;
+            for pos in positions_to_check {
+                let slab = SlabLocation::from(pos);
+                if let Some(c) = w.find_chunk_with_pos(slab.chunk) {
+                    // is there a race here? slab could be changed between the load check and fetching area
+                    let is_loaded = c.is_slab_loaded(slab.slab);
+                    any_unloaded &= !is_loaded;
+                    if is_loaded {
+                        trace!("slab is already loaded"; slab);
+                        match c.find_area_for_block_with_height(pos.into(), requirement) {
+                            Some((a, _)) => {
+                                return Ok(Ok(a.to_chunk_area(slab.slab).to_world_area(slab.chunk)))
+                            }
+                            None if is_dst => {
+                                return Err(SearchError::DestinationNotWalkable(pos, requirement))
+                            }
+                            None => {} // try other blocks
+                        };
+                    }
+                }
+                last_slab = Some(slab);
             }
 
-            // must wait
-            trace!("waiting for {} slab to become available", if is_dst {"dst"} else {"src"}; slab);
-            Ok(Err(slab))
+            if !is_dst && !any_unloaded {
+                // all were loaded for source position
+                Err(SearchError::SourceNotWalkable(pos_floor, requirement))
+            } else {
+                // must wait
+                let slab = last_slab.unwrap(); // iterated at least once
+                trace!("waiting for {} slab to become available", if is_dst {"dst"} else {"src"}; slab);
+                Ok(Err(slab))
+            }
         }
 
         async fn find_path<C: WorldContext>(
             world_ref: WorldRef<C>,
             notifier: &mut ListeningLoadNotifier,
             from: WorldPoint,
-            to: WorldPoint,
+            mut to: WorldPoint,
             requirement: NavRequirement,
             token: &C::SearchToken,
+            goal: SearchGoal,
         ) -> SearchResult {
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
@@ -597,20 +628,42 @@ impl<C: WorldContext> World<C> {
                 let mut slabs_to_wait_for;
 
                 // resolve to areas, waiting for slabs if needed
-                let src = match resolve_area(&world_ref, from, requirement, false).await {
+                let src = match resolve_area(&world_ref, from, requirement, false) {
                     Ok(res) => res,
                     Err(err) => return SearchResult::Failed(err),
                 };
-                let dst = match resolve_area(&world_ref, to, requirement, true).await {
-                    Ok(res) => res,
-                    Err(err) => return SearchResult::Failed(err),
+                let dst = match goal {
+                    SearchGoal::Arrive => match resolve_area(&world_ref, to, requirement, true) {
+                        Ok(res) => res,
+                        Err(err) => return SearchResult::Failed(err),
+                    },
+                    SearchGoal::Adjacent => {
+                        // find an area adjacent
+                        // TODO search neighbours in order of distance away from source
+                        let to_pos = to.floor();
+                        match WorldNeighbours::new(to_pos)
+                            .chain(WorldNeighbours::new(to_pos.above()))
+                            .find_map(|p| {
+                                resolve_area(&world_ref, p.floored(), requirement, true)
+                                    .ok()
+                                    .map(|res| ((p, res)))
+                            }) {
+                            Some((new_target, res)) => {
+                                debug!("resolved adjacent target"; "new_target" => %new_target, "orig_target" => %to);
+                                to = new_target.centred();
+                                res
+                            }
+                            None => return SearchResult::Failed(SearchError::NoAdjacent),
+                        }
+                    }
+                    SearchGoal::Nearby(_) => todo!("nearby search goal?"),
                 };
 
                 match (src, dst) {
                     (Ok(src), Ok(dst)) => {
                         let world = world_ref.borrow();
                         slabs_to_wait_for =
-                            match world.find_abortable_path(src, (to, dst), requirement) {
+                            match world.find_abortable_path(src, (to, dst), requirement, goal) {
                                 Ok(Either::Left((path, dst))) => {
                                     return SearchResult::Success(Path {
                                         areas: path,
@@ -686,6 +739,7 @@ impl<C: WorldContext> World<C> {
                     to,
                     requirement,
                     &token,
+                    goal,
                 )
                 .await
                 {
@@ -749,11 +803,12 @@ impl<C: WorldContext> World<C> {
         src: WorldArea,
         (to_pos, dst): (WorldPoint, WorldArea),
         requirement: NavRequirement,
+        goal: SearchGoal,
     ) -> Result<Either<(Box<PathNodesSlice>, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError>
     {
         let world_graph = self.nav_graph();
 
-        if src == dst {
+        if matches!(goal, SearchGoal::Arrive) && src == dst {
             // empty path
             return Ok(Either::Left((Box::new([]), dst)));
         }
@@ -922,7 +977,7 @@ impl<C: WorldContext> World<C> {
         requirement: NavRequirement,
     ) -> Result<Path, SearchError> {
         let h = self_.nav_runtime();
-        let mut fut = Self::find_path_async(self_, from, to, requirement);
+        let mut fut = Self::find_path_async(self_, from, to, requirement, todo!(), SearchGoal::Arrive);
         loop {
             match fut.poll_path() {
                 SearchStatus::InitialSearch => continue,

@@ -60,7 +60,8 @@ pub enum SearchGoal {
     /// Arrive exactly at the target
     Arrive,
 
-    /// Arrive within 1 block of the target, target doesn't have to be accessible itself
+    /// Arrive within 1 block of the target, target doesn't have to be accessible itself. Does not
+    /// include directly above
     Adjacent,
 
     /// Arrive somewhere within the given radius of the target, target has to be accessible
