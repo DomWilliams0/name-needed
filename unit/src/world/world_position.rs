@@ -48,6 +48,10 @@ impl WorldPosition {
             + (self.1 - other.1).pow(2)
             + (self.2.slice() - other.2.slice()).pow(2)
     }
+
+    pub fn xy(&self) -> (i32, i32) {
+        (self.0, self.1)
+    }
 }
 
 impl Display for WorldPosition {
