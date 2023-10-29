@@ -2,6 +2,7 @@ use misc::derive_more::*;
 use misc::*;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::num::NonZeroU8;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
 use misc::num_traits::{CheckedAdd, CheckedSub, One};
@@ -13,7 +14,10 @@ pub struct GlobalSliceIndex(i32);
 
 /// A slice in a slab
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct LocalSliceIndex(u8);
+pub struct LocalSliceIndex {
+    /// Real value +1
+    inner_biased: NonZeroU8,
+}
 
 pub trait SliceIndex: Sized {
     type Inner: Copy + CheckedAdd + CheckedSub + One + Ord;
@@ -66,11 +70,13 @@ impl SliceIndex for LocalSliceIndex {
     const MAX: Self::Inner = SLAB_SIZE.as_u8() - 1;
 
     fn slice(self) -> Self::Inner {
-        self.0
+        self.get()
     }
     #[inline]
     fn new_srsly_unchecked(slice: Self::Inner) -> Self {
-        Self(slice)
+        Self {
+            inner_biased: unsafe { NonZeroU8::new_unchecked(slice + 1) },
+        }
     }
 }
 
@@ -106,7 +112,7 @@ impl LocalSliceIndex {
         slice.try_into().ok().and_then(|s| {
             (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX)
                 .contains(&s)
-                .then_some(Self(s))
+                .then_some(Self::new_srsly_unchecked(s))
         })
     }
 
@@ -115,37 +121,41 @@ impl LocalSliceIndex {
         Self::new(slice).unwrap_or_else(|| panic!("slice {} is invalid for its scale", slice))
     }
 
+    fn get(&self) -> u8 {
+        self.inner_biased.get() - 1
+    }
+
     pub fn to_global(self, slab: SlabIndex) -> GlobalSliceIndex {
         let z_offset = slab * SLAB_SIZE;
-        GlobalSliceIndex(z_offset.as_i32() + self.0 as i32)
+        GlobalSliceIndex(z_offset.as_i32() + self.get() as i32)
     }
 
     /// All slices 0..=SLAB_SIZE-1
     pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator + ExactSizeIterator {
-        (0..SLAB_SIZE.as_u8()).map(Self)
+        (0..SLAB_SIZE.as_u8()).map(Self::new_srsly_unchecked)
     }
     /// All slices except the last, 0..=SLAB_SIZE-2
     pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> + ExactSizeIterator
     {
-        (0..SLAB_SIZE.as_u8() - 1).map(|s| LocalSliceIndexBelowTop(Self(s)))
+        (0..SLAB_SIZE.as_u8() - 1).map(|s| LocalSliceIndexBelowTop(Self::new_srsly_unchecked(s)))
     }
 
     pub fn slice_unsigned(self) -> u32 {
-        self.0 as u32
+        self.get() as u32
     }
 
     pub fn range() -> impl Iterator<Item = Self> {
-        (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX).map(Self)
+        (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX).map(Self::new_srsly_unchecked)
     }
 
     pub fn second_from_bottom() -> Self {
-        Self(1)
+        Self::new_srsly_unchecked(1)
     }
 }
 
 impl Display for LocalSliceIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.get())
     }
 }
 
@@ -159,7 +169,7 @@ impl LocalSliceIndexBelowTop {
     }
 
     pub fn above(self) -> LocalSliceIndex {
-        let above = (self.0).0 + 1;
+        let above = (self.0).get() + 1;
         debug_assert!(above < SLAB_SIZE.as_u8());
         SliceIndex::new_srsly_unchecked(above)
     }
@@ -222,5 +232,13 @@ mod tests {
     fn sz() {
         assert_eq!(std::mem::size_of::<GlobalSliceIndex>(), 4);
         assert_eq!(std::mem::size_of::<LocalSliceIndex>(), 1);
+    }
+
+    #[test]
+    fn raw_value() {
+        let x = LocalSliceIndex::new_unchecked(0);
+        assert_eq!(x.slice_unsigned(), 0);
+        assert_eq!(x.slice(), 0);
+        assert_eq!(x.to_global(SlabIndex(2)).slice(), 2 * SLAB_SIZE.as_i32());
     }
 }

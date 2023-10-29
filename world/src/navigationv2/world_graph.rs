@@ -1272,3 +1272,14 @@ where
     }
 }
 slog_kv_display!(WorldArea, "area");
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn optional_node_size() {
+        assert_eq!(size_of::<WorldArea>(), size_of::<Option<WorldArea>>())
+    }
+}
