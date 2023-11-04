@@ -28,7 +28,7 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
     const PRESET_TYPES: [Self::BlockType; 3];
 
     fn slab_grid_of_all(bt: Self::BlockType) -> Arc<SlabGridImpl<Self>> {
-        let mut g = crate::SlabGrid::from_iter(std::iter::repeat(Block::with_block_type(bt)));
+        let g = crate::SlabGrid::from_iter(std::iter::repeat(Block::with_block_type(bt)));
         let boxed = g.into_boxed_impl();
         Arc::from(boxed)
     }

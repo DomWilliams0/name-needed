@@ -106,7 +106,7 @@ impl LoggerBuilder {
                                 use std::io::Write;
                                 write!(count_rd, "{}", record.msg())?;
                                 Ok(count_rd.count() != 0)
-                            };
+                            }
 
                             do_it
                         })

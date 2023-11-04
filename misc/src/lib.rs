@@ -37,7 +37,7 @@ pub use std::{
 
 pub type BoxedResult<T> = Result<T, Box<dyn Error>>;
 
-pub use glam::{dvec2, dvec3, vec2, vec3, Mat2, Mat3, Quat, Vec2, Vec3, self};
+pub use glam::{self, dvec2, dvec3, vec2, vec3, Mat2, Mat3, Quat, Vec2, Vec3};
 
 pub mod newtype;
 pub mod sized_iter;
