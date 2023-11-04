@@ -9,7 +9,7 @@ use petgraph::stable_graph::EdgeIndex;
 use misc::Itertools;
 use unit::world::{
     BlockCoord, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
-    BLOCKS_PER_METRE, CHUNK_SIZE, SLAB_SIZE,
+    WorldPoint, WorldPointRange, BLOCKS_PER_METRE, BLOCKS_SCALE, CHUNK_SIZE, SLAB_SIZE,
 };
 pub use world_graph::{PathExistsResult, WorldArea};
 
@@ -543,6 +543,18 @@ impl NavRequirement {
     /// In blocks
     pub fn xy_diagonal_sqrd(&self) -> f32 {
         (self.dims.0 * self.dims.0) + (self.dims.1 * self.dims.1)
+    }
+
+    /// In blocks around given centre
+    pub fn max_rotated_aabb(&self, centre: WorldPoint) -> WorldPointRange {
+        let (w, h) = self.dims;
+        let hw = w * 0.5;
+        let hh = h * 0.5;
+        let diag = ((hw * hw) + (hh * hh)).sqrt();
+        WorldPointRange::with_inclusive_range(
+            centre + (-diag, -diag, 0.0),
+            centre + (diag, diag, self.height as f32 * BLOCKS_SCALE),
+        )
     }
 }
 

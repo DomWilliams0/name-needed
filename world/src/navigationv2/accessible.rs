@@ -10,6 +10,25 @@ use crate::navigationv2::world_graph::WorldGraphNodeIndex;
 use crate::navigationv2::WorldArea;
 use crate::{NavRequirement, World, WorldContext};
 
+pub fn does_entity_fit_in_area<C: WorldContext>(
+    agent_bounds: &WorldPointRange,
+    agent_req: NavRequirement,
+    world: &World<C>,
+    agent_area: WorldArea,
+    filter_fn: impl Fn(WorldGraphNodeIndex) -> bool,
+    save_debug_files: bool,
+) -> bool {
+    AccessibilityCalculator::with_graph(
+        agent_bounds,
+        agent_req,
+        world,
+        agent_area,
+        filter_fn,
+        save_debug_files,
+    )
+    .process_fully_and_check()
+}
+
 #[cfg_attr(feature = "debug-accessibility", derive(serde::Serialize))]
 #[derive(Clone)]
 struct Rect {
@@ -23,6 +42,7 @@ pub struct AccessibilityCalculator {
     #[cfg(feature = "debug-accessibility")]
     dbg: RefCell<Option<debug_renderer::DebugRenderer>>,
 }
+
 impl AccessibilityCalculator {
     pub fn with_graph<C: WorldContext>(
         agent_bounds: &WorldPointRange,

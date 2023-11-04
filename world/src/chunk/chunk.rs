@@ -17,7 +17,10 @@ use crate::navigationv2::{
 };
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2, WorldContext};
+use crate::{
+    does_entity_fit_in_area, BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2,
+    WorldContext,
+};
 use enumflags2::bitflags;
 use parking_lot::RwLock;
 use petgraph::visit::Walker;
@@ -445,7 +448,7 @@ impl<C: WorldContext> Chunk<C> {
         }
     }
 
-    /// Searches downwards in vertical space for area z
+    /// Searches downwards in vertical space for area z. Only checks height requirement, not accessibility
     pub fn find_area_for_block_with_height(
         &self,
         block: BlockPosition,
@@ -463,7 +466,7 @@ impl<C: WorldContext> Chunk<C> {
                 let info = self
                     .area_info(slab_idx, a)
                     .unwrap_or_else(|| panic!("unknown area {a:?} in chunk {:?}", self.pos));
-                if info.fits_requirement(requirement) && info.contains(slice_block) {
+                if info.height >= requirement.height && info.contains(slice_block) {
                     return Some((a, info));
                 }
             }
@@ -510,13 +513,11 @@ impl AreaInfo {
     }
 
     /// Point is relative to this area
-    pub fn random_point(&self, xy_blocks: (f32, f32), random: &mut dyn RngCore) -> (f32, f32) {
-        debug_assert!(self.fits_xy(xy_blocks.0.powi(2) + xy_blocks.1.powi(2)));
+    pub fn random_point(&self, random: &mut dyn RngCore) -> (f32, f32) {
         let ((xmin, ymin), (xmax, ymax)) = self.range;
-        let half_width = xy_blocks.0.min(xy_blocks.1) * 0.5;
         (
-            random.gen_range(xmin as f32 + half_width, xmax as f32 - half_width + 1.0) - half_width,
-            random.gen_range(ymin as f32 + half_width, ymax as f32 - half_width + 1.0) - half_width,
+            random.gen_range(xmin as f32, xmax as f32 + 1.0),
+            random.gen_range(ymin as f32, ymax as f32 + 1.0),
         )
     }
 
@@ -526,29 +527,17 @@ impl AreaInfo {
 
     pub fn random_world_point(
         &self,
-        xy_blocks: (f32, f32),
         slice: GlobalSliceIndex,
         chunk: ChunkLocation,
         random: &mut dyn RngCore,
     ) -> WorldPoint {
-        let (x, y) = self.random_point(xy_blocks, random);
+        let (x, y) = self.random_point(random);
 
         // TODO new BlockPoint for BlockPosition but floats. this conversion is gross
         let block_pos = BlockPosition::new_unchecked(x as BlockCoord, y as BlockCoord, slice);
         let world_pos = block_pos.to_world_position(chunk).floored();
 
         world_pos + (x.fract(), y.fract(), 0.0)
-    }
-
-    pub fn fits_xy(&self, xy_diagonal_sqrd: f32) -> bool {
-        let (x, y) = self.size();
-        let x = (x as u32).pow(2);
-        let y = (y as u32).pow(2);
-        xy_diagonal_sqrd < (x + y) as f32
-    }
-
-    pub fn fits_requirement(&self, req: NavRequirement) -> bool {
-        self.height >= req.height && self.fits_xy(req.xy_diagonal_sqrd())
     }
 
     fn pos_to_world(

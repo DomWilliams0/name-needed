@@ -1,18 +1,15 @@
 use std::collections::HashSet;
 use std::iter::once;
-
-use enumflags2::BitFlags;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use enumflags2::BitFlags;
 use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::SendError;
 
 use misc::derive_more::Constructor;
 use misc::*;
 use unit::world::{
-    BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
-    SlabLocation, SliceBlock, SliceIndex, WorldPosition, WorldPositionRange,
+    BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabLocation, SliceBlock,
+    SliceIndex, WorldPointRange, WorldPosition, WorldPositionRange,
 };
 use unit::world::{WorldPoint, CHUNK_SIZE};
 
@@ -27,15 +24,16 @@ use crate::chunk::{
 use crate::context::WorldContext;
 use crate::loader::{SlabTerrainUpdate, SlabVerticalSpace};
 use crate::navigation::{
-    AreaGraph, AreaGraphSearchContext, AreaNavEdge, AreaPath, BlockGraph, BlockGraphSearchContext,
-    BlockPath, ExploreResult, NavigationError, SearchGoal, WorldArea, WorldPath, WorldPathNode,
+    AreaGraph, AreaNavEdge, AreaPath, BlockPath, NavigationError, SearchGoal, WorldArea, WorldPath,
+    WorldPathNode,
 };
 use crate::navigationv2::world_graph::WorldGraph;
-use crate::navigationv2::{as_border_area, ChunkArea, NavRequirement, SlabArea, SlabNavEdge};
-use crate::neighbour::{NeighbourOffset, WorldNeighbours};
+use crate::navigationv2::{ChunkArea, NavRequirement};
+use crate::neighbour::WorldNeighbours;
 use crate::occlusion::NeighbourOpacity;
 use crate::{
-    BlockOcclusion, BlockType, OcclusionFace, SearchError, Slab, SliceRange, WorldAreaV2, WorldRef,
+    does_entity_fit_in_area, AccessibilityCalculator, BlockOcclusion, BlockType, OcclusionFace,
+    Slab, SliceRange, WorldAreaV2, WorldRef,
 };
 
 /// All mutable world changes must go through `loader.apply_terrain_updates`
@@ -327,7 +325,9 @@ impl<C: WorldContext> World<C> {
                     let ai = self
                         .lookup_area_info(a)
                         .unwrap_or_else(|| panic!("missing area info {:?}", a));
-                    (ai.fits_requirement(req)).then_some((a, ai))
+                    unreachable!();
+                    Some((a, ai))
+                    // (ai.fits_requirement(req)).then_some((a, ai))
                 })
                 .choose(&mut random)
             {
@@ -632,13 +632,23 @@ impl<C: WorldContext> World<C> {
             let chunk = self.all_chunks().choose(random).unwrap(); // never empty
 
             // choose random area
-            let (a, ai) = chunk
-                .iter_areas_with_info()
-                .filter(|(a, ai)| ai.fits_requirement(requirement))
-                .choose(random)?;
+            let (a, ai) = chunk.iter_areas_with_info().choose(random)?;
 
             // take random point in this area
-            Some(ai.random_world_point(requirement.dims, a.slice(), chunk.pos(), random))
+            let centre = ai.random_world_point(a.slice(), chunk.pos(), random);
+
+            // ensure adjacent areas can hold us
+            let bounds_here = requirement.max_rotated_aabb(centre);
+
+            does_entity_fit_in_area(
+                &bounds_here,
+                requirement,
+                self,
+                a.to_world_area(chunk.pos()),
+                |_| true,
+                false,
+            )
+            .then_some(centre)
         })
     }
 
@@ -1166,14 +1176,15 @@ impl AreaLookup {
 
 /// Helpers to create a world synchronously for tests and benchmarks
 pub mod helpers {
-    use color::Color;
-    use futures::future::BoxFuture;
-    use futures::FutureExt;
     use std::sync::Arc;
     use std::time::Duration;
 
+    use futures::future::BoxFuture;
+    use futures::FutureExt;
+
+    use color::Color;
     use misc::Itertools;
-    use unit::world::{ChunkLocation, SlabLocation, WorldPoint};
+    use unit::world::{ChunkLocation, SlabLocation};
 
     use crate::block::{Block, BlockDurability, BlockOpacity};
     use crate::chunk::slab::SlabGridImpl;
@@ -1330,28 +1341,26 @@ pub mod helpers {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
     use std::time::Duration;
 
-    use misc::{logging, thread_rng, Itertools, Rng, SeedableRng, StdRng};
-    use unit::world::{all_slabs_in_range, SliceBlock, SliceIndex, WorldPoint, CHUNK_SIZE};
+    use misc::{thread_rng, Itertools, Rng, SeedableRng, StdRng};
+    use unit::world::{all_slabs_in_range, SliceIndex, WorldPoint, CHUNK_SIZE};
     use unit::world::{
-        BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
-        WorldPositionRange, SLAB_SIZE,
+        BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPositionRange, SLAB_SIZE,
     };
 
     use crate::chunk::ChunkBuilder;
     use crate::helpers::{DummyBlockType, DummyWorldContext};
-    use crate::loader::{AsyncWorkerPool, MemoryTerrainSource, WorldLoader, WorldTerrainUpdate};
+    use crate::loader::{AsyncWorkerPool, WorldLoader, WorldTerrainUpdate};
     use crate::navigation::EdgeCost;
     use crate::navigationv2::NavRequirement;
-    use crate::occlusion::{NeighbourOpacity, VertexOcclusion};
+    use crate::occlusion::VertexOcclusion;
     use crate::presets::from_preset;
     use crate::world::helpers::{
         apply_updates, loader_from_chunks_blocking, world_from_chunks_blocking,
     };
     use crate::world::ContiguousChunkIterator;
-    use crate::{presets, BlockType, SearchGoal, World, WorldContext, WorldRef};
+    use crate::{presets, BlockType, SearchGoal, World, WorldContext};
 
     #[test]
     fn world_context() {
