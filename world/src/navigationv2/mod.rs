@@ -1,26 +1,25 @@
-use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::hint::unreachable_unchecked;
 use std::num::NonZeroU8;
 
-use misc::{debug, trace, Either, Itertools};
 use petgraph::graphmap::UnGraphMap;
-use petgraph::prelude::DiGraphMap;
+
+use misc::Itertools;
 use unit::world::{
-    BlockCoord, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SlabLocation,
-    SliceBlock, SliceIndex, BLOCKS_PER_METRE, BLOCKS_SCALE, CHUNK_SIZE, SLAB_SIZE,
+    BlockCoord, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
+    BLOCKS_PER_METRE, CHUNK_SIZE, SLAB_SIZE,
 };
+pub use world_graph::{PathExistsResult, WorldArea};
 
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::{SliceAreaIndex, SliceAreaIndexAllocator};
 use crate::chunk::AreaInfo;
 use crate::neighbour::NeighbourOffset;
-use crate::{flatten_coords, WorldAreaV2, ABSOLUTE_MAX_FREE_VERTICAL_SPACE, SLICE_SIZE};
+use crate::{WorldAreaV2, ABSOLUTE_MAX_FREE_VERTICAL_SPACE};
 
+pub mod accessible;
 pub mod world_graph;
-
-pub use world_graph::{PathExistsResult, WorldArea};
 
 /// Area within a slab
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -540,9 +539,11 @@ impl NavRequirement {
 //noinspection DuplicatedCode
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use misc::Itertools;
     use std::collections::HashSet;
+
+    use misc::Itertools;
+
+    use super::*;
 
     #[test]
     fn touching() {

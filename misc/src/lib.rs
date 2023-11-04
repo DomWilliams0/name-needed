@@ -37,7 +37,7 @@ pub use std::{
 
 pub type BoxedResult<T> = Result<T, Box<dyn Error>>;
 
-pub use glam::{dvec2, dvec3, vec2, vec3, Mat2, Mat3, Quat, Vec2, Vec3};
+pub use glam::{dvec2, dvec3, vec2, vec3, Mat2, Mat3, Quat, Vec2, Vec3, self};
 
 pub mod newtype;
 pub mod sized_iter;
@@ -48,6 +48,16 @@ macro_rules! some_or_continue {
         match $opt {
             Some(v) => v,
             None => continue,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! some_or_return {
+    ($opt:expr) => {
+        match $opt {
+            Some(v) => v,
+            None => return,
         }
     };
 }

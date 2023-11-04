@@ -1,45 +1,41 @@
-use futures::FutureExt;
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::future::Future;
 use std::hash::Hash;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicPtr, Ordering as AtomicOrdering};
+use std::sync::atomic::AtomicPtr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
+
+use futures::FutureExt;
+use petgraph::algo::Measure;
+use petgraph::stable_graph::*;
+use petgraph::visit::{EdgeRef, IntoEdges, VisitMap};
+use petgraph::visit::{NodeRef, Visitable};
+use petgraph::Direction;
+use tokio::runtime::{Handle, Runtime};
 
 use misc::parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use misc::SliceRandom;
 use misc::*;
 use misc::{Rng, SmallVec};
-use petgraph::algo::Measure;
-use petgraph::stable_graph::*;
-use petgraph::visit::{EdgeRef, IntoEdges, VisitMap};
-use petgraph::visit::{NodeRef, Visitable};
-use tokio::runtime::{Handle, Runtime};
-use tokio::time::timeout;
 use unit::world::{
-    BlockPosition, ChunkLocation, LocalSliceIndex, RangePosition, SlabLocation, SliceIndex,
-    WorldPoint, WorldPosition,
+    ChunkLocation, LocalSliceIndex, RangePosition, SlabLocation, SliceIndex, WorldPoint,
+    WorldPosition,
 };
 
-use crate::chunk::slab::SliceNavArea;
-use crate::chunk::slice_navmesh::SliceAreaIndexAllocator;
 use crate::chunk::{SlabAvailability, SlabLoadingStatus};
 use crate::context::SearchToken;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
 use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
 use crate::neighbour::WorldNeighbours;
-use crate::world::{AllSlabs, AnyChanged, AnySlab, ListeningLoadNotifier, WaitResult};
-use crate::{
-    AreaInfo, InnerWorldRef, SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext,
-    WorldRef,
-};
+use crate::world::{AllSlabs, AnySlab, ListeningLoadNotifier, WaitResult};
+use crate::{SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext, WorldRef};
 
 /// Area within the world
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -48,13 +44,15 @@ pub struct WorldArea {
     pub chunk_area: ChunkArea,
 }
 
+pub type WorldGraphNodeIndex = NodeIndex;
+
 // TODO hierarchical, nodes should be slabs only
 // TODO ensure undirected edges go a consistent direction e.g. src<dst, so edges can be reverserd consistently
 type WorldNavGraphType = StableUnGraph<WorldArea, SlabNavEdge, u32>;
 
 pub struct WorldGraph {
     graph: WorldNavGraphType,
-    nodes: HashMap<WorldArea, NodeIndex>,
+    nodes: HashMap<WorldArea, WorldGraphNodeIndex>,
     pathfinding_runtime: Runtime,
 }
 
@@ -131,24 +129,42 @@ impl WorldGraph {
         self.graph.node_weights().copied()
     }
 
+    /// Does not filter out inaccessible edges.
+    /// Returns (area, edge, directional height)
     pub fn iter_edges(
         &self,
         node: WorldArea,
-    ) -> impl Iterator<Item = (WorldArea, &SlabNavEdge)> + '_ {
+    ) -> impl Iterator<Item = (WorldArea, &SlabNavEdge, i8)> + '_ {
         let idx = self.node(&node);
         self.graph.edges(idx).map(move |e| {
-            (
-                *self
-                    .graph
-                    .node_weight(if idx == e.source() {
-                        e.target()
-                    } else {
-                        e.source()
-                    })
-                    .unwrap(),
-                e.weight(),
-            )
+            let (h, n) = e.directional_height_and_target(idx);
+            (*self.graph.node_weight(n).unwrap(), e.weight(), h)
         })
+    }
+
+    pub fn iter_accessible_edges<'a>(
+        &'a self,
+        node: WorldArea,
+        req: NavRequirement,
+        filter_fn: impl (Fn(WorldGraphNodeIndex, i8) -> bool) + 'a,
+    ) -> impl Iterator<Item = (WorldGraphNodeIndex, WorldArea, &SlabNavEdge)> + 'a {
+        let idx = self.node(&node);
+        let step_size = req.step_size as i8;
+        self.graph
+            .edges_directed(idx, Direction::Outgoing)
+            .filter_map(move |e| {
+                let n = if idx == e.source() {
+                    e.target()
+                } else {
+                    e.source()
+                };
+
+                let (directional_height, _) = e.directional_height_and_target(idx);
+                (filter_fn(n, directional_height) && directional_height <= step_size).then(|| {
+                    // TODO check clearance size too
+                    (n, *self.graph.node_weight(n).unwrap(), e.weight())
+                })
+            })
     }
 
     /// (src area, dst area) -> should continue recursing
@@ -189,7 +205,7 @@ impl WorldGraph {
         }
     }
 
-    fn node(&self, area: &WorldArea) -> NodeIndex {
+    pub fn node(&self, area: &WorldArea) -> NodeIndex {
         *self
             .nodes
             .get(area)
@@ -552,16 +568,22 @@ impl SearchResult {
 }
 
 trait EdgeRefExt {
-    fn directional_height(&self, source: NodeIndex) -> i8;
+    fn directional_height_and_target(&self, source: NodeIndex) -> (i8, NodeIndex);
+
+    fn directional_height(&self, source: NodeIndex) -> i8 {
+        self.directional_height_and_target(source).0
+    }
 }
 
 impl<'a> EdgeRefExt for EdgeReference<'a, SlabNavEdge> {
-    fn directional_height(&self, source: NodeIndex) -> i8 {
-        if self.source() == source {
-            self.weight().height_diff as i8
+    fn directional_height_and_target(&self, source: NodeIndex) -> (i8, NodeIndex) {
+        let h = self.weight().height_diff as i8;
+        let src = self.source();
+        if src == source {
+            (h, self.target())
         } else {
             debug_assert_eq!(source, self.target());
-            -(self.weight().height_diff as i8)
+            (-h, src)
         }
     }
 }
@@ -949,6 +971,7 @@ impl<C: WorldContext> World<C> {
             */
 
             let step_size = requirement.step_size as i8;
+            // TODO replcae with new accesibility check
             let filtered_edges = world_graph
                 .graph
                 .edges(node)
@@ -1275,8 +1298,9 @@ slog_kv_display!(WorldArea, "area");
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::mem::size_of;
+
+    use super::*;
 
     #[test]
     fn optional_node_size() {

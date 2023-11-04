@@ -15,6 +15,7 @@ pub use self::context::{
 pub use self::mesh::BaseVertex;
 pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, WorldPath};
 pub use self::navigationv2::{
+    accessible::AccessibilityCalculator,
     world_graph::{
         OngoingPathSearchFuture, Path, SearchError, SearchStatus, WorldArea as WorldAreaV2,
     },

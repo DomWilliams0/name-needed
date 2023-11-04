@@ -20,7 +20,7 @@ pub struct VoxelRayOutput {
     pub ray: VoxelRay,
     pub points: Vec<WorldPoint>,
     pub blocks: Vec<(WorldPosition, bool)>,
-    pub result: Option<WorldPosition>,
+    hit_block: Option<WorldPosition>,
 }
 
 impl VoxelRayOutput {
@@ -29,7 +29,7 @@ impl VoxelRayOutput {
             ray: ray.clone(),
             points: vec![],
             blocks: vec![],
-            result: None,
+            hit_block: None,
         }
     }
     fn on_point(&mut self, p: WorldPoint) {
@@ -41,7 +41,12 @@ impl VoxelRayOutput {
     }
 
     pub fn result(&self) -> Option<WorldPosition> {
-        self.result
+        self.hit_block
+    }
+
+    pub fn block_before_hit(&self) -> Option<WorldPosition> {
+        let idx = self.blocks.len().checked_sub(2)?;
+        self.blocks.get(idx).map(|(b, _)| *b)
     }
 }
 
@@ -69,7 +74,7 @@ impl VoxelRay {
     ) -> VoxelRayOutput {
         let mut output = VoxelRayOutput::new(self);
         let res = self.dew_it(world, |pos| range.contains(pos.slice()), &mut output);
-        output.result = res;
+        output.hit_block = res;
         output
     }
 

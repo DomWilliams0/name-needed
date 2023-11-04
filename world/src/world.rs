@@ -322,8 +322,8 @@ impl<C: WorldContext> World<C> {
             let (dst, ai) = match self
                 .nav_graph
                 .iter_edges(current)
-                .filter(|(a, _)| *a != last)
-                .filter_map(|(a, _)| {
+                .filter(|(a, _, _)| *a != last)
+                .filter_map(|(a, _, _)| {
                     let ai = self
                         .lookup_area_info(a)
                         .unwrap_or_else(|| panic!("missing area info {:?}", a));
@@ -772,6 +772,7 @@ impl<C: WorldContext> World<C> {
     }
 }
 
+#[derive(Debug)]
 pub enum AreaLookupV2 {
     Found(WorldAreaV2, AreaInfo),
     Loading,
