@@ -1,19 +1,15 @@
-use crate::world::ContiguousChunkIterator;
-use crate::{BlockType, InnerWorldRef, SliceRange, WorldContext};
-use misc::num_traits::signum;
-use misc::parking_lot::Mutex;
+use misc::glam::DVec3;
 use misc::*;
-use std::cell::RefCell;
 use unit::space::view::ViewPoint;
-use unit::world::{
-    BlockPosition, ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition,
-    BLOCKS_PER_METRE,
-};
+use unit::world::{ChunkLocation, GlobalSliceIndex, SliceIndex, WorldPoint, WorldPosition};
+
+use crate::world::ContiguousChunkIterator;
+use crate::{BlockType, InnerWorldRef, OcclusionFace, SliceRange, WorldContext};
 
 #[derive(Debug, Clone)]
 pub struct VoxelRay {
     pos: ViewPoint,
-    dir: Vec3,
+    dir: DVec3,
 }
 
 pub struct VoxelRayOutput {
@@ -43,15 +39,10 @@ impl VoxelRayOutput {
     pub fn result(&self) -> Option<WorldPosition> {
         self.hit_block
     }
-
-    pub fn block_before_hit(&self) -> Option<WorldPosition> {
-        let idx = self.blocks.len().checked_sub(2)?;
-        self.blocks.get(idx).map(|(b, _)| *b)
-    }
 }
 
 impl VoxelRay {
-    pub fn new(pos: ViewPoint, dir: Vec3) -> Self {
+    pub fn new(pos: ViewPoint, dir: DVec3) -> Self {
         Self {
             pos,
             dir: dir.normalize(),
@@ -62,7 +53,7 @@ impl VoxelRay {
         self.pos
     }
 
-    pub fn direction(&self) -> Vec3 {
+    pub fn direction(&self) -> DVec3 {
         self.dir
     }
 
@@ -90,16 +81,15 @@ impl VoxelRay {
         }
 
         // TODO skip ahead over unloaded chunks
-        let step: [f64; 3] = {
-            let vec = (self.dir / 10.0).as_dvec3();
-            *vec.as_ref()
-        };
+        let mut step = self.dir.to_array();
+        step.iter_mut().for_each(|c| *c /= 10.0);
 
-        // https://gamedev.stackexchange.com/a/49423j
+        // https://gamedev.stackexchange.com/a/49423
         let range = 800.0;
         let cam_pos = WorldPoint::from(self.pos);
         let mut pos = dvec3(cam_pos.x() as f64, cam_pos.y() as f64, cam_pos.z() as f64);
-        let dir = self.dir.as_dvec3();
+        let dir = self.dir;
+        // TODO this is not very accurate
         let mut t_max = dvec3(
             intbound(pos.x, dir.x),
             intbound(pos.y, dir.y),
@@ -107,6 +97,7 @@ impl VoxelRay {
         );
 
         let t_delta = dvec3(step[0] / dir.x, step[1] / dir.y, step[2] / dir.z);
+        let mut face = OcclusionFace::Top;
 
         let mut last_block = WorldPosition::new(i32::MIN, i32::MIN, GlobalSliceIndex::bottom());
         let mut has_seen_a_block = false;
@@ -116,8 +107,13 @@ impl VoxelRay {
             output.on_point(point);
 
             let block_pos = point.floor();
-            let filtered = filter(block_pos);
-            output.on_block(block_pos, filtered);
+            let same_as_last = last_block == block_pos;
+            let filtered = same_as_last || {
+                let filtered = filter(block_pos);
+                output.on_block(block_pos, filtered);
+                filtered
+            };
+
             if filtered {
                 // TODO filter out invisible here
                 if block_pos != last_block {
@@ -127,10 +123,10 @@ impl VoxelRay {
 
                     if let Some(b) = block {
                         has_seen_a_block = true;
+
                         if !b.block_type().is_air() {
                             // found a solid block
-                            // TODO capture face
-                            // TODO return a point instead of block
+                            // TODO the exact point is on the given face of a block. inverse project to get the real block from that instead of flooring which is wrong
                             return Some(block_pos);
                         }
                     } else if has_seen_a_block {
@@ -142,7 +138,7 @@ impl VoxelRay {
                 }
             }
 
-            let face = if t_max[0] < t_max[1] {
+            face = if t_max[0] < t_max[1] {
                 if t_max[0] < t_max[2] {
                     if t_max[0] > range {
                         break;
@@ -151,14 +147,20 @@ impl VoxelRay {
                     pos.x += step[0];
                     t_max[0] += t_delta[0];
 
-                    (-step[0], 0.0, 0.0)
+                    // (-step[0], 0.0, 0.0)
+                    if step[0].is_sign_positive() {
+                        OcclusionFace::West
+                    } else {
+                        OcclusionFace::East
+                    }
                 } else {
                     if t_max[2] > range {
                         break;
                     }
                     pos.z += step[2];
                     t_max[2] += t_delta[2];
-                    (0.0, 0.0, -step[2])
+                    // (0.0, 0.0, -step[2])
+                    OcclusionFace::Top
                 }
             } else {
                 if t_max[1] < t_max[2] {
@@ -167,14 +169,21 @@ impl VoxelRay {
                     }
                     pos.y += step[1];
                     t_max[1] += t_delta[1];
-                    (0.0, -step[1], 0.0)
+
+                    // (0.0, -step[1], 0.0)
+                    if step[1].is_sign_positive() {
+                        OcclusionFace::South
+                    } else {
+                        OcclusionFace::North
+                    }
                 } else {
                     if t_max[2] > range {
                         break;
                     }
                     pos.z += step[2];
                     t_max[2] += t_delta[2];
-                    (0.0, 0.0, -step[2])
+                    // (0.0, 0.0, -step[2])
+                    OcclusionFace::Top
                 }
             };
         }

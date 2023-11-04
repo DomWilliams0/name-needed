@@ -397,6 +397,22 @@ impl OcclusionFace {
             West => pos.try_add((-1, 0)),
         }
     }
+
+    pub fn offset_i32(self) -> (i32, i32, i32) {
+        use OcclusionFace::*;
+        match self {
+            Top => (0, 0, 1),
+            North => (0, 1, 0),
+            East => (1, 0, 0),
+            South => (0, -1, 0),
+            West => (-1, 0, 0),
+        }
+    }
+
+    pub fn offset_f32(self) -> (f32, f32, f32) {
+        let (x, y, z) = self.offset_i32();
+        (x as f32, y as f32, z as f32)
+    }
 }
 
 #[derive(Copy, Clone)]
