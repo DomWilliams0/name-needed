@@ -3,9 +3,8 @@ use std::collections::VecDeque;
 
 use ahash::HashSet;
 
-use misc::glam::{ivec2, IVec2};
-use misc::some_or_continue;
-use unit::world::WorldPositionRange;
+use misc::{some_or_continue, vec2, Vec2};
+use unit::world::{WorldPointRange, WorldPositionRange};
 
 use crate::navigationv2::world_graph::WorldGraphNodeIndex;
 use crate::navigationv2::WorldArea;
@@ -14,9 +13,9 @@ use crate::{NavRequirement, World, WorldContext};
 #[cfg_attr(feature = "debug-accessibility", derive(serde::Serialize))]
 #[derive(Clone)]
 struct Rect {
-    min: IVec2,
+    min: Vec2,
     /// Inclusive
-    max: IVec2,
+    max: Vec2,
 }
 pub struct AccessibilityCalculator {
     agent_remaining: Vec<Rect>,
@@ -26,7 +25,7 @@ pub struct AccessibilityCalculator {
 }
 impl AccessibilityCalculator {
     pub fn with_graph<C: WorldContext>(
-        agent_bounds: &WorldPositionRange,
+        agent_bounds: &WorldPointRange,
         agent_req: NavRequirement,
         world: &World<C>,
         agent_area: WorldArea,
@@ -189,12 +188,22 @@ search check
     second: in centre of next potential edge->area
  */
 
+impl From<&WorldPointRange> for Rect {
+    fn from(range: &WorldPointRange) -> Self {
+        let (min, max) = range.bounds();
+        Rect {
+            min: vec2(min.x(), min.y()),
+            max: vec2(max.x() + 1.0, max.y() + 1.0),
+        }
+    }
+}
+
 impl From<&WorldPositionRange> for Rect {
     fn from(range: &WorldPositionRange) -> Self {
         let (min, max) = range.bounds();
         Rect {
-            min: ivec2(min.0, min.1),
-            max: ivec2(max.0 + 1, max.1 + 1),
+            min: vec2(min.0 as f32, min.1 as f32),
+            max: vec2((max.0 + 1) as f32, (max.1 + 1) as f32),
         }
     }
 }
@@ -214,10 +223,10 @@ impl Rect {
     }
 
     fn intersects(&self, other: &Rect) -> bool {
-        self.min.x <= other.max.x
-            && self.max.x >= other.min.x
-            && self.min.y <= other.max.y
-            && self.max.y >= other.min.y
+        self.min.x < other.max.x
+            && self.max.x > other.min.x
+            && self.min.y < other.max.y
+            && self.max.y > other.min.y
     }
 
     fn subtract(&self, other: &Rect, result: &mut Vec<Rect>) {
@@ -232,32 +241,32 @@ impl Rect {
             // Left rectangle
             if self.min.x < x1 {
                 result.push(Rect {
-                    min: IVec2::new(self.min.x, self.min.y),
-                    max: IVec2::new(x1, self.max.y),
+                    min: vec2(self.min.x, self.min.y),
+                    max: vec2(x1, self.max.y),
                 });
             }
 
             // Right rectangle
             if self.max.x > x2 {
                 result.push(Rect {
-                    min: IVec2::new(x2, self.min.y),
-                    max: IVec2::new(self.max.x, self.max.y),
+                    min: vec2(x2, self.min.y),
+                    max: vec2(self.max.x, self.max.y),
                 });
             }
 
             // Top rectangle
             if self.min.y < y1 {
                 result.push(Rect {
-                    min: IVec2::new(x1, self.min.y),
-                    max: IVec2::new(x2, y1),
+                    min: vec2(x1, self.min.y),
+                    max: vec2(x2, y1),
                 });
             }
 
             // Bottom rectangle
             if self.max.y > y2 {
                 result.push(Rect {
-                    min: IVec2::new(x1, y2),
-                    max: IVec2::new(x2, self.max.y),
+                    min: vec2(x1, y2),
+                    max: vec2(x2, self.max.y),
                 });
             }
         }
