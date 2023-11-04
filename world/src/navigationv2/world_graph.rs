@@ -32,7 +32,9 @@ use unit::world::{
 use crate::chunk::{SlabAvailability, SlabLoadingStatus};
 use crate::context::SearchToken;
 use crate::navigationv2::world_graph::SearchError::InvalidArea;
-use crate::navigationv2::{ChunkArea, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph};
+use crate::navigationv2::{
+    ChunkArea, DirectionalSlabNavEdge, NavRequirement, SlabArea, SlabNavEdge, SlabNavGraph,
+};
 use crate::neighbour::WorldNeighbours;
 use crate::world::{AllSlabs, AnySlab, ListeningLoadNotifier, WaitResult};
 use crate::{SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext, WorldRef};
@@ -48,12 +50,37 @@ pub type WorldGraphNodeIndex = NodeIndex;
 
 // TODO hierarchical, nodes should be slabs only
 // TODO ensure undirected edges go a consistent direction e.g. src<dst, so edges can be reverserd consistently
-type WorldNavGraphType = StableUnGraph<WorldArea, SlabNavEdge, u32>;
+type WorldNavGraphType = StableDiGraph<WorldArea, SlabNavEdge, u32>;
 
 pub struct WorldGraph {
     graph: WorldNavGraphType,
     nodes: HashMap<WorldArea, WorldGraphNodeIndex>,
     pathfinding_runtime: Runtime,
+}
+
+pub trait WorldNodeRef {
+    fn into_node_index(self, graph: &WorldGraph) -> WorldGraphNodeIndex;
+    fn into_area(self, graph: &WorldGraph) -> WorldArea;
+}
+
+impl WorldNodeRef for WorldGraphNodeIndex {
+    fn into_node_index(self, _: &WorldGraph) -> WorldGraphNodeIndex {
+        self
+    }
+
+    fn into_area(self, graph: &WorldGraph) -> WorldAreaV2 {
+        graph.node_weight(self)
+    }
+}
+
+impl WorldNodeRef for WorldArea {
+    fn into_node_index(self, graph: &WorldGraph) -> WorldGraphNodeIndex {
+        graph.node(&self)
+    }
+
+    fn into_area(self, _: &WorldGraph) -> WorldAreaV2 {
+        self
+    }
 }
 
 impl Default for WorldGraph {
@@ -129,42 +156,68 @@ impl WorldGraph {
         self.graph.node_weights().copied()
     }
 
-    /// Does not filter out inaccessible edges.
-    /// Returns (area, edge, directional height)
-    pub fn iter_edges(
-        &self,
-        node: WorldArea,
-    ) -> impl Iterator<Item = (WorldArea, &SlabNavEdge, i8)> + '_ {
-        let idx = self.node(&node);
-        self.graph.edges(idx).map(move |e| {
-            let (h, n) = e.directional_height_and_target(idx);
-            (*self.graph.node_weight(n).unwrap(), e.weight(), h)
-        })
+    fn node_weight(&self, n: NodeIndex) -> WorldArea {
+        *self
+            .graph
+            .node_weight(n)
+            .unwrap_or_else(|| panic!("invalid node index {n:?}"))
     }
 
+    /// Does not filter out inaccessible edges.
+    pub fn iter_edges(
+        &self,
+        node: impl WorldNodeRef,
+    ) -> impl Iterator<Item = (WorldArea, DirectionalSlabNavEdge<'_>)> + Clone + '_ {
+        let node = node.into_node_index(self);
+        self.graph
+            .edges_directed(node, Direction::Outgoing)
+            .map(move |e| {
+                debug_assert_ne!(e.target(), node);
+                (
+                    self.node_weight(e.target()),
+                    DirectionalSlabNavEdge {
+                        edge: e.weight(),
+                        edge_id: e.id(),
+                        is_outgoing: true,
+                        other_node: e.target(),
+                    },
+                )
+            })
+            .chain(
+                self.graph
+                    .edges_directed(node, Direction::Incoming)
+                    .map(move |e| {
+                        debug_assert_ne!(e.source(), node);
+                        (
+                            self.node_weight(e.source()),
+                            DirectionalSlabNavEdge {
+                                edge: e.weight(),
+                                edge_id: e.id(),
+                                is_outgoing: false,
+                                other_node: e.source(),
+                            },
+                        )
+                    }),
+            )
+    }
+
+    /// Filter function takes (candidate dest node, directional step height). Step height has already
+    /// been checked against requirement.
+    ///
+    /// Returns (target area, edge from source to target area)
     pub fn iter_accessible_edges<'a>(
         &'a self,
-        node: WorldArea,
+        node: impl WorldNodeRef,
         req: NavRequirement,
-        filter_fn: impl (Fn(WorldGraphNodeIndex, i8) -> bool) + 'a,
-    ) -> impl Iterator<Item = (WorldGraphNodeIndex, WorldArea, &SlabNavEdge)> + 'a {
-        let idx = self.node(&node);
+        filter_fn: impl (Fn(WorldGraphNodeIndex, i8) -> bool) + Clone + 'a,
+    ) -> impl Iterator<Item = (WorldArea, DirectionalSlabNavEdge<'a>)> + Clone + 'a {
         let step_size = req.step_size as i8;
-        self.graph
-            .edges_directed(idx, Direction::Outgoing)
-            .filter_map(move |e| {
-                let n = if idx == e.source() {
-                    e.target()
-                } else {
-                    e.source()
-                };
 
-                let (directional_height, _) = e.directional_height_and_target(idx);
-                (filter_fn(n, directional_height) && directional_height <= step_size).then(|| {
-                    // TODO check clearance size too
-                    (n, *self.graph.node_weight(n).unwrap(), e.weight())
-                })
-            })
+        self.iter_edges(node).filter(move |(a, e)| {
+            let step = e.step();
+            // TODO check clearance size too
+            step <= step_size && filter_fn(e.other_node(), step)
+        })
     }
 
     /// (src area, dst area) -> should continue recursing
@@ -188,18 +241,16 @@ impl WorldGraph {
                 continue;
             }
 
-            let src_area = self.graph.node_weight(node).unwrap();
+            let src_area = self.node_weight(node);
 
-            for edge in self.graph.edges(node) {
-                if req.height <= edge.weight().clearance.get()
-                    && edge.directional_height(node) <= step_size
-                {
-                    let other_node = edge.target();
-                    debug_assert_ne!(other_node, node);
-                    let area = self.graph.node_weight(other_node).unwrap();
-                    if per_node(src_area, area) {
-                        stack.push(other_node);
-                    }
+            for (area, edge) in self.iter_accessible_edges(node, req, |n, _| !visited.contains(&n))
+            {
+                debug_assert!(req.height <= edge.clearance() && edge.step() <= step_size);
+
+                let other_node = edge.other_node();
+                debug_assert_ne!(other_node, node);
+                if per_node(&src_area, &area) {
+                    stack.push(other_node);
                 }
             }
         }
@@ -342,7 +393,7 @@ pub enum SearchError {
     NoAdjacent,
 }
 
-fn edge_cost(e: EdgeReference<SlabNavEdge>) -> f32 {
+fn edge_cost(e: DirectionalSlabNavEdge) -> f32 {
     // TODO edge cost
     /*
        if too high to step up: infnite cost
@@ -563,27 +614,6 @@ impl SearchResult {
         match self {
             SearchResult::Success(path) => Ok(path),
             SearchResult::Failed(err) => Err(err),
-        }
-    }
-}
-
-trait EdgeRefExt {
-    fn directional_height_and_target(&self, source: NodeIndex) -> (i8, NodeIndex);
-
-    fn directional_height(&self, source: NodeIndex) -> i8 {
-        self.directional_height_and_target(source).0
-    }
-}
-
-impl<'a> EdgeRefExt for EdgeReference<'a, SlabNavEdge> {
-    fn directional_height_and_target(&self, source: NodeIndex) -> (i8, NodeIndex) {
-        let h = self.weight().height_diff as i8;
-        let src = self.source();
-        if src == source {
-            (h, self.target())
-        } else {
-            debug_assert_eq!(source, self.target());
-            (-h, src)
         }
     }
 }
@@ -970,22 +1000,13 @@ impl<C: WorldContext> World<C> {
                if loading slab: await on it (but this adds new nodes to graph, so need to release reference somehow). then continue
             */
 
-            let step_size = requirement.step_size as i8;
-            // TODO replcae with new accesibility check
             let filtered_edges = world_graph
-                .graph
-                .edges(node)
-                .filter(|e| e.directional_height(node) <= step_size);
-            // TODO use edge clearance too
+                .iter_accessible_edges(node, requirement, |n, _| !ctx.visited.is_visited(&n));
 
             // iter edges to find if neighbouring slabs are loading/being modified, and abort if so
             let this_slab = node_weight(node).slab();
-            let slabs = filtered_edges.clone().filter_map(|e| {
-                let src_slab = node_weight(e.source()).slab();
-                if src_slab != this_slab {
-                    return Some(src_slab);
-                }
-                let dst_slab = node_weight(e.target()).slab();
+            let slabs = filtered_edges.clone().filter_map(|(a, e)| {
+                let dst_slab = node_weight(e.other_node()).slab();
                 if dst_slab != this_slab {
                     return Some(dst_slab);
                 }
@@ -1020,8 +1041,8 @@ impl<C: WorldContext> World<C> {
                 return Ok(Either::Right(changed_slabs));
             }
 
-            for edge in filtered_edges {
-                let next = edge.target();
+            for (a, edge) in filtered_edges {
+                let next = edge.other_node();
                 if ctx.visited.is_visited(&next) {
                     continue;
                 }
@@ -1032,14 +1053,14 @@ impl<C: WorldContext> World<C> {
                         let old_score = *ent.get();
                         if next_score < old_score {
                             *ent.into_mut() = next_score;
-                            ctx.path_tracker.set_predecessor(next, node, edge.id());
+                            ctx.path_tracker.set_predecessor(next, node, edge.edge_id);
                         } else {
                             next_score = old_score;
                         }
                     }
                     Vacant(ent) => {
                         ent.insert(next_score);
-                        ctx.path_tracker.set_predecessor(next, node, edge.id());
+                        ctx.path_tracker.set_predecessor(next, node, edge.edge_id);
                     }
                 }
 

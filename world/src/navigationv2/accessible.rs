@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use ahash::HashSet;
 
 use misc::glam::{ivec2, IVec2};
-use misc::{some_or_continue, SmallVec};
+use misc::some_or_continue;
 use unit::world::WorldPositionRange;
 
 use crate::navigationv2::world_graph::WorldGraphNodeIndex;
@@ -18,11 +18,6 @@ struct Rect {
     /// Inclusive
     max: IVec2,
 }
-
-pub trait NavProvider {
-    fn unvisited_edges_for_node(&self, src_node: WorldGraphNodeIndex, out: &mut SmallVec<[(); 4]>);
-}
-
 pub struct AccessibilityCalculator {
     agent_remaining: Vec<Rect>,
     areas_to_check: Vec<Rect>,
@@ -66,12 +61,13 @@ impl AccessibilityCalculator {
 
             areas_to_check.push(rect);
 
-            for (n, na, _) in world
-                .nav_graph()
-                .iter_accessible_edges(area, agent_req, &edge_filter)
+            for (other_area, edge) in
+                world
+                    .nav_graph()
+                    .iter_accessible_edges(node, agent_req, &edge_filter)
             {
-                if visited.insert(n) {
-                    frontier.push_back((n, na))
+                if visited.insert(edge.other_node()) {
+                    frontier.push_back((edge.other_node(), other_area))
                 }
             }
         }

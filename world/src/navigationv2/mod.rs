@@ -3,7 +3,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hint::unreachable_unchecked;
 use std::num::NonZeroU8;
 
-use petgraph::graphmap::UnGraphMap;
+use petgraph::graphmap::DiGraphMap;
+use petgraph::stable_graph::EdgeIndex;
 
 use misc::Itertools;
 use unit::world::{
@@ -15,6 +16,7 @@ pub use world_graph::{PathExistsResult, WorldArea};
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::{SliceAreaIndex, SliceAreaIndexAllocator};
 use crate::chunk::AreaInfo;
+use crate::navigationv2::world_graph::WorldGraphNodeIndex;
 use crate::neighbour::NeighbourOffset;
 use crate::{WorldAreaV2, ABSOLUTE_MAX_FREE_VERTICAL_SPACE};
 
@@ -51,9 +53,17 @@ pub struct SlabNavEdge {
     pub height_diff: u8,
 }
 
+#[derive(Copy, Clone)]
+pub struct DirectionalSlabNavEdge<'a> {
+    edge: &'a SlabNavEdge,
+    edge_id: EdgeIndex,
+    is_outgoing: bool,
+    other_node: WorldGraphNodeIndex,
+}
+
 /// Undirected as all edges are bidirectional. Nodes are the unique slab area.
 // TODO probably is immutable and recreated on any modification so rewrite to be more efficient one day
-type SlabNavGraphType = UnGraphMap<SlabArea, SlabNavEdge>;
+type SlabNavGraphType = DiGraphMap<SlabArea, SlabNavEdge>;
 
 impl SlabNavGraph {
     pub fn empty() -> Self {
@@ -533,6 +543,25 @@ impl NavRequirement {
     /// In blocks
     pub fn xy_diagonal_sqrd(&self) -> f32 {
         (self.dims.0 * self.dims.0) + (self.dims.1 * self.dims.1)
+    }
+}
+
+impl DirectionalSlabNavEdge<'_> {
+    pub fn clearance(&self) -> u8 {
+        self.edge.clearance.get()
+    }
+
+    pub fn step(&self) -> i8 {
+        let h = self.edge.height_diff as i8;
+        if self.is_outgoing {
+            h
+        } else {
+            -h
+        }
+    }
+
+    pub fn other_node(&self) -> WorldGraphNodeIndex {
+        self.other_node
     }
 }
 
