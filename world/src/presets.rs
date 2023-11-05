@@ -20,6 +20,8 @@ pub fn from_preset<C: WorldContext>(preset: &str, rng: &mut dyn RngCore) -> Memo
         "fatstairs" => fat_stairs(),
         "fuckystairs" => fucky_stairs(),
         "ring" => ring_preset(),
+        "doors" => doors_preset(),
+        "chessboard" => chessboard_preset(),
         _ => unreachable!("unknown preset"),
     }
 }
@@ -147,6 +149,27 @@ pub fn one_block_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
         .expect("hardcoded world preset is wrong??!!1!")
 }
 
+pub fn chessboard_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let a = ChunkBuilder::new()
+        .fill_slice(4, C::PRESET_TYPES[0])
+        .fill_slice(5, C::PRESET_TYPES[1])
+        .fill_slice(6, C::PRESET_TYPES[2])
+        .fill_range((0, 0, 12), (15, 15, 12), |(x, y, z)| {
+            if x.checked_add(y).and_then(|i| i.checked_rem(2)) == Some(0) {
+                C::PRESET_TYPES[0]
+            } else {
+                BlockType::AIR
+            }
+        })
+        .build((0, 0));
+    let b = ChunkBuilder::new().build((0, 1));
+
+    let chunks = vec![a, b];
+
+    MemoryTerrainSource::from_chunks(chunks.into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
+}
+
 /// Multiple flat chunks at z=0
 pub fn flat_lands<C: WorldContext>() -> MemoryTerrainSource<C> {
     let chunks = (-8..8).flat_map(|x| {
@@ -182,9 +205,7 @@ pub fn bottleneck<C: WorldContext>(rng: &mut dyn RngCore) -> MemoryTerrainSource
             .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32() - 1, half_y, 4), |_| {
                 C::PRESET_TYPES[0]
             })
-            .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| {
-                C::BlockType::AIR
-            })
+            .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| BlockType::AIR)
             .fill_slice(-5, C::PRESET_TYPES[0])
             .build((0, i))
     });
@@ -258,6 +279,21 @@ pub fn fucky_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
                 .set((xz + 1, y, xz + y), block)
         }
     }
+
+    MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
+}
+
+pub fn doors_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let mut b = WorldBuilder::<C>::new();
+    b = b.fill_range((-20, -20, 0), (5, 5, 1), C::PRESET_TYPES[0])
+        .fill_range((-2, -20, 1), (-4, 5, 4), C::PRESET_TYPES[1]) // short wall
+        .fill_range((-7, -3, 2), (1, -3, 4), BlockType::AIR) // 1 wide tunnel
+        .fill_range((-7, 0, 2), (1, 2, 4), BlockType::AIR) // 3 wide tunnel
+        .fill_range((-14, -20, 1), (-16, 5, 9), C::PRESET_TYPES[2]) // second taller wall
+        .fill_range((-14, -6, 2), (-16, -3, 2), BlockType::AIR) // 4 wide but 1 tall tunnel
+        .fill_range((-14, -8, 2), (-16, -10, 3), BlockType::AIR) // 3 wide and 2 tall tunnel
+        .fill_range((-14, -12, 3), (-16, -14, 5), BlockType::AIR) // 3 wide and 3 tall
+    ;
 
     MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
 }
