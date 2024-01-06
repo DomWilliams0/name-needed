@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+
 use nd_iter::iter_3d;
-use std::collections::HashMap;
 
 use misc::*;
 use unit::world::{
@@ -12,14 +14,13 @@ use crate::chunk::slice::SliceMut;
 use crate::chunk::terrain::{SlabCreationPolicy, SlabStorage};
 use crate::loader::split_range_across_slabs;
 use crate::WorldContext;
-use std::convert::TryFrom;
 
 pub struct ChunkBuilder<C: WorldContext> {
     inner: Option<SlabStorage<C>>,
     cowed_range: (SlabIndex, SlabIndex),
 }
 
-pub struct WorldBuilder<C: WorldContext>(HashMap<ChunkLocation, ChunkBuilder<C>>);
+pub struct WorldBuilder<C: WorldContext>(BTreeMap<ChunkLocation, ChunkBuilder<C>>);
 
 pub struct ChunkBuilderApply<C: WorldContext>(SlabStorage<C>);
 

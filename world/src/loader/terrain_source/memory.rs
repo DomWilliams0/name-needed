@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
@@ -10,7 +10,7 @@ use crate::{BlockType, WorldContext};
 
 /// Used for testing
 pub struct MemoryTerrainSource<C: WorldContext> {
-    chunk_map: HashMap<ChunkLocation, SlabStorage<C>>,
+    chunk_map: BTreeMap<ChunkLocation, SlabStorage<C>>,
     bounds: (ChunkLocation, ChunkLocation),
     initial_load_blacklist: HashSet<SlabLocation>,
 }
@@ -19,8 +19,8 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
     pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, SlabStorage<C>)>>(
         chunks: impl Iterator<Item = T>,
     ) -> Result<Self, TerrainSourceError> {
-        let size = chunks.size_hint().1.unwrap_or(8);
-        let mut chunk_map = HashMap::with_capacity(size);
+        // let size = chunks.size_hint().1.unwrap_or(8);
+        let mut chunk_map = BTreeMap::new();
 
         for it in chunks {
             let (chunk, terrain) = it.into();

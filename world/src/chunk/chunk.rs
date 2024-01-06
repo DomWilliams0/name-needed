@@ -46,8 +46,8 @@ pub struct Chunk<C: WorldContext> {
 
     slabs: SlabStorage<C>,
 
-    /// Big info about each area not needed for nav graph
-    areas: HashMap<ChunkArea, AreaInfo>,
+    /// Big info about each area not needed for nav graph. BTreeMap to be deterministic
+    areas: BTreeMap<ChunkArea, AreaInfo>,
 
     // TODO use lockfree DashMap?
     slab_progress: RwLock<HashMap<SlabIndex, SlabLoadingStatus>>,
@@ -90,7 +90,7 @@ impl<C: WorldContext> Chunk<C> {
         Self {
             pos: pos.into(),
             slabs: SlabStorage::default(),
-            areas: HashMap::new(),
+            areas: Default::default(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: world.load_notifications(),
         }
@@ -102,7 +102,7 @@ impl<C: WorldContext> Chunk<C> {
         Self {
             pos: pos.into(),
             slabs: SlabStorage::default(),
-            areas: HashMap::new(),
+            areas: Default::default(),
             slab_progress: RwLock::new(HashMap::new()),
             slab_notify: LoadNotifier::default(),
         }
