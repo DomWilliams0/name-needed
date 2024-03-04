@@ -645,7 +645,6 @@ impl<C: WorldContext> World<C> {
                 requirement,
                 self,
                 a.to_world_area(chunk.pos()),
-                |_| true,
                 false,
             )
             .then_some(centre)

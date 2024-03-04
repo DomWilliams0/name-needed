@@ -1,34 +1,28 @@
-use misc::*;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Deref;
+use std::sync::Arc;
+use std::time::Instant;
 
+use enumflags2::bitflags;
+use parking_lot::RwLock;
+use petgraph::visit::Walker;
+
+use misc::*;
 use unit::world::{
     BlockCoord, BlockPosition, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex,
     SlabLocation, SliceBlock, SliceIndex, WorldPoint, WorldPosition, WorldPositionRange,
 };
 
 use crate::chunk::slab::SliceNavArea;
-use crate::chunk::slice::{Slice, SliceOwned};
-
-use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndex, SliceAreaIndexAllocator};
-use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage, SlabVersion};
-use crate::chunk::{SlabData, SparseGrid};
-use crate::navigation::{BlockGraph, SlabAreaIndex};
-use crate::navigationv2::{
-    filter_border_areas, is_border, ChunkArea, NavRequirement, SlabArea, SlabNavGraph,
-};
+use crate::chunk::slice::Slice;
+use crate::chunk::slice_navmesh::{SlabVerticalSpace, SliceAreaIndexAllocator};
+use crate::chunk::terrain::{NeighbourAreaHash, SlabNeighbour, SlabStorage};
+use crate::chunk::SparseGrid;
+use crate::navigation::BlockGraph;
+use crate::navigationv2::{is_border, ChunkArea, NavRequirement, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{
-    does_entity_fit_in_area, BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2,
-    WorldContext,
-};
-use enumflags2::bitflags;
-use parking_lot::RwLock;
-use petgraph::visit::Walker;
-use std::collections::HashMap;
-use std::iter::once;
-use std::ops::Deref;
-use std::sync::{Arc, Weak};
-use std::time::Instant;
+use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2, WorldContext};
 
 pub type ChunkId = u64;
 
@@ -574,10 +568,10 @@ pub enum SlabThingOrWait<T> {
 #[cfg(test)]
 mod tests {
     use unit::world::GlobalSliceIndex;
+    use unit::world::CHUNK_SIZE;
 
     use crate::chunk::{Chunk, ChunkBuilder};
     use crate::helpers::{DummyBlockType, DummyWorldContext};
-    use unit::world::CHUNK_SIZE;
 
     #[test]
     fn chunk_ops() {

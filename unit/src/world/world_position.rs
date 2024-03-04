@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Add;
 
 use misc::derive_more::*;
+use misc::glam::IVec2;
 use misc::*;
 
 use crate::space::view::ViewPoint;
@@ -101,6 +102,14 @@ impl Add<(i32, i32, i32)> for WorldPosition {
 
     fn add(self, (x, y, z): (i32, i32, i32)) -> Self::Output {
         WorldPosition(self.0 + x, self.1 + y, self.2 + z)
+    }
+}
+
+impl Add<IVec2> for WorldPosition {
+    type Output = WorldPosition;
+
+    fn add(self, vec: IVec2) -> Self::Output {
+        WorldPosition(self.0 + vec.x, self.1 + vec.y, self.2)
     }
 }
 

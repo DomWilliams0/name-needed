@@ -20,13 +20,14 @@ use petgraph::visit::{NodeRef, Visitable};
 use petgraph::Direction;
 use tokio::runtime::{Handle, Runtime};
 
+use misc::glam::IVec2;
 use misc::parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use misc::SliceRandom;
 use misc::*;
 use misc::{Rng, SmallVec};
 use unit::world::{
     ChunkLocation, LocalSliceIndex, RangePosition, SlabLocation, SliceIndex, WorldPoint,
-    WorldPosition,
+    WorldPointRange, WorldPosition, WorldPositionRange,
 };
 
 use crate::chunk::{SlabAvailability, SlabLoadingStatus};
@@ -37,7 +38,10 @@ use crate::navigationv2::{
 };
 use crate::neighbour::WorldNeighbours;
 use crate::world::{AllSlabs, AnySlab, ListeningLoadNotifier, WaitResult};
-use crate::{SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext, WorldRef};
+use crate::{
+    AccessibilityCalculator, SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext,
+    WorldRef,
+};
 
 /// Area within the world
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -58,7 +62,7 @@ pub struct WorldGraph {
     pathfinding_runtime: Runtime,
 }
 
-pub trait WorldNodeRef {
+pub trait WorldNodeRef: Clone {
     fn into_node_index(self, graph: &WorldGraph) -> WorldGraphNodeIndex;
     fn into_area(self, graph: &WorldGraph) -> WorldArea;
 }
@@ -201,8 +205,8 @@ impl WorldGraph {
             )
     }
 
-    /// Filter function takes (candidate dest node, directional step height). Step height has already
-    /// been checked against requirement.
+    /// Filter function takes (candidate dest node, directional step height). Step height and
+    /// clearance have already been checked against requirement.
     ///
     /// Returns (target area, edge from source to target area)
     pub fn iter_accessible_edges<'a>(
@@ -214,8 +218,12 @@ impl WorldGraph {
         let step_size = req.step_size as i8;
 
         self.iter_edges(node).filter(move |(a, e)| {
+            // must be tall enough
+            if req.height > e.clearance() {
+                return false;
+            }
+
             let step = e.step();
-            // TODO check clearance size too
             step <= step_size && filter_fn(e.other_node(), step)
         })
     }
@@ -497,7 +505,7 @@ pub struct OngoingPathSearchFuture {
     task_present: bool,
 
     /// Shared with consumer who will poll via this
-    path: Arc<Mutex<OngoingPath>>,
+    path: Arc<Mutex<(OngoingPath, Option<Box<SearchDebug>>)>>,
 }
 
 struct AtomicPathNodes {
@@ -548,7 +556,7 @@ impl OngoingPathSearchFuture {
         }
 
         let mut guard = self.path.lock();
-        match &mut *guard {
+        match &mut guard.0 {
             OngoingPath::InitialSearch => SearchStatus::InitialSearch,
             OngoingPath::InterruptedSearch => SearchStatus::Interrupted,
             OngoingPath::Found {
@@ -557,7 +565,7 @@ impl OngoingPathSearchFuture {
             OngoingPath::Found { first_time, .. } => {
                 debug_assert!(*first_time);
                 *first_time = false;
-                SearchStatus::Found(MutexGuard::map(guard, |p| match p {
+                SearchStatus::Found(MutexGuard::map(guard, |p| match &mut p.0 {
                     OngoingPath::Found { path, .. } => path,
                     _ => unreachable!(),
                 }))
@@ -571,14 +579,23 @@ impl OngoingPathSearchFuture {
         }
 
         let guard = self.path.lock();
-        if let OngoingPath::Found { .. } = &*guard {
-            Some(MutexGuard::map(guard, |p| match p {
+        if let OngoingPath::Found { .. } = &guard.0 {
+            Some(MutexGuard::map(guard, |p| match &mut p.0 {
                 OngoingPath::Found { path, .. } => path,
                 _ => unreachable!(),
             }))
         } else {
             None
         }
+    }
+
+    pub fn debug(&self) -> MappedMutexGuard<Option<Box<SearchDebug>>> {
+        // if !self.task_present || self.task.is_finished() {
+        //     return None;
+        // }
+
+        let guard = self.path.lock();
+        MutexGuard::map(guard, |p| &mut p.1)
     }
 }
 
@@ -609,15 +626,6 @@ impl OngoingPathSearchFuture {
     }
 }
 
-impl SearchResult {
-    fn into_result(self) -> Result<Path, SearchError> {
-        match self {
-            SearchResult::Success(path) => Ok(path),
-            SearchResult::Failed(err) => Err(err),
-        }
-    }
-}
-
 #[derive(Copy, Clone)]
 enum ResolveAreaType {
     Source,
@@ -638,6 +646,13 @@ pub enum PathExistsResult {
     Yes,
     No,
     Loading,
+}
+
+#[derive(Default)]
+pub struct SearchDebug {
+    pub area_scores: Vec<(WorldArea, f32)>,
+    pub checked_accessibility_ranges: Vec<(WorldPointRange, Option<bool>)>,
+    pub common_edges: Vec<(WorldPosition, IVec2)>,
 }
 
 impl<C: WorldContext> World<C> {
@@ -726,7 +741,7 @@ impl<C: WorldContext> World<C> {
             requirement: NavRequirement,
             token: &C::SearchToken,
             goal: SearchGoal,
-        ) -> SearchResult {
+        ) -> (SearchResult, Option<Box<SearchDebug>>) {
             const MAX_RETRIES: usize = 8;
             for retry in 0..MAX_RETRIES {
                 trace!("path finding"; "attempt" => retry+1, "from" => %from, "to" => %to, "req" => ?requirement, token);
@@ -740,7 +755,7 @@ impl<C: WorldContext> World<C> {
                     requirement,
                 ) {
                     Ok(res) => res,
-                    Err(err) => return SearchResult::Failed(err),
+                    Err(err) => return (SearchResult::Failed(err), None),
                 };
                 let dst = match World::resolve_area(
                     &world_ref,
@@ -749,7 +764,7 @@ impl<C: WorldContext> World<C> {
                     requirement,
                 ) {
                     Ok(res) => res,
-                    Err(err) => return SearchResult::Failed(err),
+                    Err(err) => return (SearchResult::Failed(err), None),
                 };
                 if let (SearchGoal::Adjacent, ResolvedArea::Found { new_pos, .. }) = (goal, &dst) {
                     debug!("resolved adjacent target"; "new_target" => %new_pos, "orig_target" => %to);
@@ -765,19 +780,27 @@ impl<C: WorldContext> World<C> {
                     ) => {
                         let world = world_ref.borrow();
                         let new_dst = new_dst.centred();
-                        slabs_to_wait_for =
-                            match world.find_abortable_path(src, (new_dst, dst), requirement, goal)
-                            {
-                                Ok(Either::Left((path, dst))) => {
-                                    return SearchResult::Success(Path {
+                        let mut debug = Some(Box::new(SearchDebug::default())); // TODO configurable
+                        slabs_to_wait_for = match world.find_abortable_path(
+                            src,
+                            (new_dst, dst),
+                            requirement,
+                            goal,
+                            debug.as_deref_mut(),
+                        ) {
+                            Ok(Either::Left((path, dst))) => {
+                                return (
+                                    SearchResult::Success(Path {
                                         areas: path,
                                         source: from,
                                         target: (new_dst, dst),
-                                    })
-                                }
-                                Ok(Either::Right(loading_slabs)) => loading_slabs,
-                                Err(err) => return SearchResult::Failed(err),
-                            };
+                                    }),
+                                    debug,
+                                )
+                            }
+                            Ok(Either::Right(loading_slabs)) => loading_slabs,
+                            Err(err) => return (SearchResult::Failed(err), debug),
+                        };
                     }
                     (ResolvedArea::WaitForSlab(a), ResolvedArea::WaitForSlab(b)) if a == b => {
                         slabs_to_wait_for = smallvec![a]
@@ -801,15 +824,18 @@ impl<C: WorldContext> World<C> {
                 {
                     WaitResult::Success(_) | WaitResult::Retry => continue, // try again
                     WaitResult::Disconnected => {
-                        return SearchResult::Failed(SearchError::WaitingForSlabLoading)
+                        return (
+                            SearchResult::Failed(SearchError::WaitingForSlabLoading),
+                            None,
+                        )
                     }
                 }
             }
 
-            SearchResult::Failed(SearchError::WorldChanged)
+            (SearchResult::Failed(SearchError::WorldChanged), None)
         }
 
-        let path_arc = Arc::new(Mutex::new(OngoingPath::InitialSearch));
+        let path_arc = Arc::new(Mutex::new((OngoingPath::InitialSearch, None)));
         let path_tx = path_arc.clone();
         let task = self_.nav_runtime().spawn(async move {
             let world_ref = self_.clone();
@@ -842,7 +868,7 @@ impl<C: WorldContext> World<C> {
                 };
 
                 // find initial path
-                let path = match find_path(
+                let (res, search_debug) = find_path(
                     world_ref.clone(),
                     &mut listener,
                     from,
@@ -851,8 +877,13 @@ impl<C: WorldContext> World<C> {
                     &token,
                     goal,
                 )
-                .await
-                {
+                .await;
+
+                if search_debug.is_some() {
+                    path_tx.lock().1 = search_debug;
+                }
+
+                let path = match res {
                     SearchResult::Success(p) => p,
                     SearchResult::Failed(e) => return e,
                 };
@@ -862,7 +893,7 @@ impl<C: WorldContext> World<C> {
                 watching_slabs.extend(path.iter_slabs());
 
                 // publish path
-                *path_tx.lock() = OngoingPath::Found {
+                path_tx.lock().0 = OngoingPath::Found {
                     path,
                     first_time: true,
                 };
@@ -881,7 +912,7 @@ impl<C: WorldContext> World<C> {
                             // TODO could be more graceful than stopping immediately
 
                             trace!("invalidating path because a slab changed"; s);
-                            *path_tx.lock() = OngoingPath::InterruptedSearch;
+                            *path_tx.lock() = (OngoingPath::InterruptedSearch, None);
 
                             // commence search again
                             // TODO from current position
@@ -914,6 +945,7 @@ impl<C: WorldContext> World<C> {
         (to_pos, dst): (WorldPoint, WorldArea),
         requirement: NavRequirement,
         goal: SearchGoal,
+        mut debug: Option<&mut SearchDebug>,
     ) -> Result<Either<(Box<PathNodesSlice>, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError>
     {
         let world_graph = self.nav_graph();
@@ -967,6 +999,12 @@ impl<C: WorldContext> World<C> {
                     &mut path,
                 );
 
+                if let Some(dbg) = debug {
+                    for (n, score) in ctx.scores.iter() {
+                        dbg.area_scores.push((node_weight(*n), *score));
+                    }
+                }
+
                 // ensure nodes from slabs havent changed since we visited them
                 let changed_slabs = path
                     .iter()
@@ -1000,12 +1038,37 @@ impl<C: WorldContext> World<C> {
                if loading slab: await on it (but this adds new nodes to graph, so need to release reference somehow). then continue
             */
 
-            let filtered_edges = world_graph
-                .iter_accessible_edges(node, requirement, |n, _| !ctx.visited.is_visited(&n));
+            let this_area = node_weight(node);
+            let filtered_edges = {
+                let candidate_edges =
+                    world_graph.iter_accessible_edges(node, requirement, |n, _| {
+                        !ctx.visited.is_visited(&n)
+                    });
+
+                debug!("search filtered edges from {}:", this_area);
+                candidate_edges.filter(|(to_area, edge)| {
+                    // could cache this check for (nav requirement, edge id) until modification
+                    let mut calc = AccessibilityCalculator::on_boundary_between_areas(
+                        this_area,
+                        *to_area,
+                        requirement,
+                        self,
+                        true, // TODO
+                        debug.as_deref_mut(),
+                    );
+
+                    debug!(" check filtered edges to {}:", to_area);
+                    // TODO pass through to the final path calculating the rects of the accessible areas, so it can
+                    //  still use them to find a nice path
+
+                    calc.process_fully_and_check(debug.as_deref_mut())
+                })
+            }
+            .collect_vec();
 
             // iter edges to find if neighbouring slabs are loading/being modified, and abort if so
-            let this_slab = node_weight(node).slab();
-            let slabs = filtered_edges.clone().filter_map(|(a, e)| {
+            let this_slab = this_area.slab();
+            let slabs = filtered_edges.iter().filter_map(|(a, e)| {
                 let dst_slab = node_weight(e.other_node()).slab();
                 if dst_slab != this_slab {
                     return Some(dst_slab);
@@ -1107,7 +1170,7 @@ impl<C: WorldContext> World<C> {
 
         let w = self_.borrow();
         // TODO use a shitter heuristic?
-        match w.find_abortable_path(src, dst, requirement, goal) {
+        match w.find_abortable_path(src, dst, requirement, goal, None) {
             Ok(Either::Left(_)) => PathExistsResult::Yes,
             Ok(Either::Right(_)) => PathExistsResult::Loading,
             Err(_) => PathExistsResult::No,
@@ -1315,6 +1378,61 @@ where
         self.path_tracker.came_from.clear();
     }
 }
+
+/// Returns (start point, vector).
+/// Vector is axis aligned, either x=0 or y=0
+pub fn find_common_edge(
+    a: &WorldPositionRange,
+    b: &WorldPositionRange,
+) -> Option<((i32, i32), (u8, u8))> {
+    enum FromSourceDirection {
+        North,
+        East,
+        South,
+        West,
+    }
+    use FromSourceDirection::*;
+
+    // +1 to max pos because its inclusive
+    let a_min_x = a.min().0;
+    let a_min_y = a.min().1;
+    let a_max_x = a.max().0 + 1;
+    let a_max_y = a.max().1 + 1;
+    let b_min_x = b.min().0;
+    let b_min_y = b.min().1;
+    let b_max_x = b.max().0 + 1;
+    let b_max_y = b.max().1 + 1;
+
+    let (dir, common_coord) = if a_min_y == b_max_y {
+        (North, a_min_y)
+    } else if a_max_y == b_min_y {
+        (South, b_min_y)
+    } else if a_max_x == b_min_x {
+        (East, b_min_x)
+    } else if a_min_x == b_max_x {
+        (West, a_min_x)
+    } else {
+        return None;
+    };
+
+    let (start, end) = if matches!(dir, North | South) {
+        // TODO wrong way around?
+        // vertical, y already known
+        let start_x = a_min_x.max(b_min_x);
+        let end_x = a_max_x.min(b_max_x);
+        ((start_x, common_coord), (end_x, common_coord))
+    } else {
+        // horizontal, x already known
+        let start_y = a_min_y.max(b_min_y);
+        let end_y = a_max_y.min(b_max_y);
+        ((common_coord, start_y), (common_coord, end_y))
+    };
+
+    let source_delta = ((end.0 - start.0) as u8, (end.1 - start.1) as u8);
+
+    Some((start, source_delta))
+}
+
 slog_kv_display!(WorldArea, "area");
 
 #[cfg(test)]

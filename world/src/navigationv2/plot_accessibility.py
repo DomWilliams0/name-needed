@@ -1,3 +1,4 @@
+import itertools
 import json
 
 import matplotlib.patches
@@ -83,17 +84,20 @@ def do_frame(frame):
         ]
         ax.add_patch(matplotlib.patches.Polygon(points, linewidth=1, edgecolor="black", facecolor=c, alpha=0.5))
 
+    if not frame["agent_rects"]:
+        print("empty agent!")
+
     for r in frame["agent_rects"]:
         draw_rect(r, "blue")
 
     for r in frame["to_check"]:
         draw_rect(r, "red")
 
-    ax.set_title(f"{i}")
+    ax.set_title(f"{i} ({input_json})")
 
 
 interval = 500
-anim = matplotlib.animation.FuncAnimation(fig, do_frame, enumerate(frames), interval=interval)
+anim = matplotlib.animation.FuncAnimation(fig, do_frame, itertools.cycle(enumerate(frames)), interval=interval)
 
 paused = False
 

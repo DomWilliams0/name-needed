@@ -11,7 +11,7 @@ use unit::world::{
     BlockCoord, ChunkLocation, GlobalSliceIndex, LocalSliceIndex, SlabIndex, SliceIndex,
     WorldPoint, WorldPointRange, BLOCKS_PER_METRE, BLOCKS_SCALE, CHUNK_SIZE, SLAB_SIZE,
 };
-pub use world_graph::{PathExistsResult, WorldArea};
+pub use world_graph::{PathExistsResult, SearchDebug, WorldArea};
 
 use crate::chunk::slab::SliceNavArea;
 use crate::chunk::slice_navmesh::{SliceAreaIndex, SliceAreaIndexAllocator};

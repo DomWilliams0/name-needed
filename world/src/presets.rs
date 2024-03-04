@@ -289,10 +289,11 @@ pub fn doors_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
         .fill_range((-2, -20, 1), (-4, 5, 4), C::PRESET_TYPES[1]) // short wall
         .fill_range((-7, -3, 2), (1, -3, 4), BlockType::AIR) // 1 wide tunnel
         .fill_range((-7, 0, 2), (1, 2, 4), BlockType::AIR) // 3 wide tunnel
-        .fill_range((-14, -20, 1), (-16, 5, 9), C::PRESET_TYPES[2]) // second taller wall
+        .fill_range((-14, -20, 1), (-16, 5, 15), C::PRESET_TYPES[2])// second taller wall
         .fill_range((-14, -6, 2), (-16, -3, 2), BlockType::AIR) // 4 wide but 1 tall tunnel
         .fill_range((-14, -8, 2), (-16, -10, 3), BlockType::AIR) // 3 wide and 2 tall tunnel
         .fill_range((-14, -12, 3), (-16, -14, 5), BlockType::AIR) // 3 wide and 3 tall
+        .fill_range((-14, -17, 3), (-16, -19, 7), BlockType::AIR) // 3 wide and 5 tall
     ;
 
     MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
