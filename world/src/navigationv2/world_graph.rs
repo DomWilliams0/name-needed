@@ -60,6 +60,14 @@ pub struct WorldGraph {
     graph: WorldNavGraphType,
     nodes: HashMap<WorldArea, WorldGraphNodeIndex>,
     pathfinding_runtime: Runtime,
+    cfg: arc_swap::ArcSwap<GlobalSearchConfig>,
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct GlobalSearchConfig {
+    /// Save debug files to disk
+    pub debug_accessibility: bool,
+    pub store_search_debug_info: bool,
 }
 
 pub trait WorldNodeRef: Clone {
@@ -105,6 +113,7 @@ impl Default for WorldGraph {
             pathfinding_runtime: runtime_builder
                 .build()
                 .expect("failed to create navigation runtime"),
+            cfg: Default::default(),
         }
     }
 }
@@ -316,6 +325,14 @@ impl WorldGraph {
             })
         })
     }
+
+    pub fn configure(&self, func: impl FnOnce(&mut GlobalSearchConfig)) {
+        let mut cfg = self.cfg.load_full();
+        let cfg_mut = Arc::make_mut(&mut cfg);
+        func(cfg_mut);
+        debug!("configuring search: {cfg:?}");
+        self.cfg.swap(cfg);
+    }
 }
 
 impl From<(SlabLocation, SlabArea)> for WorldArea {
@@ -500,6 +517,7 @@ enum OngoingPath {
     InterruptedSearch,
     Found { path: Path, first_time: bool },
 }
+
 pub struct OngoingPathSearchFuture {
     task: ManuallyDrop<tokio::task::JoinHandle<SearchError>>,
     task_present: bool,
@@ -718,8 +736,8 @@ impl<C: WorldContext> World<C> {
                 ResolveAreaType::Source => Err(SearchError::SourceNotWalkable(pos, requirement)),
             }
         } else {
-            // must wait
-            let slab = last_slab.unwrap(); // iterated at least once
+            // must wait. iterated at least once so can unwrap
+            let slab = last_slab.unwrap();
             trace!("waiting for {} slab to become available", if matches!(ty, ResolveAreaType::Target(_)) {"dst"} else {"src"}; slab);
             Ok(ResolvedArea::WaitForSlab(slab))
         }
@@ -780,7 +798,12 @@ impl<C: WorldContext> World<C> {
                     ) => {
                         let world = world_ref.borrow();
                         let new_dst = new_dst.centred();
-                        let mut debug = Some(Box::new(SearchDebug::default())); // TODO configurable
+                        let mut debug = world
+                            .nav_graph()
+                            .cfg
+                            .load()
+                            .store_search_debug_info
+                            .then(|| Box::new(SearchDebug::default()));
                         slabs_to_wait_for = match world.find_abortable_path(
                             src,
                             (new_dst, dst),
@@ -796,7 +819,7 @@ impl<C: WorldContext> World<C> {
                                         target: (new_dst, dst),
                                     }),
                                     debug,
-                                )
+                                );
                             }
                             Ok(Either::Right(loading_slabs)) => loading_slabs,
                             Err(err) => return (SearchResult::Failed(err), debug),
@@ -827,7 +850,7 @@ impl<C: WorldContext> World<C> {
                         return (
                             SearchResult::Failed(SearchError::WaitingForSlabLoading),
                             None,
-                        )
+                        );
                     }
                 }
             }
@@ -949,6 +972,7 @@ impl<C: WorldContext> World<C> {
     ) -> Result<Either<(Box<PathNodesSlice>, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError>
     {
         let world_graph = self.nav_graph();
+        let accessibility_debug = world_graph.cfg.load().debug_accessibility;
 
         if matches!(goal, SearchGoal::Arrive) && src == dst {
             // empty path
@@ -1053,7 +1077,7 @@ impl<C: WorldContext> World<C> {
                         *to_area,
                         requirement,
                         self,
-                        true, // TODO
+                        accessibility_debug,
                         debug.as_deref_mut(),
                     );
 
@@ -1236,6 +1260,7 @@ where
     scores: HashMap<N, K>,
     path_tracker: PathTracker<N, E>,
 }
+
 pub struct PathTracker<N, E>
 where
     N: Eq + Hash,
