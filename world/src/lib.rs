@@ -17,7 +17,7 @@ pub use self::navigation::{EdgeCost, NavigationError, SearchGoal, WorldArea, Wor
 pub use self::navigationv2::{
     accessible::{does_entity_fit_in_area, AccessibilityCalculator},
     world_graph::{
-        OngoingPathSearchFuture, Path, SearchDebug, SearchError, SearchStatus,
+        OngoingPathSearchFuture, Path, PathTarget, SearchDebug, SearchError, SearchStatus,
         WorldArea as WorldAreaV2,
     },
     NavRequirement, PathExistsResult,

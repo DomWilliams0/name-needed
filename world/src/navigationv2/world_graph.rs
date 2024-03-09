@@ -1,4 +1,5 @@
-use std::cell::RefCell;
+use ahash::AHashSet;
+use std::cell::{Cell, RefCell, RefMut};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -15,12 +16,13 @@ use std::time::Instant;
 use futures::FutureExt;
 use petgraph::algo::Measure;
 use petgraph::stable_graph::*;
-use petgraph::visit::{EdgeRef, IntoEdges, VisitMap};
+use petgraph::visit::{EdgeRef, IntoEdges, VisitMap, Walker};
 use petgraph::visit::{NodeRef, Visitable};
 use petgraph::Direction;
 use tokio::runtime::{Handle, Runtime};
 
 use misc::glam::IVec2;
+use misc::num_traits::real::Real;
 use misc::parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use misc::SliceRandom;
 use misc::*;
@@ -39,8 +41,8 @@ use crate::navigationv2::{
 use crate::neighbour::WorldNeighbours;
 use crate::world::{AllSlabs, AnySlab, ListeningLoadNotifier, WaitResult};
 use crate::{
-    AccessibilityCalculator, SearchGoal, UpdatedSearchSource, World, WorldAreaV2, WorldContext,
-    WorldRef,
+    AccessibilityCalculator, AreaInfo, SearchGoal, UpdatedSearchSource, World, WorldAreaV2,
+    WorldContext, WorldRef,
 };
 
 /// Area within the world
@@ -418,7 +420,7 @@ pub enum SearchError {
     NoAdjacent,
 }
 
-fn edge_cost(e: DirectionalSlabNavEdge) -> f32 {
+fn edge_cost(e: DirectionalSlabNavEdge, rng: Option<&mut SmallRng>) -> f32 {
     // TODO edge cost
     /*
        if too high to step up: infnite cost
@@ -427,17 +429,25 @@ fn edge_cost(e: DirectionalSlabNavEdge) -> f32 {
        doors/gates etc: higher
     */
     // TODO slightly better edge if point is more towards goal than sideways
-    1.0
+    match rng {
+        None => 1.0,
+        Some(mut rng) => rng.gen_range(0.1, 2.5),
+    }
 }
 
-fn heuristic<C: WorldContext>(n: NodeIndex, dst: WorldPosition, world: &World<C>) -> f32 {
+fn area_info<C: WorldContext>(n: NodeIndex, world: &World<C>) -> Option<(WorldArea, AreaInfo)> {
     let area = world.nav_graph().graph.node_weight(n).unwrap();
     world
         .find_chunk_with_pos(area.chunk_idx)
         .and_then(|c| c.area_info(area.chunk_area.slab_idx, area.chunk_area.slab_area))
-        .map(|ai| {
-            let min = ai.min_pos(*area);
-            let max = ai.max_pos(*area);
+        .map(|ai| (*area, ai))
+}
+
+fn heuristic<C: WorldContext>(n: NodeIndex, dst: WorldPosition, world: &World<C>) -> f32 {
+    area_info(n, world)
+        .map(|(area, ai)| {
+            let min = ai.min_pos(area);
+            let max = ai.max_pos(area);
             let corners = [
                 (min.0, min.1),
                 (min.0, max.1),
@@ -666,6 +676,38 @@ pub enum PathExistsResult {
     Loading,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum PathTarget {
+    Specific(WorldPoint),
+    Random { fuel: u32 },
+}
+
+#[derive(Clone)]
+enum ResolvedPathPoint {
+    Specific(WorldPoint, ResolvedArea),
+    Random { fuel: u32 },
+}
+
+impl From<WorldPoint> for PathTarget {
+    fn from(pos: WorldPoint) -> Self {
+        PathTarget::Specific(pos)
+    }
+}
+
+impl Display for PathTarget {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathTarget::Specific(p) => Display::fmt(p, f),
+            PathTarget::Random { fuel } => write!(f, "Random(fuel={fuel})"),
+        }
+    }
+}
+
+enum ResolvedPathDestination {
+    Specific(WorldPosition, WorldArea),
+    Random { fuel: u32 },
+}
+
 #[derive(Default)]
 pub struct SearchDebug {
     pub area_scores: Vec<(WorldArea, f32)>,
@@ -746,7 +788,7 @@ impl<C: WorldContext> World<C> {
     pub fn find_path_async(
         self_: WorldRef<C>,
         from: WorldPoint,
-        to: WorldPoint,
+        to: PathTarget,
         requirement: NavRequirement,
         token: C::SearchToken,
         goal: SearchGoal,
@@ -755,7 +797,7 @@ impl<C: WorldContext> World<C> {
             world_ref: WorldRef<C>,
             notifier: &mut ListeningLoadNotifier,
             from: WorldPoint,
-            to: WorldPoint,
+            to: PathTarget,
             requirement: NavRequirement,
             token: &C::SearchToken,
             goal: SearchGoal,
@@ -775,48 +817,66 @@ impl<C: WorldContext> World<C> {
                     Ok(res) => res,
                     Err(err) => return (SearchResult::Failed(err), None),
                 };
-                let dst = match World::resolve_area(
-                    &world_ref,
-                    to.floor(),
-                    ResolveAreaType::Target(goal),
-                    requirement,
-                ) {
-                    Ok(res) => res,
-                    Err(err) => return (SearchResult::Failed(err), None),
+
+                let dst = match to {
+                    PathTarget::Specific(to) => {
+                        match World::resolve_area(
+                            &world_ref,
+                            to.floor(),
+                            ResolveAreaType::Target(goal),
+                            requirement,
+                        ) {
+                            Ok(res) => ResolvedPathPoint::Specific(to, res),
+                            Err(err) => return (SearchResult::Failed(err), None),
+                        }
+                    }
+                    PathTarget::Random { fuel } => ResolvedPathPoint::Random { fuel },
                 };
-                if let (SearchGoal::Adjacent, ResolvedArea::Found { new_pos, .. }) = (goal, &dst) {
+
+                if let (
+                    SearchGoal::Adjacent,
+                    ResolvedPathPoint::Specific(_, ResolvedArea::Found { new_pos, .. }),
+                ) = (goal, &dst)
+                {
                     debug!("resolved adjacent target"; "new_target" => %new_pos, "orig_target" => %to);
                 }
 
-                match (src, dst) {
+                match (src, &dst) {
                     (
                         ResolvedArea::Found { area: src, .. },
-                        ResolvedArea::Found {
-                            area: dst,
-                            new_pos: new_dst,
-                        },
+                        ResolvedPathPoint::Specific(_, ResolvedArea::Found { .. })
+                        | ResolvedPathPoint::Random { .. },
                     ) => {
                         let world = world_ref.borrow();
-                        let new_dst = new_dst.centred();
                         let mut debug = world
                             .nav_graph()
                             .cfg
                             .load()
                             .store_search_debug_info
                             .then(|| Box::new(SearchDebug::default()));
+                        let new_dst = match &dst {
+                            ResolvedPathPoint::Specific(
+                                dst_point,
+                                ResolvedArea::Found { area, new_pos },
+                            ) => ResolvedPathDestination::Specific(*new_pos, *area),
+                            ResolvedPathPoint::Random { fuel } => {
+                                ResolvedPathDestination::Random { fuel: *fuel }
+                            }
+                            _ => unreachable!(),
+                        };
                         slabs_to_wait_for = match world.find_abortable_path(
                             src,
-                            (new_dst, dst),
+                            new_dst,
                             requirement,
                             goal,
                             debug.as_deref_mut(),
                         ) {
-                            Ok(Either::Left((path, dst))) => {
+                            Ok(Either::Left((path, actual_dst_area, actual_dst_point))) => {
                                 return (
                                     SearchResult::Success(Path {
                                         areas: path,
                                         source: from,
-                                        target: (new_dst, dst),
+                                        target: (actual_dst_point, actual_dst_area),
                                     }),
                                     debug,
                                 );
@@ -825,15 +885,21 @@ impl<C: WorldContext> World<C> {
                             Err(err) => return (SearchResult::Failed(err), debug),
                         };
                     }
-                    (ResolvedArea::WaitForSlab(a), ResolvedArea::WaitForSlab(b)) if a == b => {
-                        slabs_to_wait_for = smallvec![a]
-                    }
-                    (ResolvedArea::WaitForSlab(a), ResolvedArea::WaitForSlab(b)) => {
-                        slabs_to_wait_for = smallvec![a, b]
-                    }
-                    (ResolvedArea::WaitForSlab(s), _) | (_, ResolvedArea::WaitForSlab(s)) => {
+                    (
+                        ResolvedArea::WaitForSlab(a),
+                        ResolvedPathPoint::Specific(_, ResolvedArea::WaitForSlab(b)),
+                    ) if a == *b => slabs_to_wait_for = smallvec![a],
+                    (
+                        ResolvedArea::WaitForSlab(a),
+                        ResolvedPathPoint::Specific(_, ResolvedArea::WaitForSlab(b)),
+                    ) => slabs_to_wait_for = smallvec![a, *b],
+                    (ResolvedArea::WaitForSlab(s), ResolvedPathPoint::Specific(_, _)) => {
                         slabs_to_wait_for = smallvec![s]
                     }
+                    (_, ResolvedPathPoint::Specific(_, ResolvedArea::WaitForSlab(s))) => {
+                        slabs_to_wait_for = smallvec![*s]
+                    }
+                    _ => unreachable!(), // other combos with random wandering don't make sense
                 }
 
                 trace!("waiting for slabs"; "slabs" => ?slabs_to_wait_for, token);
@@ -961,34 +1027,82 @@ impl<C: WorldContext> World<C> {
     // TODO should have a slight preference for similar direction, or rather avoid going
     //  back towards where the previous path came from. to avoid ping ponging
 
-    /// On success (Left=(path, target area), Right=[slabs to wait for])
+    /// On success (Left=(path, target area, target pos), Right=[slabs to wait for])
     fn find_abortable_path(
         &self,
         src: WorldArea,
-        (to_pos, dst): (WorldPoint, WorldArea),
+        dst: ResolvedPathDestination,
         requirement: NavRequirement,
         goal: SearchGoal,
         mut debug: Option<&mut SearchDebug>,
-    ) -> Result<Either<(Box<PathNodesSlice>, WorldArea), SmallVec<[SlabLocation; 2]>>, SearchError>
-    {
+    ) -> Result<
+        Either<(Box<PathNodesSlice>, WorldArea, WorldPoint), SmallVec<[SlabLocation; 2]>>,
+        SearchError,
+    > {
         let world_graph = self.nav_graph();
         let accessibility_debug = world_graph.cfg.load().debug_accessibility;
 
-        if matches!(goal, SearchGoal::Arrive) && src == dst {
-            // empty path
-            return Ok(Either::Left((Box::new([]), dst)));
+        enum Destination {
+            Target {
+                pos: WorldPosition,
+                point: WorldPoint,
+                area: WorldArea,
+                node: NodeIndex,
+            },
+            Random {
+                remaining_fuel: Cell<u32>,
+                rng: RefCell<SmallRng>,
+            },
         }
 
-        let to_pos = to_pos.floor();
+        let dst = match dst {
+            ResolvedPathDestination::Specific(pos, dst_area) => {
+                if dst_area == src {
+                    // empty path
+                    return Ok(Either::Left((Box::new([]), dst_area, pos.centred())));
+                }
+
+                let node = *world_graph
+                    .nodes
+                    .get(&dst_area)
+                    .ok_or(InvalidArea(dst_area))?;
+                Destination::Target {
+                    // TODO need to preserve original point request in some cases?
+                    point: pos.centred(),
+                    pos,
+                    area: dst_area,
+                    node,
+                }
+            }
+            ResolvedPathDestination::Random { fuel } => Destination::Random {
+                remaining_fuel: Cell::new(fuel),
+                rng: RefCell::new(SmallRng::seed_from_u64(thread_rng().gen())),
+            },
+        };
+
+        /*
+           TODO fuel is currently nonsense. it doesnt dictate the path length, just how much of
+           the graph is explored.
+
+           instead, occasionally pass the is_goal check, reconstruct the path so far, and check its
+           (physical) length from the area size. if enough, then thats the new destination. if not,
+           keep trying
+        */
+
         let mut ctx =
             SearchContextInner::<_, EdgeIndex, _, <WorldNavGraphType as Visitable>::Map>::new(
                 world_graph.graph.visit_map(),
             );
         let src_node = *world_graph.nodes.get(&src).ok_or(InvalidArea(src))?;
-        let dst_node = *world_graph.nodes.get(&dst).ok_or(InvalidArea(dst))?;
 
-        let estimate_cost = |n| heuristic(n, to_pos, self);
-        let is_goal = |n| n == dst_node;
+        let estimate_cost = |n| match &dst {
+            Destination::Target { pos, .. } => heuristic(n, *pos, self),
+            Destination::Random { remaining_fuel, .. } => remaining_fuel.get() as f32,
+        };
+        let is_goal = |n| match &dst {
+            Destination::Target { node, .. } => n == *node,
+            Destination::Random { remaining_fuel, .. } => remaining_fuel.get() == 0,
+        };
         let node_weight = |n| {
             let opt = world_graph.graph.node_weight(n);
             debug_assert!(opt.is_some(), "bad node {:?}", n);
@@ -1006,13 +1120,20 @@ impl<C: WorldContext> World<C> {
         };
 
         let start_time = Instant::now();
+        let mut reusable_hashset = AHashSet::new();
+        let mut path = Vec::new();
 
         ctx.scores.insert(src_node, 0.0);
         ctx.visit_next
             .push(MinScored(estimate_cost(src_node), src_node));
         while let Some(MinScored(_, node)) = ctx.visit_next.pop() {
+            // take fuel
+            if let Destination::Random { remaining_fuel, .. } = &dst {
+                remaining_fuel.set(remaining_fuel.get().saturating_sub(1));
+            }
+
             if is_goal(node) {
-                let mut path = Vec::new();
+                debug_assert!(path.is_empty());
                 ctx.path_tracker.reconstruct_path_to(
                     node,
                     |n, e| {
@@ -1029,21 +1150,44 @@ impl<C: WorldContext> World<C> {
                     }
                 }
 
-                // ensure nodes from slabs havent changed since we visited them
-                let changed_slabs = path
-                    .iter()
-                    .map(|(n, _)| n.slab())
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .filter(|s| match latest_slab_version(*s) {
-                        Some(SlabAvailability::Present(t)) if t <= start_time => false,
-                        _ => true,
-                    })
-                    .collect::<SmallVec<[_; 2]>>();
+                // ensure nodes from slabs haven't changed since we visited them
+                let changed_slabs = {
+                    debug_assert!(reusable_hashset.is_empty());
+                    reusable_hashset.extend(path.iter().map(|(n, _)| n.slab()));
+                    reusable_hashset
+                        .drain()
+                        .filter(|s| match latest_slab_version(*s) {
+                            Some(SlabAvailability::Present(t)) if t <= start_time => false,
+                            _ => true,
+                        })
+                        .collect::<SmallVec<[_; 2]>>()
+                };
+
                 return Ok(if !changed_slabs.is_empty() {
                     Either::Right(changed_slabs)
                 } else {
-                    Either::Left((path.into_boxed_slice(), dst))
+                    let (dst_area, dst_pos) = match &dst {
+                        Destination::Target { point, area, .. } => (*area, *point),
+                        Destination::Random { rng, .. } => {
+                            let (area, info) =
+                                area_info(node, self).ok_or(SearchError::WorldChanged)?;
+                            // TODO slice above?
+                            let random_res = self.random_accessible_point_in_area(
+                                30,
+                                info,
+                                area,
+                                requirement,
+                                &mut *rng.borrow_mut(),
+                            );
+                            // use even pos where cannot fit
+                            let pos_in_area = random_res.unwrap_or_else(|p| {
+                                warn!("random pathfinding to inaccessible target out of lack of choice"; "dst" => %p);
+                                p
+                            });
+                            (area, pos_in_area)
+                        }
+                    };
+                    Either::Left((path.into_boxed_slice(), dst_area, dst_pos))
                 });
             }
 
@@ -1057,11 +1201,6 @@ impl<C: WorldContext> World<C> {
             // before adding him to `visit_next`.
             let node_score = ctx.scores[&node];
 
-            /*
-               get all edges from this node in world graph, which can be an edge OR a placeholder for a loading slab
-               if loading slab: await on it (but this adds new nodes to graph, so need to release reference somehow). then continue
-            */
-
             let this_area = node_weight(node);
             let filtered_edges = {
                 let candidate_edges =
@@ -1069,26 +1208,27 @@ impl<C: WorldContext> World<C> {
                         !ctx.visited.is_visited(&n)
                     });
 
-                debug!("search filtered edges from {}:", this_area);
-                candidate_edges.filter(|(to_area, edge)| {
-                    // could cache this check for (nav requirement, edge id) until modification
-                    let mut calc = AccessibilityCalculator::on_boundary_between_areas(
-                        this_area,
-                        *to_area,
-                        requirement,
-                        self,
-                        accessibility_debug,
-                        debug.as_deref_mut(),
-                    );
+                trace!("search filtered edges from {}:", this_area);
+                candidate_edges
+                    .filter(|(to_area, edge)| {
+                        // could cache this check for (nav requirement, edge id) until modification
+                        let mut calc = AccessibilityCalculator::on_boundary_between_areas(
+                            this_area,
+                            *to_area,
+                            requirement,
+                            self,
+                            accessibility_debug,
+                            debug.as_deref_mut(),
+                        );
 
-                    debug!(" check filtered edges to {}:", to_area);
-                    // TODO pass through to the final path calculating the rects of the accessible areas, so it can
-                    //  still use them to find a nice path
+                        trace!(" check filtered edges to {}:", to_area);
+                        // TODO pass through to the final path calculating the rects of the accessible areas, so it can
+                        //  still use them to find a nice path
 
-                    calc.process_fully_and_check(debug.as_deref_mut())
-                })
-            }
-            .collect_vec();
+                        calc.process_fully_and_check(debug.as_deref_mut())
+                    })
+                    .collect_vec()
+            };
 
             // iter edges to find if neighbouring slabs are loading/being modified, and abort if so
             let this_slab = this_area.slab();
@@ -1101,40 +1241,48 @@ impl<C: WorldContext> World<C> {
                 None
             });
 
-            let changed_slabs = slabs
-                .collect::<HashSet<_>>() // dedupe because parallel edges exist
-                .into_iter()
-                .filter(|slab| {
-                    let chunk = match self.find_chunk_with_pos(slab.chunk) {
-                        None => {
-                            debug!("chunk {:?} has disappeared, aborting search", slab.chunk);
-                            return true;
-                        }
-                        Some(c) => c,
-                    };
+            let changed_slabs = {
+                debug_assert!(reusable_hashset.is_empty());
+                reusable_hashset.extend(slabs); // dedupe because parallel edges exist
+                reusable_hashset
+                    .drain()
+                    .filter(|slab| {
+                        let chunk = match self.find_chunk_with_pos(slab.chunk) {
+                            None => {
+                                debug!("chunk {:?} has disappeared, aborting search", slab.chunk);
+                                return true;
+                            }
+                            Some(c) => c,
+                        };
 
-                    match chunk.slab_availability(slab.slab) {
-                        SlabAvailability::NotRequested => false,
-                        SlabAvailability::InProgress => {
-                            debug!("slab {:?} is in progress, aborting search", slab.slab);
-                            true
+                        match chunk.slab_availability(slab.slab) {
+                            SlabAvailability::NotRequested => false,
+                            SlabAvailability::InProgress => {
+                                debug!("slab {:?} is in progress, aborting search", slab.slab);
+                                true
+                            }
+                            SlabAvailability::Present(t) => start_time <= t,
                         }
-                        SlabAvailability::Present(t) => start_time <= t,
-                    }
-                })
-                .collect::<SmallVec<_>>();
+                    })
+                    .collect::<SmallVec<_>>()
+            };
 
             if !changed_slabs.is_empty() {
                 return Ok(Either::Right(changed_slabs));
             }
 
+            let mut rng = match &dst {
+                Destination::Target { .. } => None,
+                Destination::Random { rng, .. } => Some(rng),
+            };
             for (a, edge) in filtered_edges {
                 let next = edge.other_node();
                 if ctx.visited.is_visited(&next) {
                     continue;
                 }
 
-                let mut next_score = node_score + edge_cost(edge);
+                let mut next_score =
+                    node_score + edge_cost(edge, rng.map(|rc| rc.borrow_mut()).as_deref_mut());
                 match ctx.scores.entry(next) {
                     Occupied(ent) => {
                         let old_score = *ent.get();
@@ -1177,20 +1325,22 @@ impl<C: WorldContext> World<C> {
             PathExistsEndpoint::Area(a) => a,
         };
 
-        let dst = match dst {
+        let (tgt, area) = match dst {
             PathExistsEndpoint::Point(dst) => {
                 match World::resolve_area(self_, dst, ResolveAreaType::Target(goal), requirement) {
                     Ok(ResolvedArea::WaitForSlab(_)) => return PathExistsResult::Loading,
-                    Ok(ResolvedArea::Found { area, new_pos }) => (new_pos.centred(), area),
+                    Ok(ResolvedArea::Found { area, new_pos }) => (new_pos, area),
                     Err(_) => return PathExistsResult::No,
                 }
             }
             PathExistsEndpoint::Area(a) => {
                 // just use any point within area
                 let pos = self_.borrow().lookup_area_info(a).unwrap(); // just resolved
-                (pos.min_pos(a).floored(), a)
+                (pos.min_pos(a), a)
             }
         };
+
+        let dst = ResolvedPathDestination::Specific(tgt, area);
 
         let w = self_.borrow();
         // TODO use a shitter heuristic?

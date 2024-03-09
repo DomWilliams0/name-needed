@@ -98,6 +98,7 @@ pub struct ExplorationFilter(pub Box<dyn (Fn(WorldPosition) -> ExplorationResult
 
 // only used on main thread by synchronous systems
 unsafe impl Send for ExplorationFilter {}
+
 unsafe impl Sync for ExplorationFilter {}
 
 pub enum ExplorationResult {
@@ -634,21 +635,44 @@ impl<C: WorldContext> World<C> {
             // choose random area
             let (a, ai) = chunk.iter_areas_with_info().choose(random)?;
 
-            // take random point in this area
-            let centre = ai.random_world_point(a.slice(), chunk.pos(), random);
-
-            // ensure adjacent areas can hold us
-            let bounds_here = requirement.max_rotated_aabb(centre);
-
-            does_entity_fit_in_area(
-                &bounds_here,
-                requirement,
-                self,
+            self.random_accessible_point_in_area(
+                3,
+                ai,
                 a.to_world_area(chunk.pos()),
-                false,
+                requirement,
+                random,
             )
-            .then_some(centre)
+            .ok()
         })
+    }
+
+    /// Returns Err(doesn't actually fit) if none found
+    pub fn random_accessible_point_in_area(
+        &self,
+        max_attempts: usize,
+        area_info: AreaInfo,
+        area: WorldAreaV2,
+        req: NavRequirement,
+        random: &mut dyn RngCore,
+    ) -> Result<WorldPoint, WorldPoint> {
+        let slice = area.chunk_area.slice();
+        let chunk = area.chunk_idx;
+        let mut first_attempted = None;
+        assert!(max_attempts > 0);
+        (0..max_attempts)
+            .find_map(|_| {
+                // take random point in this area
+                let centre = area_info.random_world_point(slice, chunk, random);
+                if first_attempted.is_none() {
+                    first_attempted = Some(centre);
+                }
+
+                // ensure adjacent areas can hold us
+                let bounds_here = req.max_rotated_aabb(centre);
+
+                does_entity_fit_in_area(&bounds_here, req, self, area, false).then_some(centre)
+            })
+            .ok_or_else(|| first_attempted.unwrap())
     }
 
     pub fn choose_random_accessible_block(
@@ -951,7 +975,7 @@ impl ListeningLoadNotifier {
                     if !(filter.acceptable_states() & state).is_empty()
                         && filter.accept_slab(slab) =>
                 {
-                    break WaitResult::Success(slab)
+                    break WaitResult::Success(slab);
                 }
                 Ok(_) => { /* keep waiting */ }
             }
@@ -1425,7 +1449,7 @@ mod tests {
         assert_eq!(
             w.find_accessible_block_in_column_with_range(
                 (4, 4, 8).into(),
-                Some(GlobalSliceIndex::new(7))
+                Some(GlobalSliceIndex::new(7)),
             ),
             Some((4, 4, 7).into())
         );
@@ -1446,7 +1470,7 @@ mod tests {
         assert_eq!(
             w.find_accessible_block_in_column_with_range(
                 (10, 10, 20).into(),
-                Some(GlobalSliceIndex::new(8))
+                Some(GlobalSliceIndex::new(8)),
             ),
             None
         );

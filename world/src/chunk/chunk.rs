@@ -22,7 +22,10 @@ use crate::navigation::BlockGraph;
 use crate::navigationv2::{is_border, ChunkArea, NavRequirement, SlabArea, SlabNavGraph};
 use crate::neighbour::NeighbourOffset;
 use crate::world::LoadNotifier;
-use crate::{BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2, WorldContext};
+use crate::{
+    does_entity_fit_in_area, BlockOcclusion, Slab, SliceRange, World, WorldArea, WorldAreaV2,
+    WorldContext,
+};
 
 pub type ChunkId = u64;
 
