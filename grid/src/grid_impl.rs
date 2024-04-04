@@ -15,6 +15,8 @@ pub trait GridImpl {
     const DIMS: [usize; 3];
     const FULL_SIZE: usize;
 
+    const SLICE_SIZE: usize = Self::DIMS[0] * Self::DIMS[1];
+
     fn array(&self) -> &[Self::Item];
     fn array_mut(&mut self) -> &mut [Self::Item];
 
@@ -84,16 +86,15 @@ pub trait GridImpl {
     }
 
     /// Vertical slice in z direction
-    fn slice_range(&self, index: u32) -> (usize, usize) {
-        self.slice_range_multiple(index, index + 1)
+    fn slice_range(index: u32) -> (usize, usize) {
+        Self::slice_range_multiple(index, index + 1)
     }
 
     /// Vertical slices in z direction, [from..to)
-    fn slice_range_multiple(&self, from: u32, to: u32) -> (usize, usize) {
-        assert!(from < to);
+    fn slice_range_multiple(from: u32, to: u32) -> (usize, usize) {
+        debug_assert!(from < to);
 
-        let [xs, ys, _] = Self::DIMS;
-        let slice_count = (xs * ys) as u32;
+        let slice_count = Self::SLICE_SIZE as u32;
         let offset = from * slice_count;
         let n = to - from; // asserted to>from above
         (
@@ -147,6 +148,11 @@ impl<I: GridImpl> Grid<I> {
     pub fn unflatten<C: CoordType>(index: usize) -> Option<C> {
         I::unflatten(index)
     }
+
+    pub fn from_iter(items: impl Iterator<Item = I::Item>) -> Self {
+        let inner = I::from_iter(items);
+        Self(inner)
+    }
 }
 
 // should use safe Option-returning version instead
@@ -182,24 +188,23 @@ impl<G: GridImpl> std::ops::IndexMut<Range<usize>> for Grid<G> {
 impl<G: GridImpl> GridImplExt for G {
     /// The grid may be too big for the stack, build directly on the heap
     fn default_boxed() -> Box<Self> {
-        let vec = (0..G::FULL_SIZE)
+        let boxed = (0..G::FULL_SIZE)
             .map(|_| Default::default())
-            .collect::<Vec<G::Item>>();
+            .collect::<Box<[G::Item]>>();
 
         // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
         unsafe {
-            let raw_slice = Box::into_raw(vec.into_boxed_slice());
+            let raw_slice = Box::into_raw(boxed);
             Box::from_raw(raw_slice as *mut Self)
         }
     }
 
     fn from_iter<T: IntoIterator<Item = G::Item>>(iter: T) -> Box<Self> {
-        let vec: Vec<G::Item> = iter.into_iter().collect();
-        assert_eq!(vec.len(), G::FULL_SIZE, "grid iterator is wrong length");
+        let slice: Box<[G::Item]> = iter.into_iter().take(G::FULL_SIZE).collect();
+        assert_eq!(slice.len(), G::FULL_SIZE, "grid iterator is wrong length");
 
         // safety: pointer comes from Box::into_raw and self is #[repr(transparent)]
         unsafe {
-            let slice = vec.into_boxed_slice();
             let raw_slice = Box::into_raw(slice);
             Box::from_raw(raw_slice as *mut Self)
         }

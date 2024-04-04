@@ -26,6 +26,7 @@ pub struct Intelligence<C: Context> {
 
     last_action: Cell<C::Action>,
 
+    // TODO can this be moved to storage outside of ai? in ecs it should be stored in another component
     /// Only populated during thinking
     decision_progress: Option<DecisionProgress<C>>,
 }

@@ -2,80 +2,88 @@ use misc::derive_more::*;
 use misc::*;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::num::NonZeroU8;
 
 use crate::world::{SlabIndex, SLAB_SIZE};
+use misc::num_traits::{CheckedAdd, CheckedSub, One};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A slice in the world
-pub type GlobalSliceIndex = SliceIndex<Chunk>;
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub struct GlobalSliceIndex(i32);
 
-/// A slice in a single slab
-pub type LocalSliceIndex = SliceIndex<Slab>;
-
-pub trait SliceIndexScale {
-    /// Must be valid
-    const MIN: i32;
-    /// Must be valid
-    const MAX: i32;
+/// A slice in a slab
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub struct LocalSliceIndex {
+    /// Real value +1
+    inner_biased: NonZeroU8,
 }
 
-/// A slice in the world
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Chunk;
+pub trait SliceIndex: Sized {
+    type Inner: Copy + CheckedAdd + CheckedSub + One + Ord;
+    const MIN: Self::Inner;
+    const MAX: Self::Inner;
 
-/// A slice in a single slab
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Slab;
-
-impl SliceIndexScale for Chunk {
-    const MIN: i32 = i32::MIN;
-    const MAX: i32 = i32::MAX;
-}
-
-impl SliceIndexScale for Slab {
-    const MIN: i32 = 0;
-    const MAX: i32 = SLAB_SIZE.as_i32() - 1;
-}
-
-/// A slice of blocks in a chunk, z coordinate
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Into, From)]
-pub struct SliceIndex<S: SliceIndexScale>(i32, PhantomData<S>);
-
-/// Slice index in range 0..MAX, so a single z+1 operation is infallible
-#[derive(Copy, Clone)]
-pub struct LocalSliceIndexBelowTop(LocalSliceIndex);
-
-impl<S: SliceIndexScale> SliceIndex<S> {
-    pub fn abs(mut self) -> Self {
-        self.0 = self.0.abs();
-        self
+    /// Last valid slice index
+    fn top() -> Self {
+        Self::new_srsly_unchecked(Self::MAX)
+    }
+    fn bottom() -> Self {
+        Self::new_srsly_unchecked(Self::MIN)
     }
 
-    #[inline]
-    pub fn slice(self) -> i32 {
+    fn slice(self) -> Self::Inner;
+
+    fn new_srsly_unchecked(slice: Self::Inner) -> Self;
+
+    fn above(self) -> Option<Self> {
+        self.slice()
+            .checked_add(&Self::Inner::one())
+            .and_then(|s| (s <= Self::top().slice()).then(|| Self::new_srsly_unchecked(s)))
+    }
+
+    fn below(self) -> Option<Self> {
+        self.slice()
+            .checked_sub(&Self::Inner::one())
+            .and_then(|s| (s >= Self::bottom().slice()).then(|| Self::new_srsly_unchecked(s)))
+    }
+}
+
+impl SliceIndex for GlobalSliceIndex {
+    type Inner = i32;
+    const MIN: Self::Inner = i32::MIN;
+    const MAX: Self::Inner = i32::MAX;
+
+    fn slice(self) -> Self::Inner {
         self.0
     }
 
-    fn new_srsly_unchecked(slice: i32) -> Self {
-        Self(slice, PhantomData)
-    }
-
-    /// Last valid slice index
-    pub fn top() -> Self {
-        Self::new_srsly_unchecked(S::MAX)
-    }
-    pub fn bottom() -> Self {
-        Self::new_srsly_unchecked(S::MIN)
-    }
-
-    pub fn range() -> impl Iterator<Item = Self> {
-        (S::MIN..=S::MAX).map(Self::new_srsly_unchecked)
+    #[inline]
+    fn new_srsly_unchecked(slice: Self::Inner) -> Self {
+        Self(slice)
     }
 }
 
-impl SliceIndex<Chunk> {
+impl SliceIndex for LocalSliceIndex {
+    type Inner = u8;
+    const MIN: Self::Inner = 0;
+    const MAX: Self::Inner = SLAB_SIZE.as_u8() - 1;
+
+    fn slice(self) -> Self::Inner {
+        self.get()
+    }
+    #[inline]
+    fn new_srsly_unchecked(slice: Self::Inner) -> Self {
+        Self {
+            inner_biased: unsafe { NonZeroU8::new_unchecked(slice + 1) },
+        }
+    }
+}
+
+impl GlobalSliceIndex {
+    pub const MAX: Self = GlobalSliceIndex(i32::MAX);
     pub fn new(slice: i32) -> Self {
-        Self::new_srsly_unchecked(slice)
+        Self(slice)
     }
 
     pub fn to_local(self) -> LocalSliceIndex {
@@ -86,46 +94,74 @@ impl SliceIndex<Chunk> {
             idx += SLAB_SIZE.as_i32();
         }
 
-        LocalSliceIndex::new_unchecked(idx)
+        LocalSliceIndex::new_srsly_unchecked(idx as u8)
     }
 
     pub fn slab_index(self) -> SlabIndex {
         SlabIndex(self.slice().div_euclid(SLAB_SIZE.as_i32()))
     }
+
+    pub fn abs(self) -> Self {
+        Self(self.0.abs())
+    }
 }
 
-impl SliceIndex<Slab> {
+impl LocalSliceIndex {
     /// None if out of range for scale
-    pub fn new(slice: i32) -> Option<Self> {
-        let range = Slab::MIN..=Slab::MAX;
-        range.contains(&slice).then(|| Self(slice, PhantomData))
+    pub fn new(slice: impl TryInto<u8>) -> Option<Self> {
+        slice.try_into().ok().and_then(|s| {
+            (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX)
+                .contains(&s)
+                .then_some(Self::new_srsly_unchecked(s))
+        })
     }
 
     /// Panics if out of range for scale
-    pub fn new_unchecked(slice: i32) -> Self {
+    pub fn new_unchecked(slice: impl TryInto<u8> + Display + Copy) -> Self {
         Self::new(slice).unwrap_or_else(|| panic!("slice {} is invalid for its scale", slice))
+    }
+
+    fn get(&self) -> u8 {
+        self.inner_biased.get() - 1
     }
 
     pub fn to_global(self, slab: SlabIndex) -> GlobalSliceIndex {
         let z_offset = slab * SLAB_SIZE;
-        GlobalSliceIndex::new(z_offset.as_i32() + self.0)
+        GlobalSliceIndex(z_offset.as_i32() + self.get() as i32)
     }
 
     /// All slices 0..=SLAB_SIZE-1
-    pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator {
-        (Slab::MIN..=Slab::MAX).map(|i| Self(i, PhantomData))
+    pub fn slices() -> impl Iterator<Item = Self> + DoubleEndedIterator + ExactSizeIterator {
+        (0..SLAB_SIZE.as_u8()).map(Self::new_srsly_unchecked)
     }
     /// All slices except the last, 0..=SLAB_SIZE-2
     pub fn slices_except_last() -> impl Iterator<Item = LocalSliceIndexBelowTop> + ExactSizeIterator
     {
-        (Slab::MIN..Slab::MAX).map(|i| LocalSliceIndexBelowTop(Self(i, PhantomData)))
+        (0..SLAB_SIZE.as_u8() - 1).map(|s| LocalSliceIndexBelowTop(Self::new_srsly_unchecked(s)))
     }
 
-    pub fn slice_unsigned(&self) -> u32 {
-        debug_assert!(self.0 >= 0);
-        self.0 as u32
+    pub fn slice_unsigned(self) -> u32 {
+        self.get() as u32
+    }
+
+    pub fn range() -> impl Iterator<Item = Self> {
+        (<Self as SliceIndex>::MIN..=<Self as SliceIndex>::MAX).map(Self::new_srsly_unchecked)
+    }
+
+    pub fn second_from_bottom() -> Self {
+        Self::new_srsly_unchecked(1)
     }
 }
+
+impl Display for LocalSliceIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get())
+    }
+}
+
+/// Slice index in range 0..MAX, so a single z+1 operation is infallible
+#[derive(Copy, Clone)]
+pub struct LocalSliceIndexBelowTop(LocalSliceIndex);
 
 impl LocalSliceIndexBelowTop {
     pub fn current(self) -> LocalSliceIndex {
@@ -133,8 +169,8 @@ impl LocalSliceIndexBelowTop {
     }
 
     pub fn above(self) -> LocalSliceIndex {
-        let above = (self.0).0 + 1;
-        debug_assert!(above <= Slab::MAX);
+        let above = (self.0).get() + 1;
+        debug_assert!(above < SLAB_SIZE.as_u8());
         SliceIndex::new_srsly_unchecked(above)
     }
 }
@@ -144,7 +180,7 @@ impl Add<i32> for GlobalSliceIndex {
     type Output = Self;
 
     fn add(self, rhs: i32) -> Self::Output {
-        Self::new_srsly_unchecked(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }
 
@@ -182,20 +218,27 @@ impl From<i32> for GlobalSliceIndex {
     }
 }
 
-impl From<SliceIndex<Chunk>> for SlabIndex {
-    fn from(slice: SliceIndex<Chunk>) -> Self {
+impl From<GlobalSliceIndex> for SlabIndex {
+    fn from(slice: GlobalSliceIndex) -> Self {
         slice.slab_index()
     }
 }
 
-impl Debug for SliceIndex<Chunk> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("GlobalSliceIndex").field(&self.0).finish()
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Debug for SliceIndex<Slab> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("LocalSliceIndex").field(&self.0).finish()
+    #[test]
+    fn sz() {
+        assert_eq!(std::mem::size_of::<GlobalSliceIndex>(), 4);
+        assert_eq!(std::mem::size_of::<LocalSliceIndex>(), 1);
+    }
+
+    #[test]
+    fn raw_value() {
+        let x = LocalSliceIndex::new_unchecked(0);
+        assert_eq!(x.slice_unsigned(), 0);
+        assert_eq!(x.slice(), 0);
+        assert_eq!(x.to_global(SlabIndex(2)).slice(), 2 * SLAB_SIZE.as_i32());
     }
 }

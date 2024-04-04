@@ -44,6 +44,11 @@ impl SlabIndex {
         (bottom, top)
     }
 
+    pub fn contains_slice(self, slice: GlobalSliceIndex) -> bool {
+        let (from, to) = self.slice_range();
+        (from..to).contains(&slice)
+    }
+
     pub fn try_add(self, dz: i32) -> Option<Self> {
         self.0.checked_add(dz).map(Self)
     }
@@ -82,7 +87,7 @@ slog_kv_debug!(SlabIndex, "slab");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::world::SLAB_SIZE;
+    use crate::world::{SliceIndex, SLAB_SIZE};
 
     fn check(slab: i32, slice: i32) {
         let slab = SlabIndex(slab);

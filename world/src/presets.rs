@@ -1,11 +1,10 @@
-use std::iter::once;
+use std::iter::{once, repeat};
 
 use misc::*;
-use unit::world::CHUNK_SIZE;
+use unit::world::{CHUNK_SIZE, SLAB_SIZE};
 
-use crate::chunk::ChunkBuilder;
+use crate::chunk::{ChunkBuilder, WorldBuilder};
 use crate::loader::MemoryTerrainSource;
-#[cfg(test)]
 use crate::ChunkDescriptor;
 use crate::{BlockType, WorldContext};
 
@@ -18,6 +17,11 @@ pub fn from_preset<C: WorldContext>(preset: &str, rng: &mut dyn RngCore) -> Memo
         "flatlands" => flat_lands(),
         "bottleneck" => bottleneck(rng),
         "stairs" => stairs(),
+        "fatstairs" => fat_stairs(),
+        "fuckystairs" => fucky_stairs(),
+        "ring" => ring_preset(),
+        "doors" => doors_preset(),
+        "chessboard" => chessboard_preset(),
         _ => unreachable!("unknown preset"),
     }
 }
@@ -57,7 +61,21 @@ pub fn multi_chunk_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
             .build((2, 0)),
     ];
 
-    MemoryTerrainSource::from_chunks(chunks.into_iter())
+    let mut builder = WorldBuilder::with_chunks(chunks.into_iter());
+
+    // "trees"
+    /*    for _ in 0..40 {
+            let x = thread_rng().gen_range(-CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2);
+            let y = thread_rng().gen_range(-CHUNK_SIZE.as_i32(), CHUNK_SIZE.as_i32() * 2);
+
+            builder = builder.fill_range(
+                (x, y, 0),
+                (x, y, 10),
+                *C::PRESET_TYPES.choose(&mut thread_rng()).unwrap(),
+            );
+        }
+    */
+    MemoryTerrainSource::from_chunks(builder.build())
         .expect("hardcoded world preset is wrong??!!1!")
 }
 
@@ -131,10 +149,31 @@ pub fn one_block_wonder<C: WorldContext>() -> MemoryTerrainSource<C> {
         .expect("hardcoded world preset is wrong??!!1!")
 }
 
+pub fn chessboard_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let a = ChunkBuilder::new()
+        .fill_slice(4, C::PRESET_TYPES[0])
+        .fill_slice(5, C::PRESET_TYPES[1])
+        .fill_slice(6, C::PRESET_TYPES[2])
+        .fill_range((0, 0, 12), (15, 15, 12), |(x, y, z)| {
+            if x.checked_add(y).and_then(|i| i.checked_rem(2)) == Some(0) {
+                C::PRESET_TYPES[0]
+            } else {
+                BlockType::AIR
+            }
+        })
+        .build((0, 0));
+    let b = ChunkBuilder::new().build((0, 1));
+
+    let chunks = vec![a, b];
+
+    MemoryTerrainSource::from_chunks(chunks.into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
+}
+
 /// Multiple flat chunks at z=0
 pub fn flat_lands<C: WorldContext>() -> MemoryTerrainSource<C> {
-    let chunks = (-2..4).flat_map(|x| {
-        (-2..2).map(move |y| {
+    let chunks = (-8..8).flat_map(|x| {
+        (-8..8).map(move |y| {
             ChunkBuilder::new()
                 .fill_slice(0, C::PRESET_TYPES[0])
                 .fill_slice(1, C::PRESET_TYPES[1])
@@ -166,10 +205,8 @@ pub fn bottleneck<C: WorldContext>(rng: &mut dyn RngCore) -> MemoryTerrainSource
             .fill_range((0, half_y, 1), (CHUNK_SIZE.as_i32() - 1, half_y, 4), |_| {
                 C::PRESET_TYPES[0]
             })
-            .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| {
-                C::BlockType::AIR
-            })
-            // .fill_slice(-5, C::PRESET_TYPES[0])
+            .fill_range((hole, half_y, 1), (hole + 1, half_y, 4), |_| BlockType::AIR)
+            .fill_slice(-5, C::PRESET_TYPES[0])
             .build((0, i))
     });
 
@@ -180,7 +217,7 @@ pub fn bottleneck<C: WorldContext>(rng: &mut dyn RngCore) -> MemoryTerrainSource
 pub fn stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
     let mut chunk = ChunkBuilder::new();
 
-    const HEIGHT: i32 = 500;
+    const HEIGHT: i32 = 35;
 
     // 3x3 spiral
     const COORDS: [(i32, i32); 8] = [
@@ -210,7 +247,63 @@ pub fn stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
         .expect("hardcoded world preset is wrong??!!1!")
 }
 
-#[cfg(test)]
+pub fn fat_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let mut b = WorldBuilder::<C>::new();
+
+    let top = SLAB_SIZE.as_i32() - 1;
+
+    for (x, z) in (0..10).zip(top - 3..top + 5) {
+        let sz = 6;
+        b = b.fill_range(
+            (x * sz, 0, z),
+            ((x + 1) * sz, 20, z),
+            C::PRESET_TYPES[(x % 3) as usize],
+        );
+    }
+
+    MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
+}
+
+pub fn fucky_stairs<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let mut b = WorldBuilder::<C>::new();
+
+    let z_range = -6..SLAB_SIZE.as_i32() * 3;
+
+    let mut bt = C::PRESET_TYPES.into_iter().cycle();
+    for y in z_range.clone() {
+        let block = bt.next().unwrap();
+        for xz in z_range.clone() {
+            b = b
+                .set((xz, y, xz + y), block)
+                .set((xz, y + 1, xz + y), block)
+                .set((xz + 1, y, xz + y), block)
+        }
+    }
+
+    MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
+}
+
+pub fn doors_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    let mut b = WorldBuilder::<C>::new();
+    b = b.fill_range((-20, -20, 0), (5, 5, 1), C::PRESET_TYPES[0])
+        .fill_range((-2, -20, 1), (-4, 5, 4), C::PRESET_TYPES[1]) // short wall
+        .fill_range((-7, -3, 2), (1, -3, 4), BlockType::AIR) // 1 wide tunnel
+        .fill_range((-7, 0, 2), (1, 2, 4), BlockType::AIR) // 3 wide tunnel
+        .fill_range((-14, -20, 1), (-16, 5, 15), C::PRESET_TYPES[2])// second taller wall
+        .fill_range((-14, -6, 2), (-16, -3, 2), BlockType::AIR) // 4 wide but 1 tall tunnel
+        .fill_range((-14, -8, 2), (-16, -10, 3), BlockType::AIR) // 3 wide and 2 tall tunnel
+        .fill_range((-14, -12, 3), (-16, -14, 5), BlockType::AIR) // 3 wide and 3 tall
+        .fill_range((-14, -17, 3), (-16, -19, 7), BlockType::AIR) // 3 wide and 5 tall
+    ;
+
+    MemoryTerrainSource::from_chunks(b.build()).expect("hardcoded world preset is wrong??!!1!")
+}
+
+pub fn ring_preset<C: WorldContext>() -> MemoryTerrainSource<C> {
+    MemoryTerrainSource::from_chunks(ring().into_iter())
+        .expect("hardcoded world preset is wrong??!!1!")
+}
+
 pub fn ring<C: WorldContext>() -> Vec<ChunkDescriptor<C>> {
     let fill_except_outline = |z| {
         ChunkBuilder::new().fill_range(
@@ -233,6 +326,7 @@ pub fn ring<C: WorldContext>() -> Vec<ChunkDescriptor<C>> {
         fill_except_outline(300)
             .set_block((3, CHUNK_SIZE.as_i32() - 1, 300), C::PRESET_TYPES[2]) /* north bridge */
             .set_block((0, 3, 300), C::PRESET_TYPES[2]) /* west bridge */
+            .set_block((0, 0, 300), C::PRESET_TYPES[1]) /* ground for camera to centre on... */
             .build((0, 0)),
         // bottom left
         fill_except_outline(301)

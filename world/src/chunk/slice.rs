@@ -29,6 +29,12 @@ pub struct SliceOwned<C: WorldContext> {
     slice: Box<[Block<C>; SLICE_SIZE]>,
 }
 
+pub trait IndexableSlice<C: WorldContext> {
+    // can't use normal Index trait because it's auto implemented for references, and we need the
+    // manual impl
+    fn index(&self, pos: SliceBlock) -> &Block<C>;
+}
+
 impl<'a, C: WorldContext> Slice<'a, C> {
     pub fn new(slice: &'a [Block<C>]) -> Self {
         Self { slice }
@@ -89,6 +95,12 @@ impl<'a, C: WorldContext> Slice<'a, C> {
 
     pub fn into_iter(self) -> impl Iterator<Item = &'a Block<C>> {
         self.slice.iter()
+    }
+}
+
+impl<C: WorldContext> IndexableSlice<C> for Slice<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
     }
 }
 
@@ -162,6 +174,18 @@ impl<'a, C: WorldContext> SliceMut<'a, C> {
     }
 }
 
+impl<C: WorldContext> IndexableSlice<C> for SliceMut<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
+    }
+}
+
+impl<C: WorldContext> IndexableSlice<C> for &SliceMut<'_, C> {
+    fn index(&self, pos: SliceBlock) -> &Block<C> {
+        &self[pos]
+    }
+}
+
 impl<C: WorldContext> Deref for SliceMut<'_, C> {
     type Target = [Block<C>];
 
@@ -201,7 +225,6 @@ impl<I: Into<SliceBlock>, C: WorldContext> IndexMut<I> for SliceMut<'_, C> {
     }
 }
 
-// TODO make not pub
 pub fn unflatten_index(index: usize) -> SliceBlock {
     SliceBlock::new_unchecked(
         (index % CHUNK_SIZE.as_usize()) as BlockCoord,
@@ -209,7 +232,7 @@ pub fn unflatten_index(index: usize) -> SliceBlock {
     )
 }
 
-fn flatten_coords(block: SliceBlock) -> usize {
+pub fn flatten_coords(block: SliceBlock) -> usize {
     let (x, y) = block.xy();
     ((y * CHUNK_SIZE.as_block_coord()) + x) as usize
 }

@@ -2,18 +2,14 @@ use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Sub};
 
-use misc::{NotNan, Point3, Vector2, Vector3};
+use misc::{NotNan, Vec2, Vec3};
 
 use crate::space::view::ViewPoint;
-use crate::world::{GlobalSliceIndex, WorldPosition, BLOCKS_PER_METRE};
+use crate::world::{GlobalSliceIndex, SliceIndex, WorldPosition, BLOCKS_PER_METRE};
 
-/// A point anywhere in the world. All possible non-NaN and finite values are valid
+/// A point anywhere in the world, in block terms. All possible non-NaN and finite values are valid
 #[derive(Copy, Clone, PartialEq, Default, PartialOrd, Hash, Ord)]
 pub struct WorldPoint(NotNan<f32>, NotNan<f32>, NotNan<f32>);
-
-#[deprecated(note = "camera is not 2d anymore")]
-#[derive(Copy, Clone)]
-pub struct WorldPoint2d(NotNan<f32>, NotNan<f32>);
 
 #[inline]
 fn not_nan(x: f32) -> Option<NotNan<f32>> {
@@ -49,8 +45,19 @@ impl WorldPoint {
         Self::new(x, y, z).unwrap_or_else(|| panic!("bad coords {:?}", (x, y, z)))
     }
 
+    pub fn new_really_unchecked(x: f32, y: f32, z: f32) -> Self {
+        debug_assert!(x.is_finite() && y.is_finite() && z.is_finite());
+        unsafe {
+            Self(
+                NotNan::new_unchecked(x),
+                NotNan::new_unchecked(y),
+                NotNan::new_unchecked(z),
+            )
+        }
+    }
+
     pub fn slice(&self) -> GlobalSliceIndex {
-        GlobalSliceIndex::new(self.z() as i32)
+        GlobalSliceIndex::new(self.z().floor() as i32)
     }
 
     pub fn floored(&self) -> Self {
@@ -101,9 +108,20 @@ impl WorldPoint {
         (self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)
     }
 
+    /// z only
+    pub fn distance_ver(&self, other: impl Into<Self>) -> f32 {
+        let other = other.into();
+        (self.2 - other.2).abs()
+    }
+
     #[inline]
     pub fn xyz(&self) -> (f32, f32, f32) {
         (self.x(), self.y(), self.z())
+    }
+
+    #[inline]
+    pub fn xy(&self) -> (f32, f32) {
+        (self.x(), self.y())
     }
 
     #[inline]
@@ -143,41 +161,31 @@ impl WorldPoint {
     }
 }
 
-impl WorldPoint2d {
-    /// None if any coord is not finite
-    pub fn new_checked(x: f32, y: f32) -> Option<Self> {
-        match (not_nan(x), not_nan(y)) {
-            (Some(x), Some(y)) => Some(Self(x, y)),
-            _ => None,
-        }
-    }
+#[derive(Copy, Clone)]
+pub struct ZOffset(pub f32);
 
-    pub fn new(x: NotNan<f32>, y: NotNan<f32>) -> Self {
-        Self(x, y)
-    }
+impl Add<ZOffset> for WorldPoint {
+    type Output = Self;
 
-    pub fn into_world_point(self, z: NotNan<f32>) -> WorldPoint {
-        WorldPoint(self.0, self.1, z)
-    }
-
-    #[inline]
-    pub fn x(self) -> f32 {
-        self.0.into_inner()
-    }
-
-    #[inline]
-    pub fn y(self) -> f32 {
-        self.1.into_inner()
+    fn add(mut self, rhs: ZOffset) -> Self::Output {
+        self.2 += rhs.0;
+        self
     }
 }
 
-impl From<WorldPoint> for Vector3 {
+impl From<WorldPoint> for Vec3 {
     fn from(p: WorldPoint) -> Self {
-        Vector3 {
+        Vec3 {
             x: p.x(),
             y: p.y(),
             z: p.z(),
         }
+    }
+}
+
+impl From<WorldPoint> for [f32; 2] {
+    fn from(p: WorldPoint) -> Self {
+        [p.x(), p.y()]
     }
 }
 
@@ -187,26 +195,16 @@ impl From<(NotNan<f32>, NotNan<f32>, NotNan<f32>)> for WorldPoint {
     }
 }
 
-impl From<WorldPoint> for Vector2 {
+impl From<WorldPoint> for Vec2 {
     fn from(p: WorldPoint) -> Self {
-        Vector2 { x: p.x(), y: p.y() }
+        Vec2 { x: p.x(), y: p.y() }
     }
 }
 
-impl From<WorldPoint> for Point3 {
-    fn from(p: WorldPoint) -> Self {
-        Point3 {
-            x: p.x(),
-            y: p.y(),
-            z: p.z(),
-        }
-    }
-}
-
-impl TryFrom<Vector3> for WorldPoint {
+impl TryFrom<Vec3> for WorldPoint {
     type Error = ();
 
-    fn try_from(vec: Vector3) -> Result<Self, Self::Error> {
+    fn try_from(vec: Vec3) -> Result<Self, Self::Error> {
         Self::new(vec.x, vec.y, vec.z).ok_or(())
     }
 }
@@ -217,8 +215,8 @@ impl From<WorldPosition> for WorldPoint {
     }
 }
 
-impl AddAssign<Vector2> for WorldPoint {
-    fn add_assign(&mut self, rhs: Vector2) {
+impl AddAssign<Vec2> for WorldPoint {
+    fn add_assign(&mut self, rhs: Vec2) {
         self.0 += rhs.x;
         self.1 += rhs.y;
     }
@@ -246,10 +244,10 @@ impl From<WorldPoint> for (f32, f32, f32) {
     }
 }
 
-impl Add<Vector2> for WorldPoint {
+impl Add<Vec2> for WorldPoint {
     type Output = Self;
 
-    fn add(self, rhs: Vector2) -> Self::Output {
+    fn add(self, rhs: Vec2) -> Self::Output {
         Self(self.0 + rhs.x, self.1 + rhs.y, self.2)
     }
 }
@@ -269,6 +267,17 @@ impl TryFrom<&[f32]> for WorldPoint {
     }
 }
 
+impl TryFrom<&[f32; 3]> for WorldPoint {
+    type Error = ();
+
+    fn try_from(slice: &[f32; 3]) -> Result<Self, Self::Error> {
+        let x = slice[0];
+        let y = slice[1];
+        let z = slice[2];
+        WorldPoint::new(x, y, z).ok_or(())
+    }
+}
+
 impl Add<GlobalSliceIndex> for WorldPoint {
     type Output = Self;
 
@@ -281,6 +290,14 @@ impl Add<(f32, f32, f32)> for WorldPoint {
     type Output = Self;
 
     fn add(self, (x, y, z): (f32, f32, f32)) -> Self::Output {
+        Self(self.0 + x, self.1 + y, self.2 + z)
+    }
+}
+
+impl Add<[f32; 3]> for WorldPoint {
+    type Output = Self;
+
+    fn add(self, [x, y, z]: [f32; 3]) -> Self::Output {
         Self(self.0 + x, self.1 + y, self.2 + z)
     }
 }
@@ -314,7 +331,7 @@ impl From<ViewPoint> for WorldPoint {
 
         // safety: guaranteed valid coords from viewpoint
         unsafe {
-            const SCALE: f32 = BLOCKS_PER_METRE as f32;
+            const SCALE: f32 = BLOCKS_PER_METRE.as_f32();
             new_xyz(x * SCALE, y * SCALE, z * SCALE)
         }
     }

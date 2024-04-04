@@ -2,16 +2,19 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Add;
 
 use misc::derive_more::*;
+use misc::glam::IVec2;
 use misc::*;
 
 use crate::space::view::ViewPoint;
-use crate::world::{GlobalSliceIndex, WorldPoint, BLOCKS_SCALE};
+use crate::world::{GlobalSliceIndex, SliceIndex, WorldPoint, BLOCKS_SCALE};
 
 /// A block anywhere in the world. All possible values are valid
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Into, From, PartialOrd, Ord)]
 pub struct WorldPosition(pub i32, pub i32, pub GlobalSliceIndex);
 
 impl WorldPosition {
+    pub const MAX: Self = Self(i32::MAX, i32::MAX, GlobalSliceIndex::MAX);
+
     pub fn new(x: i32, y: i32, z: GlobalSliceIndex) -> Self {
         Self(x, y, z)
     }
@@ -28,6 +31,10 @@ impl WorldPosition {
         )
     }
 
+    pub fn floored(self) -> WorldPoint {
+        WorldPoint::new_unchecked(self.0 as f32, self.1 as f32, self.2.slice() as f32)
+    }
+
     pub fn below(self) -> WorldPosition {
         Self(self.0, self.1, self.2 - 1)
     }
@@ -41,6 +48,10 @@ impl WorldPosition {
         (self.0 - other.0).pow(2)
             + (self.1 - other.1).pow(2)
             + (self.2.slice() - other.2.slice()).pow(2)
+    }
+
+    pub fn xy(&self) -> (i32, i32) {
+        (self.0, self.1)
     }
 }
 
@@ -59,6 +70,12 @@ impl Debug for WorldPosition {
 impl From<(i32, i32, i32)> for WorldPosition {
     fn from((x, y, z): (i32, i32, i32)) -> Self {
         Self(x, y, GlobalSliceIndex::new(z))
+    }
+}
+
+impl From<((i32, i32), GlobalSliceIndex)> for WorldPosition {
+    fn from(((x, y), z): ((i32, i32), GlobalSliceIndex)) -> Self {
+        Self(x, y, z)
     }
 }
 
@@ -88,13 +105,11 @@ impl Add<(i32, i32, i32)> for WorldPosition {
     }
 }
 
-impl From<&WorldPosition> for Point3 {
-    fn from(pos: &WorldPosition) -> Self {
-        Self {
-            x: pos.0 as f32,
-            y: pos.1 as f32,
-            z: pos.2.slice() as f32,
-        }
+impl Add<IVec2> for WorldPosition {
+    type Output = WorldPosition;
+
+    fn add(self, vec: IVec2) -> Self::Output {
+        WorldPosition(self.0 + vec.x, self.1 + vec.y, self.2)
     }
 }
 

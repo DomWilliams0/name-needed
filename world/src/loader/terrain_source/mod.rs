@@ -31,9 +31,6 @@ pub enum TerrainSourceError {
     #[error("Requested block {0} is out of bounds")]
     BlockOutOfBounds(WorldPosition),
 
-    #[error("Received signal to bail")]
-    Bailed,
-
     #[error("Async task failed to complete: {0}")]
     Async(#[from] tokio::task::JoinError),
 }
@@ -41,7 +38,7 @@ pub enum TerrainSourceError {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub enum TerrainSource<C: WorldContext> {
-    Memory(Arc<RwLock<MemoryTerrainSource<C>>>),
+    Memory(Arc<MemoryTerrainSource<C>>),
     #[cfg(feature = "worldprocgen")]
     Generated(C::GeneratedTerrainSource),
 }
@@ -56,7 +53,7 @@ pub struct GeneratedSlab<C: WorldContext> {
 
 impl<C: WorldContext> From<MemoryTerrainSource<C>> for TerrainSource<C> {
     fn from(src: MemoryTerrainSource<C>) -> Self {
-        Self::Memory(Arc::new(RwLock::new(src)))
+        Self::Memory(Arc::new(src))
     }
 }
 
@@ -74,10 +71,7 @@ impl<C: WorldContext> TerrainSource<C> {
         slab: SlabLocation,
     ) -> Result<GeneratedSlab<C>, TerrainSourceError> {
         match self {
-            TerrainSource::Memory(src) => src
-                .read()
-                .get_slab_copy(slab)
-                .map(GeneratedSlab::with_terrain),
+            TerrainSource::Memory(src) => src.get_slab_copy(slab).map(GeneratedSlab::with_terrain),
             #[cfg(feature = "worldprocgen")]
             TerrainSource::Generated(src) => {
                 // TODO handle wrapping of slabs around planet boundaries
@@ -94,7 +88,7 @@ impl<C: WorldContext> TerrainSource<C> {
         block: WorldPosition,
     ) -> Result<GlobalSliceIndex, TerrainSourceError> {
         match self {
-            TerrainSource::Memory(src) => src.read().get_ground_level(block),
+            TerrainSource::Memory(src) => src.get_ground_level(block),
             #[cfg(feature = "worldprocgen")]
             TerrainSource::Generated(src) => src
                 .find_ground_level(block)
@@ -144,6 +138,14 @@ impl<C: WorldContext> TerrainSource<C> {
             }
         }
     }
+
+    pub fn world_boundary(&self) -> (ChunkLocation, ChunkLocation) {
+        match self {
+            TerrainSource::Memory(src) => src.world_bounds(),
+            #[cfg(feature = "worldprocgen")]
+            TerrainSource::Generated(_) => (ChunkLocation(0, 0), ChunkLocation::MAX), // planet chunks dont go negative
+        }
+    }
 }
 
 impl<C: WorldContext> GeneratedSlab<C> {
@@ -159,7 +161,7 @@ impl<C: WorldContext> GeneratedSlab<C> {
 mod tests {
     use std::iter::once;
 
-    use crate::chunk::RawChunkTerrain;
+    use crate::chunk::SlabStorage;
     use crate::helpers::DummyWorldContext;
     use crate::loader::terrain_source::memory::MemoryTerrainSource;
 
@@ -173,7 +175,7 @@ mod tests {
 
         let random = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
             (5, 5),
-            RawChunkTerrain::default(),
+            SlabStorage::default(),
         )));
         assert!(matches!(
             random.err().unwrap(),
@@ -185,7 +187,7 @@ mod tests {
     fn bounds() {
         let just_one = MemoryTerrainSource::<DummyWorldContext>::from_chunks(once((
             (0, 0),
-            RawChunkTerrain::default(),
+            SlabStorage::default(),
         )))
         .unwrap();
         assert_eq!(
@@ -194,7 +196,7 @@ mod tests {
         );
 
         // cheap check to tests bounds
-        assert!(!just_one.is_in_bounds(ChunkLocation(1, 1).get_slab(0)));
+        assert!(!just_one.is_in_bounds(ChunkLocation(1, 1)));
 
         // make sure impl fails too
         assert!(just_one.get_slab_copy(SlabLocation::new(0, (0, 0))).is_ok());
@@ -205,11 +207,11 @@ mod tests {
         ));
         let sparse = MemoryTerrainSource::<DummyWorldContext>::from_chunks(
             vec![
-                ((0, 0), RawChunkTerrain::default()),
-                ((2, 5), RawChunkTerrain::default()),
-                ((1, 6), RawChunkTerrain::default()),
-                ((-5, -4), RawChunkTerrain::default()),
-                ((-8, -2), RawChunkTerrain::default()),
+                ((0, 0), SlabStorage::default()),
+                ((2, 5), SlabStorage::default()),
+                ((1, 6), SlabStorage::default()),
+                ((-5, -4), SlabStorage::default()),
+                ((-8, -2), SlabStorage::default()),
             ]
             .into_iter(),
         )

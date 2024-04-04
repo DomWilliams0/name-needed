@@ -1,16 +1,18 @@
 use crate::block::{Block, BlockDurability, BlockOpacity};
+use crate::chunk::slab::SlabGridImpl;
 pub use crate::chunk::slice::SLICE_SIZE;
 use crate::loader::{GeneratedSlab, WorldTerrainUpdate};
 use async_trait::async_trait;
+use futures::future::BoxFuture;
 use misc::Derivative;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
+use std::sync::Arc;
+use unit::world::{ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPoint, WorldPosition};
 
 pub trait WorldContext: 'static + Send + Sync + Sized {
-    type AssociatedBlockData;
     type BlockType: BlockType;
 
     type GeneratedTerrainSource: GeneratedTerrainSource<Self> + Send + Sync;
@@ -19,8 +21,29 @@ pub trait WorldContext: 'static + Send + Sync + Sized {
 
     fn air_slice() -> &'static [Block<Self>; SLICE_SIZE];
 
+    fn all_air() -> Arc<SlabGridImpl<Self>>;
+    fn all_stone() -> Arc<SlabGridImpl<Self>>;
+
     // non-air, solid, walkable blocks to use in presets
     const PRESET_TYPES: [Self::BlockType; 3];
+
+    fn slab_grid_of_all(bt: Self::BlockType) -> Arc<SlabGridImpl<Self>> {
+        let g = crate::SlabGrid::from_iter(std::iter::repeat(Block::with_block_type(bt)));
+        let boxed = g.into_boxed_impl();
+        Arc::from(boxed)
+    }
+
+    type SearchToken: SearchToken;
+}
+
+pub trait SearchToken: Debug + Clone + Send + Sync + misc::slog::KV {
+    fn get_updated_search_source(&self) -> BoxFuture<UpdatedSearchSource>;
+}
+
+pub enum UpdatedSearchSource {
+    Unchanged,
+    New(WorldPoint),
+    Abort,
 }
 
 /// Panics in all methods

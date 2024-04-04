@@ -17,13 +17,34 @@ nd_iter = "0.0"
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 tokio = { version = "1.0", default-features = false, features = ["time", "rt", "rt-multi-thread", "sync"] }
 async-trait = "0.1"
+array-init = "2.1"
+bitbybit = "1.1"
+arbitrary-int = "1.2"
+ahash = "0.8"
+md-5 = "0.10"
+strum = { version = "0.19", features = ["derive"] }
+crossbeam = "0.8"
+spiral = "0.2"
+enumflags2 = "0.7"
+slice-group-by = "0.3"
+arc-swap = "1.6"
+
+backtrace = { version = "0.3", optional = true }
+
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [features]
+default = ["log-lock-delay", "debug-accessibility"]
 worldprocgen = []
+log-lock-delay = ["backtrace"]
+debug-accessibility = ["serde", "serde_json", "misc/serde"]
 
 [dev-dependencies]
 criterion = "0.3"
 num_cpus = "1.13"
+rstest = "0.17"
+
 
 [[bench]]
 name = "terrain"

@@ -1,12 +1,16 @@
 use misc::*;
 
+use crate::loader::WorldLoader;
 use crate::mesh::BaseVertex;
 use crate::{mesh, InnerWorldRef, WorldContext, WorldRef};
+use futures::FutureExt;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, RangeInclusive};
+use std::time::{Duration, Instant};
 use unit::world::{
-    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition,
+    all_slabs_in_range, ChunkLocation, GlobalSliceIndex, SlabIndex, SlabLocation, SliceIndex,
+    WorldPosition,
 };
 
 #[derive(Clone)]
@@ -14,8 +18,11 @@ pub struct WorldViewer<C: WorldContext> {
     world: WorldRef<C>,
     view_range: SliceRange,
     chunk_range: (ChunkLocation, ChunkLocation),
-    clean_slabs: HashSet<SlabLocation>,
+    clean_chunks: HashSet<ChunkLocation>,
     requested_slabs: Vec<SlabLocation>,
+
+    /// Any slabs in this set will not be requested again
+    all_requested_slabs: HashSet<SlabLocation>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -72,6 +79,10 @@ impl SliceRange {
         self.as_range().contains(&slice.slice())
     }
 
+    pub fn intersects(self, (from, to): (GlobalSliceIndex, GlobalSliceIndex)) -> bool {
+        self.1 >= from && to >= self.0
+    }
+
     pub const fn bottom(self) -> GlobalSliceIndex {
         self.0
     }
@@ -84,6 +95,12 @@ impl SliceRange {
         self.0.slice()..=self.1.slice()
     }
 
+    pub fn slabs(self) -> impl Iterator<Item = SlabIndex> {
+        self.as_range()
+            .map(|slice| GlobalSliceIndex::new(slice).slab_index())
+            .dedup()
+    }
+
     pub fn size(self) -> u32 {
         (self.1.slice() - self.0.slice()) as u32
     }
@@ -91,7 +108,7 @@ impl SliceRange {
 
 impl Display for SliceRange {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{} => {}]", self.0.slice(), self.1.slice())
+        write!(f, "{}:{}", self.0.slice(), self.1.slice())
     }
 }
 
@@ -132,13 +149,21 @@ impl<C: WorldContext> WorldViewer<C> {
 
         info!("positioning world viewer at {:?}", view_range);
 
+        // track already loaded or requested slabs
+        let mut all_requested_slabs = HashSet::with_capacity(1024);
+        all_requested_slabs.extend(world.borrow().all_chunks().flat_map(|c| {
+            c.iter_slabs()
+                .map((|(slab, _)| SlabLocation::new(slab, c.pos())))
+        }));
+
         let initial_chunk = ChunkLocation::from(initial_block);
         Ok(Self {
             world,
             view_range,
             chunk_range: (initial_chunk, initial_chunk), // TODO is this ok?
-            clean_slabs: HashSet::with_capacity(128),
+            clean_chunks: HashSet::with_capacity(128),
             requested_slabs: Vec::with_capacity(128),
+            all_requested_slabs,
         })
     }
 
@@ -146,29 +171,46 @@ impl<C: WorldContext> WorldViewer<C> {
         &mut self,
         mut f: F,
     ) {
+        let _span = misc::tracy_client::span!();
+
         let range = self.terrain_range();
         let world = self.world.borrow();
 
+        let mut start_time = Instant::now();
+        const MAX_TIME: Duration = Duration::from_millis(85);
+
+        let mut done = 0usize;
+        let mut done_chunks = vec![];
+        // TODO generate these concurrently instead of blocking main thread?
         for dirty_chunk in self
-            .visible_slabs(range)
-            .filter_map(|slab| self.is_slab_dirty(&slab).then_some(slab.chunk))
-            .dedup()
+            .visible_chunks_spiral()
+            .filter(|chunk| self.is_chunk_dirty(*chunk))
             .filter_map(|chunk| world.find_chunk_with_pos(chunk))
         {
-            // TODO do mesh generation on a worker thread? or just do this bit in a parallel iter
             let mesh = mesh::make_simple_render_mesh(dirty_chunk, range);
-            trace!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
+            debug!("chunk mesh has {count} vertices", count = mesh.len(); dirty_chunk.pos());
             f(dirty_chunk.pos(), mesh);
-        }
 
+            done_chunks.push(dirty_chunk.pos());
+            if start_time.elapsed() >= MAX_TIME {
+                break;
+            }
+        }
         drop(world);
 
-        self.clean_slabs.extend(self.visible_slabs(range));
+        if !done_chunks.is_empty() {
+            debug!(
+                "regenerated {} chunk meshes in {}ms",
+                done_chunks.len(),
+                start_time.elapsed().as_millis()
+            );
+            self.clean_chunks.extend(done_chunks.into_iter());
+        }
     }
 
     fn invalidate_meshes(&mut self) {
         // TODO slice-aware chunk mesh caching, moving around shouldn't regen meshes constantly
-        self.clean_slabs.clear();
+        self.clean_chunks.clear();
     }
 
     fn update_range(&mut self, new_range: SliceRange, wat: &str) {
@@ -223,6 +265,15 @@ impl<C: WorldContext> WorldViewer<C> {
             .map(|(x, y)| ChunkLocation(x, y))
     }
 
+    pub fn visible_chunks_spiral(&self) -> impl Iterator<Item = ChunkLocation> {
+        let (min, max) = self.chunk_range;
+        let (centre_x, centre_y) = ((min.0 + max.0) / 2, (min.1 + max.1) / 2);
+        let (w, h) = (max.0 - min.0, max.1 - min.1);
+
+        spiral::ChebyshevIterator::new(centre_x, centre_y, w.max(h))
+            .map(|(x, y)| ChunkLocation(x, y))
+    }
+
     pub fn visible_slabs(&self, range: SliceRange) -> impl Iterator<Item = SlabLocation> {
         let (bottom_slab, top_slab) = (range.bottom().slab_index(), range.top().slab_index());
         let (bottom_chunk, top_chunk) = self.chunk_range;
@@ -231,10 +282,6 @@ impl<C: WorldContext> WorldViewer<C> {
         let to = SlabLocation::new(top_slab, top_chunk);
         let (slabs, _) = all_slabs_in_range(from, to);
         slabs
-    }
-
-    pub fn world(&self) -> InnerWorldRef<C> {
-        self.world.borrow()
     }
 
     /// Slice range for terrain rendering
@@ -273,15 +320,16 @@ impl<C: WorldContext> WorldViewer<C> {
         self.chunk_range
     }
 
-    fn is_slab_dirty(&self, slab: &SlabLocation) -> bool {
-        !self.clean_slabs.contains(slab)
+    fn is_chunk_dirty(&self, chunk: ChunkLocation) -> bool {
+        !self.clean_chunks.contains(&chunk)
     }
 
-    pub fn mark_dirty(&mut self, slab: SlabLocation) {
-        self.clean_slabs.remove(&slab);
+    pub fn mark_dirty(&mut self, chunk: ChunkLocation) {
+        self.clean_chunks.remove(&chunk);
     }
 
-    /// Returns deduped and sorted by chunk+slab, inner vec is cleared on ret value drop
+    /// Returns deduped and unrequested, sorted by chunk+slab. Call `consume` when requested to clear out the
+    /// requested ones.
     pub fn requested_slabs(
         &mut self,
         extras: impl Iterator<Item = SlabLocation>,
@@ -295,35 +343,42 @@ impl<C: WorldContext> WorldViewer<C> {
         self.requested_slabs
             .sort_unstable_by(|a, b| a.chunk.cmp(&b.chunk).then_with(|| a.slab.cmp(&b.slab)));
         self.requested_slabs.dedup();
-
-        // filter down any already loaded slabs
-        let world = self.world.borrow();
-        world.retain_slabs_to_load(&mut self.requested_slabs);
-        drop(world);
+        self.requested_slabs
+            .retain(|s| !self.all_requested_slabs.contains(s));
 
         if len_before > 0 {
-            // FIXME tepmorary
-            //debug!(
-            //    "filtered {unfiltered} slab requests down to {filtered}",
-            //    unfiltered = len_before,
-            //    filtered = self.requested_slabs.len()
-            //);
+            debug!(
+                "filtered {unfiltered} slab requests down to {filtered}",
+                unfiltered = len_before,
+                filtered = self.requested_slabs.len()
+            );
+        }
 
+        if !self.requested_slabs.is_empty() {
             trace!("slab requests"; "slabs" => ?self.requested_slabs);
+
+            self.all_requested_slabs
+                .extend(self.requested_slabs.iter().copied());
         }
 
         RequestedSlabs(&mut self.requested_slabs)
     }
 }
 
-impl Drop for RequestedSlabs<'_> {
-    fn drop(&mut self) {
-        self.0.clear();
+impl RequestedSlabs<'_> {
+    pub fn consume(self, n: usize) {
+        let _ = self.0.drain(0..n);
     }
 }
 
 impl AsRef<[SlabLocation]> for RequestedSlabs<'_> {
     fn as_ref(&self) -> &[SlabLocation] {
         self.0
+    }
+}
+
+impl RequestedSlabs<'_> {
+    pub fn filter(&mut self, pred: impl Fn(SlabLocation) -> bool) {
+        self.0.retain(|s| pred(*s));
     }
 }

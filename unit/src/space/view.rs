@@ -1,7 +1,7 @@
 use misc::derive_more::*;
+use misc::{Vec2, Vec3};
 
 use crate::world::{WorldPoint, BLOCKS_SCALE};
-use misc::{Point2, Vector3};
 use std::convert::TryFrom;
 
 /// A point anywhere in the world, in meters
@@ -24,15 +24,23 @@ impl ViewPoint {
         Self::new(x, y, z).unwrap_or_else(|| panic!("bad coords {:?}", (x, y, z)))
     }
 
+    pub fn new_arr([x, y, z]: [f32; 3]) -> Option<Self> {
+        Self::new(x, y, z)
+    }
+
     pub const fn xyz(&self) -> (f32, f32, f32) {
         (self.0, self.1, self.2)
     }
+
+    pub const fn xyz_arr(&self) -> [f32; 3] {
+        [self.0, self.1, self.2]
+    }
 }
 
-impl TryFrom<Point2> for ViewPoint {
+impl TryFrom<Vec2> for ViewPoint {
     type Error = ();
 
-    fn try_from(point: Point2) -> Result<Self, Self::Error> {
+    fn try_from(point: Vec2) -> Result<Self, Self::Error> {
         Self::new(point.x, point.y, 0.0).ok_or(())
     }
 }
@@ -45,7 +53,7 @@ impl From<WorldPoint> for ViewPoint {
     }
 }
 
-impl From<ViewPoint> for Vector3 {
+impl From<ViewPoint> for Vec3 {
     fn from(v: ViewPoint) -> Self {
         Self::new(v.0, v.1, v.2)
     }

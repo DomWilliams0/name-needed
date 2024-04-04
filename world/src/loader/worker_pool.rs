@@ -3,34 +3,24 @@ use std::time::Duration;
 use misc::*;
 use unit::world::SlabLocation;
 
-use crate::loader::finalizer::SlabFinalizer;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::{OcclusionChunkUpdate, WorldContext, WorldRef};
+use crate::{WorldContext, WorldRef};
 
-use crate::loader::loading::LoadedSlab;
 use futures::channel::mpsc as async_channel;
 use futures::{SinkExt, StreamExt};
 
+use futures::executor::block_on;
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-pub type LoadTerrainResult<C> = Result<LoadedSlab<C>, TerrainSourceError>;
-
 pub struct AsyncWorkerPool {
-    pool: tokio::runtime::Runtime,
-    success_rx: async_channel::UnboundedReceiver<Result<SlabLocation, TerrainSourceError>>,
-    success_tx: async_channel::UnboundedSender<Result<SlabLocation, TerrainSourceError>>,
+    pool: Runtime,
 }
 
 impl AsyncWorkerPool {
-    /// Spawns no threads, only runs on current thread
-    pub fn new_blocking() -> Result<Self, futures::io::Error> {
-        Self::with_rt_builder(tokio::runtime::Builder::new_current_thread())
-    }
-
     /// Runs tasks on a thread pool
     pub fn new(threads: usize) -> Result<Self, futures::io::Error> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
@@ -43,107 +33,8 @@ impl AsyncWorkerPool {
     }
 
     fn with_rt_builder(mut builder: tokio::runtime::Builder) -> Result<Self, futures::io::Error> {
-        let (success_tx, success_rx) = async_channel::unbounded();
         let pool = builder.enable_time().build()?;
-        Ok(Self {
-            pool,
-            success_rx,
-            success_tx,
-        })
-    }
-
-    pub fn start_finalizer<C: WorldContext>(
-        &mut self,
-        world: WorldRef<C>,
-        mut finalize_rx: async_channel::Receiver<LoadTerrainResult<C>>,
-        chunk_updates_tx: async_channel::UnboundedSender<OcclusionChunkUpdate>,
-    ) {
-        let mut success_tx = self.success_tx.clone();
-
-        let fut = async move {
-            let mut finalizer = SlabFinalizer::new(world, chunk_updates_tx);
-
-            while let Some(result) = finalize_rx.next().await {
-                let result = match result {
-                    Err(e) => {
-                        error!("failed to load requested slab"; "error" => %e);
-                        Err(e)
-                    }
-                    Ok(result) => {
-                        let slab = result.slab;
-                        finalizer.finalize(result).await;
-                        Ok(slab)
-                    }
-                };
-
-                if let Err(e) = success_tx.send(result).await {
-                    error!("failed to report finalized terrain result"; "error" => %e);
-                    // trace!("lost result"; "result" => ?e.0);
-                }
-            }
-
-            // TODO detect this as an error condition?
-            info!("terrain finalizer thread exiting")
-        };
-
-        #[cfg(test)]
-        {
-            // tests use a single thread which is required for WorldRef::into_inner to work,
-            // so run finalizer on the same runtime
-            self.pool.spawn(fut);
-        }
-
-        #[cfg(not(test))]
-        {
-            // prioritize finalizer thread over other workers by running on a separate OS thread
-            std::thread::Builder::new()
-                .name("wlrd-finalize".to_owned())
-                .spawn(move || futures::executor::block_on(fut))
-                .expect("failed to start finalizer thread");
-        }
-    }
-
-    pub fn block_on_next_finalize(
-        &mut self,
-        timeout: Duration,
-    ) -> Option<Result<SlabLocation, TerrainSourceError>> {
-        let pool = &self.pool;
-        let rx = &mut self.success_rx;
-        pool.block_on(async {
-            let future = rx.next();
-            tokio::time::timeout(timeout, future)
-                .await
-                .unwrap_or_default()
-        })
-    }
-
-    pub fn submit_async<C: WorldContext>(
-        &mut self,
-        task: impl Future<Output = LoadTerrainResult<C>> + Send + 'static,
-        done_channel: async_channel::Sender<LoadTerrainResult<C>>,
-    ) {
-        self.pool.spawn(async move {
-            let result = task.await;
-            Self::send_result(done_channel, result).await;
-        });
-    }
-
-    pub fn submit_any_async_with_handle<R: Send + 'static>(
-        &self,
-        task: impl Future<Output = R> + Send + 'static,
-    ) -> JoinHandle<R> {
-        self.pool.spawn(async move { task.await })
-    }
-
-    async fn send_result<C: WorldContext>(
-        mut done_channel: async_channel::Sender<LoadTerrainResult<C>>,
-        result: LoadTerrainResult<C>,
-    ) {
-        // terrain has been processed in isolation on worker thread, now post to
-        // finalization thread
-        if let Err(e) = done_channel.send(result).await {
-            error!("failed to send terrain result to finalizer"; "error" => %e);
-        }
+        Ok(Self { pool })
     }
 
     pub fn runtime(&self) -> &Runtime {

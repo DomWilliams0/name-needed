@@ -1,45 +1,30 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use misc::*;
 use unit::world::{BlockPosition, ChunkLocation, GlobalSliceIndex, SlabLocation, WorldPosition};
 
 use crate::chunk::slab::Slab;
-use crate::chunk::RawChunkTerrain;
+use crate::chunk::SlabStorage;
 use crate::loader::terrain_source::TerrainSourceError;
-use crate::{BaseTerrain, BlockType, WorldContext};
+use crate::{BlockType, WorldContext};
 
 /// Used for testing
 pub struct MemoryTerrainSource<C: WorldContext> {
-    chunk_map: HashMap<ChunkLocation, RawChunkTerrain<C>>,
+    chunk_map: BTreeMap<ChunkLocation, SlabStorage<C>>,
     bounds: (ChunkLocation, ChunkLocation),
+    initial_load_blacklist: HashSet<SlabLocation>,
 }
 
 impl<C: WorldContext> MemoryTerrainSource<C> {
-    pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, RawChunkTerrain<C>)>>(
+    pub fn from_chunks<P: Into<ChunkLocation>, T: Into<(P, SlabStorage<C>)>>(
         chunks: impl Iterator<Item = T>,
     ) -> Result<Self, TerrainSourceError> {
-        let size = chunks.size_hint().1.unwrap_or(8);
-        let mut chunk_map = HashMap::with_capacity(size);
+        // let size = chunks.size_hint().1.unwrap_or(8);
+        let mut chunk_map = BTreeMap::new();
 
         for it in chunks {
             let (chunk, terrain) = it.into();
             let chunk = chunk.into();
-
-            // assert placeholder slabs are really placeholders
-            if cfg!(debug_assertions) {
-                for (slab, idx) in terrain.slabs_from_bottom() {
-                    if slab.is_placeholder() {
-                        for (_, slice) in slab.slices_from_bottom() {
-                            assert!(
-                                slice.all_blocks_are(C::BlockType::AIR),
-                                "non air blocks in \"placeholder\" slab {:?}",
-                                SlabLocation::new(idx, chunk)
-                            );
-                        }
-                    }
-                }
-            }
-
             if chunk_map.insert(chunk, terrain).is_some() {
                 return Err(TerrainSourceError::Duplicate(chunk));
             }
@@ -65,14 +50,25 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
             _ => (ChunkLocation(0, 0), ChunkLocation(0, 0)),
         };
 
-        Ok(Self { chunk_map, bounds })
+        Ok(Self {
+            chunk_map,
+            bounds,
+            initial_load_blacklist: Default::default(),
+        })
     }
 
-    pub fn all_slabs(&self) -> impl Iterator<Item = SlabLocation> + '_ {
-        self.chunk_map.iter().flat_map(|(chunk, terrain)| {
-            let (min, max) = terrain.slab_range();
-            (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
-        })
+    pub fn blacklist_slab_on_initial_load(&mut self, slab: SlabLocation) {
+        self.initial_load_blacklist.insert(slab);
+    }
+
+    pub fn all_slabs(&self, apply_blacklist: bool) -> impl Iterator<Item = SlabLocation> + '_ {
+        self.chunk_map
+            .iter()
+            .flat_map(|(chunk, terrain)| {
+                let (min, max) = terrain.slab_range();
+                (min.as_i32()..=max.as_i32()).map(move |slab| chunk.get_slab(slab))
+            })
+            .filter(move |s| !apply_blacklist || !self.initial_load_blacklist.contains(s))
     }
 
     pub fn get_slab_copy(&self, slab: SlabLocation) -> Result<Slab<C>, TerrainSourceError> {
@@ -93,7 +89,7 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
             .get(&block.into())
             .and_then(|terrain| {
                 let block = BlockPosition::from(block);
-                terrain.find_ground_level(block.into(), None, None)
+                terrain.find_guessed_ground_level(block.into(), None, None)
             })
             .map(|block| block.z())
             .ok_or(TerrainSourceError::BlockOutOfBounds(block))
@@ -104,9 +100,8 @@ impl<C: WorldContext> MemoryTerrainSource<C> {
         self.bounds
     }
 
-    /// Checks chunk bounds only, assume infinite depth
-    pub fn is_in_bounds(&self, slab: SlabLocation) -> bool {
+    pub fn is_in_bounds(&self, chunk: ChunkLocation) -> bool {
         let (min, max) = self.bounds;
-        (min.0..=max.0).contains(&slab.chunk.0) && (min.1..=max.1).contains(&slab.chunk.1)
+        (min.0..=max.0).contains(&chunk.0) && (min.1..=max.1).contains(&chunk.1)
     }
 }

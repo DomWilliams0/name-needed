@@ -1,14 +1,15 @@
-pub use batch::UpdateBatch;
-pub use loading::{BlockForAllError, LoadedSlab, WorldLoader};
+pub use loading::{BlockForAllError, WorldLoader, WorldLoaderEvent};
 // #[cfg(feature = "worldprocgen")]
 // pub use {procgen::PlanetParams, terrain_source::GeneratedTerrainSource};
 
 pub use terrain_source::{GeneratedSlab, MemoryTerrainSource, TerrainSource, TerrainSourceError};
-pub use update::{GenericTerrainUpdate, SlabTerrainUpdate, WorldTerrainUpdate};
+pub use update::{
+    split_range_across_slabs, GenericTerrainUpdate, SlabTerrainUpdate, WorldTerrainUpdate,
+};
 pub use worker_pool::AsyncWorkerPool;
 
-mod batch;
-mod finalizer;
+pub use crate::chunk::slice_navmesh::{FreeVerticalSpace, SlabVerticalSpace};
+
 mod loading;
 mod terrain_source;
 mod update;
